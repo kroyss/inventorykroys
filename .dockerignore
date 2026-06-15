@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+!.env.production.example
+README.md
+*.md
+.vscode
+.idea
+.DS_Store
+npm-debug.log
+test-results
+playwright-report
+tests
+e2e
+coverage

@@ -1,0 +1,839 @@
+'use client'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
+import { int } from '@/components/ui'
+import { useEscape } from '@/components/ui/useEscape'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
+
+// ─── helpers ────────────────────────────────────────────────────
+const ML_ACCOUNTS: Record<Country, string[]> = {
+  VE: ['PIKEKE', 'SOLUCION-MC'],
+  CO: ['KROYS', 'VAPERK'],
+}
+
+function fmt(n: number) {
+  return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+interface VeRate { official: number; parallel: number; excess: number }
+
+// Cálculo de precios — paridad con el legacy.
+//  Precio base    = costo total × (1 + ganancia%)          (markup sobre costo)
+//  Precio sug. ML = precio base × (1 + exceso%)            (lo que publicas en VE)
+//  Precio final   = publicado × (1 − descuento%)
+//  Recibes (par.) = (final × oficial) ÷ paralelo           (al cambiar Bs a paralelo)
+function calcPrices(
+  baseCost: number, shippingCost: number, profitPct: number,
+  rate: VeRate | null, publishedOverride: number | undefined, discountPct = 0,
+) {
+  const totalCost     = baseCost + shippingCost
+  const basePriceUsd  = totalCost * (1 + profitPct / 100)
+  const excessPct     = rate?.excess ?? 0
+  const suggestedMl   = basePriceUsd * (1 + excessPct / 100)
+  const publishedPriceUsd = publishedOverride ?? suggestedMl
+  const finalPriceUsd = publishedPriceUsd * (1 - discountPct / 100)
+
+  // VE (hay tasa con paralelo > oficial): descuento recomendado, USD real y margen
+  let recDiscount = 0, realUsd = finalPriceUsd, marginPct = 0
+  if (rate && rate.parallel > rate.official && rate.official > 0 && publishedPriceUsd > 0) {
+    recDiscount = Math.max(0, (1 - (basePriceUsd * 1.05 * rate.parallel) / (publishedPriceUsd * rate.official)) * 100)
+    realUsd     = (finalPriceUsd * rate.official) / rate.parallel
+    marginPct   = basePriceUsd > 0 ? (realUsd - basePriceUsd) / basePriceUsd * 100 : 0
+  }
+  return { totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd, recDiscount, realUsd, marginPct, excessPct }
+}
+
+// ─── types ──────────────────────────────────────────────────────
+interface FormState {
+  code: string
+  name: string
+  profit_category_id: number | null
+  base_cost: number
+  shipping_cost: number
+  published_price_usd: number
+  discount_percent: number
+  sale_price: number
+  ml_codes: MLCode[]
+}
+
+const emptyForm = (mlAccounts: string[]): FormState => ({
+  code: '',
+  name: '',
+  profit_category_id: null,
+  base_cost: 0,
+  shipping_cost: 0,
+  published_price_usd: 0,
+  discount_percent: 0,
+  sale_price: 0,
+  ml_codes: mlAccounts.map(a => ({ account: a, code: '' })),
+})
+
+// ─── component ──────────────────────────────────────────────────
+interface Props {
+  initialProducts:  Product[]
+  profitCategories: ProfitCategory[]
+  country:          Country
+}
+
+export default function ProductosClient({ initialProducts, profitCategories, country }: Props) {
+  const [products,  setProducts]  = useState<Product[]>(initialProducts)
+  const [search,    setSearch]    = useState('')
+  const [selected,  setSelected]  = useState<number[]>([])
+  const [batchCat,  setBatchCat]  = useState<number | null>(null)
+  const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
+  const [editId,    setEditId]    = useState<number | null>(null)
+  const [form,      setForm]      = useState<FormState>(emptyForm(ML_ACCOUNTS[country]))
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [okMsg,     setOkMsg]     = useState('')
+  const [mounted,   setMounted]   = useState(false)
+
+  const mlAccounts = ML_ACCOUNTS[country]
+  const confirm = useConfirm()
+
+  // Tasa VE (para exceso/descuento sugerido). Solo aplica en VE.
+  const [veRate, setVeRate] = useState<VeRate | null>(null)
+  useEffect(() => {
+    if (country !== 'VE') return
+    fetch('/api/rates/latest').then(r => r.json()).then(d => {
+      setVeRate({ official: d.official_rate, parallel: d.parallel_rate, excess: d.excess_percentage })
+    }).catch(() => {})
+  }, [country])
+
+  // derived calculator values
+  const selectedCat = profitCategories.find(c => c.id === form.profit_category_id)
+  const profitPct   = selectedCat?.profit_percentage ?? 0
+  const {
+    totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd,
+    recDiscount, realUsd, marginPct,
+  } = calcPrices(
+    // publicado = derivado del precio sugerido ML (no input suelto), igual que legacy
+    form.base_cost, form.shipping_cost, profitPct, veRate, undefined, form.discount_percent
+  )
+  const spread  = veRate && veRate.official > 0 ? (veRate.parallel - veRate.official) / veRate.official * 100 : 0
+  const priceBs = finalPriceUsd * (veRate?.official ?? 0)
+
+  // Open create modal when arriving via command palette (/productos?new=1)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('new') === '1') openCreate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // slide-over mount/unmount animation
+  useEffect(() => { if (modal) setMounted(true) }, [modal])
+  const closeModal = () => { setMounted(false); setTimeout(() => setModal(null), 180) }
+
+  // Esc closes the slide-over
+  useEscape(!!modal, closeModal)
+
+  // ── open create modal ──
+  async function openCreate() {
+    setError('')
+    const res  = await fetch('/api/products/next-code')
+    const data = await res.json()
+    setForm({ ...emptyForm(mlAccounts), code: data.next_code ?? data.code })
+    setEditId(null)
+    setModal('create')
+  }
+
+  // ── open edit modal ──
+  async function openEdit(id: number) {
+    setError('')
+    const res  = await fetch(`/api/products/${id}`)
+    const data = await res.json()
+    setForm({
+      code:               data.code,
+      name:               data.name,
+      profit_category_id: data.profit_category_id ?? null,
+      base_cost:          data.base_cost,
+      shipping_cost:      data.shipping_cost,
+      published_price_usd:data.published_price_usd,
+      discount_percent:   data.discount_percent,
+      sale_price:         data.sale_price,
+      ml_codes:           mlAccounts.map(a => ({
+        account: a,
+        code: (data.ml_codes as MLCode[]).find(m => m.account === a)?.code ?? '',
+      })),
+    })
+    setEditId(id)
+    setModal('edit')
+  }
+
+  // ── save (create or update) ──
+  const handleSave = useCallback(async (keepOpen = false) => {
+    setSaving(true)
+    setError(''); setOkMsg('')
+    try {
+      const payload = {
+        ...form,
+        base_price_usd:      basePriceUsd,
+        published_price_usd: publishedPriceUsd,
+        final_price_usd:     finalPriceUsd,
+        discount_percent:    form.discount_percent,
+        // El precio de inventario sigue al Precio Base.
+        sale_price:          basePriceUsd,
+      }
+
+      let res: Response
+      if (modal === 'create') {
+        res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      } else {
+        res = await fetch(`/api/products/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name:               form.name,
+            profit_category_id: form.profit_category_id,
+            base_cost:          form.base_cost,
+            shipping_cost:      form.shipping_cost,
+            base_price_usd:     basePriceUsd,
+            published_price_usd:publishedPriceUsd,
+            final_price_usd:    finalPriceUsd,
+            discount_percent:   form.discount_percent,
+            sale_price:         basePriceUsd,
+            ml_codes:           form.ml_codes.filter(m => m.code.trim()),
+          }),
+        })
+      }
+
+      if (!res.ok) {
+        const d = await res.json()
+        setError(d.error ?? 'Error al guardar')
+        return
+      }
+
+      // refresh product list
+      const listRes = await fetch('/api/products')
+      setProducts(await listRes.json())
+
+      if (keepOpen && modal === 'create') {
+        const created = form.code
+        // reset form + fetch next code for the following product
+        const codeRes = await fetch('/api/products/next-code')
+        const codeData = await codeRes.json()
+        setForm({ ...emptyForm(mlAccounts), code: codeData.next_code ?? codeData.code })
+        setOkMsg(`Producto ${created} creado. Listo para el siguiente.`)
+        setTimeout(() => setOkMsg(''), 3000)
+      } else {
+        closeModal()
+      }
+    } finally {
+      setSaving(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, modal, editId, basePriceUsd, publishedPriceUsd, finalPriceUsd, mlAccounts])
+
+  // ── status toggle / delete ──
+  async function handleStatus(id: number, action: 'activate' | 'deactivate' | 'delete') {
+    if (action === 'delete' && !await confirm({ title: 'Eliminar producto', message: 'Se eliminará permanentemente este producto. Esta acción no se puede deshacer.', confirmText: 'Eliminar', danger: true })) return
+    const res = await fetch(`/api/products/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    if (!res.ok) {
+      const d = await res.json()
+      alert(d.error ?? 'Error')
+      return
+    }
+    const listRes = await fetch('/api/products')
+    setProducts(await listRes.json())
+  }
+
+  // ── batch category ──
+  async function handleBatch() {
+    if (!batchCat || selected.length === 0) return
+    const res = await fetch('/api/products/batch-category', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_ids: selected, profit_category_id: batchCat }),
+    })
+    if (!res.ok) { alert('Error al actualizar categorías'); return }
+    const listRes = await fetch('/api/products')
+    setProducts(await listRes.json())
+    setSelected([])
+    setBatchCat(null)
+  }
+
+  function toggleSelect(id: number) {
+    setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+  }
+
+  function toggleAll(ids: number[]) {
+    setSelected(s => s.length === ids.length ? [] : ids)
+  }
+
+  // ── filtered + sorted list with client-side pagination ──
+  const PAGE_SIZE = 100
+  const [visible, setVisible] = useState(PAGE_SIZE)
+
+  type SortKey = 'code' | 'name' | 'category' | 'cost' | 'price' | 'margin' | 'stock' | 'status'
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(k); setSortDir('asc') }
+  }
+  const sortArrow = (k: SortKey) =>
+    sortKey === k ? <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span> : null
+
+  const filtered = useMemo(() => products.filter(p =>
+    !search ||
+    p.code.toLowerCase().includes(search.toLowerCase()) ||
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.category_name ?? '').toLowerCase().includes(search.toLowerCase())
+  ), [products, search])
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered
+    const margin = (p: Product) =>
+      p.final_price_usd > 0 && p.total_cost > 0
+        ? (p.final_price_usd - p.total_cost) / p.final_price_usd
+        : -1
+    const valueFor = (p: Product): number | string => {
+      switch (sortKey) {
+        case 'code':     return p.code
+        case 'name':     return p.name.toLowerCase()
+        case 'category': return p.category_name ?? '￿'
+        case 'cost':     return p.total_cost
+        case 'price':    return p.final_price_usd
+        case 'margin':   return margin(p)
+        case 'stock':    return p.quantity
+        case 'status':   return p.is_active ? 0 : 1
+      }
+    }
+    const arr = [...filtered].sort((a, b) => {
+      const va = valueFor(a), vb = valueFor(b)
+      if (typeof va === 'number' && typeof vb === 'number') return va - vb
+      return String(va).localeCompare(String(vb))
+    })
+    return sortDir === 'desc' ? arr.reverse() : arr
+  }, [filtered, sortKey, sortDir])
+
+  const isSearching = search.trim().length > 0
+  const displayed   = isSearching ? sorted : sorted.slice(0, visible)
+  const hasMore     = !isSearching && sorted.length > visible
+  const filteredIds = sorted.map(p => p.id)
+
+  // ── catalog KPIs ──
+  const kpis = {
+    total:       products.length,
+    activos:     products.filter(p => p.is_active).length,
+    inactivos:   products.filter(p => !p.is_active).length,
+    sinCat:      products.filter(p => p.is_active && !p.profit_category_id).length,
+    valor:       products.filter(p => p.is_active).reduce((s, p) => s + p.quantity * p.total_cost, 0),
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* KPI header */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {([
+          { label: 'Productos',     value: int(kpis.total),     accent: 'text-neutral-900' },
+          { label: 'Activos',       value: int(kpis.activos),   accent: 'text-green-600' },
+          { label: 'Inactivos',     value: int(kpis.inactivos), accent: kpis.inactivos > 0 ? 'text-neutral-400' : 'text-neutral-900' },
+          { label: 'Sin categoría', value: int(kpis.sinCat),    accent: kpis.sinCat > 0 ? 'text-orange-500' : 'text-neutral-900' },
+          { label: 'Valor catálogo (costo)', value: `$${fmt(kpis.valor)}`, accent: 'text-neutral-900' },
+        ]).map(c => (
+          <div key={c.label} className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+            <div className="text-xs text-neutral-500 mb-1">{c.label}</div>
+            <div className={`text-xl font-bold ${c.accent}`}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── header ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-bold text-neutral-900 mr-auto">Catálogo</h1>
+
+        {selected.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-neutral-500">{selected.length} seleccionados</span>
+            <select
+              value={batchCat ?? ''}
+              onChange={e => setBatchCat(Number(e.target.value) || null)}
+              className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+            >
+              <option value="">Cambiar categoría…</option>
+              {profitCategories.map(c => (
+                <option key={c.id} value={c.id}>{c.name} {c.profit_percentage}%</option>
+              ))}
+            </select>
+            <button
+              onClick={handleBatch}
+              disabled={!batchCat}
+              className="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 disabled:opacity-40"
+            >
+              Aplicar
+            </button>
+          </div>
+        )}
+
+        <input
+          type="search"
+          placeholder="Buscar…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-neutral-800"
+        />
+
+        <button
+          onClick={openCreate}
+          className="px-4 py-1.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700"
+        >
+          + Nuevo
+        </button>
+      </div>
+
+      {/* ── table (desktop) ── */}
+      <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+        <div className="overflow-x-auto hidden md:block">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-100 bg-neutral-50">
+                <th className="w-8 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={filteredIds.length > 0 && filteredIds.every(id => selected.includes(id))}
+                    onChange={() => toggleAll(filteredIds)}
+                    className="cursor-pointer"
+                  />
+                </th>
+                <th onClick={() => toggleSort('code')}
+                  className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Código{sortArrow('code')}
+                </th>
+                <th onClick={() => toggleSort('name')}
+                  className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Nombre{sortArrow('name')}
+                </th>
+                <th onClick={() => toggleSort('category')}
+                  className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Categoría{sortArrow('category')}
+                </th>
+                <th onClick={() => toggleSort('cost')}
+                  className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Costo{sortArrow('cost')}
+                </th>
+                <th onClick={() => toggleSort('price')}
+                  className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Precio{sortArrow('price')}
+                </th>
+                <th onClick={() => toggleSort('margin')}
+                  className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Margen{sortArrow('margin')}
+                </th>
+                <th onClick={() => toggleSort('stock')}
+                  className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Stock{sortArrow('stock')}
+                </th>
+                <th onClick={() => toggleSort('status')}
+                  className="px-3 py-2 text-center font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Estado{sortArrow('status')}
+                </th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-3 py-8 text-center text-neutral-400">
+                    {search ? 'Sin resultados' : 'No hay productos'}
+                  </td>
+                </tr>
+              )}
+              {displayed.map(p => (
+                <tr key={p.id} className="border-b border-neutral-50 hover:bg-neutral-50">
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-neutral-500">{p.code}</td>
+                  <td className="px-3 py-2 font-medium text-neutral-900">{p.name}</td>
+                  <td className="px-3 py-2">
+                    {p.category_name ? (
+                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">
+                        {p.category_name} {p.profit_percentage}%
+                      </span>
+                    ) : (
+                      <span className="text-neutral-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right text-neutral-600">${fmt(p.total_cost)}</td>
+                  <td className="px-3 py-2 text-right font-medium text-neutral-900">${fmt(p.final_price_usd)}</td>
+                  <td className="px-3 py-2 text-right">
+                    {p.final_price_usd > 0 && p.total_cost > 0 ? (
+                      <span className={`font-medium ${
+                        (p.final_price_usd - p.total_cost) / p.final_price_usd >= 0.4 ? 'text-green-600'
+                          : (p.final_price_usd - p.total_cost) / p.final_price_usd >= 0.2 ? 'text-amber-600'
+                          : 'text-red-600'
+                      }`}>
+                        {Math.round((p.final_price_usd - p.total_cost) / p.final_price_usd * 100)}%
+                      </span>
+                    ) : <span className="text-neutral-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right text-neutral-600">{p.quantity}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      p.is_active
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-neutral-100 text-neutral-400'
+                    }`}>
+                      {p.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1 justify-end">
+                      <button
+                        onClick={() => openEdit(p.id)}
+                        className="text-xs px-2 py-1 rounded hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate')}
+                        className="text-xs px-2 py-1 rounded hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900"
+                      >
+                        {p.is_active ? 'Desactivar' : 'Activar'}
+                      </button>
+                      <button
+                        onClick={() => handleStatus(p.id, 'delete')}
+                        className="text-xs px-2 py-1 rounded hover:bg-red-50 text-neutral-400 hover:text-red-600"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── cards (mobile) ── */}
+        <div className="md:hidden divide-y divide-neutral-100">
+          {filtered.length === 0 && (
+            <p className="px-3 py-8 text-center text-neutral-400">{search ? 'Sin resultados' : 'No hay productos'}</p>
+          )}
+          {displayed.map(p => {
+            const margin = p.final_price_usd > 0 && p.total_cost > 0
+              ? Math.round((p.final_price_usd - p.total_cost) / p.final_price_usd * 100)
+              : null
+            return (
+              <div key={p.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-mono text-xs text-neutral-400">{p.code}</div>
+                    <div className="font-medium text-neutral-900 truncate">{p.name}</div>
+                    {p.category_name && (
+                      <span className="inline-block mt-1 text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{p.category_name} {p.profit_percentage}%</span>
+                    )}
+                  </div>
+                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${p.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
+                    {p.is_active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 mt-2 text-sm">
+                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">${fmt(p.final_price_usd)}</span></span>
+                  {margin !== null && (
+                    <span className={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'}>{margin}%</span>
+                  )}
+                  <span className="text-neutral-500 ml-auto">Stock: <span className="font-medium text-neutral-900">{p.quantity}</span></span>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <button onClick={() => openEdit(p.id)} className="text-xs px-3 py-1 border border-neutral-200 rounded-lg text-neutral-600">Editar</button>
+                  <button onClick={() => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate')} className="text-xs px-3 py-1 border border-neutral-200 rounded-lg text-neutral-600">
+                    {p.is_active ? 'Desactivar' : 'Activar'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="px-3 py-2 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400">
+          <span>
+            Mostrando {displayed.length} de {filtered.length}
+            {filtered.length !== products.length && ` (${products.length} total)`}
+          </span>
+          {hasMore && (
+            <button
+              onClick={() => setVisible(v => v + PAGE_SIZE)}
+              className="px-3 py-1 text-xs bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700"
+            >
+              Cargar 100 más
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── slide-over ── */}
+      {modal && (
+        <div className="fixed inset-0 z-50">
+          <div className={`absolute inset-0 bg-black/30 transition-opacity duration-200 ${mounted ? 'opacity-100' : 'opacity-0'}`} onClick={closeModal} />
+          <div className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl flex flex-col transition-transform duration-200 ${mounted ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 shrink-0">
+              <h2 className="font-bold text-neutral-900">
+                {modal === 'create' ? 'Nuevo Producto' : 'Editar Producto'}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-neutral-400 hover:text-neutral-700 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4 flex-1 overflow-y-auto">
+              {okMsg && <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-sm">{okMsg}</div>}
+              {/* código + nombre */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Código</label>
+                  <input
+                    value={form.code}
+                    onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
+                    readOnly={modal === 'edit'}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm font-mono
+                               focus:outline-none focus:ring-2 focus:ring-neutral-800 read-only:bg-neutral-50 read-only:text-neutral-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Nombre</label>
+                  <input
+                    value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                  />
+                </div>
+              </div>
+
+              {/* ── Precios ── */}
+              <div className="border border-neutral-200 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Calculadora de precios</p>
+
+                {/* costo / envío / total */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Costo ($)</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={form.base_cost}
+                      onChange={e => setForm(f => ({ ...f, base_cost: Number(e.target.value) }))}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Envío ($)</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={form.shipping_cost}
+                      onChange={e => setForm(f => ({ ...f, shipping_cost: Number(e.target.value) }))}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">Total</label>
+                    <div className="w-full border border-neutral-200 bg-neutral-50 rounded-lg px-3 py-2 text-sm font-bold text-neutral-800">
+                      ${fmt(totalCost)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* categoría */}
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1">Categoría de ganancia</label>
+                  <select
+                    value={form.profit_category_id ?? ''}
+                    onChange={e => setForm(f => ({ ...f, profit_category_id: Number(e.target.value) || null }))}
+                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-neutral-800 bg-white"
+                  >
+                    <option value="">Sin categoría</option>
+                    {profitCategories.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.profit_percentage}%
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Precios calculados (organización estilo legacy) */}
+                <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3 space-y-3">
+                  <p className="text-sm font-semibold text-neutral-700">Precios calculados</p>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Costo Base */}
+                    <div className="bg-white border border-neutral-200 rounded-lg p-2.5">
+                      <p className="text-[11px] text-neutral-500">Costo Base (Costo + Envío)</p>
+                      <p className="text-lg font-bold text-neutral-800">${fmt(totalCost)}</p>
+                    </div>
+                    {/* Precio Base (tu precio real) */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                      <p className="text-[11px] text-blue-600 font-medium">Precio Base (tu precio real)</p>
+                      <p className="text-lg font-bold text-blue-700">${fmt(basePriceUsd)}</p>
+                      <p className="text-[10px] text-neutral-400">Costo Base × {(1 + profitPct / 100).toFixed(2)}</p>
+                    </div>
+
+                    {country === 'VE' && (
+                      <>
+                        {/* Precio Exceso ML */}
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+                          <p className="text-[11px] text-purple-600">Precio Exceso ML ({veRate?.excess ?? 0}%)</p>
+                          <p className="text-lg font-bold text-purple-700">${fmt(suggestedMl)}</p>
+                          <p className="text-[10px] text-neutral-400">Base × {(1 + (veRate?.excess ?? 0) / 100).toFixed(2)}</p>
+                        </div>
+                        {/* Tasas actuales */}
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                          <p className="text-[11px] text-amber-700 font-medium">Tasas actuales</p>
+                          <p className="text-[11px] text-neutral-600">Oficial: <b>Bs {fmt(veRate?.official ?? 0)}</b></p>
+                          <p className="text-[11px] text-neutral-600">Paralelo: <b>Bs {fmt(veRate?.parallel ?? 0)}</b></p>
+                          <p className="text-[11px] text-neutral-600">Spread: <b>{spread.toFixed(1)}%</b></p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {country === 'VE' ? (
+                    <>
+                      {/* Descuento ML */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-medium text-neutral-700">
+                            Descuento ML: <b>{form.discount_percent.toFixed(1)}%</b>
+                          </label>
+                          {recDiscount > 0 && (
+                            <button type="button"
+                              onClick={() => setForm(f => ({ ...f, discount_percent: Math.round(recDiscount * 10) / 10 }))}
+                              className="text-[11px] text-blue-600 hover:underline">
+                              Rec: {recDiscount.toFixed(1)}%
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 items-center">
+                          <input type="range" min="0" max="99" step="0.5"
+                            value={form.discount_percent}
+                            onChange={e => setForm(f => ({ ...f, discount_percent: Number(e.target.value) }))}
+                            className="col-span-3 accent-neutral-800" />
+                          <input type="number" min="0" max="99" step="0.5"
+                            value={form.discount_percent}
+                            onChange={e => setForm(f => ({ ...f, discount_percent: Number(e.target.value) }))}
+                            className="border border-neutral-300 rounded-lg px-2 py-1 text-sm text-center font-bold
+                                       focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+                        </div>
+                      </div>
+
+                      {/* Resultado */}
+                      <div className={`rounded-lg p-3 border-2 ${marginPct < 3 ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-400'}`}>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <p className="text-[11px] text-neutral-500">Precio ML (USD oficial)</p>
+                            <p className="text-base font-bold text-neutral-800">${fmt(finalPriceUsd)}</p>
+                            <p className="text-[10px] text-neutral-400">Bs {fmt(priceBs)}</p>
+                          </div>
+                          <div className="border-l border-r border-neutral-200 px-2">
+                            <p className="text-[11px] text-neutral-500">Lo que recibes (paralelo)</p>
+                            <p className="text-base font-bold text-green-700">${fmt(realUsd)}</p>
+                            <p className="text-[10px] text-neutral-400">Bs ÷ {(veRate?.parallel ?? 0).toFixed(0)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-neutral-500">Margen sobre base</p>
+                            <p className={`text-base font-bold ${marginPct >= 5 ? 'text-green-700' : marginPct >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                              {marginPct >= 0 ? '+' : ''}{marginPct.toFixed(1)}%
+                            </p>
+                            <p className={`text-[10px] ${marginPct >= 5 ? 'text-green-600' : marginPct >= 0 ? 'text-amber-500' : 'text-red-500'}`}>
+                              {marginPct >= 5 ? '✅ Seguro' : marginPct >= 0 ? '⚠️ Ajustado' : 'Pérdida'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* Colombia — precio directo sin exceso */
+                    <div className="bg-green-50 border-2 border-green-400 rounded-lg p-3">
+                      <p className="text-[11px] text-green-600 font-medium">Precio Base (precio de venta)</p>
+                      <p className="text-2xl font-bold text-green-700">${fmt(basePriceUsd)}</p>
+                      <p className="text-[10px] text-neutral-400">Costo × {(1 + profitPct / 100).toFixed(2)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* El precio de inventario = Precio Base (no es campo aparte) */}
+              <p className="text-xs text-neutral-400 -mt-1">
+                El precio de venta de inventario se guarda igual al <b>Precio Base</b> (${fmt(basePriceUsd)}).
+              </p>
+
+              {/* ML codes — en una sola línea */}
+              <div className="border border-neutral-200 rounded-xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                  Códigos ML ({country})
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {form.ml_codes.map((ml, i) => (
+                    <div key={ml.account}>
+                      <label className="block text-[11px] font-mono text-neutral-500 mb-1">{ml.account}</label>
+                      <input
+                        value={ml.code}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          ml_codes: f.ml_codes.map((m, j) => j === i ? { ...m, code: e.target.value } : m),
+                        }))}
+                        placeholder="MLA-XXXXXXXXXX"
+                        className="w-full border border-neutral-300 rounded-lg px-3 py-1.5 text-sm
+                                   focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-neutral-100 flex justify-end gap-3 bg-neutral-50 shrink-0">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900"
+              >
+                Cancelar
+              </button>
+              {modal === 'create' && (
+                <button
+                  onClick={() => handleSave(true)}
+                  disabled={saving || !form.code || !form.name}
+                  className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 disabled:opacity-50"
+                >
+                  {saving ? 'Guardando…' : 'Guardar y crear otro'}
+                </button>
+              )}
+              <button
+                onClick={() => handleSave(false)}
+                disabled={saving || !form.code || !form.name}
+                className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium
+                           hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

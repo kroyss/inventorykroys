@@ -1,7 +1,10 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  // Disable x-powered-by header
+  poweredByHeader: false,
+  // Build a self-contained server bundle for the production Docker image
+  output: 'standalone',
+}
 
-export default nextConfig;
+export default nextConfig

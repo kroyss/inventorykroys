@@ -30,8 +30,17 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — ignora los reales, versiona solo las plantillas (sin secretos)
 .env*
+!.env.example
+!.env.production.example
+
+# uploads (fotos de importaciones — viven en el server, no en git)
+/uploads
+
+# bundles de deploy y secreto temporal de simuladores
+*.tar.gz
+/scripts/.wh
 
 # vercel
 .vercel

@@ -1,0 +1,48 @@
+services:
+  inventory_next:
+    container_name: inventory_next
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Rotación de logs: máx. 10MB por archivo × 5 archivos = 50MB tope por contenedor.
+    # Al llegar al límite, Docker rota y borra el más viejo. No llena el disco.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      # Toma el puerto del legacy (al que ya apunta el reverse proxy / dominio).
+      # El legacy debe estar detenido para liberar 8501 antes de levantar.
+      - "8501:3000"
+    env_file:
+      - .env.production
+    volumes:
+      # Fotos/archivos de importaciones. El legacy las guarda DENTRO del contenedor
+      # inventory_backend en /app/uploads (sin volumen). Para que el nuevo las vea,
+      # se copian una vez al host y se montan aquí. UPLOAD_DIR=/app/uploads (env).
+      # Paso único de migración en el VPS (antes de levantar):
+      #   mkdir -p ./uploads
+      #   docker cp inventory_backend:/app/uploads/. ./uploads/
+      - ./uploads:/app/uploads
+    networks:
+      # Red del proyecto legacy (donde viven inventory_db_ve / inventory_db_co)
+      # Si el nombre real es distinto, edítalo abajo y abajo del archivo.
+      - inventory_net
+    healthcheck:
+      # Una request a la raíz devuelve 302 (redirect a /login) — suficiente para saber que vive
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  inventory_net:
+    external: true
+    # Nombre real de la red de Docker donde corren inventory_db_ve / inventory_db_co.
+    # Para descubrirlo en el VPS:
+    #   docker inspect inventory_db_ve -f '{{json .NetworkSettings.Networks}}' | jq 'keys'
+    # Si por ejemplo arroja "inventory_web_default", pon eso como name:
+    name: inventory_web_inventory_network
