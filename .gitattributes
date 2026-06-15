@@ -1,0 +1,3 @@
+# Los shell scripts SIEMPRE con LF (se ejecutan en el VPS Linux; CRLF los rompe).
+*.sh text eol=lf
+Dockerfile text eol=lf
