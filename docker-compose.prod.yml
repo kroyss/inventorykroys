@@ -31,8 +31,9 @@ services:
       # Si el nombre real es distinto, edítalo abajo y abajo del archivo.
       - inventory_net
     healthcheck:
-      # Una request a la raíz devuelve 302 (redirect a /login) — suficiente para saber que vive
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/login || exit 1"]
+      # Descarga /login y la descarta; busybox wget da exit≠0 con --spider aunque
+      # la página responda, por eso usamos -O /dev/null (fiable en alpine).
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/login || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
