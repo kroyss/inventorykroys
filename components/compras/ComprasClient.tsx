@@ -181,9 +181,9 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
       || (o.notes ?? '').toLowerCase().includes(q)
       || o.items.some(i => i.product_name.toLowerCase().includes(q) || i.product_code.toLowerCase().includes(q))
   })].sort((a, b) => {
-    // Fecha descendente, luego número de orden descendente
-    const ta = a.created_at ? new Date(a.created_at).getTime() : 0
-    const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+    // Último movimiento descendente (updated_at), luego número de orden
+    const ta = new Date(a.updated_at ?? a.created_at ?? 0).getTime()
+    const tb = new Date(b.updated_at ?? b.created_at ?? 0).getTime()
     if (tb !== ta) return tb - ta
     return b.order_number.localeCompare(a.order_number)
   })
@@ -521,7 +521,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               <th className="px-3 py-2 text-right" title="Productos distintos (completos/total en recepción)">Productos</th>
               <th className="px-3 py-2 text-right" title="Unidades totales (recibidas/total en recepción)">Cantidad</th>
               {isAdmin && <th className="px-3 py-2 text-right">Total</th>}
-              <th className="px-3 py-2 text-right">Fecha</th>
+              <th className="px-3 py-2 text-right" title="Fecha del último movimiento">Últ. mov.</th>
               <th className="px-3 py-2 text-center">Estado</th>
               {historyMode && <th className="px-2 py-2 text-center">Inconsistente</th>}
             </tr>
@@ -531,7 +531,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               <tr><td colSpan={(isAdmin ? 8 : 7) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
             )}
             {paginatedOrders.map((o, idx) => {
-              const date = o.created_at ? new Date(o.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
+              const dateSrc = o.updated_at ?? o.created_at
+              const date = dateSrc ? new Date(dateSrc).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
               const units     = o.items.reduce((a, i) => a + i.quantity, 0)
               const prods     = o.items.length
               const recUnits  = o.items.reduce((a, i) => a + (i.total_received_qty || i.received_qty || 0), 0)

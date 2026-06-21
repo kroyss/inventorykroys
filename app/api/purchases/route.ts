@@ -20,6 +20,7 @@ const ORDERS_SQL = `
     u.username AS received_by,
     po.received_at,
     po.created_at,
+    po.updated_at,
     s.id   AS supplier_id,
     s.name AS supplier_name,
     COALESCE(
@@ -58,7 +59,7 @@ const ORDERS_SQL = `
       WHEN 'FINALIZADA'     THEN 7
       ELSE 8
     END,
-    po.created_at DESC
+    po.updated_at DESC
 `
 
 const CreateSchema = z.object({
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
           po.total_usd, po.total_paid, po.notes, po.tracking_info,
           po.is_incomplete, po.incomplete_note, po.reopen_count,
           u.username AS received_by,
-          po.received_at, po.created_at,
+          po.received_at, po.created_at, po.updated_at,
           po.supplier_id,
           s.name AS supplier_name,
           COALESCE(

@@ -42,7 +42,7 @@ const IMPORTS_SQL = `
   LEFT JOIN import_order_items ioi ON ioi.import_order_id = io.id
   LEFT JOIN products p ON p.id = ioi.product_id
   GROUP BY io.id, s.id, uc.username
-  ORDER BY io.created_at DESC
+  ORDER BY io.updated_at DESC
 `
 
 const ItemSchema = z.object({
