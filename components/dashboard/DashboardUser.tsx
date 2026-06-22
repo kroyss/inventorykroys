@@ -95,9 +95,11 @@ export default function DashboardUser({ country }: { country: Country }) {
             accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
             href="/ventas?estado=PROCESADA" />
         </div>
-        <div className="mt-4">
-          <BonusPipeline />
-        </div>
+        {country === 'VE' && (
+          <div className="mt-4">
+            <BonusPipeline />
+          </div>
+        )}
       </Panel>
 
       {/* ───────── Recepciones ───────── */}

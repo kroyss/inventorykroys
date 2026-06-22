@@ -154,7 +154,8 @@ export default function DashboardAdmin({ country }: { country: Country }) {
         </div>
       </div>
 
-      <BonusPipeline />
+      {/* Bonos: solo VE (no aplica en CO) */}
+      {country === 'VE' && <BonusPipeline />}
 
       {/* Gráfico con métricas integradas arriba */}
       <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-sm">
