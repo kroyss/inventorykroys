@@ -264,7 +264,7 @@ export default function InventarioClient({ initialItems, userRole }: Props) {
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase">
+            <thead className="bg-neutral-50 text-xs">
               <tr className="border-b border-neutral-100">
                 {th('code', 'Código')}
                 {th('name', 'Nombre')}

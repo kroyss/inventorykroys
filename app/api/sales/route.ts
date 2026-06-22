@@ -42,6 +42,18 @@ export async function GET(req: NextRequest) {
   const dateTo       = DATE_RE.test(dateToRaw)   ? dateToRaw   : null
   const offset       = (page - 1) * pageSize
 
+  // Orden por columna (whitelist → expresión SQL). Default: fecha desc.
+  const SORT_MAP: Record<string, string> = {
+    order_number: 's.ml_order_number',
+    customer:     's.customer_name',
+    units:        'COALESCE(SUM(si.quantity), 0)',
+    total:        's.total_amount',
+    created_at:   's.created_at',
+    status:       's.status',
+  }
+  const sortExpr = SORT_MAP[url.searchParams.get('sort_by') ?? ''] ?? 's.created_at'
+  const sortDir  = (url.searchParams.get('sort_dir') ?? '').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+
   // Build the shared filter (search + date range) starting at a given param index.
   // Returns the SQL conditions joined with AND plus the matching params.
   const buildFilters = (startIdx: number) => {
@@ -128,7 +140,7 @@ export async function GET(req: NextRequest) {
     WHERE ${finalSearchPredicate}
     ${statusClause}
     GROUP BY s.id, uc.username, uv.username, up.username
-    ORDER BY s.created_at DESC, s.ml_order_number DESC
+    ORDER BY ${sortExpr} ${sortDir}, s.ml_order_number DESC
     LIMIT $1 OFFSET $2
   `
 

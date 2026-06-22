@@ -86,6 +86,26 @@ export default function VentasClient({ products, userRole }: Props) {
   const [busy, setBusy]         = useState(false)
   const [error, setError]       = useState<string | null>(null)
 
+  // Orden por columna (server-side; default fecha desc)
+  type SortKey = 'order_number' | 'customer' | 'units' | 'total' | 'created_at' | 'status'
+  const [sortKey, setSortKey] = useState<SortKey>('created_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    // números/fecha arrancan desc; texto asc
+    else { setSortKey(k); setSortDir(['units', 'total', 'created_at'].includes(k) ? 'desc' : 'asc') }
+  }
+  const sortArrow = (k: SortKey) => sortKey === k
+    ? <span className="ml-1 text-[9px]">{sortDir === 'asc' ? '▲' : '▼'}</span> : null
+  const th = (key: SortKey, label: string, align: 'left' | 'right' | 'center' = 'left', title?: string) => (
+    <th onClick={() => toggleSort(key)} title={title}
+      className={`px-3 py-2 cursor-pointer select-none hover:text-neutral-800 ${
+        align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+      }`}>
+      {label}{sortArrow(key)}
+    </th>
+  )
+
   const isAdmin = userRole === 'admin'
   const confirm = useConfirm()
 
@@ -95,8 +115,8 @@ export default function VentasClient({ products, userRole }: Props) {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // Reset to page 1 whenever the filter, search or date range changes
-  useEffect(() => { setPage(1) }, [filter, search, dateFrom, dateTo])
+  // Reset to page 1 whenever the filter, search, date range or sort changes
+  useEffect(() => { setPage(1) }, [filter, search, dateFrom, dateTo, sortKey, sortDir])
 
   // Esc cierra el form si está abierto, si no el slide-over de detalle
   useEffect(() => {
@@ -127,6 +147,8 @@ export default function VentasClient({ products, userRole }: Props) {
     if (search)           qs.set('search', search)
     if (dateFrom)         qs.set('date_from', dateFrom)
     if (dateTo)           qs.set('date_to', dateTo)
+    qs.set('sort_by', sortKey)
+    qs.set('sort_dir', sortDir)
     const res: SalesResponse = await fetch(`/api/sales?${qs}`).then(r => r.json())
     setSales(res.rows)
     setCounts(res.counts ?? EMPTY_COUNTS)
@@ -134,7 +156,7 @@ export default function VentasClient({ products, userRole }: Props) {
     setLoading(false)
     // Keep the selected detail in sync if it's on this page
     setSelected(prev => prev ? (res.rows.find(s => s.id === prev.id) ?? prev) : null)
-  }, [page, filter, search, dateFrom, dateTo])
+  }, [page, filter, search, dateFrom, dateTo, sortKey, sortDir])
 
   useEffect(() => { fetchSales() }, [fetchSales])
 
@@ -298,16 +320,16 @@ export default function VentasClient({ products, userRole }: Props) {
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
+            <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr className="border-b border-neutral-100">
                 <th className="w-8 px-3 py-2" />
-                <th className="px-3 py-2 text-left">Orden</th>
-                <th className="px-3 py-2 text-left">Cliente</th>
+                {th('order_number', 'Orden')}
+                {th('customer', 'Cliente')}
                 <th className="px-3 py-2 text-left">Productos</th>
-                <th className="px-3 py-2 text-right" title="Unidades totales / Cantidad de productos">Und/Prod</th>
-                <th className="px-3 py-2 text-right">Total</th>
-                <th className="px-3 py-2 text-right">Fecha</th>
-                <th className="px-3 py-2 text-center">Estado</th>
+                {th('units', 'Und/Prod', 'right', 'Unidades totales / Cantidad de productos')}
+                {th('total', 'Total', 'right')}
+                {th('created_at', 'Fecha', 'right')}
+                {th('status', 'Estado', 'center')}
               </tr>
             </thead>
             <tbody>
