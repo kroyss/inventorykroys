@@ -34,9 +34,7 @@ export function SortableTh({ label, sortKey, sort, onSort, align = 'left', title
     >
       <span className={`inline-flex items-center gap-1 ${rowCls}`}>
         {label}
-        <span className={active ? 'text-neutral-800 text-[9px]' : 'text-neutral-300 text-[9px]'}>
-          {active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
-        </span>
+        {active && <span className="text-neutral-800 text-[9px]">{sort.dir === 'asc' ? '▲' : '▼'}</span>}
       </span>
     </th>
   )

@@ -531,7 +531,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
+          <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr className="border-b border-neutral-100">
               <SortableTh label="Orden" sortKey="order_number" sort={sort} onSort={onSort} />
               <SortableTh label="Proveedor" sortKey="supplier" sort={sort} onSort={onSort} />
