@@ -10,11 +10,20 @@ const CURRENCIES = ['USD', 'COP', 'VES'] as const
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const thisMonth = () => new Date().toISOString().slice(0, 7)
 
-interface CloseLine { label: string; usd: number }
+interface CloseLine { label: string; usd: number; ve: number; co: number; other: number }
 interface Summary {
   month: string; rates: { cop: number; ves: number }
   income: CloseLine[]; expenses: CloseLine[]
-  totalIncome: number; totalExpense: number; surplus: number
+  totalIncome: number; incomeVE: number; incomeCO: number; incomeOther: number
+  totalExpense: number; expenseVE: number; expenseCO: number; expenseOther: number
+  surplus: number; surplusVE: number; surplusCO: number
+}
+
+// "VE $X · CO $Y · otros $Z" (omite otros si es 0)
+const split = (ve: number, co: number, other = 0) => {
+  const p = [`VE $${money(ve)}`, `CO $${money(co)}`]
+  if (Math.abs(other) > 0.005) p.push(`otros $${money(other)}`)
+  return p.join('  ·  ')
 }
 interface CapAccount { id: number; name: string; currency: string; balance: number; usd: number; is_reserve: boolean }
 interface Capital {
@@ -218,14 +227,17 @@ export default function FinanzasClient() {
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Ingresos</div>
               <div className="text-xl font-bold text-green-600">${money(summary.totalIncome)}</div>
+              <div className="text-[11px] text-neutral-400 mt-0.5">{split(summary.incomeVE, summary.incomeCO, summary.incomeOther)}</div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Gastos</div>
               <div className="text-xl font-bold text-red-600">${money(summary.totalExpense)}</div>
+              <div className="text-[11px] text-neutral-400 mt-0.5">{split(summary.expenseVE, summary.expenseCO, summary.expenseOther)}</div>
             </div>
             <div className={`rounded-xl border p-3 shadow-sm ${summary.surplus >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
               <div className="text-xs text-neutral-500 mb-1">Sobrante</div>
               <div className={`text-xl font-bold ${summary.surplus >= 0 ? 'text-green-700' : 'text-red-600'}`}>${money(summary.surplus)}</div>
+              <div className="text-[11px] text-neutral-400 mt-0.5">{split(summary.surplusVE, summary.surplusCO, summary.incomeOther - summary.expenseOther)}</div>
             </div>
           </div>
 
@@ -236,9 +248,12 @@ export default function FinanzasClient() {
                 <tbody>
                   {summary.income.length === 0 && <tr><td className="px-4 py-3 text-neutral-400">Sin ingresos</td></tr>}
                   {summary.income.map(l => (
-                    <tr key={l.label} className="border-t border-neutral-50">
+                    <tr key={l.label} className="border-t border-neutral-50" title={split(l.ve, l.co, l.other)}>
                       <td className="px-4 py-2 text-neutral-700">{l.label}</td>
-                      <td className="px-4 py-2 text-right font-medium text-green-600">${money(l.usd)}</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="font-medium text-green-600">${money(l.usd)}</span>
+                        <span className="block text-[10px] text-neutral-400">{split(l.ve, l.co, l.other)}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -250,9 +265,12 @@ export default function FinanzasClient() {
                 <tbody>
                   {summary.expenses.length === 0 && <tr><td className="px-4 py-3 text-neutral-400">Sin gastos</td></tr>}
                   {summary.expenses.map(l => (
-                    <tr key={l.label} className="border-t border-neutral-50">
+                    <tr key={l.label} className="border-t border-neutral-50" title={split(l.ve, l.co, l.other)}>
                       <td className="px-4 py-2 text-neutral-700">{l.label}</td>
-                      <td className="px-4 py-2 text-right font-medium text-red-600">${money(l.usd)}</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="font-medium text-red-600">${money(l.usd)}</span>
+                        <span className="block text-[10px] text-neutral-400">{split(l.ve, l.co, l.other)}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

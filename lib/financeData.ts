@@ -37,15 +37,17 @@ const SALES_DONE = `status IN ('DESCARGADA','DESCARGADA_LOCAL')`
 const SALES_DATE = `COALESCE(processed_at, payment_verified_at, created_at)`
 
 // ───────────────────────── Cierre mensual ─────────────────────────
-export interface CloseLine { label: string; usd: number }
+// Cada línea trae el consolidado (usd) y el desglose por origen: ve, co, other
+// (other = movimientos manuales sin país asignado).
+export interface CloseLine { label: string; usd: number; ve: number; co: number; other: number }
 export interface MonthlyClose {
   month: string
   rates: FinanceRates
   income: CloseLine[]
   expenses: CloseLine[]
-  totalIncome: number
-  totalExpense: number
-  surplus: number
+  totalIncome: number; incomeVE: number; incomeCO: number; incomeOther: number
+  totalExpense: number; expenseVE: number; expenseCO: number; expenseOther: number
+  surplus: number; surplusVE: number; surplusCO: number
 }
 
 export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
@@ -76,45 +78,56 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
   const impVE = (await ve.query(impSql, [month])).rows[0].t as number
   const impCO = await coSafe(async db => (await db.query(impSql, [month])).rows[0].t as number, 0)
 
-  // Movimientos manuales por categoría/moneda (en VE maestra)
+  // Movimientos manuales por categoría/moneda/país (en VE maestra)
   const { rows: mov } = await ve.query(`
-    SELECT COALESCE(c.name,'Sin categoría') AS category, m.kind, m.currency,
+    SELECT COALESCE(c.name,'Sin categoría') AS category, m.kind, m.currency, m.country,
            COALESCE(SUM(m.amount),0)::float AS amount
     FROM finance_movements m
     LEFT JOIN finance_categories c ON c.id = m.category_id
     WHERE to_char(m.date,'YYYY-MM')=$1
-    GROUP BY c.name, m.kind, m.currency
+    GROUP BY c.name, m.kind, m.currency, m.country
   `, [month])
 
-  // Construir líneas
-  const incomeMap = new Map<string, number>()
-  const expenseMap = new Map<string, number>()
-  const add = (map: Map<string, number>, label: string, usd: number) =>
-    map.set(label, (map.get(label) ?? 0) + usd)
-
-  // Auto
-  add(incomeMap, 'Ventas', salesVE + toUsd(salesCO, 'COP', rates))
-  add(expenseMap, 'Compras locales', purchVE + toUsd(purchCO, 'COP', rates))
-  add(expenseMap, 'Importaciones', impVE + toUsd(impCO, 'COP', rates))
-
-  // Manuales
-  for (const r of mov) {
-    const usd = toUsd(r.amount, r.currency, rates)
-    if (r.kind === 'income') add(incomeMap, r.category, usd)
-    else add(expenseMap, r.category, usd)
+  // Construir líneas con desglose ve/co/other
+  type Bucket = 've' | 'co' | 'other'
+  type Cell = { usd: number; ve: number; co: number; other: number }
+  const incomeMap = new Map<string, Cell>()
+  const expenseMap = new Map<string, Cell>()
+  const add = (map: Map<string, Cell>, label: string, usd: number, b: Bucket) => {
+    const c = map.get(label) ?? { usd: 0, ve: 0, co: 0, other: 0 }
+    c.usd += usd; c[b] += usd
+    map.set(label, c)
   }
 
-  const income   = [...incomeMap].map(([label, usd]) => ({ label, usd })).filter(l => l.usd !== 0)
-  const expenses = [...expenseMap].map(([label, usd]) => ({ label, usd })).filter(l => l.usd !== 0)
-  const totalIncome  = income.reduce((s, l) => s + l.usd, 0)
-  const totalExpense = expenses.reduce((s, l) => s + l.usd, 0)
+  // Auto (origen claro por país)
+  add(incomeMap, 'Ventas', salesVE, 've');  add(incomeMap, 'Ventas', toUsd(salesCO, 'COP', rates), 'co')
+  add(expenseMap, 'Compras locales', purchVE, 've'); add(expenseMap, 'Compras locales', toUsd(purchCO, 'COP', rates), 'co')
+  add(expenseMap, 'Importaciones', impVE, 've'); add(expenseMap, 'Importaciones', toUsd(impCO, 'COP', rates), 'co')
+
+  // Manuales (por su etiqueta de país; sin país → other)
+  for (const r of mov) {
+    const usd = toUsd(r.amount, r.currency, rates)
+    const b: Bucket = r.country === 'VE' ? 've' : r.country === 'CO' ? 'co' : 'other'
+    add(r.kind === 'income' ? incomeMap : expenseMap, r.category, usd, b)
+  }
+
+  const toLines = (m: Map<string, Cell>): CloseLine[] =>
+    [...m].map(([label, c]) => ({ label, ...c })).filter(l => l.usd !== 0).sort((a, b) => b.usd - a.usd)
+
+  const income = toLines(incomeMap)
+  const expenses = toLines(expenseMap)
+  const sum = (ls: CloseLine[], k: keyof Cell) => ls.reduce((s, l) => s + l[k], 0)
+
+  const totalIncome = sum(income, 'usd'), incomeVE = sum(income, 've'), incomeCO = sum(income, 'co'), incomeOther = sum(income, 'other')
+  const totalExpense = sum(expenses, 'usd'), expenseVE = sum(expenses, 've'), expenseCO = sum(expenses, 'co'), expenseOther = sum(expenses, 'other')
 
   return {
-    month, rates,
-    income:   income.sort((a, b) => b.usd - a.usd),
-    expenses: expenses.sort((a, b) => b.usd - a.usd),
-    totalIncome, totalExpense,
+    month, rates, income, expenses,
+    totalIncome, incomeVE, incomeCO, incomeOther,
+    totalExpense, expenseVE, expenseCO, expenseOther,
     surplus: totalIncome - totalExpense,
+    surplusVE: incomeVE - expenseVE,
+    surplusCO: incomeCO - expenseCO,
   }
 }
 
