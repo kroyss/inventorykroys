@@ -28,8 +28,12 @@ const split = (ve: number, co: number, other = 0) => {
 interface CapAccount { id: number; name: string; currency: string; balance: number; usd: number; is_reserve: boolean }
 interface Capital {
   rates: { cop: number; ves: number }
-  mercanciaVE: number; mercanciaCO_cop: number; mercanciaCO: number
-  accounts: CapAccount[]; liquidez: number; reservas: number; total: number
+  mercanciaVE_cost: number; mercanciaVE_sale: number
+  mercanciaCO_cost_cop: number; mercanciaCO_sale_cop: number
+  mercanciaCO_cost: number; mercanciaCO_sale: number
+  mercanciaCost: number; mercanciaSale: number
+  accounts: CapAccount[]; liquidez: number; reservas: number
+  totalCost: number; totalSale: number
 }
 
 type Tab = 'movimientos' | 'cierre' | 'capital' | 'cuentas'
@@ -286,20 +290,29 @@ export default function FinanzasClient() {
       {/* ════════ CAPITAL / LIQUIDEZ ════════ */}
       {tab === 'capital' && capital && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-neutral-900 bg-neutral-900 text-white p-4 shadow-sm">
-            <div className="text-xs text-white/60 mb-1">Capital total (USD)</div>
-            <div className="text-3xl font-bold">${money(capital.total)}</div>
+          {/* Dos capitales: a costo y a venta (potencial) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-neutral-900 bg-neutral-900 text-white p-4 shadow-sm">
+              <div className="text-xs text-white/60 mb-1">Capital a costo (USD)</div>
+              <div className="text-2xl md:text-3xl font-bold">${money(capital.totalCost)}</div>
+            </div>
+            <div className="rounded-xl border border-green-700 bg-green-700 text-white p-4 shadow-sm">
+              <div className="text-xs text-white/70 mb-1">Capital a venta · potencial (USD)</div>
+              <div className="text-2xl md:text-3xl font-bold">${money(capital.totalSale)}</div>
+            </div>
           </div>
 
+          {/* Mercancía (costo y venta) + liquidez + reservas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Mercancía VE</div>
-              <div className="text-lg font-bold text-neutral-900">${money(capital.mercanciaVE)}</div>
+              <div className="text-sm">costo <span className="font-bold text-neutral-900">${money(capital.mercanciaVE_cost)}</span></div>
+              <div className="text-sm">venta <span className="font-bold text-green-700">${money(capital.mercanciaVE_sale)}</span></div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Mercancía CO</div>
-              <div className="text-lg font-bold text-neutral-900">${money(capital.mercanciaCO)}</div>
-              <div className="text-[10px] text-neutral-400">COP {money(capital.mercanciaCO_cop)}</div>
+              <div className="text-sm">costo <span className="font-bold text-neutral-900">${money(capital.mercanciaCO_cost)}</span> <span className="text-[10px] text-neutral-400">COP {money(capital.mercanciaCO_cost_cop)}</span></div>
+              <div className="text-sm">venta <span className="font-bold text-green-700">${money(capital.mercanciaCO_sale)}</span> <span className="text-[10px] text-neutral-400">COP {money(capital.mercanciaCO_sale_cop)}</span></div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Liquidez</div>
@@ -310,6 +323,9 @@ export default function FinanzasClient() {
               <div className="text-lg font-bold text-orange-600">${money(capital.reservas)}</div>
             </div>
           </div>
+          <p className="text-xs text-neutral-400 -mt-2">
+            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). Liquidez y reservas suman igual en ambos capitales.
+          </p>
 
           {/* Tasa COP/USD */}
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 flex flex-wrap items-end gap-3">

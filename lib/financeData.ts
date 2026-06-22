@@ -135,19 +135,26 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
 export interface CapitalAccount { id: number; name: string; currency: string; balance: number; usd: number; is_reserve: boolean }
 export interface Capital {
   rates: FinanceRates
-  mercanciaVE: number       // USD
-  mercanciaCO_cop: number   // COP
-  mercanciaCO: number       // USD
+  // Mercancía en DOS valuaciones: a costo y a precio de venta. Todo en USD,
+  // salvo los *_cop que son el bruto de Colombia antes de convertir.
+  mercanciaVE_cost: number;  mercanciaVE_sale: number
+  mercanciaCO_cost_cop: number; mercanciaCO_sale_cop: number
+  mercanciaCO_cost: number;  mercanciaCO_sale: number
+  mercanciaCost: number;     mercanciaSale: number      // VE+CO consolidado USD
   accounts: CapitalAccount[]
-  liquidez: number          // USD (no reservas)
-  reservas: number          // USD
-  total: number             // USD
+  liquidez: number           // USD (no reservas)
+  reservas: number           // USD
+  totalCost: number          // mercancía a costo + liquidez − reservas
+  totalSale: number          // mercancía a venta  + liquidez − reservas
 }
 
+// Valoriza inventario activo a costo y a precio de venta a la vez.
 const INV_VAL = `
-  SELECT COALESCE(SUM(i.quantity * pp.total_cost),0)::float AS t
+  SELECT
+    COALESCE(SUM(i.quantity * COALESCE(pp.total_cost, 0)),0)::float AS cost,
+    COALESCE(SUM(i.quantity * COALESCE(NULLIF(i.sale_price,0), pp.final_price_usd, 0)),0)::float AS sale
   FROM inventory i
-  JOIN product_pricing pp ON pp.product_id = i.product_id
+  LEFT JOIN product_pricing pp ON pp.product_id = i.product_id
   JOIN products p ON p.id = i.product_id
   WHERE p.is_active = TRUE`
 
@@ -155,9 +162,18 @@ export async function getCapital(): Promise<Capital> {
   const ve = veDb()
   const rates = await getRates()
 
-  const mercanciaVE   = (await ve.query(INV_VAL)).rows[0].t as number
-  const mercanciaCO_cop = await coSafe(async db => (await db.query(INV_VAL)).rows[0].t as number, 0)
-  const mercanciaCO   = toUsd(mercanciaCO_cop, 'COP', rates)
+  const veRow = (await ve.query(INV_VAL)).rows[0]
+  const mercanciaVE_cost = veRow.cost as number
+  const mercanciaVE_sale = veRow.sale as number
+
+  const coRow = await coSafe(async db => (await db.query(INV_VAL)).rows[0] as { cost: number; sale: number }, { cost: 0, sale: 0 })
+  const mercanciaCO_cost_cop = coRow.cost
+  const mercanciaCO_sale_cop = coRow.sale
+  const mercanciaCO_cost = toUsd(mercanciaCO_cost_cop, 'COP', rates)
+  const mercanciaCO_sale = toUsd(mercanciaCO_sale_cop, 'COP', rates)
+
+  const mercanciaCost = mercanciaVE_cost + mercanciaCO_cost
+  const mercanciaSale = mercanciaVE_sale + mercanciaCO_sale
 
   const { rows: acc } = await ve.query(
     `SELECT id, name, currency, balance::float AS balance, is_reserve
@@ -171,7 +187,15 @@ export async function getCapital(): Promise<Capital> {
 
   const liquidez = accounts.filter(a => !a.is_reserve).reduce((s, a) => s + a.usd, 0)
   const reservas = accounts.filter(a =>  a.is_reserve).reduce((s, a) => s + a.usd, 0)
-  const total = mercanciaVE + mercanciaCO + liquidez - reservas
 
-  return { rates, mercanciaVE, mercanciaCO_cop, mercanciaCO, accounts, liquidez, reservas, total }
+  return {
+    rates,
+    mercanciaVE_cost, mercanciaVE_sale,
+    mercanciaCO_cost_cop, mercanciaCO_sale_cop,
+    mercanciaCO_cost, mercanciaCO_sale,
+    mercanciaCost, mercanciaSale,
+    accounts, liquidez, reservas,
+    totalCost: mercanciaCost + liquidez - reservas,
+    totalSale: mercanciaSale + liquidez - reservas,
+  }
 }
