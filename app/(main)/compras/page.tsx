@@ -79,6 +79,7 @@ export default async function ComprasPage() {
         s.id   AS supplier_id,
         s.name AS supplier_name,
         uc.username AS created_by,
+        io.container_id, ct.code AS container_code,
         (SELECT COUNT(*) FROM import_order_files f WHERE f.import_order_id = io.id) AS file_count,
         COALESCE(
           JSON_AGG(
@@ -100,9 +101,10 @@ export default async function ComprasPage() {
       FROM import_orders io
       LEFT JOIN suppliers s  ON io.supplier_id = s.id
       LEFT JOIN users uc     ON io.created_by  = uc.id
+      LEFT JOIN import_containers ct ON ct.id = io.container_id
       LEFT JOIN import_order_items ioi ON ioi.import_order_id = io.id
       LEFT JOIN products p ON p.id = ioi.product_id
-      GROUP BY io.id, s.id, uc.username
+      GROUP BY io.id, s.id, uc.username, ct.code
       ORDER BY
         CASE io.status
           WHEN 'PENDIENTE'           THEN 0

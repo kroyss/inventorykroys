@@ -535,6 +535,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     <td className="px-3 py-2 font-mono text-xs font-bold text-neutral-900 whitespace-nowrap">
                       {o.order_number}
                       {o.file_count > 0 && <span className="ml-1 text-neutral-500 font-normal">📎{o.file_count}</span>}
+                      {o.container_code && <span title={`Contenedor ${o.container_code}`} className="ml-1 text-blue-600 font-normal">📦</span>}
                     </td>
                     <td className="px-3 py-2 text-neutral-700 max-w-[12rem] truncate">{o.supplier_name || '—'}</td>
                     <td className="px-3 py-2 text-xs text-neutral-500 max-w-[18rem] truncate cursor-help"

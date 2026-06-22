@@ -222,7 +222,29 @@ export interface ImportOrder {
   received_by: string | null
   received_at: string | null
   file_count: number
+  container_id: number | null
+  container_code: string | null
   items: PurchaseOrderItem[]
+}
+
+// ─── Import Containers (agrupación de importaciones) ──
+export type ContainerStatus = 'ABIERTO' | 'EN_TRANSITO' | 'RECIBIDO' | 'CERRADO'
+
+export interface ImportContainer {
+  id: number
+  code: string
+  name: string | null
+  status: ContainerStatus
+  origin_country: string | null
+  tracking_number: string | null
+  shipping_cost: number | null
+  eta: string | null
+  notes: string | null
+  created_at: string | null
+  updated_at: string | null
+  order_count: number
+  total_usd: number
+  total_boxes: number
 }
 
 // ─── Sales ──────────────────────────────────────────
