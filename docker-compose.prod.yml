@@ -31,9 +31,10 @@ services:
       # Si el nombre real es distinto, edítalo abajo y abajo del archivo.
       - inventory_net
     healthcheck:
-      # Descarga /login y la descarta; busybox wget da exit≠0 con --spider aunque
-      # la página responda, por eso usamos -O /dev/null (fiable en alpine).
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/login || exit 1"]
+      # Usar 127.0.0.1 (IPv4), NO localhost: en Alpine localhost resuelve primero
+      # a ::1 (IPv6) y Next escucha en 0.0.0.0 (solo IPv4) → conexión rechazada.
+      # -O /dev/null (no --spider): busybox wget da exit≠0 con --spider aunque responda.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
