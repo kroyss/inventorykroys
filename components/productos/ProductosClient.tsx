@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
 import { int } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
@@ -68,6 +68,28 @@ const emptyForm = (mlAccounts: string[]): FormState => ({
   ml_codes: mlAccounts.map(a => ({ account: a, code: '' })),
 })
 
+// Detalle completo de un producto (respuesta de GET /api/products/[id])
+interface ProductDetail {
+  id: number
+  code: string
+  name: string
+  is_active: boolean
+  base_cost: number
+  shipping_cost: number
+  total_cost: number
+  base_price_usd: number
+  published_price_usd: number
+  final_price_usd: number
+  price_bolivares: number
+  discount_percent: number
+  category_name: string | null
+  profit_percentage: number
+  profit_category_id: number | null
+  sale_price: number
+  quantity: number
+  ml_codes: MLCode[]
+}
+
 // ─── component ──────────────────────────────────────────────────
 interface Props {
   initialProducts:  Product[]
@@ -87,6 +109,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const [error,     setError]     = useState('')
   const [okMsg,     setOkMsg]     = useState('')
   const [mounted,   setMounted]   = useState(false)
+
+  // Vista de lectura (slide-over de solo lectura al clickear una fila)
+  const [viewing,     setViewing]     = useState<ProductDetail | null>(null)
+  const [viewMounted, setViewMounted] = useState(false)
 
   const mlAccounts = ML_ACCOUNTS[country]
   const confirm = useConfirm()
@@ -125,6 +151,17 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   // Esc closes the slide-over
   useEscape(!!modal, closeModal)
+
+  // ── vista de lectura ──
+  useEffect(() => { if (viewing) setViewMounted(true) }, [viewing])
+  const closeView = () => { setViewMounted(false); setTimeout(() => setViewing(null), 180) }
+  useEscape(!!viewing && !modal, closeView)
+
+  async function openView(id: number) {
+    const res  = await fetch(`/api/products/${id}`)
+    if (!res.ok) return
+    setViewing(await res.json())
+  }
 
   // ── open create modal ──
   async function openCreate() {
@@ -228,8 +265,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   }, [form, modal, editId, basePriceUsd, publishedPriceUsd, finalPriceUsd, mlAccounts])
 
   // ── status toggle / delete ──
-  async function handleStatus(id: number, action: 'activate' | 'deactivate' | 'delete') {
-    if (action === 'delete' && !await confirm({ title: 'Eliminar producto', message: 'Se eliminará permanentemente este producto. Esta acción no se puede deshacer.', confirmText: 'Eliminar', danger: true })) return
+  async function handleStatus(id: number, action: 'activate' | 'deactivate' | 'delete'): Promise<boolean> {
+    if (action === 'delete' && !await confirm({ title: 'Eliminar producto', message: 'Se eliminará permanentemente este producto. Esta acción no se puede deshacer.', confirmText: 'Eliminar', danger: true })) return false
     const res = await fetch(`/api/products/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -238,10 +275,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     if (!res.ok) {
       const d = await res.json()
       alert(d.error ?? 'Error')
-      return
+      return false
     }
     const listRes = await fetch('/api/products')
     setProducts(await listRes.json())
+    return true
   }
 
   // ── batch category ──
@@ -447,8 +485,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </tr>
               )}
               {displayed.map(p => (
-                <tr key={p.id} className="border-b border-neutral-50 hover:bg-neutral-50">
-                  <td className="px-3 py-2 text-center">
+                <tr key={p.id} onClick={() => openView(p.id)}
+                  className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
+                  <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selected.includes(p.id)}
@@ -490,7 +529,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       {p.is_active ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1 justify-end">
                       <button
                         onClick={() => openEdit(p.id)}
@@ -528,7 +567,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
               ? Math.round((p.final_price_usd - p.total_cost) / p.final_price_usd * 100)
               : null
             return (
-              <div key={p.id} className="px-4 py-3">
+              <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-mono text-xs text-neutral-400">{p.code}</div>
@@ -548,7 +587,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   )}
                   <span className="text-neutral-500 ml-auto">Stock: <span className="font-medium text-neutral-900">{p.quantity}</span></span>
                 </div>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => openEdit(p.id)} className="text-xs px-3 py-1 border border-neutral-200 rounded-lg text-neutral-600">Editar</button>
                   <button onClick={() => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate')} className="text-xs px-3 py-1 border border-neutral-200 rounded-lg text-neutral-600">
                     {p.is_active ? 'Desactivar' : 'Activar'}
@@ -834,6 +873,124 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           </div>
         </div>
       )}
+
+      {/* ── vista de lectura (slide-over) ── */}
+      {viewing && (() => {
+        const v = viewing
+        const margin = v.final_price_usd > 0 && v.total_cost > 0
+          ? Math.round((v.final_price_usd - v.total_cost) / v.final_price_usd * 100)
+          : null
+        const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
+          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+            <p className="text-[11px] text-neutral-500">{label}</p>
+            <p className={`text-sm font-semibold ${accent}`}>{value}</p>
+          </div>
+        )
+        return (
+          <div className="fixed inset-0 z-50">
+            <div className={`absolute inset-0 bg-black/30 transition-opacity duration-200 ${viewMounted ? 'opacity-100' : 'opacity-0'}`} onClick={closeView} />
+            <div className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-200 ${viewMounted ? 'translate-x-0' : 'translate-x-full'}`}>
+              {/* header */}
+              <div className="flex items-start justify-between px-6 py-4 border-b border-neutral-100 shrink-0">
+                <div className="min-w-0">
+                  <div className="font-mono text-xs text-neutral-400">{v.code}</div>
+                  <h2 className="font-bold text-neutral-900 truncate">{v.name}</h2>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
+                      {v.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                    {v.category_name && (
+                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{v.category_name} {v.profit_percentage}%</span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={closeView} className="text-neutral-400 hover:text-neutral-700 text-lg">✕</button>
+              </div>
+
+              {/* body */}
+              <div className="px-6 py-4 space-y-4 flex-1 overflow-y-auto text-sm">
+                <div>
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Costos</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Field label="Costo" value={`$${fmt(v.base_cost)}`} />
+                    <Field label="Envío" value={`$${fmt(v.shipping_cost)}`} />
+                    <Field label="Costo total" value={`$${fmt(v.total_cost)}`} />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Precios</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="Precio base" value={`$${fmt(v.base_price_usd)}`} accent="text-blue-700" />
+                    <Field label="Precio publicado" value={`$${fmt(v.published_price_usd)}`} />
+                    <Field label="Descuento" value={`${fmt(v.discount_percent)}%`} />
+                    <Field label="Precio final" value={`$${fmt(v.final_price_usd)}`} accent="text-green-700" />
+                    {country === 'VE' && v.price_bolivares > 0 && (
+                      <Field label="Precio Bs" value={`Bs ${fmt(v.price_bolivares)}`} />
+                    )}
+                    {margin !== null && (
+                      <Field label="Margen" value={`${margin}%`}
+                        accent={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'} />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Inventario</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="Stock" value={int(v.quantity)} accent={v.quantity > 0 ? 'text-neutral-900' : 'text-red-600'} />
+                    <Field label="Precio de venta" value={`$${fmt(v.sale_price)}`} />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Códigos ML ({country})</p>
+                  {v.ml_codes.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {v.ml_codes.map(ml => (
+                        <div key={ml.account} className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+                          <p className="text-[11px] font-mono text-neutral-500">{ml.account}</p>
+                          <p className="text-sm font-mono text-neutral-800">{ml.code || '—'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-neutral-400 text-xs">Sin códigos ML registrados</p>
+                  )}
+                </div>
+              </div>
+
+              {/* footer: acciones */}
+              <div className="px-6 py-4 border-t border-neutral-100 flex flex-wrap justify-end gap-2 bg-neutral-50 shrink-0">
+                <button
+                  onClick={async () => {
+                    const ok = await handleStatus(v.id, 'delete')
+                    if (ok) closeView()
+                  }}
+                  className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg mr-auto"
+                >
+                  Eliminar
+                </button>
+                <button
+                  onClick={async () => {
+                    const ok = await handleStatus(v.id, v.is_active ? 'deactivate' : 'activate')
+                    if (ok) setViewing(prev => prev ? { ...prev, is_active: !prev.is_active } : prev)
+                  }}
+                  className="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100"
+                >
+                  {v.is_active ? 'Desactivar' : 'Activar'}
+                </button>
+                <button
+                  onClick={() => { closeView(); openEdit(v.id) }}
+                  className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700"
+                >
+                  Editar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { Stepper, KPICard, int, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
+import { SortableTh, toggleSort, type SortState } from './SortableTh'
 
 const PAGE_SIZE = 15
 
@@ -104,9 +105,13 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [showPay, setShowPay]             = useState<'50' | '100' | null>(null)
   const [payAmount, setPayAmount]         = useState('')
 
+  // Orden por columna (default: último movimiento, descendente)
+  const [sort, setSort] = useState<SortState>({ key: 'updated_at', dir: 'desc' })
+  const onSort = (key: string) => setSort(prev => toggleSort(prev, key))
+
   // Paginación
   const [page, setPage] = useState(1)
-  useEffect(() => { setPage(1) }, [chipFilter, search])
+  useEffect(() => { setPage(1) }, [chipFilter, search, sort])
 
   // Esc cierra el overlay de encima primero, luego el slide-over de detalle
   useEffect(() => {
@@ -184,6 +189,18 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     return true
   })
 
+  // Valor de orden por columna clickeable
+  const SORT_ACCESSORS: Record<string, (o: ImportOrder) => string | number> = {
+    order_number: o => o.order_number,
+    supplier:     o => (o.supplier_name ?? '').toLowerCase(),
+    productos:    o => o.items.length,
+    cantidad:     o => o.items.reduce((a, i) => a + i.quantity, 0),
+    cajas:        o => o.box_count ?? 0,
+    total:        o => o.total_usd ?? 0,
+    updated_at:   o => new Date(o.updated_at ?? o.created_at ?? 0).getTime(),
+    estado:       o => STATUS_LABELS[o.status] ?? o.status,
+  }
+
   const visibleOrders = [...baseVisible.filter(o => {
     const grp = CHIP_GROUPS[chipFilter]
     if (grp && !grp.includes(o.status)) return false
@@ -195,11 +212,13 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       || (o.tracking_number ?? '').toLowerCase().includes(q)
       || o.items.some(i => i.product_name.toLowerCase().includes(q) || i.product_code.toLowerCase().includes(q))
   })].sort((a, b) => {
-    // Último movimiento descendente (updated_at), luego número de orden
-    const ta = new Date(a.updated_at ?? a.created_at ?? 0).getTime()
-    const tb = new Date(b.updated_at ?? b.created_at ?? 0).getTime()
-    if (tb !== ta) return tb - ta
-    return b.order_number.localeCompare(a.order_number)
+    const get = SORT_ACCESSORS[sort.key] ?? SORT_ACCESSORS.updated_at
+    const va = get(a), vb = get(b)
+    let r = typeof va === 'number' && typeof vb === 'number'
+      ? va - vb
+      : String(va).localeCompare(String(vb), 'es', { numeric: true })
+    if (r === 0) return b.order_number.localeCompare(a.order_number)  // desempate estable
+    return sort.dir === 'asc' ? r : -r
   })
 
   const chipCountI = (k: ChipFilter) => {
@@ -486,15 +505,15 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
               <tr className="border-b border-neutral-100">
-                <th className="px-3 py-2 text-left">Orden</th>
-                <th className="px-3 py-2 text-left">Proveedor</th>
+                <SortableTh label="Orden" sortKey="order_number" sort={sort} onSort={onSort} />
+                <SortableTh label="Proveedor" sortKey="supplier" sort={sort} onSort={onSort} />
                 <th className="px-3 py-2 text-left">Detalle</th>
-                <th className="px-3 py-2 text-right" title="Productos distintos (completos/total en recepción)">Productos</th>
-                <th className="px-3 py-2 text-right" title="Unidades totales (recibidas/total en recepción)">Cantidad</th>
-                <th className="px-3 py-2 text-right" title="Cantidad de cajas de la orden">Cajas</th>
-                {isAdmin && <th className="px-3 py-2 text-right">Total</th>}
-                <th className="px-3 py-2 text-right" title="Fecha del último movimiento">Últ. mov.</th>
-                <th className="px-3 py-2 text-center">Estado</th>
+                <SortableTh label="Productos" sortKey="productos" sort={sort} onSort={onSort} align="right" title="Productos distintos (completos/total en recepción)" />
+                <SortableTh label="Cantidad" sortKey="cantidad" sort={sort} onSort={onSort} align="right" title="Unidades totales (recibidas/total en recepción)" />
+                <SortableTh label="Cajas" sortKey="cajas" sort={sort} onSort={onSort} align="right" title="Cantidad de cajas de la orden" />
+                {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
+                <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
+                <SortableTh label="Estado" sortKey="estado" sort={sort} onSort={onSort} align="center" />
                 {historyMode && <th className="px-2 py-2 text-center">Inconsistente</th>}
               </tr>
             </thead>
