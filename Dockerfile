@@ -18,6 +18,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+# Docker pone HOSTNAME=<id-contenedor> y el server.js de Next standalone se
+# enlaza a ese hostname (su IP de eth0), no a 127.0.0.1. Eso hace que el
+# healthcheck a localhost:3000 dé "connection refused" aunque el puerto
+# publicado funcione. Forzar 0.0.0.0 hace que escuche en todas las interfaces.
+ENV HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
