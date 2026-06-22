@@ -10,14 +10,38 @@ const CURRENCIES = ['USD', 'COP', 'VES'] as const
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const thisMonth = () => new Date().toISOString().slice(0, 7)
 
+interface CloseLine { label: string; usd: number }
+interface Summary {
+  month: string; rates: { cop: number; ves: number }
+  income: CloseLine[]; expenses: CloseLine[]
+  totalIncome: number; totalExpense: number; surplus: number
+}
+interface CapAccount { id: number; name: string; currency: string; balance: number; usd: number; is_reserve: boolean }
+interface Capital {
+  rates: { cop: number; ves: number }
+  mercanciaVE: number; mercanciaCO_cop: number; mercanciaCO: number
+  accounts: CapAccount[]; liquidez: number; reservas: number; total: number
+}
+
+type Tab = 'movimientos' | 'cierre' | 'capital' | 'cuentas'
+const TAB_LABELS: Record<Tab, string> = {
+  movimientos: 'Movimientos',
+  cierre:      'Cierre mensual',
+  capital:     'Capital / Liquidez',
+  cuentas:     'Cuentas',
+}
+
 export default function FinanzasClient() {
   const confirm = useConfirm()
-  const [tab, setTab] = useState<'movimientos' | 'cuentas'>('movimientos')
+  const [tab, setTab] = useState<Tab>('movimientos')
 
   const [accounts,   setAccounts]   = useState<FinanceAccount[]>([])
   const [categories, setCategories] = useState<FinanceCategory[]>([])
   const [movements,  setMovements]  = useState<FinanceMovement[]>([])
   const [month,      setMonth]      = useState(thisMonth())
+  const [summary,    setSummary]    = useState<Summary | null>(null)
+  const [capital,    setCapital]    = useState<Capital | null>(null)
+  const [rateInput,  setRateInput]  = useState('')
   const [error,      setError]      = useState<string | null>(null)
   const [busy,       setBusy]       = useState(false)
 
@@ -41,8 +65,32 @@ export default function FinanzasClient() {
     setMovements(r.rows ?? [])
   }, [month])
 
+  const loadSummary = useCallback(async () => {
+    const r = await fetch(`/api/finance/summary?month=${month}`).then(r => r.json())
+    setSummary(r)
+  }, [month])
+
+  const loadCapital = useCallback(async () => {
+    const r = await fetch('/api/finance/capital').then(r => r.json())
+    setCapital(r)
+    setRateInput(String(r?.rates?.cop ?? ''))
+  }, [])
+
   useEffect(() => { loadStatic() }, [loadStatic])
   useEffect(() => { loadMovements() }, [loadMovements])
+  useEffect(() => { loadSummary() }, [loadSummary])
+  useEffect(() => { loadCapital() }, [loadCapital])
+
+  const saveRate = async () => {
+    const v = parseFloat(rateInput)
+    if (!v || v <= 0) return
+    const r = await fetch('/api/finance/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cop_usd_rate: v }),
+    })
+    if (r.ok) { loadCapital(); loadSummary() }
+    else setError((await r.json()).error ?? 'Error')
+  }
 
   // ── resumen del mes (sin conversión de moneda; el cierre consolidado llega en A2/A3) ──
   const ingresos = movements.filter(m => m.kind === 'income').reduce((s, m) => s + m.amount, 0)
@@ -66,13 +114,13 @@ export default function FinanzasClient() {
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white rounded-xl border border-neutral-200 shadow-sm p-1 w-fit">
-        {(['movimientos', 'cuentas'] as const).map(t => (
+      <div className="flex gap-1 bg-white rounded-xl border border-neutral-200 shadow-sm p-1 w-fit overflow-x-auto">
+        {(['movimientos', 'cierre', 'capital', 'cuentas'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100'
             }`}>
-            {t === 'movimientos' ? 'Movimientos' : 'Cuentas / Liquidez'}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -146,6 +194,143 @@ export default function FinanzasClient() {
                           </>
                         )}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════ CIERRE MENSUAL ════════ */}
+      {tab === 'cierre' && summary && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+            <span className="text-xs text-neutral-400">
+              Consolidado en USD · COP/USD {summary.rates.cop} · VES/USD {summary.rates.ves || '—'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Ingresos</div>
+              <div className="text-xl font-bold text-green-600">${money(summary.totalIncome)}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Gastos</div>
+              <div className="text-xl font-bold text-red-600">${money(summary.totalExpense)}</div>
+            </div>
+            <div className={`rounded-xl border p-3 shadow-sm ${summary.surplus >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+              <div className="text-xs text-neutral-500 mb-1">Sobrante</div>
+              <div className={`text-xl font-bold ${summary.surplus >= 0 ? 'text-green-700' : 'text-red-600'}`}>${money(summary.surplus)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-2 border-b bg-neutral-50 text-sm font-semibold text-green-700">Ingresos</div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {summary.income.length === 0 && <tr><td className="px-4 py-3 text-neutral-400">Sin ingresos</td></tr>}
+                  {summary.income.map(l => (
+                    <tr key={l.label} className="border-t border-neutral-50">
+                      <td className="px-4 py-2 text-neutral-700">{l.label}</td>
+                      <td className="px-4 py-2 text-right font-medium text-green-600">${money(l.usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-2 border-b bg-neutral-50 text-sm font-semibold text-red-700">Gastos</div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {summary.expenses.length === 0 && <tr><td className="px-4 py-3 text-neutral-400">Sin gastos</td></tr>}
+                  {summary.expenses.map(l => (
+                    <tr key={l.label} className="border-t border-neutral-50">
+                      <td className="px-4 py-2 text-neutral-700">{l.label}</td>
+                      <td className="px-4 py-2 text-right font-medium text-red-600">${money(l.usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-xs text-neutral-400">
+            Ventas (ingreso) y Compras locales / Importaciones (gastos) se traen automáticamente del sistema (VE + CO). El resto son tus movimientos manuales.
+          </p>
+        </div>
+      )}
+
+      {/* ════════ CAPITAL / LIQUIDEZ ════════ */}
+      {tab === 'capital' && capital && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-neutral-900 bg-neutral-900 text-white p-4 shadow-sm">
+            <div className="text-xs text-white/60 mb-1">Capital total (USD)</div>
+            <div className="text-3xl font-bold">${money(capital.total)}</div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Mercancía VE</div>
+              <div className="text-lg font-bold text-neutral-900">${money(capital.mercanciaVE)}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Mercancía CO</div>
+              <div className="text-lg font-bold text-neutral-900">${money(capital.mercanciaCO)}</div>
+              <div className="text-[10px] text-neutral-400">COP {money(capital.mercanciaCO_cop)}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Liquidez</div>
+              <div className="text-lg font-bold text-green-700">${money(capital.liquidez)}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Reservas (−)</div>
+              <div className="text-lg font-bold text-orange-600">${money(capital.reservas)}</div>
+            </div>
+          </div>
+
+          {/* Tasa COP/USD */}
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs text-neutral-500 mb-1">Tasa COP por USD (para consolidar Colombia)</label>
+              <input type="number" step="1" value={rateInput} onChange={e => setRateInput(e.target.value)}
+                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+            </div>
+            <button onClick={saveRate} className="btn-secondary text-sm">Actualizar tasa</button>
+            {capital.rates.ves > 0 && (
+              <span className="text-xs text-neutral-400 ml-auto">VES/USD (oficial BCV): {money(capital.rates.ves)}</span>
+            )}
+          </div>
+
+          {/* Cuentas con su valor en USD */}
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-2 border-b bg-neutral-50 text-sm font-semibold text-neutral-700">Cuentas de liquidez</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-neutral-50 text-xs text-neutral-500">
+                  <tr className="border-b border-neutral-100">
+                    <th className="px-3 py-2 text-left">Cuenta</th>
+                    <th className="px-3 py-2 text-center">Moneda</th>
+                    <th className="px-3 py-2 text-right">Saldo</th>
+                    <th className="px-3 py-2 text-right">En USD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {capital.accounts.length === 0 && (
+                    <tr><td colSpan={4} className="px-3 py-6 text-center text-neutral-400">Sin cuentas (agrégalas en la pestaña Cuentas)</td></tr>
+                  )}
+                  {capital.accounts.map((a, i) => (
+                    <tr key={a.id} className={`border-b border-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
+                      <td className="px-3 py-2 text-neutral-800">
+                        {a.name}{a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">reserva</span>}
+                      </td>
+                      <td className="px-3 py-2 text-center text-neutral-500">{a.currency}</td>
+                      <td className="px-3 py-2 text-right text-neutral-600">{money(a.balance)}</td>
+                      <td className={`px-3 py-2 text-right font-semibold ${a.is_reserve ? 'text-orange-600' : 'text-neutral-900'}`}>${money(a.usd)}</td>
                     </tr>
                   ))}
                 </tbody>
