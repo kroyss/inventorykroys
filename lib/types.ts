@@ -46,6 +46,48 @@ export interface MLCode {
   code: string
 }
 
+// ─── Finance (módulo global VE+CO) ──────────────────
+export type FinanceKind = 'income' | 'expense'
+
+export interface FinanceAccount {
+  id: number
+  name: string
+  type: string          // banco|efectivo|cripto|paypal|otro
+  currency: string      // USD|COP|VES
+  balance: number
+  is_reserve: boolean
+  is_active: boolean
+  display_order: number
+  notes: string | null
+}
+
+export interface FinanceCategory {
+  id: number
+  name: string
+  kind: FinanceKind
+  is_active: boolean
+  display_order: number
+}
+
+export interface FinanceMovement {
+  id: number
+  date: string
+  description: string | null
+  amount: number
+  kind: FinanceKind
+  currency: string
+  category_id: number | null
+  category_name: string | null
+  account_id: number | null
+  account_name: string | null
+  country: string | null
+  source: 'manual' | 'auto'
+  ref_type: string | null
+  ref_id: number | null
+  created_by: number | null
+  created_at: string
+}
+
 // ─── Inventory ──────────────────────────────────────
 export type StockStatus = 'OK' | 'BAJO' | 'SIN_STOCK' | 'INACTIVO'
 

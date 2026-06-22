@@ -10,6 +10,7 @@ const allLinks = [
   { href: '/compras',    label: 'Compras',   roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/productos',  label: 'Productos', roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/reportes',   label: 'Reportes',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
+  { href: '/finanzas',   label: 'Finanzas',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/tasas',      label: 'Tasas',     roles: ['admin']         as UserRole[], countries: ['VE']       as Country[] },
 ]
 
