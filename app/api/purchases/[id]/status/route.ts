@@ -83,7 +83,19 @@ export async function PUT(
           await db.query('ROLLBACK')
           return NextResponse.json({ error: `No se puede avanzar desde ${order.status}` }, { status: 409 })
         }
-        await db.query(`UPDATE purchase_orders SET status = $1 WHERE id = $2`, [next, id])
+        // Al pasar a PAGADA, registrar el pago = total de la orden si aún no se cargó
+        // (el monto pagado no puede quedar en 0). Respeta un pago parcial ya ingresado.
+        if (next === 'PAGADA') {
+          await db.query(
+            `UPDATE purchase_orders
+             SET status = $1,
+                 total_paid = CASE WHEN COALESCE(total_paid, 0) = 0 THEN total_usd ELSE total_paid END
+             WHERE id = $2`,
+            [next, id]
+          )
+        } else {
+          await db.query(`UPDATE purchase_orders SET status = $1 WHERE id = $2`, [next, id])
+        }
 
       } else if (action === 'finalize' || action === 'inconsistente') {
         const target = action === 'finalize' ? 'FINALIZADA' : 'INCONSISTENTE'

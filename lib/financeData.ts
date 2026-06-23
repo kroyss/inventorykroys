@@ -63,8 +63,8 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
     (await db.query(`SELECT COALESCE(SUM(total_amount),0)::float AS t FROM sales WHERE ${SALES_DONE} AND to_char(${SALES_DATE},'YYYY-MM')=$1`, [month])).rows[0].t as number,
     0)
 
-  // Compras locales (auto) = total de la orden ya pagada (PAGADA+), por fecha de creación
-  const purchQ = `SELECT COALESCE(SUM(total_usd),0)::float AS t FROM purchase_orders WHERE order_type='local' AND status NOT IN ('PENDIENTE','REABIERTA') AND to_char(created_at,'YYYY-MM')=$1`
+  // Compras locales (auto) = lo pagado (total_paid), por fecha de creación
+  const purchQ = `SELECT COALESCE(SUM(total_paid),0)::float AS t FROM purchase_orders WHERE order_type='local' AND total_paid > 0 AND to_char(created_at,'YYYY-MM')=$1`
   const purchVE = (await ve.query(purchQ, [month])).rows[0].t as number
   const purchCO = await coSafe(async db =>
     (await db.query(purchQ, [month])).rows[0].t as number, 0)
@@ -157,13 +157,12 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
   if (salesVE) rows.push({ key: 'sales-ve', id: null, date: null, description: 'Ventas del mes', category_name: 'Ventas', account_name: null, category_id: null, account_id: null, kind: 'income', amount: salesVE, currency: 'USD', usd: salesVE, country: 'VE', source: 'auto' })
   if (salesCO) rows.push({ key: 'sales-co', id: null, date: null, description: 'Ventas del mes', category_name: 'Ventas', account_name: null, category_id: null, account_id: null, kind: 'income', amount: salesCO, currency: 'COP', usd: toUsd(salesCO, 'COP', rates), country: 'CO', source: 'auto' })
 
-  // ── Compras locales (auto, una fila por orden ya pagada en el mes) ──
-  // Se cuenta el total de la orden (total_usd) una vez pagada (PAGADA en adelante),
-  // no total_paid (que el módulo no llena solo).
+  // ── Compras locales (auto, una fila por orden pagada en el mes) ──
+  // total_paid es la fuente de verdad del dinero que salió (se setea al pagar).
   const purchSql = `
-    SELECT po.id, po.order_number, po.total_usd::float AS amt, po.created_at AS date, s.name AS supplier
+    SELECT po.id, po.order_number, po.total_paid::float AS amt, po.created_at AS date, s.name AS supplier
     FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-    WHERE po.order_type = 'local' AND po.status NOT IN ('PENDIENTE','REABIERTA')
+    WHERE po.order_type = 'local' AND po.total_paid > 0
       AND to_char(po.created_at,'YYYY-MM') = $1
     ORDER BY po.created_at`
   const pushPurch = (list: Array<Record<string, unknown>>, country: 'VE' | 'CO', currency: string) => {
