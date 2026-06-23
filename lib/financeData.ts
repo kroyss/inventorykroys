@@ -1,5 +1,6 @@
 import { getDb } from '@/lib/db'
 import type { Pool } from 'pg'
+import type { FinanceLedgerRow } from '@/lib/types'
 
 // Finanzas global: VE es la maestra (cuentas, movimientos, settings) y además
 // la operación de VE; CO aporta solo su operación (ventas, compras, inventario).
@@ -129,6 +130,113 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
     surplusVE: incomeVE - expenseVE,
     surplusCO: incomeCO - expenseCO,
   }
+}
+
+// ───────────────────────── Libro de movimientos del mes ─────────────────────────
+// Lista, por mes, el detalle tipo "Excel": cada compra local e importación (auto,
+// desde el módulo de compras), las ventas como ingreso, y los movimientos manuales.
+// Todo consolidado a USD (COP por tasa manual, VES por oficial BCV).
+export interface MonthlyMovements {
+  month: string
+  rates: FinanceRates
+  rows: FinanceLedgerRow[]
+  totalIncome: number
+  totalExpense: number
+  surplus: number
+}
+
+const isoDate = (d: unknown): string | null => (d ? new Date(d as string).toISOString() : null)
+
+export async function getMonthlyMovements(month: string): Promise<MonthlyMovements> {
+  const ve = veDb()
+  const rates = await getRates()
+  const rows: FinanceLedgerRow[] = []
+
+  // ── Ventas (auto, agregado por país: como el "INGRESO BRUTO DEL MES") ──
+  const salesQ = `SELECT COALESCE(SUM(total_amount),0)::float AS t FROM sales WHERE ${SALES_DONE} AND to_char(${SALES_DATE},'YYYY-MM')=$1`
+  const salesVE = (await ve.query(salesQ, [month])).rows[0].t as number
+  const salesCO = await coSafe(async db => (await db.query(salesQ, [month])).rows[0].t as number, 0)
+  if (salesVE) rows.push({ key: 'sales-ve', id: null, date: null, description: 'Ventas del mes', category_name: 'Ventas', account_name: null, category_id: null, account_id: null, kind: 'income', amount: salesVE, currency: 'USD', usd: salesVE, country: 'VE', source: 'auto' })
+  if (salesCO) rows.push({ key: 'sales-co', id: null, date: null, description: 'Ventas del mes', category_name: 'Ventas', account_name: null, category_id: null, account_id: null, kind: 'income', amount: salesCO, currency: 'COP', usd: toUsd(salesCO, 'COP', rates), country: 'CO', source: 'auto' })
+
+  // ── Compras locales (auto, una fila por orden con pago en el mes) ──
+  const purchSql = `
+    SELECT po.id, po.order_number, po.total_paid::float AS paid, po.created_at AS date, s.name AS supplier
+    FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+    WHERE po.order_type = 'local' AND po.total_paid > 0 AND to_char(po.created_at,'YYYY-MM') = $1
+    ORDER BY po.created_at`
+  const pushPurch = (list: Array<Record<string, unknown>>, country: 'VE' | 'CO', currency: string) => {
+    for (const p of list) {
+      const paid = p.paid as number
+      rows.push({
+        key: `po-${country.toLowerCase()}-${p.id}`, id: null, date: isoDate(p.date),
+        description: `${p.order_number}${p.supplier ? ' · ' + p.supplier : ''}`,
+        category_name: 'Compras locales', account_name: null, category_id: null, account_id: null,
+        kind: 'expense', amount: paid, currency, usd: toUsd(paid, currency, rates), country, source: 'auto',
+      })
+    }
+  }
+  pushPurch((await ve.query(purchSql, [month])).rows, 'VE', 'USD')
+  pushPurch(await coSafe(async db => (await db.query(purchSql, [month])).rows, []), 'CO', 'COP')
+
+  // ── Importaciones (auto, una fila por pago 50%/100% en el mes) ──
+  const impSql = `
+    SELECT id, order_number, supplier, amt::float AS amt, dt, step FROM (
+      SELECT io.id, io.order_number, s.name AS supplier, io.paid_50_amount AS amt, io.paid_50_at AS dt, '50' AS step
+      FROM import_orders io LEFT JOIN suppliers s ON s.id = io.supplier_id
+      WHERE io.paid_50_done AND to_char(io.paid_50_at,'YYYY-MM') = $1
+      UNION ALL
+      SELECT io.id, io.order_number, s.name, io.paid_100_amount, io.paid_100_at, '100'
+      FROM import_orders io LEFT JOIN suppliers s ON s.id = io.supplier_id
+      WHERE io.paid_100_done AND to_char(io.paid_100_at,'YYYY-MM') = $1
+    ) x ORDER BY dt`
+  const pushImp = (list: Array<Record<string, unknown>>, country: 'VE' | 'CO', currency: string) => {
+    for (const p of list) {
+      const amt = (p.amt as number) ?? 0
+      if (!amt) continue
+      rows.push({
+        key: `imp-${country.toLowerCase()}-${p.id}-${p.step}`, id: null, date: isoDate(p.dt),
+        description: `${p.order_number}${p.supplier ? ' · ' + p.supplier : ''} · Pago ${p.step}%`,
+        category_name: 'Importaciones', account_name: null, category_id: null, account_id: null,
+        kind: 'expense', amount: amt, currency, usd: toUsd(amt, currency, rates), country, source: 'auto',
+      })
+    }
+  }
+  pushImp((await ve.query(impSql, [month])).rows, 'VE', 'USD')
+  pushImp(await coSafe(async db => (await db.query(impSql, [month])).rows, []), 'CO', 'COP')
+
+  // ── Movimientos manuales (en VE maestra) ──
+  const { rows: mov } = await ve.query(`
+    SELECT m.id, m.date, m.description, m.amount::float AS amount, m.kind, m.currency,
+           m.category_id, c.name AS category_name, m.account_id, a.name AS account_name, m.country
+    FROM finance_movements m
+    LEFT JOIN finance_categories c ON c.id = m.category_id
+    LEFT JOIN finance_accounts   a ON a.id = m.account_id
+    WHERE to_char(m.date,'YYYY-MM') = $1
+  `, [month])
+  for (const m of mov) {
+    rows.push({
+      key: `mov-${m.id}`, id: m.id as number, date: isoDate(m.date),
+      description: m.description as string | null,
+      category_name: m.category_name as string | null, account_name: m.account_name as string | null,
+      category_id: m.category_id as number | null, account_id: m.account_id as number | null,
+      kind: m.kind as FinanceLedgerRow['kind'], amount: m.amount as number, currency: m.currency as string,
+      usd: toUsd(m.amount as number, m.currency as string, rates),
+      country: m.country as string | null, source: 'manual',
+    })
+  }
+
+  // Orden: agregados sin fecha arriba, luego por fecha desc
+  rows.sort((a, b) => {
+    if (!a.date && !b.date) return 0
+    if (!a.date) return -1
+    if (!b.date) return 1
+    return a.date < b.date ? 1 : a.date > b.date ? -1 : 0
+  })
+
+  const totalIncome  = rows.filter(r => r.kind === 'income').reduce((s, r) => s + r.usd, 0)
+  const totalExpense = rows.filter(r => r.kind === 'expense').reduce((s, r) => s + r.usd, 0)
+  return { month, rates, rows, totalIncome, totalExpense, surplus: totalIncome - totalExpense }
 }
 
 // ───────────────────────── Capital / Patrimonio ─────────────────────────

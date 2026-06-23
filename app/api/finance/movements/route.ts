@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getFinanceSession } from '@/lib/finance'
+import { getMonthlyMovements } from '@/lib/financeData'
 import { unauthorized, forbidden } from '@/lib/session'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
@@ -27,18 +28,9 @@ export async function GET(req: NextRequest) {
     ? monthRaw
     : new Date().toISOString().slice(0, 7) // YYYY-MM actual
 
-  const { rows } = await db.query(`
-    SELECT m.id, m.date, m.description, m.amount::float AS amount, m.kind, m.currency,
-           m.category_id, c.name AS category_name,
-           m.account_id,  a.name AS account_name,
-           m.country, m.source, m.ref_type, m.ref_id, m.created_by, m.created_at
-    FROM finance_movements m
-    LEFT JOIN finance_categories c ON c.id = m.category_id
-    LEFT JOIN finance_accounts   a ON a.id = m.account_id
-    WHERE to_char(m.date, 'YYYY-MM') = $1
-    ORDER BY m.date DESC, m.id DESC
-  `, [month])
-  return NextResponse.json({ month, rows })
+  // Libro unificado: compras/importaciones (auto) + ventas + movimientos manuales
+  const data = await getMonthlyMovements(month)
+  return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {

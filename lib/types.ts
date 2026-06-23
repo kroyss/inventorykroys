@@ -88,6 +88,24 @@ export interface FinanceMovement {
   created_at: string
 }
 
+// Fila del libro de movimientos (manual + automáticos consolidados a USD)
+export interface FinanceLedgerRow {
+  key: string                 // clave única de React (manuales: id; auto: sintética)
+  id: number | null           // id de movimiento manual (editable); null si es automático
+  date: string | null         // ISO; null en agregados sin fecha (ventas del mes)
+  description: string | null
+  category_name: string | null
+  account_name: string | null
+  category_id: number | null
+  account_id: number | null
+  kind: FinanceKind
+  amount: number              // monto en su moneda original
+  currency: string            // USD|COP|VES
+  usd: number                 // consolidado a USD
+  country: string | null      // VE|CO
+  source: 'manual' | 'auto'
+}
+
 // ─── Inventory ──────────────────────────────────────
 export type StockStatus = 'OK' | 'BAJO' | 'SIN_STOCK' | 'INACTIVO'
 

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import type { FinanceAccount, FinanceCategory, FinanceMovement, FinanceKind } from '@/lib/types'
+import type { FinanceAccount, FinanceCategory, FinanceLedgerRow, FinanceKind } from '@/lib/types'
 import { money } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
@@ -50,7 +50,7 @@ export default function FinanzasClient() {
 
   const [accounts,   setAccounts]   = useState<FinanceAccount[]>([])
   const [categories, setCategories] = useState<FinanceCategory[]>([])
-  const [movements,  setMovements]  = useState<FinanceMovement[]>([])
+  const [movements,  setMovements]  = useState<FinanceLedgerRow[]>([])
   const [month,      setMonth]      = useState(thisMonth())
   const [summary,    setSummary]    = useState<Summary | null>(null)
   const [capital,    setCapital]    = useState<Capital | null>(null)
@@ -60,7 +60,7 @@ export default function FinanzasClient() {
 
   // ── modales ──
   const [accModal, setAccModal] = useState<null | FinanceAccount>(null)  // null=cerrado; objeto vacío=nuevo
-  const [movModal, setMovModal] = useState<null | FinanceMovement>(null)
+  const [movModal, setMovModal] = useState<null | FinanceLedgerRow>(null)
   const [showAcc,  setShowAcc]  = useState(false)
   const [showMov,  setShowMov]  = useState(false)
 
@@ -105,9 +105,9 @@ export default function FinanzasClient() {
     else setError((await r.json()).error ?? 'Error')
   }
 
-  // ── resumen del mes (sin conversión de moneda; el cierre consolidado llega en A2/A3) ──
-  const ingresos = movements.filter(m => m.kind === 'income').reduce((s, m) => s + m.amount, 0)
-  const gastos   = movements.filter(m => m.kind === 'expense').reduce((s, m) => s + m.amount, 0)
+  // ── resumen del mes (consolidado en USD) ──
+  const ingresos = movements.filter(m => m.kind === 'income').reduce((s, m) => s + m.usd, 0)
+  const gastos   = movements.filter(m => m.kind === 'expense').reduce((s, m) => s + m.usd, 0)
   const neto     = ingresos - gastos
 
   // ── totales de cuentas por moneda ──
@@ -162,9 +162,11 @@ export default function FinanzasClient() {
               <div className={`text-xl font-bold ${neto >= 0 ? 'text-neutral-900' : 'text-red-600'}`}>${money(neto)}</div>
             </div>
           </div>
-          <p className="text-xs text-neutral-400 -mt-2">Montos sumados sin conversión de moneda. El cierre consolidado (COP→USD) llega en la siguiente fase.</p>
+          <p className="text-xs text-neutral-400 -mt-2">
+            Ventas, compras locales e importaciones se traen automáticamente del sistema (etiqueta <span className="text-blue-600">auto</span>). Agrega a mano sueldos, comisiones, envíos, etc. Todo consolidado en USD · COP/USD {capital?.rates.cop ?? '—'}.
+          </p>
 
-          {/* Tabla */}
+          {/* Tabla — libro de movimientos */}
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -173,7 +175,7 @@ export default function FinanzasClient() {
                     <th className="px-3 py-2 text-left">Fecha</th>
                     <th className="px-3 py-2 text-left">Categoría</th>
                     <th className="px-3 py-2 text-left">Descripción</th>
-                    <th className="px-3 py-2 text-left">Cuenta</th>
+                    <th className="px-3 py-2 text-center">País</th>
                     <th className="px-3 py-2 text-right">Monto</th>
                     <th className="px-3 py-2" />
                   </tr>
@@ -183,16 +185,26 @@ export default function FinanzasClient() {
                     <tr><td colSpan={6} className="px-3 py-8 text-center text-neutral-400">Sin movimientos este mes</td></tr>
                   )}
                   {movements.map((m, i) => (
-                    <tr key={m.id} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
-                      <td className="px-3 py-2 whitespace-nowrap text-neutral-600">{new Date(m.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</td>
-                      <td className="px-3 py-2">
+                    <tr key={m.key} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
+                      <td className="px-3 py-2 whitespace-nowrap text-neutral-600">
+                        {m.date ? new Date(m.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : <span className="text-neutral-300">mes</span>}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
                         {m.category_name ?? <span className="text-neutral-300">—</span>}
                         {m.source === 'auto' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">auto</span>}
                       </td>
-                      <td className="px-3 py-2 text-neutral-500 max-w-[16rem] truncate">{m.description ?? ''}</td>
-                      <td className="px-3 py-2 text-neutral-500">{m.account_name ?? <span className="text-neutral-300">—</span>}</td>
+                      <td className="px-3 py-2 text-neutral-500 max-w-[16rem] truncate" title={[m.description, m.account_name].filter(Boolean).join(' · ')}>
+                        {m.description ?? ''}
+                        {m.account_name && <span className="text-neutral-400"> · {m.account_name}</span>}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {m.country
+                          ? <span className={`text-[10px] px-1.5 py-0.5 rounded ${m.country === 'VE' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>{m.country}</span>
+                          : <span className="text-neutral-300">—</span>}
+                      </td>
                       <td className={`px-3 py-2 text-right font-semibold whitespace-nowrap ${m.kind === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                         {m.kind === 'income' ? '+' : '−'}{money(m.amount)} <span className="text-neutral-400 text-xs">{m.currency}</span>
+                        {m.currency !== 'USD' && <span className="block text-[10px] text-neutral-400 font-normal">${money(m.usd)}</span>}
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         {m.source === 'manual' && (
@@ -547,7 +559,7 @@ function AccountModal({ initial, busy, onClose, onSave }: {
 
 // ─────────────────────────── Modal de movimiento ───────────────────────────
 function MovementModal({ initial, categories, accounts, busy, onClose, onSave }: {
-  initial: FinanceMovement | null
+  initial: FinanceLedgerRow | null
   categories: FinanceCategory[]
   accounts: FinanceAccount[]
   busy: boolean
