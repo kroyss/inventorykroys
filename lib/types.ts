@@ -279,6 +279,7 @@ export interface Sale {
   verified_by: string | null
   processed_by: string | null
   reopen_count: number
+  is_flex: boolean
   items: SaleItem[]
 }
 

@@ -6,8 +6,10 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 const Schema = z.object({
   // 'REABIERTA' action → reverts sale to BORRADOR
   // 'PAGO_VERIFICADO' → verifies payment (LOCAL sales skip to DESCARGADA_LOCAL)
-  // 'PROCESADA' → processes sale, deducts inventory
-  status: z.enum(['PAGO_VERIFICADO', 'PROCESADA', 'REABIERTA']),
+  // 'PROCESADA' → processes sale, deducts inventory (FLEX: espera descarga del Excel)
+  // 'DESCARGADA' → CO no-FLEX: procesa y marca descargada en un paso
+  status:  z.enum(['PAGO_VERIFICADO', 'PROCESADA', 'REABIERTA', 'DESCARGADA']),
+  is_flex: z.boolean().optional(),
 })
 
 export async function PUT(
@@ -19,7 +21,7 @@ export async function PUT(
   if (!session || !db) return unauthorized()
 
   try {
-    const { status: newStatus } = Schema.parse(await req.json())
+    const { status: newStatus, is_flex: isFlexBody } = Schema.parse(await req.json())
     const userId = parseInt(session.user.id, 10)
 
     const { rows: [sale] } = await db.query(
@@ -212,7 +214,49 @@ export async function PUT(
         }
         await db.query(
           `UPDATE sales
-           SET status='PROCESADA', processed_by=$1, processed_at=NOW(), updated_at=NOW()
+           SET status='PROCESADA', processed_by=$1, processed_at=NOW(), updated_at=NOW(),
+               is_flex = COALESCE($3, is_flex)
+           WHERE id=$2`,
+          [userId, id, isFlexBody ?? null]
+        )
+
+      } else if (newStatus === 'DESCARGADA') {
+        // CO sin FLEX: procesa y marca descargada en un solo paso (descuenta inventario).
+        if (session.user.country !== 'CO') {
+          await db.query('ROLLBACK')
+          return NextResponse.json({ error: 'Transición no permitida' }, { status: 409 })
+        }
+        if (!['BORRADOR', 'PAGO_VERIFICADO'].includes(current)) {
+          await db.query('ROLLBACK')
+          return NextResponse.json({ error: 'Solo se puede descargar desde borrador' }, { status: 409 })
+        }
+        const { rows: items } = await db.query(
+          `SELECT si.product_id, si.quantity, p.name AS product_name
+           FROM sale_items si JOIN products p ON p.id = si.product_id
+           WHERE si.sale_id = $1`, [id]
+        )
+        for (const item of items) {
+          const { rows: [inv] } = await db.query(`SELECT quantity FROM inventory WHERE product_id = $1`, [item.product_id])
+          if (!inv) {
+            await db.query('ROLLBACK')
+            return NextResponse.json({ error: `Producto ${item.product_name} no tiene inventario` }, { status: 400 })
+          }
+          if (inv.quantity < item.quantity) {
+            await db.query('ROLLBACK')
+            return NextResponse.json({ error: `Stock insuficiente para '${item.product_name}'. Disponible: ${inv.quantity}, requerido: ${item.quantity}` }, { status: 400 })
+          }
+        }
+        for (const item of items) {
+          await db.query(`UPDATE inventory SET quantity = quantity - $1, last_updated = NOW() WHERE product_id = $2`, [item.quantity, item.product_id])
+          await db.query(
+            `INSERT INTO inventory_movements (product_id, movement_type, quantity, reference, notes, created_by)
+             VALUES ($1, 'OUT', $2, $3, $4, $5)`,
+            [item.product_id, -item.quantity, `Venta #${id}`, 'Venta directa (no FLEX)', userId]
+          )
+        }
+        await db.query(
+          `UPDATE sales
+           SET status='DESCARGADA', is_flex=FALSE, processed_by=$1, processed_at=NOW(), updated_at=NOW()
            WHERE id=$2`,
           [userId, id]
         )

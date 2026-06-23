@@ -18,7 +18,7 @@ export async function GET(
       s.total_amount::float    AS total_amount,
       s.discount_percent::float AS discount_percent,
       s.notes, s.created_at, s.updated_at,
-      s.payment_verified_at, s.processed_at, s.reopen_count,
+      s.payment_verified_at, s.processed_at, s.reopen_count, s.is_flex,
       uc.username AS created_by,
       uv.username AS verified_by,
       up.username AS processed_by,

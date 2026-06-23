@@ -86,6 +86,7 @@ export default function VentasClient({ products, userRole, country }: Props) {
   const [selection, setSelection] = useState<Set<number>>(new Set())
   const [busy, setBusy]         = useState(false)
   const [error, setError]       = useState<string | null>(null)
+  const [flex, setFlex]         = useState(false)  // CO: marca FLEX antes de procesar
 
   // Orden por columna (server-side; default fecha desc)
   type SortKey = 'order_number' | 'customer' | 'units' | 'total' | 'created_at' | 'status'
@@ -109,6 +110,9 @@ export default function VentasClient({ products, userRole, country }: Props) {
 
   const isAdmin = userRole === 'admin'
   const confirm = useConfirm()
+
+  // Al abrir una venta, precarga su marca FLEX
+  useEffect(() => { setFlex(selected?.is_flex ?? false) }, [selected?.id])
 
   // Debounce the search box
   useEffect(() => {
@@ -163,13 +167,16 @@ export default function VentasClient({ products, userRole, country }: Props) {
 
   const reload = () => fetchSales()
 
-  const doAction = async (status: 'PAGO_VERIFICADO' | 'PROCESADA' | 'REABIERTA') => {
+  const doAction = async (
+    status: 'PAGO_VERIFICADO' | 'PROCESADA' | 'REABIERTA' | 'DESCARGADA',
+    extra?: Record<string, unknown>,
+  ) => {
     if (!selected) return
     setBusy(true); setError(null)
     const res = await fetch(`/api/sales/${selected.id}/status`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ status }),
+      body:    JSON.stringify({ status, ...extra }),
     })
     setBusy(false)
     if (!res.ok) {
@@ -460,8 +467,18 @@ export default function VentasClient({ products, userRole, country }: Props) {
                       {country === 'CO' ? 'Entregar' : 'Verificar y entregar'}
                     </button>
                   ) : country === 'CO' ? (
-                    // CO: sin verificar pago → procesar directo desde borrador
-                    <button onClick={() => doAction('PROCESADA')} disabled={busy} className="btn-primary text-sm">Procesar</button>
+                    // CO: sin verificar pago. FLEX → PROCESADA (espera Excel); no FLEX → DESCARGADA directo
+                    <>
+                      <label className="flex items-center gap-1.5 text-sm self-center mr-1" title="FLEX: requiere descargar el Excel; sin FLEX pasa directo a Descargada">
+                        <input type="checkbox" checked={flex} onChange={e => setFlex(e.target.checked)} className="rounded" />
+                        FLEX
+                      </label>
+                      <button
+                        onClick={() => flex ? doAction('PROCESADA', { is_flex: true }) : doAction('DESCARGADA', { is_flex: false })}
+                        disabled={busy} className="btn-primary text-sm">
+                        {flex ? 'Procesar (FLEX)' : 'Procesar → Descargada'}
+                      </button>
+                    </>
                   ) : (
                     <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy} className="btn-primary text-sm">Verificar pago</button>
                   )}
