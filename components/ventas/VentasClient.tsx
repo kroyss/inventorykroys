@@ -484,6 +484,9 @@ export default function VentasClient({ products, userRole, country }: Props) {
               {['PROCESADA','DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
                 <button onClick={() => setSelected(null)} className="btn-secondary text-sm">Salir</button>
               )}
+              {['DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
+                <button onClick={() => { setSelected(null); setEditing(null); setShowForm(true) }} className="btn-primary text-sm">Nueva</button>
+              )}
             </div>
           </div>
         </div>
