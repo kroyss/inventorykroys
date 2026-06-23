@@ -164,16 +164,16 @@ export default function VentasForm({ editing, products, country, onClose, onSave
                   <input type="checkbox" checked={isLocal}
                     onChange={e => { setIsLocal(e.target.checked); if (e.target.checked) setIsFlex(false) }}
                     className="accent-orange-600 w-4 h-4" />
-                  Venta LOCAL (entrega personal, descuenta inventario al verificar)
+                  Venta LOCAL
                 </label>
               )}
               {country === 'CO' && !isLocal && (
                 <label className={`flex items-center gap-2 text-sm rounded-lg border px-3 py-2 cursor-pointer transition-colors font-medium whitespace-nowrap ${
                   isFlex
-                    ? 'bg-sky-600 border-sky-600 text-white'
-                    : 'bg-sky-50 border-sky-300 text-sky-700 hover:bg-sky-100'
+                    ? 'bg-green-500 border-green-500 text-white'
+                    : 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100'
                 }`}>
-                  <input type="checkbox" checked={isFlex} onChange={e => setIsFlex(e.target.checked)} className="accent-sky-600 w-4 h-4" />
+                  <input type="checkbox" checked={isFlex} onChange={e => setIsFlex(e.target.checked)} className="accent-green-600 w-4 h-4" />
                   Venta FLEX
                 </label>
               )}
