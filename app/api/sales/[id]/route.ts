@@ -56,6 +56,7 @@ const EditSchema = z.object({
   customer_name:    z.string().optional(),
   discount_percent: z.number().min(0).max(100).default(0),
   notes:            z.string().optional(),
+  is_flex:          z.boolean().optional(),
   items: z.array(z.object({
     product_id: z.number().int().positive(),
     quantity:   z.number().int().positive(),
@@ -106,10 +107,10 @@ export async function PUT(
       await db.query(
         `UPDATE sales
          SET ml_order_number=$1, customer_name=$2, total_amount=$3,
-             discount_percent=$4, notes=$5, updated_at=NOW()
-         WHERE id=$6`,
+             discount_percent=$4, notes=$5, is_flex=COALESCE($6, is_flex), updated_at=NOW()
+         WHERE id=$7`,
         [body.ml_order_number, body.customer_name ?? null, total,
-         body.discount_percent, body.notes ?? null, id]
+         body.discount_percent, body.notes ?? null, body.is_flex ?? null, id]
       )
       await db.query(`DELETE FROM sale_items WHERE sale_id = $1`, [id])
       for (const item of body.items) {

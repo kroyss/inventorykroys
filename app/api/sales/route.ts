@@ -15,6 +15,7 @@ const CreateSchema = z.object({
   customer_name:   z.string().optional(),
   discount_percent: z.number().min(0).max(100).default(0),
   notes:           z.string().optional(),
+  is_flex:         z.boolean().optional(),
   items:           z.array(ItemSchema).min(1),
 })
 
@@ -192,11 +193,11 @@ export async function POST(req: NextRequest) {
     try {
       const { rows: [sale] } = await db.query(
         `INSERT INTO sales
-           (ml_order_number, status, customer_name, total_amount, discount_percent, notes, created_by)
-         VALUES ($1, 'BORRADOR', $2, $3, $4, $5, $6)
+           (ml_order_number, status, customer_name, total_amount, discount_percent, notes, is_flex, created_by)
+         VALUES ($1, 'BORRADOR', $2, $3, $4, $5, $6, $7)
          RETURNING id`,
         [body.ml_order_number, body.customer_name ?? null, total,
-         body.discount_percent, body.notes ?? null, userId]
+         body.discount_percent, body.notes ?? null, body.is_flex ?? false, userId]
       )
       for (const item of body.items) {
         await db.query(

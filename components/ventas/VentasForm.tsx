@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import type { Sale, InventoryItem } from '@/lib/types'
+import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { blockNumberKeys, blockIntKeys, digitsOnly } from '@/lib/inputGuards'
 
@@ -16,6 +16,7 @@ interface FormItem {
 interface Props {
   editing: Sale | null
   products: InventoryItem[]
+  country: Country
   onClose: () => void
   onSaved: () => void                 // guardar + cerrar panel
   onContinue?: (id: number) => void   // guardar y abrir el detalle para avanzar estados
@@ -24,7 +25,7 @@ interface Props {
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function VentasForm({ editing, products, onClose, onSaved, onContinue }: Props) {
+export default function VentasForm({ editing, products, country, onClose, onSaved, onContinue }: Props) {
   const [orderNumber, setOrderNumber] = useState(editing?.ml_order_number ?? '')
   const [customer,    setCustomer]    = useState(editing?.customer_name ?? '')
   const [discount,    setDiscount]    = useState(editing?.discount_percent ?? 0)
@@ -45,6 +46,7 @@ export default function VentasForm({ editing, products, onClose, onSaved, onCont
   const [busy,   setBusy]   = useState(false)
   const [error,  setError]  = useState<string | null>(null)
   const [isLocal, setIsLocal] = useState(editing?.ml_order_number.startsWith('LOCAL-') ?? false)
+  const [isFlex, setIsFlex] = useState(editing?.is_flex ?? false)  // CO: venta FLEX
   const [mounted, setMounted] = useState(false)
 
   // slide-in on mount
@@ -105,6 +107,8 @@ export default function VentasForm({ editing, products, onClose, onSaved, onCont
       customer_name:    customer.trim(),
       discount_percent: discount,
       notes:            notes.trim(),
+      // FLEX solo aplica en CO y en ventas no-LOCAL
+      ...(country === 'CO' ? { is_flex: isFlex && !isLocal } : {}),
       items: items.map(i => ({
         product_id: i.product_id,
         quantity:   i.quantity,
@@ -149,15 +153,31 @@ export default function VentasForm({ editing, products, onClose, onSaved, onCont
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
 
-          {!editing && (
-            <label className={`flex items-center gap-2 text-sm rounded-lg border px-3 py-2 cursor-pointer transition-colors font-medium ${
-              isLocal
-                ? 'bg-orange-500 border-orange-500 text-white'
-                : 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100'
-            }`}>
-              <input type="checkbox" checked={isLocal} onChange={e => setIsLocal(e.target.checked)} className="accent-orange-600 w-4 h-4" />
-              Venta LOCAL (entrega personal, descuenta inventario al verificar)
-            </label>
+          {(!editing || (country === 'CO' && !isLocal)) && (
+            <div className="flex gap-2">
+              {!editing && (
+                <label className={`flex-1 flex items-center gap-2 text-sm rounded-lg border px-3 py-2 cursor-pointer transition-colors font-medium ${
+                  isLocal
+                    ? 'bg-orange-500 border-orange-500 text-white'
+                    : 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100'
+                }`}>
+                  <input type="checkbox" checked={isLocal}
+                    onChange={e => { setIsLocal(e.target.checked); if (e.target.checked) setIsFlex(false) }}
+                    className="accent-orange-600 w-4 h-4" />
+                  Venta LOCAL (entrega personal, descuenta inventario al verificar)
+                </label>
+              )}
+              {country === 'CO' && !isLocal && (
+                <label className={`flex items-center gap-2 text-sm rounded-lg border px-3 py-2 cursor-pointer transition-colors font-medium whitespace-nowrap ${
+                  isFlex
+                    ? 'bg-sky-600 border-sky-600 text-white'
+                    : 'bg-sky-50 border-sky-300 text-sky-700 hover:bg-sky-100'
+                }`}>
+                  <input type="checkbox" checked={isFlex} onChange={e => setIsFlex(e.target.checked)} className="accent-sky-600 w-4 h-4" />
+                  Venta FLEX
+                </label>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
