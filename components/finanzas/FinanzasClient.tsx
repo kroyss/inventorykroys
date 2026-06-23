@@ -52,6 +52,7 @@ export default function FinanzasClient() {
   const [categories, setCategories] = useState<FinanceCategory[]>([])
   const [movements,  setMovements]  = useState<FinanceLedgerRow[]>([])
   const [month,      setMonth]      = useState(thisMonth())
+  const [movPais,    setMovPais]    = useState<'all' | 'VE' | 'CO'>('all')  // filtro país del libro
   const [summary,    setSummary]    = useState<Summary | null>(null)
   const [capital,    setCapital]    = useState<Capital | null>(null)
   const [rateInput,  setRateInput]  = useState('')
@@ -105,9 +106,12 @@ export default function FinanzasClient() {
     else setError((await r.json()).error ?? 'Error')
   }
 
-  // ── resumen del mes (consolidado en USD) ──
-  const ingresos = movements.filter(m => m.kind === 'income').reduce((s, m) => s + m.usd, 0)
-  const gastos   = movements.filter(m => m.kind === 'expense').reduce((s, m) => s + m.usd, 0)
+  // ── filtro por país (las filas sin país solo aparecen en "Ambos") ──
+  const visibleMov = movPais === 'all' ? movements : movements.filter(m => m.country === movPais)
+
+  // ── resumen del mes (consolidado en USD, según el filtro de país) ──
+  const ingresos = visibleMov.filter(m => m.kind === 'income').reduce((s, m) => s + m.usd, 0)
+  const gastos   = visibleMov.filter(m => m.kind === 'expense').reduce((s, m) => s + m.usd, 0)
   const neto     = ingresos - gastos
 
   // ── totales de cuentas por moneda ──
@@ -142,8 +146,21 @@ export default function FinanzasClient() {
       {tab === 'movimientos' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <input type="month" value={month} onChange={e => setMonth(e.target.value)}
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+            <div className="flex items-center gap-2">
+              <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              {/* switch país */}
+              <div className="flex rounded-lg border border-neutral-200 overflow-hidden text-sm">
+                {([['all', 'Ambos'], ['VE', 'VE'], ['CO', 'CO']] as const).map(([v, label]) => (
+                  <button key={v} onClick={() => setMovPais(v)}
+                    className={`px-3 py-2 font-medium transition-colors ${
+                      movPais === v ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-500 hover:bg-neutral-100'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button onClick={() => { setMovModal(null); setShowMov(true) }} className="btn-primary text-sm">+ Movimiento</button>
           </div>
 
@@ -181,10 +198,10 @@ export default function FinanzasClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {movements.length === 0 && (
+                  {visibleMov.length === 0 && (
                     <tr><td colSpan={6} className="px-3 py-8 text-center text-neutral-400">Sin movimientos este mes</td></tr>
                   )}
-                  {movements.map((m, i) => (
+                  {visibleMov.map((m, i) => (
                     <tr key={m.key} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                       <td className="px-3 py-2 whitespace-nowrap text-neutral-600">
                         {m.date ? new Date(m.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : <span className="text-neutral-300">mes</span>}
