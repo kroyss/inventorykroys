@@ -29,6 +29,7 @@ export default async function VentasPage() {
     <VentasClient
       products={productsRes.rows as InventoryItem[]}
       userRole={session!.user.role}
+      country={session!.user.country}
     />
   )
 }

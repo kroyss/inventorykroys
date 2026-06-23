@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole } from '@/lib/types'
+import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
 import { Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -59,6 +59,7 @@ interface SalesResponse {
 interface Props {
   products: InventoryItem[]
   userRole: UserRole
+  country: Country
 }
 
 type Filter = 'all' | SaleStatus
@@ -68,7 +69,7 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products, userRole }: Props) {
+export default function VentasClient({ products, userRole, country }: Props) {
   const [sales, setSales]       = useState<Sale[]>([])
   const [counts, setCounts]     = useState<Counts>(EMPTY_COUNTS)
   const [total, setTotal]       = useState(0)
@@ -239,7 +240,9 @@ export default function VentasClient({ products, userRole }: Props) {
       <div className="mb-4 space-y-2">
         {/* Fila 1: chips de estado */}
         <div className="flex flex-wrap gap-1.5 bg-white rounded-xl border border-neutral-200 shadow-sm p-2">
-          {(['all','BORRADOR','PAGO_VERIFICADO','PROCESADA','DESCARGADA','DESCARGADA_LOCAL'] as Filter[]).map(f => {
+          {(['all','BORRADOR','PAGO_VERIFICADO','PROCESADA','DESCARGADA','DESCARGADA_LOCAL'] as Filter[])
+            .filter(f => country !== 'CO' || f !== 'PAGO_VERIFICADO')
+            .map(f => {
             const count  = f === 'all' ? counts.all : counts[f as keyof Counts]
             const active = filter === f
             return (
@@ -451,9 +454,17 @@ export default function VentasClient({ products, userRole }: Props) {
                     <button onClick={deleteSale} disabled={busy} className="btn-danger text-sm">Eliminar</button>
                   )}
                   <button onClick={() => { setEditing(selected); setShowForm(true) }} className="btn-secondary text-sm">Editar</button>
-                  <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy} className="btn-primary text-sm">
-                    {selected.ml_order_number.startsWith('LOCAL-') ? 'Verificar y entregar' : 'Verificar pago'}
-                  </button>
+                  {selected.ml_order_number.startsWith('LOCAL-') ? (
+                    // LOCAL: salta a entregada (descuenta inventario) en un paso
+                    <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy} className="btn-primary text-sm">
+                      {country === 'CO' ? 'Entregar' : 'Verificar y entregar'}
+                    </button>
+                  ) : country === 'CO' ? (
+                    // CO: sin verificar pago → procesar directo desde borrador
+                    <button onClick={() => doAction('PROCESADA')} disabled={busy} className="btn-primary text-sm">Procesar</button>
+                  ) : (
+                    <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy} className="btn-primary text-sm">Verificar pago</button>
+                  )}
                 </>
               )}
               {!['BORRADOR','REABIERTA'].includes(selected.status) && (

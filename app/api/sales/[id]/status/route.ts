@@ -156,9 +156,16 @@ export async function PUT(
         )
 
       } else if (newStatus === 'PROCESADA') {
-        if (current !== 'PAGO_VERIFICADO') {
+        // CO no usa "verificar pago": se procesa directo desde BORRADOR.
+        // VE mantiene el paso PAGO_VERIFICADO obligatorio.
+        const isCO = session.user.country === 'CO'
+        const allowedFrom = isCO ? ['BORRADOR', 'PAGO_VERIFICADO'] : ['PAGO_VERIFICADO']
+        if (!allowedFrom.includes(current)) {
           await db.query('ROLLBACK')
-          return NextResponse.json({ error: 'Debe verificar el pago primero' }, { status: 409 })
+          return NextResponse.json(
+            { error: isCO ? 'Solo se puede procesar desde borrador' : 'Debe verificar el pago primero' },
+            { status: 409 }
+          )
         }
 
         const { rows: items } = await db.query(
