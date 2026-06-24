@@ -1,7 +1,9 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import SignOutButton from './SignOutButton'
+import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
+import type { Country } from '@/lib/types'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
@@ -22,6 +24,7 @@ export default async function Navbar() {
 
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-xs text-neutral-400 hidden sm:block">{session?.user?.name}</span>
+          {role === 'admin' && <CountrySwitcher current={country as Country} />}
           <SignOutButton />
         </div>
 

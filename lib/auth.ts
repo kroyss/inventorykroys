@@ -46,11 +46,30 @@ export const authOptions: NextAuthOptions = {
   // se use, así las 12h cuentan desde la última actividad, no desde el login.
   session: { strategy: 'jwt', maxAge: 12 * 60 * 60, updateAge: 60 * 60 },
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         const u = user as { role: UserRole; country: Country }
         token.role    = u.role
         token.country = u.country
+      }
+
+      // Cambio de país en caliente (solo admin), vía useSession().update({ country }).
+      // El admin está duplicado por DB con id propio, así que re-resolvemos su id en
+      // la DB destino para no atribuir movimientos al id equivocado.
+      if (trigger === 'update' && token.role === 'admin') {
+        const c = (session as { country?: string } | undefined)?.country
+        if (c === 'VE' || c === 'CO') {
+          const db = getDb(c)
+          const { rows } = await db.query(
+            `SELECT id, role, country_access FROM users WHERE username = $1 AND is_active = TRUE`,
+            [String(token.email ?? '').toLowerCase().trim()]
+          )
+          const u = rows[0]
+          if (u && u.role === 'admin' && u.country_access === c) {
+            token.sub     = String(u.id)
+            token.country = c
+          }
+        }
       }
       return token
     },
