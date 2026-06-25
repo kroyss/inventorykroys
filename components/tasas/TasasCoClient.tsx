@@ -15,6 +15,16 @@ const fmtUsd  = (n: number) => Number(n).toLocaleString('de-DE', { minimumFracti
 
 interface CoRate { id?: number; trm_rate: number; rate_date: string | null; source: string }
 
+// Fila etiqueta/valor del desglose ML
+function Row({ label, value, neg }: { label: string; value: string; neg?: boolean }) {
+  return (
+    <div className="flex justify-between items-center px-3 text-neutral-600">
+      <span>{label}</span>
+      <span className={neg ? 'text-red-500' : ''}>{value}</span>
+    </div>
+  )
+}
+
 // Tasas Colombia: solo TRM oficial (sin paralelo/spread/descuento como VE).
 // Se actualiza sola por el cron; aquí se ve, se refresca a mano y hay simulador.
 export default function TasasCoClient() {
@@ -23,6 +33,11 @@ export default function TasasCoClient() {
   const [cats,    setCats]    = useState<ProfitCategory[]>([])
   const [simCost, setSimCost] = useState('10')
   const [simCat,  setSimCat]  = useState<number | null>(null)
+  // Parámetros ML Colombia (editables; defaults razonables)
+  const [precioPub,  setPrecioPub]  = useState('')      // vacío → usa el sugerido
+  const [mlComision, setMlComision] = useState('17')    // promedio 15-19%
+  const [mlEnvio,    setMlEnvio]     = useState('8000')  // mitad de envío típico
+  const [mlReten,    setMlReten]     = useState(true)    // retenciones si pago con tarjeta
   const [busy,    setBusy]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [okMsg,   setOkMsg]   = useState<string | null>(null)
@@ -63,6 +78,19 @@ export default function TasasCoClient() {
       basePesos: baseUsd * latest.trm_rate,
     }
   }, [simCost, simCat, cats, latest])
+
+  // Neto real en ML: Recibes = precio − comisión − envío − retenciones; luego − costo.
+  const mlNet = useMemo(() => {
+    if (!latest || !sim) return null
+    const precio = parseFloat(precioPub) || sim.basePesos
+    const comision = precio * (parseFloat(mlComision) || 0) / 100
+    const envio = parseFloat(mlEnvio) || 0
+    const reten = mlReten ? precio * 0.0191 : 0
+    const recibes = precio - comision - envio - reten
+    const costoPesos = (parseFloat(simCost) || 0) * latest.trm_rate
+    const ganancia = recibes - costoPesos
+    return { precio, comision, envio, reten, recibes, costoPesos, ganancia, margen: precio > 0 ? ganancia / precio * 100 : 0 }
+  }, [precioPub, mlComision, mlEnvio, mlReten, simCost, sim, latest])
 
   const refresh = async () => {
     setBusy(true); setError(null); setOkMsg(null)
@@ -149,6 +177,53 @@ export default function TasasCoClient() {
               </div>
             </div>
           )}
+
+          {/* Ganancia neta real en ML Colombia */}
+          <div className="mt-4 border-t border-neutral-100 pt-4">
+            <p className="text-sm font-semibold text-neutral-700 mb-2">Ganancia neta en ML Colombia</p>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <div>
+                <label className="text-[11px] text-neutral-500">Precio publicación</label>
+                <input type="text" inputMode="numeric"
+                  value={precioPub ? fmtPeso(Number(precioPub)) : ''}
+                  onChange={e => setPrecioPub(e.target.value.replace(/\D/g, ''))}
+                  placeholder={sim ? fmtPeso(sim.basePesos) : '0'}
+                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              </div>
+              <div>
+                <label className="text-[11px] text-neutral-500">Comisión %</label>
+                <input type="number" step="0.5" value={mlComision} onChange={e => setMlComision(e.target.value)}
+                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              </div>
+              <div>
+                <label className="text-[11px] text-neutral-500">Envío (pesos)</label>
+                <input type="text" inputMode="numeric"
+                  value={mlEnvio ? fmtPeso(Number(mlEnvio)) : ''}
+                  onChange={e => setMlEnvio(e.target.value.replace(/\D/g, ''))}
+                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-neutral-600 mb-3">
+              <input type="checkbox" checked={mlReten} onChange={e => setMlReten(e.target.checked)} className="accent-neutral-800 w-4 h-4" />
+              Aplicar retenciones (1,91% — ICA 0,41% + Fuente 1,5%, si pagan con tarjeta)
+            </label>
+            {mlNet && (
+              <div className="space-y-1.5 text-sm">
+                <Row label="Precio publicación" value={`$${fmtPeso(mlNet.precio)}`} />
+                <Row label={`Comisión (${mlComision || 0}%)`} value={`−$${fmtPeso(mlNet.comision)}`} neg />
+                <Row label="Costo de envío" value={`−$${fmtPeso(mlNet.envio)}`} neg />
+                {mlReten && <Row label="Retenciones (1,91%)" value={`−$${fmtPeso(mlNet.reten)}`} neg />}
+                <div className="flex justify-between items-center bg-neutral-100 rounded px-3 py-1.5 font-semibold">
+                  <span>Recibes</span><span>${fmtPeso(mlNet.recibes)}</span>
+                </div>
+                <Row label="− Tu costo" value={`−$${fmtPeso(mlNet.costoPesos)}`} neg />
+                <div className={`flex justify-between items-center rounded px-3 py-2 font-bold ${mlNet.ganancia >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  <span>Ganancia neta ({mlNet.margen >= 0 ? '+' : ''}{mlNet.margen.toFixed(1)}%)</span>
+                  <span>${fmtPeso(mlNet.ganancia)}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Evolución */}
