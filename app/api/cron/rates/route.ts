@@ -38,10 +38,13 @@ async function updateVE() {
     return parseFloat(data.promedio)
   }
 
-  const [official_rate, parallel_rate] = await Promise.all([
+  const [officialRaw, parallelRaw] = await Promise.all([
     fetchRate('oficial'),
     fetchRate('paralelo'),
   ])
+  // Tasas se guardan como entero (números grandes, el decimal es ruido).
+  const official_rate = Math.round(officialRaw)
+  const parallel_rate = Math.round(parallelRaw)
   if (!(official_rate > 0) || !(parallel_rate > 0)) {
     throw new Error('API VE retornó valores inválidos')
   }
@@ -92,7 +95,7 @@ async function updateCO() {
   })
   if (!res.ok) throw new Error(`HTTP ${res.status} para TRM`)
   const data = await res.json()
-  const trm = parseFloat(data.valor)
+  const trm = Math.round(parseFloat(data.valor)) // TRM como entero
   if (!(trm > 0)) throw new Error('API CO retornó TRM inválida')
 
   const { rows: [existing] } = await db.query(`
