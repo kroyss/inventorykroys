@@ -18,8 +18,14 @@ async function coSafe<T>(fn: (db: Pool) => Promise<T>, fallback: T): Promise<T> 
 
 export async function getRates(): Promise<FinanceRates> {
   const ve = veDb()
-  const { rows: s } = await ve.query(`SELECT value FROM finance_settings WHERE key='cop_usd_rate'`)
-  const cop = s[0] ? parseFloat(s[0].value) : 4000
+  // COP: TRM automática (cron) desde la DB de CO. La última fila es la vigente;
+  // si CO no está disponible o aún no hay tasa, cae a 4000 como último recurso.
+  const cop = await coSafe(async db => {
+    const { rows } = await db.query(
+      `SELECT trm_rate::float AS r FROM colombia_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`
+    )
+    return rows[0]?.r ?? 0
+  }, 0)
   const { rows: r } = await ve.query(
     `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`
   )

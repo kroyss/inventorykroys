@@ -55,7 +55,6 @@ export default function FinanzasClient() {
   const [movPais,    setMovPais]    = useState<'all' | 'VE' | 'CO'>('all')  // filtro país del libro
   const [summary,    setSummary]    = useState<Summary | null>(null)
   const [capital,    setCapital]    = useState<Capital | null>(null)
-  const [rateInput,  setRateInput]  = useState('')
   const [error,      setError]      = useState<string | null>(null)
   const [busy,       setBusy]       = useState(false)
 
@@ -87,24 +86,12 @@ export default function FinanzasClient() {
   const loadCapital = useCallback(async () => {
     const r = await fetch('/api/finance/capital').then(r => r.json())
     setCapital(r)
-    setRateInput(String(r?.rates?.cop ?? ''))
   }, [])
 
   useEffect(() => { loadStatic() }, [loadStatic])
   useEffect(() => { loadMovements() }, [loadMovements])
   useEffect(() => { loadSummary() }, [loadSummary])
   useEffect(() => { loadCapital() }, [loadCapital])
-
-  const saveRate = async () => {
-    const v = parseFloat(rateInput)
-    if (!v || v <= 0) return
-    const r = await fetch('/api/finance/settings', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cop_usd_rate: v }),
-    })
-    if (r.ok) { loadCapital(); loadSummary() }
-    else setError((await r.json()).error ?? 'Error')
-  }
 
   // ── filtro por país (las filas sin país solo aparecen en "Ambos") ──
   const visibleMov = movPais === 'all' ? movements : movements.filter(m => m.country === movPais)
@@ -356,17 +343,17 @@ export default function FinanzasClient() {
             Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). Liquidez y reservas suman igual en ambos capitales.
           </p>
 
-          {/* Tasa COP/USD */}
-          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 flex flex-wrap items-end gap-3">
+          {/* Tasas automáticas (solo lectura) */}
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 flex flex-wrap items-center gap-6">
             <div>
-              <label className="block text-xs text-neutral-500 mb-1">Tasa COP por USD (para consolidar Colombia)</label>
-              <input type="number" step="1" value={rateInput} onChange={e => setRateInput(e.target.value)}
-                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              <div className="text-xs text-neutral-500 mb-0.5">TRM COP/USD (Colombia)</div>
+              <div className="text-lg font-bold text-neutral-900">{capital.rates.cop > 0 ? money(capital.rates.cop) : '—'}</div>
             </div>
-            <button onClick={saveRate} className="btn-secondary text-sm">Actualizar tasa</button>
-            {capital.rates.ves > 0 && (
-              <span className="text-xs text-neutral-400 ml-auto">VES/USD (oficial BCV): {money(capital.rates.ves)}</span>
-            )}
+            <div>
+              <div className="text-xs text-neutral-500 mb-0.5">VES/USD oficial BCV (Venezuela)</div>
+              <div className="text-lg font-bold text-neutral-900">{capital.rates.ves > 0 ? money(capital.rates.ves) : '—'}</div>
+            </div>
+            <span className="text-xs text-neutral-400 ml-auto">Ambas tasas se actualizan solas (cron) · TRM de co.dolarapi.com</span>
           </div>
 
           {/* Cuentas con su valor en USD */}
