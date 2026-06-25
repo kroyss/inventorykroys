@@ -26,10 +26,9 @@ export async function GET(_: NextRequest) {
           AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
       `),
       db.query(`
-        SELECT COALESCE(SUM(si.quantity * COALESCE(pp.total_cost, 0)), 0) AS total
+        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
-        LEFT JOIN product_pricing pp ON pp.product_id = si.product_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
           AND DATE_TRUNC('month', s.created_at) = DATE_TRUNC('month', NOW())
       `),
@@ -60,10 +59,9 @@ export async function GET(_: NextRequest) {
       `),
       db.query(`
         -- Costos del mes anterior, mismo tramo de días (para ganancia comparable)
-        SELECT COALESCE(SUM(si.quantity * COALESCE(pp.total_cost, 0)), 0) AS total
+        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
-        LEFT JOIN product_pricing pp ON pp.product_id = si.product_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
           AND DATE_TRUNC('month', s.created_at) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
           AND s.created_at < NOW() - INTERVAL '1 month'

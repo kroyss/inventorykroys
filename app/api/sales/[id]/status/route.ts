@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { localCostFactor } from '@/lib/localCost'
 
 const Schema = z.object({
   // 'REABIERTA' action → reverts sale to BORRADOR
@@ -23,6 +24,15 @@ export async function PUT(
   try {
     const { status: newStatus, is_flex: isFlexBody } = Schema.parse(await req.json())
     const userId = parseInt(session.user.id, 10)
+    // Factor para congelar el costo en la moneda de la venta (CO: USD×TRM; VE: USD).
+    const costFactor = await localCostFactor(session.user.country)
+    // Snapshot del costo unitario de todas las líneas de la venta (se llama al procesar).
+    const snapshotCost = () => db.query(
+      `UPDATE sale_items si SET unit_cost = ROUND(COALESCE(pp.total_cost, 0) * $1, 2)
+       FROM product_pricing pp
+       WHERE pp.product_id = si.product_id AND si.sale_id = $2`,
+      [costFactor, id]
+    )
 
     const { rows: [sale] } = await db.query(
       `SELECT id, status, ml_order_number, notes, COALESCE(reopen_count, 0) AS reopen_count
@@ -138,6 +148,7 @@ export async function PUT(
                'Entrega personal / cobro destino', userId]
             )
           }
+          await snapshotCost()
           await db.query(
             `UPDATE sales
              SET status='DESCARGADA_LOCAL',
@@ -212,6 +223,7 @@ export async function PUT(
              'Descuento por venta procesada', userId]
           )
         }
+        await snapshotCost()
         await db.query(
           `UPDATE sales
            SET status='PROCESADA', processed_by=$1, processed_at=NOW(), updated_at=NOW(),
@@ -254,6 +266,7 @@ export async function PUT(
             [item.product_id, -item.quantity, `Venta #${id}`, 'Venta directa (no FLEX)', userId]
           )
         }
+        await snapshotCost()
         await db.query(
           `UPDATE sales
            SET status='DESCARGADA', is_flex=FALSE, processed_by=$1, processed_at=NOW(), updated_at=NOW()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { localCostFactor } from '@/lib/localCost'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -8,6 +9,9 @@ export async function GET(_: NextRequest) {
   if (session.user.role !== 'admin') return forbidden()
 
   try {
+    // Valuación de inventario "a hoy": en CO el costo (USD) se expresa en pesos (×TRM)
+    // para que cuadre con el precio de venta en pesos. VE: factor 1.
+    const costFactor = await localCostFactor(session.user.country)
     const { rows } = await db.query(`
       SELECT
         p.code, p.name, p.is_active,
@@ -31,7 +35,7 @@ export async function GET(_: NextRequest) {
     const items = rows.map(r => {
       const qty        = parseInt(r.quantity, 10) || 0
       const minStock   = parseInt(r.min_stock, 10) || 0
-      const valorCosto = parseFloat(r.valor_costo) || 0
+      const valorCosto = (parseFloat(r.valor_costo) || 0) * costFactor
       const valorVenta = parseFloat(r.valor_venta) || 0
 
       let status = 'OK'
@@ -45,7 +49,7 @@ export async function GET(_: NextRequest) {
       return {
         code:        r.code,
         name:        r.name,
-        total_cost:  parseFloat(r.total_cost) || 0,
+        total_cost:  Math.round((parseFloat(r.total_cost) || 0) * costFactor * 100) / 100,
         sale_price:  parseFloat(r.sale_price) || 0,
         quantity:    qty,
         min_stock:   minStock,

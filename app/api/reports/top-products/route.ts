@@ -5,7 +5,7 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 const ORDER_MAP: Record<string, string> = {
   qty:      'total_qty DESC',
   ganancia: 'ganancia DESC',
-  margen:   '(CASE WHEN SUM(si.total_price) > 0 THEN (SUM(si.total_price) - SUM(si.quantity * COALESCE(pp.total_cost, 0))) / SUM(si.total_price) ELSE 0 END) DESC',
+  margen:   '(CASE WHEN SUM(si.total_price) > 0 THEN (SUM(si.total_price) - SUM(si.quantity * COALESCE(si.unit_cost, 0))) / SUM(si.total_price) ELSE 0 END) DESC',
 }
 
 export async function GET(req: NextRequest) {
@@ -37,8 +37,8 @@ export async function GET(req: NextRequest) {
         pc.name AS category_name,
         SUM(si.quantity)                                                AS total_qty,
         SUM(si.total_price)                                             AS total_venta,
-        SUM(si.quantity * COALESCE(pp.total_cost, 0))                  AS total_costo,
-        SUM(si.total_price) - SUM(si.quantity * COALESCE(pp.total_cost, 0)) AS ganancia
+        SUM(si.quantity * COALESCE(si.unit_cost, 0))                  AS total_costo,
+        SUM(si.total_price) - SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS ganancia
       FROM sale_items si
       JOIN products p     ON p.id = si.product_id
       JOIN sales s        ON s.id = si.sale_id

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
               'quantity',     si.quantity,
               'unit_price',   si.unit_price,
               'total_price',  si.total_price,
-              'total_cost',   COALESCE(pp.total_cost, 0)
+              'total_cost',   COALESCE(si.unit_cost, 0)
             ) ORDER BY si.id
           ) FILTER (WHERE si.id IS NOT NULL),
           '[]'::json
@@ -39,7 +39,6 @@ export async function GET(req: NextRequest) {
       LEFT JOIN users u     ON s.created_by = u.id
       LEFT JOIN sale_items si ON si.sale_id = s.id
       LEFT JOIN products p    ON p.id = si.product_id
-      LEFT JOIN product_pricing pp ON pp.product_id = si.product_id
       WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
         AND DATE(s.created_at) BETWEEN $1 AND $2
       GROUP BY s.id, u.username

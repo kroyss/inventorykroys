@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { localCostFactor } from '@/lib/localCost'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -8,6 +9,8 @@ export async function GET(_: NextRequest) {
   if (session.user.role !== 'admin') return forbidden()
 
   try {
+    // CO: el costo (USD) se lleva a pesos (×TRM) para el margen vs precio de venta (pesos).
+    const costFactor = await localCostFactor(session.user.country)
     const [{ rows: products }, { rows: localTransit }, { rows: importTransit }] = await Promise.all([
       db.query(`
         SELECT
@@ -78,7 +81,7 @@ export async function GET(_: NextRequest) {
       const ventas6m     = parseInt(r.ventas_6m, 10) || 0
       const ventaMensual = Math.round((ventas6m / 6) * 10) / 10
       const enTransito   = (transitLocal[r.id] ?? 0) + (transitImport[r.id] ?? 0)
-      const cost         = parseFloat(r.cost) || 0
+      const cost         = (parseFloat(r.cost) || 0) * costFactor
       const salePrice    = parseFloat(r.sale_price) || 0
       const margenUnit   = Math.round((salePrice - cost) * 100) / 100
       const gananciaMensual = Math.round(ventaMensual * margenUnit * 100) / 100

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { localCostFactor } from '@/lib/localCost'
 import * as XLSX from 'xlsx'
 
 export async function GET(_: NextRequest) {
@@ -8,6 +9,8 @@ export async function GET(_: NextRequest) {
   if (!session || !db) return unauthorized()
 
   try {
+    // CO: costo (USD) a pesos (×TRM) para que cuadre con el precio de venta en pesos.
+    const costFactor = await localCostFactor(session.user.country)
     const { rows } = await db.query(`
       SELECT
         p.code, p.name, p.is_active,
@@ -37,9 +40,9 @@ export async function GET(_: NextRequest) {
         STOCK:        qty,
         MIN:          min,
         MAX:          parseInt(r.max_stock, 10) || 0,
-        COSTO_UNIT:   Math.round(parseFloat(r.total_cost) * 100) / 100,
+        COSTO_UNIT:   Math.round(parseFloat(r.total_cost) * costFactor * 100) / 100,
         PRECIO_VENTA: Math.round(parseFloat(r.sale_price) * 100) / 100,
-        VALOR_COSTO:  Math.round(parseFloat(r.valor_costo) * 100) / 100,
+        VALOR_COSTO:  Math.round(parseFloat(r.valor_costo) * costFactor * 100) / 100,
         VALOR_VENTA:  Math.round(parseFloat(r.valor_venta) * 100) / 100,
         ESTADO:       estado,
       }
