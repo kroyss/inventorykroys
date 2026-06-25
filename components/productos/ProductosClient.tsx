@@ -14,6 +14,10 @@ const ML_ACCOUNTS: Record<Country, string[]> = {
 function fmt(n: number) {
   return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+// Pesos colombianos: sin decimales (ej. 140.700)
+function fmtPeso(n: number) {
+  return Number(n).toLocaleString('de-DE', { maximumFractionDigits: 0 })
+}
 
 interface VeRate { official: number; parallel: number; excess: number }
 
@@ -126,6 +130,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     }).catch(() => {})
   }, [country])
 
+  // Tasa TRM (CO): para sugerir el precio de venta en pesos a partir del costo USD.
+  const [coTrm, setCoTrm] = useState(0)
+  useEffect(() => {
+    if (country !== 'CO') return
+    fetch('/api/rates/co/latest').then(r => r.json()).then(d => {
+      setCoTrm(Number(d.trm_rate) || 0)
+    }).catch(() => {})
+  }, [country])
+
   // derived calculator values
   const selectedCat = profitCategories.find(c => c.id === form.profit_category_id)
   const profitPct   = selectedCat?.profit_percentage ?? 0
@@ -138,6 +151,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   )
   const spread  = veRate && veRate.official > 0 ? (veRate.parallel - veRate.official) / veRate.official * 100 : 0
   const priceBs = finalPriceUsd * (veRate?.official ?? 0)
+  // CO: precio de venta sugerido en pesos = precio base (USD) × TRM
+  const suggestedPesos = Math.round(basePriceUsd * coTrm)
 
   // Open create modal when arriving via command palette (/productos?new=1)
   useEffect(() => {
@@ -201,14 +216,17 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     setSaving(true)
     setError(''); setOkMsg('')
     try {
+      // CO (híbrido): costo en USD, precio de venta en PESOS (sale_price); los
+      // campos *_usd no se usan en CO → 0. VE: calculadora USD como siempre.
+      const isCO = country === 'CO'
       const payload = {
         ...form,
-        base_price_usd:      basePriceUsd,
-        published_price_usd: publishedPriceUsd,
-        final_price_usd:     finalPriceUsd,
-        discount_percent:    form.discount_percent,
-        // El precio de inventario sigue al Precio Base.
-        sale_price:          basePriceUsd,
+        base_price_usd:      isCO ? 0 : basePriceUsd,
+        published_price_usd: isCO ? 0 : publishedPriceUsd,
+        final_price_usd:     isCO ? 0 : finalPriceUsd,
+        discount_percent:    isCO ? 0 : form.discount_percent,
+        // VE: el precio de inventario sigue al Precio Base (USD). CO: pesos del input.
+        sale_price:          isCO ? form.sale_price : basePriceUsd,
       }
 
       let res: Response
@@ -227,11 +245,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             profit_category_id: form.profit_category_id,
             base_cost:          form.base_cost,
             shipping_cost:      form.shipping_cost,
-            base_price_usd:     basePriceUsd,
-            published_price_usd:publishedPriceUsd,
-            final_price_usd:    finalPriceUsd,
-            discount_percent:   form.discount_percent,
-            sale_price:         basePriceUsd,
+            base_price_usd:     isCO ? 0 : basePriceUsd,
+            published_price_usd:isCO ? 0 : publishedPriceUsd,
+            final_price_usd:    isCO ? 0 : finalPriceUsd,
+            discount_percent:   isCO ? 0 : form.discount_percent,
+            sale_price:         isCO ? form.sale_price : basePriceUsd,
             ml_codes:           form.ml_codes.filter(m => m.code.trim()),
           }),
         })
@@ -484,7 +502,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </td>
                 </tr>
               )}
-              {displayed.map(p => (
+              {displayed.map(p => {
+                // CO: el "precio" es sale_price en pesos; su equivalente USD (para margen) = ÷ TRM
+                const priceUsd = country === 'CO' ? (coTrm > 0 ? p.sale_price / coTrm : 0) : p.final_price_usd
+                return (
                 <tr key={p.id} onClick={() => openView(p.id)}
                   className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
                   <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
@@ -507,15 +528,17 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     )}
                   </td>
                   <td className="px-3 py-2 text-right text-neutral-600">${fmt(p.total_cost)}</td>
-                  <td className="px-3 py-2 text-right font-medium text-neutral-900">${fmt(p.final_price_usd)}</td>
+                  <td className="px-3 py-2 text-right font-medium text-neutral-900">
+                    {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(p.final_price_usd)}`}
+                  </td>
                   <td className="px-3 py-2 text-right">
-                    {p.final_price_usd > 0 && p.total_cost > 0 ? (
+                    {priceUsd > 0 && p.total_cost > 0 ? (
                       <span className={`font-medium ${
-                        (p.final_price_usd - p.total_cost) / p.final_price_usd >= 0.4 ? 'text-green-600'
-                          : (p.final_price_usd - p.total_cost) / p.final_price_usd >= 0.2 ? 'text-amber-600'
+                        (priceUsd - p.total_cost) / priceUsd >= 0.4 ? 'text-green-600'
+                          : (priceUsd - p.total_cost) / priceUsd >= 0.2 ? 'text-amber-600'
                           : 'text-red-600'
                       }`}>
-                        {Math.round((p.final_price_usd - p.total_cost) / p.final_price_usd * 100)}%
+                        {Math.round((priceUsd - p.total_cost) / priceUsd * 100)}%
                       </span>
                     ) : <span className="text-neutral-300">—</span>}
                   </td>
@@ -552,7 +575,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -563,8 +587,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <p className="px-3 py-8 text-center text-neutral-400">{search ? 'Sin resultados' : 'No hay productos'}</p>
           )}
           {displayed.map(p => {
-            const margin = p.final_price_usd > 0 && p.total_cost > 0
-              ? Math.round((p.final_price_usd - p.total_cost) / p.final_price_usd * 100)
+            const priceUsd = country === 'CO' ? (coTrm > 0 ? p.sale_price / coTrm : 0) : p.final_price_usd
+            const margin = priceUsd > 0 && p.total_cost > 0
+              ? Math.round((priceUsd - p.total_cost) / priceUsd * 100)
               : null
             return (
               <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
@@ -581,7 +606,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-sm">
-                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">${fmt(p.final_price_usd)}</span></span>
+                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(p.final_price_usd)}`}</span></span>
                   {margin !== null && (
                     <span className={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'}>{margin}%</span>
                   )}
@@ -799,19 +824,53 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       </div>
                     </>
                   ) : (
-                    /* Colombia — precio directo sin exceso */
-                    <div className="bg-green-50 border-2 border-green-400 rounded-lg p-3">
-                      <p className="text-[11px] text-green-600 font-medium">Precio Base (precio de venta)</p>
-                      <p className="text-2xl font-bold text-green-700">${fmt(basePriceUsd)}</p>
-                      <p className="text-[10px] text-neutral-400">Costo × {(1 + profitPct / 100).toFixed(2)}</p>
+                    /* Colombia — costo USD, precio de venta en PESOS (sugerido por TRM) */
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                          <p className="text-[11px] text-blue-600 font-medium">Precio Base (USD)</p>
+                          <p className="text-lg font-bold text-blue-700">${fmt(basePriceUsd)}</p>
+                          <p className="text-[10px] text-neutral-400">Costo × {(1 + profitPct / 100).toFixed(2)}</p>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                          <p className="text-[11px] text-amber-700 font-medium">Sugerido en pesos</p>
+                          <p className="text-lg font-bold text-amber-700">${fmtPeso(suggestedPesos)}</p>
+                          <p className="text-[10px] text-neutral-400">Base × TRM {fmtPeso(coTrm)}</p>
+                        </div>
+                      </div>
+                      {/* Precio de venta real (lo que publicas en ML), en pesos */}
+                      <div className="bg-green-50 border-2 border-green-400 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] text-green-700 font-medium">Precio de venta (pesos)</label>
+                          {suggestedPesos > 0 && (
+                            <button type="button"
+                              onClick={() => setForm(f => ({ ...f, sale_price: suggestedPesos }))}
+                              className="text-[11px] text-green-700 hover:underline">
+                              Usar sugerido (${fmtPeso(suggestedPesos)})
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="number" min="0" step="1"
+                          value={form.sale_price}
+                          onChange={e => setForm(f => ({ ...f, sale_price: Number(e.target.value) }))}
+                          className="w-full border border-green-300 rounded-lg px-3 py-2 text-xl font-bold text-green-700
+                                     focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-1">
+                          {coTrm > 0 ? `≈ $${fmt(form.sale_price / coTrm)} USD a la TRM` : 'Sin TRM cargada'}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* El precio de inventario = Precio Base (no es campo aparte) */}
+              {/* Nota del precio de venta de inventario */}
               <p className="text-xs text-neutral-400 -mt-1">
-                El precio de venta de inventario se guarda igual al <b>Precio Base</b> (${fmt(basePriceUsd)}).
+                {country === 'CO'
+                  ? <>El <b>costo</b> se guarda en USD y el <b>precio de venta</b> en pesos (${fmtPeso(form.sale_price)}).</>
+                  : <>El precio de venta de inventario se guarda igual al <b>Precio Base</b> (${fmt(basePriceUsd)}).</>}
               </p>
 
               {/* ML codes — en una sola línea */}
@@ -920,26 +979,38 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                 <div>
                   <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Precios</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Precio base" value={`$${fmt(v.base_price_usd)}`} accent="text-blue-700" />
-                    <Field label="Precio publicado" value={`$${fmt(v.published_price_usd)}`} />
-                    <Field label="Descuento" value={`${fmt(v.discount_percent)}%`} />
-                    <Field label="Precio final" value={`$${fmt(v.final_price_usd)}`} accent="text-green-700" />
-                    {country === 'VE' && v.price_bolivares > 0 && (
-                      <Field label="Precio Bs" value={`Bs ${fmt(v.price_bolivares)}`} />
-                    )}
-                    {margin !== null && (
-                      <Field label="Margen" value={`${margin}%`}
-                        accent={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'} />
-                    )}
-                  </div>
+                  {country === 'VE' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Precio base" value={`$${fmt(v.base_price_usd)}`} accent="text-blue-700" />
+                      <Field label="Precio publicado" value={`$${fmt(v.published_price_usd)}`} />
+                      <Field label="Descuento" value={`${fmt(v.discount_percent)}%`} />
+                      <Field label="Precio final" value={`$${fmt(v.final_price_usd)}`} accent="text-green-700" />
+                      {v.price_bolivares > 0 && (
+                        <Field label="Precio Bs" value={`Bs ${fmt(v.price_bolivares)}`} />
+                      )}
+                      {margin !== null && (
+                        <Field label="Margen" value={`${margin}%`}
+                          accent={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'} />
+                      )}
+                    </div>
+                  ) : (
+                    /* CO: el precio de venta está en pesos (sección Inventario); aquí el análisis en USD */
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Precio venta ≈ USD" value={coTrm > 0 ? `$${fmt(v.sale_price / coTrm)}` : '—'} accent="text-green-700" />
+                      {coTrm > 0 && v.total_cost > 0 && (
+                        <Field label="Margen"
+                          value={`${Math.round((v.sale_price / coTrm - v.total_cost) / v.total_cost * 100)}%`}
+                          accent="text-green-600" />
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Inventario</p>
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="Stock" value={int(v.quantity)} accent={v.quantity > 0 ? 'text-neutral-900' : 'text-red-600'} />
-                    <Field label="Precio de venta" value={`$${fmt(v.sale_price)}`} />
+                    <Field label="Precio de venta" value={country === 'CO' ? `$${fmtPeso(v.sale_price)}` : `$${fmt(v.sale_price)}`} accent={country === 'CO' ? 'text-green-700' : undefined} />
                   </div>
                 </div>
 

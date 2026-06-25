@@ -281,11 +281,13 @@ export async function getCapital(): Promise<Capital> {
   const mercanciaVE_cost = veRow.cost as number
   const mercanciaVE_sale = veRow.sale as number
 
+  // CO híbrido: el COSTO del inventario ya está en USD (total_cost en USD), no se
+  // divide. El PRECIO DE VENTA sigue en pesos (sale_price) → ese sí se convierte.
   const coRow = await coSafe(async db => (await db.query(INV_VAL)).rows[0] as { cost: number; sale: number }, { cost: 0, sale: 0 })
-  const mercanciaCO_cost_cop = coRow.cost
-  const mercanciaCO_sale_cop = coRow.sale
-  const mercanciaCO_cost = toUsd(mercanciaCO_cost_cop, 'COP', rates)
-  const mercanciaCO_sale = toUsd(mercanciaCO_sale_cop, 'COP', rates)
+  const mercanciaCO_cost = coRow.cost                                  // USD nativo
+  const mercanciaCO_sale_cop = coRow.sale                              // pesos nativo
+  const mercanciaCO_sale = toUsd(coRow.sale, 'COP', rates)             // pesos → USD
+  const mercanciaCO_cost_cop = rates.cop ? mercanciaCO_cost * rates.cop : 0  // USD → pesos (referencia)
 
   const mercanciaCost = mercanciaVE_cost + mercanciaCO_cost
   const mercanciaSale = mercanciaVE_sale + mercanciaCO_sale

@@ -61,6 +61,7 @@ export default async function InventarioPage() {
     <InventarioClient
       initialItems={rows as InventoryItem[]}
       userRole={session!.user.role}
+      country={session!.user.country}
     />
   )
 }

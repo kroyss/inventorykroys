@@ -1,12 +1,16 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
-import type { InventoryItem, InventoryMovement, StockStatus, UserRole } from '@/lib/types'
+import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
   return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+// Pesos colombianos: sin decimales (ej. 140.700)
+function fmtPeso(n: number) {
+  return Number(n).toLocaleString('de-DE', { maximumFractionDigits: 0 })
 }
 function fmtDate(s: string) {
   return new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -37,10 +41,14 @@ type SortKey = 'code' | 'name' | 'quantity' | 'min_stock' | 'max_stock' | 'sale_
 interface Props {
   initialItems: InventoryItem[]
   userRole:     UserRole
+  country:      Country
 }
 
-export default function InventarioClient({ initialItems, userRole }: Props) {
+export default function InventarioClient({ initialItems, userRole, country }: Props) {
   const isAdmin = userRole === 'admin'
+  const isCO    = country === 'CO'
+  // En CO el precio de venta está en pesos (sin decimales); en VE en USD.
+  const priceLabel = (n: number) => isCO ? `$${fmtPeso(n)}` : `$${fmt(n)}`
   const [items,    setItems]    = useState<InventoryItem[]>(initialItems)
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [search,   setSearch]   = useState('')
@@ -206,7 +214,8 @@ export default function InventarioClient({ initialItems, userRole }: Props) {
   }
 
   const activeItems = items.filter(i => i.is_active)
-  const valorCosto  = activeItems.reduce((s, i) => s + i.quantity * i.total_cost, 0)
+  const valorCosto  = activeItems.reduce((s, i) => s + i.quantity * i.total_cost, 0)                        // USD
+  const valorVenta  = activeItems.reduce((s, i) => s + i.quantity * (i.sale_price || i.final_price_usd), 0) // CO: pesos · VE: USD
 
   type StockChip = StockStatus | ''
   const CHIPS: { val: StockChip; label: string; count: number; adminOnly?: boolean }[] = [
@@ -247,8 +256,9 @@ export default function InventarioClient({ initialItems, userRole }: Props) {
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         {isAdmin && (
-          <div className="text-xs text-neutral-500">
-            Valor inventario (a costo): <span className="font-semibold text-neutral-800">${fmt(valorCosto)}</span>
+          <div className="text-xs text-neutral-500 flex flex-wrap gap-x-4">
+            <span>Valor a costo: <span className="font-semibold text-neutral-800">${fmt(valorCosto)}{isCO ? ' USD' : ''}</span></span>
+            <span>Valor a venta: <span className="font-semibold text-green-700">{priceLabel(valorVenta)}{isCO ? ' pesos' : ''}</span></span>
           </div>
         )}
         <input
@@ -295,7 +305,7 @@ export default function InventarioClient({ initialItems, userRole }: Props) {
                   <td className="px-3 py-2 text-right font-bold text-neutral-900">{item.quantity}</td>
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-500">{item.min_stock}</td>}
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-500">{item.max_stock}</td>}
-                  <td className="px-3 py-2 text-right text-neutral-700">${fmt(item.sale_price || item.final_price_usd)}</td>
+                  <td className="px-3 py-2 text-right text-neutral-700">{priceLabel(item.sale_price || item.final_price_usd)}</td>
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-600">{item.ventas_6m}</td>}
                   <td className="px-3 py-2 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[item.status]}`}>
@@ -361,7 +371,7 @@ export default function InventarioClient({ initialItems, userRole }: Props) {
                     </div>
                     <div>
                       <span className="text-neutral-400 text-xs">Precio venta</span>
-                      <p className="font-medium text-neutral-700">${fmt(selected.sale_price || selected.final_price_usd)}</p>
+                      <p className="font-medium text-neutral-700">{priceLabel(selected.sale_price || selected.final_price_usd)}</p>
                     </div>
                     <div>
                       <span className="text-neutral-400 text-xs">Ventas 6m</span>
@@ -435,14 +445,14 @@ export default function InventarioClient({ initialItems, userRole }: Props) {
                           </label>
                           {configEditing ? (
                             <input
-                              type="number" min="0" step={key === 'sale_price' ? '0.01' : '1'}
+                              type="number" min="0" step={key === 'sale_price' && !isCO ? '0.01' : '1'}
                               value={configForm[key]}
                               onChange={e => setConfigForm(f => ({ ...f, [key]: Number(e.target.value) }))}
                               className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                             />
                           ) : (
                             <div className="border border-neutral-200 rounded-lg px-3 py-2 text-sm bg-neutral-50 text-neutral-700">
-                              {key === 'sale_price' ? `$${fmt(configForm[key])}` : configForm[key]}
+                              {key === 'sale_price' ? priceLabel(configForm[key]) : configForm[key]}
                             </div>
                           )}
                         </div>
