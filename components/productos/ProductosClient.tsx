@@ -851,9 +851,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                           )}
                         </div>
                         <input
-                          type="number" min="0" step="1"
-                          value={form.sale_price}
-                          onChange={e => setForm(f => ({ ...f, sale_price: Number(e.target.value) }))}
+                          type="text" inputMode="numeric"
+                          value={form.sale_price ? fmtPeso(form.sale_price) : ''}
+                          onChange={e => {
+                            const digits = e.target.value.replace(/\D/g, '')
+                            setForm(f => ({ ...f, sale_price: digits ? parseInt(digits, 10) : 0 }))
+                          }}
+                          placeholder="0"
                           className="w-full border border-green-300 rounded-lg px-3 py-2 text-xl font-bold text-green-700
                                      focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                         />
