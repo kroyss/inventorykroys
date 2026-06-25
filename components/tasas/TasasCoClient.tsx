@@ -33,11 +33,14 @@ export default function TasasCoClient() {
   const [cats,    setCats]    = useState<ProfitCategory[]>([])
   const [simCost, setSimCost] = useState('10')
   const [simCat,  setSimCat]  = useState<number | null>(null)
-  // Parámetros ML Colombia (editables; defaults razonables)
-  const [precioPub,  setPrecioPub]  = useState('')      // vacío → usa el sugerido
-  const [mlComision, setMlComision] = useState('17')    // promedio 15-19%
-  const [mlEnvio,    setMlEnvio]     = useState('8000')  // mitad de envío típico
-  const [mlReten,    setMlReten]     = useState(true)    // retenciones si pago con tarjeta
+  // Parámetros ML Colombia (editables; defaults según cobros reales)
+  const [precioPub,   setPrecioPub]   = useState('')        // vacío → usa el sugerido
+  const [mlComision,  setMlComision]  = useState('15.5')    // 15,5% es lo más frecuente
+  const [mlUmbral,    setMlUmbral]    = useState('60000')   // <umbral envío bajo, ≥umbral alto
+  const [mlEnvioBajo, setMlEnvioBajo] = useState('2600')    // envío en precios bajos
+  const [mlEnvioAlto, setMlEnvioAlto] = useState('8000')    // envío en precios altos
+  const [mlRetenPct,  setMlRetenPct]  = useState('1.91')    // ICA 0,41% + Fuente 1,5%
+  const [mlReten,     setMlReten]     = useState(true)      // retenciones si pago con tarjeta
   const [busy,    setBusy]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [okMsg,   setOkMsg]   = useState<string | null>(null)
@@ -80,17 +83,20 @@ export default function TasasCoClient() {
   }, [simCost, simCat, cats, latest])
 
   // Neto real en ML: Recibes = precio − comisión − envío − retenciones; luego − costo.
+  // El envío se elige solo según el umbral (precios bajos pagan menos).
   const mlNet = useMemo(() => {
     if (!latest || !sim) return null
     const precio = parseFloat(precioPub) || sim.basePesos
     const comision = precio * (parseFloat(mlComision) || 0) / 100
-    const envio = parseFloat(mlEnvio) || 0
-    const reten = mlReten ? precio * 0.0191 : 0
+    const umbral = parseFloat(mlUmbral) || 0
+    const esAlto = precio >= umbral
+    const envio = esAlto ? (parseFloat(mlEnvioAlto) || 0) : (parseFloat(mlEnvioBajo) || 0)
+    const reten = mlReten ? precio * (parseFloat(mlRetenPct) || 0) / 100 : 0
     const recibes = precio - comision - envio - reten
     const costoPesos = (parseFloat(simCost) || 0) * latest.trm_rate
     const ganancia = recibes - costoPesos
-    return { precio, comision, envio, reten, recibes, costoPesos, ganancia, margen: precio > 0 ? ganancia / precio * 100 : 0 }
-  }, [precioPub, mlComision, mlEnvio, mlReten, simCost, sim, latest])
+    return { precio, comision, envio, esAlto, reten, recibes, costoPesos, ganancia, margen: precio > 0 ? ganancia / precio * 100 : 0 }
+  }, [precioPub, mlComision, mlUmbral, mlEnvioBajo, mlEnvioAlto, mlRetenPct, mlReten, simCost, sim, latest])
 
   const refresh = async () => {
     setBusy(true); setError(null); setOkMsg(null)
@@ -180,8 +186,9 @@ export default function TasasCoClient() {
 
           {/* Ganancia neta real en ML Colombia */}
           <div className="mt-4 border-t border-neutral-100 pt-4">
-            <p className="text-sm font-semibold text-neutral-700 mb-2">Ganancia neta en ML Colombia</p>
-            <div className="grid grid-cols-3 gap-2 mb-2">
+            <p className="text-sm font-semibold text-neutral-700 mb-1">Ganancia neta en ML Colombia</p>
+            <p className="text-[11px] text-neutral-400 mb-2">El envío se elige solo según el umbral: precios bajos pagan menos.</p>
+            <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <label className="text-[11px] text-neutral-500">Precio publicación</label>
                 <input type="text" inputMode="numeric"
@@ -195,24 +202,40 @@ export default function TasasCoClient() {
                 <input type="number" step="0.5" value={mlComision} onChange={e => setMlComision(e.target.value)}
                   className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
               </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-2">
               <div>
-                <label className="text-[11px] text-neutral-500">Envío (pesos)</label>
-                <input type="text" inputMode="numeric"
-                  value={mlEnvio ? fmtPeso(Number(mlEnvio)) : ''}
-                  onChange={e => setMlEnvio(e.target.value.replace(/\D/g, ''))}
+                <label className="text-[11px] text-neutral-500">Umbral envío</label>
+                <input type="text" inputMode="numeric" value={mlUmbral ? fmtPeso(Number(mlUmbral)) : ''}
+                  onChange={e => setMlUmbral(e.target.value.replace(/\D/g, ''))}
+                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              </div>
+              <div>
+                <label className="text-[11px] text-neutral-500">Envío &lt; umbral</label>
+                <input type="text" inputMode="numeric" value={mlEnvioBajo ? fmtPeso(Number(mlEnvioBajo)) : ''}
+                  onChange={e => setMlEnvioBajo(e.target.value.replace(/\D/g, ''))}
+                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              </div>
+              <div>
+                <label className="text-[11px] text-neutral-500">Envío ≥ umbral</label>
+                <input type="text" inputMode="numeric" value={mlEnvioAlto ? fmtPeso(Number(mlEnvioAlto)) : ''}
+                  onChange={e => setMlEnvioAlto(e.target.value.replace(/\D/g, ''))}
                   className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
               </div>
             </div>
             <label className="flex items-center gap-2 text-xs text-neutral-600 mb-3">
               <input type="checkbox" checked={mlReten} onChange={e => setMlReten(e.target.checked)} className="accent-neutral-800 w-4 h-4" />
-              Aplicar retenciones (1,91% — ICA 0,41% + Fuente 1,5%, si pagan con tarjeta)
+              Retención
+              <input type="number" step="0.01" value={mlRetenPct} onChange={e => setMlRetenPct(e.target.value)} disabled={!mlReten}
+                className="w-16 border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-center disabled:opacity-50" />
+              % (ICA + Fuente, si pagan con tarjeta)
             </label>
             {mlNet && (
               <div className="space-y-1.5 text-sm">
                 <Row label="Precio publicación" value={`$${fmtPeso(mlNet.precio)}`} />
                 <Row label={`Comisión (${mlComision || 0}%)`} value={`−$${fmtPeso(mlNet.comision)}`} neg />
-                <Row label="Costo de envío" value={`−$${fmtPeso(mlNet.envio)}`} neg />
-                {mlReten && <Row label="Retenciones (1,91%)" value={`−$${fmtPeso(mlNet.reten)}`} neg />}
+                <Row label={`Envío (${mlNet.esAlto ? '≥' : '<'} umbral)`} value={`−$${fmtPeso(mlNet.envio)}`} neg />
+                {mlReten && <Row label={`Retención (${mlRetenPct || 0}%)`} value={`−$${fmtPeso(mlNet.reten)}`} neg />}
                 <div className="flex justify-between items-center bg-neutral-100 rounded px-3 py-1.5 font-semibold">
                   <span>Recibes</span><span>${fmtPeso(mlNet.recibes)}</span>
                 </div>
