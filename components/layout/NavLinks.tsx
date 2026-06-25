@@ -11,7 +11,7 @@ const allLinks = [
   { href: '/productos',  label: 'Productos', roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/reportes',   label: 'Reportes',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/finanzas',   label: 'Finanzas',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/tasas',      label: 'Tasas',     roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
+  { href: '/tasas',      label: 'Ajustes',   roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
 ]
 
 interface Props {

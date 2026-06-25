@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import TasasClient from '@/components/tasas/TasasClient'
 import TasasCoClient from '@/components/tasas/TasasCoClient'
 
-export const metadata = { title: 'Tasas — Syncsora Inventory' }
+export const metadata = { title: 'Ajustes — Syncsora Inventory' }
 
 export default async function TasasPage() {
   const session = await getServerSession(authOptions)
