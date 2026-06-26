@@ -26,7 +26,8 @@ export async function GET(_: NextRequest) {
           AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
       `),
       db.query(`
-        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total
+        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total,
+               COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
@@ -59,7 +60,8 @@ export async function GET(_: NextRequest) {
       `),
       db.query(`
         -- Costos del mes anterior, mismo tramo de días (para ganancia comparable)
-        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total
+        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total,
+               COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
@@ -70,7 +72,8 @@ export async function GET(_: NextRequest) {
 
     const salesAmount = parseFloat(a2.total ?? 0)
     const costsMonth  = parseFloat(a3.total ?? 0)
-    const profitMonth = salesAmount - costsMonth
+    const commMonth   = parseFloat(a3.commission ?? 0)   // comisión ML neteada (ganancia real)
+    const profitMonth = salesAmount - costsMonth - commMonth
     const profitPct   = costsMonth > 0 ? (profitMonth / costsMonth) * 100 : 0
 
     const { rows: [a9] } = await db.query(`
@@ -124,7 +127,7 @@ export async function GET(_: NextRequest) {
       reposicion_count:        parseInt(a10.n, 10),
       last_month_sales_amount: Math.round(parseFloat(a8.total ?? 0) * 100) / 100,
       last_month_profit_amount:
-        Math.round((parseFloat(a8.total ?? 0) - parseFloat(a8c.total ?? 0)) * 100) / 100,
+        Math.round((parseFloat(a8.total ?? 0) - parseFloat(a8c.total ?? 0) - parseFloat(a8c.commission ?? 0)) * 100) / 100,
     })
   } catch (err) {
     return apiError(err)

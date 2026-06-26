@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
         COUNT(DISTINCT s.id)                          AS cantidad_ventas
       FROM sales s
       LEFT JOIN (
-        SELECT si.sale_id, SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS costo
+        SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo
         FROM sale_items si
         GROUP BY si.sale_id
       ) si_cost ON si_cost.sale_id = s.id

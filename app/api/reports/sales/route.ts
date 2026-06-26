@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
               'quantity',     si.quantity,
               'unit_price',   si.unit_price,
               'total_price',  si.total_price,
-              'total_cost',   COALESCE(si.unit_cost, 0)
+              'total_cost',   COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0)
             ) ORDER BY si.id
           ) FILTER (WHERE si.id IS NOT NULL),
           '[]'::json

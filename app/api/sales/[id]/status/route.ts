@@ -34,6 +34,29 @@ export async function PUT(
       [costFactor, id]
     )
 
+    // Snapshot de la comisión estimada de ML por línea (ganancia neta en dashboard/reportes).
+    // Parámetros editables en Ajustes (app_settings). Misma moneda que la venta (VE USD, CO pesos).
+    const { rows: setRows } = await db.query(`SELECT key, value FROM app_settings`)
+    const mlp: Record<string, number> = {}
+    for (const r of setRows) { const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v }
+    const saleIsCO = session.user.country === 'CO'
+    const snapshotCommission = () => saleIsCO
+      ? db.query(
+          `UPDATE sale_items SET unit_commission = ROUND(
+             unit_price * ($1 + $2) / 100
+             + CASE WHEN unit_price >= $3 THEN $4 ELSE $5 END
+           , 2) WHERE sale_id = $6`,
+          [mlp.ml_comision ?? 15.5, mlp.ml_reten ?? 1.91, mlp.ml_umbral_envio ?? 60000,
+           mlp.ml_envio_alto ?? 8000, mlp.ml_envio_bajo ?? 2600, id]
+        )
+      : db.query(
+          `UPDATE sale_items SET unit_commission = ROUND(
+             unit_price * $1 / 100
+             + $2 * LEAST(1, unit_price / NULLIF($3, 0))
+           , 2) WHERE sale_id = $4`,
+          [mlp.ml_comision ?? 12, mlp.ml_envio ?? 0.65, mlp.ml_umbral ?? 5, id]
+        )
+
     const { rows: [sale] } = await db.query(
       `SELECT id, status, ml_order_number, notes, COALESCE(reopen_count, 0) AS reopen_count
        FROM sales WHERE id = $1`,
@@ -149,6 +172,7 @@ export async function PUT(
             )
           }
           await snapshotCost()
+          await snapshotCommission()
           await db.query(
             `UPDATE sales
              SET status='DESCARGADA_LOCAL',
@@ -224,6 +248,7 @@ export async function PUT(
           )
         }
         await snapshotCost()
+          await snapshotCommission()
         await db.query(
           `UPDATE sales
            SET status='PROCESADA', processed_by=$1, processed_at=NOW(), updated_at=NOW(),
@@ -267,6 +292,7 @@ export async function PUT(
           )
         }
         await snapshotCost()
+          await snapshotCommission()
         await db.query(
           `UPDATE sales
            SET status='DESCARGADA', is_flex=FALSE, processed_by=$1, processed_at=NOW(), updated_at=NOW()
