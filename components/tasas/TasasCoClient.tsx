@@ -13,7 +13,6 @@ import MlBreakdown from '@/components/productos/MlBreakdown'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 const fmtPeso = (n: number) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 0 })
-const fmtUsd  = (n: number) => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 interface CoRate { id?: number; trm_rate: number; rate_date: string | null; source: string }
 
@@ -150,66 +149,49 @@ export default function TasasCoClient() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Simulador */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-          <h2 className="font-semibold mb-1">Simulador de precio</h2>
-          <p className="text-xs text-neutral-500 mb-3">Costo en USD → precio sugerido en pesos a la TRM</p>
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
+          <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
-              <label className="text-xs text-neutral-500">Costo USD</label>
+              <label className="text-xs text-neutral-500">Costo (compra+envío) USD</label>
               <input type="number" step="0.01" min={0} value={simCost} onChange={e => setSimCost(e.target.value)}
                 className="mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
             </div>
             <div>
-              <label className="text-xs text-neutral-500">Categoría de ganancia</label>
+              <label className="text-xs text-neutral-500">Categoría <span className="text-neutral-400">(sugiere)</span></label>
               <select value={simCat ?? ''} onChange={e => setSimCat(Number(e.target.value) || null)}
                 className="mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-neutral-800">
-                <option value="">Sin ganancia</option>
-                {cats.map(c => <option key={c.id} value={c.id}>{c.name} — {c.profit_percentage}%</option>)}
+                <option value="">—</option>
+                {cats.map(c => <option key={c.id} value={c.id}>{c.name} {c.profit_percentage}%</option>)}
               </select>
             </div>
-          </div>
-          {sim && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center bg-neutral-50 rounded-lg px-3 py-2 text-sm">
-                <span className="text-neutral-500">Conversión directa (costo × TRM)</span>
-                <span className="font-semibold">${fmtPeso(sim.directoPesos)}</span>
-              </div>
-              <div className="flex justify-between items-center bg-blue-50 rounded-lg px-3 py-2 text-sm">
-                <span className="text-blue-700">Precio base (USD, +{sim.pct}%)</span>
-                <span className="font-semibold text-blue-700">${fmtUsd(sim.baseUsd)}</span>
-              </div>
-              <div className="flex justify-between items-center bg-green-50 rounded-lg px-3 py-2 text-sm">
-                <span className="text-green-700 font-medium">Precio sugerido en pesos</span>
-                <span className="font-bold text-green-700 text-base">${fmtPeso(sim.basePesos)}</span>
-              </div>
+            <div>
+              <label className="text-xs text-neutral-500">Precio de venta estimado (pesos)</label>
+              <input type="text" inputMode="numeric"
+                value={precioPub ? fmtPeso(Number(precioPub)) : ''}
+                onChange={e => setPrecioPub(e.target.value.replace(/\D/g, ''))}
+                placeholder={sim ? fmtPeso(sim.basePesos) : '0'}
+                className="mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
             </div>
-          )}
-
-          {/* Ganancia neta real en ML Colombia */}
-          <div className="mt-4 border-t border-neutral-100 pt-4">
-            <p className="text-sm font-semibold text-neutral-700 mb-1">Ganancia neta en ML Colombia</p>
+          </div>
+          {/* Parámetros + ganancia neta real en ML Colombia */}
+          <div className="mt-1 border-t border-neutral-100 pt-4">
+            <p className="text-sm font-semibold text-neutral-700 mb-1">Costos de ML Colombia</p>
             <p className="text-[11px] text-neutral-400 mb-2">El envío se elige solo según el umbral: precios bajos pagan menos.</p>
             <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label className="text-[11px] text-neutral-500">Precio publicación</label>
-                <input type="text" inputMode="numeric"
-                  value={precioPub ? fmtPeso(Number(precioPub)) : ''}
-                  onChange={e => setPrecioPub(e.target.value.replace(/\D/g, ''))}
-                  placeholder={sim ? fmtPeso(sim.basePesos) : '0'}
-                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
-              </div>
               <div>
                 <label className="text-[11px] text-neutral-500">Comisión %</label>
                 <input type="number" step="0.5" value={mlComision} onChange={e => setMlComision(e.target.value)}
                   className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
               </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 mb-2">
               <div>
                 <label className="text-[11px] text-neutral-500">Umbral envío</label>
                 <input type="text" inputMode="numeric" value={mlUmbral ? fmtPeso(Number(mlUmbral)) : ''}
                   onChange={e => setMlUmbral(e.target.value.replace(/\D/g, ''))}
                   className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <label className="text-[11px] text-neutral-500">Envío &lt; umbral</label>
                 <input type="text" inputMode="numeric" value={mlEnvioBajo ? fmtPeso(Number(mlEnvioBajo)) : ''}

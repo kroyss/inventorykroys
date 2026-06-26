@@ -87,17 +87,6 @@ export default function TasasClient() {
     return calcSpreadAndDiscount(latest.official_rate, latest.parallel_rate, ex)
   }, [excess, latest])
 
-  // ── price simulator ──
-  const sim = useMemo(() => {
-    if (!latest) return null
-    const usd = parseFloat(simUsd) || 0
-    const disc = latest.recommended_discount / 100
-    return {
-      oficial:    usd * latest.official_rate,
-      paralelo:   usd * latest.parallel_rate,
-      sugerido:   usd * latest.official_rate * (1 - disc),
-    }
-  }, [simUsd, latest])
 
   const saveManual = async () => {
     setBusy(true); setError(null); setOkMsg(null)
@@ -181,40 +170,24 @@ export default function TasasClient() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Price simulator */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-          <h2 className="font-semibold mb-1">Simulador de precio</h2>
-          <p className="text-xs text-neutral-500 mb-3">Cuánto cobrar en bolívares por un producto en USD</p>
+          <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
+          <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
           <div className="flex items-end gap-3 mb-4">
             <div className="flex-1">
-              <label className="text-xs text-neutral-500">Precio USD</label>
-              <input type="number" step="0.01" min={0} value={simUsd} onChange={e => setSimUsd(e.target.value)}
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" />
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-neutral-500">Costo USD <span className="text-neutral-400">(opcional)</span></label>
+              <label className="text-xs text-neutral-500">Costo (compra + envío) USD</label>
               <input type="number" step="0.01" min={0} value={simCost} onChange={e => setSimCost(e.target.value)}
                 placeholder="0.00" className="mt-1 w-full border rounded px-3 py-2 text-sm" />
             </div>
-          </div>
-          {sim && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center bg-neutral-50 rounded-lg px-3 py-2 text-sm">
-                <span className="text-neutral-500">A tasa oficial</span>
-                <span className="font-semibold">Bs {money(sim.oficial)}</span>
-              </div>
-              <div className="flex justify-between items-center bg-neutral-50 rounded-lg px-3 py-2 text-sm">
-                <span className="text-neutral-500">A tasa paralela <span className="text-neutral-400">(referencia)</span></span>
-                <span className="font-semibold">Bs {money(sim.paralelo)}</span>
-              </div>
-              <div className="flex justify-between items-center bg-blue-50 rounded-lg px-3 py-2 text-sm">
-                <span className="text-blue-700">Precio sugerido (oficial − {latest.recommended_discount}%)</span>
-                <span className="font-bold text-blue-700">Bs {money(sim.sugerido)}</span>
-              </div>
+            <div className="flex-1">
+              <label className="text-xs text-neutral-500">Precio de venta estimado USD</label>
+              <input type="number" step="0.01" min={0} value={simUsd} onChange={e => setSimUsd(e.target.value)}
+                className="mt-1 w-full border rounded px-3 py-2 text-sm" />
             </div>
-          )}
+          </div>
 
-          {/* Ganancia neta real en ML Venezuela */}
-          <div className="mt-4 border-t border-neutral-100 pt-4">
-            <p className="text-sm font-semibold text-neutral-700 mb-2">Ganancia neta en ML Venezuela</p>
+          {/* Parámetros + ganancia neta real en ML Venezuela */}
+          <div className="mt-1 border-t border-neutral-100 pt-4">
+            <p className="text-sm font-semibold text-neutral-700 mb-2">Costos de ML Venezuela</p>
             <div className="grid grid-cols-3 gap-2 mb-3">
               <div>
                 <label className="text-[11px] text-neutral-500">Comisión %</label>
