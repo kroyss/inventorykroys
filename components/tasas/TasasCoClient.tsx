@@ -7,6 +7,7 @@ import {
 } from 'chart.js'
 import { KPICard } from '@/components/ui'
 import type { ProfitCategory } from '@/lib/types'
+import { parseLocalDate } from '@/lib/tz'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -85,7 +86,9 @@ export default function TasasCoClient() {
 
   const freshness = useMemo(() => {
     if (!latest?.rate_date) return null
-    const days = Math.floor((Date.now() - new Date(latest.rate_date).getTime()) / 86400000)
+    const rd = parseLocalDate(latest.rate_date)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const days = Math.round((today.getTime() - rd.getTime()) / 86400000)
     return { days, stale: days >= 2 } // la TRM cambia en días hábiles
   }, [latest])
 
@@ -154,7 +157,7 @@ export default function TasasCoClient() {
           {latest.rate_date ? (
             <>
               <span className="text-neutral-500">Última actualización: </span>
-              <span className="font-medium">{new Date(latest.rate_date).toLocaleDateString('es-CO')}</span>
+              <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-CO')}</span>
               {freshness && (
                 <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
                   {freshness.days === 0 ? 'Hoy' : freshness.days === 1 ? 'hace 1 día' : `hace ${freshness.days} días`}
@@ -281,7 +284,7 @@ export default function TasasCoClient() {
             <div className="relative h-56">
               <Line
                 data={{
-                  labels: chrono.map(r => r.rate_date ? new Date(r.rate_date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }) : ''),
+                  labels: chrono.map(r => r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }) : ''),
                   datasets: [
                     { label: 'TRM', data: chrono.map(r => r.trm_rate), borderColor: '#16a34a', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 2 },
                   ],
@@ -317,7 +320,7 @@ export default function TasasCoClient() {
             <tbody>
               {pageRows.map((r, i) => (
                 <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
-                  <td className="px-4 py-2">{r.rate_date ? new Date(r.rate_date).toLocaleDateString('es-CO') : ''}</td>
+                  <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-CO') : ''}</td>
                   <td className="px-4 py-2 text-right font-medium">${fmtPeso(r.trm_rate)}</td>
                   <td className="px-4 py-2 text-center text-xs">
                     <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{r.source}</span>

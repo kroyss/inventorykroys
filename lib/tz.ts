@@ -36,3 +36,11 @@ export function currentDate(tz: string = DEFAULT_TZ): string {
   const { year, month, day } = nowParts(tz)
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
+
+// Parsea 'YYYY-MM-DD' como fecha LOCAL de calendario (no UTC), para que al
+// mostrarla en el navegador no se corra un día según el huso. Las APIs de tasas
+// devuelven rate_date como texto 'YYYY-MM-DD' justamente para esto.
+export function parseLocalDate(s: string): Date {
+  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1)
+}

@@ -7,6 +7,7 @@ import {
 } from 'chart.js'
 import { KPICard, money } from '@/components/ui'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
+import { parseLocalDate } from '@/lib/tz'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -81,7 +82,9 @@ export default function TasasClient() {
   // ── freshness ──
   const freshness = useMemo(() => {
     if (!latest?.rate_date) return null
-    const days = Math.floor((Date.now() - new Date(latest.rate_date).getTime()) / 86400000)
+    const rd = parseLocalDate(latest.rate_date)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const days = Math.round((today.getTime() - rd.getTime()) / 86400000)
     return { days, stale: days >= 1 }
   }, [latest])
 
@@ -184,7 +187,7 @@ export default function TasasClient() {
           {latest.rate_date ? (
             <>
               <span className="text-neutral-500">Última actualización: </span>
-              <span className="font-medium">{new Date(latest.rate_date).toLocaleDateString('es-VE')}</span>
+              <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-VE')}</span>
               <span className="text-neutral-400"> ({latest.source})</span>
               {freshness && (
                 <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
@@ -290,7 +293,7 @@ export default function TasasClient() {
             <div className="relative h-56">
               <Line
                 data={{
-                  labels: chrono.map(r => r.rate_date ? new Date(r.rate_date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : ''),
+                  labels: chrono.map(r => r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : ''),
                   datasets: [
                     { label: 'Oficial',  data: chrono.map(r => r.official_rate), borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 2 },
                     { label: 'Paralelo', data: chrono.map(r => r.parallel_rate), borderColor: '#f97316', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 2 },
@@ -375,7 +378,7 @@ export default function TasasClient() {
             <tbody>
               {histPageRows.map((r, i) => (
                 <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
-                  <td className="px-4 py-2">{r.rate_date ? new Date(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
+                  <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
                   <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
                   <td className="px-4 py-2 text-right">Bs {money(r.parallel_rate)}</td>
                   <td className="px-4 py-2 text-right">{r.spread_percentage}%</td>

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { parseLocalDate } from '@/lib/tz'
 
 interface Rate {
   official_rate: number
@@ -42,7 +43,7 @@ export default function RateBar() {
         <span>Oficial: <span className="font-semibold text-neutral-800">Bs {fmt(rate.official_rate)}</span></span>
         <span>Paralelo: <span className="font-semibold text-neutral-800">Bs {fmt(rate.parallel_rate)}</span></span>
         {rate.rate_date && (
-          <span className="text-neutral-400 text-xs">📅 {new Date(rate.rate_date).toLocaleDateString('es-VE')}</span>
+          <span className="text-neutral-400 text-xs">📅 {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE')}</span>
         )}
         <span>Spread: <span className="font-semibold text-orange-600">{rate.spread_percentage}%</span></span>
         <span>Exceso: <span className="font-semibold text-purple-600">{rate.excess_percentage}%</span></span>

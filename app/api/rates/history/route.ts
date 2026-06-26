@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const { rows } = await db.query(`
-      SELECT id, rate_date, official_rate, parallel_rate, excess_percentage, source, created_at
+      SELECT id, to_char(rate_date, 'YYYY-MM-DD') AS rate_date,
+             official_rate, parallel_rate, excess_percentage, source, created_at
       FROM venezuela_exchange_rates
       ORDER BY rate_date DESC, created_at DESC
       LIMIT $1

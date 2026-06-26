@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Country } from '@/lib/types'
 import BonusPipeline from './BonusPipeline'
 import SalesMiniChart from './SalesMiniChart'
+import { parseLocalDate } from '@/lib/tz'
 
 interface Summary {
   active_products: number
@@ -130,7 +131,7 @@ export default function DashboardUser({ country }: { country: Country }) {
           </div>
           {rate.rate_date && (
             <div className="text-right text-xs text-neutral-400 mt-3">
-              Actualizado: {new Date(rate.rate_date).toLocaleDateString('es-VE')}
+              Actualizado: {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE')}
             </div>
           )}
         </Panel>

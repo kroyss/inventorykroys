@@ -12,7 +12,8 @@ export async function GET(_: NextRequest) {
 
   try {
     const { rows: [row] } = await db.query(`
-      SELECT id, trm_rate::float AS trm_rate, rate_date, created_at, source
+      SELECT id, trm_rate::float AS trm_rate,
+             to_char(rate_date, 'YYYY-MM-DD') AS rate_date, created_at, source
       FROM colombia_exchange_rates
       ORDER BY rate_date DESC, created_at DESC LIMIT 1
     `)
