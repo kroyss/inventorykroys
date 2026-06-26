@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react'
 import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ComprasClient from './ComprasClient'
 import ImportsClient from './ImportsClient'
-import ContainersClient from './ContainersClient'
 
 interface Props {
   initialOrders: PurchaseOrder[]
@@ -16,7 +15,7 @@ interface Props {
 export default function ComprasTabs({
   initialOrders, initialImports, localSuppliers, importSuppliers, userRole,
 }: Props) {
-  const [tab, setTab] = useState<'local' | 'import' | 'containers' | 'history'>('local')
+  const [tab, setTab] = useState<'local' | 'import' | 'history'>('local')
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
 
@@ -76,7 +75,6 @@ export default function ComprasTabs({
       <div className="flex gap-1 mb-4 flex-wrap">
         {tabBtn('local', `Locales (${localActive})`)}
         {tabBtn('import', `Importaciones (${importActive})`)}
-        {isAdmin && tabBtn('containers', 'Contenedores')}
         {tabBtn('history', `Historial (${historyTotal})`)}
       </div>
 
@@ -85,9 +83,6 @@ export default function ComprasTabs({
       )}
       {tab === 'import' && (
         <ImportsClient initialOrders={imports} suppliers={importSuppliers} userRole={userRole} onChanged={refresh} />
-      )}
-      {tab === 'containers' && isAdmin && (
-        <ContainersClient onChanged={refresh} />
       )}
       {tab === 'history' && (
         <div className="space-y-3">

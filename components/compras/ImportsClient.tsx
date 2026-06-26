@@ -225,6 +225,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     total:        o => o.total_usd ?? 0,
     updated_at:   o => new Date(o.updated_at ?? o.created_at ?? 0).getTime(),
     estado:       o => STATUS_LABELS[o.status] ?? o.status,
+    contenedor:   o => (o.container_code ?? '').toLowerCase(),
   }
 
   const visibleOrders = [...baseVisible.filter(o => {
@@ -601,13 +602,14 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 <SortableTh label="Cajas" sortKey="cajas" sort={sort} onSort={onSort} align="right" title="Cantidad de cajas de la orden" />
                 {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
                 <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
+                <SortableTh label="Contenedor" sortKey="contenedor" sort={sort} onSort={onSort} title="Contenedor asignado (clic para agrupar)" />
                 <SortableTh label="Estado" sortKey="estado" sort={sort} onSort={onSort} align="center" />
                 {historyMode && <th className="px-2 py-2 text-center">Inconsistente</th>}
               </tr>
             </thead>
             <tbody>
               {visibleOrders.length === 0 && (
-                <tr><td colSpan={(isAdmin ? 9 : 8) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
+                <tr><td colSpan={(isAdmin ? 10 : 9) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
               )}
               {paginatedOrders.map((o, idx) => {
                 const dateSrc = o.updated_at ?? o.created_at
@@ -623,7 +625,6 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     <td className="px-3 py-2 font-mono text-xs font-bold text-neutral-900 whitespace-nowrap">
                       {o.order_number}
                       {o.file_count > 0 && <span className="ml-1 text-neutral-500 font-normal">📎{o.file_count}</span>}
-                      {o.container_code && <span title={`Contenedor ${o.container_code}`} className="ml-1 text-blue-600 font-normal">📦</span>}
                     </td>
                     <td className="px-3 py-2 text-neutral-700 max-w-[12rem] truncate">{o.supplier_name || '—'}</td>
                     <td className="px-3 py-2 text-xs text-neutral-500 max-w-[18rem] truncate cursor-help"
@@ -662,6 +663,11 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     </td>
                     {isAdmin && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
                     <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
+                    <td className="px-3 py-2 text-xs whitespace-nowrap font-mono">
+                      {o.container_code
+                        ? <span className="text-blue-700">📦 {o.container_code}</span>
+                        : <span className="text-neutral-300">—</span>}
+                    </td>
                     <td className="px-3 py-2 text-center">
                       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-700">
                         {STATUS_LABELS[o.status] ?? o.status}
