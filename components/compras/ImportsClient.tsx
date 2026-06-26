@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
+import { Combobox } from '@/components/ui/Combobox'
 
 const PAGE_SIZE = 15
 
@@ -104,6 +105,11 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [showIncNote, setShowIncNote]     = useState(false)
   const [showPay, setShowPay]             = useState<'50' | '100' | null>(null)
   const [payAmount, setPayAmount]         = useState('')
+  // Pago 100%: tracking + contenedor (combobox dinámico: elegir activo o crear)
+  const [payTracking, setPayTracking]       = useState('')
+  const [payContName, setPayContName]       = useState('')
+  const [payContId,   setPayContId]         = useState<number | null>(null)
+  const [containers,  setContainers]        = useState<{ id: number; code: string }[]>([])
 
   // Orden por columna (default: último movimiento, descendente)
   const [sort, setSort] = useState<SortState>({ key: 'updated_at', dir: 'desc' })
@@ -118,7 +124,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (showIncNote)      { setShowIncNote(false); setIncNote('') }
-      else if (showPay)     { setShowPay(null); setPayAmount('') }
+      else if (showPay)     { closePay() }
       else if (showReceive) { setShowReceive(false) }
       else if (showForm)    { setShowForm(false); setEditing(null) }
       else if (selected)    { setSelected(null) }
@@ -414,8 +420,23 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     const remaining = total - (selected.paid_50_done ? (selected.paid_50_amount || 0) : 0)
     return Math.max(0, remaining).toFixed(2)
   }
-  const openPay = (step: '50' | '100') => {
+  const closePay = () => {
+    setShowPay(null); setPayAmount('')
+    setPayTracking(''); setPayContName(''); setPayContId(null)
+  }
+  const openPay = async (step: '50' | '100') => {
     setPayAmount(suggestedPay(step))
+    setPayTracking(''); setPayContName(''); setPayContId(null)
+    if (step === '100') {
+      // Carga solo contenedores activos (abiertos / en tránsito) para asignar
+      try {
+        const r = await fetch('/api/containers', { cache: 'no-store' })
+        if (r.ok) {
+          const all = await r.json() as { id: number; code: string; status: string }[]
+          setContainers(all.filter(c => c.status === 'ABIERTO' || c.status === 'EN_TRANSITO'))
+        }
+      } catch { /* sin contenedores, igual se puede crear */ }
+    }
     setShowPay(step)
   }
 
@@ -423,11 +444,35 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     if (!selected || !showPay) return
     const amount = parseFloat(payAmount)
     if (!amount || amount <= 0) { setError('Monto inválido'); return }
+
+    let tracking_number: string | undefined
+    let container_id: number | undefined
+    if (showPay === '100') {
+      if (!payTracking.trim())  { setError('El tracking es obligatorio'); return }
+      if (!payContName.trim())  { setError('Seleccioná o creá un contenedor'); return }
+      tracking_number = payTracking.trim()
+    }
+
     setBusy(true); setError(null)
+
+    // Si el contenedor es nuevo (sin id), créalo primero y usa su id
+    if (showPay === '100') {
+      if (payContId) {
+        container_id = payContId
+      } else {
+        const cr = await fetch('/api/containers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: payContName.trim() }),
+        })
+        if (!cr.ok) { setBusy(false); setError('No se pudo crear el contenedor'); return }
+        container_id = (await cr.json()).id
+      }
+    }
+
     const res = await fetch(`/api/imports/${selected.id}/payment`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_step: showPay, amount }),
+      body: JSON.stringify({ payment_step: showPay, amount, tracking_number, container_id }),
     })
     setBusy(false)
     if (!res.ok) {
@@ -435,7 +480,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       setError(e.error ?? 'Error')
       return
     }
-    setShowPay(null); setPayAmount('')
+    closePay()
     reload()
   }
 
@@ -925,27 +970,65 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-4 border-b">
               <h2 className="font-semibold">Registrar pago {showPay}%</h2>
+              {showPay === '100' && (
+                <p className="text-[11px] text-neutral-500 mt-1">Al pagar el 100% la orden pasa a <b>En tránsito</b>.</p>
+              )}
             </div>
-            <div className="p-4">
-              <label className="text-xs text-neutral-500">
-                Monto $ {showPay === '100' && selected?.paid_50_done ? '(lo que falta)' : '(sugerido)'}
-              </label>
-              <input type="number" step="0.01" min={0} value={payAmount} onKeyDown={blockNumberKeys} onChange={e => setPayAmount(e.target.value)}
-                placeholder="0.00" autoFocus
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" />
-              {selected && (
-                <p className="mt-2 text-[11px] text-neutral-500 leading-relaxed">
-                  {showPay === '50'
-                    ? <>Sugerido: mitad del total (${fmt(selected.total_usd / 2)} de ${fmt(selected.total_usd)}). Es la plata que sale ahora; va a Finanzas, no cambia el costo del producto.</>
-                    : selected.paid_50_done
-                      ? <>Sugerido: el <b>restante</b> (${fmt(selected.total_usd)} total − ${fmt(selected.paid_50_amount)} ya pagado = ${fmt(Math.max(0, selected.total_usd - selected.paid_50_amount))}). Finanzas suma ambos pagos, por eso aquí va solo lo que falta.</>
-                      : <>Sugerido: el total (${fmt(selected.total_usd)}), porque no hubo pago del 50%. Va a Finanzas como la plata que sale.</>}
-                </p>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-xs text-neutral-500">
+                  Monto $ {showPay === '100' && selected?.paid_50_done ? '(lo que falta)' : '(sugerido)'}
+                </label>
+                <input type="number" step="0.01" min={0} value={payAmount} onKeyDown={blockNumberKeys} onChange={e => setPayAmount(e.target.value)}
+                  placeholder="0.00" autoFocus
+                  className="mt-1 w-full border rounded px-3 py-2 text-sm" />
+                {selected && (
+                  <p className="mt-2 text-[11px] text-neutral-500 leading-relaxed">
+                    {showPay === '50'
+                      ? <>Sugerido: mitad del total (${fmt(selected.total_usd / 2)} de ${fmt(selected.total_usd)}). Es la plata que sale ahora; va a Finanzas, no cambia el costo del producto.</>
+                      : selected.paid_50_done
+                        ? <>Sugerido: el <b>restante</b> (${fmt(selected.total_usd)} total − ${fmt(selected.paid_50_amount)} ya pagado = ${fmt(Math.max(0, selected.total_usd - selected.paid_50_amount))}). Finanzas suma ambos pagos, por eso aquí va solo lo que falta.</>
+                        : <>Sugerido: el total (${fmt(selected.total_usd)}), porque no hubo pago del 50%. Va a Finanzas como la plata que sale.</>}
+                  </p>
+                )}
+              </div>
+
+              {showPay === '100' && (
+                <>
+                  <div>
+                    <label className="text-xs text-neutral-500">Tracking *</label>
+                    <input value={payTracking} onChange={e => setPayTracking(e.target.value)}
+                      placeholder="N° de guía / tracking"
+                      className="mt-1 w-full border rounded px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-500">Contenedor *</label>
+                    <div className="mt-1">
+                      <Combobox
+                        value={payContName}
+                        options={containers.map(c => ({ id: c.id, name: c.code }))}
+                        placeholder="Elegí un contenedor activo o escribí uno nuevo…"
+                        onChange={(name, id) => { setPayContName(name); setPayContId(id) }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-neutral-500">
+                      {payContId
+                        ? <>Se agrega a <b>{payContName}</b> (existente).</>
+                        : payContName.trim()
+                          ? <>Se creará el contenedor <b>{payContName.trim()}</b>.</>
+                          : <>Podés agrupar varias importaciones en un mismo contenedor. Luego se ve en la pestaña Contenedores.</>}
+                    </p>
+                  </div>
+                </>
               )}
             </div>
             <div className="p-4 border-t flex justify-end gap-2 bg-neutral-50">
-              <button onClick={() => { setShowPay(null); setPayAmount('') }} className="btn-secondary text-sm">Cancelar</button>
-              <button onClick={submitPayment} disabled={busy || !payAmount} className="btn-primary text-sm">Guardar</button>
+              <button onClick={closePay} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={submitPayment}
+                disabled={busy || !payAmount || (showPay === '100' && (!payTracking.trim() || !payContName.trim()))}
+                className="btn-primary text-sm">
+                {showPay === '100' ? 'Pagar y enviar a tránsito' : 'Guardar'}
+              </button>
             </div>
           </div>
         </div>
