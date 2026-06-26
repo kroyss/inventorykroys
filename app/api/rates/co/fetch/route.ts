@@ -39,6 +39,10 @@ export async function GET(_: NextRequest) {
         [trm]
       )
     }
+
+    // Poda: el historial es solo referencia, se conservan ~30 días.
+    await db.query(`DELETE FROM colombia_exchange_rates WHERE rate_date < CURRENT_DATE - INTERVAL '30 days'`)
+
     return NextResponse.json({ ok: true, trm_rate: trm })
   } catch (err) {
     return apiError(err)

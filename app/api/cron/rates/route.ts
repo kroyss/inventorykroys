@@ -82,6 +82,9 @@ async function updateVE() {
     id = row.id; action = 'inserted'
   }
 
+  // Poda: el historial es solo referencia, se conservan ~30 días.
+  await db.query(`DELETE FROM venezuela_exchange_rates WHERE rate_date < CURRENT_DATE - INTERVAL '30 days'`)
+
   return { id, action, official_rate, parallel_rate, spread_percentage: spread, recommended_discount }
 }
 
@@ -119,6 +122,9 @@ async function updateCO() {
     `, [trm, await adminId(db)])
     id = row.id; action = 'inserted'
   }
+
+  // Poda: el historial es solo referencia, se conservan ~30 días.
+  await db.query(`DELETE FROM colombia_exchange_rates WHERE rate_date < CURRENT_DATE - INTERVAL '30 days'`)
 
   return { id, action, trm_rate: trm }
 }

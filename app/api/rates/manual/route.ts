@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
       RETURNING id
     `, [official_rate, parallel_rate, spread, recommended_discount, excess, userId])
 
+    // Poda: el historial es solo referencia, se conservan ~30 días.
+    await db.query(`DELETE FROM venezuela_exchange_rates WHERE rate_date < CURRENT_DATE - INTERVAL '30 days'`)
+
     return NextResponse.json({
       id: row.id,
       message: 'Tasa guardada',

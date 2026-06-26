@@ -39,13 +39,10 @@ export default function TasasClient() {
   const [error,    setError]    = useState<string | null>(null)
   const [okMsg,    setOkMsg]    = useState<string | null>(null)
 
-  const [histPage, setHistPage] = useState(1)
-  const HIST_PAGE_SIZE = 10
-
   const loadAll = async () => {
     const [l, h, s] = await Promise.all([
       fetch('/api/rates/latest').then(r => r.json()),
-      fetch('/api/rates/history?limit=365').then(r => r.json()),
+      fetch('/api/rates/history?limit=30').then(r => r.json()),
       fetch('/api/settings').then(r => r.json()).catch(() => ({})),
     ])
     setLatest(l)
@@ -125,12 +122,6 @@ export default function TasasClient() {
 
   // chart data (chronological) — solo los últimos 30 para que sea legible
   const chrono = [...history].slice(0, 30).reverse()
-
-  // historial paginado (10 por página)
-  const histTotalPages = Math.max(1, Math.ceil(history.length / HIST_PAGE_SIZE))
-  const histClampedPage = Math.min(histPage, histTotalPages)
-  const histStart = (histClampedPage - 1) * HIST_PAGE_SIZE
-  const histPageRows = history.slice(histStart, histStart + HIST_PAGE_SIZE)
 
   return (
     <div className="space-y-4">
@@ -290,14 +281,11 @@ export default function TasasClient() {
           )}
         </div>
 
-        {/* History */}
+        {/* History — compacto, scroll, últimos 30 días (solo referencia) */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-neutral-100 bg-neutral-50">
-            <h2 className="font-semibold">Historial ({history.length})</h2>
-          </div>
-          <div className="overflow-x-auto">
+          <div className="max-h-72 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-neutral-500 text-xs">
+              <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2 text-left">Fecha</th>
                   <th className="px-4 py-2 text-right">Oficial</th>
@@ -308,7 +296,7 @@ export default function TasasClient() {
                 </tr>
               </thead>
               <tbody>
-                {histPageRows.map((r, i) => (
+                {history.map((r, i) => (
                   <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                     <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
                     <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
@@ -326,30 +314,6 @@ export default function TasasClient() {
               </tbody>
             </table>
           </div>
-          {history.length > HIST_PAGE_SIZE && (
-            <div className="px-5 py-3 border-t border-neutral-100 flex items-center justify-between text-sm">
-              <span className="text-neutral-500">
-                {histStart + 1}–{Math.min(histStart + HIST_PAGE_SIZE, history.length)} de {history.length}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setHistPage(p => Math.max(1, p - 1))}
-                  disabled={histClampedPage <= 1}
-                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  ← Anterior
-                </button>
-                <span className="text-neutral-500">{histClampedPage} / {histTotalPages}</span>
-                <button
-                  onClick={() => setHistPage(p => Math.min(histTotalPages, p + 1))}
-                  disabled={histClampedPage >= histTotalPages}
-                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Siguiente →
-                </button>
-              </div>
-            </div>
-          )}
         </div>
         </div>
       </div>
