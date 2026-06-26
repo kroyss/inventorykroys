@@ -45,17 +45,18 @@ export async function PUT(
     const saleIsCO = session.user.country === 'CO'
     const snapshotCommission = () => saleIsCO
       ? db.query(
+          // $1 = comisión% + retención% (precomputado para evitar "unknown + unknown").
           `UPDATE sale_items SET unit_commission = ROUND(
-             unit_price * ($1 + $2) / 100
-             + CASE WHEN unit_price >= $3 THEN $4 ELSE $5 END
-           , 2) WHERE sale_id = $6`,
-          [mlp.ml_comision ?? 15.5, mlp.ml_reten ?? 1.91, mlp.ml_umbral_envio ?? 60000,
-           mlp.ml_envio_alto ?? 8000, mlp.ml_envio_bajo ?? 2600, id]
+             unit_price * $1::numeric / 100
+             + CASE WHEN unit_price >= $2::numeric THEN $3::numeric ELSE $4::numeric END
+           , 2) WHERE sale_id = $5`,
+          [(mlp.ml_comision ?? 15.5) + (mlp.ml_reten ?? 1.91),
+           mlp.ml_umbral_envio ?? 60000, mlp.ml_envio_alto ?? 8000, mlp.ml_envio_bajo ?? 2600, id]
         )
       : db.query(
           `UPDATE sale_items SET unit_commission = ROUND(
-             unit_price * $1 / 100
-             + $2 * LEAST(1, unit_price / NULLIF($3, 0))
+             unit_price * $1::numeric / 100
+             + $2::numeric * LEAST(1, unit_price / NULLIF($3::numeric, 0))
            , 2) WHERE sale_id = $4`,
           [mlp.ml_comision ?? 12, mlp.ml_envio ?? 0.65, mlp.ml_umbral ?? 5, id]
         )
