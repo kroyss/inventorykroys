@@ -110,6 +110,9 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [payContName, setPayContName]       = useState('')
   const [payContId,   setPayContId]         = useState<number | null>(null)
   const [containers,  setContainers]        = useState<{ id: number; code: string }[]>([])
+  // Contenedor inline para el paso PAGADA → En tránsito (órdenes ya pagadas)
+  const [trkContName, setTrkContName]       = useState('')
+  const [trkContId,   setTrkContId]         = useState<number | null>(null)
 
   // Orden por columna (default: último movimiento, descendente)
   const [sort, setSort] = useState<SortState>({ key: 'updated_at', dir: 'desc' })
@@ -132,6 +135,23 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
   }, [showIncNote, showPay, showReceive, showForm, selected])
+
+  // Contenedores activos (abiertos / en tránsito) para asignar una orden
+  const loadActiveContainers = useCallback(async () => {
+    try {
+      const r = await fetch('/api/containers', { cache: 'no-store' })
+      if (r.ok) {
+        const all = await r.json() as { id: number; code: string; status: string }[]
+        setContainers(all.filter(c => c.status === 'ABIERTO' || c.status === 'EN_TRANSITO'))
+      }
+    } catch { /* sin contenedores, igual se puede crear */ }
+  }, [])
+
+  // Al abrir una orden ya PAGADA, carga contenedores activos para el paso a tránsito
+  useEffect(() => {
+    setTrkContName(''); setTrkContId(null)
+    if (isAdmin && selected?.status === 'PAGADA') loadActiveContainers()
+  }, [selected, isAdmin, loadActiveContainers])
 
   const reload = useCallback(async () => {
     const r = await fetch('/api/imports', { cache: 'no-store' })
@@ -250,6 +270,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       return false
     }
     setTrackingInput(''); setShippingInput(''); setBoxCountInput(''); setIncNote('')
+    setTrkContName(''); setTrkContId(null)
     reload()
     return true
   }
@@ -261,7 +282,24 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
         setError('Tracking number requerido')
         return
       }
+      if (!trkContName.trim()) {
+        setError('Contenedor requerido')
+        return
+      }
       extras.tracking_number = trackingInput
+      // Resolver contenedor: usar el activo elegido o crear uno nuevo
+      let cid = trkContId
+      if (!cid) {
+        setBusy(true)
+        const cr = await fetch('/api/containers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: trkContName.trim() }),
+        })
+        setBusy(false)
+        if (!cr.ok) { setError('No se pudo crear el contenedor'); return }
+        cid = (await cr.json()).id
+      }
+      extras.container_id = cid
     }
     if (nextStatus === 'EN_CAMINO') {
       const sc = parseFloat(shippingInput)
@@ -427,16 +465,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const openPay = async (step: '50' | '100') => {
     setPayAmount(suggestedPay(step))
     setPayTracking(''); setPayContName(''); setPayContId(null)
-    if (step === '100') {
-      // Carga solo contenedores activos (abiertos / en tránsito) para asignar
-      try {
-        const r = await fetch('/api/containers', { cache: 'no-store' })
-        if (r.ok) {
-          const all = await r.json() as { id: number; code: string; status: string }[]
-          setContainers(all.filter(c => c.status === 'ABIERTO' || c.status === 'EN_TRANSITO'))
-        }
-      } catch { /* sin contenedores, igual se puede crear */ }
-    }
+    if (step === '100') await loadActiveContainers()
     setShowPay(step)
   }
 
@@ -761,7 +790,16 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       <>
                         <input value={trackingInput} onChange={e => setTrackingInput(e.target.value)}
                           placeholder="Tracking number" className="border rounded px-2 py-1 text-sm" />
-                        <button onClick={() => advanceTo('EN_TRANSITO')} disabled={busy || !trackingInput.trim()} className="btn-primary text-sm">
+                        <div className="w-56">
+                          <Combobox
+                            value={trkContName}
+                            options={containers.map(c => ({ id: c.id, name: c.code }))}
+                            placeholder="Contenedor activo o nuevo…"
+                            onChange={(name, id) => { setTrkContName(name); setTrkContId(id) }}
+                            className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                          />
+                        </div>
+                        <button onClick={() => advanceTo('EN_TRANSITO')} disabled={busy || !trackingInput.trim() || !trkContName.trim()} className="btn-primary text-sm">
                           En tránsito
                         </button>
                       </>

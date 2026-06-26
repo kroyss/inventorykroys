@@ -17,6 +17,7 @@ const Schema = z.object({
   status:          z.string(),
   notes:           z.string().optional(),
   tracking_number: z.string().optional(),
+  container_id:    z.number().int().positive().optional(),
   shipping_cost:   z.number().nonnegative().optional(),
   box_count:       z.number().int().positive().optional(),
   photos_notes:    z.string().optional(),
@@ -233,6 +234,10 @@ export async function PUT(
       if (newStatus === 'EN_TRANSITO' && body.tracking_number) {
         extra.push(`tracking_number=$${vals.length + 1}`)
         vals.push(body.tracking_number)
+      }
+      if (newStatus === 'EN_TRANSITO' && body.container_id) {
+        extra.push(`container_id=$${vals.length + 1}`)
+        vals.push(body.container_id)
       }
       if (newStatus === 'EN_CAMINO') {
         extra.push(`shipping_cost=$${vals.length + 1}`, `box_count=$${vals.length + 2}`)
