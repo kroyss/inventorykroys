@@ -145,24 +145,61 @@ export default function TasasClient() {
         <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-blue-600" />
       </div>
 
-      {/* freshness + BCV */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
+      {/* Barra superior: estado + entrada manual + % exceso + BCV (todo en una línea) */}
+      <div className="flex flex-wrap items-end gap-x-5 gap-y-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
+        {/* Estado de la tasa */}
         <div className="text-sm">
+          <div className="text-[11px] text-neutral-400">Última actualización</div>
           {latest.rate_date ? (
-            <>
-              <span className="text-neutral-500">Última actualización: </span>
+            <div className="flex items-center gap-2">
               <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-VE')}</span>
-              <span className="text-neutral-400"> ({latest.source})</span>
+              <span className="text-neutral-400 text-xs">({latest.source})</span>
               {freshness && (
-                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
                   {freshness.days === 0 ? 'Hoy' : freshness.days === 1 ? 'hace 1 día' : `hace ${freshness.days} días`}
-                  {freshness.stale ? ' · desactualizada' : ''}
+                  {freshness.stale ? ' · desact.' : ''}
                 </span>
               )}
-            </>
+            </div>
           ) : <span className="text-neutral-400">Sin fecha</span>}
         </div>
-        <button onClick={fetchBcv} disabled={busy} className="btn-primary text-sm">
+
+        {/* Entrada manual */}
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="text-[11px] text-neutral-500">T. oficial</label>
+            <input type="number" step="0.01" value={official} onChange={e => setOfficial(e.target.value)}
+              className="mt-0.5 w-24 border rounded px-2 py-1.5 text-sm" placeholder="0.00" />
+          </div>
+          <div>
+            <label className="text-[11px] text-neutral-500">T. paralela</label>
+            <input type="number" step="0.01" value={parallel} onChange={e => setParallel(e.target.value)}
+              className="mt-0.5 w-24 border rounded px-2 py-1.5 text-sm" placeholder="0.00" />
+          </div>
+          <button onClick={saveManual} disabled={busy || !official || !parallel}
+            className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50 whitespace-nowrap">Guardar</button>
+        </div>
+
+        {/* % Exceso */}
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="text-[11px] text-neutral-500" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Exceso %</label>
+            <input type="number" step="0.1" min={0} max={500} value={excess} onChange={e => setExcess(e.target.value)}
+              className="mt-0.5 w-20 border rounded px-2 py-1.5 text-sm" />
+          </div>
+          <button onClick={saveExcess} disabled={busy}
+            className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">Actualizar</button>
+          {excessPreview && (
+            <div className="text-sm leading-tight">
+              <div className="text-[11px] text-neutral-500">Desc. result.</div>
+              <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-blue-600' : 'text-neutral-900'}`}>
+                {excessPreview.recommended_discount}%
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button onClick={fetchBcv} disabled={busy} className="btn-primary text-sm ml-auto whitespace-nowrap">
           {busy ? 'Cargando…' : 'Actualizar desde BCV'}
         </button>
       </div>
@@ -314,51 +351,6 @@ export default function TasasClient() {
             </div>
           )}
         </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Manual entry */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-          <h2 className="font-semibold mb-3">Entrada manual</h2>
-          <div className="grid grid-cols-3 gap-3 items-end">
-            <div>
-              <label className="text-xs text-neutral-500">Tasa oficial</label>
-              <input type="number" step="0.01" value={official} onChange={e => setOfficial(e.target.value)}
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" placeholder="0.00" />
-            </div>
-            <div>
-              <label className="text-xs text-neutral-500">Tasa paralela</label>
-              <input type="number" step="0.01" value={parallel} onChange={e => setParallel(e.target.value)}
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" placeholder="0.00" />
-            </div>
-            <button onClick={saveManual} disabled={busy || !official || !parallel} className="btn-primary">Guardar</button>
-          </div>
-        </div>
-
-        {/* Excess % with live preview */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-          <h2 className="font-semibold mb-1">% Exceso</h2>
-          <p className="text-xs text-neutral-500 mb-3">Margen del precio publicado sobre el base. Afecta el descuento recomendado.</p>
-          <div className="grid grid-cols-3 gap-3 items-end">
-            <div>
-              <label className="text-xs text-neutral-500">Exceso %</label>
-              <input type="number" step="0.1" min={0} max={500} value={excess} onChange={e => setExcess(e.target.value)}
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" />
-            </div>
-            <button onClick={saveExcess} disabled={busy} className="btn-secondary">Actualizar</button>
-            {excessPreview && (
-              <div className="text-sm">
-                <div className="text-xs text-neutral-500">Descuento resultante</div>
-                <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-blue-600' : 'text-neutral-900'}`}>
-                  {excessPreview.recommended_discount}%
-                  {Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 && (
-                    <span className="text-xs text-neutral-400 ml-1">(actual {latest.recommended_discount}%)</span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
