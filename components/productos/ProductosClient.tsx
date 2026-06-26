@@ -139,6 +139,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     }).catch(() => {})
   }, [country])
 
+  // Parámetros de costos ML (Ajustes) para la ganancia neta.
+  const [mlSettings, setMlSettings] = useState<Record<string, string>>({})
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json())
+      .then(d => setMlSettings(d && typeof d === 'object' ? d : {})).catch(() => {})
+  }, [])
+
   // derived calculator values
   const selectedCat = profitCategories.find(c => c.id === form.profit_category_id)
   const profitPct   = selectedCat?.profit_percentage ?? 0
@@ -153,6 +160,27 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const priceBs = finalPriceUsd * (veRate?.official ?? 0)
   // CO: precio de venta sugerido en pesos = precio base (USD) × TRM
   const suggestedPesos = Math.round(basePriceUsd * coTrm)
+
+  // Ganancia neta después de los costos de ML (comisión + envío), por país.
+  // Usa los parámetros guardados en Ajustes (con fallback a defaults).
+  const mlNetProducto = (() => {
+    const num = (k: string, d: number) => { const v = parseFloat(mlSettings[k]); return isNaN(v) ? d : v }
+    if (country === 'CO') {
+      const price = form.sale_price || suggestedPesos
+      if (!price || !coTrm) return null
+      const comision = price * num('ml_comision', 15.5) / 100
+      const envio = price >= num('ml_umbral_envio', 60000) ? num('ml_envio_alto', 8000) : num('ml_envio_bajo', 2600)
+      const reten = price * num('ml_reten', 1.91) / 100
+      const recibes = price - comision - envio - reten
+      const ganancia = recibes - totalCost * coTrm
+      return { recibes, ganancia, margen: price > 0 ? ganancia / price * 100 : 0, pesos: true }
+    }
+    if (!veRate || veRate.parallel <= 0 || !finalPriceUsd) return null
+    const envio = num('ml_envio', 0.65) * Math.min(1, finalPriceUsd / num('ml_umbral', 5))
+    const neto = realUsd * (1 - num('ml_comision', 12) / 100) - envio
+    const ganancia = neto - totalCost
+    return { recibes: neto, ganancia, margen: totalCost > 0 ? ganancia / totalCost * 100 : 0, pesos: false }
+  })()
 
   // Open create modal when arriving via command palette (/productos?new=1)
   useEffect(() => {
@@ -865,6 +893,25 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                           {coTrm > 0 ? `≈ $${fmt(form.sale_price / coTrm)} USD a la TRM` : 'Sin TRM cargada'}
                         </p>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Ganancia neta después de ML (parámetros en Ajustes) */}
+                  {mlNetProducto && (
+                    <div className={`rounded-lg p-2.5 border-2 ${mlNetProducto.ganancia >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-red-50 border-red-300'}`}>
+                      <div className="flex items-center justify-between text-[11px] text-neutral-500">
+                        <span>Recibes después de ML</span>
+                        <span className="font-medium text-neutral-700">{mlNetProducto.pesos ? `$${fmtPeso(mlNetProducto.recibes)}` : `$${fmt(mlNetProducto.recibes)}`}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className={`text-xs font-semibold ${mlNetProducto.ganancia >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          Ganancia neta ML ({mlNetProducto.margen >= 0 ? '+' : ''}{mlNetProducto.margen.toFixed(1)}%)
+                        </span>
+                        <span className={`font-bold ${mlNetProducto.ganancia >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {mlNetProducto.pesos ? `$${fmtPeso(mlNetProducto.ganancia)}` : `$${fmt(mlNetProducto.ganancia)}`}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-neutral-400 mt-1">Después de comisión y envío de ML (ajustable en Ajustes).</p>
                     </div>
                   )}
                 </div>

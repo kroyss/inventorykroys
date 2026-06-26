@@ -51,15 +51,32 @@ export default function TasasClient() {
   const HIST_PAGE_SIZE = 10
 
   const loadAll = async () => {
-    const [l, h] = await Promise.all([
+    const [l, h, s] = await Promise.all([
       fetch('/api/rates/latest').then(r => r.json()),
       fetch('/api/rates/history?limit=365').then(r => r.json()),
+      fetch('/api/settings').then(r => r.json()).catch(() => ({})),
     ])
     setLatest(l)
     setHistory(Array.isArray(h) ? h : [])
     setExcess(String(l.excess_percentage ?? 100))
+    if (s && typeof s === 'object') {
+      if (s.ml_comision) setVeComision(String(s.ml_comision))
+      if (s.ml_envio)    setVeEnvio(String(s.ml_envio))
+      if (s.ml_umbral)   setVeUmbral(String(s.ml_umbral))
+    }
   }
   useEffect(() => { loadAll() }, [])
+
+  const saveSettings = async () => {
+    setBusy(true); setError(null); setOkMsg(null)
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ml_comision: veComision, ml_envio: veEnvio, ml_umbral: veUmbral }),
+    })
+    setBusy(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
+    setOkMsg('Parámetros guardados'); setTimeout(() => setOkMsg(null), 2500)
+  }
 
   // ── freshness ──
   const freshness = useMemo(() => {
@@ -237,6 +254,9 @@ export default function TasasClient() {
                   className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
               </div>
             </div>
+            <button onClick={saveSettings} disabled={busy} className="btn-secondary text-xs mb-3">
+              {busy ? 'Guardando…' : 'Guardar parámetros'}
+            </button>
             {veNet && (
               <div className="space-y-1.5 text-sm">
                 <RowVe label="Precio (USD)" value={`$${money(veNet.precio)}`} />

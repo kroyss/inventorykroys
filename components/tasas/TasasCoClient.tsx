@@ -48,18 +48,40 @@ export default function TasasCoClient() {
   const HIST_PAGE_SIZE = 10
 
   const loadAll = async () => {
-    const [l, h, c] = await Promise.all([
+    const [l, h, c, s] = await Promise.all([
       fetch('/api/rates/co/latest').then(r => r.json()),
       fetch('/api/rates/co/history?limit=365').then(r => r.json()),
       fetch('/api/profit-categories').then(r => r.json()),
+      fetch('/api/settings').then(r => r.json()).catch(() => ({})),
     ])
     setLatest(l)
     setHistory(Array.isArray(h) ? h : [])
     const list: ProfitCategory[] = Array.isArray(c) ? c : []
     setCats(list)
     setSimCat(prev => prev ?? (list[0]?.id ?? null))
+    if (s && typeof s === 'object') {
+      if (s.ml_comision)     setMlComision(String(s.ml_comision))
+      if (s.ml_umbral_envio) setMlUmbral(String(s.ml_umbral_envio))
+      if (s.ml_envio_bajo)   setMlEnvioBajo(String(s.ml_envio_bajo))
+      if (s.ml_envio_alto)   setMlEnvioAlto(String(s.ml_envio_alto))
+      if (s.ml_reten)        setMlRetenPct(String(s.ml_reten))
+    }
   }
   useEffect(() => { loadAll() }, [])
+
+  const saveSettings = async () => {
+    setBusy(true); setError(null); setOkMsg(null)
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ml_comision: mlComision, ml_umbral_envio: mlUmbral,
+        ml_envio_bajo: mlEnvioBajo, ml_envio_alto: mlEnvioAlto, ml_reten: mlRetenPct,
+      }),
+    })
+    setBusy(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
+    setOkMsg('Parámetros guardados'); setTimeout(() => setOkMsg(null), 2500)
+  }
 
   const freshness = useMemo(() => {
     if (!latest?.rate_date) return null
@@ -230,6 +252,9 @@ export default function TasasCoClient() {
                 className="w-16 border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-center disabled:opacity-50" />
               % (ICA + Fuente, si pagan con tarjeta)
             </label>
+            <button onClick={saveSettings} disabled={busy} className="btn-secondary text-xs mb-3">
+              {busy ? 'Guardando…' : 'Guardar parámetros'}
+            </button>
             {mlNet && (
               <div className="space-y-1.5 text-sm">
                 <Row label="Precio publicación" value={`$${fmtPeso(mlNet.precio)}`} />
