@@ -59,6 +59,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
     const costoPesos  = p.totalCost * coTrm
     const ganancia    = price - comision - envio - reten - costoPesos
     const margen      = ganancia / price * 100
+    const costPct     = costoPesos > 0 ? ganancia / costoPesos * 100 : 0   // ganancia sobre el costo (compra+envío)
     return (
       <div className="space-y-2">
         <div className="text-sm space-y-0.5">
@@ -70,8 +71,8 @@ export default function MlBreakdown(p: MlBreakdownProps) {
         </div>
         <div className={`rounded-lg p-2.5 border-2 ${netBg(margen)} flex items-center justify-between`}>
           <div>
-            <p className={`text-xs font-semibold ${netColor(margen)}`}>Ganancia neta</p>
-            <p className="text-[10px] text-neutral-500">{netFlag(margen)} · {margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta</p>
+            <p className={`text-xs font-semibold ${netColor(margen)}`}>Ganancia neta · {netFlag(margen)}</p>
+            <p className="text-[10px] text-neutral-500">{margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta · {costPct >= 0 ? '+' : ''}{costPct.toFixed(1)}% sobre costo</p>
           </div>
           <span className={`text-lg font-bold ${netColor(margen)}`}>${fmtPeso(ganancia)}</span>
         </div>
@@ -94,10 +95,11 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   const neto      = realUsd - comision - envio
   const ganancia  = neto - p.totalCost
   const margen    = realUsd > 0 ? ganancia / realUsd * 100 : 0
+  const costPct   = p.totalCost > 0 ? ganancia / p.totalCost * 100 : 0   // ganancia sobre el costo (compra+envío)
   return (
     <div className="space-y-2">
       <div className="text-sm space-y-0.5">
-        <Row label="Publicás en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
+        <Row label="Venta con descuento aplicado en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
         <Row label="En dólares reales (paralelo)" value={`$${fmtUsd(realUsd)}`} sub={`−$${fmtUsd(cambiario)} cambiario`} />
         <Row label={`− Comisión ML (${comisionPct}%)`} value={`−$${fmtUsd(comision)}`} neg />
         <Row label="− Envío ML" value={`−$${fmtUsd(envio)}`} neg />
@@ -105,8 +107,8 @@ export default function MlBreakdown(p: MlBreakdownProps) {
       </div>
       <div className={`rounded-lg p-2.5 border-2 ${netBg(margen)} flex items-center justify-between`}>
         <div>
-          <p className={`text-xs font-semibold ${netColor(margen)}`}>Ganancia neta</p>
-          <p className="text-[10px] text-neutral-500">{netFlag(margen)} · {margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta</p>
+          <p className={`text-xs font-semibold ${netColor(margen)}`}>Ganancia neta · {netFlag(margen)}</p>
+          <p className="text-[10px] text-neutral-500">{margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta · {costPct >= 0 ? '+' : ''}{costPct.toFixed(1)}% sobre costo</p>
         </div>
         <span className={`text-lg font-bold ${netColor(margen)}`}>${fmtUsd(ganancia)}</span>
       </div>

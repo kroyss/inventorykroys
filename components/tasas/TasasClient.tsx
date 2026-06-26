@@ -232,9 +232,12 @@ export default function TasasClient() {
                   className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
               </div>
             </div>
-            <button onClick={saveSettings} disabled={busy} className="btn-secondary text-xs mb-3">
-              {busy ? 'Guardando…' : 'Guardar parámetros'}
-            </button>
+            <div className="flex justify-end mb-3">
+              <button onClick={saveSettings} disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-lg border-2 border-neutral-900/40 font-semibold text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-colors disabled:opacity-60 whitespace-nowrap">
+                {busy ? 'Guardando…' : '💾 Guardar parámetros'}
+              </button>
+            </div>
             <MlBreakdown
               country="VE"
               totalCost={parseFloat(simCost) || 0}

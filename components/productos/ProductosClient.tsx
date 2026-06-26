@@ -53,9 +53,19 @@ function calcPrices(
 //   VE: ingreso real = precio final llevado a paralelo; − comisión % − envío (con prorrateo bajo el umbral).
 //   CO: ingreso = precio de venta en pesos; − comisión % − envío por umbral − retención.
 // margen = ganancia ÷ ingreso real (SOBRE VENTA), consistente en ambos países. null si falta dato.
+// Precio final VE calculado EN VIVO desde el costo y la config actual (categoría → base,
+// exceso, descuento), para que catálogo, vista y calculadora coincidan. El final_price_usd
+// guardado queda viejo cuando cambia el exceso/costo y no se re-guarda el producto.
+function liveBaseVE(p: { total_cost: number; profit_percentage: number }): number {
+  return p.total_cost * (1 + (p.profit_percentage ?? 0) / 100)
+}
+function liveFinalVE(p: { total_cost: number; profit_percentage: number; discount_percent: number }, excess: number): number {
+  return liveBaseVE(p) * (1 + excess / 100) * (1 - (p.discount_percent ?? 0) / 100)
+}
+
 function mlNetFor(
   country: Country,
-  p: { total_cost: number; base_price_usd: number; discount_percent: number; sale_price: number },
+  p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number },
   veRate: VeRate | null, coTrm: number, ml: Record<string, string>,
 ): { ganancia: number; margen: number; pesos: boolean } | null {
   const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
@@ -72,7 +82,7 @@ function mlNetFor(
   // la calculadora — así no se desincroniza con el final_price_usd guardado (que queda viejo
   // cuando cambia el exceso o no se re-guardó el producto).
   if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0)) return null
-  const finalLive = p.base_price_usd * (1 + (veRate.excess ?? 0) / 100) * (1 - (p.discount_percent ?? 0) / 100)
+  const finalLive = liveFinalVE(p, veRate.excess ?? 0)
   if (!(finalLive > 0)) return null
   const realUsd  = finalLive * veRate.official / veRate.parallel
   const envio    = num('ml_envio', 0.65) * Math.min(1, finalLive / num('ml_umbral', 5))
@@ -397,7 +407,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         case 'name':     return p.name.toLowerCase()
         case 'category': return p.category_name ?? '￿'
         case 'cost':     return p.total_cost
-        case 'price':    return p.final_price_usd
+        case 'price':    return country === 'CO' ? p.sale_price : liveBaseVE(p)
         case 'margin':   return margin(p)
         case 'stock':    return p.quantity
         case 'status':   return p.is_active ? 0 : 1
@@ -569,7 +579,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </td>
                   <td className="px-3 py-2 text-right text-neutral-600">${fmt(p.total_cost)}</td>
                   <td className="px-3 py-2 text-right font-medium text-neutral-900">
-                    {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(p.final_price_usd)}`}
+                    {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}
                   </td>
                   <td className="px-3 py-2 text-right">
                     {net ? (
@@ -639,7 +649,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-sm">
-                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(p.final_price_usd)}`}</span></span>
+                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}</span></span>
                   {net && (
                     <span className={netColor(net.margen)}>{Math.round(net.margen)}% neto</span>
                   )}
@@ -1007,13 +1017,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Precios</p>
                   {country === 'VE' ? (
                     <div className="grid grid-cols-2 gap-2">
-                      <Field label="Precio base" value={`$${fmt(v.base_price_usd)}`} accent="text-blue-700" />
-                      <Field label="Precio publicado" value={`$${fmt(v.published_price_usd)}`} />
+                      <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-blue-700" />
+                      <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
                       <Field label="Descuento" value={`${fmt(v.discount_percent)}%`} />
-                      <Field label="Precio final" value={`$${fmt(v.final_price_usd)}`} accent="text-green-700" />
-                      {v.price_bolivares > 0 && (
-                        <Field label="Precio Bs" value={`Bs ${fmt(v.price_bolivares)}`} />
-                      )}
+                      <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0))}`} accent="text-green-700" />
+                      <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0) * (veRate?.official ?? 0))}`} />
                       {net && (
                         <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
                       )}
@@ -1035,9 +1043,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     country={country}
                     totalCost={v.total_cost}
                     ml={mlSettings}
-                    finalPriceUsd={v.final_price_usd}
+                    finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0)}
                     veRate={veRate}
-                    priceBs={v.final_price_usd * (veRate?.official ?? 0)}
+                    priceBs={liveFinalVE(v, veRate?.excess ?? 0) * (veRate?.official ?? 0)}
                     salePrice={v.sale_price}
                     coTrm={coTrm}
                   />

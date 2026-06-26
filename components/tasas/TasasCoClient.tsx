@@ -223,16 +223,19 @@ export default function TasasCoClient() {
                   className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
               </div>
             </div>
-            <label className="flex items-center gap-2 text-xs text-neutral-600 mb-3">
-              <input type="checkbox" checked={mlReten} onChange={e => setMlReten(e.target.checked)} className="accent-neutral-800 w-4 h-4" />
-              Retención
-              <input type="number" step="0.01" value={mlRetenPct} onChange={e => setMlRetenPct(e.target.value)} disabled={!mlReten}
-                className="w-16 border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-center disabled:opacity-50" />
-              % (ICA + Fuente, si pagan con tarjeta)
-            </label>
-            <button onClick={saveSettings} disabled={busy} className="btn-secondary text-xs mb-3">
-              {busy ? 'Guardando…' : 'Guardar parámetros'}
-            </button>
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <label className="flex items-center gap-2 text-xs text-neutral-600">
+                <input type="checkbox" checked={mlReten} onChange={e => setMlReten(e.target.checked)} className="accent-neutral-800 w-4 h-4" />
+                Retención
+                <input type="number" step="0.01" value={mlRetenPct} onChange={e => setMlRetenPct(e.target.value)} disabled={!mlReten}
+                  className="w-16 border border-neutral-300 rounded px-1.5 py-0.5 text-xs text-center disabled:opacity-50" />
+                % <span className="text-neutral-400">(ICA + Fuente)</span>
+              </label>
+              <button onClick={saveSettings} disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-lg border-2 border-neutral-900/40 font-semibold text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-colors disabled:opacity-60 whitespace-nowrap">
+                {busy ? 'Guardando…' : '💾 Guardar parámetros'}
+              </button>
+            </div>
             <MlBreakdown
               country="CO"
               totalCost={parseFloat(simCost) || 0}
