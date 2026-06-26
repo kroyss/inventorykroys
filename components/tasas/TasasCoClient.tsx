@@ -8,6 +8,7 @@ import {
 import { KPICard } from '@/components/ui'
 import type { ProfitCategory } from '@/lib/types'
 import { parseLocalDate } from '@/lib/tz'
+import MlBreakdown from '@/components/productos/MlBreakdown'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -15,16 +16,6 @@ const fmtPeso = (n: number) => Number(n).toLocaleString('de-DE', { maximumFracti
 const fmtUsd  = (n: number) => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 interface CoRate { id?: number; trm_rate: number; rate_date: string | null; source: string }
-
-// Fila etiqueta/valor del desglose ML
-function Row({ label, value, neg }: { label: string; value: string; neg?: boolean }) {
-  return (
-    <div className="flex justify-between items-center px-3 text-neutral-600">
-      <span>{label}</span>
-      <span className={neg ? 'text-red-500' : ''}>{value}</span>
-    </div>
-  )
-}
 
 // Tasas Colombia: solo TRM oficial (sin paralelo/spread/descuento como VE).
 // Se actualiza sola por el cron; aquí se ve, se refresca a mano y hay simulador.
@@ -106,22 +97,6 @@ export default function TasasCoClient() {
       basePesos: baseUsd * latest.trm_rate,
     }
   }, [simCost, simCat, cats, latest])
-
-  // Neto real en ML: Recibes = precio − comisión − envío − retenciones; luego − costo.
-  // El envío se elige solo según el umbral (precios bajos pagan menos).
-  const mlNet = useMemo(() => {
-    if (!latest || !sim) return null
-    const precio = parseFloat(precioPub) || sim.basePesos
-    const comision = precio * (parseFloat(mlComision) || 0) / 100
-    const umbral = parseFloat(mlUmbral) || 0
-    const esAlto = precio >= umbral
-    const envio = esAlto ? (parseFloat(mlEnvioAlto) || 0) : (parseFloat(mlEnvioBajo) || 0)
-    const reten = mlReten ? precio * (parseFloat(mlRetenPct) || 0) / 100 : 0
-    const recibes = precio - comision - envio - reten
-    const costoPesos = (parseFloat(simCost) || 0) * latest.trm_rate
-    const ganancia = recibes - costoPesos
-    return { precio, comision, envio, esAlto, reten, recibes, costoPesos, ganancia, margen: precio > 0 ? ganancia / precio * 100 : 0 }
-  }, [precioPub, mlComision, mlUmbral, mlEnvioBajo, mlEnvioAlto, mlRetenPct, mlReten, simCost, sim, latest])
 
   const refresh = async () => {
     setBusy(true); setError(null); setOkMsg(null)
@@ -258,22 +233,19 @@ export default function TasasCoClient() {
             <button onClick={saveSettings} disabled={busy} className="btn-secondary text-xs mb-3">
               {busy ? 'Guardando…' : 'Guardar parámetros'}
             </button>
-            {mlNet && (
-              <div className="space-y-1.5 text-sm">
-                <Row label="Precio publicación" value={`$${fmtPeso(mlNet.precio)}`} />
-                <Row label={`Comisión (${mlComision || 0}%)`} value={`−$${fmtPeso(mlNet.comision)}`} neg />
-                <Row label={`Envío (${mlNet.esAlto ? '≥' : '<'} umbral)`} value={`−$${fmtPeso(mlNet.envio)}`} neg />
-                {mlReten && <Row label={`Retención (${mlRetenPct || 0}%)`} value={`−$${fmtPeso(mlNet.reten)}`} neg />}
-                <div className="flex justify-between items-center bg-neutral-100 rounded px-3 py-1.5 font-semibold">
-                  <span>Recibes</span><span>${fmtPeso(mlNet.recibes)}</span>
-                </div>
-                <Row label="− Tu costo" value={`−$${fmtPeso(mlNet.costoPesos)}`} neg />
-                <div className={`flex justify-between items-center rounded px-3 py-2 font-bold ${mlNet.ganancia >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                  <span>Ganancia neta ({mlNet.margen >= 0 ? '+' : ''}{mlNet.margen.toFixed(1)}%)</span>
-                  <span>${fmtPeso(mlNet.ganancia)}</span>
-                </div>
-              </div>
-            )}
+            <MlBreakdown
+              country="CO"
+              totalCost={parseFloat(simCost) || 0}
+              ml={{
+                ml_comision: mlComision,
+                ml_umbral_envio: mlUmbral,
+                ml_envio_bajo: mlEnvioBajo,
+                ml_envio_alto: mlEnvioAlto,
+                ml_reten: mlReten ? mlRetenPct : '0',
+              }}
+              salePrice={parseFloat(precioPub) || sim?.basePesos || 0}
+              coTrm={latest.trm_rate}
+            />
           </div>
         </div>
 

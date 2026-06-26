@@ -8,6 +8,7 @@ import {
 import { KPICard, money } from '@/components/ui'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { parseLocalDate } from '@/lib/tz'
+import MlBreakdown from '@/components/productos/MlBreakdown'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -20,16 +21,6 @@ interface Rate {
   excess_percentage: number
   rate_date: string | null
   source: string
-}
-
-// Fila etiqueta/valor del desglose neto ML
-function RowVe({ label, value, neg }: { label: string; value: string; neg?: boolean }) {
-  return (
-    <div className="flex justify-between items-center px-3 text-neutral-600">
-      <span>{label}</span>
-      <span className={neg ? 'text-red-500' : ''}>{value}</span>
-    </div>
-  )
 }
 
 export default function TasasClient() {
@@ -107,22 +98,6 @@ export default function TasasClient() {
       sugerido:   usd * latest.official_rate * (1 - disc),
     }
   }, [simUsd, latest])
-
-  // Neto real ML Venezuela: comisión en bolívares → lo que queda se cambia a paralelo,
-  // menos el envío. Ganancia = neto − costo. Envío gratis solo desde el umbral ($5).
-  const veNet = useMemo(() => {
-    if (!latest || latest.parallel_rate <= 0) return null
-    const precio = parseFloat(simUsd) || 0
-    const recibesParalelo = precio * latest.official_rate / latest.parallel_rate
-    const comisionPct = parseFloat(veComision) || 0
-    const umbral = parseFloat(veUmbral) || 5
-    const envioBase = parseFloat(veEnvio) || 0
-    const envio = precio > 0 ? envioBase * Math.min(1, precio / umbral) : 0
-    const neto = recibesParalelo * (1 - comisionPct / 100) - envio
-    const costo = parseFloat(simCost) || 0
-    const ganancia = neto - costo
-    return { precio, recibesParalelo, comisionPct, envio, neto, costo, ganancia, margen: costo > 0 ? ganancia / costo * 100 : 0 }
-  }, [simUsd, simCost, veComision, veEnvio, veUmbral, latest])
 
   const saveManual = async () => {
     setBusy(true); setError(null); setOkMsg(null)
@@ -260,26 +235,14 @@ export default function TasasClient() {
             <button onClick={saveSettings} disabled={busy} className="btn-secondary text-xs mb-3">
               {busy ? 'Guardando…' : 'Guardar parámetros'}
             </button>
-            {veNet && (
-              <div className="space-y-1.5 text-sm">
-                <RowVe label="Precio (USD)" value={`$${money(veNet.precio)}`} />
-                <RowVe label="Lo que recibes (paralelo)" value={`$${money(veNet.recibesParalelo)}`} />
-                <RowVe label={`− Comisión (${veNet.comisionPct}%, en Bs)`} value={`−$${money(veNet.recibesParalelo * veNet.comisionPct / 100)}`} neg />
-                <RowVe label="− Envío" value={`−$${money(veNet.envio)}`} neg />
-                <div className="flex justify-between items-center bg-neutral-100 rounded px-3 py-1.5 font-semibold">
-                  <span>Neto recibido</span><span>${money(veNet.neto)}</span>
-                </div>
-                {veNet.costo > 0 && (
-                  <>
-                    <RowVe label="− Tu costo" value={`−$${money(veNet.costo)}`} neg />
-                    <div className={`flex justify-between items-center rounded px-3 py-2 font-bold ${veNet.ganancia >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                      <span>Ganancia ({veNet.margen >= 0 ? '+' : ''}{veNet.margen.toFixed(1)}%)</span>
-                      <span>${money(veNet.ganancia)}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            <MlBreakdown
+              country="VE"
+              totalCost={parseFloat(simCost) || 0}
+              ml={{ ml_comision: veComision, ml_envio: veEnvio, ml_umbral: veUmbral }}
+              finalPriceUsd={parseFloat(simUsd) || 0}
+              veRate={latest ? { official: latest.official_rate, parallel: latest.parallel_rate } : null}
+              priceBs={(parseFloat(simUsd) || 0) * (latest?.official_rate ?? 0)}
+            />
             <div className="mt-3 text-[11px] text-neutral-500 bg-neutral-50 rounded-lg p-3 leading-relaxed">
               <b>Cómo se calcula:</b> ML descuenta la comisión ({veComision}%) sobre el precio en bolívares; lo que queda se cambia a <b>dólar paralelo</b> (por eso se multiplica sobre "lo que recibes"). El <b>envío</b> (${veEnvio}) es gratis solo desde <b>${veUmbral}</b>: si el precio es menor, el cliente debe juntar varias unidades hasta llegar a ${veUmbral}, así que el costo de envío se reparte → <b>envío = ${veEnvio} × (precio / {veUmbral})</b>. Ej: precio $2 → envío ≈ ${money((parseFloat(veEnvio) || 0) * 2 / (parseFloat(veUmbral) || 5))}.
             </div>
