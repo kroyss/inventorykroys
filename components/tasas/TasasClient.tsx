@@ -203,7 +203,7 @@ export default function TasasClient() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Price simulator */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de precio</h2>
@@ -286,6 +286,8 @@ export default function TasasClient() {
           </div>
         </div>
 
+        {/* Right column: gráfico + historial (aprovecha el espacio bajo el chart) */}
+        <div className="space-y-4">
         {/* Evolution chart */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-3">Evolución (últimos {chrono.length})</h2>
@@ -310,6 +312,69 @@ export default function TasasClient() {
           ) : (
             <div className="text-neutral-400 text-sm text-center py-12">Pocos datos para graficar</div>
           )}
+        </div>
+
+        {/* History */}
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-neutral-100 bg-neutral-50">
+            <h2 className="font-semibold">Historial ({history.length})</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-neutral-50 text-neutral-500 text-xs">
+                <tr>
+                  <th className="px-4 py-2 text-left">Fecha</th>
+                  <th className="px-4 py-2 text-right">Oficial</th>
+                  <th className="px-4 py-2 text-right">Paralelo</th>
+                  <th className="px-4 py-2 text-right">Spread</th>
+                  <th className="px-4 py-2 text-right">Descuento</th>
+                  <th className="px-4 py-2 text-center">Fuente</th>
+                </tr>
+              </thead>
+              <tbody>
+                {histPageRows.map((r, i) => (
+                  <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
+                    <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
+                    <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
+                    <td className="px-4 py-2 text-right">Bs {money(r.parallel_rate)}</td>
+                    <td className="px-4 py-2 text-right">{r.spread_percentage}%</td>
+                    <td className="px-4 py-2 text-right">{r.recommended_discount}%</td>
+                    <td className="px-4 py-2 text-center text-xs">
+                      <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{r.source}</span>
+                    </td>
+                  </tr>
+                ))}
+                {history.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-neutral-400">Sin historial</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {history.length > HIST_PAGE_SIZE && (
+            <div className="px-5 py-3 border-t border-neutral-100 flex items-center justify-between text-sm">
+              <span className="text-neutral-500">
+                {histStart + 1}–{Math.min(histStart + HIST_PAGE_SIZE, history.length)} de {history.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHistPage(p => Math.max(1, p - 1))}
+                  disabled={histClampedPage <= 1}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Anterior
+                </button>
+                <span className="text-neutral-500">{histClampedPage} / {histTotalPages}</span>
+                <button
+                  onClick={() => setHistPage(p => Math.min(histTotalPages, p + 1))}
+                  disabled={histClampedPage >= histTotalPages}
+                  className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         </div>
       </div>
 
@@ -358,67 +423,6 @@ export default function TasasClient() {
         </div>
       </div>
 
-      {/* History */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-neutral-100 bg-neutral-50">
-          <h2 className="font-semibold">Historial ({history.length})</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-neutral-500 text-xs">
-              <tr>
-                <th className="px-4 py-2 text-left">Fecha</th>
-                <th className="px-4 py-2 text-right">Oficial</th>
-                <th className="px-4 py-2 text-right">Paralelo</th>
-                <th className="px-4 py-2 text-right">Spread</th>
-                <th className="px-4 py-2 text-right">Descuento</th>
-                <th className="px-4 py-2 text-center">Fuente</th>
-              </tr>
-            </thead>
-            <tbody>
-              {histPageRows.map((r, i) => (
-                <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
-                  <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
-                  <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
-                  <td className="px-4 py-2 text-right">Bs {money(r.parallel_rate)}</td>
-                  <td className="px-4 py-2 text-right">{r.spread_percentage}%</td>
-                  <td className="px-4 py-2 text-right">{r.recommended_discount}%</td>
-                  <td className="px-4 py-2 text-center text-xs">
-                    <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{r.source}</span>
-                  </td>
-                </tr>
-              ))}
-              {history.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-neutral-400">Sin historial</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {history.length > HIST_PAGE_SIZE && (
-          <div className="px-5 py-3 border-t border-neutral-100 flex items-center justify-between text-sm">
-            <span className="text-neutral-500">
-              {histStart + 1}–{Math.min(histStart + HIST_PAGE_SIZE, history.length)} de {history.length}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setHistPage(p => Math.max(1, p - 1))}
-                disabled={histClampedPage <= 1}
-                className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                ← Anterior
-              </button>
-              <span className="text-neutral-500">{histClampedPage} / {histTotalPages}</span>
-              <button
-                onClick={() => setHistPage(p => Math.min(histTotalPages, p + 1))}
-                disabled={histClampedPage >= histTotalPages}
-                className="px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Siguiente →
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
