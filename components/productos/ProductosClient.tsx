@@ -4,6 +4,7 @@ import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
 import { int } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import MlBreakdown from './MlBreakdown'
 
 // ─── helpers ────────────────────────────────────────────────────
 const ML_ACCOUNTS: Record<Country, string[]> = {
@@ -183,7 +184,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const profitPct   = selectedCat?.profit_percentage ?? 0
   const {
     totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd,
-    recDiscount, realUsd, marginPct,
+    recDiscount,
   } = calcPrices(
     // publicado = derivado del precio sugerido ML (no input suelto), igual que legacy
     form.base_cost, form.shipping_cost, profitPct, veRate, undefined, form.discount_percent
@@ -192,27 +193,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const priceBs = finalPriceUsd * (veRate?.official ?? 0)
   // CO: precio de venta sugerido en pesos = precio base (USD) × TRM
   const suggestedPesos = Math.round(basePriceUsd * coTrm)
-
-  // Ganancia neta después de los costos de ML (comisión + envío), por país.
-  // Usa los parámetros guardados en Ajustes (con fallback a defaults).
-  const mlNetProducto = (() => {
-    const num = (k: string, d: number) => { const v = parseFloat(mlSettings[k]); return isNaN(v) ? d : v }
-    if (country === 'CO') {
-      const price = form.sale_price || suggestedPesos
-      if (!price || !coTrm) return null
-      const comision = price * num('ml_comision', 15.5) / 100
-      const envio = price >= num('ml_umbral_envio', 60000) ? num('ml_envio_alto', 8000) : num('ml_envio_bajo', 2600)
-      const reten = price * num('ml_reten', 1.91) / 100
-      const recibes = price - comision - envio - reten
-      const ganancia = recibes - totalCost * coTrm
-      return { recibes, ganancia, margen: price > 0 ? ganancia / price * 100 : 0, pesos: true }
-    }
-    if (!veRate || veRate.parallel <= 0 || !finalPriceUsd) return null
-    const envio = num('ml_envio', 0.65) * Math.min(1, finalPriceUsd / num('ml_umbral', 5))
-    const neto = realUsd * (1 - num('ml_comision', 12) / 100) - envio
-    const ganancia = neto - totalCost
-    return { recibes: neto, ganancia, margen: totalCost > 0 ? ganancia / totalCost * 100 : 0, pesos: false }
-  })()
 
   // Open create modal when arriving via command palette (/productos?new=1)
   useEffect(() => {
@@ -847,30 +827,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                         </div>
                       </div>
 
-                      {/* Resultado */}
-                      <div className={`rounded-lg p-3 border-2 ${marginPct < 3 ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-400'}`}>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <p className="text-[11px] text-neutral-500">Precio ML (USD oficial)</p>
-                            <p className="text-base font-bold text-neutral-800">${fmt(finalPriceUsd)}</p>
-                            <p className="text-[10px] text-neutral-400">Bs {fmt(priceBs)}</p>
-                          </div>
-                          <div className="border-l border-r border-neutral-200 px-2">
-                            <p className="text-[11px] text-neutral-500">Lo que recibes (paralelo)</p>
-                            <p className="text-base font-bold text-green-700">${fmt(realUsd)}</p>
-                            <p className="text-[10px] text-neutral-400">Bs ÷ {(veRate?.parallel ?? 0).toFixed(0)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[11px] text-neutral-500">Margen sobre base</p>
-                            <p className={`text-base font-bold ${marginPct >= 5 ? 'text-green-700' : marginPct >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
-                              {marginPct >= 0 ? '+' : ''}{marginPct.toFixed(1)}%
-                            </p>
-                            <p className={`text-[10px] ${marginPct >= 5 ? 'text-green-600' : marginPct >= 0 ? 'text-amber-500' : 'text-red-500'}`}>
-                              {marginPct >= 5 ? '✅ Seguro' : marginPct >= 0 ? '⚠️ Ajustado' : 'Pérdida'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
                     </>
                   ) : (
                     /* Colombia — costo USD, precio de venta en PESOS (sugerido por TRM) */
@@ -917,24 +873,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     </div>
                   )}
 
-                  {/* Ganancia neta después de ML (parámetros en Ajustes) */}
-                  {mlNetProducto && (
-                    <div className={`rounded-lg p-2.5 border-2 ${mlNetProducto.ganancia >= 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-red-50 border-red-300'}`}>
-                      <div className="flex items-center justify-between text-[11px] text-neutral-500">
-                        <span>Recibes después de ML</span>
-                        <span className="font-medium text-neutral-700">{mlNetProducto.pesos ? `$${fmtPeso(mlNetProducto.recibes)}` : `$${fmt(mlNetProducto.recibes)}`}</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className={`text-xs font-semibold ${mlNetProducto.ganancia >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                          Ganancia neta ML ({mlNetProducto.margen >= 0 ? '+' : ''}{mlNetProducto.margen.toFixed(1)}%)
-                        </span>
-                        <span className={`font-bold ${mlNetProducto.ganancia >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                          {mlNetProducto.pesos ? `$${fmtPeso(mlNetProducto.ganancia)}` : `$${fmt(mlNetProducto.ganancia)}`}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-neutral-400 mt-1">Después de comisión y envío de ML (ajustable en Ajustes).</p>
-                    </div>
-                  )}
+                  {/* Lo que realmente te queda — cascada compartida (parámetros en Ajustes) */}
+                  <div className="border-t border-neutral-200 pt-3">
+                    <p className="text-sm font-semibold text-neutral-700 mb-2">Lo que realmente te queda</p>
+                    <MlBreakdown
+                      country={country}
+                      totalCost={totalCost}
+                      ml={mlSettings}
+                      finalPriceUsd={finalPriceUsd}
+                      veRate={veRate}
+                      priceBs={priceBs}
+                      salePrice={form.sale_price || suggestedPesos}
+                      coTrm={coTrm}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1071,6 +1023,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       )}
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Lo que realmente te queda</p>
+                  <MlBreakdown
+                    country={country}
+                    totalCost={v.total_cost}
+                    ml={mlSettings}
+                    finalPriceUsd={v.final_price_usd}
+                    veRate={veRate}
+                    priceBs={v.final_price_usd * (veRate?.official ?? 0)}
+                    salePrice={v.sale_price}
+                    coTrm={coTrm}
+                  />
                 </div>
 
                 <div>
