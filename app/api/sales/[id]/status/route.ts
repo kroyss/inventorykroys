@@ -36,9 +36,12 @@ export async function PUT(
 
     // Snapshot de la comisión estimada de ML por línea (ganancia neta en dashboard/reportes).
     // Parámetros editables en Ajustes (app_settings). Misma moneda que la venta (VE USD, CO pesos).
-    const { rows: setRows } = await db.query(`SELECT key, value FROM app_settings`)
+    // Resiliente: si app_settings no existe (migración pendiente), usa defaults y no rompe la venta.
     const mlp: Record<string, number> = {}
-    for (const r of setRows) { const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v }
+    try {
+      const { rows: setRows } = await db.query(`SELECT key, value FROM app_settings`)
+      for (const r of setRows) { const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v }
+    } catch { /* app_settings ausente → defaults */ }
     const saleIsCO = session.user.country === 'CO'
     const snapshotCommission = () => saleIsCO
       ? db.query(

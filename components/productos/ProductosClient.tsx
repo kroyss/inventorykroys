@@ -55,7 +55,7 @@ function calcPrices(
 // margen = ganancia ÷ ingreso real (SOBRE VENTA), consistente en ambos países. null si falta dato.
 function mlNetFor(
   country: Country,
-  p: { total_cost: number; final_price_usd: number; sale_price: number },
+  p: { total_cost: number; base_price_usd: number; discount_percent: number; sale_price: number },
   veRate: VeRate | null, coTrm: number, ml: Record<string, string>,
 ): { ganancia: number; margen: number; pesos: boolean } | null {
   const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
@@ -68,10 +68,14 @@ function mlNetFor(
     const ganancia = (price - comision - envio - reten) - p.total_cost * coTrm
     return { ganancia, margen: ganancia / price * 100, pesos: true }
   }
-  if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0) || !(p.final_price_usd > 0)) return null
-  const realUsd  = p.final_price_usd * veRate.official / veRate.parallel
-  if (!(realUsd > 0)) return null
-  const envio    = num('ml_envio', 0.65) * Math.min(1, p.final_price_usd / num('ml_umbral', 5))
+  // VE: precio publicado calculado EN VIVO (base × exceso actual × (1−descuento)), igual que
+  // la calculadora — así no se desincroniza con el final_price_usd guardado (que queda viejo
+  // cuando cambia el exceso o no se re-guardó el producto).
+  if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0)) return null
+  const finalLive = p.base_price_usd * (1 + (veRate.excess ?? 0) / 100) * (1 - (p.discount_percent ?? 0) / 100)
+  if (!(finalLive > 0)) return null
+  const realUsd  = finalLive * veRate.official / veRate.parallel
+  const envio    = num('ml_envio', 0.65) * Math.min(1, finalLive / num('ml_umbral', 5))
   const neto     = realUsd * (1 - num('ml_comision', 12) / 100) - envio
   const ganancia = neto - p.total_cost
   return { ganancia, margen: ganancia / realUsd * 100, pesos: false }
