@@ -140,7 +140,7 @@ export default function TasasCoClient() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
         {/* Simulador */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
@@ -228,8 +228,8 @@ export default function TasasCoClient() {
           </div>
         </div>
 
-        {/* Columna derecha: gráfico + historial (aprovecha el espacio bajo el chart) */}
-        <div className="space-y-4">
+        {/* Columna derecha: gráfico + historial (igualan la altura del simulador) */}
+        <div className="flex flex-col gap-4">
         {/* Evolución */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-3">Evolución TRM (últimos {chrono.length})</h2>
@@ -256,8 +256,8 @@ export default function TasasCoClient() {
         </div>
 
         {/* Historial — compacto, scroll, últimos 30 días (solo referencia) */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-          <div className="max-h-72 overflow-y-auto">
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="flex-1 min-h-[180px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>

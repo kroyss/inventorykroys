@@ -38,6 +38,7 @@ export default function TasasClient() {
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [okMsg,    setOkMsg]    = useState<string | null>(null)
+  const [manualOpen, setManualOpen] = useState(false)  // edición manual bloqueada por defecto
 
   const loadAll = async () => {
     const [l, h, s] = await Promise.all([
@@ -136,66 +137,74 @@ export default function TasasClient() {
         <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-blue-600" />
       </div>
 
-      {/* Barra superior: estado + entrada manual + % exceso + BCV (todo en una línea) */}
-      <div className="flex flex-wrap items-end gap-x-5 gap-y-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
-        {/* Estado de la tasa */}
-        <div className="text-sm">
-          <div className="text-[11px] text-neutral-400">Última actualización</div>
-          {latest.rate_date ? (
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-VE')}</span>
-              <span className="text-neutral-400 text-xs">({latest.source})</span>
-              {freshness && (
-                <span className={`px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
-                  {freshness.days === 0 ? 'Hoy' : freshness.days === 1 ? 'hace 1 día' : `hace ${freshness.days} días`}
-                  {freshness.stale ? ' · desact.' : ''}
-                </span>
-              )}
-            </div>
-          ) : <span className="text-neutral-400">Sin fecha</span>}
-        </div>
-
-        {/* Entrada manual */}
-        <div className="flex items-end gap-2">
-          <div>
-            <label className="text-[11px] text-neutral-500">T. oficial</label>
-            <input type="number" step="0.01" value={official} onChange={e => setOfficial(e.target.value)}
-              className="mt-0.5 w-24 border rounded px-2 py-1.5 text-sm" placeholder="0.00" />
-          </div>
-          <div>
-            <label className="text-[11px] text-neutral-500">T. paralela</label>
-            <input type="number" step="0.01" value={parallel} onChange={e => setParallel(e.target.value)}
-              className="mt-0.5 w-24 border rounded px-2 py-1.5 text-sm" placeholder="0.00" />
-          </div>
-          <button onClick={saveManual} disabled={busy || !official || !parallel}
-            className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50 whitespace-nowrap">Guardar</button>
-        </div>
-
-        {/* % Exceso */}
-        <div className="flex items-end gap-2">
-          <div>
-            <label className="text-[11px] text-neutral-500" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Exceso %</label>
-            <input type="number" step="0.1" min={0} max={500} value={excess} onChange={e => setExcess(e.target.value)}
-              className="mt-0.5 w-20 border rounded px-2 py-1.5 text-sm" />
-          </div>
-          <button onClick={saveExcess} disabled={busy}
-            className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">Actualizar</button>
-          {excessPreview && (
-            <div className="text-sm leading-tight">
-              <div className="text-[11px] text-neutral-500">Desc. result.</div>
-              <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-blue-600' : 'text-neutral-900'}`}>
-                {excessPreview.recommended_discount}%
+      {/* Barra superior: estado+actualizar │ edición manual │ config exceso ML */}
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
+        {/* Estado de la tasa + Actualizar TASA */}
+        <div className="flex items-center gap-3">
+          <div className="text-sm">
+            <div className="text-[11px] text-neutral-400">Última actualización</div>
+            {latest.rate_date ? (
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-VE')}</span>
+                {freshness && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                    {freshness.days === 0 ? 'Hoy' : freshness.days === 1 ? 'hace 1 día' : `hace ${freshness.days} días`}
+                    {freshness.stale ? ' · desact.' : ''}
+                  </span>
+                )}
               </div>
-            </div>
-          )}
+            ) : <span className="text-neutral-400">Sin fecha</span>}
+          </div>
+          <button onClick={fetchBcv} disabled={busy} className="btn-primary text-sm whitespace-nowrap">
+            {busy ? 'Cargando…' : 'Actualizar TASA'}
+          </button>
         </div>
 
-        <button onClick={fetchBcv} disabled={busy} className="btn-primary text-sm ml-auto whitespace-nowrap">
-          {busy ? 'Cargando…' : 'Actualizar desde BCV'}
-        </button>
+        {/* separador */}
+        <div className="w-px self-stretch bg-neutral-200" />
+
+        {/* Edición manual (bloqueada por defecto, poco usada) */}
+        <div>
+          <button type="button" onClick={() => setManualOpen(o => !o)}
+            className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-1 mb-1">
+            <span>{manualOpen ? '🔓' : '🔒'}</span> Edición manual
+          </button>
+          <div className="flex items-end gap-1.5">
+            <input type="number" step="0.01" value={official} onChange={e => setOfficial(e.target.value)} disabled={!manualOpen}
+              title="Tasa oficial" placeholder="Oficial"
+              className="w-20 border rounded px-2 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" />
+            <input type="number" step="0.01" value={parallel} onChange={e => setParallel(e.target.value)} disabled={!manualOpen}
+              title="Tasa paralela" placeholder="Paralela"
+              className="w-20 border rounded px-2 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" />
+            <button onClick={saveManual} disabled={!manualOpen || busy || !official || !parallel}
+              className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Guardar</button>
+          </div>
+        </div>
+
+        {/* separador */}
+        <div className="w-px self-stretch bg-neutral-200" />
+
+        {/* Config Exceso ML */}
+        <div>
+          <label className="text-[11px] text-neutral-500 block mb-1" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Config Exceso ML</label>
+          <div className="flex items-end gap-2">
+            <input type="number" step="0.1" min={0} max={500} value={excess} onChange={e => setExcess(e.target.value)}
+              className="w-20 border rounded px-2 py-1.5 text-sm" />
+            <button onClick={saveExcess} disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">Actualizar</button>
+            {excessPreview && (
+              <div className="text-sm leading-tight">
+                <div className="text-[11px] text-neutral-500">Desc. result.</div>
+                <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-blue-600' : 'text-neutral-900'}`}>
+                  {excessPreview.recommended_discount}%
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
         {/* Price simulator */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
@@ -253,8 +262,8 @@ export default function TasasClient() {
           </div>
         </div>
 
-        {/* Right column: gráfico + historial (aprovecha el espacio bajo el chart) */}
-        <div className="space-y-4">
+        {/* Right column: gráfico + historial (igualan la altura del simulador) */}
+        <div className="flex flex-col gap-4">
         {/* Evolution chart */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-3">Evolución (últimos {chrono.length})</h2>
@@ -282,8 +291,8 @@ export default function TasasClient() {
         </div>
 
         {/* History — compacto, scroll, últimos 30 días (solo referencia) */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-          <div className="max-h-72 overflow-y-auto">
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="flex-1 min-h-[180px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>
