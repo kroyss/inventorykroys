@@ -23,6 +23,11 @@ ENV PORT=3000
 # healthcheck a localhost:3000 dé "connection refused" aunque el puerto
 # publicado funcione. Forzar 0.0.0.0 hace que escuche en todas las interfaces.
 ENV HOSTNAME=0.0.0.0
+# Alpine no trae la base de zonas horarias; sin tzdata el TZ del contenedor se
+# ignora y el reloj queda en UTC. Con tzdata, TZ=America/Caracas aplica a logs y
+# a `new Date()`. (Las fechas críticas igual se calculan por zona vía lib/tz.ts.)
+RUN apk add --no-cache tzdata
+ENV TZ=America/Caracas
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
