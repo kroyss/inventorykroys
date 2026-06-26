@@ -144,6 +144,7 @@ export default async function ComprasPage() {
       localSuppliers={localSup as Supplier[]}
       importSuppliers={importSup as Supplier[]}
       userRole={session!.user.role}
+      country={session!.user.country}
     />
   )
 }

@@ -10,12 +10,14 @@ interface Props {
   localSuppliers: Supplier[]
   importSuppliers: Supplier[]
   userRole: UserRole
+  country: 'VE' | 'CO'
 }
 
 export default function ComprasTabs({
-  initialOrders, initialImports, localSuppliers, importSuppliers, userRole,
+  initialOrders, initialImports, localSuppliers, importSuppliers, userRole, country,
 }: Props) {
-  const [tab, setTab] = useState<'local' | 'import' | 'history'>('local')
+  // En CO lo común son las importaciones → esa pestaña va primero y por defecto
+  const [tab, setTab] = useState<'local' | 'import' | 'history'>(country === 'CO' ? 'import' : 'local')
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
 
@@ -73,8 +75,17 @@ export default function ComprasTabs({
   return (
     <div>
       <div className="flex gap-1 mb-4 flex-wrap">
-        {tabBtn('local', `Locales (${localActive})`)}
-        {tabBtn('import', `Importaciones (${importActive})`)}
+        {country === 'CO' ? (
+          <>
+            {tabBtn('import', `Importaciones (${importActive})`)}
+            {tabBtn('local', `Locales (${localActive})`)}
+          </>
+        ) : (
+          <>
+            {tabBtn('local', `Locales (${localActive})`)}
+            {tabBtn('import', `Importaciones (${importActive})`)}
+          </>
+        )}
         {tabBtn('history', `Historial (${historyTotal})`)}
       </div>
 
