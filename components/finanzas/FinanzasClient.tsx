@@ -3,12 +3,17 @@ import { useState, useEffect, useCallback } from 'react'
 import type { FinanceAccount, FinanceCategory, FinanceLedgerRow, FinanceKind } from '@/lib/types'
 import { money } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { parseLocalDate } from '@/lib/tz'
 
 const ACCOUNT_TYPES = ['banco', 'efectivo', 'cripto', 'paypal', 'otro'] as const
 const CURRENCIES = ['USD', 'COP', 'VES'] as const
 
-const todayISO = () => new Date().toISOString().slice(0, 10)
-const thisMonth = () => new Date().toISOString().slice(0, 7)
+// Fecha/mes LOCAL del navegador (no UTC: toISOString se corre un día de noche).
+const todayISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const thisMonth = () => todayISO().slice(0, 7)
 
 interface CloseLine { label: string; usd: number; ve: number; co: number; other: number }
 interface Summary {
@@ -191,7 +196,7 @@ export default function FinanzasClient() {
                   {visibleMov.map((m, i) => (
                     <tr key={m.key} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                       <td className="px-3 py-2 whitespace-nowrap text-neutral-600">
-                        {m.date ? new Date(m.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : <span className="text-neutral-300">mes</span>}
+                        {m.date ? parseLocalDate(m.date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : <span className="text-neutral-300">mes</span>}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {m.category_name ?? <span className="text-neutral-300">—</span>}

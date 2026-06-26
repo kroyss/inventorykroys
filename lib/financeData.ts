@@ -149,8 +149,6 @@ export interface MonthlyMovements {
   surplus: number
 }
 
-const isoDate = (d: unknown): string | null => (d ? new Date(d as string).toISOString() : null)
-
 export async function getMonthlyMovements(month: string): Promise<MonthlyMovements> {
   const ve = veDb()
   const rates = await getRates()
@@ -166,7 +164,8 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
   // ── Compras locales (auto, una fila por orden pagada en el mes) ──
   // total_paid es la fuente de verdad del dinero que salió (se setea al pagar).
   const purchSql = `
-    SELECT po.id, po.order_number, po.total_paid::float AS amt, po.created_at AS date, s.name AS supplier
+    SELECT po.id, po.order_number, po.total_paid::float AS amt,
+           to_char(po.created_at,'YYYY-MM-DD') AS date, s.name AS supplier
     FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
     WHERE po.order_type = 'local' AND po.total_paid > 0
       AND to_char(po.created_at,'YYYY-MM') = $1
@@ -176,7 +175,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
       const amt = (p.amt as number) ?? 0
       if (!amt) continue
       rows.push({
-        key: `po-${country.toLowerCase()}-${p.id}`, id: null, date: isoDate(p.date),
+        key: `po-${country.toLowerCase()}-${p.id}`, id: null, date: (p.date as string | null),
         description: `${p.order_number}${p.supplier ? ' · ' + p.supplier : ''}`,
         category_name: 'Compras locales', account_name: null, category_id: null, account_id: null,
         kind: 'expense', amount: amt, currency, usd: toUsd(amt, currency, rates), country, source: 'auto',
@@ -189,11 +188,11 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
   // ── Importaciones (auto, una fila por pago 50%/100% en el mes) ──
   const impSql = `
     SELECT id, order_number, supplier, amt::float AS amt, dt, step FROM (
-      SELECT io.id, io.order_number, s.name AS supplier, io.paid_50_amount AS amt, io.paid_50_at AS dt, '50' AS step
+      SELECT io.id, io.order_number, s.name AS supplier, io.paid_50_amount AS amt, to_char(io.paid_50_at,'YYYY-MM-DD') AS dt, '50' AS step
       FROM import_orders io LEFT JOIN suppliers s ON s.id = io.supplier_id
       WHERE io.paid_50_done AND to_char(io.paid_50_at,'YYYY-MM') = $1
       UNION ALL
-      SELECT io.id, io.order_number, s.name, io.paid_100_amount, io.paid_100_at, '100'
+      SELECT io.id, io.order_number, s.name, io.paid_100_amount, to_char(io.paid_100_at,'YYYY-MM-DD'), '100'
       FROM import_orders io LEFT JOIN suppliers s ON s.id = io.supplier_id
       WHERE io.paid_100_done AND to_char(io.paid_100_at,'YYYY-MM') = $1
     ) x ORDER BY dt`
@@ -202,7 +201,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
       const amt = (p.amt as number) ?? 0
       if (!amt) continue
       rows.push({
-        key: `imp-${country.toLowerCase()}-${p.id}-${p.step}`, id: null, date: isoDate(p.dt),
+        key: `imp-${country.toLowerCase()}-${p.id}-${p.step}`, id: null, date: (p.dt as string | null),
         description: `${p.order_number}${p.supplier ? ' · ' + p.supplier : ''} · Pago ${p.step}%`,
         category_name: 'Importaciones', account_name: null, category_id: null, account_id: null,
         kind: 'expense', amount: amt, currency, usd: toUsd(amt, currency, rates), country, source: 'auto',
@@ -214,7 +213,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
 
   // ── Movimientos manuales (en VE maestra) ──
   const { rows: mov } = await ve.query(`
-    SELECT m.id, m.date, m.description, m.amount::float AS amount, m.kind, m.currency,
+    SELECT m.id, to_char(m.date,'YYYY-MM-DD') AS date, m.description, m.amount::float AS amount, m.kind, m.currency,
            m.category_id, c.name AS category_name, m.account_id, a.name AS account_name, m.country
     FROM finance_movements m
     LEFT JOIN finance_categories c ON c.id = m.category_id
@@ -223,7 +222,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
   `, [month])
   for (const m of mov) {
     rows.push({
-      key: `mov-${m.id}`, id: m.id as number, date: isoDate(m.date),
+      key: `mov-${m.id}`, id: m.id as number, date: (m.date as string | null),
       description: m.description as string | null,
       category_name: m.category_name as string | null, account_name: m.account_name as string | null,
       category_id: m.category_id as number | null, account_id: m.account_id as number | null,
