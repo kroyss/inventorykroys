@@ -107,7 +107,8 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
   // Auto (origen claro por país)
   add(incomeMap, 'Ventas', salesVE, 've');  add(incomeMap, 'Ventas', toUsd(salesCO, 'COP', rates), 'co')
   add(expenseMap, 'Compras locales', purchVE, 've'); add(expenseMap, 'Compras locales', toUsd(purchCO, 'COP', rates), 'co')
-  add(expenseMap, 'Importaciones', impVE, 've'); add(expenseMap, 'Importaciones', toUsd(impCO, 'COP', rates), 'co')
+  // Importaciones se pagan en USD en ambos países (no se convierten desde COP)
+  add(expenseMap, 'Importaciones', impVE, 've'); add(expenseMap, 'Importaciones', impCO, 'co')
 
   // Manuales (por su etiqueta de país; sin país → other)
   for (const r of mov) {
@@ -209,7 +210,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
     }
   }
   pushImp((await ve.query(impSql, [month])).rows, 'VE', 'USD')
-  pushImp(await coSafe(async db => (await db.query(impSql, [month])).rows, []), 'CO', 'COP')
+  pushImp(await coSafe(async db => (await db.query(impSql, [month])).rows, []), 'CO', 'USD')
 
   // ── Movimientos manuales (en VE maestra) ──
   const { rows: mov } = await ve.query(`
