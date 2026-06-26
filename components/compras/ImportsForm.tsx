@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { ImportOrder, Supplier } from '@/lib/types'
 import { Combobox } from '@/components/ui/Combobox'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { matchTokens } from '@/lib/search'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
 
 interface FormItem {
@@ -64,10 +65,7 @@ export default function ImportsForm({ editing, suppliers, onClose, onSaved, onRe
     fetch('/api/products').then(r => r.json()).then((rows: ProductRow[]) => setProducts(rows))
   }, [])
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.code.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 20)
+  const filtered = products.filter(p => matchTokens(search, p.name, p.code)).slice(0, 20)
 
   const addItem = (p: ProductRow) => {
     if (items.some(i => i.product_id === p.id)) return

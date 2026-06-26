@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { blockNumberKeys, blockIntKeys, digitsOnly } from '@/lib/inputGuards'
+import { matchTokens } from '@/lib/search'
 
 interface FormItem {
   product_id: number
@@ -71,10 +72,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     }
   }, [isLocal, editing, orderNumber])
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.code.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 20)
+  const filtered = products.filter(p => matchTokens(search, p.name, p.code)).slice(0, 20)
 
   // VE: el monto que va a la venta es el precio REAL que recibís (oficial→paralelo),
   // congelado a la tasa del momento (snapshot). CO: el precio en pesos. Fallback al base.

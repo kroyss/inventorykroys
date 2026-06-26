@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
+import { matchTokens } from '@/lib/search'
 
 const PAGE_SIZE = 15
 
@@ -463,10 +464,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   }
 
   const filteredProducts = products.filter(p =>
-    productSearch && (
-      p.code.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.name.toLowerCase().includes(productSearch.toLowerCase())
-    )
+    !!productSearch.trim() && matchTokens(productSearch, p.code, p.name)
   ).slice(0, 10)
 
   const formTotal = formItems.reduce((s, i) => s + i.quantity * i.unit_cost_usd, 0)

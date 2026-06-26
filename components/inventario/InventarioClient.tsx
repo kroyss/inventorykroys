@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
+import { matchTokens } from '@/lib/search'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -176,9 +177,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
   // ── filter + sort ──
   const filtered = items
     .filter(item => {
-      const matchSearch = !search ||
-        item.code.toLowerCase().includes(search.toLowerCase()) ||
-        item.name.toLowerCase().includes(search.toLowerCase())
+      const matchSearch = matchTokens(search, item.code, item.name)
       const matchStatus = !statusF || item.status === statusF
       return matchSearch && matchStatus
     })
