@@ -47,6 +47,38 @@ function calcPrices(
   return { totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd, recDiscount, realUsd, marginPct, excessPct }
 }
 
+// Margen NETO real por producto (después de comisiones de ML), por país.
+// Reusa las mismas fórmulas que el simulador de Ajustes y la calculadora:
+//   VE: ingreso real = precio final llevado a paralelo; − comisión % − envío (con prorrateo bajo el umbral).
+//   CO: ingreso = precio de venta en pesos; − comisión % − envío por umbral − retención.
+// margen = ganancia ÷ ingreso real (SOBRE VENTA), consistente en ambos países. null si falta dato.
+function mlNetFor(
+  country: Country,
+  p: { total_cost: number; final_price_usd: number; sale_price: number },
+  veRate: VeRate | null, coTrm: number, ml: Record<string, string>,
+): { ganancia: number; margen: number; pesos: boolean } | null {
+  const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
+  if (country === 'CO') {
+    const price = p.sale_price
+    if (!(price > 0) || !(coTrm > 0) || !(p.total_cost > 0)) return null
+    const comision = price * num('ml_comision', 15.5) / 100
+    const envio    = price >= num('ml_umbral_envio', 60000) ? num('ml_envio_alto', 8000) : num('ml_envio_bajo', 2600)
+    const reten    = price * num('ml_reten', 1.91) / 100
+    const ganancia = (price - comision - envio - reten) - p.total_cost * coTrm
+    return { ganancia, margen: ganancia / price * 100, pesos: true }
+  }
+  if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0) || !(p.final_price_usd > 0)) return null
+  const realUsd  = p.final_price_usd * veRate.official / veRate.parallel
+  if (!(realUsd > 0)) return null
+  const envio    = num('ml_envio', 0.65) * Math.min(1, p.final_price_usd / num('ml_umbral', 5))
+  const neto     = realUsd * (1 - num('ml_comision', 12) / 100) - envio
+  const ganancia = neto - p.total_cost
+  return { ganancia, margen: ganancia / realUsd * 100, pesos: false }
+}
+
+// Color del margen neto sobre venta: sano ≥20%, ajustado ≥8%, riesgo/pérdida abajo.
+const netColor = (m: number) => m >= 20 ? 'text-green-600' : m >= 8 ? 'text-amber-600' : 'text-red-600'
+
 // ─── types ──────────────────────────────────────────────────────
 interface FormState {
   code: string
@@ -374,10 +406,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
-    const margin = (p: Product) =>
-      p.final_price_usd > 0 && p.total_cost > 0
-        ? (p.final_price_usd - p.total_cost) / p.final_price_usd
-        : -1
+    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings)?.margen ?? -Infinity
     const valueFor = (p: Product): number | string => {
       switch (sortKey) {
         case 'code':     return p.code
@@ -396,7 +425,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       return String(va).localeCompare(String(vb))
     })
     return sortDir === 'desc' ? arr.reverse() : arr
-  }, [filtered, sortKey, sortDir])
+  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings])
 
   const isSearching = search.trim().length > 0
   const displayed   = isSearching ? sorted : sorted.slice(0, visible)
@@ -509,7 +538,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </th>
                 <th onClick={() => toggleSort('margin')}
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
-                  Margen{sortArrow('margin')}
+                  Margen neto{sortArrow('margin')}
                 </th>
                 <th onClick={() => toggleSort('stock')}
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
@@ -531,8 +560,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </tr>
               )}
               {displayed.map(p => {
-                // CO: el "precio" es sale_price en pesos; su equivalente USD (para margen) = ÷ TRM
-                const priceUsd = country === 'CO' ? (coTrm > 0 ? p.sale_price / coTrm : 0) : p.final_price_usd
+                const net = mlNetFor(country, p, veRate, coTrm, mlSettings)
                 return (
                 <tr key={p.id} onClick={() => openView(p.id)}
                   className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
@@ -560,13 +588,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(p.final_price_usd)}`}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {priceUsd > 0 && p.total_cost > 0 ? (
-                      <span className={`font-medium ${
-                        (priceUsd - p.total_cost) / priceUsd >= 0.4 ? 'text-green-600'
-                          : (priceUsd - p.total_cost) / priceUsd >= 0.2 ? 'text-amber-600'
-                          : 'text-red-600'
-                      }`}>
-                        {Math.round((priceUsd - p.total_cost) / priceUsd * 100)}%
+                    {net ? (
+                      <span className={`font-medium ${netColor(net.margen)}`}>
+                        {Math.round(net.margen)}%
                       </span>
                     ) : <span className="text-neutral-300">—</span>}
                   </td>
@@ -615,10 +639,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <p className="px-3 py-8 text-center text-neutral-400">{search ? 'Sin resultados' : 'No hay productos'}</p>
           )}
           {displayed.map(p => {
-            const priceUsd = country === 'CO' ? (coTrm > 0 ? p.sale_price / coTrm : 0) : p.final_price_usd
-            const margin = priceUsd > 0 && p.total_cost > 0
-              ? Math.round((priceUsd - p.total_cost) / priceUsd * 100)
-              : null
+            const net = mlNetFor(country, p, veRate, coTrm, mlSettings)
             return (
               <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
                 <div className="flex items-start justify-between gap-2">
@@ -635,8 +656,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-sm">
                   <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(p.final_price_usd)}`}</span></span>
-                  {margin !== null && (
-                    <span className={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'}>{margin}%</span>
+                  {net && (
+                    <span className={netColor(net.margen)}>{Math.round(net.margen)}% neto</span>
                   )}
                   <span className="text-neutral-500 ml-auto">Stock: <span className="font-medium text-neutral-900">{p.quantity}</span></span>
                 </div>
@@ -771,9 +792,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       <p className="text-[11px] text-neutral-500">Costo Base (Costo + Envío)</p>
                       <p className="text-lg font-bold text-neutral-800">${fmt(totalCost)}</p>
                     </div>
-                    {/* Precio Base (tu precio real) */}
+                    {/* Precio Base = precio que se registra en la venta (inventario) */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-                      <p className="text-[11px] text-blue-600 font-medium">Precio Base (tu precio real)</p>
+                      <p className="text-[11px] text-blue-600 font-medium">Precio de venta (va a Ventas)</p>
                       <p className="text-lg font-bold text-blue-700">${fmt(basePriceUsd)}</p>
                       <p className="text-[10px] text-neutral-400">Costo Base × {(1 + profitPct / 100).toFixed(2)}</p>
                     </div>
@@ -987,9 +1008,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       {/* ── vista de lectura (slide-over) ── */}
       {viewing && (() => {
         const v = viewing
-        const margin = v.final_price_usd > 0 && v.total_cost > 0
-          ? Math.round((v.final_price_usd - v.total_cost) / v.final_price_usd * 100)
-          : null
+        const net = mlNetFor(country, v, veRate, coTrm, mlSettings)
         const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
             <p className="text-[11px] text-neutral-500">{label}</p>
@@ -1039,19 +1058,16 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       {v.price_bolivares > 0 && (
                         <Field label="Precio Bs" value={`Bs ${fmt(v.price_bolivares)}`} />
                       )}
-                      {margin !== null && (
-                        <Field label="Margen" value={`${margin}%`}
-                          accent={margin >= 40 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-600'} />
+                      {net && (
+                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
                       )}
                     </div>
                   ) : (
                     /* CO: el precio de venta está en pesos (sección Inventario); aquí el análisis en USD */
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Precio venta ≈ USD" value={coTrm > 0 ? `$${fmt(v.sale_price / coTrm)}` : '—'} accent="text-green-700" />
-                      {coTrm > 0 && v.total_cost > 0 && (
-                        <Field label="Margen"
-                          value={`${Math.round((v.sale_price / coTrm - v.total_cost) / v.total_cost * 100)}%`}
-                          accent="text-green-600" />
+                      {net && (
+                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
                       )}
                     </div>
                   )}
