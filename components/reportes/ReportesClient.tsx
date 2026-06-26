@@ -194,15 +194,17 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
     { key: 'status', label: 'Estado', render: s => <span className="text-xs px-2 py-0.5 bg-neutral-100 rounded">{s.status}</span>, sortValue: s => s.status },
     { key: 'total_amount', label: 'Total', align: 'right', render: s => `$${money(s.total_amount)}`, sortValue: s => s.total_amount, total: rs => `$${money(rs.reduce((a, x) => a + x.total_amount, 0))}`, exportValue: s => s.total_amount },
     { key: 'cost', label: 'Costo', align: 'right', render: s => `$${money(s.cost)}`, sortValue: s => s.cost, total: rs => `$${money(rs.reduce((a, x) => a + x.cost, 0))}`, exportValue: s => s.cost },
-    { key: 'ganancia', label: 'Ganancia', align: 'right', render: s => <span className="text-green-600">${money(s.total_amount - s.cost)}</span>, sortValue: s => s.total_amount - s.cost, total: rs => `$${money(rs.reduce((a, x) => a + (x.total_amount - x.cost), 0))}`, exportValue: s => s.total_amount - s.cost },
+    { key: 'commission', label: 'Comisión', align: 'right', render: s => <span className="text-red-500">${money(s.commission || 0)}</span>, sortValue: s => s.commission || 0, total: rs => `$${money(rs.reduce((a, x) => a + (x.commission || 0), 0))}`, exportValue: s => s.commission || 0 },
+    { key: 'ganancia', label: 'Ganancia', align: 'right', render: s => <span className="text-green-600">${money(s.total_amount - s.cost - (s.commission || 0))}</span>, sortValue: s => s.total_amount - s.cost - (s.commission || 0), total: rs => `$${money(rs.reduce((a, x) => a + (x.total_amount - x.cost - (x.commission || 0)), 0))}`, exportValue: s => s.total_amount - s.cost - (s.commission || 0) },
   ]
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KPICard compact label="Cantidad" value={data.totals.count} />
         <KPICard compact label="Ventas"   value={`$${money(data.totals.total_amount)}`} />
         <KPICard compact label="Costos"   value={`$${money(data.totals.total_cost)}`} />
+        <KPICard compact label="Comisión" value={`$${money(data.totals.total_commission || 0)}`} accent="text-red-500" />
         <KPICard compact label={`Ganancia · ${data.totals.profit_pct}%`} value={`$${money(data.totals.profit)}`} accent="text-green-600" />
       </div>
       <div className="flex flex-wrap gap-2 items-center">
@@ -548,6 +550,7 @@ function TopProductsReport({ rows }: { rows: any[] }) {
       ), total: rs => rs.reduce((a, x) => a + x.total_qty, 0) },
     { key: 'total_venta', label: 'Venta', align: 'right', render: p => `$${money(p.total_venta)}`, sortValue: p => p.total_venta, total: () => `$${money(totalVenta)}`, exportValue: p => p.total_venta },
     { key: 'total_costo', label: 'Costo', align: 'right', render: p => `$${money(p.total_costo)}`, sortValue: p => p.total_costo, exportValue: p => p.total_costo },
+    { key: 'total_comision', label: 'Comisión', align: 'right', render: p => <span className="text-red-500">${money(p.total_comision || 0)}</span>, sortValue: p => p.total_comision || 0, exportValue: p => p.total_comision || 0 },
     { key: 'ganancia', label: 'Ganancia', align: 'right', render: p => <span className="text-green-600">${money(p.ganancia)}</span>, sortValue: p => p.ganancia, total: () => `$${money(totalGan)}`, exportValue: p => p.ganancia },
   ]
 

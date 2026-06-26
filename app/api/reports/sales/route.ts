@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
               'quantity',     si.quantity,
               'unit_price',   si.unit_price,
               'total_price',  si.total_price,
-              'total_cost',   COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0)
+              'total_cost',   COALESCE(si.unit_cost, 0),
+              'total_commission', COALESCE(si.unit_commission, 0)
             ) ORDER BY si.id
           ) FILTER (WHERE si.id IS NOT NULL),
           '[]'::json
@@ -47,26 +48,29 @@ export async function GET(req: NextRequest) {
 
     let totalAmount = 0
     let totalCost   = 0
+    let totalComm   = 0
 
     const sales = rows.map(row => {
       const amount = parseFloat(row.total_amount) || 0
-      const cost   = (row.items as any[]).reduce(
-        (s: number, i: any) => s + (i.quantity * parseFloat(i.total_cost || 0)), 0
-      )
+      const items  = row.items as any[]
+      const cost   = items.reduce((s: number, i: any) => s + (i.quantity * parseFloat(i.total_cost || 0)), 0)
+      const comm   = items.reduce((s: number, i: any) => s + (i.quantity * parseFloat(i.total_commission || 0)), 0)
       totalAmount += amount
       totalCost   += cost
-      return { ...row, total_amount: amount, cost: Math.round(cost * 100) / 100 }
+      totalComm   += comm
+      return { ...row, total_amount: amount, cost: Math.round(cost * 100) / 100, commission: Math.round(comm * 100) / 100 }
     })
 
-    const profit = totalAmount - totalCost
+    const profit = totalAmount - totalCost - totalComm
     return NextResponse.json({
       sales,
       totals: {
-        total_amount: Math.round(totalAmount * 100) / 100,
-        total_cost:   Math.round(totalCost * 100) / 100,
-        profit:       Math.round(profit * 100) / 100,
-        profit_pct:   totalCost > 0 ? Math.round((profit / totalCost) * 1000) / 10 : 0,
-        count:        sales.length,
+        total_amount:     Math.round(totalAmount * 100) / 100,
+        total_cost:       Math.round(totalCost * 100) / 100,
+        total_commission: Math.round(totalComm * 100) / 100,
+        profit:           Math.round(profit * 100) / 100,
+        profit_pct:       totalCost > 0 ? Math.round((profit / totalCost) * 1000) / 10 : 0,
+        count:            sales.length,
       },
     })
   } catch (err) {
