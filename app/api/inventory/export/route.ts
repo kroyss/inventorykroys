@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { localCostFactor } from '@/lib/localCost'
+import { COUNTRY_TZ, DEFAULT_TZ, currentDate } from '@/lib/tz'
 import * as XLSX from 'xlsx'
 
 export async function GET(_: NextRequest) {
@@ -56,7 +57,7 @@ export async function GET(_: NextRequest) {
     const rawBuf: Uint8Array = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
     const buf = Buffer.from(rawBuf)
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = currentDate(COUNTRY_TZ[session.user.country as 'VE' | 'CO'] ?? DEFAULT_TZ)
     return new NextResponse(buf as unknown as BodyInit, {
       status: 200,
       headers: {

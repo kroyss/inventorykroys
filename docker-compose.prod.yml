@@ -16,6 +16,11 @@ services:
       # Toma el puerto del legacy (al que ya apunta el reverse proxy / dominio).
       # El legacy debe estar detenido para liberar 8501 antes de levantar.
       - "8501:3000"
+    # El server está en hora europea (CEST); el negocio es VE/CO. Esto alinea logs
+    # y cualquier `new Date()` del app a Caracas. (Las fechas críticas se calculan
+    # por zona en código vía lib/tz.ts; toISOString ignora este TZ.)
+    environment:
+      - TZ=America/Caracas
     env_file:
       - .env.production
     volumes:

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getFinanceSession } from '@/lib/finance'
 import { getMonthlyMovements } from '@/lib/financeData'
 import { unauthorized, forbidden } from '@/lib/session'
+import { currentYearMonth } from '@/lib/tz'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const monthRaw = new URL(req.url).searchParams.get('month') ?? ''
   const month = MONTH_RE.test(monthRaw)
     ? monthRaw
-    : new Date().toISOString().slice(0, 7) // YYYY-MM actual
+    : currentYearMonth() // YYYY-MM actual (zona VE)
 
   // Libro unificado: compras/importaciones (auto) + ventas + movimientos manuales
   const data = await getMonthlyMovements(month)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { COUNTRY_TZ, DEFAULT_TZ, nowParts } from '@/lib/tz'
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -35,10 +36,13 @@ export async function GET(_: NextRequest) {
       `),
     ])
 
-    // Días del mes actual
-    const now         = new Date()
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const today       = now.getDate()
+    // Días del mes actual — en la zona del país de la sesión (no la del contenedor),
+    // para que coincida con NOW()/DATE_TRUNC del SQL de arriba.
+    const tz          = COUNTRY_TZ[session.user.country as 'VE' | 'CO'] ?? DEFAULT_TZ
+    const { year, month } = nowParts(tz)                 // month 1-12
+    const mIdx        = month - 1                          // 0-based para Date/MONTH_NAMES
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const today       = nowParts(tz).day
 
     const perDay = new Map<number, number>()
     for (const r of daily) perDay.set(r.day, parseInt(r.count, 10) || 0)
@@ -66,7 +70,7 @@ export async function GET(_: NextRequest) {
     }
     const refs: { label: string; total: number; at_today: number; cumulative: (number | null)[] }[] = []
     for (let i = 2; i >= 1; i--) {
-      const dt        = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const dt        = new Date(year, mIdx - i, 1)
       const ym        = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
       const daysInRef = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()
       const perDayRef = prevByMonthDay.get(ym) ?? new Map<number, number>()
@@ -86,7 +90,7 @@ export async function GET(_: NextRequest) {
     }
 
     return NextResponse.json({
-      current_month: MONTH_NAMES[now.getMonth()],
+      current_month: MONTH_NAMES[mIdx],
       total:         running,
       days_in_month: daysInMonth,
       today,
