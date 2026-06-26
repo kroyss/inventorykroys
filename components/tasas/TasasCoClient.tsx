@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -35,6 +35,25 @@ export default function TasasCoClient() {
   const [busy,    setBusy]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [okMsg,   setOkMsg]   = useState<string | null>(null)
+
+  // Igualar la altura del historial para que la columna derecha termine
+  // exactamente donde termina el simulador (sin espacio vacío).
+  const leftRef  = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
+  const [histMax, setHistMax] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    const recompute = () => {
+      const lh = leftRef.current?.offsetHeight ?? 0
+      const ch = chartRef.current?.offsetHeight ?? 0
+      if (lh && ch) setHistMax(Math.max(140, lh - ch - 16))  // 16 = gap entre chart e historial
+    }
+    recompute()
+    const ro = new ResizeObserver(recompute)
+    if (leftRef.current)  ro.observe(leftRef.current)
+    if (chartRef.current) ro.observe(chartRef.current)
+    window.addEventListener('resize', recompute)
+    return () => { ro.disconnect(); window.removeEventListener('resize', recompute) }
+  })
 
   const loadAll = async () => {
     const [l, h, c, s] = await Promise.all([
@@ -140,9 +159,9 @@ export default function TasasCoClient() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Simulador */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+        <div ref={leftRef} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
           <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -231,7 +250,7 @@ export default function TasasCoClient() {
         {/* Columna derecha: gráfico + historial (igualan la altura del simulador) */}
         <div className="flex flex-col gap-4">
         {/* Evolución */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+        <div ref={chartRef} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-3">Evolución TRM (últimos {chrono.length})</h2>
           {chrono.length > 1 ? (
             <div className="relative h-56">
@@ -256,8 +275,8 @@ export default function TasasCoClient() {
         </div>
 
         {/* Historial — compacto, scroll, últimos 30 días (solo referencia) */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-          <div className="flex-1 min-h-[180px] overflow-y-auto">
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+          <div className="overflow-y-auto" style={{ maxHeight: histMax }}>
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>
