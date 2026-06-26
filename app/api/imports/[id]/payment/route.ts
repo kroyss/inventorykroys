@@ -4,10 +4,8 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
 
 const Schema = z.object({
-  payment_step:    z.enum(['50', '100']),
-  amount:          z.number().nonnegative(),
-  tracking_number: z.string().optional(),   // requerido en el 100%
-  container_id:    z.number().int().positive().optional(), // contenedor (CONTENEDOR-XXX)
+  payment_step: z.enum(['50', '100']),
+  amount:       z.number().nonnegative(),
 })
 
 export async function PUT(
@@ -19,7 +17,7 @@ export async function PUT(
   if (!session || !db) return unauthorized()
 
   try {
-    const { payment_step, amount, tracking_number, container_id } = Schema.parse(await req.json())
+    const { payment_step, amount } = Schema.parse(await req.json())
 
     const { rows: [order] } = await db.query(
       `SELECT id, status FROM import_orders WHERE id = $1`, [id]
@@ -38,26 +36,16 @@ export async function PUT(
         await db.query(`UPDATE import_orders SET status='PAGO_PARCIAL' WHERE id=$1`, [id])
       }
     } else {
-      // Pago 100%: registra el pago, captura tracking + contenedor y mueve la
-      // orden directo a EN_TRANSITO (ya va montada en contenedor y en camino).
-      if (!tracking_number?.trim()) {
-        return NextResponse.json({ error: 'El tracking es obligatorio al pagar el 100%' }, { status: 400 })
+      await db.query(
+        `UPDATE import_orders
+         SET paid_100_done=TRUE, paid_100_at=NOW(), paid_100_amount=$1, updated_at=NOW()
+         WHERE id=$2`,
+        [amount, id]
+      )
+      // Advance to PAGADA if in early states (tracking/contenedor van en el paso siguiente)
+      if (['PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS'].includes(order.status)) {
+        await db.query(`UPDATE import_orders SET status='PAGADA' WHERE id=$1`, [id])
       }
-      const sets: string[] = [
-        'paid_100_done=TRUE', 'paid_100_at=NOW()', 'paid_100_amount=$1',
-        'tracking_number=$2', 'updated_at=NOW()',
-      ]
-      const vals: unknown[] = [amount, tracking_number.trim()]
-      if (container_id) {
-        sets.push(`container_id=$${vals.length + 1}`)
-        vals.push(container_id)
-      }
-      // Avanza a EN_TRANSITO desde cualquier estado previo al tránsito
-      if (['PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS', 'PAGADA'].includes(order.status)) {
-        sets.push(`status='EN_TRANSITO'`)
-      }
-      vals.push(id)
-      await db.query(`UPDATE import_orders SET ${sets.join(', ')} WHERE id=$${vals.length}`, vals)
     }
 
     return NextResponse.json({ message: `Pago ${payment_step}% registrado exitosamente` })
