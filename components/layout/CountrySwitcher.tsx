@@ -12,8 +12,10 @@ export default function CountrySwitcher({ current }: { current: 'VE' | 'CO' }) {
     if (c === current || busy) return
     setBusy(true)
     await update({ country: c })
-    // Recarga completa: server components y datos por país se rehacen limpios.
-    window.location.assign('/dashboard')
+    // Recarga completa para rehacer server components y datos del nuevo país,
+    // pero manteniendo la pestaña/sección actual (sin query, que puede traer
+    // filtros o ids del país anterior). Las secciones del navbar existen en ambos.
+    window.location.assign(window.location.pathname)
   }
 
   return (
