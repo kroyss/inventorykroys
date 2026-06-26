@@ -405,6 +405,20 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     reload()
   }
 
+  // Monto sugerido: 50% = mitad del total; 100% = lo que falta (total − pagado 50%).
+  // Finanzas SUMA ambos pagos, así que el 100% debe ser el restante, no el total.
+  const suggestedPay = (step: '50' | '100'): string => {
+    if (!selected) return ''
+    const total = selected.total_usd || 0
+    if (step === '50') return (total / 2).toFixed(2)
+    const remaining = total - (selected.paid_50_done ? (selected.paid_50_amount || 0) : 0)
+    return Math.max(0, remaining).toFixed(2)
+  }
+  const openPay = (step: '50' | '100') => {
+    setPayAmount(suggestedPay(step))
+    setShowPay(step)
+  }
+
   const submitPayment = async () => {
     if (!selected || !showPay) return
     const amount = parseFloat(payAmount)
@@ -676,21 +690,21 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     {selected.status === 'PENDIENTE' && (
                       <>
                         <button onClick={() => { setEditing(selected); setShowForm(true) }} className="btn-secondary text-sm">Editar</button>
-                        <button onClick={() => setShowPay('50')} className="btn-primary text-sm">Pagar 50%</button>
-                        <button onClick={() => setShowPay('100')} className="btn-primary text-sm">Pagar 100%</button>
+                        <button onClick={() => openPay('50')} className="btn-primary text-sm">Pagar 50%</button>
+                        <button onClick={() => openPay('100')} className="btn-primary text-sm">Pagar 100%</button>
                         <button onClick={deleteOrder} disabled={busy} className="btn-danger text-sm">Eliminar</button>
                       </>
                     )}
                     {selected.status === 'PAGO_PARCIAL' && (
                       <>
-                        <button onClick={() => setShowPay('100')} className="btn-primary text-sm">Pagar 100%</button>
+                        <button onClick={() => openPay('100')} className="btn-primary text-sm">Pagar 100%</button>
                         <button onClick={() => advanceTo('ESPERANDO_FOTOS')} disabled={busy} className="btn-secondary text-sm">Esperar fotos</button>
                       </>
                     )}
                     {selected.status === 'ESPERANDO_FOTOS' && (
                       <>
                         {!selected.paid_100_done && (
-                          <button onClick={() => setShowPay('100')} className="btn-primary text-sm">Pagar 100%</button>
+                          <button onClick={() => openPay('100')} className="btn-primary text-sm">Pagar 100%</button>
                         )}
                         <button onClick={() => advanceTo('PAGADA')} disabled={busy} className="btn-primary text-sm">
                           Marcar pagada
@@ -913,10 +927,21 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
               <h2 className="font-semibold">Registrar pago {showPay}%</h2>
             </div>
             <div className="p-4">
-              <label className="text-xs text-neutral-500">Monto $</label>
+              <label className="text-xs text-neutral-500">
+                Monto $ {showPay === '100' && selected?.paid_50_done ? '(lo que falta)' : '(sugerido)'}
+              </label>
               <input type="number" step="0.01" min={0} value={payAmount} onKeyDown={blockNumberKeys} onChange={e => setPayAmount(e.target.value)}
                 placeholder="0.00" autoFocus
                 className="mt-1 w-full border rounded px-3 py-2 text-sm" />
+              {selected && (
+                <p className="mt-2 text-[11px] text-neutral-500 leading-relaxed">
+                  {showPay === '50'
+                    ? <>Sugerido: mitad del total (${fmt(selected.total_usd / 2)} de ${fmt(selected.total_usd)}). Es la plata que sale ahora; va a Finanzas, no cambia el costo del producto.</>
+                    : selected.paid_50_done
+                      ? <>Sugerido: el <b>restante</b> (${fmt(selected.total_usd)} total − ${fmt(selected.paid_50_amount)} ya pagado = ${fmt(Math.max(0, selected.total_usd - selected.paid_50_amount))}). Finanzas suma ambos pagos, por eso aquí va solo lo que falta.</>
+                      : <>Sugerido: el total (${fmt(selected.total_usd)}), porque no hubo pago del 50%. Va a Finanzas como la plata que sale.</>}
+                </p>
+              )}
             </div>
             <div className="p-4 border-t flex justify-end gap-2 bg-neutral-50">
               <button onClick={() => { setShowPay(null); setPayAmount('') }} className="btn-secondary text-sm">Cancelar</button>
