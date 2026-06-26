@@ -43,6 +43,15 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   const [search, setSearch] = useState('')
   const [customers, setCustomers] = useState<ComboOption[]>([])
   useEffect(() => { fetch('/api/sales/customers').then(r => r.json()).then(setCustomers).catch(() => {}) }, [])
+
+  // VE: tasa para calcular el precio REAL (paralelo) que va a la venta.
+  const [veRate, setVeRate] = useState<{ official: number; parallel: number } | null>(null)
+  useEffect(() => {
+    if (country !== 'VE') return
+    fetch('/api/rates/latest').then(r => r.json())
+      .then(d => { if (d?.official_rate > 0 && d?.parallel_rate > 0) setVeRate({ official: d.official_rate, parallel: d.parallel_rate }) })
+      .catch(() => {})
+  }, [country])
   const [busy,   setBusy]   = useState(false)
   const [error,  setError]  = useState<string | null>(null)
   const [isLocal, setIsLocal] = useState(editing?.ml_order_number.startsWith('LOCAL-') ?? false)
@@ -67,6 +76,15 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     p.code.toLowerCase().includes(search.toLowerCase())
   ).slice(0, 20)
 
+  // VE: el monto que va a la venta es el precio REAL que recibís (oficial→paralelo),
+  // congelado a la tasa del momento (snapshot). CO: el precio en pesos. Fallback al base.
+  const defaultPrice = (p: InventoryItem) => {
+    if (country === 'VE' && veRate && veRate.parallel > 0 && p.final_price_usd > 0) {
+      return Math.round(p.final_price_usd * veRate.official / veRate.parallel * 100) / 100
+    }
+    return p.sale_price || p.final_price_usd
+  }
+
   const addItem = (p: InventoryItem) => {
     if (items.some(i => i.product_id === p.product_id)) return
     setItems([...items, {
@@ -74,7 +92,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
       product_name: p.name,
       product_code: p.code,
       quantity:     1,
-      unit_price:   p.sale_price || p.final_price_usd,
+      unit_price:   defaultPrice(p),
     }])
     setSearch('')
   }
@@ -261,6 +279,12 @@ export default function VentasForm({ editing, products, country, onClose, onSave
                 </tbody>
               </table>
             </div>
+          )}
+
+          {country === 'VE' && veRate && items.length > 0 && (
+            <p className="text-[11px] text-neutral-400 -mt-1">
+              El precio es <b>lo que recibís en paralelo</b> (real, ya descontado el cambiario), congelado a la tasa de hoy. Editable por línea.
+            </p>
           )}
 
           <div className="flex items-end justify-between gap-4">
