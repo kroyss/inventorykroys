@@ -25,6 +25,7 @@ interface ProductRow {
 interface Props {
   editing: ImportOrder | null
   suppliers: Supplier[]
+  carriers?: string[]
   onClose: () => void
   onSaved: () => void
   onReload?: () => void
@@ -34,7 +35,7 @@ interface Props {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function ImportsForm({ editing, suppliers, onClose, onSaved, onReload, onContinue }: Props) {
+export default function ImportsForm({ editing, suppliers, carriers = [], onClose, onSaved, onReload, onContinue }: Props) {
   const confirm = useConfirm()
   const [supplierList, setSupplierList] = useState<Supplier[]>(suppliers)
   const [supplierId,   setSupplierId]   = useState<number | null>(editing?.supplier_id ?? null)
@@ -166,9 +167,15 @@ export default function ImportsForm({ editing, suppliers, onClose, onSaved, onRe
               </div>
             </div>
             <div>
-              <label className="text-xs text-neutral-500">País de origen</label>
-              <input value={origin} onChange={e => setOrigin(e.target.value)}
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" placeholder="China, USA…" />
+              <label className="text-xs text-neutral-500">Transportista</label>
+              <div className="mt-1">
+                <Combobox
+                  value={origin}
+                  options={carriers.map((c, i) => ({ id: i, name: c }))}
+                  placeholder="Escribe o busca el transportista…"
+                  onChange={(name) => setOrigin(name)}
+                />
+              </div>
             </div>
           </div>
 

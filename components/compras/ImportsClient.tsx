@@ -222,6 +222,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     updated_at:   o => new Date(o.updated_at ?? o.created_at ?? 0).getTime(),
     estado:       o => STATUS_LABELS[o.status] ?? o.status,
     contenedor:   o => (o.container_code ?? '').toLowerCase(),
+    transportista: o => (o.origin_country ?? '').toLowerCase(),
   }
 
   const visibleOrders = [...baseVisible.filter(o => {
@@ -569,6 +570,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 <SortableTh label="Cajas" sortKey="cajas" sort={sort} onSort={onSort} align="right" title="Cantidad de cajas de la orden" />
                 {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
                 <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
+                <SortableTh label="Transportista" sortKey="transportista" sort={sort} onSort={onSort} title="Transportista (clic para agrupar)" />
                 <SortableTh label="Contenedor" sortKey="contenedor" sort={sort} onSort={onSort} title="Contenedor asignado (clic para agrupar)" />
                 <SortableTh label="Estado" sortKey="estado" sort={sort} onSort={onSort} align="center" />
                 {historyMode && <th className="px-2 py-2 text-center">Inconsistente</th>}
@@ -576,7 +578,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
             </thead>
             <tbody>
               {visibleOrders.length === 0 && (
-                <tr><td colSpan={(isAdmin ? 10 : 9) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
+                <tr><td colSpan={(isAdmin ? 11 : 10) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
               )}
               {paginatedOrders.map((o, idx) => {
                 const dateSrc = o.updated_at ?? o.created_at
@@ -630,6 +632,9 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     </td>
                     {isAdmin && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
                     <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
+                    <td className="px-3 py-2 text-xs text-neutral-600 whitespace-nowrap max-w-[10rem] truncate">
+                      {o.origin_country || <span className="text-neutral-300">—</span>}
+                    </td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap font-mono">
                       {o.container_code
                         ? <span className="text-blue-700">📦 {o.container_code}</span>
@@ -670,7 +675,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 <div className="font-semibold mt-0.5">{selected.supplier_name}</div>
                 <div className="text-xs text-neutral-400 mt-0.5">
                   {isAdmin && <>Total: <span className="font-medium">${fmt(selected.total_usd)}</span></>}
-                  {selected.origin_country && <span className={isAdmin ? 'ml-2' : ''}>{isAdmin ? '· ' : ''}{selected.origin_country}</span>}
+                  {selected.origin_country && <span className={isAdmin ? 'ml-2' : ''}>{isAdmin ? '· ' : ''}🚚 {selected.origin_country}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1035,6 +1040,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
         <ImportsForm
           editing={editing}
           suppliers={suppliers}
+          carriers={[...new Set(orders.map(o => o.origin_country).filter(Boolean) as string[])].sort()}
           onClose={() => { setShowForm(false); setEditing(null) }}
           onSaved={() => { setShowForm(false); setEditing(null); reload() }}
           onReload={reload}

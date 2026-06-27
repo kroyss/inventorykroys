@@ -151,7 +151,7 @@ export default function ReceptionPrint({ order, country, kind, photos = [] }: Pr
             )}
             {order.origin_country && (
               <div>
-                <span className="text-neutral-500">Origen:</span>{' '}
+                <span className="text-neutral-500">Transportista:</span>{' '}
                 <span className="font-medium">{order.origin_country}</span>
               </div>
             )}

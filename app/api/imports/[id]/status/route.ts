@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
-import { unlink, rmdir } from 'fs/promises'
-import path from 'path'
 
 const IMPORT_FLOW = [
   'PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS', 'PAGADA',
   'EN_TRANSITO', 'ADUANA', 'EN_IMPORTADOR_PAGAR',
   'EN_CAMINO', 'RECIBIDA', 'PARCIAL', 'FINALIZADA', 'INCONSISTENTE',
 ]
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR ?? './uploads'
 
 const Schema = z.object({
   status:          z.string(),
@@ -50,22 +46,6 @@ async function revertImportInventory(
       [item.product_id, -qty, `Importación #${orderId}`, note, userId]
     )
   }
-}
-
-async function deleteOrderFiles(db: any, orderId: string) {
-  // Hard-guard against path traversal: orderId must be a positive integer.
-  if (!/^\d+$/.test(orderId)) return
-  const { rows: files } = await db.query(
-    `SELECT file_path FROM import_order_files WHERE import_order_id = $1`, [orderId]
-  )
-  for (const { file_path } of files) {
-    try { await unlink(file_path) } catch {}
-  }
-  await db.query(`DELETE FROM import_order_files WHERE import_order_id = $1`, [orderId])
-  try {
-    const folder = path.join(UPLOAD_DIR, orderId)
-    await rmdir(folder)
-  } catch {}
 }
 
 export async function PUT(
@@ -134,11 +114,7 @@ export async function PUT(
         // Always revert to PENDIENTE
         newStatus = 'PENDIENTE'
 
-        // Delete files for most states
-        const filesStates = ['PAGADA','ESPERANDO_FOTOS','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR','EN_CAMINO','PARCIAL','FINALIZADA','INCONSISTENTE']
-        if (filesStates.includes(current)) {
-          await deleteOrderFiles(db, id)
-        }
+        // Los archivos/fotos NO se borran al reabrir: son evidencia de la orden.
 
         // Reset payments for paid/advanced states
         const resetPayStates = ['PAGADA','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR','EN_CAMINO','PARCIAL','FINALIZADA','INCONSISTENTE']
