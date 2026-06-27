@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { FinanceAccount, FinanceCategory, FinanceLedgerRow, FinanceKind } from '@/lib/types'
 import { money } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
 
 const ACCOUNT_TYPES = ['banco', 'efectivo', 'cripto', 'paypal', 'otro'] as const
@@ -457,6 +458,7 @@ export default function FinanzasClient() {
       {showAcc && (
         <AccountModal
           initial={accModal}
+          names={[...new Set(accounts.map(a => a.name).filter(Boolean))]}
           busy={busy}
           onClose={() => setShowAcc(false)}
           onSave={async (body) => {
@@ -495,8 +497,9 @@ export default function FinanzasClient() {
 }
 
 // ─────────────────────────── Modal de cuenta ───────────────────────────
-function AccountModal({ initial, busy, onClose, onSave }: {
+function AccountModal({ initial, names = [], busy, onClose, onSave }: {
   initial: FinanceAccount | null
+  names?: string[]
   busy: boolean
   onClose: () => void
   onSave: (b: Record<string, unknown>) => void
@@ -518,8 +521,12 @@ function AccountModal({ initial, busy, onClose, onSave }: {
         <div className="p-5 space-y-3">
           <div>
             <label className="block text-xs text-neutral-500 mb-1">Nombre</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="BOA, PayPal, Binance USDT…"
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+            <Combobox
+              value={name}
+              options={names.map((n, i) => ({ id: i, name: n }))}
+              placeholder="BOA, PayPal, Binance USDT…"
+              onChange={(v) => setName(v)}
+            />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
