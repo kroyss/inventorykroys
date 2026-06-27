@@ -767,7 +767,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     {selected.status === 'PAGADA' && (
                       <>
                         <input value={trackingInput} onChange={e => setTrackingInput(e.target.value)}
-                          placeholder="Tracking number" className="border rounded px-2 py-1 text-sm" />
+                          placeholder="Tracking number" className="w-56 border rounded px-2 py-1 text-sm" />
                         <div className="w-56">
                           <Combobox
                             value={trkContName}

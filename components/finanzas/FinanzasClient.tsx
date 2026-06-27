@@ -212,8 +212,8 @@ export default function FinanzasClient() {
                           : <span className="text-neutral-300">—</span>}
                       </td>
                       <td className={`px-3 py-2 text-right font-semibold whitespace-nowrap ${m.kind === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                        {m.kind === 'income' ? '+' : '−'}{money(m.amount)} <span className="text-neutral-400 text-xs">{m.currency}</span>
-                        {m.currency !== 'USD' && <span className="block text-[10px] text-neutral-400 font-normal">${money(m.usd)}</span>}
+                        {m.kind === 'income' ? '+' : '−'}${money(m.usd)} <span className="text-neutral-400 text-xs">USD</span>
+                        {m.currency !== 'USD' && <span className="block text-[10px] text-neutral-400 font-normal">{money(m.amount)} {m.currency}</span>}
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         {m.source === 'manual' && (
