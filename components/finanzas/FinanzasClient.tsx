@@ -488,7 +488,12 @@ export default function FinanzasClient() {
             const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             setBusy(false)
             if (!r.ok) { setError((await r.json()).error ?? 'Error'); return }
-            setShowMov(false); loadMovements()
+            setShowMov(false); loadMovements(); loadStatic()  // refresca categorías nuevas
+          }}
+          onDeleteCategory={async (opt) => {
+            if (!await confirm({ title: 'Quitar categoría', message: `¿Quitar la categoría "${opt.name}"? Si tiene movimientos, solo se oculta.`, confirmText: 'Quitar', danger: true })) return
+            const r = await fetch(`/api/finance/categories/${opt.id}`, { method: 'DELETE' })
+            if (r.ok) loadStatic()
           }}
         />
       )}
@@ -574,24 +579,51 @@ function AccountModal({ initial, names = [], busy, onClose, onSave }: {
 }
 
 // ─────────────────────────── Modal de movimiento ───────────────────────────
-function MovementModal({ initial, categories, accounts, busy, onClose, onSave }: {
+function MovementModal({ initial, categories, accounts, busy, onClose, onSave, onDeleteCategory }: {
   initial: FinanceLedgerRow | null
   categories: FinanceCategory[]
   accounts: FinanceAccount[]
   busy: boolean
   onClose: () => void
   onSave: (b: Record<string, unknown>) => void
+  onDeleteCategory?: (opt: { id: number; name: string }) => void | Promise<void>
 }) {
   const [kind, setKind]         = useState<FinanceKind>(initial?.kind ?? 'expense')
   const [date, setDate]         = useState(initial?.date?.slice(0, 10) ?? todayISO())
-  const [categoryId, setCatId]  = useState<string>(initial?.category_id ? String(initial.category_id) : '')
+  const [catName, setCatName]   = useState<string>(initial?.category_name ?? '')
+  const [catId, setCatId]       = useState<number | null>(initial?.category_id ?? null)
   const [amount, setAmount]     = useState(String(initial?.amount ?? ''))
   const [currency, setCurrency] = useState(initial?.currency ?? 'USD')
   const [accountId, setAccId]   = useState<string>(initial?.account_id ? String(initial.account_id) : '')
   const [country, setCountry]   = useState<string>(initial?.country ?? '')
   const [description, setDesc]  = useState(initial?.description ?? '')
+  const [catErr, setCatErr]     = useState<string | null>(null)
 
   const cats = categories.filter(c => c.kind === kind)
+
+  // Resuelve la categoría (crea si es nueva) y dispara onSave del movimiento.
+  const submit = async () => {
+    setCatErr(null)
+    let categoryId = catId
+    const nm = catName.trim()
+    if (nm && !categoryId) {
+      const r = await fetch('/api/finance/categories', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nm, kind }),
+      })
+      if (!r.ok) { setCatErr('No se pudo crear la categoría'); return }
+      categoryId = (await r.json()).id
+    }
+    onSave({
+      date, kind,
+      amount: parseFloat(amount) || 0,
+      currency,
+      category_id: categoryId ?? null,
+      account_id:  accountId ? Number(accountId) : null,
+      country:     country || null,
+      description: description || undefined,
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -604,7 +636,7 @@ function MovementModal({ initial, categories, accounts, busy, onClose, onSave }:
           {/* tipo */}
           <div className="grid grid-cols-2 gap-2">
             {(['expense', 'income'] as const).map(k => (
-              <button key={k} onClick={() => { setKind(k); setCatId('') }}
+              <button key={k} onClick={() => { setKind(k); setCatName(''); setCatId(null) }}
                 className={`py-2 rounded-lg text-sm font-medium border ${
                   kind === k
                     ? k === 'income' ? 'bg-green-600 border-green-600 text-white' : 'bg-red-600 border-red-600 text-white'
@@ -622,10 +654,14 @@ function MovementModal({ initial, categories, accounts, busy, onClose, onSave }:
             </div>
             <div>
               <label className="block text-xs text-neutral-500 mb-1">Categoría</label>
-              <select value={categoryId} onChange={e => setCatId(e.target.value)} className="w-full border rounded-lg px-2 py-2 text-sm bg-white">
-                <option value="">Sin categoría</option>
-                {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Combobox
+                value={catName}
+                options={cats.map(c => ({ id: c.id, name: c.name }))}
+                placeholder="Escribe o elige…"
+                onChange={(name, id) => { setCatName(name); setCatId(id) }}
+                onDelete={onDeleteCategory}
+              />
+              {catErr && <p className="mt-1 text-[11px] text-red-600">{catErr}</p>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -665,15 +701,7 @@ function MovementModal({ initial, categories, accounts, busy, onClose, onSave }:
         <div className="p-5 border-t flex justify-end gap-2 bg-neutral-50">
           <button onClick={onClose} className="btn-secondary text-sm">Cancelar</button>
           <button disabled={busy || !amount || parseFloat(amount) <= 0} className="btn-primary text-sm"
-            onClick={() => onSave({
-              date, kind,
-              amount: parseFloat(amount) || 0,
-              currency,
-              category_id: categoryId ? Number(categoryId) : null,
-              account_id:  accountId ? Number(accountId) : null,
-              country:     country || null,
-              description: description || undefined,
-            })}>
+            onClick={submit}>
             {busy ? 'Guardando…' : 'Guardar'}
           </button>
         </div>
