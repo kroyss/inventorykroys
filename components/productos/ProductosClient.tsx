@@ -62,6 +62,10 @@ function liveBaseVE(p: { total_cost: number; profit_percentage: number }): numbe
 function liveFinalVE(p: { total_cost: number; profit_percentage: number; discount_percent: number }, excess: number): number {
   return liveBaseVE(p) * (1 + excess / 100) * (1 - (p.discount_percent ?? 0) / 100)
 }
+// Precio publicado en ML = base × (1 + exceso), antes del descuento.
+function livePublishedVE(p: { total_cost: number; profit_percentage: number }, excess: number): number {
+  return liveBaseVE(p) * (1 + excess / 100)
+}
 
 function mlNetFor(
   country: Country,
@@ -381,7 +385,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const PAGE_SIZE = 100
   const [visible, setVisible] = useState(PAGE_SIZE)
 
-  type SortKey = 'code' | 'name' | 'category' | 'cost' | 'price' | 'margin' | 'stock' | 'status'
+  type SortKey = 'code' | 'name' | 'category' | 'cost' | 'price' | 'mlprice' | 'margin' | 'stock' | 'status'
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const toggleSort = (k: SortKey) => {
@@ -408,6 +412,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         case 'category': return p.category_name ?? '￿'
         case 'cost':     return p.total_cost
         case 'price':    return country === 'CO' ? p.sale_price : liveBaseVE(p)
+        case 'mlprice':  return livePublishedVE(p, veRate?.excess ?? 0)
         case 'margin':   return margin(p)
         case 'stock':    return p.quantity
         case 'status':   return p.is_active ? 0 : 1
@@ -530,6 +535,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Precio{sortArrow('price')}
                 </th>
+                {country === 'VE' && (
+                  <th onClick={() => toggleSort('mlprice')}
+                    className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800"
+                    title="Precio publicado en ML (con exceso, antes del descuento)">
+                    Precio ML{sortArrow('mlprice')}
+                  </th>
+                )}
                 <th onClick={() => toggleSort('margin')}
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Margen neto{sortArrow('margin')}
@@ -548,7 +560,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-neutral-400">
+                  <td colSpan={country === 'VE' ? 11 : 10} className="px-3 py-8 text-center text-neutral-400">
                     {search ? 'Sin resultados' : 'No hay productos'}
                   </td>
                 </tr>
@@ -581,6 +593,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   <td className="px-3 py-2 text-right font-medium text-neutral-900">
                     {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}
                   </td>
+                  {country === 'VE' && (
+                    <td className="px-3 py-2 text-right font-medium text-purple-700">
+                      ${fmt(livePublishedVE(p, veRate?.excess ?? 0))}
+                    </td>
+                  )}
                   <td className="px-3 py-2 text-right">
                     {net ? (
                       <span className={`font-medium ${netColor(net.margen)}`}>
@@ -650,6 +667,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-sm">
                   <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}</span></span>
+                  {country === 'VE' && (
+                    <span className="text-neutral-500">ML: <span className="font-medium text-purple-700">${fmt(livePublishedVE(p, veRate?.excess ?? 0))}</span></span>
+                  )}
                   {net && (
                     <span className={netColor(net.margen)}>{Math.round(net.margen)}% neto</span>
                   )}

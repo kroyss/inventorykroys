@@ -118,6 +118,7 @@ export interface InventoryItem {
   shipping_cost: number
   total_cost: number
   final_price_usd: number
+  profit_percentage: number
   inventory_id: number
   quantity: number
   min_stock: number

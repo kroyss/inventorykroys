@@ -10,6 +10,7 @@ const INVENTORY_SQL = `
       COALESCE(pp.shipping_cost,   0)::float      AS shipping_cost,
       COALESCE(pp.total_cost,      0)::float      AS total_cost,
       COALESCE(pp.final_price_usd, 0)::float      AS final_price_usd,
+      COALESCE(pc.profit_percentage, 0)::float    AS profit_percentage,
       inv.id                                      AS inventory_id,
       COALESCE(inv.quantity,   0)::int            AS quantity,
       COALESCE(inv.min_stock,  0)::int            AS min_stock,
@@ -26,6 +27,7 @@ const INVENTORY_SQL = `
       ), 0)::int AS ventas_6m
     FROM products p
     LEFT JOIN product_pricing pp  ON p.id = pp.product_id
+    LEFT JOIN profit_categories pc ON pc.id = pp.profit_category_id
     LEFT JOIN inventory       inv ON p.id = inv.product_id
   )
   SELECT

@@ -36,7 +36,7 @@ const STATUS_DOT: Record<StockStatus, string> = {
   INACTIVO:  'bg-neutral-300',
 }
 
-type SortKey = 'code' | 'name' | 'quantity' | 'min_stock' | 'max_stock' | 'sale_price' | 'ventas_6m' | 'status'
+type SortKey = 'code' | 'name' | 'quantity' | 'min_stock' | 'max_stock' | 'sale_price' | 'mlprice' | 'ventas_6m' | 'status'
 
 // ─── component ──────────────────────────────────────────────────────────────
 interface Props {
@@ -48,8 +48,17 @@ interface Props {
 export default function InventarioClient({ initialItems, userRole, country }: Props) {
   const isAdmin = userRole === 'admin'
   const isCO    = country === 'CO'
+  const isVE    = country === 'VE'
   // En CO el precio de venta está en pesos (sin decimales); en VE en USD.
   const priceLabel = (n: number) => isCO ? `$${fmtPeso(n)}` : `$${fmt(n)}`
+  // Precio ML (solo VE) = costo × (1+ganancia%) × (1+exceso%) = publicado con exceso.
+  const [veExcess, setVeExcess] = useState(0)
+  useEffect(() => {
+    if (country !== 'VE') return
+    fetch('/api/rates/latest').then(r => r.json()).then(d => setVeExcess(d?.excess_percentage ?? 0)).catch(() => {})
+  }, [country])
+  const mlPriceVE = (it: InventoryItem) =>
+    it.total_cost * (1 + (it.profit_percentage ?? 0) / 100) * (1 + veExcess / 100)
   const [items,    setItems]    = useState<InventoryItem[]>(initialItems)
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [search,   setSearch]   = useState('')
@@ -190,6 +199,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
           case 'min_stock':  return i.min_stock
           case 'max_stock':  return i.max_stock
           case 'sale_price': return i.sale_price || i.final_price_usd
+          case 'mlprice':    return mlPriceVE(i)
           case 'ventas_6m':  return i.ventas_6m
           case 'status':     return i.status
         }
@@ -281,6 +291,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                 {isAdmin && th('min_stock', 'Mín', 'right')}
                 {isAdmin && th('max_stock', 'Máx', 'right')}
                 {th('sale_price', 'P. Venta', 'right')}
+                {isVE && th('mlprice', 'Precio ML', 'right')}
                 {isAdmin && th('ventas_6m', 'Ventas 6m', 'right')}
                 {th('status', 'Estado', 'center')}
                 <th className="px-3 py-2" />
@@ -288,7 +299,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
             </thead>
             <tbody>
               {displayed.length === 0 && (
-                <tr><td colSpan={isAdmin ? 9 : 6} className="px-3 py-8 text-center text-neutral-400">Sin resultados</td></tr>
+                <tr><td colSpan={(isAdmin ? 9 : 6) + (isVE ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin resultados</td></tr>
               )}
               {displayed.map((item, i) => (
                 <tr key={item.product_id}
@@ -305,6 +316,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-500">{item.min_stock}</td>}
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-500">{item.max_stock}</td>}
                   <td className="px-3 py-2 text-right text-neutral-700">{priceLabel(item.sale_price || item.final_price_usd)}</td>
+                  {isVE && <td className="px-3 py-2 text-right font-medium text-purple-700">${fmt(mlPriceVE(item))}</td>}
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-600">{item.ventas_6m}</td>}
                   <td className="px-3 py-2 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[item.status]}`}>
