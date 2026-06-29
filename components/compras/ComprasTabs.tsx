@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { usePersistedTab } from '@/lib/usePersistedTab'
 import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ComprasClient from './ComprasClient'
 import ImportsClient from './ImportsClient'
@@ -16,8 +17,9 @@ interface Props {
 export default function ComprasTabs({
   initialOrders, initialImports, localSuppliers, importSuppliers, userRole,
 }: Props) {
-  // Importaciones es la pestaña principal en ambos países → primera y por defecto
-  const [tab, setTab] = useState<'local' | 'import' | 'history'>('import')
+  // Importaciones es la pestaña principal en ambos países → primera y por defecto.
+  // Se recuerda entre F5 (el deep-link ?tab=import, más abajo, igual tiene prioridad).
+  const [tab, setTab] = usePersistedTab<'local' | 'import' | 'history'>('tab:compras', 'import')
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
   // Botón unificado "+ Compra": menú abierto + tipo pendiente de crear

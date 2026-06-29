@@ -5,6 +5,7 @@ import { money } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
+import { usePersistedTab } from '@/lib/usePersistedTab'
 
 const CURRENCIES = ['USD', 'COP', 'VES'] as const
 
@@ -52,7 +53,7 @@ const TAB_LABELS: Record<Tab, string> = {
 
 export default function FinanzasClient() {
   const confirm = useConfirm()
-  const [tab, setTab] = useState<Tab>('movimientos')
+  const [tab, setTab] = usePersistedTab<Tab>('tab:finanzas', 'movimientos')
 
   const [accounts,   setAccounts]   = useState<FinanceAccount[]>([])
   const [categories, setCategories] = useState<FinanceCategory[]>([])

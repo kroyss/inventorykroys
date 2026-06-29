@@ -4,6 +4,7 @@ import {
   DateRangeBar, presetRange, type DatePreset,
   KPICard, DataTable, exportRows, money, type Column,
 } from '@/components/ui'
+import { usePersistedTab } from '@/lib/usePersistedTab'
 
 type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
 
@@ -19,7 +20,7 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function ReportesClient() {
-  const [tab,      setTab]      = useState<Tab>('ventas')
+  const [tab,      setTab]      = usePersistedTab<Tab>('tab:reportes', 'ventas')
   const [preset,   setPreset]   = useState<DatePreset>('last90')
   const [dateFrom, setDateFrom] = useState(presetRange('last90').from)
   const [dateTo,   setDateTo]   = useState(presetRange('last90').to)
