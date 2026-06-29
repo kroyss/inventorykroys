@@ -35,6 +35,7 @@ export default function TasasClient() {
   const [veComision, setVeComision] = useState('12')    // % comisión ML
   const [veEnvio,    setVeEnvio]     = useState('0.65')  // $ envío por venta
   const [veUmbral,   setVeUmbral]    = useState('5')     // envío gratis aplica desde $5
+  const [transitoFactor, setTransitoFactor] = useState('1.4') // Finanzas: factor venta mercancía en tránsito
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [okMsg,    setOkMsg]    = useState<string | null>(null)
@@ -72,6 +73,7 @@ export default function TasasClient() {
       if (s.ml_comision) setVeComision(String(s.ml_comision))
       if (s.ml_envio)    setVeEnvio(String(s.ml_envio))
       if (s.ml_umbral)   setVeUmbral(String(s.ml_umbral))
+      if (s.transito_sale_factor) setTransitoFactor(String(s.transito_sale_factor))
     }
   }
   useEffect(() => { loadAll() }, [])
@@ -85,6 +87,19 @@ export default function TasasClient() {
     setBusy(false)
     if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
     setOkMsg('Parámetros guardados'); setTimeout(() => setOkMsg(null), 2500)
+  }
+
+  const saveTransitoFactor = async () => {
+    const f = parseFloat(transitoFactor)
+    if (isNaN(f) || f < 1) { setError('El factor debe ser ≥ 1 (ej. 1.4 = +40%)'); return }
+    setBusy(true); setError(null); setOkMsg(null)
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transito_sale_factor: transitoFactor }),
+    })
+    setBusy(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
+    setOkMsg('Factor de tránsito guardado'); setTimeout(() => setOkMsg(null), 2500)
   }
 
   // ── freshness ──
@@ -271,6 +286,26 @@ export default function TasasClient() {
             />
             <div className="mt-3 text-[11px] text-neutral-500 bg-neutral-50 rounded-lg p-3 leading-relaxed">
               <b>Cómo se calcula:</b> ML descuenta la comisión ({veComision}%) sobre el precio en bolívares; lo que queda se cambia a <b>dólar paralelo</b> (por eso se multiplica sobre "lo que recibes"). El <b>envío</b> (${veEnvio}) es gratis solo desde <b>${veUmbral}</b>: si el precio es menor, el cliente debe juntar varias unidades hasta llegar a ${veUmbral}, así que el costo de envío se reparte → <b>envío = ${veEnvio} × (precio / {veUmbral})</b>. Ej: precio $2 → envío ≈ ${money((parseFloat(veEnvio) || 0) * 2 / (parseFloat(veUmbral) || 5))}.
+            </div>
+          </div>
+
+          {/* Finanzas: factor de venta de la mercancía en tránsito (global) */}
+          <div className="mt-1 border-t border-neutral-100 pt-4">
+            <p className="text-sm font-semibold text-neutral-700 mb-1">Finanzas · Mercancía en tránsito</p>
+            <p className="text-[11px] text-neutral-500 mb-2">
+              Factor con el que se estima el <b>valor de venta</b> de la mercancía pagada que aún no recibís,
+              en el <b>Capital a venta · potencial</b> de Finanzas. Ej: <b>1.4</b> = +40%. Es global (VE + CO).
+            </p>
+            <div className="flex items-end gap-2">
+              <div className="w-40">
+                <label className="text-[11px] text-neutral-500">Factor (× costo)</label>
+                <input type="number" step="0.05" min="1" value={transitoFactor} onChange={e => setTransitoFactor(e.target.value)}
+                  className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+              <button onClick={saveTransitoFactor} disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-lg border-2 border-neutral-900/40 font-semibold text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-colors disabled:opacity-60 whitespace-nowrap">
+                {busy ? 'Guardando…' : '💾 Guardar'}
+              </button>
             </div>
           </div>
         </div>

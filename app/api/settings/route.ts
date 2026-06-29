@@ -7,6 +7,7 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 const ALLOWED = new Set([
   'ml_comision', 'ml_envio', 'ml_umbral',            // VE
   'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten', // CO
+  'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)
 ])
 
 // GET /api/settings → { key: value, ... } del país de la sesión

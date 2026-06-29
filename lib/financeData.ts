@@ -257,7 +257,8 @@ export interface Capital {
   mercanciaCO_cost: number;  mercanciaCO_sale: number
   mercanciaCost: number;     mercanciaSale: number      // VE+CO consolidado USD
   transito: number           // USD a costo: importaciones/compras pagadas aún no recibidas
-  transitoSale: number       // USD estimado de venta de ese tránsito (×1.4)
+  transitoSale: number       // USD estimado de venta de ese tránsito (× factor)
+  transitoFactor: number     // factor de venta del tránsito (editable, default 1.4)
   accounts: CapitalAccount[]
   liquidez: number           // USD (no reservas)
   reservas: number           // USD
@@ -323,10 +324,11 @@ export async function getCapital(): Promise<Capital> {
                  + impPaidCO                             // importación CO también en USD
                  + toUsd(purPaidCO, 'COP', rates)        // compra local CO en pesos
   // Estimado de venta de la mercancía en camino: al costo no tiene precio aún,
-  // así que para el capital "a venta · potencial" se proyecta con un margen fijo
-  // (+40%). Es un aproximado a propósito; cambiá el factor si tu margen difiere.
-  const TRANSITO_SALE_FACTOR = 1.4
-  const transitoSale = transito * TRANSITO_SALE_FACTOR
+  // así que para el capital "a venta · potencial" se proyecta con un factor
+  // editable desde Ajustes VE (app_settings.transito_sale_factor). Default 1.4 (+40%).
+  const factorRow = await ve.query(`SELECT value FROM app_settings WHERE key='transito_sale_factor'`)
+  const transitoFactor = parseFloat(factorRow.rows[0]?.value) || 1.4
+  const transitoSale = transito * transitoFactor
 
   const { rows: acc } = await ve.query(
     `SELECT id, name, currency, balance::float AS balance, is_reserve
@@ -347,7 +349,7 @@ export async function getCapital(): Promise<Capital> {
     mercanciaCO_cost_cop, mercanciaCO_sale_cop,
     mercanciaCO_cost, mercanciaCO_sale,
     mercanciaCost, mercanciaSale,
-    transito, transitoSale,
+    transito, transitoSale, transitoFactor,
     accounts, liquidez, reservas,
     totalCost: mercanciaCost + transito     + liquidez - reservas,  // tránsito a costo
     totalSale: mercanciaSale + transitoSale + liquidez - reservas,  // tránsito ×1.4 (estimado)
