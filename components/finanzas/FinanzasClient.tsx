@@ -37,6 +37,7 @@ interface Capital {
   mercanciaCO_cost_cop: number; mercanciaCO_sale_cop: number
   mercanciaCO_cost: number; mercanciaCO_sale: number
   mercanciaCost: number; mercanciaSale: number
+  transito: number
   accounts: CapAccount[]; liquidez: number; reservas: number
   totalCost: number; totalSale: number
 }
@@ -323,8 +324,8 @@ export default function FinanzasClient() {
             </div>
           </div>
 
-          {/* Mercancía (costo y venta) + liquidez + reservas */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Mercancía (costo y venta) + tránsito + liquidez + reservas */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Mercancía VE</div>
               <div className="text-sm">costo <span className="font-bold text-neutral-900">${money(capital.mercanciaVE_cost)}</span></div>
@@ -336,6 +337,11 @@ export default function FinanzasClient() {
               <div className="text-sm">venta <span className="font-bold text-green-700">${money(capital.mercanciaCO_sale)}</span> <span className="text-[10px] text-neutral-400">COP {money(capital.mercanciaCO_sale_cop)}</span></div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
+              <div className="text-xs text-neutral-500 mb-1">Mercancía en tránsito</div>
+              <div className="text-lg font-bold text-blue-700">${money(capital.transito)}</div>
+              <div className="text-[10px] text-neutral-400">importac./compras pagadas, sin recibir</div>
+            </div>
+            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Liquidez</div>
               <div className="text-lg font-bold text-green-700">${money(capital.liquidez)}</div>
             </div>
@@ -345,7 +351,7 @@ export default function FinanzasClient() {
             </div>
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
-            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). Liquidez y deudas/reservas se aplican igual en ambos capitales.
+            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). <b>En tránsito</b> = lo ya pagado de importaciones/compras que aún no recibís (al recibirlas pasan a Mercancía). Tránsito, liquidez y deudas/reservas se aplican igual en ambos capitales.
           </p>
 
           {/* Tasas automáticas (solo lectura) */}

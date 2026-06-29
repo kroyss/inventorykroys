@@ -256,11 +256,12 @@ export interface Capital {
   mercanciaCO_cost_cop: number; mercanciaCO_sale_cop: number
   mercanciaCO_cost: number;  mercanciaCO_sale: number
   mercanciaCost: number;     mercanciaSale: number      // VE+CO consolidado USD
+  transito: number           // USD: importaciones/compras pagadas aún no recibidas
   accounts: CapitalAccount[]
   liquidez: number           // USD (no reservas)
   reservas: number           // USD
-  totalCost: number          // mercancía a costo + liquidez − reservas
-  totalSale: number          // mercancía a venta  + liquidez − reservas
+  totalCost: number          // mercancía a costo + tránsito + liquidez − reservas
+  totalSale: number          // mercancía a venta  + tránsito + liquidez − reservas
 }
 
 // Valoriza inventario activo a costo y a precio de venta a la vez.
@@ -292,6 +293,35 @@ export async function getCapital(): Promise<Capital> {
   const mercanciaCost = mercanciaVE_cost + mercanciaCO_cost
   const mercanciaSale = mercanciaVE_sale + mercanciaCO_sale
 
+  // ── Mercancía EN TRÁNSITO ──────────────────────────────────────────────
+  // Importaciones y compras pagadas que aún NO entraron al inventario (no se
+  // valuó "Mercancía"). Se cuenta lo efectivamente PAGADO (no el total), así:
+  //  · representa dinero ya invertido en mercancía que viene en camino,
+  //  · al bajar manualmente el saldo de la cuenta de donde salió → se neutraliza,
+  //  · al finalizar la orden pasa de "tránsito" a "Mercancía" sin contar doble
+  //    (las que cargan inventario —PARCIAL/FINALIZADA/INCONSISTENTE— se excluyen).
+  const NOT_LOADED = `status NOT IN ('PARCIAL','FINALIZADA','INCONSISTENTE')`
+  // Importaciones: pagos 50/100 en USD en ambos países
+  const impPaidSql = `
+    SELECT COALESCE(SUM(
+      CASE WHEN paid_50_done  THEN COALESCE(paid_50_amount,0)  ELSE 0 END +
+      CASE WHEN paid_100_done THEN COALESCE(paid_100_amount,0) ELSE 0 END
+    ),0)::float AS paid
+    FROM import_orders WHERE ${NOT_LOADED}`
+  // Compras locales: total_paid (VE en USD, CO en COP)
+  const purPaidSql = `
+    SELECT COALESCE(SUM(total_paid),0)::float AS paid
+    FROM purchase_orders WHERE order_type='local' AND total_paid > 0 AND ${NOT_LOADED}`
+
+  const impPaidVE = (await ve.query(impPaidSql)).rows[0].paid as number
+  const purPaidVE = (await ve.query(purPaidSql)).rows[0].paid as number
+  const impPaidCO = await coSafe(async db => (await db.query(impPaidSql)).rows[0].paid as number, 0)
+  const purPaidCO = await coSafe(async db => (await db.query(purPaidSql)).rows[0].paid as number, 0)
+
+  const transito = impPaidVE + purPaidVE                 // USD nativos
+                 + impPaidCO                             // importación CO también en USD
+                 + toUsd(purPaidCO, 'COP', rates)        // compra local CO en pesos
+
   const { rows: acc } = await ve.query(
     `SELECT id, name, currency, balance::float AS balance, is_reserve
      FROM finance_accounts WHERE is_active = TRUE
@@ -311,8 +341,9 @@ export async function getCapital(): Promise<Capital> {
     mercanciaCO_cost_cop, mercanciaCO_sale_cop,
     mercanciaCO_cost, mercanciaCO_sale,
     mercanciaCost, mercanciaSale,
+    transito,
     accounts, liquidez, reservas,
-    totalCost: mercanciaCost + liquidez - reservas,
-    totalSale: mercanciaSale + liquidez - reservas,
+    totalCost: mercanciaCost + transito + liquidez - reservas,
+    totalSale: mercanciaSale + transito + liquidez - reservas,
   }
 }
