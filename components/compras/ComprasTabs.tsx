@@ -98,10 +98,10 @@ export default function ComprasTabs({
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setCreateOpen(false)} />
                 <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                  <button onClick={() => startCreate('local')}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50">🧾 Compra local</button>
                   <button onClick={() => startCreate('import')}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-t border-neutral-100">📦 Importación</button>
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50">📦 Importación</button>
+                  <button onClick={() => startCreate('local')}
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-t border-neutral-100">🧾 Compra local</button>
                 </div>
               </>
             )}
