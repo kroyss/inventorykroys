@@ -14,10 +14,10 @@ interface Props {
 }
 
 export default function ComprasTabs({
-  initialOrders, initialImports, localSuppliers, importSuppliers, userRole, country,
+  initialOrders, initialImports, localSuppliers, importSuppliers, userRole,
 }: Props) {
-  // En CO lo común son las importaciones → esa pestaña va primero y por defecto
-  const [tab, setTab] = useState<'local' | 'import' | 'history'>(country === 'CO' ? 'import' : 'local')
+  // Importaciones es la pestaña principal en ambos países → primera y por defecto
+  const [tab, setTab] = useState<'local' | 'import' | 'history'>('import')
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
   // Botón unificado "+ Compra": menú abierto + tipo pendiente de crear
@@ -83,17 +83,9 @@ export default function ComprasTabs({
   return (
     <div>
       <div className="flex gap-1 mb-4 flex-wrap items-center">
-        {country === 'CO' ? (
-          <>
-            {tabBtn('import', `Importaciones (${importActive})`)}
-            {tabBtn('local', `Locales (${localActive})`)}
-          </>
-        ) : (
-          <>
-            {tabBtn('local', `Locales (${localActive})`)}
-            {tabBtn('import', `Importaciones (${importActive})`)}
-          </>
-        )}
+        {/* Importaciones primero (lo más común) en VE y CO, luego Locales, luego Historial */}
+        {tabBtn('import', `Importaciones (${importActive})`)}
+        {tabBtn('local', `Locales (${localActive})`)}
         {tabBtn('history', `Historial (${historyTotal})`)}
 
         {/* Botón unificado "+ Compra" (admin): elige Local o Importación */}
