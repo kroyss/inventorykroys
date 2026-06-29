@@ -75,9 +75,12 @@ interface Props {
   historyMode?: boolean
   /** Aviso al padre (ComprasTabs) tras cualquier cambio, para refrescar contadores y la otra pestaña. */
   onChanged?: () => void
+  /** El padre pide abrir el form de creación (botón unificado "+ Compra"). */
+  autoCreate?: boolean
+  onAutoCreateHandled?: () => void
 }
 
-export default function ImportsClient({ initialOrders, suppliers, userRole, historyMode = false, onChanged }: Props) {
+export default function ImportsClient({ initialOrders, suppliers, userRole, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
   const isAdmin = userRole === 'admin'
   const confirm = useConfirm()
 
@@ -148,6 +151,12 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     setTrkContName(''); setTrkContId(null)
     if (isAdmin && selected?.status === 'PAGADA') loadActiveContainers()
   }, [selected, isAdmin, loadActiveContainers])
+
+  // Botón unificado "+ Compra" del padre: abre el form de importación al activarse
+  useEffect(() => {
+    if (autoCreate && !historyMode && isAdmin) { setEditing(null); setShowForm(true); onAutoCreateHandled?.() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCreate])
 
   const reload = useCallback(async () => {
     const r = await fetch('/api/imports', { cache: 'no-store' })
@@ -282,6 +291,10 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       }
       if (!trkContName.trim()) {
         setError('Contenedor requerido')
+        return
+      }
+      if (!selected || (selected.file_count ?? 0) < 1) {
+        setError('Adjunta al menos una foto antes de pasar a tránsito')
         return
       }
       extras.tracking_number = trackingInput
@@ -539,11 +552,6 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
             placeholder="Buscar…"
             className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[140px] md:flex-none md:w-40 focus:outline-none focus:ring-2 focus:ring-neutral-800"
           />
-          {isAdmin && !historyMode && (
-            <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn-primary text-sm whitespace-nowrap">
-              + Nueva importación
-            </button>
-          )}
         </div>
       </div>
 
@@ -777,9 +785,14 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                             className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                           />
                         </div>
-                        <button onClick={() => advanceTo('EN_TRANSITO')} disabled={busy || !trackingInput.trim() || !trkContName.trim()} className="btn-primary text-sm">
+                        <button onClick={() => advanceTo('EN_TRANSITO')}
+                          disabled={busy || !trackingInput.trim() || !trkContName.trim() || (selected.file_count ?? 0) < 1}
+                          className="btn-primary text-sm">
                           En tránsito
                         </button>
+                        {(selected.file_count ?? 0) < 1 && (
+                          <span className="text-xs text-orange-500 self-center">⚠ Adjunta ≥1 foto abajo</span>
+                        )}
                       </>
                     )}
                     {selected.status === 'EN_TRANSITO' && (

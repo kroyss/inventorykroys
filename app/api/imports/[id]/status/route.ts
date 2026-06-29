@@ -176,15 +176,16 @@ export async function PUT(
           )
         }
 
-        // Validate ESPERANDO_FOTOS: must have at least 1 file
-        if (current === 'ESPERANDO_FOTOS') {
+        // Fotos obligatorias: al salir de ESPERANDO_FOTOS y al pasar a EN_TRANSITO
+        // (cubre el caso de pagar 100% directo y saltarse el paso de fotos).
+        if (current === 'ESPERANDO_FOTOS' || newStatus === 'EN_TRANSITO') {
           const { rows: [fc] } = await db.query(
             `SELECT COUNT(*) AS n FROM import_order_files WHERE import_order_id=$1`, [id]
           )
           if (parseInt(fc.n, 10) === 0) {
             await db.query('ROLLBACK')
             return NextResponse.json(
-              { error: 'Debes subir al menos un archivo antes de avanzar' },
+              { error: 'Debes adjuntar al menos una foto antes de pasar a tránsito' },
               { status: 400 }
             )
           }

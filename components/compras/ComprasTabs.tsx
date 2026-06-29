@@ -20,6 +20,14 @@ export default function ComprasTabs({
   const [tab, setTab] = useState<'local' | 'import' | 'history'>(country === 'CO' ? 'import' : 'local')
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
+  // Botón unificado "+ Compra": menú abierto + tipo pendiente de crear
+  const [createOpen,    setCreateOpen]    = useState(false)
+  const [pendingCreate, setPendingCreate] = useState<null | 'local' | 'import'>(null)
+  const startCreate = (type: 'local' | 'import') => {
+    setCreateOpen(false)
+    setTab(type)
+    setPendingCreate(type)
+  }
 
   // Fuente única de datos: arranca con lo del servidor y se re-consulta al cambiar
   // de pestaña, así los contadores y la lista de Historial reflejan al instante lo
@@ -74,7 +82,7 @@ export default function ComprasTabs({
 
   return (
     <div>
-      <div className="flex gap-1 mb-4 flex-wrap">
+      <div className="flex gap-1 mb-4 flex-wrap items-center">
         {country === 'CO' ? (
           <>
             {tabBtn('import', `Importaciones (${importActive})`)}
@@ -87,13 +95,35 @@ export default function ComprasTabs({
           </>
         )}
         {tabBtn('history', `Historial (${historyTotal})`)}
+
+        {/* Botón unificado "+ Compra" (admin): elige Local o Importación */}
+        {isAdmin && (
+          <div className="relative ml-auto">
+            <button onClick={() => setCreateOpen(o => !o)} className="btn-primary text-sm whitespace-nowrap">
+              + Compra ▾
+            </button>
+            {createOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setCreateOpen(false)} />
+                <div className="absolute right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                  <button onClick={() => startCreate('local')}
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50">🧾 Compra local</button>
+                  <button onClick={() => startCreate('import')}
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-t border-neutral-100">📦 Importación</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {tab === 'local' && (
-        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} userRole={userRole} onChanged={refresh} />
+        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} userRole={userRole} onChanged={refresh}
+          autoCreate={pendingCreate === 'local'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'import' && (
-        <ImportsClient initialOrders={imports} suppliers={importSuppliers} userRole={userRole} onChanged={refresh} />
+        <ImportsClient initialOrders={imports} suppliers={importSuppliers} userRole={userRole} onChanged={refresh}
+          autoCreate={pendingCreate === 'import'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'history' && (
         <div className="space-y-3">

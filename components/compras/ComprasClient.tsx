@@ -69,9 +69,12 @@ interface Props {
   historyMode?: boolean
   /** Aviso al padre (ComprasTabs) tras cualquier cambio, para refrescar contadores y la otra pestaña. */
   onChanged?: () => void
+  /** El padre pide abrir el form de creación (botón unificado "+ Compra"). */
+  autoCreate?: boolean
+  onAutoCreateHandled?: () => void
 }
 
-export default function ComprasClient({ initialOrders, initialSuppliers, userRole, historyMode = false, onChanged }: Props) {
+export default function ComprasClient({ initialOrders, initialSuppliers, userRole, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
   const isAdmin = userRole === 'admin'
   const confirm = useConfirm()
 
@@ -223,6 +226,12 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     setError('')
     setShowForm(true)
   }
+
+  // Botón unificado "+ Compra" del padre: abre el form al activarse autoCreate
+  useEffect(() => {
+    if (autoCreate && !historyMode && isAdmin) { openCreate(); onAutoCreateHandled?.() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCreate])
 
   // Open create modal when arriving via command palette (/compras?new=1)
   // Skip if ?tab=import (that opens the import form instead)
@@ -510,9 +519,6 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
             placeholder="Buscar…"
             className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[140px] md:flex-none md:w-40 focus:outline-none focus:ring-2 focus:ring-neutral-800"
           />
-          {isAdmin && !historyMode && (
-            <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nueva compra</button>
-          )}
         </div>
       </div>
 
