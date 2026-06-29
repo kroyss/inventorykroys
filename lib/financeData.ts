@@ -256,12 +256,13 @@ export interface Capital {
   mercanciaCO_cost_cop: number; mercanciaCO_sale_cop: number
   mercanciaCO_cost: number;  mercanciaCO_sale: number
   mercanciaCost: number;     mercanciaSale: number      // VE+CO consolidado USD
-  transito: number           // USD: importaciones/compras pagadas aún no recibidas
+  transito: number           // USD a costo: importaciones/compras pagadas aún no recibidas
+  transitoSale: number       // USD estimado de venta de ese tránsito (×1.4)
   accounts: CapitalAccount[]
   liquidez: number           // USD (no reservas)
   reservas: number           // USD
-  totalCost: number          // mercancía a costo + tránsito + liquidez − reservas
-  totalSale: number          // mercancía a venta  + tránsito + liquidez − reservas
+  totalCost: number          // mercancía a costo + tránsito(costo) + liquidez − reservas
+  totalSale: number          // mercancía a venta  + tránsito(×1.4)  + liquidez − reservas
 }
 
 // Valoriza inventario activo a costo y a precio de venta a la vez.
@@ -321,6 +322,11 @@ export async function getCapital(): Promise<Capital> {
   const transito = impPaidVE + purPaidVE                 // USD nativos
                  + impPaidCO                             // importación CO también en USD
                  + toUsd(purPaidCO, 'COP', rates)        // compra local CO en pesos
+  // Estimado de venta de la mercancía en camino: al costo no tiene precio aún,
+  // así que para el capital "a venta · potencial" se proyecta con un margen fijo
+  // (+40%). Es un aproximado a propósito; cambiá el factor si tu margen difiere.
+  const TRANSITO_SALE_FACTOR = 1.4
+  const transitoSale = transito * TRANSITO_SALE_FACTOR
 
   const { rows: acc } = await ve.query(
     `SELECT id, name, currency, balance::float AS balance, is_reserve
@@ -341,9 +347,9 @@ export async function getCapital(): Promise<Capital> {
     mercanciaCO_cost_cop, mercanciaCO_sale_cop,
     mercanciaCO_cost, mercanciaCO_sale,
     mercanciaCost, mercanciaSale,
-    transito,
+    transito, transitoSale,
     accounts, liquidez, reservas,
-    totalCost: mercanciaCost + transito + liquidez - reservas,
-    totalSale: mercanciaSale + transito + liquidez - reservas,
+    totalCost: mercanciaCost + transito     + liquidez - reservas,  // tránsito a costo
+    totalSale: mercanciaSale + transitoSale + liquidez - reservas,  // tránsito ×1.4 (estimado)
   }
 }
