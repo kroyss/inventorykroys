@@ -6,7 +6,6 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
 
-const ACCOUNT_TYPES = ['banco', 'efectivo', 'cripto', 'paypal', 'otro'] as const
 const CURRENCIES = ['USD', 'COP', 'VES'] as const
 
 // Fecha/mes LOCAL del navegador (no UTC: toISOString se corre un día de noche).
@@ -417,7 +416,6 @@ export default function FinanzasClient() {
                 <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr className="border-b border-neutral-100">
                     <th className="px-3 py-2 text-left">Cuenta</th>
-                    <th className="px-3 py-2 text-left">Tipo</th>
                     <th className="px-3 py-2 text-center">Moneda</th>
                     <th className="px-3 py-2 text-right">Saldo</th>
                     <th className="px-3 py-2" />
@@ -425,7 +423,7 @@ export default function FinanzasClient() {
                 </thead>
                 <tbody>
                   {accounts.length === 0 && (
-                    <tr><td colSpan={5} className="px-3 py-8 text-center text-neutral-400">Sin cuentas. Agrega tus cuentas de liquidez.</td></tr>
+                    <tr><td colSpan={4} className="px-3 py-8 text-center text-neutral-400">Sin cuentas. Agrega tus cuentas de liquidez.</td></tr>
                   )}
                   {accounts.map((a, i) => (
                     <tr key={a.id} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
@@ -433,7 +431,6 @@ export default function FinanzasClient() {
                         {a.name}
                         {a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">reserva</span>}
                       </td>
-                      <td className="px-3 py-2 text-neutral-500 capitalize">{a.type}</td>
                       <td className="px-3 py-2 text-center text-neutral-500">{a.currency}</td>
                       <td className="px-3 py-2 text-right font-semibold text-neutral-900 whitespace-nowrap">{money(a.balance)}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -510,7 +507,6 @@ function AccountModal({ initial, names = [], busy, onClose, onSave }: {
   onSave: (b: Record<string, unknown>) => void
 }) {
   const [name, setName]         = useState(initial?.name ?? '')
-  const [type, setType]         = useState(initial?.type ?? 'banco')
   const [currency, setCurrency] = useState(initial?.currency ?? 'USD')
   const [balance, setBalance]   = useState(String(initial?.balance ?? ''))
   const [isReserve, setReserve] = useState(initial?.is_reserve ?? false)
@@ -533,13 +529,7 @@ function AccountModal({ initial, names = [], busy, onClose, onSave }: {
               onChange={(v) => setName(v)}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs text-neutral-500 mb-1">Tipo</label>
-              <select value={type} onChange={e => setType(e.target.value)} className="w-full border rounded-lg px-2 py-2 text-sm bg-white capitalize">
-                {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-neutral-500 mb-1">Moneda</label>
               <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full border rounded-lg px-2 py-2 text-sm bg-white">
@@ -566,9 +556,9 @@ function AccountModal({ initial, names = [], busy, onClose, onSave }: {
           <button onClick={onClose} className="btn-secondary text-sm">Cancelar</button>
           <button disabled={busy || !name.trim()} className="btn-primary text-sm"
             onClick={() => onSave({
-              name: name.trim(), type, currency,
+              name: name.trim(), currency,
               balance: parseFloat(balance) || 0,
-              is_reserve: isReserve, notes: notes || null,
+              is_reserve: isReserve, notes: notes.trim() || null,
             })}>
             {busy ? 'Guardando…' : 'Guardar'}
           </button>

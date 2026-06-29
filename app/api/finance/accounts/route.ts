@@ -11,7 +11,7 @@ const AccountSchema = z.object({
   balance:       z.number().default(0),
   is_reserve:    z.boolean().default(false),
   display_order: z.number().int().default(0),
-  notes:         z.string().optional(),
+  notes:         z.string().nullable().optional(),
 })
 
 export async function GET(_: NextRequest) {
