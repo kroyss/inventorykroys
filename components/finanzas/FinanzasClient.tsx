@@ -340,12 +340,12 @@ export default function FinanzasClient() {
               <div className="text-lg font-bold text-green-700">${money(capital.liquidez)}</div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
-              <div className="text-xs text-neutral-500 mb-1">Reservas (−)</div>
+              <div className="text-xs text-neutral-500 mb-1">Deudas / Reservas (−)</div>
               <div className="text-lg font-bold text-orange-600">${money(capital.reservas)}</div>
             </div>
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
-            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). Liquidez y reservas suman igual en ambos capitales.
+            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). Liquidez y deudas/reservas se aplican igual en ambos capitales.
           </p>
 
           {/* Tasas automáticas (solo lectura) */}
@@ -381,7 +381,7 @@ export default function FinanzasClient() {
                   {capital.accounts.map((a, i) => (
                     <tr key={a.id} className={`border-b border-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                       <td className="px-3 py-2 text-neutral-800">
-                        {a.name}{a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">reserva</span>}
+                        {a.name}{a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">deuda/reserva</span>}
                       </td>
                       <td className="px-3 py-2 text-center text-neutral-500">{a.currency}</td>
                       <td className="px-3 py-2 text-right text-neutral-600">{money(a.balance)}</td>
@@ -404,7 +404,7 @@ export default function FinanzasClient() {
                 <span key={cur}>Liquidez {cur}: <span className="font-semibold text-neutral-900">{money(v)}</span></span>
               ))}
               {Object.entries(reservasPorMoneda).map(([cur, v]) => (
-                <span key={cur}>Reserva {cur}: <span className="font-semibold text-orange-600">{money(v)}</span></span>
+                <span key={cur}>Deuda/Reserva {cur}: <span className="font-semibold text-orange-600">{money(v)}</span></span>
               ))}
             </div>
             <button onClick={() => { setAccModal(null); setShowAcc(true) }} className="btn-primary text-sm">+ Cuenta</button>
@@ -429,7 +429,7 @@ export default function FinanzasClient() {
                     <tr key={a.id} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                       <td className="px-3 py-2 font-medium text-neutral-900">
                         {a.name}
-                        {a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">reserva</span>}
+                        {a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">deuda/reserva</span>}
                       </td>
                       <td className="px-3 py-2 text-center text-neutral-500">{a.currency}</td>
                       <td className="px-3 py-2 text-right font-semibold text-neutral-900 whitespace-nowrap">{money(a.balance)}</td>
@@ -542,10 +542,13 @@ function AccountModal({ initial, names = [], busy, onClose, onSave }: {
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isReserve} onChange={e => setReserve(e.target.checked)} className="rounded" />
-            <span>Es reserva (se resta del total de capital)</span>
-          </label>
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={isReserve} onChange={e => setReserve(e.target.checked)} className="rounded" />
+              <span>Es deuda / reserva (se resta del capital)</span>
+            </label>
+            <p className="text-[11px] text-neutral-400 mt-1 ml-6">Marca esto si es plata que <b>debés</b> o que tenés <b>apartada</b> (no cuenta como disponible).</p>
+          </div>
           <div>
             <label className="block text-xs text-neutral-500 mb-1">Notas</label>
             <input value={notes ?? ''} onChange={e => setNotes(e.target.value)}
