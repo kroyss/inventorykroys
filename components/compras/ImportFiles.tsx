@@ -9,6 +9,7 @@ interface ImportFile {
   file_size_kb: number
   uploaded_at: string
   uploaded_by: string | null
+  visible_to_user?: boolean
 }
 
 interface Props {
@@ -58,6 +59,20 @@ export default function ImportFiles({ orderId, canEdit = true, onChange }: Props
     await load()
     onChange()
   }, [orderId, load, onChange])
+
+  // Admin: marca/desmarca una foto como visible para el usuario normal.
+  // La API recibe el set completo de ids visibles, así que lo recalculamos.
+  const toggleVisible = async (fileId: number) => {
+    const next = new Set(files.filter(f => f.visible_to_user).map(f => f.id))
+    if (next.has(fileId)) next.delete(fileId); else next.add(fileId)
+    // Optimista: refleja el cambio al instante
+    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, visible_to_user: next.has(fileId) } : f))
+    const res = await fetch(`/api/imports/${orderId}/files/visibility`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visible_ids: [...next] }),
+    })
+    if (!res.ok) { setError('No se pudo cambiar la visibilidad'); await load() }
+  }
 
   const remove = async (fileId: number) => {
     if (!await confirm({ title: 'Eliminar archivo', message: '¿Eliminar este archivo?', confirmText: 'Eliminar', danger: true })) return
@@ -118,7 +133,12 @@ export default function ImportFiles({ orderId, canEdit = true, onChange }: Props
   return (
     <div className="bg-white rounded-lg border shadow-sm p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs text-neutral-500">Archivos / Fotos ({files.length})</div>
+        <div className="text-xs text-neutral-500">
+          Archivos / Fotos ({files.length})
+          {canEdit && (
+            <span className="ml-2 text-[10px] text-neutral-400">👁 = visible al usuario normal</span>
+          )}
+        </div>
         {canEdit && (
           <label className="btn-secondary text-sm cursor-pointer">
             {busy ? 'Subiendo…' : '+ Archivo'}
@@ -200,6 +220,17 @@ export default function ImportFiles({ orderId, canEdit = true, onChange }: Props
                     title="Eliminar"
                     className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center hover:bg-red-600">
                     ✕
+                  </button>
+                )}
+                {canEdit && (
+                  <button onClick={() => toggleVisible(f.id)} disabled={busy}
+                    title={f.visible_to_user ? 'Visible para el usuario — clic para ocultar' : 'Oculta al usuario — clic para mostrar'}
+                    className={`absolute top-1 left-1 rounded-full w-5 h-5 text-[11px] font-bold transition flex items-center justify-center ${
+                      f.visible_to_user
+                        ? 'bg-green-600 text-white opacity-100'
+                        : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'
+                    }`}>
+                    {f.visible_to_user ? '👁' : '🚫'}
                   </button>
                 )}
                 {isImage(f.file_type) && (

@@ -113,6 +113,12 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [trkContName, setTrkContName]       = useState('')
   const [trkContId,   setTrkContId]         = useState<number | null>(null)
 
+  // Modal "fotos visibles al usuario" al pasar EN_IMPORTADOR_PAGAR → EN_CAMINO
+  type VisFile = { id: number; file_name: string; file_type: string | null; visible_to_user: boolean }
+  const [showVisModal, setShowVisModal] = useState(false)
+  const [visFiles,     setVisFiles]     = useState<VisFile[]>([])
+  const [visSel,       setVisSel]       = useState<Set<number>>(new Set())
+
   // Orden por columna (default: último movimiento, descendente)
   const [sort, setSort] = useState<SortState>({ key: 'updated_at', dir: 'desc' })
   const onSort = (key: string) => setSort(prev => toggleSort(prev, key))
@@ -125,7 +131,8 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (showIncNote)      { setShowIncNote(false); setIncNote('') }
+      if (showVisModal)     { setShowVisModal(false) }
+      else if (showIncNote) { setShowIncNote(false); setIncNote('') }
       else if (showPay)     { closePay() }
       else if (showReceive) { setShowReceive(false) }
       else if (showForm)    { setShowForm(false); setEditing(null) }
@@ -133,7 +140,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [showIncNote, showPay, showReceive, showForm, selected])
+  }, [showVisModal, showIncNote, showPay, showReceive, showForm, selected])
 
   // Contenedores activos (abiertos / en tránsito) para asignar una orden
   const loadActiveContainers = useCallback(async () => {
@@ -321,6 +328,36 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       extras.box_count     = bc
     }
     await callStatus({ status: nextStatus, ...extras })
+  }
+
+  // EN_IMPORTADOR_PAGAR → EN_CAMINO: antes de avanzar, validar envío/cajas y
+  // abrir el modal para elegir qué fotos verá el usuario normal (recién en
+  // EN_CAMINO la mercancía es visible para él). Las de pagos u otras quedan ocultas.
+  const openEnCaminoVisibility = async () => {
+    if (!selected) return
+    const sc = parseFloat(shippingInput)
+    const bc = parseInt(boxCountInput, 10)
+    if (!sc || sc <= 0) { setError('Costo de envío requerido'); return }
+    if (!bc || bc <= 0) { setError('Cantidad de cajas requerida'); return }
+    setError(null)
+    const r = await fetch(`/api/imports/${selected.id}/files`, { cache: 'no-store' })
+    const all: VisFile[] = r.ok ? await r.json() : []
+    setVisFiles(all)
+    setVisSel(new Set(all.filter(f => f.visible_to_user).map(f => f.id)))
+    setShowVisModal(true)
+  }
+
+  const confirmEnCamino = async () => {
+    if (!selected) return
+    setBusy(true)
+    const vr = await fetch(`/api/imports/${selected.id}/files/visibility`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visible_ids: [...visSel] }),
+    })
+    if (!vr.ok) { setBusy(false); setError('No se pudo guardar la visibilidad de fotos'); return }
+    setBusy(false)
+    setShowVisModal(false)
+    await advanceTo('EN_CAMINO')
   }
 
   const finalize = async (target: 'FINALIZADA' | 'INCONSISTENTE') => {
@@ -809,7 +846,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                           placeholder="Costo envío $" className="border rounded px-2 py-1 text-sm w-32" />
                         <input type="number" value={boxCountInput} onKeyDown={blockIntKeys} onChange={e => setBoxCountInput(e.target.value)}
                           placeholder="# cajas" className="border rounded px-2 py-1 text-sm w-24" />
-                        <button onClick={() => advanceTo('EN_CAMINO')} disabled={busy} className="btn-primary text-sm">
+                        <button onClick={openEnCaminoVisibility} disabled={busy} className="btn-primary text-sm">
                           En camino
                         </button>
                       </>
@@ -1042,6 +1079,66 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
               <button onClick={() => { setShowIncNote(false); setIncNote('') }} className="btn-secondary text-sm">Cancelar</button>
               <button onClick={() => finalize('INCONSISTENTE')} disabled={busy || !incNote.trim()} className="btn-danger text-sm">
                 Confirmar inconsistente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fotos visibles al usuario — al pasar a EN_CAMINO */}
+      {showVisModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b">
+              <h2 className="font-semibold">¿Qué fotos verá el usuario?</h2>
+              <p className="text-xs text-neutral-500 mt-1">
+                Marcá solo las fotos de la mercancía que el usuario normal debe ver en la recepción.
+                Las de pagos u otras internas dejalas sin marcar. Podés cambiarlo después con el 👁 en cada foto.
+              </p>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              {visFiles.length === 0 ? (
+                <div className="text-sm text-neutral-400 py-6 text-center">Esta orden no tiene archivos.</div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-3 text-xs">
+                    <span className="text-neutral-500">{visSel.size} de {visFiles.length} seleccionadas</span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setVisSel(new Set(visFiles.map(f => f.id)))} className="text-blue-600 hover:underline">Todas</button>
+                      <button onClick={() => setVisSel(new Set())} className="text-neutral-500 hover:underline">Ninguna</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {visFiles.map(f => {
+                      const on  = visSel.has(f.id)
+                      const img = (f.file_type || '').startsWith('image/')
+                      const src = `/api/imports/${selected?.id}/files/${f.id}/download`
+                      return (
+                        <button key={f.id} type="button"
+                          onClick={() => setVisSel(prev => { const n = new Set(prev); n.has(f.id) ? n.delete(f.id) : n.add(f.id); return n })}
+                          className={`relative rounded-lg overflow-hidden aspect-square border-2 transition ${on ? 'border-green-600 ring-2 ring-green-200' : 'border-neutral-200 opacity-70 hover:opacity-100'}`}>
+                          {img ? (
+                            <img src={src} alt={f.file_name} loading="lazy" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="w-full h-full flex flex-col items-center justify-center p-1 bg-neutral-50">
+                              <span className="text-2xl">📄</span>
+                              <span className="text-[9px] text-neutral-600 truncate w-full text-center">{f.file_name}</span>
+                            </span>
+                          )}
+                          <span className={`absolute top-1 left-1 rounded-full w-5 h-5 text-[11px] font-bold flex items-center justify-center ${on ? 'bg-green-600 text-white' : 'bg-black/40 text-white'}`}>
+                            {on ? '✓' : ''}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2 bg-neutral-50">
+              <button onClick={() => setShowVisModal(false)} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={confirmEnCamino} disabled={busy} className="btn-primary text-sm">
+                Pasar a En camino
               </button>
             </div>
           </div>

@@ -12,10 +12,16 @@ export async function GET(
   if (!session || !db) return unauthorized()
 
   const { rows: [file] } = await db.query(
-    `SELECT file_path, file_name, file_type FROM import_order_files WHERE id=$1 AND import_order_id=$2`,
+    `SELECT file_path, file_name, file_type, visible_to_user FROM import_order_files WHERE id=$1 AND import_order_id=$2`,
     [fileId, id]
   )
   if (!file) return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
+
+  // El usuario normal no puede descargar fotos no marcadas como visibles
+  // (p.ej. comprobantes de pago) aunque adivine la URL.
+  if (session.user.role !== 'admin' && !file.visible_to_user) {
+    return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
+  }
 
   // El file_path en DB puede venir roto entre entornos (ruta legacy /app/uploads,
   // backslashes, etc.). Resolver físicamente desde UPLOAD_DIR + orden + nombre.

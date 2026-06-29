@@ -16,22 +16,27 @@ export async function GET(
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
 
+  // El usuario normal solo ve las fotos que el admin marcó como visibles.
+  const isAdmin = session.user.role === 'admin'
+  const visClause = isAdmin ? '' : 'AND f.visible_to_user = TRUE'
+
   const { rows } = await db.query(`
     SELECT f.id, f.file_name, f.file_path, f.file_type,
-           f.file_size, f.uploaded_at, u.username AS uploaded_by
+           f.file_size, f.uploaded_at, f.visible_to_user, u.username AS uploaded_by
     FROM import_order_files f
     LEFT JOIN users u ON f.uploaded_by = u.id
-    WHERE f.import_order_id = $1
+    WHERE f.import_order_id = $1 ${visClause}
     ORDER BY f.uploaded_at DESC
   `, [id])
 
   return NextResponse.json(rows.map(r => ({
-    id:           r.id,
-    file_name:    r.file_name,
-    file_type:    r.file_type,
-    file_size_kb: r.file_size ? Math.round(r.file_size / 1024 * 10) / 10 : 0,
-    uploaded_at:  r.uploaded_at,
-    uploaded_by:  r.uploaded_by,
+    id:              r.id,
+    file_name:       r.file_name,
+    file_type:       r.file_type,
+    file_size_kb:    r.file_size ? Math.round(r.file_size / 1024 * 10) / 10 : 0,
+    uploaded_at:     r.uploaded_at,
+    uploaded_by:     r.uploaded_by,
+    visible_to_user: r.visible_to_user,
   })))
 }
 

@@ -39,9 +39,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!order) notFound()
 
   // Fotos adjuntas (solo imágenes) — importantes para verificar la recepción.
+  // El usuario normal solo ve las marcadas como visibles (no pagos ni internas).
+  const visClause = session.user.role === 'admin' ? '' : 'AND visible_to_user = TRUE'
   const { rows: files } = await db.query(
     `SELECT id, file_name FROM import_order_files
-     WHERE import_order_id = $1 AND COALESCE(file_type, '') LIKE 'image/%'
+     WHERE import_order_id = $1 AND COALESCE(file_type, '') LIKE 'image/%' ${visClause}
      ORDER BY id`,
     [id]
   )
