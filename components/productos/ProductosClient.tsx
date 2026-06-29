@@ -4,6 +4,7 @@ import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
 import { int } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { matchTokens } from '@/lib/search'
 import MlBreakdown from './MlBreakdown'
 
 // ─── helpers ────────────────────────────────────────────────────
@@ -396,10 +397,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     sortKey === k ? <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span> : null
 
   const filtered = useMemo(() => products.filter(p =>
-    !search ||
-    p.code.toLowerCase().includes(search.toLowerCase()) ||
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.category_name ?? '').toLowerCase().includes(search.toLowerCase())
+    matchTokens(search, p.code, p.name, p.category_name ?? '')
   ), [products, search])
 
   const sorted = useMemo(() => {
