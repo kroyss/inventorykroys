@@ -297,33 +297,29 @@ export async function getCapital(): Promise<Capital> {
   const mercanciaSale = mercanciaVE_sale + mercanciaCO_sale
 
   // ── Mercancía EN TRÁNSITO ──────────────────────────────────────────────
-  // Importaciones y compras pagadas que aún NO entraron al inventario (no se
-  // valuó "Mercancía"). Se cuenta lo efectivamente PAGADO (no el total), así:
-  //  · representa dinero ya invertido en mercancía que viene en camino,
-  //  · al bajar manualmente el saldo de la cuenta de donde salió → se neutraliza,
-  //  · al finalizar la orden pasa de "tránsito" a "Mercancía" sin contar doble
-  //    (las que cargan inventario —PARCIAL/FINALIZADA/INCONSISTENTE— se excluyen).
-  const NOT_LOADED = `status NOT IN ('PARCIAL','FINALIZADA','INCONSISTENTE')`
-  // Importaciones: pagos 50/100 en USD en ambos países
-  const impPaidSql = `
-    SELECT COALESCE(SUM(
-      CASE WHEN paid_50_done  THEN COALESCE(paid_50_amount,0)  ELSE 0 END +
-      CASE WHEN paid_100_done THEN COALESCE(paid_100_amount,0) ELSE 0 END
-    ),0)::float AS paid
-    FROM import_orders WHERE ${NOT_LOADED}`
-  // Compras locales: total_paid (VE en USD, CO en COP)
-  const purPaidSql = `
-    SELECT COALESCE(SUM(total_paid),0)::float AS paid
-    FROM purchase_orders WHERE order_type='local' AND total_paid > 0 AND ${NOT_LOADED}`
+  // Mercancía YA PAGADA al 100% que viene en camino y todavía no entró al
+  // inventario. Se cuenta el VALOR COMPLETO de la orden (total_usd), desde que
+  // pasa el pago total y en todos los estados siguientes, hasta que se finaliza
+  // (ahí carga inventario y pasa a "Mercancía", sin contar doble).
+  //   · Importaciones: desde PAGADA (100%) → En tránsito → Aduana → Importador
+  //     por pagar → En camino → Recibida. (Antes de PAGADA: 50% o sin pagar = NO.)
+  //   · Compras locales: desde PAGADA → En camino → Recibida.
+  // Se excluyen los estados que ya cargaron inventario (PARCIAL/FINALIZADA/INCONSISTENTE).
+  const IMP_TRANSITO = `status IN ('PAGADA','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR','EN_CAMINO','RECIBIDA')`
+  const PUR_TRANSITO = `status IN ('PAGADA','EN_CAMINO','RECIBIDA')`
+  // Importaciones: total_usd en USD en ambos países
+  const impSql = `SELECT COALESCE(SUM(total_usd),0)::float AS val FROM import_orders WHERE ${IMP_TRANSITO}`
+  // Compras locales: total_usd (VE en USD, CO en COP)
+  const purSql = `SELECT COALESCE(SUM(total_usd),0)::float AS val FROM purchase_orders WHERE order_type='local' AND ${PUR_TRANSITO}`
 
-  const impPaidVE = (await ve.query(impPaidSql)).rows[0].paid as number
-  const purPaidVE = (await ve.query(purPaidSql)).rows[0].paid as number
-  const impPaidCO = await coSafe(async db => (await db.query(impPaidSql)).rows[0].paid as number, 0)
-  const purPaidCO = await coSafe(async db => (await db.query(purPaidSql)).rows[0].paid as number, 0)
+  const impVE = (await ve.query(impSql)).rows[0].val as number
+  const purVE = (await ve.query(purSql)).rows[0].val as number
+  const impCO = await coSafe(async db => (await db.query(impSql)).rows[0].val as number, 0)
+  const purCO = await coSafe(async db => (await db.query(purSql)).rows[0].val as number, 0)
 
-  const transitoVE = impPaidVE + purPaidVE                // USD nativos
-  const transitoCO = impPaidCO                            // importación CO también en USD
-                   + toUsd(purPaidCO, 'COP', rates)       // compra local CO en pesos
+  const transitoVE = impVE + purVE                        // USD nativos
+  const transitoCO = impCO                                // importación CO también en USD
+                   + toUsd(purCO, 'COP', rates)           // compra local CO en pesos
   const transito = transitoVE + transitoCO
   // Estimado de venta de la mercancía en camino: al costo no tiene precio aún,
   // así que para el capital "a venta · potencial" se proyecta con un factor

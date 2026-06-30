@@ -342,7 +342,7 @@ export default function FinanzasClient() {
               <div className="text-sm">costo <span className="font-bold text-blue-700">${money(capital.transito)}</span></div>
               <div className="text-[10px] text-neutral-400">VE ${money(capital.transitoVE)} · CO ${money(capital.transitoCO)}</div>
               <div className="text-sm mt-0.5">venta <span className="font-bold text-green-700">${money(capital.transitoSale)}</span> <span className="text-[10px] text-neutral-400">est. ×{capital.transitoFactor}</span></div>
-              <div className="text-[10px] text-neutral-400">importac.+locales pagadas, sin recibir</div>
+              <div className="text-[10px] text-neutral-400">importac.+locales 100% pagadas, sin recibir</div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Liquidez</div>
@@ -354,7 +354,7 @@ export default function FinanzasClient() {
             </div>
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
-            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). <b>En tránsito</b> = lo ya pagado de importaciones <b>y</b> compras locales (VE + CO) que aún no recibís; al recibirlas/finalizarlas pasan a Mercancía (por eso no incluye las ya finalizadas, aunque sigan apareciendo pagadas en Compras). En el capital a costo va a su costo y en el potencial de venta se estima a <b>×{capital.transitoFactor}</b> (editable en Ajustes VE). Liquidez y deudas/reservas se aplican igual en ambos capitales.
+            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). <b>En tránsito</b> = valor de importaciones <b>y</b> compras locales (VE + CO) <b>100% pagadas</b> que aún no recibís (importaciones desde "Pagada/100%", locales desde "Pagada"). Al recibirlas/finalizarlas pasan a Mercancía (por eso no incluye las finalizadas ni las que están a 50% o sin pagar). En el capital a costo va a su costo y en el potencial de venta se estima a <b>×{capital.transitoFactor}</b> (editable en Ajustes VE). Liquidez y deudas/reservas se aplican igual en ambos capitales.
           </p>
 
           {/* Tasas automáticas (solo lectura) */}
