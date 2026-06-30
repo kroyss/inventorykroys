@@ -22,7 +22,11 @@ export async function GET(_: NextRequest) {
           pc.name                                        AS categoria,
           pc.profit_percentage                           AS categoria_pct,
           pc.color                                       AS categoria_color,
-          COALESCE(v6m.ventas_6m, 0)                     AS ventas_6m
+          COALESCE(v6m.ventas_6m, 0)                     AS ventas_6m,
+          -- "Disponible desde": primera llegada al inventario (primer movimiento IN),
+          -- o la creación del producto si no hay movimientos. Sirve para no tratar
+          -- como remate a lo que recién llegó y aún no tuvo tiempo de venderse.
+          COALESCE(fin.first_in, p.created_at)           AS disponible_desde
         FROM products p
         LEFT JOIN inventory i ON p.id = i.product_id
         LEFT JOIN product_pricing pp ON p.id = pp.product_id
@@ -35,6 +39,12 @@ export async function GET(_: NextRequest) {
             AND s.created_at >= NOW() - INTERVAL '6 months'
           GROUP BY si.product_id
         ) v6m ON v6m.product_id = p.id
+        LEFT JOIN (
+          SELECT product_id, MIN(created_at) AS first_in
+          FROM inventory_movements
+          WHERE movement_type = 'IN'
+          GROUP BY product_id
+        ) fin ON fin.product_id = p.id
         WHERE p.is_active = TRUE
         ORDER BY p.code ASC
       `),
@@ -70,16 +80,29 @@ export async function GET(_: NextRequest) {
 
     const reposicion: any[] = []
     const remate:     any[] = []
+    const nuevos:     any[] = []
 
     // Umbral de cobertura: la importación tarda ~4 meses en llegar.
     const LEAD_MONTHS   = 4   // por debajo de esto, hay que reponer
     const URGENT_MONTHS = 2   // por debajo de esto (incluso con tránsito), es urgente
     const TARGET_MONTHS = 6   // objetivo de cobertura al pedir
+    const NEW_GRACE_MONTHS = 3 // recién llegados: período de prueba antes de juzgarlos
 
+    const now = Date.now()
     for (const r of products) {
       const stock        = parseInt(r.stock_actual, 10) || 0
       const ventas6m     = parseInt(r.ventas_6m, 10) || 0
-      const ventaMensual = Math.round((ventas6m / 6) * 10) / 10
+
+      // Antigüedad desde que el producto llegó por primera vez al inventario.
+      const desde        = r.disponible_desde ? new Date(r.disponible_desde).getTime() : now
+      const mesesDisp    = Math.max(0, Math.round((now - desde) / (1000 * 60 * 60 * 24 * 30.44) * 10) / 10)
+      const esNuevo      = mesesDisp < NEW_GRACE_MONTHS
+
+      // Tasa de venta JUSTA: dividir por los meses que el producto estuvo disponible
+      // (entre 1 y 6), no siempre por 6. Así un recién llegado que vende bien no
+      // queda subestimado, ni uno nuevo sin ventas se confunde con remate.
+      const divisorMeses = Math.min(6, Math.max(1, mesesDisp))
+      const ventaMensual = Math.round((ventas6m / divisorMeses) * 10) / 10
       const enTransito   = (transitLocal[r.id] ?? 0) + (transitImport[r.id] ?? 0)
       const cost         = (parseFloat(r.cost) || 0) * costFactor
       const salePrice    = parseFloat(r.sale_price) || 0
@@ -114,11 +137,15 @@ export async function GET(_: NextRequest) {
         cobertura_total:  coberturaTotal,
         en_transito:      enTransito,
         sugerido_comprar: sugerido,
+        meses_disponible: mesesDisp,        // antigüedad desde la primera llegada
+        es_nuevo:         esNuevo,
       }
 
-      // Remate: rotación muy baja con stock parado.
-      if (ventas6m < 6 && stock > 0) {
-        remate.push(base)
+      // Rotación muy baja con stock parado (≈ < 1 venta/mes según su antigüedad).
+      if (ventaMensual < 1 && stock > 0) {
+        // Si recién llegó, no es remate: aún no tuvo tiempo de venderse → "Nuevos".
+        if (esNuevo) nuevos.push(base)
+        else         remate.push(base)
         continue
       }
 
@@ -147,6 +174,8 @@ export async function GET(_: NextRequest) {
     return NextResponse.json({
       reposicion,
       remate: remate.sort((a, b) => a.ventas_6m - b.ventas_6m),
+      // Recién llegados (en período de prueba): no se juzgan como remate todavía.
+      nuevos: nuevos.sort((a, b) => a.meses_disponible - b.meses_disponible),
     })
   } catch (err) {
     return apiError(err)

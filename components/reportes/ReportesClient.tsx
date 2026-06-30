@@ -30,7 +30,7 @@ export default function ReportesClient() {
   const [search,   setSearch]   = useState('')
 
   // Stock subtab
-  const [stockSub, setStockSub] = useState<'reposicion' | 'remate'>('reposicion')
+  const [stockSub, setStockSub] = useState<'reposicion' | 'remate' | 'nuevos'>('reposicion')
   // Top params
   const [topN,       setTopN]       = useState(10)
   const [topOrderBy, setTopOrderBy] = useState<'qty' | 'ganancia' | 'margen'>('qty')
@@ -48,7 +48,7 @@ export default function ReportesClient() {
     const t = params.get('tab')
     if (t && ['ventas', 'compras', 'inventario', 'stock', 'top', 'transito'].includes(t)) setTab(t as Tab)
     const s = params.get('sub')
-    if (s === 'remate' || s === 'reposicion') setStockSub(s)
+    if (s === 'remate' || s === 'reposicion' || s === 'nuevos') setStockSub(s)
   }, [])
 
   useEffect(() => { load() }, [tab, dateFrom, dateTo, topN, topOrderBy, topCat])
@@ -362,19 +362,27 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
     return l
   }, [all, hideCovered, sortKey, sortDir])
 
-  if (sub === 'remate') {
+  if (sub === 'remate' || sub === 'nuevos') {
     const cols: Column<any>[] = [
       { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
       { key: 'name', label: 'Producto', sortValue: p => p.name },
       { key: 'stock_actual', label: 'Stock', align: 'right', sortValue: p => p.stock_actual },
       { key: 'ventas_6m', label: 'Ventas 6m', align: 'right', sortValue: p => p.ventas_6m },
       { key: 'venta_mensual', label: 'V. mensual', align: 'right', sortValue: p => p.venta_mensual },
+      { key: 'meses_disponible', label: 'Antigüedad', align: 'right', render: p => `${p.meses_disponible} m`, sortValue: p => p.meses_disponible },
       { key: 'meses_duracion', label: 'Duración', align: 'right', render: p => `${p.meses_duracion} m`, sortValue: p => p.meses_duracion },
     ]
+    const rows = sub === 'nuevos' ? (data.nuevos ?? []) : data.remate
     return (
       <div className="space-y-3">
         <SubTabs sub={sub} setSub={setSub} data={data} />
-        <DataTable columns={cols} rows={data.remate} exportName="stock_remate" emptyText="Sin productos" />
+        {sub === 'nuevos' && (
+          <p className="text-xs text-neutral-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            🆕 Recién llegados (menos de 3 meses en inventario). Tienen pocas ventas porque aún
+            no tuvieron tiempo de exposición, por eso <b>no</b> se cuentan como remate todavía.
+          </p>
+        )}
+        <DataTable columns={cols} rows={rows} exportName={sub === 'nuevos' ? 'stock_nuevos' : 'stock_remate'} emptyText="Sin productos" />
       </div>
     )
   }
@@ -519,7 +527,8 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
   )
 }
 
-function SubTabs({ sub, setSub, data }: { sub: 'reposicion' | 'remate'; setSub: (s: 'reposicion' | 'remate') => void; data: any }) {
+type StockSub = 'reposicion' | 'remate' | 'nuevos'
+function SubTabs({ sub, setSub, data }: { sub: StockSub; setSub: (s: StockSub) => void; data: any }) {
   return (
     <div className="flex gap-2">
       <button onClick={() => setSub('reposicion')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'reposicion' ? 'bg-orange-500 text-white' : 'bg-neutral-100'}`}>
@@ -527,6 +536,9 @@ function SubTabs({ sub, setSub, data }: { sub: 'reposicion' | 'remate'; setSub: 
       </button>
       <button onClick={() => setSub('remate')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'remate' ? 'bg-red-500 text-white' : 'bg-neutral-100'}`}>
         Remate ({data.remate.length})
+      </button>
+      <button onClick={() => setSub('nuevos')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'nuevos' ? 'bg-blue-500 text-white' : 'bg-neutral-100'}`}>
+        Nuevos ({(data.nuevos ?? []).length})
       </button>
     </div>
   )
