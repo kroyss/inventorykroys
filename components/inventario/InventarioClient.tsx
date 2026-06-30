@@ -232,7 +232,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
     { val: 'SIN_STOCK', label: 'Sin stock',    count: counts.SIN_STOCK },
     { val: 'BAJO',      label: 'Stock bajo',   count: counts.BAJO,     adminOnly: true },
     { val: 'OK',        label: 'En nivel',     count: counts.OK,       adminOnly: true },
-    { val: 'INACTIVO',  label: 'Inactivos',    count: counts.INACTIVO },
+    // Inactivos ya no se listan en Inventario (solo en Productos).
   ]
 
   const th = (key: SortKey, label: string, align: 'left' | 'right' | 'center' = 'left') => (

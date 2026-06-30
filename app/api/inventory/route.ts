@@ -29,6 +29,8 @@ const INVENTORY_SQL = `
     LEFT JOIN product_pricing pp  ON p.id = pp.product_id
     LEFT JOIN profit_categories pc ON pc.id = pp.profit_category_id
     LEFT JOIN inventory       inv ON p.id = inv.product_id
+    -- Los productos desactivados solo se ven en el listado de Productos, no en Inventario.
+    WHERE p.is_active = TRUE
   )
   SELECT
     *,

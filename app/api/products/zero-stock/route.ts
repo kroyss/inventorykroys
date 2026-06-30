@@ -18,6 +18,7 @@ export async function GET(_: NextRequest) {
     LEFT JOIN inventory i          ON i.product_id = p.id
     LEFT JOIN product_pricing pp   ON pp.product_id = p.id
     WHERE COALESCE(i.quantity, 0) = 0
+      AND p.is_active = TRUE
     ORDER BY p.name
   `)
 
