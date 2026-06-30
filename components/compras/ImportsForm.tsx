@@ -19,7 +19,8 @@ interface ProductRow {
   id: number
   code: string
   name: string
-  total_cost?: number
+  base_cost?: number   // costo del producto (lo que se paga al proveedor, sin envío)
+  total_cost?: number  // base + envío estimado (NO se usa para importaciones)
 }
 
 interface Props {
@@ -70,8 +71,9 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
 
   const addItem = (p: ProductRow) => {
     if (items.some(i => i.product_id === p.id)) return
-    // Pre-llena con el costo registrado del producto (editable).
-    setItems([...items, { product_id: p.id, product_name: p.name, product_code: p.code, quantity: 1, unit_cost_usd: p.total_cost ?? 0 }])
+    // Pre-llena con el COSTO DE PRODUCTO (base, sin envío), que es lo que se le
+    // paga al proveedor. El envío de la importación se registra aparte. Editable.
+    setItems([...items, { product_id: p.id, product_name: p.name, product_code: p.code, quantity: 1, unit_cost_usd: p.base_cost ?? 0 }])
     setSearch('')
   }
 
@@ -198,8 +200,8 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
                       <span className="font-mono text-xs text-neutral-400 mr-2">{p.code}</span>
                       {p.name}
                     </span>
-                    {(p.total_cost ?? 0) > 0 && (
-                      <span className="text-neutral-400 whitespace-nowrap">${fmt(p.total_cost!)}</span>
+                    {(p.base_cost ?? 0) > 0 && (
+                      <span className="text-neutral-400 whitespace-nowrap">${fmt(p.base_cost!)}</span>
                     )}
                   </div>
                 ))}
