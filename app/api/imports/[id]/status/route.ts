@@ -123,7 +123,7 @@ export async function PUT(
             UPDATE import_orders
             SET paid_50_done=FALSE, paid_50_at=NULL, paid_50_amount=NULL,
                 paid_100_done=FALSE, paid_100_at=NULL, paid_100_amount=NULL,
-                tracking_number=NULL, shipping_cost=NULL, box_count=NULL
+                tracking_number=NULL, shipping_cost=NULL, box_count=NULL, shipping_paid_at=NULL
             WHERE id=$1
           `, [id])
         }
@@ -158,7 +158,7 @@ export async function PUT(
           // Also reset shipping/tracking for RECIBIDA
           if (current === 'RECIBIDA') {
             await db.query(
-              `UPDATE import_orders SET shipping_cost=NULL, box_count=NULL, tracking_number=NULL WHERE id=$1`, [id]
+              `UPDATE import_orders SET shipping_cost=NULL, box_count=NULL, tracking_number=NULL, shipping_paid_at=NULL WHERE id=$1`, [id]
             )
           }
         }
@@ -217,7 +217,7 @@ export async function PUT(
         vals.push(body.container_id)
       }
       if (newStatus === 'EN_CAMINO') {
-        extra.push(`shipping_cost=$${vals.length + 1}`, `box_count=$${vals.length + 2}`)
+        extra.push(`shipping_cost=$${vals.length + 1}`, `box_count=$${vals.length + 2}`, `shipping_paid_at=NOW()`)
         vals.push(body.shipping_cost, body.box_count)
       }
       if (body.photos_notes) {

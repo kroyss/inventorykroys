@@ -83,6 +83,11 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
   const impVE = (await ve.query(impSql, [month])).rows[0].t as number
   const impCO = await coSafe(async db => (await db.query(impSql, [month])).rows[0].t as number, 0)
 
+  // Envíos de importación (auto) = flete pagado en el mes (shipping_paid_at). USD.
+  const shipSql = `SELECT COALESCE(SUM(shipping_cost),0)::float AS t FROM import_orders WHERE COALESCE(shipping_cost,0) > 0 AND to_char(shipping_paid_at,'YYYY-MM')=$1`
+  const shipVE = (await ve.query(shipSql, [month])).rows[0].t as number
+  const shipCO = await coSafe(async db => (await db.query(shipSql, [month])).rows[0].t as number, 0)
+
   // Movimientos manuales por categoría/moneda/país (en VE maestra)
   const { rows: mov } = await ve.query(`
     SELECT COALESCE(c.name,'Sin categoría') AS category, m.kind, m.currency, m.country,
@@ -109,6 +114,8 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
   add(expenseMap, 'Compras locales', purchVE, 've'); add(expenseMap, 'Compras locales', toUsd(purchCO, 'COP', rates), 'co')
   // Importaciones se pagan en USD en ambos países (no se convierten desde COP)
   add(expenseMap, 'Importaciones', impVE, 've'); add(expenseMap, 'Importaciones', impCO, 'co')
+  // Envíos de importación (flete) — gasto del mes, USD
+  add(expenseMap, 'Envíos de importación', shipVE, 've'); add(expenseMap, 'Envíos de importación', shipCO, 'co')
 
   // Manuales (por su etiqueta de país; sin país → other)
   for (const r of mov) {
@@ -211,6 +218,28 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
   }
   pushImp((await ve.query(impSql, [month])).rows, 'VE', 'USD')
   pushImp(await coSafe(async db => (await db.query(impSql, [month])).rows, []), 'CO', 'USD')
+
+  // ── Envíos de importación (auto, una fila por flete pagado en el mes) ──
+  const shipSql = `
+    SELECT io.id, io.order_number, s.name AS supplier, io.shipping_cost::float AS amt,
+           to_char(io.shipping_paid_at,'YYYY-MM-DD') AS dt
+    FROM import_orders io LEFT JOIN suppliers s ON s.id = io.supplier_id
+    WHERE COALESCE(io.shipping_cost,0) > 0 AND to_char(io.shipping_paid_at,'YYYY-MM') = $1
+    ORDER BY io.shipping_paid_at`
+  const pushShip = (list: Array<Record<string, unknown>>, country: 'VE' | 'CO') => {
+    for (const p of list) {
+      const amt = (p.amt as number) ?? 0
+      if (!amt) continue
+      rows.push({
+        key: `ship-${country.toLowerCase()}-${p.id}`, id: null, date: (p.dt as string | null),
+        description: `${p.order_number}${p.supplier ? ' · ' + p.supplier : ''} · Envío`,
+        category_name: 'Envíos de importación', account_name: null, category_id: null, account_id: null,
+        kind: 'expense', amount: amt, currency: 'USD', usd: amt, country, source: 'auto',
+      })
+    }
+  }
+  pushShip((await ve.query(shipSql, [month])).rows, 'VE')
+  pushShip(await coSafe(async db => (await db.query(shipSql, [month])).rows, []), 'CO')
 
   // ── Movimientos manuales (en VE maestra) ──
   const { rows: mov } = await ve.query(`
