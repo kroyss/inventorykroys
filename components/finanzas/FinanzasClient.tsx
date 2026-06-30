@@ -38,7 +38,7 @@ interface Capital {
   mercanciaCO_cost_cop: number; mercanciaCO_sale_cop: number
   mercanciaCO_cost: number; mercanciaCO_sale: number
   mercanciaCost: number; mercanciaSale: number
-  transito: number; transitoSale: number; transitoFactor: number
+  transito: number; transitoVE: number; transitoCO: number; transitoSale: number; transitoFactor: number
   accounts: CapAccount[]; liquidez: number; reservas: number
   totalCost: number; totalSale: number
 }
@@ -340,8 +340,9 @@ export default function FinanzasClient() {
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Mercancía en tránsito</div>
               <div className="text-sm">costo <span className="font-bold text-blue-700">${money(capital.transito)}</span></div>
-              <div className="text-sm">venta <span className="font-bold text-green-700">${money(capital.transitoSale)}</span> <span className="text-[10px] text-neutral-400">est. ×{capital.transitoFactor}</span></div>
-              <div className="text-[10px] text-neutral-400">pagadas, sin recibir</div>
+              <div className="text-[10px] text-neutral-400">VE ${money(capital.transitoVE)} · CO ${money(capital.transitoCO)}</div>
+              <div className="text-sm mt-0.5">venta <span className="font-bold text-green-700">${money(capital.transitoSale)}</span> <span className="text-[10px] text-neutral-400">est. ×{capital.transitoFactor}</span></div>
+              <div className="text-[10px] text-neutral-400">importac.+locales pagadas, sin recibir</div>
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Liquidez</div>
@@ -353,7 +354,7 @@ export default function FinanzasClient() {
             </div>
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
-            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). <b>En tránsito</b> = lo ya pagado de importaciones/compras que aún no recibís (al recibirlas pasan a Mercancía); en el capital a costo va a su costo y en el potencial de venta se estima a <b>×{capital.transitoFactor}</b> (editable en Ajustes VE). Liquidez y deudas/reservas se aplican igual en ambos capitales.
+            Mercancía a <b>costo</b> = inventario por su costo · a <b>venta</b> = inventario por su precio de venta (valor potencial si se vende todo). <b>En tránsito</b> = lo ya pagado de importaciones <b>y</b> compras locales (VE + CO) que aún no recibís; al recibirlas/finalizarlas pasan a Mercancía (por eso no incluye las ya finalizadas, aunque sigan apareciendo pagadas en Compras). En el capital a costo va a su costo y en el potencial de venta se estima a <b>×{capital.transitoFactor}</b> (editable en Ajustes VE). Liquidez y deudas/reservas se aplican igual en ambos capitales.
           </p>
 
           {/* Tasas automáticas (solo lectura) */}

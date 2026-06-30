@@ -486,7 +486,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     valorActivo: orders
       .filter(o => !['FINALIZADA'].includes(o.status))
       .reduce((s, o) => s + (o.total_usd || 0), 0),
-    totalPagado: orders.reduce((s, o) => s + (o.total_paid || 0), 0),
+    // Acompaña a "Valor activo": solo órdenes activas (sin finalizadas).
+    totalPagado: orders
+      .filter(o => !['FINALIZADA'].includes(o.status))
+      .reduce((s, o) => s + (o.total_paid || 0), 0),
   }
 
   // Finalizadas/Inconsistentes ya no van en chips: viven en la pestaña Historial.

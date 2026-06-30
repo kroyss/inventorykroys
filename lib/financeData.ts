@@ -257,6 +257,7 @@ export interface Capital {
   mercanciaCO_cost: number;  mercanciaCO_sale: number
   mercanciaCost: number;     mercanciaSale: number      // VE+CO consolidado USD
   transito: number           // USD a costo: importaciones/compras pagadas aún no recibidas
+  transitoVE: number; transitoCO: number  // desglose del tránsito por país (USD a costo)
   transitoSale: number       // USD estimado de venta de ese tránsito (× factor)
   transitoFactor: number     // factor de venta del tránsito (editable, default 1.4)
   accounts: CapitalAccount[]
@@ -320,9 +321,10 @@ export async function getCapital(): Promise<Capital> {
   const impPaidCO = await coSafe(async db => (await db.query(impPaidSql)).rows[0].paid as number, 0)
   const purPaidCO = await coSafe(async db => (await db.query(purPaidSql)).rows[0].paid as number, 0)
 
-  const transito = impPaidVE + purPaidVE                 // USD nativos
-                 + impPaidCO                             // importación CO también en USD
-                 + toUsd(purPaidCO, 'COP', rates)        // compra local CO en pesos
+  const transitoVE = impPaidVE + purPaidVE                // USD nativos
+  const transitoCO = impPaidCO                            // importación CO también en USD
+                   + toUsd(purPaidCO, 'COP', rates)       // compra local CO en pesos
+  const transito = transitoVE + transitoCO
   // Estimado de venta de la mercancía en camino: al costo no tiene precio aún,
   // así que para el capital "a venta · potencial" se proyecta con un factor
   // editable desde Ajustes VE (app_settings.transito_sale_factor). Default 1.4 (+40%).
@@ -349,7 +351,7 @@ export async function getCapital(): Promise<Capital> {
     mercanciaCO_cost_cop, mercanciaCO_sale_cop,
     mercanciaCO_cost, mercanciaCO_sale,
     mercanciaCost, mercanciaSale,
-    transito, transitoSale, transitoFactor,
+    transito, transitoVE, transitoCO, transitoSale, transitoFactor,
     accounts, liquidez, reservas,
     totalCost: mercanciaCost + transito     + liquidez - reservas,  // tránsito a costo
     totalSale: mercanciaSale + transitoSale + liquidez - reservas,  // tránsito ×1.4 (estimado)

@@ -555,7 +555,9 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     enTransito: orders.filter(o => ['EN_TRANSITO', 'ADUANA', 'EN_IMPORTADOR_PAGAR', 'EN_CAMINO'].includes(o.status)).length,
     porRecibir: orders.filter(o => ['RECIBIDA', 'PARCIAL'].includes(o.status)).length,
     valorActivo: orders.filter(o => !['FINALIZADA'].includes(o.status)).reduce((s, o) => s + (o.total_usd || 0), 0),
-    pagado: orders.reduce((s, o) => s + (o.paid_50_amount || 0) + (o.paid_100_amount || 0), 0),
+    // "Pagado" debe acompañar a "Valor activo": solo de órdenes activas (sin finalizadas),
+    // si no se infla con pagos de importaciones ya recibidas.
+    pagado: orders.filter(o => !['FINALIZADA'].includes(o.status)).reduce((s, o) => s + (o.paid_50_amount || 0) + (o.paid_100_amount || 0), 0),
   }
 
   return (
