@@ -550,14 +550,22 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   }
 
   // ── KPIs (imports) ──
+  // "Pagado" por ESTADO (no por montos tecleados, que muchas veces quedan vacíos
+  // aunque la orden esté "Pagada 100%"): 100%-pagada o posterior → total de la
+  // orden; en 50% (parcial/esperando fotos) → mitad (o el monto del 50% si existe).
+  const PAID_100 = ['PAGADA', 'EN_TRANSITO', 'ADUANA', 'EN_IMPORTADOR_PAGAR', 'EN_CAMINO', 'RECIBIDA', 'PARCIAL', 'INCONSISTENTE']
+  const PAID_50  = ['PAGO_PARCIAL', 'ESPERANDO_FOTOS']
+  const paidOf = (o: ImportOrder) =>
+    PAID_100.includes(o.status) ? (o.total_usd || 0)
+    : PAID_50.includes(o.status) ? (o.paid_50_amount || (o.total_usd || 0) * 0.5)
+    : 0
   const kpis = {
     porPagar:   orders.filter(o => ['PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS'].includes(o.status)).length,
     enTransito: orders.filter(o => ['EN_TRANSITO', 'ADUANA', 'EN_IMPORTADOR_PAGAR', 'EN_CAMINO'].includes(o.status)).length,
     porRecibir: orders.filter(o => ['RECIBIDA', 'PARCIAL'].includes(o.status)).length,
     valorActivo: orders.filter(o => !['FINALIZADA'].includes(o.status)).reduce((s, o) => s + (o.total_usd || 0), 0),
-    // "Pagado" debe acompañar a "Valor activo": solo de órdenes activas (sin finalizadas),
-    // si no se infla con pagos de importaciones ya recibidas.
-    pagado: orders.filter(o => !['FINALIZADA'].includes(o.status)).reduce((s, o) => s + (o.paid_50_amount || 0) + (o.paid_100_amount || 0), 0),
+    // Acompaña a "Valor activo": solo órdenes activas (sin finalizadas).
+    pagado: orders.filter(o => !['FINALIZADA'].includes(o.status)).reduce((s, o) => s + paidOf(o), 0),
   }
 
   return (
