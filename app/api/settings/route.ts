@@ -5,7 +5,7 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 
 // Claves permitidas (parámetros de costos ML por país). Evita escrituras arbitrarias.
 const ALLOWED = new Set([
-  'ml_comision', 'ml_envio', 'ml_umbral',            // VE
+  'ml_comision', 'ml_envio', 'ml_umbral', 'ml_descuento', // VE (ml_descuento = descuento manual global)
   'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten', // CO
   'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)
 ])

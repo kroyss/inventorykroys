@@ -35,6 +35,7 @@ export default function TasasClient() {
   const [veComision, setVeComision] = useState('12')    // % comisión ML
   const [veEnvio,    setVeEnvio]     = useState('0.65')  // $ envío por venta
   const [veUmbral,   setVeUmbral]    = useState('5')     // envío gratis aplica desde $5
+  const [veDescuento, setVeDescuento] = useState('')     // descuento manual GLOBAL (vacío = usa el recomendado)
   const [transitoFactor, setTransitoFactor] = useState('1.4') // Finanzas: factor venta mercancía en tránsito
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState<string | null>(null)
@@ -73,6 +74,7 @@ export default function TasasClient() {
       if (s.ml_comision) setVeComision(String(s.ml_comision))
       if (s.ml_envio)    setVeEnvio(String(s.ml_envio))
       if (s.ml_umbral)   setVeUmbral(String(s.ml_umbral))
+      if (s.ml_descuento != null && s.ml_descuento !== '') setVeDescuento(String(s.ml_descuento))
       if (s.transito_sale_factor) setTransitoFactor(String(s.transito_sale_factor))
     }
   }
@@ -153,6 +155,23 @@ export default function TasasClient() {
     loadAll()
   }
 
+  // Descuento manual GLOBAL: se aplica a TODOS los productos VE. Vacío = usa el recomendado.
+  const saveDescuento = async () => {
+    const d = veDescuento.trim() === '' ? '' : parseFloat(veDescuento)
+    if (d !== '' && (isNaN(d as number) || (d as number) < 0 || (d as number) > 99)) {
+      setError('El descuento debe estar entre 0 y 99 (o vacío para usar el recomendado)'); return
+    }
+    setBusy(true); setError(null); setOkMsg(null)
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ml_descuento: String(d) }),
+    })
+    setBusy(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
+    setOkMsg(d === '' ? 'Descuento manual quitado (usa el recomendado)' : 'Descuento manual actualizado')
+    setTimeout(() => setOkMsg(null), 2500)
+  }
+
   if (!latest) return <div className="p-8 text-neutral-500">Cargando…</div>
 
   // chart data (chronological) — solo los últimos 30 para que sea legible
@@ -229,6 +248,23 @@ export default function TasasClient() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Config Descuento ML (manual GLOBAL) — se aplica a TODOS los productos */}
+        <div className="border-l border-neutral-200 pl-4">
+          <label className="text-[11px] text-neutral-500 block mb-1" title="Descuento general aplicado a TODOS los productos. Si lo dejás vacío, se usa el recomendado.">Config Descuento ML</label>
+          <div className="flex items-end gap-2">
+            <input type="number" step="0.1" min={0} max={99} value={veDescuento} onChange={e => setVeDescuento(e.target.value)}
+              placeholder={`${latest.recommended_discount}`}
+              className="w-20 border rounded px-2 py-1.5 text-sm" />
+            <button onClick={saveDescuento} disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">Actualizar</button>
+            <div className="text-sm leading-tight">
+              <div className="text-[11px] text-neutral-500">Recomendado</div>
+              <div className="font-bold text-blue-600">{latest.recommended_discount}%</div>
+            </div>
+          </div>
+          <p className="text-[10px] text-neutral-400 mt-1">Vacío = usa el recomendado</p>
         </div>
       </div>
 

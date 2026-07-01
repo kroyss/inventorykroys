@@ -60,18 +60,25 @@ function calcPrices(
 function liveBaseVE(p: { total_cost: number; profit_percentage: number }): number {
   return p.total_cost * (1 + (p.profit_percentage ?? 0) / 100)
 }
-function liveFinalVE(p: { total_cost: number; profit_percentage: number; discount_percent: number }, excess: number): number {
-  return liveBaseVE(p) * (1 + excess / 100) * (1 - (p.discount_percent ?? 0) / 100)
+// El descuento aplicado es GLOBAL (config en Ajustes); si no se pasa, cae al del producto.
+function liveFinalVE(p: { total_cost: number; profit_percentage: number; discount_percent: number }, excess: number, discount?: number): number {
+  const d = discount ?? p.discount_percent ?? 0
+  return liveBaseVE(p) * (1 + excess / 100) * (1 - d / 100)
 }
 // Precio publicado en ML = base × (1 + exceso), antes del descuento.
 function livePublishedVE(p: { total_cost: number; profit_percentage: number }, excess: number): number {
   return liveBaseVE(p) * (1 + excess / 100)
 }
+// Descuento recomendado VE (depende solo de exceso + tasas; la base se cancela).
+function recDiscountVE(rate: VeRate | null): number {
+  if (!rate || !(rate.parallel > rate.official) || !(rate.official > 0)) return 0
+  return Math.max(0, (1 - (1.05 * rate.parallel) / ((1 + (rate.excess ?? 0) / 100) * rate.official)) * 100)
+}
 
 function mlNetFor(
   country: Country,
   p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number },
-  veRate: VeRate | null, coTrm: number, ml: Record<string, string>,
+  veRate: VeRate | null, coTrm: number, ml: Record<string, string>, discount?: number,
 ): { ganancia: number; margen: number; pesos: boolean } | null {
   const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
   if (country === 'CO') {
@@ -87,7 +94,7 @@ function mlNetFor(
   // la calculadora — así no se desincroniza con el final_price_usd guardado (que queda viejo
   // cuando cambia el exceso o no se re-guardó el producto).
   if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0)) return null
-  const finalLive = liveFinalVE(p, veRate.excess ?? 0)
+  const finalLive = liveFinalVE(p, veRate.excess ?? 0, discount)
   if (!(finalLive > 0)) return null
   const realUsd  = finalLive * veRate.official / veRate.parallel
   const envio    = num('ml_envio', 0.65) * Math.min(1, finalLive / num('ml_umbral', 5))
@@ -201,12 +208,19 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   // derived calculator values
   const selectedCat = profitCategories.find(c => c.id === form.profit_category_id)
   const profitPct   = selectedCat?.profit_percentage ?? 0
+  // Descuento GLOBAL efectivo (VE): el manual de Ajustes (ml_descuento) o, si está vacío, el recomendado.
+  const recDiscountLive = recDiscountVE(veRate)
+  const globalDiscount  = (() => {
+    const raw = mlSettings.ml_descuento
+    const n = raw == null || raw === '' ? NaN : parseFloat(raw)
+    return isNaN(n) ? recDiscountLive : n
+  })()
   const {
     totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd,
-    recDiscount,
   } = calcPrices(
-    // publicado = derivado del precio sugerido ML (no input suelto), igual que legacy
-    form.base_cost, form.shipping_cost, profitPct, veRate, undefined, form.discount_percent
+    // publicado = derivado del precio sugerido ML (no input suelto), igual que legacy.
+    // El descuento es el GLOBAL (config en Ajustes), no un input por producto.
+    form.base_cost, form.shipping_cost, profitPct, veRate, undefined, globalDiscount
   )
   const spread  = veRate && veRate.official > 0 ? (veRate.parallel - veRate.official) / veRate.official * 100 : 0
   const priceBs = finalPriceUsd * (veRate?.official ?? 0)
@@ -283,7 +297,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         base_price_usd:      isCO ? 0 : basePriceUsd,
         published_price_usd: isCO ? 0 : publishedPriceUsd,
         final_price_usd:     isCO ? 0 : finalPriceUsd,
-        discount_percent:    isCO ? 0 : form.discount_percent,
+        discount_percent:    isCO ? 0 : globalDiscount,
         // VE: el precio de inventario sigue al Precio Base (USD). CO: pesos del input.
         sale_price:          isCO ? form.sale_price : basePriceUsd,
       }
@@ -402,7 +416,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
-    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings)?.margen ?? -Infinity
+    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings, globalDiscount)?.margen ?? -Infinity
     const valueFor = (p: Product): number | string => {
       switch (sortKey) {
         case 'code':     return p.code
@@ -422,7 +436,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       return String(va).localeCompare(String(vb))
     })
     return sortDir === 'desc' ? arr.reverse() : arr
-  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings])
+  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings, globalDiscount])
 
   const isSearching = search.trim().length > 0
   const displayed   = isSearching ? sorted : sorted.slice(0, visible)
@@ -564,7 +578,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </tr>
               )}
               {displayed.map(p => {
-                const net = mlNetFor(country, p, veRate, coTrm, mlSettings)
+                const net = mlNetFor(country, p, veRate, coTrm, mlSettings, globalDiscount)
                 return (
                 <tr key={p.id} onClick={() => openView(p.id)}
                   className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
@@ -832,31 +846,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                   {country === 'VE' ? (
                     <>
-                      {/* Descuento ML */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs font-medium text-neutral-700">
-                            Descuento ML: <b>{form.discount_percent.toFixed(1)}%</b>
-                          </label>
-                          {recDiscount > 0 && (
-                            <button type="button"
-                              onClick={() => setForm(f => ({ ...f, discount_percent: Math.round(recDiscount * 10) / 10 }))}
-                              className="text-[11px] text-blue-600 hover:underline">
-                              Rec: {recDiscount.toFixed(1)}%
-                            </button>
-                          )}
+                      {/* Descuento ML — GLOBAL (se configura en Ajustes, se aplica a todos) */}
+                      <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-neutral-700">
+                            Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b>
+                          </span>
+                          <span className="text-[11px] text-blue-600">Recomendado: {recDiscountLive.toFixed(1)}%</span>
                         </div>
-                        <div className="grid grid-cols-4 gap-2 items-center">
-                          <input type="range" min="0" max="99" step="0.5"
-                            value={form.discount_percent}
-                            onChange={e => setForm(f => ({ ...f, discount_percent: Number(e.target.value) }))}
-                            className="col-span-3 accent-neutral-800" />
-                          <input type="number" min="0" max="99" step="0.5"
-                            value={form.discount_percent}
-                            onChange={e => setForm(f => ({ ...f, discount_percent: Number(e.target.value) }))}
-                            className="border border-neutral-300 rounded-lg px-2 py-1 text-sm text-center font-bold
-                                       focus:outline-none focus:ring-2 focus:ring-neutral-800" />
-                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-1">Se aplica a todos los productos. Se cambia en Ajustes → Config Descuento ML.</p>
                       </div>
 
                     </>
@@ -992,7 +990,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       {/* ── vista de lectura (slide-over) ── */}
       {viewing && (() => {
         const v = viewing
-        const net = mlNetFor(country, v, veRate, coTrm, mlSettings)
+        const net = mlNetFor(country, v, veRate, coTrm, mlSettings, globalDiscount)
         const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
             <p className="text-[11px] text-neutral-500">{label}</p>
@@ -1037,9 +1035,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-blue-700" />
                       <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
-                      <Field label="Descuento" value={`${fmt(v.discount_percent)}%`} />
-                      <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0))}`} accent="text-green-700" />
-                      <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0) * (veRate?.official ?? 0))}`} />
+                      <Field label="Descuento (global)" value={`${fmt(globalDiscount)}%`} />
+                      <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, globalDiscount))}`} accent="text-green-700" />
+                      <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, globalDiscount) * (veRate?.official ?? 0))}`} />
                       {net && (
                         <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
                       )}
@@ -1061,9 +1059,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     country={country}
                     totalCost={v.total_cost}
                     ml={mlSettings}
-                    finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0)}
+                    finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0, globalDiscount)}
                     veRate={veRate}
-                    priceBs={liveFinalVE(v, veRate?.excess ?? 0) * (veRate?.official ?? 0)}
+                    priceBs={liveFinalVE(v, veRate?.excess ?? 0, globalDiscount) * (veRate?.official ?? 0)}
                     salePrice={v.sale_price}
                     coTrm={coTrm}
                   />
