@@ -242,6 +242,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     estado:       o => STATUS_LABELS[o.status] ?? o.status,
     contenedor:   o => (o.container_code ?? '').toLowerCase(),
     transportista: o => (o.origin_country ?? '').toLowerCase(),
+    tracking:     o => (o.tracking_number ?? '').toLowerCase(),
   }
 
   const visibleOrders = [...baseVisible.filter(o => {
@@ -654,6 +655,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
                 <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
                 <SortableTh label="Transportista" sortKey="transportista" sort={sort} onSort={onSort} title="Transportista (clic para agrupar)" />
+                <SortableTh label="Tracking" sortKey="tracking" sort={sort} onSort={onSort} title="Número de tracking (clic para agrupar)" />
                 <SortableTh label="Contenedor" sortKey="contenedor" sort={sort} onSort={onSort} title="Contenedor asignado (clic para agrupar)" />
                 <SortableTh label="Estado" sortKey="estado" sort={sort} onSort={onSort} align="center" />
                 {historyMode && <th className="px-2 py-2 text-center">Inconsistente</th>}
@@ -661,7 +663,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
             </thead>
             <tbody>
               {visibleOrders.length === 0 && (
-                <tr><td colSpan={(isAdmin ? 11 : 10) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
+                <tr><td colSpan={(isAdmin ? 12 : 11) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
               )}
               {paginatedOrders.map((o, idx) => {
                 const dateSrc = o.updated_at ?? o.created_at
@@ -717,6 +719,9 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
                     <td className="px-3 py-2 text-xs text-neutral-600 whitespace-nowrap max-w-[10rem] truncate">
                       {o.origin_country || <span className="text-neutral-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs whitespace-nowrap font-mono max-w-[10rem] truncate" title={o.tracking_number ?? ''}>
+                      {o.tracking_number || <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap font-mono">
                       {o.container_code
