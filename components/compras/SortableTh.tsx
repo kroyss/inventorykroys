@@ -19,16 +19,18 @@ interface Props {
   onSort: (key: string) => void
   align?: 'left' | 'right' | 'center'
   title?: string
+  /** Clases extra (p.ej. padding reducido "px-2" para angostar la columna). */
+  className?: string
 }
 
 /** Encabezado de tabla clickeable que muestra la dirección de orden activa. */
-export function SortableTh({ label, sortKey, sort, onSort, align = 'left', title }: Props) {
+export function SortableTh({ label, sortKey, sort, onSort, align = 'left', title, className }: Props) {
   const active = sort.key === sortKey
   const alignCls = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
   const rowCls = align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''
   return (
     <th
-      className={`px-3 py-2 ${alignCls} cursor-pointer select-none hover:text-neutral-800 transition-colors`}
+      className={`${className ?? 'px-3'} py-2 ${alignCls} cursor-pointer select-none hover:text-neutral-800 transition-colors`}
       title={title ?? `Ordenar por ${label.toLowerCase()}`}
       onClick={() => onSort(sortKey)}
     >

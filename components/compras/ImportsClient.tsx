@@ -647,11 +647,11 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
             <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr className="border-b border-neutral-100">
                 <SortableTh label="Orden" sortKey="order_number" sort={sort} onSort={onSort} />
-                <SortableTh label="Proveedor" sortKey="supplier" sort={sort} onSort={onSort} />
+                <SortableTh label="Prov." sortKey="supplier" sort={sort} onSort={onSort} className="px-2" title="Proveedor" />
                 <th className="px-3 py-2 text-left">Detalle</th>
-                <SortableTh label="Productos" sortKey="productos" sort={sort} onSort={onSort} align="right" title="Productos distintos (completos/total en recepción)" />
-                <SortableTh label="Cantidad" sortKey="cantidad" sort={sort} onSort={onSort} align="right" title="Unidades totales (recibidas/total en recepción)" />
-                <SortableTh label="Cajas" sortKey="cajas" sort={sort} onSort={onSort} align="right" title="Cantidad de cajas de la orden" />
+                <SortableTh label="Prod." sortKey="productos" sort={sort} onSort={onSort} align="right" className="px-1" title="Productos distintos (completos/total en recepción)" />
+                <SortableTh label="Cant." sortKey="cantidad" sort={sort} onSort={onSort} align="right" className="px-1" title="Unidades totales (recibidas/total en recepción)" />
+                <SortableTh label="Cajas" sortKey="cajas" sort={sort} onSort={onSort} align="right" className="px-1" title="Cantidad de cajas de la orden" />
                 {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
                 <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
                 <SortableTh label="Transportista" sortKey="transportista" sort={sort} onSort={onSort} title="Transportista (clic para agrupar)" />
@@ -680,7 +680,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       {o.order_number}
                       {o.file_count > 0 && <span className="ml-1 text-neutral-500 font-normal">📎{o.file_count}</span>}
                     </td>
-                    <td className="px-3 py-2 text-neutral-700 max-w-[12rem] truncate">{o.supplier_name || '—'}</td>
+                    <td className="px-2 py-2 text-neutral-700 max-w-[7rem] truncate" title={o.supplier_name || ''}>{o.supplier_name || '—'}</td>
                     <td className="px-3 py-2 text-xs text-neutral-500 max-w-[18rem] truncate cursor-help"
                       title={itemsTooltip(o.items, o.notes)}>
                       {o.items.map((i, k) => (
@@ -691,7 +691,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       ))}
                       {o.notes && <span className="text-purple-600 italic"> · {o.notes}</span>}
                     </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <td className="px-1 py-2 text-right whitespace-nowrap">
                       {receiving ? (
                         <span className={recProds >= prods ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
                           {recProds}/{prods}
@@ -700,7 +700,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                         <span className="text-neutral-700 font-medium">{prods}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <td className="px-1 py-2 text-right whitespace-nowrap">
                       {receiving ? (
                         <span className={recUnits >= units ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
                           {recUnits}/{units}
@@ -710,7 +710,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       )}
                       <span className="text-neutral-400 text-xs"> und</span>
                     </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <td className="px-1 py-2 text-right whitespace-nowrap">
                       {o.box_count
                         ? <span className="font-medium text-neutral-700">{o.box_count}</span>
                         : <span className="text-neutral-300">—</span>}
