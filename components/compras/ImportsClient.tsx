@@ -333,30 +333,34 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     await callStatus({ status: nextStatus, ...extras })
   }
 
-  // Guarda tracking y/o contenedor SIN avanzar de estado (completar por tandas:
-  // primero el tracking, y el contenedor cuando llegue días después).
-  const saveTracking = async () => {
+  // Persiste tracking y/o contenedor SIN avanzar de estado (completar por tandas:
+  // el tracking hoy, y el contenedor cuando llegue días después).
+  const saveShipping = async (patch: { tracking_number?: string | null; container_id?: number | null }) => {
     if (!selected) return
     setBusy(true); setError(null)
-    // Si hay nombre de contenedor sin id (uno nuevo), crearlo antes de guardar.
-    let cid = trkContId
-    if (!cid && trkContName.trim()) {
-      const cr = await fetch('/api/containers', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: trkContName.trim() }),
-      })
-      if (!cr.ok) { setBusy(false); setError('No se pudo crear el contenedor'); return }
-      cid = (await cr.json()).id
-      setTrkContId(cid)
-    }
     const res = await fetch(`/api/imports/${selected.id}/tracking`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tracking_number: trackingInput.trim() || null, container_id: cid ?? null }),
+      body: JSON.stringify(patch),
     })
     setBusy(false)
     if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
     setTrkSaved(true); setTimeout(() => setTrkSaved(false), 2000)
     reload()
+  }
+
+  // Crea (o reutiliza) un contenedor por nombre y lo guarda en la orden.
+  const createAndSaveContainer = async (name: string) => {
+    const n = name.trim()
+    if (!n || !selected) return
+    setBusy(true); setError(null)
+    const cr = await fetch('/api/containers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: n }),
+    })
+    if (!cr.ok) { setBusy(false); setError('No se pudo crear el contenedor'); return }
+    const cid = (await cr.json()).id
+    setTrkContName(n); setTrkContId(cid)
+    await saveShipping({ container_id: cid })
   }
 
   // EN_IMPORTADOR_PAGAR → EN_CAMINO: antes de avanzar, validar envío/cajas y
@@ -845,31 +849,38 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     )}
                     {selected.status === 'PAGADA' && (
                       <>
-                        <input value={trackingInput} onChange={e => setTrackingInput(e.target.value)}
-                          placeholder="Tracking number" className="w-56 border rounded px-2 py-1 text-sm" />
-                        <div className="w-56">
-                          <Combobox
-                            value={trkContName}
-                            options={containers.map(c => ({ id: c.id, name: c.code }))}
-                            placeholder="Contenedor activo o nuevo…"
-                            onChange={(name, id) => { setTrkContName(name); setTrkContId(id) }}
-                            className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          />
+                        <div className="w-full flex flex-wrap items-start gap-2">
+                          <div className="w-56">
+                            <Combobox
+                              value={trackingInput}
+                              options={selected.tracking_number ? [{ id: 1, name: selected.tracking_number }] : []}
+                              placeholder="Tracking: escribí y Agregar"
+                              createLabel="Agregar"
+                              onChange={(name) => setTrackingInput(name)}
+                              onCreate={(name) => { setTrackingInput(name); saveShipping({ tracking_number: name || null }) }}
+                              className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                            />
+                          </div>
+                          <div className="w-56">
+                            <Combobox
+                              value={trkContName}
+                              options={containers.map(c => ({ id: c.id, name: c.code }))}
+                              placeholder="Contenedor: activo o nuevo"
+                              createLabel="Agregar"
+                              onChange={(name, id) => { setTrkContName(name); setTrkContId(id); if (id != null) saveShipping({ container_id: id }) }}
+                              onCreate={(name) => createAndSaveContainer(name)}
+                              className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                            />
+                          </div>
+                          <button onClick={() => advanceTo('EN_TRANSITO')}
+                            disabled={busy || !trackingInput.trim() || !trkContName.trim() || (selected.file_count ?? 0) < 1}
+                            className="btn-primary text-sm">
+                            En tránsito
+                          </button>
+                          {trkSaved && <span className="text-xs text-green-600 self-center">✓ Guardado</span>}
                         </div>
-                        {/* Guardar sin avanzar: permite dejar el tracking hoy y el contenedor otro día */}
-                        <button onClick={saveTracking}
-                          disabled={busy || (!trackingInput.trim() && !trkContName.trim())}
-                          className="btn-secondary text-sm">
-                          Guardar
-                        </button>
-                        <button onClick={() => advanceTo('EN_TRANSITO')}
-                          disabled={busy || !trackingInput.trim() || !trkContName.trim() || (selected.file_count ?? 0) < 1}
-                          className="btn-primary text-sm">
-                          En tránsito
-                        </button>
-                        {trkSaved && <span className="text-xs text-green-600 self-center">✓ Guardado</span>}
                         <div className="w-full text-[11px] text-neutral-400 mt-0.5">
-                          Podés <b>Guardar</b> el tracking ahora y agregar el contenedor cuando lo tengas. Para pasar a <b>tránsito</b> se necesitan tracking + contenedor + ≥1 foto.
+                          Escribí el tracking y tocá <b>Agregar</b> para guardarlo; el contenedor cuando lo tengas. Para pasar a <b>tránsito</b> se necesitan tracking + contenedor + ≥1 foto.
                           {(selected.file_count ?? 0) < 1 && <span className="text-orange-500"> ⚠ Falta adjuntar foto.</span>}
                         </div>
                       </>

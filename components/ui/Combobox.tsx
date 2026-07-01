@@ -12,6 +12,7 @@ export interface ComboOption { id: number; name: string }
  */
 export function Combobox({
   value, onChange, options, placeholder, allowCreate = true, className, onDelete,
+  onCreate, createLabel = 'Crear',
 }: {
   value: string
   onChange: (name: string, id: number | null) => void
@@ -21,6 +22,10 @@ export function Combobox({
   className?: string
   /** Si se provee, cada opción existente muestra una "x" para eliminarla. */
   onDelete?: (opt: ComboOption) => void
+  /** Si se provee, al pulsar la opción de crear se ejecuta (además de cerrar). */
+  onCreate?: (name: string) => void
+  /** Verbo de la opción de crear (ej. "Crear", "Agregar", "Guardar"). */
+  createLabel?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -69,9 +74,9 @@ export function Combobox({
           {showCreate && (
             <button type="button"
               onMouseDown={e => e.preventDefault()}
-              onClick={() => setOpen(false)}
+              onClick={() => { onCreate?.(value.trim()); setOpen(false) }}
               className="w-full text-left px-3 py-2 text-sm text-green-700 hover:bg-green-50 border-t border-neutral-100">
-              + Crear «{value.trim()}»
+              + {createLabel} «{value.trim()}»
             </button>
           )}
         </div>
