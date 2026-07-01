@@ -111,6 +111,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [containers,  setContainers]        = useState<{ id: number; code: string }[]>([])
   const [trkContName, setTrkContName]       = useState('')
   const [trkContId,   setTrkContId]         = useState<number | null>(null)
+  const [trkSaved,    setTrkSaved]          = useState(false)  // feedback "guardado"
 
   // Modal "fotos visibles al usuario" al pasar EN_IMPORTADOR_PAGAR → EN_CAMINO
   type VisFile = { id: number; file_name: string; file_type: string | null; visible_to_user: boolean }
@@ -152,9 +153,12 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     } catch { /* sin contenedores, igual se puede crear */ }
   }, [])
 
-  // Al abrir una orden ya PAGADA, carga contenedores activos para el paso a tránsito
+  // Al abrir una orden, pre-carga tracking y contenedor ya guardados (para poder
+  // completarlos por tandas: primero el tracking, luego el contenedor otro día).
   useEffect(() => {
-    setTrkContName(''); setTrkContId(null)
+    setTrackingInput(selected?.tracking_number ?? '')
+    setTrkContName(selected?.container_code ?? '')
+    setTrkContId(selected?.container_id ?? null)
     if (isAdmin && selected?.status === 'PAGADA') loadActiveContainers()
   }, [selected, isAdmin, loadActiveContainers])
 
@@ -327,6 +331,32 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       extras.box_count     = bc
     }
     await callStatus({ status: nextStatus, ...extras })
+  }
+
+  // Guarda tracking y/o contenedor SIN avanzar de estado (completar por tandas:
+  // primero el tracking, y el contenedor cuando llegue días después).
+  const saveTracking = async () => {
+    if (!selected) return
+    setBusy(true); setError(null)
+    // Si hay nombre de contenedor sin id (uno nuevo), crearlo antes de guardar.
+    let cid = trkContId
+    if (!cid && trkContName.trim()) {
+      const cr = await fetch('/api/containers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trkContName.trim() }),
+      })
+      if (!cr.ok) { setBusy(false); setError('No se pudo crear el contenedor'); return }
+      cid = (await cr.json()).id
+      setTrkContId(cid)
+    }
+    const res = await fetch(`/api/imports/${selected.id}/tracking`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tracking_number: trackingInput.trim() || null, container_id: cid ?? null }),
+    })
+    setBusy(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
+    setTrkSaved(true); setTimeout(() => setTrkSaved(false), 2000)
+    reload()
   }
 
   // EN_IMPORTADOR_PAGAR → EN_CAMINO: antes de avanzar, validar envío/cajas y
@@ -826,14 +856,22 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                             className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                           />
                         </div>
+                        {/* Guardar sin avanzar: permite dejar el tracking hoy y el contenedor otro día */}
+                        <button onClick={saveTracking}
+                          disabled={busy || (!trackingInput.trim() && !trkContName.trim())}
+                          className="btn-secondary text-sm">
+                          Guardar
+                        </button>
                         <button onClick={() => advanceTo('EN_TRANSITO')}
                           disabled={busy || !trackingInput.trim() || !trkContName.trim() || (selected.file_count ?? 0) < 1}
                           className="btn-primary text-sm">
                           En tránsito
                         </button>
-                        {(selected.file_count ?? 0) < 1 && (
-                          <span className="text-xs text-orange-500 self-center">⚠ Adjunta ≥1 foto abajo</span>
-                        )}
+                        {trkSaved && <span className="text-xs text-green-600 self-center">✓ Guardado</span>}
+                        <div className="w-full text-[11px] text-neutral-400 mt-0.5">
+                          Podés <b>Guardar</b> el tracking ahora y agregar el contenedor cuando lo tengas. Para pasar a <b>tránsito</b> se necesitan tracking + contenedor + ≥1 foto.
+                          {(selected.file_count ?? 0) < 1 && <span className="text-orange-500"> ⚠ Falta adjuntar foto.</span>}
+                        </div>
                       </>
                     )}
                     {selected.status === 'EN_TRANSITO' && (
