@@ -264,7 +264,6 @@ export default function TasasClient() {
               <div className="font-bold text-blue-600">{latest.recommended_discount}%</div>
             </div>
           </div>
-          <p className="text-[10px] text-neutral-400 mt-1">Vacío = usa el recomendado</p>
         </div>
       </div>
 
