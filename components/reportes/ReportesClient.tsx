@@ -5,6 +5,7 @@ import {
   KPICard, DataTable, exportRows, money, type Column,
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
+import * as XLSX from 'xlsx'
 
 type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
 
@@ -333,6 +334,49 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
     window.location.href = '/compras?new=1&from=reposicion'
   }
 
+  // Filas del pedido a partir de la selección (ordenadas por código).
+  const pedidoRows = () => Object.entries(picked)
+    .map(([id, qty]) => {
+      const p = (data.reposicion as any[]).find(r => r.id === Number(id))
+      return { p, qty, costoTotal: Math.round((p.cost || 0) * qty * 100) / 100 }
+    })
+    .sort((a, b) => String(a.p.code).localeCompare(String(b.p.code)))
+
+  // Exportar lista de pedido a Excel (.xlsx), organizada por columnas.
+  const exportPedidoExcel = () => {
+    const rows = pedidoRows()
+    if (rows.length === 0) return
+    const header = ['Código', 'Producto', 'Categoría', 'A pedir', 'Stock', 'En camino', 'V. mensual', 'Costo unit', 'Costo total']
+    const aoa: (string | number)[][] = [header, ...rows.map(({ p, qty, costoTotal }) => [
+      p.code, p.name, p.categoria ?? '', qty, p.stock_actual, p.en_transito, p.venta_mensual,
+      Math.round((p.cost || 0) * 100) / 100, costoTotal,
+    ])]
+    const totalUds = rows.reduce((s, r) => s + r.qty, 0)
+    const totalUsd = Math.round(rows.reduce((s, r) => s + r.costoTotal, 0) * 100) / 100
+    aoa.push([], ['', 'TOTAL', '', totalUds, '', '', '', '', totalUsd])
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 10 }, { wch: 42 }, { wch: 14 }, { wch: 8 }, { wch: 7 }, { wch: 9 }, { wch: 10 }, { wch: 10 }, { wch: 11 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Pedido')
+    XLSX.writeFile(wb, `pedido_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  // Exportar lista de pedido a TXT ordenado (descarga).
+  const exportPedidoTxt = () => {
+    const rows = pedidoRows()
+    if (rows.length === 0) return
+    const totalUds = rows.reduce((s, r) => s + r.qty, 0)
+    const lines = rows.map(({ p, qty }) => `${String(p.code).padEnd(10)} ${String(qty).padStart(4)} u   ${p.name}`)
+    const sep = '-'.repeat(48)
+    const txt = [`PEDIDO — ${new Date().toLocaleDateString('es-VE')}`, sep, ...lines, sep,
+      `TOTAL: ${rows.length} productos · ${totalUds} unidades`].join('\n')
+    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `pedido_${new Date().toISOString().slice(0, 10)}.txt`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Reposición — custom table with selection + priority + sort.
   // NOTE: estos hooks van ANTES de cualquier early return (reglas de hooks).
   const all: any[] = data.reposicion
@@ -516,9 +560,17 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
               className="px-3 py-1.5 text-sm text-neutral-300 hover:text-white">
               Limpiar
             </button>
+            <button onClick={exportPedidoExcel} title="Descargar lista de pedido en Excel"
+              className="px-3 py-1.5 border border-neutral-600 text-white rounded text-sm font-medium hover:bg-neutral-800">
+              📊 Excel
+            </button>
+            <button onClick={exportPedidoTxt} title="Descargar lista de pedido en TXT ordenado"
+              className="px-3 py-1.5 border border-neutral-600 text-white rounded text-sm font-medium hover:bg-neutral-800">
+              📄 TXT
+            </button>
             <button onClick={createPO}
               className="px-4 py-1.5 bg-white text-neutral-900 rounded text-sm font-semibold hover:bg-neutral-100">
-              Crear orden de compra →
+              Crear orden →
             </button>
           </div>
         </div>
