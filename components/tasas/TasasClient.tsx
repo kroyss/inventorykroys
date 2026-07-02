@@ -232,10 +232,10 @@ export default function TasasClient() {
         <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-blue-600" />
       </div>
 
-      {/* Barra superior: estado+actualizar │ edición manual │ config exceso ML */}
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-3">
+      {/* Barra superior (una sola línea): estado+TASA │ edición manual │ tabla envíos │ exceso │ descuento */}
+      <div className="flex items-end gap-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-3 overflow-x-auto">
         {/* Estado de la tasa + Actualizar TASA */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="text-sm">
             <div className="text-[11px] text-neutral-400">Última actualización</div>
             {latest.rate_date ? (
@@ -256,7 +256,7 @@ export default function TasasClient() {
         </div>
 
         {/* Edición manual (bloqueada por defecto, poco usada) */}
-        <div className="border-l border-neutral-200 pl-4">
+        <div className="border-l border-neutral-200 pl-3 shrink-0">
           <button type="button" onClick={() => setManualOpen(o => !o)}
             className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-1 mb-1">
             <span>{manualOpen ? '🔓' : '🔒'}</span> Edición manual
@@ -264,17 +264,17 @@ export default function TasasClient() {
           <div className="flex items-end gap-1.5">
             <input type="number" step="0.01" value={official} onChange={e => setOfficial(e.target.value)} disabled={!manualOpen}
               title="Tasa oficial" placeholder="Oficial"
-              className="w-20 border rounded px-2 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" />
+              className="w-16 border rounded px-2 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" />
             <input type="number" step="0.01" value={parallel} onChange={e => setParallel(e.target.value)} disabled={!manualOpen}
               title="Tasa paralela" placeholder="Paralela"
-              className="w-20 border rounded px-2 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" />
+              className="w-16 border rounded px-2 py-1.5 text-sm disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed" />
             <button onClick={saveManual} disabled={!manualOpen || busy || !official || !parallel}
               className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Guardar</button>
           </div>
         </div>
 
         {/* Tabla MercadoEnvíos (abre modal de edición) */}
-        <div className="border-l border-neutral-200 pl-4 self-center">
+        <div className="border-l border-neutral-200 pl-3 self-center shrink-0">
           <button type="button" onClick={() => setShipOpen(true)}
             title="Editar la tabla de envío gratis por peso de MercadoLibre (se abre solo al hacer clic)"
             className="text-sm px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 whitespace-nowrap">
@@ -283,16 +283,16 @@ export default function TasasClient() {
         </div>
 
         {/* Config Exceso ML */}
-        <div className="border-l border-neutral-200 pl-4">
-          <label className="text-[11px] text-neutral-500 block mb-1" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Config Exceso ML</label>
-          <div className="flex items-end gap-2">
+        <div className="border-l border-neutral-200 pl-3 shrink-0">
+          <label className="text-[11px] text-neutral-500 block mb-1 whitespace-nowrap" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Exceso ML</label>
+          <div className="flex items-end gap-1.5">
             <input type="number" step="0.1" min={0} max={500} value={excess} onChange={e => setExcess(e.target.value)}
-              className="w-20 border rounded px-2 py-1.5 text-sm" />
+              className="w-16 border rounded px-2 py-1.5 text-sm" />
             <button onClick={saveExcess} disabled={busy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">Actualizar</button>
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">OK</button>
             {excessPreview && (
               <div className="text-sm leading-tight">
-                <div className="text-[11px] text-neutral-500">Desc. result.</div>
+                <div className="text-[10px] text-neutral-500">Desc.</div>
                 <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-blue-600' : 'text-neutral-900'}`}>
                   {excessPreview.recommended_discount}%
                 </div>
@@ -302,16 +302,16 @@ export default function TasasClient() {
         </div>
 
         {/* Config Descuento ML (manual GLOBAL) — se aplica a TODOS los productos */}
-        <div className="border-l border-neutral-200 pl-4">
-          <label className="text-[11px] text-neutral-500 block mb-1" title="Descuento general aplicado a TODOS los productos. Si lo dejás vacío, se usa el recomendado.">Config Descuento ML</label>
-          <div className="flex items-end gap-2">
+        <div className="border-l border-neutral-200 pl-3 shrink-0">
+          <label className="text-[11px] text-neutral-500 block mb-1 whitespace-nowrap" title="Descuento general aplicado a TODOS los productos. Si lo dejás vacío, se usa el recomendado.">Descuento ML</label>
+          <div className="flex items-end gap-1.5">
             <input type="number" step="0.1" min={0} max={99} value={veDescuento} onChange={e => setVeDescuento(e.target.value)}
               placeholder={`${latest.recommended_discount}`}
-              className="w-20 border rounded px-2 py-1.5 text-sm" />
+              className="w-16 border rounded px-2 py-1.5 text-sm" />
             <button onClick={saveDescuento} disabled={busy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">Actualizar</button>
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">OK</button>
             <div className="text-sm leading-tight">
-              <div className="text-[11px] text-neutral-500">Recomendado</div>
+              <div className="text-[10px] text-neutral-500">Rec.</div>
               <div className="font-bold text-blue-600">{latest.recommended_discount}%</div>
             </div>
           </div>
