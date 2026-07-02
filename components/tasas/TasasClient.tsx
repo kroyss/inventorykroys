@@ -58,6 +58,7 @@ export default function TasasClient() {
   const [veUmbral,   setVeUmbral]    = useState('5')     // envío gratis aplica desde $5
   const [veDescuento, setVeDescuento] = useState('')     // descuento manual GLOBAL (vacío = usa el recomendado)
   const [shipRows, setShipRows] = useState<ShipTier[]>([]) // tabla MercadoEnvíos peso→precio mín
+  const [shipOpen, setShipOpen] = useState(false)          // modal de edición de la tabla
   const [transitoFactor, setTransitoFactor] = useState('1.4') // Finanzas: factor venta mercancía en tránsito
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState<string | null>(null)
@@ -272,6 +273,15 @@ export default function TasasClient() {
           </div>
         </div>
 
+        {/* Tabla MercadoEnvíos (abre modal de edición) */}
+        <div className="border-l border-neutral-200 pl-4 self-center">
+          <button type="button" onClick={() => setShipOpen(true)}
+            title="Editar la tabla de envío gratis por peso de MercadoLibre (se abre solo al hacer clic)"
+            className="text-sm px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 whitespace-nowrap">
+            📦 Tabla MercadoEnvíos
+          </button>
+        </div>
+
         {/* Config Exceso ML */}
         <div className="border-l border-neutral-200 pl-4">
           <label className="text-[11px] text-neutral-500 block mb-1" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Config Exceso ML</label>
@@ -308,36 +318,42 @@ export default function TasasClient() {
         </div>
       </div>
 
-      {/* Tabla MercadoEnvíos (peso → precio mínimo para envío gratis) */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold">📦 Tabla MercadoEnvíos</h2>
-          <a href="/productos/mercadoenvios" className="text-xs text-blue-600 hover:underline">Ir a gestión →</a>
+      {/* Tabla MercadoEnvíos — modal (se abre solo al hacer clic en el botón de la barra) */}
+      {shipOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShipOpen(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative bg-white rounded-xl border border-neutral-200 shadow-2xl p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-semibold">📦 Tabla MercadoEnvíos</h2>
+              <button onClick={() => setShipOpen(false)} className="text-neutral-400 hover:text-neutral-700 text-lg">✕</button>
+            </div>
+            <p className="text-xs text-neutral-500 mb-3">
+              Peso máximo del rango → precio mínimo (USD) para que la publicación tenga envío gratis. Editala cuando ML cambie la tabla.
+            </p>
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+              <div className="text-[11px] text-neutral-500">Hasta (kg)</div>
+              <div className="text-[11px] text-neutral-500">Precio mín (USD)</div>
+              <div></div>
+              {shipRows.map((r, i) => (
+                <ShipRowInputs key={i} row={r}
+                  onChange={(field, val) => setShipRows(rows => rows.map((x, j) => j === i ? { ...x, [field]: val } : x))}
+                  onRemove={() => setShipRows(rows => rows.filter((_, j) => j !== i))} />
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-4">
+              <button onClick={() => setShipRows(rows => [...rows, { maxKg: 0, minPrice: 0 }])}
+                className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100">
+                + Agregar rango
+              </button>
+              <button onClick={saveShipTable} disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50">
+                {busy ? 'Guardando…' : '💾 Guardar tabla'}
+              </button>
+            </div>
+            <a href="/productos/mercadoenvios" className="block mt-3 text-xs text-blue-600 hover:underline">Ir a gestión de pesos →</a>
+          </div>
         </div>
-        <p className="text-xs text-neutral-500 mb-3">
-          Peso máximo del rango → precio mínimo (USD) para que la publicación tenga envío gratis. Editala cuando ML cambie la tabla.
-        </p>
-        <div className="grid grid-cols-[1fr_1fr_auto] gap-2 max-w-md items-center">
-          <div className="text-[11px] text-neutral-500">Hasta (kg)</div>
-          <div className="text-[11px] text-neutral-500">Precio mín (USD)</div>
-          <div></div>
-          {shipRows.map((r, i) => (
-            <ShipRowInputs key={i} row={r}
-              onChange={(field, val) => setShipRows(rows => rows.map((x, j) => j === i ? { ...x, [field]: val } : x))}
-              onRemove={() => setShipRows(rows => rows.filter((_, j) => j !== i))} />
-          ))}
-        </div>
-        <div className="flex items-center gap-2 mt-3">
-          <button onClick={() => setShipRows(rows => [...rows, { maxKg: 0, minPrice: 0 }])}
-            className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100">
-            + Agregar rango
-          </button>
-          <button onClick={saveShipTable} disabled={busy}
-            className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50">
-            {busy ? 'Guardando…' : '💾 Guardar tabla'}
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Price simulator */}
