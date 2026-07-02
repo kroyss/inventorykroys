@@ -110,7 +110,8 @@ function shipBadge(info: ShipInfo): { label: string; cls: string } {
   switch (info.status) {
     case 'ok':           return { label: '✅ Envío gratis', cls: 'text-green-700 bg-green-50 border-green-200' }
     case 'capped':       return { label: `✅ Envío gratis · tope ${info.maxDiscount!.toFixed(1)}%`, cls: 'text-amber-700 bg-amber-50 border-amber-200' }
-    case 'impossible':   return { label: '🚫 Nunca gratis (precio bajo su peso)', cls: 'text-red-700 bg-red-50 border-red-200' }
+    case 'aggregate':    return { label: `🛒 Gratis juntando ~${info.unitsForFree} uds`, cls: 'text-sky-700 bg-sky-50 border-sky-200' }
+    case 'impossible':   return { label: '🚫 Revisar: precio muy bajo para su peso', cls: 'text-red-700 bg-red-50 border-red-200' }
     case 'overweight':   return { label: '⚠️ Peso fuera de la tabla', cls: 'text-red-700 bg-red-50 border-red-200' }
     default:             return { label: '⚪ Peso sin registrar', cls: 'text-neutral-600 bg-neutral-50 border-neutral-200' }
   }

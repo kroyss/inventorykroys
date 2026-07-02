@@ -9,15 +9,16 @@ function fmt(n: number) {
   return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const STATUS_META: Record<ShipStatus, { label: string; cls: string; chip: string }> = {
-  ok:           { label: '✅ Gratis',        cls: 'text-green-700', chip: 'bg-green-50 text-green-700 border-green-200' },
-  capped:       { label: '⚠️ Tope',          cls: 'text-amber-700', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
-  impossible:   { label: '🚫 Nunca gratis',  cls: 'text-red-700',   chip: 'bg-red-50 text-red-700 border-red-200' },
-  overweight:   { label: '⚠️ Fuera de tabla',cls: 'text-red-700',   chip: 'bg-red-50 text-red-700 border-red-200' },
-  unregistered: { label: '⚪ Sin peso',       cls: 'text-neutral-500', chip: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
+const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
+  ok:           { label: '✅ Gratis',         chip: 'bg-green-50 text-green-700 border-green-200' },
+  capped:       { label: '⚠️ Tope',           chip: 'bg-amber-50 text-amber-700 border-amber-200' },
+  aggregate:    { label: '🛒 Por volumen',    chip: 'bg-sky-50 text-sky-700 border-sky-200' },
+  impossible:   { label: '🚫 Revisar precio', chip: 'bg-red-50 text-red-700 border-red-200' },
+  overweight:   { label: '⚠️ Fuera de tabla', chip: 'bg-red-50 text-red-700 border-red-200' },
+  unregistered: { label: '⚪ Sin peso',        chip: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
 }
 
-type Filter = 'all' | 'unregistered' | 'capped' | 'impossible'
+type Filter = 'all' | 'unregistered' | 'capped' | 'aggregate' | 'impossible'
 
 export default function MercadoEnviosClient({ initialProducts }: { initialProducts: Product[] }) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
@@ -58,7 +59,7 @@ export default function MercadoEnviosClient({ initialProducts }: { initialProduc
   }, [products, rate, globalDiscount, shipTable])
 
   const counts = useMemo(() => {
-    const c = { unregistered: 0, capped: 0, impossible: 0, ok: 0, overweight: 0 }
+    const c = { unregistered: 0, capped: 0, aggregate: 0, impossible: 0, ok: 0, overweight: 0 }
     for (const r of rows) c[r.info.status]++
     return c
   }, [rows])
@@ -66,7 +67,8 @@ export default function MercadoEnviosClient({ initialProducts }: { initialProduc
   const filtered = useMemo(() => {
     let arr = rows
     if (filter === 'unregistered') arr = arr.filter(r => r.info.status === 'unregistered')
-    else if (filter === 'capped')  arr = arr.filter(r => r.info.status === 'capped')
+    else if (filter === 'capped')     arr = arr.filter(r => r.info.status === 'capped')
+    else if (filter === 'aggregate')  arr = arr.filter(r => r.info.status === 'aggregate')
     else if (filter === 'impossible') arr = arr.filter(r => r.info.status === 'impossible' || r.info.status === 'overweight')
     if (search.trim()) arr = arr.filter(r => matchTokens(search, r.p.code, r.p.name, r.p.category_name ?? ''))
     return arr
@@ -110,9 +112,10 @@ export default function MercadoEnviosClient({ initialProducts }: { initialProduc
 
       <p className="text-xs text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg p-3 leading-relaxed">
         Registrá el <b>peso</b> de cada producto. El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
-        envío gratis (según la tabla de ML) y <b>limita solo</b> el descuento global a ese tope. <span className="text-amber-700">⚠️ Tope</span> = se
-        le baja el descuento para conservar el envío gratis; <span className="text-red-700">🚫 Nunca gratis</span> = su precio
-        publicado ya está por debajo del umbral de su peso (hay que subir precio).
+        envío gratis (según la tabla de ML) y <b>limita solo</b> el descuento global a ese tope.
+        <span className="text-amber-700"> ⚠️ Tope</span> = se le baja el descuento para conservar el envío gratis;
+        <span className="text-sky-700"> 🛒 Por volumen</span> = a 1 unidad no llega, pero sí juntando unidades (normal en productos baratos);
+        <span className="text-red-700"> 🚫 Revisar precio</span> = ni juntando unidades alcanza el umbral (precio muy bajo para su peso).
       </p>
 
       {/* filtros */}
@@ -120,7 +123,8 @@ export default function MercadoEnviosClient({ initialProducts }: { initialProduc
         {chip('all', 'Todos', rows.length, 'bg-neutral-900 text-white border-neutral-900')}
         {chip('unregistered', '⚪ Sin peso', counts.unregistered, 'bg-neutral-700 text-white border-neutral-700')}
         {chip('capped', '⚠️ Con tope', counts.capped, 'bg-amber-500 text-white border-amber-500')}
-        {chip('impossible', '🚫 Nunca gratis', counts.impossible + counts.overweight, 'bg-red-600 text-white border-red-600')}
+        {chip('aggregate', '🛒 Por volumen', counts.aggregate, 'bg-sky-600 text-white border-sky-600')}
+        {chip('impossible', '🚫 Revisar precio', counts.impossible + counts.overweight, 'bg-red-600 text-white border-red-600')}
         <input type="search" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)}
           className="ml-auto border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
       </div>
@@ -169,7 +173,9 @@ export default function MercadoEnviosClient({ initialProducts }: { initialProduc
                   </td>
                   <td className="px-2 py-2 text-right text-green-700">${fmt(final)}</td>
                   <td className="px-2 py-2">
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap ${meta.chip}`}>{meta.label}</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap ${meta.chip}`}>
+                      {meta.label}{info.status === 'aggregate' ? ` ~${info.unitsForFree} uds` : ''}
+                    </span>
                   </td>
                 </tr>
               )

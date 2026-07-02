@@ -50,21 +50,42 @@ export function tierFor(weightKg: number | null | undefined, table: ShipTier[]):
   return null // por encima del rango más grande
 }
 
+/**
+ * Mínimo de unidades para que un carrito de ese producto alcance el envío gratis.
+ * OJO: al sumar unidades, el PESO total también sube y puede saltar a un rango con
+ * umbral mayor → se busca iterando, no dividiendo. null si no se alcanza (peso total
+ * fuera de tabla o precio demasiado bajo).
+ */
+export function unitsForFreeShip(
+  weightKg: number, unitPrice: number, table: ShipTier[], maxUnits = 30,
+): number | null {
+  if (!(weightKg > 0) || !(unitPrice > 0)) return null
+  for (let n = 1; n <= maxUnits; n++) {
+    const t = tierFor(weightKg * n, table)
+    if (!t) return null // el peso total se salió de la tabla
+    if (unitPrice * n >= t.minPrice) return n
+  }
+  return null
+}
+
 export type ShipStatus =
-  | 'ok'            // el descuento global entra completo, con envío gratis
+  | 'ok'            // el descuento global entra completo, con envío gratis a 1 unidad
   | 'capped'        // el global excede el máximo → se limitó para no perder el envío gratis
-  | 'impossible'    // el publicado ya está bajo el umbral: nunca hay envío gratis (subir precio)
+  | 'aggregate'     // a 1 unidad no llega, pero SÍ juntando N unidades (normal en productos baratos)
+  | 'impossible'    // ni juntando unidades llega: precio demasiado bajo para su peso (revisar)
   | 'unregistered'  // falta registrar el peso
   | 'overweight'    // peso por encima del rango máximo de la tabla
 
 export interface ShipInfo {
   tier: ShipTier | null
-  /** Máximo % de descuento que mantiene envío gratis (null si no aplica). */
+  /** Máximo % de descuento que mantiene envío gratis a 1 unidad (null si no aplica). */
   maxDiscount: number | null
   /** Descuento realmente aplicado = global limitado por el máximo (o global si no aplica cap). */
   effectiveDiscount: number
-  /** ¿Con el descuento efectivo hay envío gratis? */
+  /** ¿Con el descuento efectivo hay envío gratis a 1 unidad? */
   freeShip: boolean
+  /** Unidades para envío gratis (1 si aplica solo; N si es por volumen; null si no aplica). */
+  unitsForFree: number | null
   status: ShipStatus
 }
 
@@ -82,21 +103,28 @@ export function shipInfo(
 ): ShipInfo {
   const tier = tierFor(weightKg, table)
   if (weightKg == null || !(weightKg > 0))
-    return { tier: null, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, status: 'unregistered' }
+    return { tier: null, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, unitsForFree: null, status: 'unregistered' }
   if (!tier)
-    return { tier: null, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, status: 'overweight' }
+    return { tier: null, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, unitsForFree: null, status: 'overweight' }
   if (!(published > 0))
-    return { tier, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, status: 'unregistered' }
-  if (published < tier.minPrice)
-    // Ni a 0% de descuento llega al umbral → nunca hay envío gratis.
-    return { tier, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, status: 'impossible' }
-  const maxDiscount = (1 - tier.minPrice / published) * 100
-  const effectiveDiscount = Math.min(globalDiscount, maxDiscount)
+    return { tier, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false, unitsForFree: null, status: 'unregistered' }
+
+  if (published >= tier.minPrice) {
+    // Envío gratis ya a 1 unidad: el descuento puede bajarlo hasta el umbral.
+    const maxDiscount = (1 - tier.minPrice / published) * 100
+    const effectiveDiscount = Math.min(globalDiscount, maxDiscount)
+    return {
+      tier, maxDiscount, effectiveDiscount, freeShip: true, unitsForFree: 1,
+      status: globalDiscount > maxDiscount + 1e-9 ? 'capped' : 'ok',
+    }
+  }
+
+  // Publicado por debajo del umbral: a 1 unidad no hay envío gratis. Sin cap (no hay
+  // nada que proteger a 1 unidad) → descuento global completo. ¿Se alcanza por volumen?
+  const finalUnit = published * (1 - globalDiscount / 100)
+  const units = unitsForFreeShip(weightKg, finalUnit, table)
   return {
-    tier,
-    maxDiscount,
-    effectiveDiscount,
-    freeShip: true,
-    status: globalDiscount > maxDiscount + 1e-9 ? 'capped' : 'ok',
+    tier, maxDiscount: null, effectiveDiscount: globalDiscount, freeShip: false,
+    unitsForFree: units, status: units ? 'aggregate' : 'impossible',
   }
 }
