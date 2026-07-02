@@ -428,9 +428,9 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       </div>
 
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+            <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
               <tr>
                 <th className="px-3 py-2 w-8">
                   <input type="checkbox"
@@ -615,8 +615,9 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
         <div className="text-neutral-400 text-sm py-8 text-center">Sin órdenes en tránsito</div>
       ) : (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+          <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
+            <thead className="bg-neutral-50 text-xs uppercase text-neutral-500 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
               <tr className="border-b border-neutral-100">
                 <th className="px-3 py-2 text-left">Producto</th>
                 <th className="px-3 py-2 text-right w-20">Cant.</th>
@@ -653,6 +654,7 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

@@ -336,9 +336,9 @@ export function DataTable<T extends Record<string, unknown>>({
           </button>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+          <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
               {columns.map(c => (
                 <th key={c.key}
