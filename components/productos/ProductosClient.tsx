@@ -5,6 +5,8 @@ import { int } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { matchTokens } from '@/lib/search'
+import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
+import Link from 'next/link'
 import MlBreakdown from './MlBreakdown'
 
 // ─── helpers ────────────────────────────────────────────────────
@@ -103,6 +105,17 @@ function mlNetFor(
   return { ganancia, margen: ganancia / realUsd * 100, pesos: false }
 }
 
+// Etiqueta de estado de MercadoEnvíos (envío gratis por peso).
+function shipBadge(info: ShipInfo): { label: string; cls: string } {
+  switch (info.status) {
+    case 'ok':           return { label: '✅ Envío gratis', cls: 'text-green-700 bg-green-50 border-green-200' }
+    case 'capped':       return { label: `✅ Envío gratis · tope ${info.maxDiscount!.toFixed(1)}%`, cls: 'text-amber-700 bg-amber-50 border-amber-200' }
+    case 'impossible':   return { label: '🚫 Nunca gratis (precio bajo su peso)', cls: 'text-red-700 bg-red-50 border-red-200' }
+    case 'overweight':   return { label: '⚠️ Peso fuera de la tabla', cls: 'text-red-700 bg-red-50 border-red-200' }
+    default:             return { label: '⚪ Peso sin registrar', cls: 'text-neutral-600 bg-neutral-50 border-neutral-200' }
+  }
+}
+
 // Color del margen neto sobre venta: sano ≥20%, ajustado ≥8%, riesgo/pérdida abajo.
 const netColor = (m: number) => m >= 20 ? 'text-green-600' : m >= 8 ? 'text-amber-600' : 'text-red-600'
 
@@ -116,6 +129,7 @@ interface FormState {
   published_price_usd: number
   discount_percent: number
   sale_price: number
+  weight_kg: string   // string para permitir vacío en el input
   ml_codes: MLCode[]
 }
 
@@ -128,6 +142,7 @@ const emptyForm = (mlAccounts: string[]): FormState => ({
   published_price_usd: 0,
   discount_percent: 0,
   sale_price: 0,
+  weight_kg: '',
   ml_codes: mlAccounts.map(a => ({ account: a, code: '' })),
 })
 
@@ -150,6 +165,7 @@ interface ProductDetail {
   profit_category_id: number | null
   sale_price: number
   quantity: number
+  weight_kg: number | null
   ml_codes: MLCode[]
 }
 
@@ -216,12 +232,27 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     return isNaN(n) ? recDiscountLive : n
   })()
   const {
-    totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd,
+    totalCost, basePriceUsd, suggestedMl, publishedPriceUsd,
   } = calcPrices(
     // publicado = derivado del precio sugerido ML (no input suelto), igual que legacy.
     // El descuento es el GLOBAL (config en Ajustes), no un input por producto.
     form.base_cost, form.shipping_cost, profitPct, veRate, undefined, globalDiscount
   )
+
+  // ── MercadoEnvíos (VE): tabla peso→precio mín y descuento efectivo capado por peso ──
+  const shipTable = useMemo(() => parseShippingTable(mlSettings.ml_shipping_table), [mlSettings.ml_shipping_table])
+  // Descuento efectivo por producto = global limitado por su tope de envío gratis (solo VE).
+  const shipFor = (p: { weight_kg: number | null; total_cost: number; profit_percentage: number }): ShipInfo =>
+    shipInfo(p.weight_kg, livePublishedVE(p, veRate?.excess ?? 0), globalDiscount, shipTable)
+  const effDiscountFor = (p: { weight_kg: number | null; total_cost: number; profit_percentage: number }): number =>
+    country === 'VE' ? shipFor(p).effectiveDiscount : globalDiscount
+
+  // Descuento efectivo del FORM (capado por el peso ingresado en el form).
+  const formWeight = form.weight_kg.trim() === '' ? null : parseFloat(form.weight_kg)
+  const formShip = shipInfo(isNaN(formWeight as number) ? null : formWeight, publishedPriceUsd, globalDiscount, shipTable)
+  const formEffDiscount = country === 'VE' ? formShip.effectiveDiscount : globalDiscount
+  const finalPriceUsd = publishedPriceUsd * (1 - formEffDiscount / 100)
+
   const spread  = veRate && veRate.official > 0 ? (veRate.parallel - veRate.official) / veRate.official * 100 : 0
   const priceBs = finalPriceUsd * (veRate?.official ?? 0)
   // CO: precio de venta sugerido en pesos = precio base (USD) × TRM
@@ -248,7 +279,27 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   async function openView(id: number) {
     const res  = await fetch(`/api/products/${id}`)
     if (!res.ok) return
-    setViewing(await res.json())
+    const data = await res.json()
+    setViewing(data)
+    setViewWeight(data.weight_kg != null ? String(data.weight_kg) : '')
+  }
+
+  // Peso editable desde la ficha (MercadoEnvíos)
+  const [viewWeight, setViewWeight] = useState('')
+  const [savingWeight, setSavingWeight] = useState(false)
+  async function saveViewWeight() {
+    if (!viewing) return
+    const kg = viewWeight.trim() === '' ? null : parseFloat(viewWeight)
+    if (kg !== null && (isNaN(kg) || kg <= 0)) { setError('Peso inválido'); return }
+    setSavingWeight(true)
+    const res = await fetch(`/api/products/${viewing.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weight_kg: kg }),
+    })
+    setSavingWeight(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar peso'); return }
+    setViewing({ ...viewing, weight_kg: kg })
+    setProducts(ps => ps.map(p => p.id === viewing.id ? { ...p, weight_kg: kg } : p))
   }
 
   // ── open create modal ──
@@ -275,6 +326,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       published_price_usd:data.published_price_usd,
       discount_percent:   data.discount_percent,
       sale_price:         data.sale_price,
+      weight_kg:          data.weight_kg != null ? String(data.weight_kg) : '',
       ml_codes:           mlAccounts.map(a => ({
         account: a,
         code: (data.ml_codes as MLCode[]).find(m => m.account === a)?.code ?? '',
@@ -292,14 +344,18 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       // CO (híbrido): costo en USD, precio de venta en PESOS (sale_price); los
       // campos *_usd no se usan en CO → 0. VE: calculadora USD como siempre.
       const isCO = country === 'CO'
+      const weightNum = form.weight_kg.trim() === '' || isNaN(parseFloat(form.weight_kg))
+        ? null : parseFloat(form.weight_kg)
       const payload = {
         ...form,
         base_price_usd:      isCO ? 0 : basePriceUsd,
         published_price_usd: isCO ? 0 : publishedPriceUsd,
         final_price_usd:     isCO ? 0 : finalPriceUsd,
-        discount_percent:    isCO ? 0 : globalDiscount,
+        // descuento efectivo = global capado por el peso (envío gratis)
+        discount_percent:    isCO ? 0 : formEffDiscount,
         // VE: el precio de inventario sigue al Precio Base (USD). CO: pesos del input.
         sale_price:          isCO ? form.sale_price : basePriceUsd,
+        weight_kg:           weightNum,
       }
 
       let res: Response
@@ -321,8 +377,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             base_price_usd:     isCO ? 0 : basePriceUsd,
             published_price_usd:isCO ? 0 : publishedPriceUsd,
             final_price_usd:    isCO ? 0 : finalPriceUsd,
-            discount_percent:   isCO ? 0 : form.discount_percent,
+            discount_percent:   isCO ? 0 : formEffDiscount,
             sale_price:         isCO ? form.sale_price : basePriceUsd,
+            weight_kg:          weightNum,
             ml_codes:           form.ml_codes.filter(m => m.code.trim()),
           }),
         })
@@ -416,7 +473,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
-    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings, globalDiscount)?.margen ?? -Infinity
+    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p))?.margen ?? -Infinity
     const valueFor = (p: Product): number | string => {
       switch (sortKey) {
         case 'code':     return p.code
@@ -436,7 +493,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       return String(va).localeCompare(String(vb))
     })
     return sortDir === 'desc' ? arr.reverse() : arr
-  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings, globalDiscount])
+  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings, globalDiscount, shipTable])
 
   const isSearching = search.trim().length > 0
   const displayed   = isSearching ? sorted : sorted.slice(0, visible)
@@ -504,6 +561,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           onChange={e => setSearch(e.target.value)}
           className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-neutral-800"
         />
+
+        {country === 'VE' && (
+          <Link
+            href="/productos/mercadoenvios"
+            className="px-3 py-1.5 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 whitespace-nowrap"
+          >
+            📦 MercadoEnvíos
+          </Link>
+        )}
 
         <button
           onClick={openCreate}
@@ -578,7 +644,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </tr>
               )}
               {displayed.map(p => {
-                const net = mlNetFor(country, p, veRate, coTrm, mlSettings, globalDiscount)
+                const net = mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p))
                 return (
                 <tr key={p.id} onClick={() => openView(p.id)}
                   className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
@@ -846,15 +912,27 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                   {country === 'VE' ? (
                     <>
-                      {/* Descuento ML — GLOBAL (se configura en Ajustes, se aplica a todos) */}
-                      <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-neutral-700">
-                            Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b>
-                          </span>
-                          <span className="text-[11px] text-blue-600">Recomendado: {recDiscountLive.toFixed(1)}%</span>
+                      {/* MercadoEnvíos + Descuento (VE) */}
+                      <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-xs font-medium text-neutral-700">Peso (kg) <span className="text-neutral-400">· MercadoEnvíos</span></label>
+                          <input type="number" step="0.001" min="0" value={form.weight_kg}
+                            onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))}
+                            placeholder="ej. 0.350"
+                            className="w-28 border border-neutral-300 rounded px-2 py-1 text-sm text-right
+                                       focus:outline-none focus:ring-2 focus:ring-neutral-800" />
                         </div>
-                        <p className="text-[10px] text-neutral-400 mt-1">Se aplica a todos los productos. Se cambia en Ajustes → Config Descuento ML.</p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-neutral-700">Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b></span>
+                          <span className="text-[11px] text-blue-600">Rec: {recDiscountLive.toFixed(1)}%</span>
+                        </div>
+                        <div className={`text-[11px] px-2 py-1 rounded border ${shipBadge(formShip).cls}`}>
+                          {shipBadge(formShip).label}
+                          {formShip.status === 'capped' && (
+                            <span className="block text-neutral-500">Se aplica {formEffDiscount.toFixed(1)}% (no {globalDiscount.toFixed(1)}%) para no perder envío gratis.</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-neutral-400">Descuento global en Ajustes; el peso limita cuánto se aplica sin perder envío gratis.</p>
                       </div>
 
                     </>
@@ -990,7 +1068,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       {/* ── vista de lectura (slide-over) ── */}
       {viewing && (() => {
         const v = viewing
-        const net = mlNetFor(country, v, veRate, coTrm, mlSettings, globalDiscount)
+        const vEff  = effDiscountFor(v)
+        const vShip = country === 'VE' ? shipFor(v) : null
+        const net = mlNetFor(country, v, veRate, coTrm, mlSettings, vEff)
         const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
             <p className="text-[11px] text-neutral-500">{label}</p>
@@ -1035,9 +1115,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-blue-700" />
                       <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
-                      <Field label="Descuento (global)" value={`${fmt(globalDiscount)}%`} />
-                      <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, globalDiscount))}`} accent="text-green-700" />
-                      <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, globalDiscount) * (veRate?.official ?? 0))}`} />
+                      <Field label="Descuento aplicado" value={`${fmt(vEff)}%`} />
+                      <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff))}`} accent="text-green-700" />
+                      <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0))}`} />
                       {net && (
                         <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
                       )}
@@ -1059,13 +1139,47 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     country={country}
                     totalCost={v.total_cost}
                     ml={mlSettings}
-                    finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0, globalDiscount)}
+                    finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0, vEff)}
                     veRate={veRate}
-                    priceBs={liveFinalVE(v, veRate?.excess ?? 0, globalDiscount) * (veRate?.official ?? 0)}
+                    priceBs={liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0)}
                     salePrice={v.sale_price}
                     coTrm={coTrm}
                   />
                 </div>
+
+                {country === 'VE' && vShip && (
+                  <div>
+                    <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">MercadoEnvíos</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs text-neutral-600">Peso (kg)</label>
+                        <div className="flex items-center gap-1">
+                          <input type="number" step="0.001" min="0" value={viewWeight}
+                            onChange={e => setViewWeight(e.target.value)}
+                            placeholder="ej. 0.350"
+                            className="w-24 border border-neutral-300 rounded px-2 py-1 text-sm text-right
+                                       focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+                          <button onClick={saveViewWeight} disabled={savingWeight}
+                            className="text-xs px-2 py-1 rounded bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-50">
+                            {savingWeight ? '…' : '✓'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className={`text-[11px] px-2 py-1.5 rounded border ${shipBadge(vShip).cls}`}>
+                        {shipBadge(vShip).label}
+                      </div>
+                      {vShip.tier && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Field label="Umbral envío gratis" value={`$${fmt(vShip.tier.minPrice)}`} />
+                          <Field label="Desc. máx sin perderlo" value={vShip.maxDiscount != null ? `${vShip.maxDiscount.toFixed(1)}%` : '—'} accent={vShip.status === 'capped' ? 'text-amber-700' : undefined} />
+                        </div>
+                      )}
+                      {vShip.status === 'capped' && (
+                        <p className="text-[11px] text-amber-700">Se aplica {fmt(vEff)}% en vez del global {fmt(globalDiscount)}% para no perder el envío gratis.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Inventario</p>

@@ -8,6 +8,7 @@ import {
 import { KPICard, money } from '@/components/ui'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { parseLocalDate } from '@/lib/tz'
+import { parseShippingTable, type ShipTier } from '@/lib/mlShipping'
 import MlBreakdown from '@/components/productos/MlBreakdown'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
@@ -23,6 +24,26 @@ interface Rate {
   source: string
 }
 
+// Fila editable de la tabla de MercadoEnvíos (peso máx → precio mín).
+function ShipRowInputs({ row, onChange, onRemove }: {
+  row: ShipTier
+  onChange: (field: 'maxKg' | 'minPrice', val: number) => void
+  onRemove: () => void
+}) {
+  return (
+    <>
+      <input type="number" step="0.001" min="0" value={row.maxKg === 0 ? '' : row.maxKg}
+        onChange={e => onChange('maxKg', Number(e.target.value))} placeholder="0.5"
+        className="border rounded px-2 py-1 text-sm" />
+      <input type="number" step="0.01" min="0" value={row.minPrice === 0 ? '' : row.minPrice}
+        onChange={e => onChange('minPrice', Number(e.target.value))} placeholder="4.95"
+        className="border rounded px-2 py-1 text-sm" />
+      <button onClick={onRemove} title="Quitar rango"
+        className="text-neutral-300 hover:text-red-600 px-1 text-sm">✕</button>
+    </>
+  )
+}
+
 export default function TasasClient() {
   const [latest,   setLatest]   = useState<Rate | null>(null)
   const [history,  setHistory]  = useState<Rate[]>([])
@@ -36,6 +57,7 @@ export default function TasasClient() {
   const [veEnvio,    setVeEnvio]     = useState('0.65')  // $ envío por venta
   const [veUmbral,   setVeUmbral]    = useState('5')     // envío gratis aplica desde $5
   const [veDescuento, setVeDescuento] = useState('')     // descuento manual GLOBAL (vacío = usa el recomendado)
+  const [shipRows, setShipRows] = useState<ShipTier[]>([]) // tabla MercadoEnvíos peso→precio mín
   const [transitoFactor, setTransitoFactor] = useState('1.4') // Finanzas: factor venta mercancía en tránsito
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState<string | null>(null)
@@ -76,6 +98,7 @@ export default function TasasClient() {
       if (s.ml_umbral)   setVeUmbral(String(s.ml_umbral))
       if (s.ml_descuento != null && s.ml_descuento !== '') setVeDescuento(String(s.ml_descuento))
       if (s.transito_sale_factor) setTransitoFactor(String(s.transito_sale_factor))
+      setShipRows(parseShippingTable(s.ml_shipping_table))
     }
   }
   useEffect(() => { loadAll() }, [])
@@ -172,6 +195,24 @@ export default function TasasClient() {
     setTimeout(() => setOkMsg(null), 2500)
   }
 
+  // Tabla MercadoEnvíos (peso→precio mínimo para envío gratis) — VE
+  const saveShipTable = async () => {
+    const clean = shipRows
+      .map(r => ({ maxKg: Number(r.maxKg), minPrice: Number(r.minPrice) }))
+      .filter(r => r.maxKg > 0 && r.minPrice >= 0)
+      .sort((a, b) => a.maxKg - b.maxKg)
+    if (clean.length === 0) { setError('La tabla debe tener al menos un rango válido'); return }
+    setBusy(true); setError(null); setOkMsg(null)
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ml_shipping_table: JSON.stringify(clean) }),
+    })
+    setBusy(false)
+    if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
+    setShipRows(clean)
+    setOkMsg('Tabla de MercadoEnvíos guardada'); setTimeout(() => setOkMsg(null), 2500)
+  }
+
   if (!latest) return <div className="p-8 text-neutral-500">Cargando…</div>
 
   // chart data (chronological) — solo los últimos 30 para que sea legible
@@ -264,6 +305,37 @@ export default function TasasClient() {
               <div className="font-bold text-blue-600">{latest.recommended_discount}%</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Tabla MercadoEnvíos (peso → precio mínimo para envío gratis) */}
+      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold">📦 Tabla MercadoEnvíos</h2>
+          <a href="/productos/mercadoenvios" className="text-xs text-blue-600 hover:underline">Ir a gestión →</a>
+        </div>
+        <p className="text-xs text-neutral-500 mb-3">
+          Peso máximo del rango → precio mínimo (USD) para que la publicación tenga envío gratis. Editala cuando ML cambie la tabla.
+        </p>
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2 max-w-md items-center">
+          <div className="text-[11px] text-neutral-500">Hasta (kg)</div>
+          <div className="text-[11px] text-neutral-500">Precio mín (USD)</div>
+          <div></div>
+          {shipRows.map((r, i) => (
+            <ShipRowInputs key={i} row={r}
+              onChange={(field, val) => setShipRows(rows => rows.map((x, j) => j === i ? { ...x, [field]: val } : x))}
+              onRemove={() => setShipRows(rows => rows.filter((_, j) => j !== i))} />
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <button onClick={() => setShipRows(rows => [...rows, { maxKg: 0, minPrice: 0 }])}
+            className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100">
+            + Agregar rango
+          </button>
+          <button onClick={saveShipTable} disabled={busy}
+            className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50">
+            {busy ? 'Guardando…' : '💾 Guardar tabla'}
+          </button>
         </div>
       </div>
 

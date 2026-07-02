@@ -27,6 +27,7 @@ export default async function ProductosPage() {
         pc.name                                        AS category_name,
         COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
         pp.profit_category_id,
+        p.weight_kg::float                             AS weight_kg,
         COALESCE(inv.sale_price,            0)::float AS sale_price,
         COALESCE(inv.quantity,              0)::int   AS quantity
       FROM products p

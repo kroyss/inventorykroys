@@ -16,6 +16,7 @@ const PRODUCTS_SQL = `
     pc.name                                         AS category_name,
     COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
     pp.profit_category_id,
+    p.weight_kg::float                            AS weight_kg,
     COALESCE(inv.sale_price,            0)::float AS sale_price,
     COALESCE(inv.quantity,              0)::int   AS quantity
   FROM products p
@@ -37,6 +38,7 @@ const CreateSchema = z.object({
   price_bolivares:    z.number().nonnegative().default(0),
   discount_percent:   z.number().min(0).max(100).default(0),
   sale_price:         z.number().nonnegative().default(0),
+  weight_kg:          z.number().positive().nullable().optional(),
   ml_codes:           z.array(z.object({ account: z.string(), code: z.string() })).optional(),
 })
 
@@ -59,8 +61,8 @@ export async function POST(req: NextRequest) {
     await db.query('BEGIN')
     try {
       const { rows: [product] } = await db.query(
-        `INSERT INTO products (code, name) VALUES ($1, $2) RETURNING id`,
-        [body.code.toUpperCase(), body.name]
+        `INSERT INTO products (code, name, weight_kg) VALUES ($1, $2, $3) RETURNING id`,
+        [body.code.toUpperCase(), body.name, body.weight_kg ?? null]
       )
       await db.query(
         `INSERT INTO product_pricing

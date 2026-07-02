@@ -39,6 +39,7 @@ export interface Product {
   profit_category_id: number | null
   sale_price: number
   quantity: number
+  weight_kg: number | null
 }
 
 export interface MLCode {

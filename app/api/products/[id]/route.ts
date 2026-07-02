@@ -14,6 +14,7 @@ const UpdateSchema = z.object({
   price_bolivares:    z.number().nonnegative().optional(),
   discount_percent:   z.number().min(0).max(100).optional(),
   sale_price:         z.number().nonnegative().optional(),
+  weight_kg:          z.number().positive().nullable().optional(),
   ml_codes:           z.array(z.object({ account: z.string(), code: z.string() })).optional(),
 })
 
@@ -40,6 +41,7 @@ export async function GET(
        pc.name                                         AS category_name,
        COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
        pp.profit_category_id,
+       p.weight_kg::float                            AS weight_kg,
        COALESCE(inv.sale_price,            0)::float AS sale_price,
        COALESCE(inv.quantity,              0)::int   AS quantity
      FROM products p
@@ -76,6 +78,9 @@ export async function PUT(
     try {
       if (body.name !== undefined) {
         await db.query(`UPDATE products SET name = $1 WHERE id = $2`, [body.name, id])
+      }
+      if (body.weight_kg !== undefined) {
+        await db.query(`UPDATE products SET weight_kg = $1 WHERE id = $2`, [body.weight_kg, id])
       }
 
       const pricingFields: [string, unknown][] = []
