@@ -59,6 +59,24 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   const [isFlex, setIsFlex] = useState(editing?.is_flex ?? false)  // CO: venta FLEX
   const [mounted, setMounted] = useState(false)
 
+  // Chequeo EN VIVO de número de orden duplicado (debounced), igual que el combobox de Cliente.
+  const [orderDup, setOrderDup] = useState<{ id: number; status: string; customer_name: string | null } | null>(null)
+  const [checkingOrder, setCheckingOrder] = useState(false)
+  useEffect(() => {
+    const num = orderNumber.trim()
+    if (!num || isLocal) { setOrderDup(null); setCheckingOrder(false); return }
+    if (editing && num === editing.ml_order_number) { setOrderDup(null); setCheckingOrder(false); return }
+    setCheckingOrder(true)
+    const t = setTimeout(() => {
+      const qs = new URLSearchParams({ number: num, ...(editing ? { exclude: String(editing.id) } : {}) })
+      fetch(`/api/sales/check-order?${qs}`).then(r => r.json())
+        .then(d => setOrderDup(d.exists ? d.sale : null))
+        .catch(() => {})
+        .finally(() => setCheckingOrder(false))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [orderNumber, isLocal, editing])
+
   // slide-in on mount
   useEffect(() => { setMounted(true) }, [])
 
@@ -201,7 +219,17 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               <label className="text-xs text-neutral-500">Número de orden ML</label>
               <input value={orderNumber} onChange={e => setOrderNumber(digitsOnly(e.target.value))}
                 disabled={isLocal} inputMode="numeric"
-                className="mt-1 w-full border rounded px-3 py-2 text-sm" placeholder="Solo números" />
+                className={`mt-1 w-full border rounded px-3 py-2 text-sm ${orderDup ? 'border-red-400 focus:ring-red-400' : ''}`}
+                placeholder="Solo números" />
+              {checkingOrder && (
+                <p className="text-[11px] text-neutral-400 mt-1">Verificando…</p>
+              )}
+              {!checkingOrder && orderDup && (
+                <p className="text-[11px] text-red-600 mt-1">
+                  ⚠️ Ya existe una venta con este número (#{orderDup.id} · {orderDup.status}
+                  {orderDup.customer_name ? ` · ${orderDup.customer_name}` : ''})
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs text-neutral-500">Cliente</label>
@@ -314,15 +342,15 @@ export default function VentasForm({ editing, products, country, onClose, onSave
         <div className="px-5 py-4 border-t flex justify-end gap-2 bg-neutral-50 shrink-0">
           <button onClick={close} className="btn-secondary text-sm">Cancelar</button>
           {editing ? (
-            <button onClick={() => save('close')} disabled={busy} className="btn-primary text-sm">
+            <button onClick={() => save('close')} disabled={busy || !!orderDup} className="btn-primary text-sm">
               {busy ? 'Guardando…' : 'Actualizar'}
             </button>
           ) : (
             <>
-              <button onClick={() => save('close')} disabled={busy || items.length === 0} className="btn-secondary text-sm">
+              <button onClick={() => save('close')} disabled={busy || items.length === 0 || !!orderDup} className="btn-secondary text-sm">
                 {busy ? 'Guardando…' : 'Crear venta'}
               </button>
-              <button onClick={() => save('continue')} disabled={busy || items.length === 0} className="btn-primary text-sm">
+              <button onClick={() => save('continue')} disabled={busy || items.length === 0 || !!orderDup} className="btn-primary text-sm">
                 {busy ? 'Guardando…' : 'Crear y continuar'}
               </button>
             </>
