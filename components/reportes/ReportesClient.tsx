@@ -320,20 +320,6 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       return next
     })
   }
-  const setQty = (id: number, qty: number) => {
-    setPicked(p => ({ ...p, [id]: Math.max(1, qty) }))
-  }
-
-  const createPO = () => {
-    const items = Object.entries(picked).map(([id, qty]) => {
-      const row = (data.reposicion as any[]).find(r => r.id === Number(id))
-      return { id: Number(id), code: row.code, name: row.name, quantity: qty }
-    })
-    if (items.length === 0) return
-    sessionStorage.setItem('repo_items', JSON.stringify(items))
-    window.location.href = '/compras?new=1&from=reposicion'
-  }
-
   // Filas del pedido a partir de la selección (ordenadas por código).
   const pedidoRows = () => Object.entries(picked)
     .map(([id, qty]) => {
@@ -495,12 +481,11 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
                 <Th k="cobertura_total" label="Cob+tránsito" align="right" />
                 <Th k="ganancia_mensual" label="Gan/mes" align="right" />
                 <Th k="sugerido_comprar" label="Sugerido" align="right" />
-                <th className="px-3 py-2 text-right w-24">A pedir</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 && (
-                <tr><td colSpan={13} className="px-3 py-8 text-center text-neutral-400">Sin productos para reponer</td></tr>
+                <tr><td colSpan={12} className="px-3 py-8 text-center text-neutral-400">Sin productos para reponer</td></tr>
               )}
               {list.map((p, i) => {
                 const isPicked = p.id in picked
@@ -532,13 +517,6 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
                     <td className="px-3 py-2 text-right font-medium">{p.cobertura_total} m</td>
                     <td className="px-3 py-2 text-right text-green-600">${money(p.ganancia_mensual)}</td>
                     <td className="px-3 py-2 text-right font-semibold">{p.sugerido_comprar}</td>
-                    <td className="px-3 py-2 text-right">
-                      {isPicked ? (
-                        <input type="number" min={1} value={picked[p.id]}
-                          onChange={e => setQty(p.id, parseInt(e.target.value, 10) || 1)}
-                          className="w-16 border border-neutral-300 rounded px-1.5 py-0.5 text-right text-sm" />
-                      ) : <span className="text-neutral-300">—</span>}
-                    </td>
                   </tr>
                 )
               })}
@@ -565,12 +543,8 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
               📊 Excel
             </button>
             <button onClick={exportPedidoTxt} title="Descargar lista de pedido en TXT ordenado"
-              className="px-3 py-1.5 border border-neutral-600 text-white rounded text-sm font-medium hover:bg-neutral-800">
-              📄 TXT
-            </button>
-            <button onClick={createPO}
               className="px-4 py-1.5 bg-white text-neutral-900 rounded text-sm font-semibold hover:bg-neutral-100">
-              Crear orden →
+              📄 TXT
             </button>
           </div>
         </div>
