@@ -301,6 +301,17 @@ function InventoryReport({ data, search, setSearch }: any) {
 }
 
 // ───── stock analysis ─────
+// Componente estable (fuera del render de StockAnalysisReport): si se define
+// adentro, React lo trata como un tipo nuevo en cada tecla y remonta el
+// input, perdiendo el foco a cada letra.
+function StockSearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <input type="search" value={value} onChange={e => onChange(e.target.value)}
+      placeholder="Buscar producto (admite errores de tipeo)…"
+      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+  )
+}
+
 const PRIO_META: Record<string, { label: string; rank: number; badge: string; row: string }> = {
   URGENTE:   { label: '🔴 Urgente',  rank: 0, badge: 'bg-red-100 text-red-700',       row: 'bg-red-50/40' },
   PEDIR:     { label: '🟠 Pedir',    rank: 1, badge: 'bg-orange-100 text-orange-700', row: '' },
@@ -395,11 +406,6 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
     return l
   }, [all, hideCovered, search, sortKey, sortDir])
 
-  const SearchBox = () => (
-    <input type="search" value={search} onChange={e => setSearch(e.target.value)}
-      placeholder="Buscar producto (admite errores de tipeo)…"
-      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
-  )
 
   if (sub === 'remate' || sub === 'nuevos') {
     const cols: Column<any>[] = [
@@ -417,7 +423,7 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <SubTabs sub={sub} setSub={setSub} data={data} />
-          <SearchBox />
+          <StockSearchBox value={search} onChange={setSearch} />
         </div>
         {sub === 'nuevos' && (
           <p className="text-xs text-neutral-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
@@ -454,7 +460,7 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <SubTabs sub={sub} setSub={setSub} data={data} />
-        <SearchBox />
+        <StockSearchBox value={search} onChange={setSearch} />
       </div>
 
       {/* resumen de prioridad */}
