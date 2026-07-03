@@ -5,6 +5,7 @@ import {
   KPICard, DataTable, exportRows, money, type Column,
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
+import { matchFuzzy } from '@/lib/search'
 import * as XLSX from 'xlsx'
 
 type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
@@ -311,6 +312,7 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
   const [hideCovered, setHideCovered] = useState(false)
   const [sortKey, setSortKey] = useState<string>('prioridad')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [search, setSearch] = useState('')
 
   const togglePick = (id: number, defaultQty: number) => {
     setPicked(p => {
@@ -381,6 +383,7 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       prioridad:        p => PRIO_META[p.prioridad]?.rank ?? 9,
     }
     let l = hideCovered ? all.filter(p => p.prioridad !== 'EN_CAMINO') : [...all]
+    if (search.trim()) l = l.filter(p => matchFuzzy(search, p.code, p.name, p.categoria))
     const f = sortVal[sortKey]
     if (f) {
       l.sort((a, b) => {
@@ -390,7 +393,13 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       })
     }
     return l
-  }, [all, hideCovered, sortKey, sortDir])
+  }, [all, hideCovered, search, sortKey, sortDir])
+
+  const SearchBox = () => (
+    <input type="search" value={search} onChange={e => setSearch(e.target.value)}
+      placeholder="Buscar producto (admite errores de tipeo)…"
+      className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+  )
 
   if (sub === 'remate' || sub === 'nuevos') {
     const cols: Column<any>[] = [
@@ -402,10 +411,14 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       { key: 'meses_disponible', label: 'Antigüedad', align: 'right', render: p => `${p.meses_disponible} m`, sortValue: p => p.meses_disponible },
       { key: 'meses_duracion', label: 'Duración', align: 'right', render: p => `${p.meses_duracion} m`, sortValue: p => p.meses_duracion },
     ]
-    const rows = sub === 'nuevos' ? (data.nuevos ?? []) : data.remate
+    const baseRows = sub === 'nuevos' ? (data.nuevos ?? []) : data.remate
+    const rows = search.trim() ? baseRows.filter((p: any) => matchFuzzy(search, p.code, p.name)) : baseRows
     return (
       <div className="space-y-3">
-        <SubTabs sub={sub} setSub={setSub} data={data} />
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <SubTabs sub={sub} setSub={setSub} data={data} />
+          <SearchBox />
+        </div>
         {sub === 'nuevos' && (
           <p className="text-xs text-neutral-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
             🆕 Recién llegados (menos de 3 meses en inventario). Tienen pocas ventas porque aún
@@ -439,7 +452,10 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
 
   return (
     <div className="space-y-3">
-      <SubTabs sub={sub} setSub={setSub} data={data} />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <SubTabs sub={sub} setSub={setSub} data={data} />
+        <SearchBox />
+      </div>
 
       {/* resumen de prioridad */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
