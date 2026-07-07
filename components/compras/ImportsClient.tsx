@@ -831,42 +831,36 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
               {isAdmin && selected.status !== 'PENDIENTE' && (
                 <div className="bg-white rounded-lg border shadow-sm p-4">
                   <div className="text-xs text-neutral-500 mb-2">Datos de envío</div>
-                  <div className="flex flex-wrap items-start gap-2">
-                    <div className="w-full sm:w-56">
-                      <Combobox
-                        value={trackingInput}
-                        options={selected.tracking_number ? [{ id: 1, name: selected.tracking_number }] : []}
-                        placeholder="Tracking: escribí y Agregar"
-                        createLabel="Agregar"
-                        onChange={(name) => setTrackingInput(name)}
-                        onCreate={(name) => { setTrackingInput(name); saveShipping({ tracking_number: name || null }) }}
-                        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                      />
-                    </div>
-                    <div className="w-full sm:w-56">
-                      <Combobox
-                        value={trkContName}
-                        options={containers.map(c => ({ id: c.id, name: c.code }))}
-                        placeholder="Contenedor: activo o nuevo"
-                        createLabel="Agregar"
-                        onChange={(name, id) => { setTrkContName(name); setTrkContId(id); if (id != null) saveShipping({ container_id: id }) }}
-                        onCreate={(name) => createAndSaveContainer(name)}
-                        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                      />
-                    </div>
-                    <div className="w-full sm:w-56">
-                      <Combobox
-                        value={carrierInput}
-                        options={carriers}
-                        placeholder="Transportista: escribí y Agregar"
-                        createLabel="Agregar"
-                        onChange={(name) => setCarrierInput(name)}
-                        onCreate={(name) => { setCarrierInput(name); saveShipping({ shipping_company: name || null }) }}
-                        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                      />
-                    </div>
-                    {trkSaved && <span className="text-xs text-green-600 self-center">✓ Guardado</span>}
+                  <div className="grid grid-cols-3 gap-2 items-start">
+                    <Combobox
+                      value={trackingInput}
+                      options={selected.tracking_number ? [{ id: 1, name: selected.tracking_number }] : []}
+                      placeholder="Tracking"
+                      createLabel="Agregar"
+                      onChange={(name) => setTrackingInput(name)}
+                      onCreate={(name) => { setTrackingInput(name); saveShipping({ tracking_number: name || null }) }}
+                      className="w-full min-w-0 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                    />
+                    <Combobox
+                      value={trkContName}
+                      options={containers.map(c => ({ id: c.id, name: c.code }))}
+                      placeholder="Contenedor"
+                      createLabel="Agregar"
+                      onChange={(name, id) => { setTrkContName(name); setTrkContId(id); if (id != null) saveShipping({ container_id: id }) }}
+                      onCreate={(name) => createAndSaveContainer(name)}
+                      className="w-full min-w-0 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                    />
+                    <Combobox
+                      value={carrierInput}
+                      options={carriers}
+                      placeholder="Transportista"
+                      createLabel="Agregar"
+                      onChange={(name) => setCarrierInput(name)}
+                      onCreate={(name) => { setCarrierInput(name); saveShipping({ shipping_company: name || null }) }}
+                      className="w-full min-w-0 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                    />
                   </div>
+                  {trkSaved && <span className="text-xs text-green-600">✓ Guardado</span>}
                 </div>
               )}
 
