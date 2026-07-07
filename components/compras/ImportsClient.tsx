@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ImportsForm from './ImportsForm'
 import ImportFiles from './ImportFiles'
@@ -109,12 +109,17 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [showPay, setShowPay]             = useState<'50' | '100' | null>(null)
   // Datos de envío (tracking + contenedor + transportista): editables en cualquier
   // estado post-pago (no solo PAGADA), para poder completar órdenes viejas.
+  // Transportista = origin_country (mismo campo que usa el form de creación,
+  // pese al nombre de columna — NO es shipping_company, esa columna no se usa).
   const [containers,  setContainers]        = useState<{ id: number; code: string }[]>([])
   const [trkContName, setTrkContName]       = useState('')
   const [trkContId,   setTrkContId]         = useState<number | null>(null)
   const [carrierInput, setCarrierInput]     = useState('')
-  const [carriers,     setCarriers]         = useState<{ id: number; name: string }[]>([])
   const [trkSaved,    setTrkSaved]          = useState(false)  // feedback "guardado"
+  const carrierNames = useMemo(
+    () => [...new Set(orders.map(o => o.origin_country).filter(Boolean) as string[])].sort(),
+    [orders]
+  )
 
   // Modal "fotos visibles al usuario" al pasar EN_IMPORTADOR_PAGAR → EN_CAMINO
   type VisFile = { id: number; file_name: string; file_type: string | null; visible_to_user: boolean }
@@ -156,14 +161,6 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     } catch { /* sin contenedores, igual se puede crear */ }
   }, [])
 
-  // Transportistas ya usados (autocompletado del campo libre)
-  const loadCarriers = useCallback(async () => {
-    try {
-      const r = await fetch('/api/imports/carriers', { cache: 'no-store' })
-      if (r.ok) setCarriers(await r.json())
-    } catch { /* sin sugerencias, igual se puede escribir */ }
-  }, [])
-
   // Al abrir una orden, pre-carga tracking/contenedor/transportista ya guardados
   // (para poder completarlos por tandas, o corregir órdenes que ya avanzaron de
   // estado y quedaron con estos campos vacíos).
@@ -171,9 +168,9 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     setTrackingInput(selected?.tracking_number ?? '')
     setTrkContName(selected?.container_code ?? '')
     setTrkContId(selected?.container_id ?? null)
-    setCarrierInput(selected?.shipping_company ?? '')
-    if (isAdmin && selected && selected.status !== 'PENDIENTE') { loadActiveContainers(); loadCarriers() }
-  }, [selected, isAdmin, loadActiveContainers, loadCarriers])
+    setCarrierInput(selected?.origin_country ?? '')
+    if (isAdmin && selected && selected.status !== 'PENDIENTE') loadActiveContainers()
+  }, [selected, isAdmin, loadActiveContainers])
 
   // Botón unificado "+ Compra" del padre: abre el form de importación al activarse
   useEffect(() => {
@@ -349,7 +346,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
 
   // Persiste tracking y/o contenedor SIN avanzar de estado (completar por tandas:
   // el tracking hoy, y el contenedor cuando llegue días después).
-  const saveShipping = async (patch: { tracking_number?: string | null; container_id?: number | null; shipping_company?: string | null }) => {
+  const saveShipping = async (patch: { tracking_number?: string | null; container_id?: number | null; origin_country?: string | null }) => {
     if (!selected) return
     setBusy(true); setError(null)
     const res = await fetch(`/api/imports/${selected.id}/tracking`, {
@@ -852,11 +849,11 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     />
                     <Combobox
                       value={carrierInput}
-                      options={carriers}
+                      options={carrierNames.map((c, i) => ({ id: i, name: c }))}
                       placeholder="Transportista"
                       createLabel="Agregar"
                       onChange={(name) => setCarrierInput(name)}
-                      onCreate={(name) => { setCarrierInput(name); saveShipping({ shipping_company: name || null }) }}
+                      onCreate={(name) => { setCarrierInput(name); saveShipping({ origin_country: name || null }) }}
                       className="w-full min-w-0 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                     />
                   </div>
@@ -1234,7 +1231,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
         <ImportsForm
           editing={editing}
           suppliers={suppliers}
-          carriers={[...new Set(orders.map(o => o.origin_country).filter(Boolean) as string[])].sort()}
+          carriers={carrierNames}
           onClose={() => { setShowForm(false); setEditing(null) }}
           onSaved={() => { setShowForm(false); setEditing(null); reload() }}
           onReload={reload}

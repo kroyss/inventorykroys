@@ -15,7 +15,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { rows: [order] } = await db.query(`
     SELECT io.id, io.order_number, io.status, io.notes, io.created_at,
            io.total_usd::float        AS total_usd,
-           io.tracking_number, io.origin_country, io.shipping_company, io.box_count,
+           io.tracking_number, io.origin_country, io.box_count,
            s.name AS supplier_name,
            COALESCE(
              JSON_AGG(
