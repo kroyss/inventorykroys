@@ -852,7 +852,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       options={carrierNames.map((c, i) => ({ id: i, name: c }))}
                       placeholder="Transportista"
                       createLabel="Agregar"
-                      onChange={(name) => setCarrierInput(name)}
+                      onChange={(name, id) => { setCarrierInput(name); if (id != null) saveShipping({ origin_country: name || null }) }}
                       onCreate={(name) => { setCarrierInput(name); saveShipping({ origin_country: name || null }) }}
                       className="w-full min-w-0 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                     />
