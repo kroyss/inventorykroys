@@ -3,13 +3,15 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 
-// Guarda el tracking y/o el contenedor SIN cambiar el estado. Sirve para
-// completar por tandas: a veces primero llega el tracking y días después el
-// contenedor. Así el dato queda guardado y solo se avanza a tránsito cuando
-// están ambos (+ foto). Solo admin.
+// Guarda tracking / contenedor / transportista SIN cambiar el estado. Sirve
+// para completar por tandas (a veces primero llega el tracking y días después
+// el contenedor) Y para editar/completar estos datos en órdenes que ya
+// avanzaron de estado (p.ej. campos que no existían cuando se creó la orden).
+// Solo admin.
 const Schema = z.object({
-  tracking_number: z.string().trim().nullable().optional(),
-  container_id:    z.number().int().positive().nullable().optional(),
+  tracking_number:  z.string().trim().nullable().optional(),
+  container_id:     z.number().int().positive().nullable().optional(),
+  shipping_company: z.string().trim().nullable().optional(),
 })
 
 export async function PUT(
@@ -34,6 +36,10 @@ export async function PUT(
     if (body.container_id !== undefined) {
       sets.push(`container_id=$${vals.length + 1}`)
       vals.push(body.container_id)
+    }
+    if (body.shipping_company !== undefined) {
+      sets.push(`shipping_company=$${vals.length + 1}`)
+      vals.push(body.shipping_company || null)
     }
     if (sets.length === 0) return NextResponse.json({ ok: true })
 

@@ -107,10 +107,13 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const [incNote, setIncNote]             = useState('')
   const [showIncNote, setShowIncNote]     = useState(false)
   const [showPay, setShowPay]             = useState<'50' | '100' | null>(null)
-  // Contenedores activos para el paso PAGADA → En tránsito (tracking + contenedor)
+  // Datos de envío (tracking + contenedor + transportista): editables en cualquier
+  // estado post-pago (no solo PAGADA), para poder completar órdenes viejas.
   const [containers,  setContainers]        = useState<{ id: number; code: string }[]>([])
   const [trkContName, setTrkContName]       = useState('')
   const [trkContId,   setTrkContId]         = useState<number | null>(null)
+  const [carrierInput, setCarrierInput]     = useState('')
+  const [carriers,     setCarriers]         = useState<{ id: number; name: string }[]>([])
   const [trkSaved,    setTrkSaved]          = useState(false)  // feedback "guardado"
 
   // Modal "fotos visibles al usuario" al pasar EN_IMPORTADOR_PAGAR → EN_CAMINO
@@ -153,14 +156,24 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     } catch { /* sin contenedores, igual se puede crear */ }
   }, [])
 
-  // Al abrir una orden, pre-carga tracking y contenedor ya guardados (para poder
-  // completarlos por tandas: primero el tracking, luego el contenedor otro día).
+  // Transportistas ya usados (autocompletado del campo libre)
+  const loadCarriers = useCallback(async () => {
+    try {
+      const r = await fetch('/api/imports/carriers', { cache: 'no-store' })
+      if (r.ok) setCarriers(await r.json())
+    } catch { /* sin sugerencias, igual se puede escribir */ }
+  }, [])
+
+  // Al abrir una orden, pre-carga tracking/contenedor/transportista ya guardados
+  // (para poder completarlos por tandas, o corregir órdenes que ya avanzaron de
+  // estado y quedaron con estos campos vacíos).
   useEffect(() => {
     setTrackingInput(selected?.tracking_number ?? '')
     setTrkContName(selected?.container_code ?? '')
     setTrkContId(selected?.container_id ?? null)
-    if (isAdmin && selected?.status === 'PAGADA') loadActiveContainers()
-  }, [selected, isAdmin, loadActiveContainers])
+    setCarrierInput(selected?.shipping_company ?? '')
+    if (isAdmin && selected && selected.status !== 'PENDIENTE') { loadActiveContainers(); loadCarriers() }
+  }, [selected, isAdmin, loadActiveContainers, loadCarriers])
 
   // Botón unificado "+ Compra" del padre: abre el form de importación al activarse
   useEffect(() => {
@@ -336,7 +349,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
 
   // Persiste tracking y/o contenedor SIN avanzar de estado (completar por tandas:
   // el tracking hoy, y el contenedor cuando llegue días después).
-  const saveShipping = async (patch: { tracking_number?: string | null; container_id?: number | null }) => {
+  const saveShipping = async (patch: { tracking_number?: string | null; container_id?: number | null; shipping_company?: string | null }) => {
     if (!selected) return
     setBusy(true); setError(null)
     const res = await fetch(`/api/imports/${selected.id}/tracking`, {
@@ -812,6 +825,51 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 )}
               </div>
 
+              {/* Datos de envío — editable en CUALQUIER estado post-pago (no solo PAGADA),
+                  para completar tracking/contenedor/transportista en órdenes viejas o que
+                  ya avanzaron de estado sin tener estos campos cargados. */}
+              {isAdmin && selected.status !== 'PENDIENTE' && (
+                <div className="bg-white rounded-lg border shadow-sm p-4">
+                  <div className="text-xs text-neutral-500 mb-2">Datos de envío</div>
+                  <div className="flex flex-wrap items-start gap-2">
+                    <div className="w-full sm:w-56">
+                      <Combobox
+                        value={trackingInput}
+                        options={selected.tracking_number ? [{ id: 1, name: selected.tracking_number }] : []}
+                        placeholder="Tracking: escribí y Agregar"
+                        createLabel="Agregar"
+                        onChange={(name) => setTrackingInput(name)}
+                        onCreate={(name) => { setTrackingInput(name); saveShipping({ tracking_number: name || null }) }}
+                        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                      />
+                    </div>
+                    <div className="w-full sm:w-56">
+                      <Combobox
+                        value={trkContName}
+                        options={containers.map(c => ({ id: c.id, name: c.code }))}
+                        placeholder="Contenedor: activo o nuevo"
+                        createLabel="Agregar"
+                        onChange={(name, id) => { setTrkContName(name); setTrkContId(id); if (id != null) saveShipping({ container_id: id }) }}
+                        onCreate={(name) => createAndSaveContainer(name)}
+                        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                      />
+                    </div>
+                    <div className="w-full sm:w-56">
+                      <Combobox
+                        value={carrierInput}
+                        options={carriers}
+                        placeholder="Transportista: escribí y Agregar"
+                        createLabel="Agregar"
+                        onChange={(name) => setCarrierInput(name)}
+                        onCreate={(name) => { setCarrierInput(name); saveShipping({ shipping_company: name || null }) }}
+                        className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                      />
+                    </div>
+                    {trkSaved && <span className="text-xs text-green-600 self-center">✓ Guardado</span>}
+                  </div>
+                </div>
+              )}
+
               {/* Print reception list */}
               {['EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR','EN_CAMINO','RECIBIDA','PARCIAL'].includes(selected.status) && (
                 <div>
@@ -853,42 +911,17 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       </>
                     )}
                     {selected.status === 'PAGADA' && (
-                      <>
-                        <div className="w-full flex flex-wrap items-start gap-2">
-                          <div className="w-56">
-                            <Combobox
-                              value={trackingInput}
-                              options={selected.tracking_number ? [{ id: 1, name: selected.tracking_number }] : []}
-                              placeholder="Tracking: escribí y Agregar"
-                              createLabel="Agregar"
-                              onChange={(name) => setTrackingInput(name)}
-                              onCreate={(name) => { setTrackingInput(name); saveShipping({ tracking_number: name || null }) }}
-                              className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                            />
-                          </div>
-                          <div className="w-56">
-                            <Combobox
-                              value={trkContName}
-                              options={containers.map(c => ({ id: c.id, name: c.code }))}
-                              placeholder="Contenedor: activo o nuevo"
-                              createLabel="Agregar"
-                              onChange={(name, id) => { setTrkContName(name); setTrkContId(id); if (id != null) saveShipping({ container_id: id }) }}
-                              onCreate={(name) => createAndSaveContainer(name)}
-                              className="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                            />
-                          </div>
-                          <button onClick={() => advanceTo('EN_TRANSITO')}
-                            disabled={busy || !trackingInput.trim() || !trkContName.trim() || (selected.file_count ?? 0) < 1}
-                            className="btn-primary text-sm">
-                            En tránsito
-                          </button>
-                          {trkSaved && <span className="text-xs text-green-600 self-center">✓ Guardado</span>}
-                        </div>
-                        <div className="w-full text-[11px] text-neutral-400 mt-0.5">
-                          Escribí el tracking y tocá <b>Agregar</b> para guardarlo; el contenedor cuando lo tengas. Para pasar a <b>tránsito</b> se necesitan tracking + contenedor + ≥1 foto.
+                      <div className="w-full">
+                        <button onClick={() => advanceTo('EN_TRANSITO')}
+                          disabled={busy || !trackingInput.trim() || !trkContName.trim() || !carrierInput.trim() || (selected.file_count ?? 0) < 1}
+                          className="btn-primary text-sm">
+                          En tránsito
+                        </button>
+                        <div className="text-[11px] text-neutral-400 mt-1">
+                          Completá tracking + contenedor + transportista arriba en "Datos de envío" (≥1 foto también) para poder pasar a <b>tránsito</b>.
                           {(selected.file_count ?? 0) < 1 && <span className="text-orange-500"> ⚠ Falta adjuntar foto.</span>}
                         </div>
-                      </>
+                      </div>
                     )}
                     {selected.status === 'EN_TRANSITO' && (
                       <button onClick={() => advanceTo('ADUANA')} disabled={busy} className="btn-primary text-sm">En aduana</button>

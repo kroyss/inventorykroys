@@ -18,6 +18,7 @@ interface ReceptionOrder {
   box_count?: number | null
   tracking_number?: string | null
   origin_country?: string | null
+  shipping_company?: string | null
   items: ReceptionItem[]
 }
 
@@ -149,10 +150,10 @@ export default function ReceptionPrint({ order, country, kind, photos = [] }: Pr
                 <span className="font-mono font-medium">{order.tracking_number}</span>
               </div>
             )}
-            {order.origin_country && (
+            {order.shipping_company && (
               <div>
                 <span className="text-neutral-500">Transportista:</span>{' '}
-                <span className="font-medium">{order.origin_country}</span>
+                <span className="font-medium">{order.shipping_company}</span>
               </div>
             )}
           </div>
