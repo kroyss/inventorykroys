@@ -141,8 +141,10 @@ export async function GET(_: NextRequest) {
         es_nuevo:         esNuevo,
       }
 
-      // Rotación muy baja con stock parado (≈ < 1 venta/mes según su antigüedad).
-      if (ventaMensual < 1 && stock > 0) {
+      // Rotación muy baja con stock parado: menos de 6 unidades vendidas en los
+      // últimos 6 meses (total crudo, no la tasa adaptada por antigüedad — así un
+      // producto de 4 meses con 5 ventas también cae a remate, no solo los de 6+).
+      if (ventas6m < 6 && stock > 0) {
         // Si recién llegó, no es remate: aún no tuvo tiempo de venderse → "Nuevos".
         if (esNuevo) nuevos.push(base)
         else         remate.push(base)
