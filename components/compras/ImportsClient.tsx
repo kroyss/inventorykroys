@@ -876,9 +876,14 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 <div className="bg-white rounded-lg border shadow-sm p-4">
                   <div className="text-xs text-neutral-500 mb-2">Acciones</div>
                   <div className="flex flex-wrap gap-2">
+                    {/* Editar: disponible en cualquier estado previo a la recepción física
+                        (el inventario recién se toca al recibir, así que hasta entonces
+                        productos/cantidades/costos se pueden seguir corrigiendo). */}
+                    {!['RECIBIDA', 'PARCIAL'].includes(selected.status) && (
+                      <button onClick={() => { setEditing(selected); setShowForm(true) }} className="btn-secondary text-sm">Editar</button>
+                    )}
                     {selected.status === 'PENDIENTE' && (
                       <>
-                        <button onClick={() => { setEditing(selected); setShowForm(true) }} className="btn-secondary text-sm">Editar</button>
                         <button onClick={() => openPay('50')} className="btn-primary text-sm">Pagar 50%</button>
                         <button onClick={() => openPay('100')} className="btn-primary text-sm">Pagar 100%</button>
                         <button onClick={deleteOrder} disabled={busy} className="btn-danger text-sm">Eliminar</button>
