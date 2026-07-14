@@ -259,6 +259,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   // CO: precio de venta sugerido en pesos = precio base (USD) × TRM
   const suggestedPesos = Math.round(basePriceUsd * coTrm)
 
+  // CO: el precio de venta nunca debe quedar en blanco. Si el producto ya trae
+  // un valor (nuevo o viejo) se respeta; si está vacío, se autocompleta con el
+  // sugerido apenas esté disponible (una sola vez por apertura del form, para
+  // no pelear con el usuario si luego borra el campo a mano).
+  const [salePriceAutoFilled, setSalePriceAutoFilled] = useState(false)
+  useEffect(() => {
+    if (country !== 'CO' || (modal !== 'create' && modal !== 'edit') || salePriceAutoFilled) return
+    if (form.sale_price > 0) { setSalePriceAutoFilled(true); return }
+    if (suggestedPesos > 0) {
+      setForm(f => ({ ...f, sale_price: suggestedPesos }))
+      setSalePriceAutoFilled(true)
+    }
+  }, [country, modal, salePriceAutoFilled, form.sale_price, suggestedPesos])
+
   // Open create modal when arriving via command palette (/productos?new=1)
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('new') === '1') openCreate()
@@ -310,6 +324,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     const data = await res.json()
     setForm({ ...emptyForm(mlAccounts), code: data.next_code ?? data.code })
     setEditId(null)
+    setSalePriceAutoFilled(false)
     setModal('create')
   }
 
@@ -318,6 +333,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     setError('')
     const res  = await fetch(`/api/products/${id}`)
     const data = await res.json()
+    setSalePriceAutoFilled(false)
     setForm({
       code:               data.code,
       name:               data.name,
