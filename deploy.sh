@@ -14,5 +14,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 echo "→ limpiando imágenes viejas"
 docker image prune -f >/dev/null
 
+echo "→ limpiando build cache viejo (> 72h)"
+docker builder prune -af --filter "until=72h" >/dev/null
+
 echo "✓ Deploy OK"
 docker compose -f docker-compose.prod.yml ps
