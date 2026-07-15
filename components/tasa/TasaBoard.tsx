@@ -95,12 +95,12 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
 
         <div className="bg-[#1F242B] rounded-2xl border border-[#2E343C] px-5 shadow-[0_1px_0_0_#2E343C_inset]">
           <Row
-            label="Oficial · BCV" value={fmt(data.ve.official_rate)} accent="text-[#FFB020]"
+            label="BCV" value={fmt(data.ve.official_rate)} accent="text-[#FFB020]"
             updatedAt={data.ve.updated_at} tz="America/Caracas"
           />
           <Row
-            label="Paralelo · Binance" value={fmt(data.ve.parallel_rate)} accent="text-[#FF6B4A]"
-            caption={data.ve.spread_percentage > 0 ? `+${data.ve.spread_percentage.toFixed(1)}% vs oficial` : undefined}
+            label="Referencial" value={fmt(data.ve.parallel_rate)} accent="text-[#FF6B4A]"
+            caption={data.ve.spread_percentage > 0 ? `+${data.ve.spread_percentage.toFixed(1)}% vs BCV` : undefined}
             updatedAt={data.ve.updated_at} tz="America/Caracas"
           />
           <Row
@@ -124,10 +124,6 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
         {note && (
           <p className="text-center text-[11px] text-[#8A9099] mt-3">{note}</p>
         )}
-
-        <p className="text-center text-[11px] text-[#5C636D] mt-5 leading-relaxed">
-          Bs por USD/USDT · Colombia en pesos por USD · se actualiza sola varias veces al día
-        </p>
       </div>
     </div>
   )
