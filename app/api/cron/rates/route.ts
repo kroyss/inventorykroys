@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
+import { fetchVEParallelRate } from '@/lib/binanceP2P'
 
 // Cron de tasas (lo dispara el crontab del VPS con un secreto compartido).
 // NO usa sesión. Actualiza AMBOS países en una sola pasada:
-//   - VE: BCV oficial + paralelo desde ve.dolarapi.com  → venezuela_exchange_rates
-//   - CO: TRM desde co.dolarapi.com/v1/trm              → colombia_exchange_rates
+//   - VE: BCV oficial (dolarapi) + paralelo (Binance P2P, fallback dolarapi) → venezuela_exchange_rates
+//   - CO: TRM desde co.dolarapi.com/v1/trm                                  → colombia_exchange_rates
 //   curl -fsS "https://inventory.syncsora.com/api/cron/rates?key=EL_SECRETO"
 // Cada país en su propio try/catch: si uno falla, el otro igual se actualiza.
 // Idempotente por día: si ya hay una fila 'api' de hoy, la ACTUALIZA (no duplica).
@@ -28,23 +29,23 @@ async function adminId(db: ReturnType<typeof getDb>): Promise<number | null> {
 async function updateVE() {
   const db = getDb('VE')
 
-  const fetchRate = async (type: 'oficial' | 'paralelo'): Promise<number> => {
-    const res = await fetch(`https://ve.dolarapi.com/v1/dolares/${type}`, {
+  const fetchOfficial = async (): Promise<number> => {
+    const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', {
       headers: { 'User-Agent': 'SyncsoraInventory/cron' },
       signal: AbortSignal.timeout(10000),
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status} para tasa ${type}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status} para tasa oficial`)
     const data = await res.json()
     return parseFloat(data.promedio)
   }
 
-  const [officialRaw, parallelRaw] = await Promise.all([
-    fetchRate('oficial'),
-    fetchRate('paralelo'),
+  const [officialRaw, parallelResult] = await Promise.all([
+    fetchOfficial(),
+    fetchVEParallelRate(),
   ])
   // Tasas se guardan como entero (números grandes, el decimal es ruido).
   const official_rate = Math.round(officialRaw)
-  const parallel_rate = Math.round(parallelRaw)
+  const parallel_rate = Math.round(parallelResult.rate)
   if (!(official_rate > 0) || !(parallel_rate > 0)) {
     throw new Error('API VE retornó valores inválidos')
   }
@@ -85,7 +86,11 @@ async function updateVE() {
   // Poda: el historial es solo referencia, se conservan ~30 días.
   await db.query(`DELETE FROM venezuela_exchange_rates WHERE rate_date < CURRENT_DATE - INTERVAL '30 days'`)
 
-  return { id, action, official_rate, parallel_rate, spread_percentage: spread, recommended_discount }
+  return {
+    id, action, official_rate, parallel_rate,
+    parallel_source: parallelResult.source,
+    spread_percentage: spread, recommended_discount,
+  }
 }
 
 // ───────────────────────── Colombia (TRM) ─────────────────────────

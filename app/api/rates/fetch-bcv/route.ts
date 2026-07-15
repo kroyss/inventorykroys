@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
+import { fetchVEParallelRate } from '@/lib/binanceP2P'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -13,20 +14,21 @@ export async function GET(_: NextRequest) {
   const userId = parseInt(session.user.id, 10)
 
   try {
-    const fetchRate = async (type: 'oficial' | 'paralelo'): Promise<number> => {
-      const res = await fetch(`https://ve.dolarapi.com/v1/dolares/${type}`, {
+    const fetchOfficial = async (): Promise<number> => {
+      const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', {
         headers: { 'User-Agent': 'KroysInventory/3.0' },
         signal: AbortSignal.timeout(10000),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status} para tasa ${type}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status} para tasa oficial`)
       const data = await res.json()
       return parseFloat(data.promedio)
     }
 
-    const [official_rate, parallel_rate] = await Promise.all([
-      fetchRate('oficial'),
-      fetchRate('paralelo'),
+    const [official_rate, parallelResult] = await Promise.all([
+      fetchOfficial(),
+      fetchVEParallelRate(),
     ])
+    const parallel_rate = parallelResult.rate
 
     if (official_rate <= 0 || parallel_rate <= 0) {
       return NextResponse.json({ error: 'API retornó valores inválidos' }, { status: 503 })
@@ -52,12 +54,13 @@ export async function GET(_: NextRequest) {
 
     return NextResponse.json({
       id: row.id,
-      message: 'Tasa actualizada desde BCV',
+      message: `Tasa actualizada (oficial BCV + paralelo ${parallelResult.source === 'binance' ? 'Binance' : 'dolarapi, fallback'})`,
       official_rate, parallel_rate,
       spread_percentage:    spread,
       excess_percentage:    excess,
       recommended_discount,
       source: 'api',
+      parallel_source: parallelResult.source,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 503 })
