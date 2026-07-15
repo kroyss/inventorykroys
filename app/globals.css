@@ -40,3 +40,19 @@ body {
 .btn-warning {
   @apply px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
 }
+
+/* Board público de tasas (/tasa): el dígito "flipea" cuando cambia el valor,
+   como un panel de casa de cambio. */
+@keyframes tasa-flip {
+  0%   { transform: rotateX(0deg);   opacity: 1; }
+  45%  { transform: rotateX(90deg);  opacity: 0.25; }
+  55%  { transform: rotateX(-90deg); opacity: 0.25; }
+  100% { transform: rotateX(0deg);   opacity: 1; }
+}
+.animate-tasa-flip {
+  animation: tasa-flip 0.42s ease-in-out;
+  transform-style: preserve-3d;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-tasa-flip { animation: none; }
+}
