@@ -43,7 +43,7 @@ function Row({ label, value, accent, caption, updatedAt, tz }: {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-[#2E343C] py-5 last:border-none">
       <div>
-        <div className="text-[11px] tracking-[0.18em] text-[#8A9099] uppercase font-semibold">{label}</div>
+        <div className="text-sm sm:text-base tracking-[0.14em] text-[#8A9099] uppercase font-semibold">{label}</div>
         {caption && <div className="text-xs text-[#8A9099] mt-1">{caption}</div>}
       </div>
       <div className="text-right">
@@ -108,7 +108,7 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
             updatedAt={data.ve.updated_at} tz="America/Caracas"
           />
           <Row
-            label="TRM · Colombia" value={fmt(data.co.trm_rate)} accent="text-[#4DD9C4]"
+            label="TRM · CO" value={fmt(data.co.trm_rate)} accent="text-[#4DD9C4]"
             updatedAt={data.co.updated_at} tz="America/Bogota"
           />
         </div>
@@ -139,7 +139,7 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
               type="number" inputMode="decimal" value={usd}
               onChange={e => setUsd(e.target.value)}
               placeholder="0,00"
-              className="flex-1 min-w-0 bg-transparent font-mono tabular-nums text-2xl text-[#E8E4DA]
+              className="no-spinner flex-1 min-w-0 bg-transparent font-mono tabular-nums text-2xl text-[#E8E4DA]
                          border-b border-[#2E343C] focus:border-[#FF6B4A] outline-none py-1
                          placeholder:text-[#5C636D]"
             />

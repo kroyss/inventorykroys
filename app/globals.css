@@ -56,3 +56,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-tasa-flip { animation: none; }
 }
+
+/* Oculta el spinner nativo (flechitas subir/bajar) de <input type="number">:
+   el ingreso es manual, no con clicks. */
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+}
