@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PublicRates } from '@/lib/publicRates'
 
 const fmt = (n: number) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(n)
+const fmtMoney = (n: number) => new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 
 function relTime(iso: string | null): string {
   if (!iso) return 'sin datos'
@@ -61,7 +62,10 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
   const [data, setData]       = useState(initial)
   const [loading, setLoading] = useState(false)
   const [note, setNote]       = useState<string | null>(null)
+  const [usd, setUsd]         = useState('100')
   const [, forceTick]         = useState(0)
+
+  const bsResult = (parseFloat(usd) || 0) * data.ve.parallel_rate
 
   // Refresca los "hace X min" cada 30s sin pegarle a la API.
   useEffect(() => {
@@ -124,6 +128,29 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
         {note && (
           <p className="text-center text-[11px] text-[#8A9099] mt-3">{note}</p>
         )}
+
+        <div className="mt-6 bg-[#1F242B] rounded-2xl border border-[#2E343C] p-4">
+          <div className="text-[11px] tracking-[0.18em] text-[#8A9099] uppercase font-semibold mb-3">
+            Cálculo rápido · Referencial
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-mono text-[#8A9099]">$</span>
+            <input
+              type="number" inputMode="decimal" value={usd}
+              onChange={e => setUsd(e.target.value)}
+              placeholder="100"
+              className="flex-1 min-w-0 bg-transparent font-mono tabular-nums text-2xl text-[#E8E4DA]
+                         border-b border-[#2E343C] focus:border-[#FF6B4A] outline-none py-1
+                         placeholder:text-[#5C636D]"
+            />
+          </div>
+          <div className="mt-3 text-right">
+            <span className="font-mono tabular-nums text-3xl font-bold text-[#FF6B4A]">
+              {fmtMoney(bsResult)}
+            </span>
+            <span className="text-sm text-[#8A9099] ml-1.5">Bs</span>
+          </div>
+        </div>
       </div>
     </div>
   )
