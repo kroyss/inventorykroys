@@ -60,6 +60,7 @@ function Row({ label, value, accent, caption, updatedAt, tz }: {
 export default function TasaBoard({ initial }: { initial: PublicRates }) {
   const [data, setData]       = useState(initial)
   const [loading, setLoading] = useState(false)
+  const [note, setNote]       = useState<string | null>(null)
   const [, forceTick]         = useState(0)
 
   // Refresca los "hace X min" cada 30s sin pegarle a la API.
@@ -70,9 +71,15 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
 
   const refresh = async () => {
     setLoading(true)
+    setNote(null)
     try {
-      const res = await fetch('/api/public/tasa', { cache: 'no-store' })
-      if (res.ok) setData(await res.json())
+      const res = await fetch('/api/public/tasa/refresh', { method: 'POST' })
+      if (res.ok) {
+        const json = await res.json()
+        setData(json)
+        if (json.refreshed === false) setNote('Ya estaba al día (actualizado hace menos de 3 min)')
+        else if (json.errors) setNote('No se pudo refrescar del todo, mostrando lo último disponible')
+      }
     } finally {
       setLoading(false)
     }
@@ -113,6 +120,10 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
           <span className={loading ? 'inline-block animate-spin' : 'inline-block'}>↻</span>
           {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
+
+        {note && (
+          <p className="text-center text-[11px] text-[#8A9099] mt-3">{note}</p>
+        )}
 
         <p className="text-center text-[11px] text-[#5C636D] mt-5 leading-relaxed">
           Bs por USD/USDT · Colombia en pesos por USD · se actualiza sola varias veces al día
