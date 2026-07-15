@@ -62,7 +62,7 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
   const [data, setData]       = useState(initial)
   const [loading, setLoading] = useState(false)
   const [note, setNote]       = useState<string | null>(null)
-  const [usd, setUsd]         = useState('100')
+  const [usd, setUsd]         = useState('')
   const [, forceTick]         = useState(0)
 
   const bsResult = (parseFloat(usd) || 0) * data.ve.parallel_rate
@@ -146,7 +146,7 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
           </div>
           <div className="mt-3 text-right">
             <span className="font-mono tabular-nums text-3xl font-bold text-[#FF6B4A]">
-              {fmtMoney(bsResult)}
+              {usd ? fmtMoney(bsResult) : '—'}
             </span>
             <span className="text-sm text-[#8A9099] ml-1.5">Bs</span>
           </div>
