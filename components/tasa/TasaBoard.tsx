@@ -138,15 +138,15 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
             <input
               type="number" inputMode="decimal" value={usd}
               onChange={e => setUsd(e.target.value)}
-              placeholder="100"
+              placeholder="0,00"
               className="flex-1 min-w-0 bg-transparent font-mono tabular-nums text-2xl text-[#E8E4DA]
                          border-b border-[#2E343C] focus:border-[#FF6B4A] outline-none py-1
                          placeholder:text-[#5C636D]"
             />
           </div>
           <div className="mt-3 text-right">
-            <span className="font-mono tabular-nums text-3xl font-bold text-[#FF6B4A]">
-              {usd ? fmtMoney(bsResult) : '—'}
+            <span className={`font-mono tabular-nums text-3xl font-bold ${usd ? 'text-[#FF6B4A]' : 'text-[#5C636D]'}`}>
+              {usd ? fmtMoney(bsResult) : '0,00'}
             </span>
             <span className="text-sm text-[#8A9099] ml-1.5">Bs</span>
           </div>
