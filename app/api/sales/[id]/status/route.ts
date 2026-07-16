@@ -176,7 +176,10 @@ export async function PUT(
             )
           }
           await snapshotCost()
-          await snapshotCommission()
+          // Ventas LOCAL: entrega directa / cobro en destino, SIN comisión ni
+          // envío de ML → la comisión congelada debe ser 0 (venta neta). No se
+          // llama snapshotCommission; se fuerza 0 por si venía de un reproceso.
+          await db.query(`UPDATE sale_items SET unit_commission = 0 WHERE sale_id = $1`, [id])
           await db.query(
             `UPDATE sales
              SET status='DESCARGADA_LOCAL',
