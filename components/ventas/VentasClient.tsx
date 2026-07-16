@@ -81,7 +81,6 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       if (Array.isArray(rows)) setProducts(rows)
     } catch { /* si falla, se queda con lo último cargado */ }
   }, [])
-  useRefetchOnFocus(refetchProducts)
 
   const [sales, setSales]       = useState<Sale[]>([])
   const [counts, setCounts]     = useState<Counts>(EMPTY_COUNTS)
@@ -96,8 +95,11 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const [dateTo, setDateTo]     = useState('')
   const [showForm, setShowForm] = useState(false)
   // Al abrir el form, traer la lista más reciente (por si se creó un producto
-  // o se ajustó stock desde otra pantalla antes de abrirlo).
+  // o se ajustó stock desde otra pantalla antes de abrirlo); y mientras el form
+  // esté abierto, refrescar al volver el foco a la pestaña. Sin form abierto no
+  // se pide nada: la lista de productos no se usa en la vista de ventas.
   useEffect(() => { if (showForm) refetchProducts() }, [showForm, refetchProducts])
+  useRefetchOnFocus(refetchProducts, showForm)
   const [editing, setEditing]   = useState<Sale | null>(null)
   const [selection, setSelection] = useState<Set<number>>(new Set())
   const [busy, setBusy]         = useState(false)
