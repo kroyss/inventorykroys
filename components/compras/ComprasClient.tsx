@@ -9,6 +9,7 @@ import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { matchTokens } from '@/lib/search'
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 
 const PAGE_SIZE = 15
 
@@ -147,11 +148,14 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     }
   }, [historyMode, onChanged])
 
-  useEffect(() => {
-    if (showForm) {
-      fetch('/api/products').then(r => r.json()).then(setProducts)
-    }
-  }, [showForm])
+  // Lista de productos para el form. Se recarga al abrir el form y, mientras
+  // esté abierto, cada vez que la pestaña recupera el foco (para reflejar
+  // productos creados o stock ajustado en paralelo, sin recargar la página).
+  const loadProducts = useCallback(() => {
+    fetch('/api/products', { cache: 'no-store' }).then(r => r.json()).then(setProducts).catch(() => {})
+  }, [])
+  useEffect(() => { if (showForm) loadProducts() }, [showForm, loadProducts])
+  useRefetchOnFocus(loadProducts, showForm)
 
   const CHIP_GROUPS: Record<ChipFilter, string[] | null> = {
     all:            null,

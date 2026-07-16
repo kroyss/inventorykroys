@@ -4,6 +4,7 @@ import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } fro
 import VentasForm from './VentasForm'
 import { Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 
 const PAGE_SIZE = 15
@@ -57,7 +58,7 @@ interface SalesResponse {
 }
 
 interface Props {
-  products: InventoryItem[]
+  products: InventoryItem[]  // snapshot inicial cargado en el server
   userRole: UserRole
   country: Country
 }
@@ -69,7 +70,19 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products, userRole, country }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country }: Props) {
+  // Productos en estado (no solo el prop del server): se refrescan al volver el
+  // foco a la pestaña, para detectar stock ajustado o productos nuevos creados
+  // en paralelo sin recargar la página.
+  const [products, setProducts] = useState<InventoryItem[]>(initialProducts)
+  const refetchProducts = useCallback(async () => {
+    try {
+      const rows: InventoryItem[] = await fetch('/api/sales/products', { cache: 'no-store' }).then(r => r.json())
+      if (Array.isArray(rows)) setProducts(rows)
+    } catch { /* si falla, se queda con lo último cargado */ }
+  }, [])
+  useRefetchOnFocus(refetchProducts)
+
   const [sales, setSales]       = useState<Sale[]>([])
   const [counts, setCounts]     = useState<Counts>(EMPTY_COUNTS)
   const [total, setTotal]       = useState(0)
@@ -82,6 +95,9 @@ export default function VentasClient({ products, userRole, country }: Props) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo]     = useState('')
   const [showForm, setShowForm] = useState(false)
+  // Al abrir el form, traer la lista más reciente (por si se creó un producto
+  // o se ajustó stock desde otra pantalla antes de abrirlo).
+  useEffect(() => { if (showForm) refetchProducts() }, [showForm, refetchProducts])
   const [editing, setEditing]   = useState<Sale | null>(null)
   const [selection, setSelection] = useState<Set<number>>(new Set())
   const [busy, setBusy]         = useState(false)

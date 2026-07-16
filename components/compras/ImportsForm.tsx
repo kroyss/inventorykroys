@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ImportOrder, Supplier } from '@/lib/types'
 import { Combobox } from '@/components/ui/Combobox'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { matchTokens } from '@/lib/search'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 
 interface FormItem {
   product_id: number
@@ -63,9 +64,13 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
 
   const closePanel = () => { setMounted(false); setTimeout(onClose, 180) }
 
-  useEffect(() => {
-    fetch('/api/products').then(r => r.json()).then((rows: ProductRow[]) => setProducts(rows))
+  // Recarga la lista al montar y cada vez que la pestaña recupera el foco, para
+  // reflejar productos creados o modificados en paralelo sin recargar la página.
+  const loadProducts = useCallback(() => {
+    fetch('/api/products', { cache: 'no-store' }).then(r => r.json()).then((rows: ProductRow[]) => setProducts(rows)).catch(() => {})
   }, [])
+  useEffect(() => { loadProducts() }, [loadProducts])
+  useRefetchOnFocus(loadProducts)
 
   const filtered = products.filter(p => matchTokens(search, p.name, p.code)).slice(0, 20)
 
