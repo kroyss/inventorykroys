@@ -4,7 +4,7 @@ import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { blockNumberKeys, blockIntKeys, digitsOnly } from '@/lib/inputGuards'
 import { matchTokens } from '@/lib/search'
-import { ML_ORDER_LENGTH, mlOrderError } from '@/lib/orderNumber'
+import { orderLenLabel, mlOrderError } from '@/lib/orderNumber'
 
 interface FormItem {
   product_id: number
@@ -98,9 +98,9 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   const stockOf = (productId: number) => products.find(p => p.product_id === productId)?.quantity ?? 0
   const hasInsufficientStock = items.some(i => i.quantity > stockOf(i.product_id))
 
-  // Integridad del número de orden ML (no-LOCAL): solo dígitos, largo exacto del
+  // Integridad del número de orden ML (no-LOCAL): solo dígitos, largo válido del
   // país. Se muestra en vivo y bloquea el guardado (mismo chequeo que el servidor).
-  const expectedOrderLen = ML_ORDER_LENGTH[country]
+  const orderLenText = orderLenLabel(country)
   const orderNumErr = isLocal ? null : (orderNumber.trim() ? mlOrderError(country, orderNumber) : null)
 
   // VE: el monto que va a la venta es el precio REAL que recibís (oficial→paralelo),
@@ -231,9 +231,9 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               <input value={orderNumber} onChange={e => setOrderNumber(digitsOnly(e.target.value))}
                 disabled={isLocal} inputMode="numeric"
                 className={`mt-1 w-full border rounded px-3 py-2 text-sm ${(orderDup || orderNumErr) ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder={`${expectedOrderLen} dígitos`} />
+                placeholder={orderLenText} />
               {!isLocal && !orderNumErr && orderNumber.trim() === '' && (
-                <p className="text-[11px] text-neutral-400 mt-1">Debe tener exactamente {expectedOrderLen} dígitos.</p>
+                <p className="text-[11px] text-neutral-400 mt-1">Debe tener {orderLenText}.</p>
               )}
               {orderNumErr && (
                 <p className="text-[11px] text-red-600 mt-1">⚠️ {orderNumErr}</p>
