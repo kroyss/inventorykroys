@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { mlOrderError } from '@/lib/orderNumber'
 
 export async function GET(
   _: NextRequest,
@@ -75,6 +76,10 @@ export async function PUT(
 
   try {
     const body = EditSchema.parse(await req.json())
+
+    // Integridad del número de orden ML (no-LOCAL): solo dígitos, largo exacto del país.
+    const orderErr = mlOrderError(session.user.country, body.ml_order_number)
+    if (orderErr) return NextResponse.json({ error: orderErr }, { status: 400 })
 
     const { rows: [sale] } = await db.query(
       `SELECT id, status FROM sales WHERE id = $1`,

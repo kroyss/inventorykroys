@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { mlOrderError } from '@/lib/orderNumber'
 
 const ItemSchema = z.object({
   product_id:   z.number().int().positive(),
@@ -175,6 +176,12 @@ export async function POST(req: NextRequest) {
   try {
     const body   = CreateSchema.parse(await req.json())
     const userId = parseInt(session.user.id, 10)
+
+    // Integridad del número de orden ML (no-LOCAL): solo dígitos, largo exacto
+    // del país. Frena números pegados dos veces, incompletos o con basura, que
+    // rompían el script de guías del Excel.
+    const orderErr = mlOrderError(session.user.country, body.ml_order_number)
+    if (orderErr) return NextResponse.json({ error: orderErr }, { status: 400 })
 
     const { rows: dup } = await db.query(
       `SELECT id FROM sales WHERE ml_order_number = $1`,

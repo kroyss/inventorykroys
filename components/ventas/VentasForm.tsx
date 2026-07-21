@@ -4,6 +4,7 @@ import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { blockNumberKeys, blockIntKeys, digitsOnly } from '@/lib/inputGuards'
 import { matchTokens } from '@/lib/search'
+import { ML_ORDER_LENGTH, mlOrderError } from '@/lib/orderNumber'
 
 interface FormItem {
   product_id: number
@@ -96,6 +97,11 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   // la cantidad, en vez de recién al procesar la venta).
   const stockOf = (productId: number) => products.find(p => p.product_id === productId)?.quantity ?? 0
   const hasInsufficientStock = items.some(i => i.quantity > stockOf(i.product_id))
+
+  // Integridad del número de orden ML (no-LOCAL): solo dígitos, largo exacto del
+  // país. Se muestra en vivo y bloquea el guardado (mismo chequeo que el servidor).
+  const expectedOrderLen = ML_ORDER_LENGTH[country]
+  const orderNumErr = isLocal ? null : (orderNumber.trim() ? mlOrderError(country, orderNumber) : null)
 
   // VE: el monto que va a la venta es el precio REAL que recibís (oficial→paralelo),
   // congelado a la tasa del momento (snapshot). CO: el precio en pesos. Fallback al base.
@@ -224,8 +230,14 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               <label className="text-xs text-neutral-500">Número de orden ML</label>
               <input value={orderNumber} onChange={e => setOrderNumber(digitsOnly(e.target.value))}
                 disabled={isLocal} inputMode="numeric"
-                className={`mt-1 w-full border rounded px-3 py-2 text-sm ${orderDup ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder="Solo números" />
+                className={`mt-1 w-full border rounded px-3 py-2 text-sm ${(orderDup || orderNumErr) ? 'border-red-400 focus:ring-red-400' : ''}`}
+                placeholder={`${expectedOrderLen} dígitos`} />
+              {!isLocal && !orderNumErr && orderNumber.trim() === '' && (
+                <p className="text-[11px] text-neutral-400 mt-1">Debe tener exactamente {expectedOrderLen} dígitos.</p>
+              )}
+              {orderNumErr && (
+                <p className="text-[11px] text-red-600 mt-1">⚠️ {orderNumErr}</p>
+              )}
               {checkingOrder && (
                 <p className="text-[11px] text-neutral-400 mt-1">Verificando…</p>
               )}
@@ -356,15 +368,15 @@ export default function VentasForm({ editing, products, country, onClose, onSave
         <div className="px-5 py-4 border-t flex justify-end gap-2 bg-neutral-50 shrink-0">
           <button onClick={close} className="btn-secondary text-sm">Cancelar</button>
           {editing ? (
-            <button onClick={() => save('close')} disabled={busy || !!orderDup || hasInsufficientStock} className="btn-primary text-sm">
+            <button onClick={() => save('close')} disabled={busy || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
               {busy ? 'Guardando…' : 'Actualizar'}
             </button>
           ) : (
             <>
-              <button onClick={() => save('close')} disabled={busy || items.length === 0 || !!orderDup || hasInsufficientStock} className="btn-secondary text-sm">
+              <button onClick={() => save('close')} disabled={busy || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-secondary text-sm">
                 {busy ? 'Guardando…' : 'Crear venta'}
               </button>
-              <button onClick={() => save('continue')} disabled={busy || items.length === 0 || !!orderDup || hasInsufficientStock} className="btn-primary text-sm">
+              <button onClick={() => save('continue')} disabled={busy || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
                 {busy ? 'Guardando…' : 'Crear y continuar'}
               </button>
             </>
