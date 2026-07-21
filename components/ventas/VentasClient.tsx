@@ -316,6 +316,18 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 </button>
               )}
             </div>
+            {/* Modo RE (re-descarga de emergencia): recuperar guías ya descargadas.
+                Va junto a las fechas para distinguirlo de las acciones normales. */}
+            <button
+              onClick={() => { setRedownloadMode(m => !m); setSelection(new Set()) }}
+              title="Emergencia: habilita seleccionar ventas ya descargadas para volver a bajar su Excel"
+              className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap border transition-colors ${
+                redownloadMode
+                  ? 'bg-amber-500 border-amber-500 text-white'
+                  : 'bg-white border-neutral-300 text-neutral-600 hover:border-neutral-400'
+              }`}>
+              ↺ RE
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -326,17 +338,6 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 ⚠ Borradores ({borradorCount})
               </button>
             )}
-            {/* Modo re-descarga: recuperar guías ya descargadas (admin y usuario). */}
-            <button
-              onClick={() => { setRedownloadMode(m => !m); setSelection(new Set()) }}
-              title="Habilita seleccionar ventas ya descargadas para volver a bajar su Excel"
-              className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap border transition-colors ${
-                redownloadMode
-                  ? 'bg-amber-500 border-amber-500 text-white'
-                  : 'bg-white border-neutral-300 text-neutral-600 hover:border-neutral-400'
-              }`}>
-              {redownloadMode ? '↺ Re-descarga activa' : '↺ Re-descargar'}
-            </button>
             {selection.size > 0 ? (
               <button onClick={exportSelected} className="btn-secondary text-sm whitespace-nowrap">
                 {redownloadMode ? 'Re-descargar' : 'Exportar'} ({selection.size})
