@@ -102,6 +102,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   useRefetchOnFocus(refetchProducts, showForm)
   const [editing, setEditing]   = useState<Sale | null>(null)
   const [selection, setSelection] = useState<Set<number>>(new Set())
+  // Modo re-descarga: habilita seleccionar ventas YA descargadas para volver a
+  // bajar su Excel (recuperación cuando una descarga anterior falló).
+  const [redownloadMode, setRedownloadMode] = useState(false)
   const [busy, setBusy]         = useState(false)
   const [error, setError]       = useState<string | null>(null)
 
@@ -220,10 +223,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     reload()
   }
 
-  const exportIds = (ids: number[]) => {
+  const exportIds = (ids: number[], redownload = false) => {
     if (ids.length === 0) return
     const link = document.createElement('a')
-    link.href = `/api/sales/export-excel?ids=${ids.join(',')}`
+    link.href = `/api/sales/export-excel?ids=${ids.join(',')}${redownload ? '&redownload=1' : ''}`
     link.download = 'datos.xlsx'
     document.body.appendChild(link)
     link.click()
@@ -232,7 +235,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     setSelection(new Set())
   }
 
-  const exportSelected = () => exportIds(Array.from(selection))
+  const exportSelected = () => exportIds(Array.from(selection), redownloadMode)
 
   // Export all PROCESADA across all pages — fetch their ids first
   const exportAllProcessed = async () => {
@@ -323,11 +326,22 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 ⚠ Borradores ({borradorCount})
               </button>
             )}
+            {/* Modo re-descarga: recuperar guías ya descargadas (admin y usuario). */}
+            <button
+              onClick={() => { setRedownloadMode(m => !m); setSelection(new Set()) }}
+              title="Habilita seleccionar ventas ya descargadas para volver a bajar su Excel"
+              className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap border transition-colors ${
+                redownloadMode
+                  ? 'bg-amber-500 border-amber-500 text-white'
+                  : 'bg-white border-neutral-300 text-neutral-600 hover:border-neutral-400'
+              }`}>
+              {redownloadMode ? '↺ Re-descarga activa' : '↺ Re-descargar'}
+            </button>
             {selection.size > 0 ? (
               <button onClick={exportSelected} className="btn-secondary text-sm whitespace-nowrap">
-                Exportar ({selection.size})
+                {redownloadMode ? 'Re-descargar' : 'Exportar'} ({selection.size})
               </button>
-            ) : processableTotal > 0 && (
+            ) : !redownloadMode && processableTotal > 0 && (
               <button onClick={exportAllProcessed}
                 className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 whitespace-nowrap">
                 ↓ Procesadas ({processableTotal})
@@ -369,7 +383,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   <tr key={s.id} onClick={() => setSelected(s)}
                     className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === s.id ? 'bg-blue-50' : ''}`}>
                     <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                      {s.status === 'PROCESADA' && (
+                      {(s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA')) && (
                         <input type="checkbox" checked={selection.has(s.id)} onChange={() => toggleSelection(s.id)} />
                       )}
                     </td>
@@ -498,6 +512,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               )}
               {selected.status === 'PAGO_VERIFICADO' && (
                 <button onClick={() => doAction('PROCESADA')} disabled={busy} className="btn-primary text-sm">Procesar</button>
+              )}
+              {/* Re-descargar el Excel de una venta ML ya descargada (recuperación). */}
+              {selected.status === 'DESCARGADA' && (
+                <button onClick={() => exportIds([selected.id], true)} className="btn-secondary text-sm">↺ Re-descargar Excel</button>
               )}
               {['PROCESADA','DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
                 <button onClick={() => setSelected(null)} className="btn-secondary text-sm">Salir</button>

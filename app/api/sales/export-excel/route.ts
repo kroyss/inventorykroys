@@ -10,6 +10,12 @@ export async function GET(req: NextRequest) {
 
   const url      = new URL(req.url)
   const idsParam = url.searchParams.get('ids') ?? ''
+  // Re-descarga: permite volver a bajar el Excel de ventas YA descargadas
+  // (por si la descarga anterior falló). En modo normal solo toma PROCESADA
+  // y las marca DESCARGADA; en re-descarga también toma DESCARGADA y no
+  // cambia el estado de las que ya lo estaban.
+  const redownload = url.searchParams.get('redownload') === '1'
+  const allowedStatuses = redownload ? ['PROCESADA', 'DESCARGADA'] : ['PROCESADA']
   const saleIds  = idsParam.split(',')
     .map(s => parseInt(s.trim(), 10))
     .filter(n => !isNaN(n) && n > 0)
@@ -23,8 +29,8 @@ export async function GET(req: NextRequest) {
 
     for (const saleId of saleIds) {
       const { rows: [sale] } = await db.query(
-        `SELECT ml_order_number, notes FROM sales WHERE id = $1 AND status = 'PROCESADA'`,
-        [saleId]
+        `SELECT ml_order_number, notes FROM sales WHERE id = $1 AND status = ANY($2)`,
+        [saleId, allowedStatuses]
       )
       if (!sale) continue
 
