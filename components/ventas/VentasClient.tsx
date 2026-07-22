@@ -514,10 +514,6 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               {selected.status === 'PAGO_VERIFICADO' && (
                 <button onClick={() => doAction('PROCESADA')} disabled={busy} className="btn-primary text-sm">Procesar</button>
               )}
-              {/* Re-descargar el Excel de una venta ML ya descargada (recuperación). */}
-              {selected.status === 'DESCARGADA' && (
-                <button onClick={() => exportIds([selected.id], true)} className="btn-secondary text-sm">↺ Re-descargar Excel</button>
-              )}
               {['PROCESADA','DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
                 <button onClick={() => setSelected(null)} className="btn-secondary text-sm">Salir</button>
               )}
