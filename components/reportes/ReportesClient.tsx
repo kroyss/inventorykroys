@@ -6,6 +6,7 @@ import {
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { matchFuzzy } from '@/lib/search'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import * as XLSX from 'xlsx'
 
 type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
@@ -32,7 +33,7 @@ export default function ReportesClient() {
   const [search,   setSearch]   = useState('')
 
   // Stock subtab
-  const [stockSub, setStockSub] = useState<'reposicion' | 'remate' | 'nuevos'>('reposicion')
+  const [stockSub, setStockSub] = useState<'reposicion' | 'remate' | 'nuevos' | 'declive'>('reposicion')
   // Top params
   const [topN,       setTopN]       = useState(10)
   const [topOrderBy, setTopOrderBy] = useState<'qty' | 'ganancia' | 'margen'>('qty')
@@ -50,7 +51,7 @@ export default function ReportesClient() {
     const t = params.get('tab')
     if (t && ['ventas', 'compras', 'inventario', 'stock', 'top', 'transito'].includes(t)) setTab(t as Tab)
     const s = params.get('sub')
-    if (s === 'remate' || s === 'reposicion' || s === 'nuevos') setStockSub(s)
+    if (s === 'remate' || s === 'reposicion' || s === 'nuevos' || s === 'declive') setStockSub(s)
   }, [])
 
   useEffect(() => { load() }, [tab, dateFrom, dateTo, topN, topOrderBy, topCat])
@@ -160,7 +161,7 @@ export default function ReportesClient() {
         <InventoryReport data={data} search={search} setSearch={setSearch} />
       )}
       {!loading && data && tab === 'stock'      && data.reposicion  && (
-        <StockAnalysisReport data={data} sub={stockSub} setSub={setStockSub} />
+        <StockAnalysisReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} />
       )}
       {!loading && data && tab === 'top'      && Array.isArray(data) && <TopProductsReport rows={data} />}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
@@ -318,12 +319,41 @@ const PRIO_META: Record<string, { label: string; rank: number; badge: string; ro
   EN_CAMINO: { label: '🔵 En camino', rank: 2, badge: 'bg-blue-100 text-blue-700',     row: 'opacity-70' },
 }
 
-function StockAnalysisReport({ data, sub, setSub }: any) {
+function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
   const [picked, setPicked] = useState<Record<number, number>>({})
   const [hideCovered, setHideCovered] = useState(false)
   const [sortKey, setSortKey] = useState<string>('prioridad')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [search, setSearch] = useState('')
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const confirm = useConfirm()
+
+  // Desactivar un producto desde el reporte (sale de circulación). Exige stock 0
+  // (el servidor también lo valida); útil para descontinuar modelos viejos.
+  const deactivate = async (p: any) => {
+    if (p.stock_actual > 0) return
+    if (!await confirm({ title: 'Desactivar producto', message: `¿Desactivar ${p.code} · ${p.name}? Saldrá de circulación (podés reactivarlo desde Productos).`, confirmText: 'Desactivar', danger: true })) return
+    setBusyId(p.id)
+    const res = await fetch(`/api/products/${p.id}/status`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deactivate' }),
+    })
+    setBusyId(null)
+    if (res.ok) onReload?.()
+    else alert((await res.json()).error ?? 'No se pudo desactivar')
+  }
+
+  // Columna de acción reutilizable (Declive / Remate): desactivar si stock 0.
+  const accionCol: Column<any> = {
+    key: 'acciones', label: '', align: 'right',
+    render: (p: any) => p.stock_actual === 0
+      ? <button onClick={() => deactivate(p)} disabled={busyId === p.id}
+          className="text-xs px-2 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 whitespace-nowrap">
+          {busyId === p.id ? '…' : 'Desactivar'}
+        </button>
+      : <span className="text-[10px] text-neutral-400" title="Tiene stock; vendé o ajustá a 0 para poder desactivar">con stock</span>,
+    sortValue: (p: any) => p.stock_actual === 0 ? 0 : 1,
+  }
 
   const togglePick = (id: number, defaultQty: number) => {
     setPicked(p => {
@@ -407,6 +437,35 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
   }, [all, hideCovered, search, sortKey, sortDir])
 
 
+  if (sub === 'declive') {
+    const cols: Column<any>[] = [
+      { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
+      { key: 'name', label: 'Producto', sortValue: p => p.name },
+      { key: 'stock_actual', label: 'Stock', align: 'right', sortValue: p => p.stock_actual },
+      { key: 'ventas_4m_prior', label: 'Antes (5-8m)', align: 'right', render: p => `${p.ventas_4m_prior} u`, sortValue: p => p.ventas_4m_prior },
+      { key: 'ventas_4m_recent', label: 'Ahora (últ. 4m)', align: 'right', render: p => `${p.ventas_4m_recent} u`, sortValue: p => p.ventas_4m_recent },
+      { key: 'caida', label: 'Caída', align: 'right',
+        render: p => { const d = p.ventas_4m_prior > 0 ? Math.round((1 - p.ventas_4m_recent / p.ventas_4m_prior) * 100) : 0; return <span className="text-red-600 font-medium">−{d}%</span> },
+        sortValue: p => p.ventas_4m_prior > 0 ? (p.ventas_4m_recent / p.ventas_4m_prior) : 1 },
+      accionCol,
+    ]
+    const baseRows = data.declive ?? []
+    const rows = search.trim() ? baseRows.filter((p: any) => matchFuzzy(search, p.code, p.name)) : baseRows
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <SubTabs sub={sub} setSub={setSub} data={data} />
+          <StockSearchBox value={search} onChange={setSearch} />
+        </div>
+        <p className="text-xs text-neutral-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+          📉 Ventas en caída: los 4 meses previos (5-8) vendieron al menos el <b>doble</b> que los
+          últimos 4. Candidatos a <b>descontinuar</b>. Si ya están en stock 0, podés desactivarlos acá.
+        </p>
+        <DataTable columns={cols} rows={rows} exportName="stock_declive" emptyText="Sin productos en declive" />
+      </div>
+    )
+  }
+
   if (sub === 'remate' || sub === 'nuevos') {
     const cols: Column<any>[] = [
       { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
@@ -416,6 +475,8 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
       { key: 'venta_mensual', label: 'V. mensual', align: 'right', sortValue: p => p.venta_mensual },
       { key: 'meses_disponible', label: 'Antigüedad', align: 'right', render: p => `${p.meses_disponible} m`, sortValue: p => p.meses_disponible },
       { key: 'meses_duracion', label: 'Duración', align: 'right', render: p => `${p.meses_duracion} m`, sortValue: p => p.meses_duracion },
+      // En remate se puede desactivar (stock 0); en nuevos no tiene sentido.
+      ...(sub === 'remate' ? [accionCol] : []),
     ]
     const baseRows = sub === 'nuevos' ? (data.nuevos ?? []) : data.remate
     const rows = search.trim() ? baseRows.filter((p: any) => matchFuzzy(search, p.code, p.name)) : baseRows
@@ -575,12 +636,15 @@ function StockAnalysisReport({ data, sub, setSub }: any) {
   )
 }
 
-type StockSub = 'reposicion' | 'remate' | 'nuevos'
+type StockSub = 'reposicion' | 'remate' | 'nuevos' | 'declive'
 function SubTabs({ sub, setSub, data }: { sub: StockSub; setSub: (s: StockSub) => void; data: any }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 flex-wrap">
       <button onClick={() => setSub('reposicion')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'reposicion' ? 'bg-orange-500 text-white' : 'bg-neutral-100'}`}>
         Reposición ({data.reposicion.length})
+      </button>
+      <button onClick={() => setSub('declive')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'declive' ? 'bg-amber-500 text-white' : 'bg-neutral-100'}`}>
+        Declive ({(data.declive ?? []).length})
       </button>
       <button onClick={() => setSub('remate')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'remate' ? 'bg-red-500 text-white' : 'bg-neutral-100'}`}>
         Remate ({data.remate.length})

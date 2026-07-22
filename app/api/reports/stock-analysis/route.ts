@@ -22,7 +22,10 @@ export async function GET(_: NextRequest) {
           pc.name                                        AS categoria,
           pc.profit_percentage                           AS categoria_pct,
           pc.color                                       AS categoria_color,
-          COALESCE(v6m.ventas_6m, 0)                     AS ventas_6m,
+          COALESCE(v.ventas_6m, 0)                       AS ventas_6m,
+          -- Ventanas para detectar declive: últimos 4 meses vs los 4 meses previos (5-8).
+          COALESCE(v.ventas_4m_recent, 0)                AS ventas_4m_recent,
+          COALESCE(v.ventas_4m_prior, 0)                 AS ventas_4m_prior,
           -- "Disponible desde": primera llegada al inventario (primer movimiento IN),
           -- o la creación del producto si no hay movimientos. Sirve para no tratar
           -- como remate a lo que recién llegó y aún no tuvo tiempo de venderse.
@@ -32,13 +35,19 @@ export async function GET(_: NextRequest) {
         LEFT JOIN product_pricing pp ON p.id = pp.product_id
         LEFT JOIN profit_categories pc ON pp.profit_category_id = pc.id
         LEFT JOIN (
-          SELECT si.product_id, SUM(si.quantity) AS ventas_6m
+          SELECT si.product_id,
+            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - INTERVAL '6 months') AS ventas_6m,
+            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - INTERVAL '4 months') AS ventas_4m_recent,
+            SUM(si.quantity) FILTER (
+              WHERE s.created_at >= NOW() - INTERVAL '8 months'
+                AND s.created_at <  NOW() - INTERVAL '4 months'
+            ) AS ventas_4m_prior
           FROM sale_items si
           JOIN sales s ON si.sale_id = s.id
           WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-            AND s.created_at >= NOW() - INTERVAL '6 months'
+            AND s.created_at >= NOW() - INTERVAL '8 months'
           GROUP BY si.product_id
-        ) v6m ON v6m.product_id = p.id
+        ) v ON v.product_id = p.id
         LEFT JOIN (
           SELECT product_id, MIN(created_at) AS first_in
           FROM inventory_movements
@@ -81,17 +90,29 @@ export async function GET(_: NextRequest) {
     const reposicion: any[] = []
     const remate:     any[] = []
     const nuevos:     any[] = []
+    const declive:    any[] = []
 
     // Umbral de cobertura: la importación tarda ~4 meses en llegar.
     const LEAD_MONTHS   = 4   // por debajo de esto, hay que reponer
     const URGENT_MONTHS = 2   // por debajo de esto (incluso con tránsito), es urgente
     const TARGET_MONTHS = 6   // objetivo de cobertura al pedir
+    // Reposición: solo vale la pena importar (4 meses de lead) lo que rota lo
+    // suficiente. Por debajo de esto NO se ofrece reponer (evita sugerir traer
+    // productos que casi no se venden, incluso si están en stock 0).
+    const MIN_REPOSICION = 1  // unidades/mes mínimas para considerar reponer
+    // Declive: se compara últimos 4 meses vs los 4 previos (5-8). Es declive real
+    // si el período anterior vendió al menos el DOBLE que el reciente, y con un
+    // piso de unidades para no marcar ruido (ej. 2 vs 0).
+    const DECLINE_FACTOR = 2  // anterior >= 2× reciente
+    const DECLINE_FLOOR  = 8  // mínimo de unidades en el período anterior
     const NEW_GRACE_MONTHS = 3 // recién llegados: período de prueba antes de juzgarlos
 
     const now = Date.now()
     for (const r of products) {
       const stock        = parseInt(r.stock_actual, 10) || 0
       const ventas6m     = parseInt(r.ventas_6m, 10) || 0
+      const ventas4mRec  = parseInt(r.ventas_4m_recent, 10) || 0
+      const ventas4mPrev = parseInt(r.ventas_4m_prior, 10) || 0
 
       // Antigüedad desde que el producto llegó por primera vez al inventario.
       const desde        = r.disponible_desde ? new Date(r.disponible_desde).getTime() : now
@@ -108,6 +129,10 @@ export async function GET(_: NextRequest) {
       const salePrice    = parseFloat(r.sale_price) || 0
       const margenUnit   = Math.round((salePrice - cost) * 100) / 100
       const gananciaMensual = Math.round(ventaMensual * margenUnit * 100) / 100
+
+      // Declive real: el período anterior (meses 5-8) vendió al menos el doble
+      // que el reciente (últimos 4 meses), con un piso para descartar ruido.
+      const enDeclive = ventas4mPrev >= DECLINE_FLOOR && ventas4mPrev >= DECLINE_FACTOR * ventas4mRec
 
       // Cobertura en meses con stock actual, y contando lo que ya viene en camino.
       const cobertura      = ventaMensual > 0 ? Math.round((stock / ventaMensual) * 10) / 10 : 999
@@ -139,20 +164,39 @@ export async function GET(_: NextRequest) {
         sugerido_comprar: sugerido,
         meses_disponible: mesesDisp,        // antigüedad desde la primera llegada
         es_nuevo:         esNuevo,
+        ventas_4m_recent: ventas4mRec,
+        ventas_4m_prior:  ventas4mPrev,
+        en_declive:       enDeclive,
+      }
+
+      // Recién llegados: período de prueba, no se juzgan todavía.
+      if (esNuevo) {
+        // Solo van a "Nuevos" si aún no despegan (baja rotación); si venden bien,
+        // siguen el flujo normal (pueden entrar a reposición).
+        if (ventas6m < 6 && stock > 0) { nuevos.push(base); continue }
+      }
+
+      // Declive real (venía vendiendo y se cayó): tiene prioridad como señal de
+      // "evaluar descontinuar". No se ofrece reponer aunque el promedio dé.
+      if (!esNuevo && enDeclive) {
+        base.alerta = `📉 Cayó: ${ventas4mPrev} → ${ventas4mRec} u (últimos 4m vs 4m previos)`
+        declive.push(base)
+        continue
       }
 
       // Rotación muy baja con stock parado: menos de 6 unidades vendidas en los
       // últimos 6 meses (total crudo, no la tasa adaptada por antigüedad — así un
       // producto de 4 meses con 5 ventas también cae a remate, no solo los de 6+).
       if (ventas6m < 6 && stock > 0) {
-        // Si recién llegó, no es remate: aún no tuvo tiempo de venderse → "Nuevos".
         if (esNuevo) nuevos.push(base)
         else         remate.push(base)
         continue
       }
 
-      // Reposición: lo que se agota antes del lead time de importación.
-      if (ventaMensual > 0 && cobertura < LEAD_MONTHS) {
+      // Reposición: rota lo suficiente (>= MIN_REPOSICION/mes, sin importar stock)
+      // y se agota antes del lead time de importación. El umbral de rotación evita
+      // ofrecer reponer productos que casi no se venden (aunque estén en stock 0).
+      if (ventaMensual >= MIN_REPOSICION && cobertura < LEAD_MONTHS) {
         let prioridad: 'URGENTE' | 'PEDIR' | 'EN_CAMINO'
         if (coberturaTotal >= LEAD_MONTHS)      prioridad = 'EN_CAMINO'   // lo que viene ya lo cubre
         else if (coberturaTotal < URGENT_MONTHS) prioridad = 'URGENTE'
@@ -178,6 +222,8 @@ export async function GET(_: NextRequest) {
       remate: remate.sort((a, b) => a.ventas_6m - b.ventas_6m),
       // Recién llegados (en período de prueba): no se juzgan como remate todavía.
       nuevos: nuevos.sort((a, b) => a.meses_disponible - b.meses_disponible),
+      // Declive: mayor caída primero (anterior − reciente en unidades).
+      declive: declive.sort((a, b) => (b.ventas_4m_prior - b.ventas_4m_recent) - (a.ventas_4m_prior - a.ventas_4m_recent)),
     })
   } catch (err) {
     return apiError(err)

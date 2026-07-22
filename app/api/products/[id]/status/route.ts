@@ -47,6 +47,22 @@ export async function PUT(
       return NextResponse.json({ ok: true })
     }
 
+    // Desactivar exige stock = 0: no tiene sentido "sacar de circulación" algo
+    // que todavía tenés en inventario (desaparecería de Inventario con stock vivo).
+    // Hay que vender/ajustar el stock a 0 primero. (Aplica también a Productos.)
+    if (action === 'deactivate') {
+      const { rows: [inv] } = await db.query(
+        `SELECT COALESCE(quantity, 0) AS quantity FROM inventory WHERE product_id = $1`, [id]
+      )
+      const qty = inv ? parseInt(inv.quantity, 10) || 0 : 0
+      if (qty > 0) {
+        return NextResponse.json(
+          { error: `No se puede desactivar: el producto todavía tiene ${qty} en stock. Vendé o ajustá el stock a 0 primero.` },
+          { status: 409 }
+        )
+      }
+    }
+
     const isActive = action === 'activate'
     const { rowCount } = await db.query(
       `UPDATE products SET is_active = $1 WHERE id = $2`,
