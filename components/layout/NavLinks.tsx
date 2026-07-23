@@ -26,7 +26,10 @@ export default function NavLinks({ role, country }: Props) {
   )
 
   return (
-    <div className="flex items-center gap-0.5 flex-1">
+    // En mobile la navegación vive en la barra inferior (BottomNav); acá se
+    // ocultan los links para que la barra superior no se desborde.
+    <div className="hidden md:flex items-center gap-0.5 flex-1">
+
       {links.map(l => {
         const active =
           pathname === l.href ||

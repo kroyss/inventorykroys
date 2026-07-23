@@ -22,7 +22,7 @@ export default async function Navbar() {
 
         <NavLinks role={role} country={country} />
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 ml-auto">
           <span className="text-xs text-neutral-400 hidden sm:block">{session?.user?.name}</span>
           {role === 'admin' && <CountrySwitcher current={country as Country} />}
           <SignOutButton />
