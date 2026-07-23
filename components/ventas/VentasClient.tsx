@@ -280,15 +280,15 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           })}
         </div>
 
-        {/* Fila 2: búsqueda + fechas (izq) · acciones (der) */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* Fila 2: búsqueda + fechas (izq) · acciones (der) — apila en mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <input
               type="search"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               placeholder="Buscar…"
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-neutral-800"
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-44 focus:outline-none focus:ring-2 focus:ring-neutral-800"
             />
             <div className="flex items-center gap-1">
               <input
@@ -330,7 +330,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {borradorCount > 0 && filter !== 'BORRADOR' && (
               <button onClick={() => setFilter('BORRADOR')}
                 title="Hay ventas en borrador pendientes"
@@ -355,9 +355,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
         </div>
       </div>
 
-      {/* Tabla ancha */}
+      {/* Tabla (desktop) / tarjetas (mobile) */}
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr className="border-b border-neutral-100">
@@ -417,6 +417,47 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </tbody>
           </table>
         </div>
+
+        {/* Tarjetas (mobile) — misma data que la tabla, en formato apto para teléfono */}
+        <div className="md:hidden divide-y divide-neutral-100">
+          {loading && (
+            <div className="px-4 py-8 text-center text-neutral-400 text-sm">Cargando…</div>
+          )}
+          {!loading && sales.length === 0 && (
+            <div className="px-4 py-8 text-center text-neutral-400 text-sm">Sin ventas</div>
+          )}
+          {!loading && sales.map(s => {
+            const date = s.created_at ? new Date(s.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
+            const units = s.items.reduce((a, i) => a + i.quantity, 0)
+            const prods = s.items.map(i => `${i.product_name} ×${i.quantity}`).join(' · ')
+            const selectable = s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA')
+            return (
+              <div key={s.id} onClick={() => setSelected(s)}
+                className={`px-4 py-3 active:bg-neutral-50 cursor-pointer ${selected?.id === s.id ? 'bg-blue-50' : ''}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {selectable && (
+                      <input type="checkbox" checked={selection.has(s.id)}
+                        onClick={e => e.stopPropagation()} onChange={() => toggleSelection(s.id)}
+                        className="shrink-0" />
+                    )}
+                    <span className="font-mono text-xs font-bold text-neutral-900 truncate">{s.ml_order_number}</span>
+                  </div>
+                  <span className={`shrink-0 inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[s.status]}`}>
+                    {STATUS_LABELS[s.status]}
+                  </span>
+                </div>
+                <div className="mt-1 text-sm text-neutral-700 truncate">{s.customer_name || '—'}</div>
+                {prods && <div className="mt-0.5 text-xs text-neutral-500 truncate">{prods}</div>}
+                <div className="mt-1.5 flex items-center justify-between text-xs">
+                  <span className="font-bold text-neutral-900">${money(s.total_amount)}</span>
+                  <span className="text-neutral-400">{units} u · {date}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
         <Pagination total={total} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
       </div>
 
@@ -472,12 +513,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               <div className="text-xs text-neutral-500 mb-2">Productos ({selected.items.length})</div>
               <div className="space-y-1">
                 {selected.items.map((i: SaleItem) => (
-                  <div key={i.id} className="flex justify-between text-sm">
-                    <div>
+                  <div key={i.id} className="flex justify-between gap-2 text-sm">
+                    <div className="min-w-0">
                       <span className="text-neutral-400 mr-2">{i.product_code}</span>
                       {i.product_name}
                     </div>
-                    <div>{i.quantity} × ${money(i.unit_price)}</div>
+                    <div className="shrink-0 whitespace-nowrap">{i.quantity} × ${money(i.unit_price)}</div>
                   </div>
                 ))}
               </div>

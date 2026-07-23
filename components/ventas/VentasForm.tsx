@@ -225,7 +225,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-neutral-500">Número de orden ML</label>
               <input value={orderNumber} onChange={e => setOrderNumber(digitsOnly(e.target.value))}
@@ -285,8 +285,8 @@ export default function VentasForm({ editing, products, country, onClose, onSave
           </div>
 
           {items.length > 0 && (
-            <div className="border rounded">
-              <table className="w-full text-sm">
+            <div className="border rounded overflow-x-auto">
+              <table className="w-full text-sm min-w-[26rem]">
                 <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
                   <tr>
                     <th className="px-3 py-2 text-left">Producto</th>
