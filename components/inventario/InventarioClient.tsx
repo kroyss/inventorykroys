@@ -39,6 +39,15 @@ const STATUS_DOT: Record<StockStatus, string> = {
 
 type SortKey = 'code' | 'name' | 'quantity' | 'min_stock' | 'max_stock' | 'sale_price' | 'mlprice' | 'ventas_6m' | 'status'
 
+// En el ajuste de stock el 0 es un valor VÁLIDO (Ajuste → "nuevo total 0" deja
+// el producto sin stock), así que no puede ser también el "campo vacío": se usa
+// -1 como centinela de vacío para que el 0 se vea y se pueda guardar.
+const EMPTY_QTY = -1
+
+// IN/OUT necesitan una cantidad > 0; ADJUST acepta 0 (dejar el stock en cero).
+const adjQtyOk = (f: { movement_type: 'IN' | 'OUT' | 'ADJUST'; quantity: number }) =>
+  f.movement_type === 'ADJUST' ? f.quantity >= 0 : f.quantity > 0
+
 // ─── component ──────────────────────────────────────────────────────────────
 interface Props {
   initialItems: InventoryItem[]
@@ -75,7 +84,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
   const [savingConfig,  setSavingConfig]  = useState(false)
 
   // adjustment panel
-  const [adjForm, setAdjForm] = useState({ movement_type: 'IN' as 'IN' | 'OUT' | 'ADJUST', quantity: 0, notes: '' })
+  const [adjForm, setAdjForm] = useState({ movement_type: 'IN' as 'IN' | 'OUT' | 'ADJUST', quantity: EMPTY_QTY, notes: '' })
   const [savingAdj, setSavingAdj] = useState(false)
 
   // movements
@@ -102,7 +111,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
     setMovements([])
     setMsg(null)
     setConfigForm({ min_stock: item.min_stock, max_stock: item.max_stock, sale_price: item.sale_price })
-    setAdjForm({ movement_type: 'IN', quantity: 0, notes: '' })
+    setAdjForm({ movement_type: 'IN', quantity: EMPTY_QTY, notes: '' })
     // Use nextTab (not stale `tab` state) to decide whether to load movements immediately
     if (nextTab === 'movimientos' || tab === 'movimientos') await loadMovements(item.product_id)
   }
@@ -150,7 +159,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
   // ── save adjustment ──
   const saveAdjust = useCallback(async () => {
     if (!selected) return
-    if (adjForm.movement_type !== 'ADJUST' && adjForm.quantity <= 0) return
+    if (!adjQtyOk(adjForm)) return
     setSavingAdj(true); setMsg(null)
     try {
       const res = await fetch(`/api/inventory/${selected.product_id}/adjust`, {
@@ -164,7 +173,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
       setItems(updated)
       const fresh = updated.find(i => i.product_id === selected.product_id)
       if (fresh) setSelected(fresh)
-      setAdjForm({ movement_type: 'IN', quantity: 0, notes: '' })
+      setAdjForm({ movement_type: 'IN', quantity: EMPTY_QTY, notes: '' })
       if (tab === 'movimientos') await loadMovements(selected.product_id)
       setMsg({ type: 'ok', text: 'Movimiento registrado' })
       setTimeout(() => setMsg(null), 2500)
@@ -494,7 +503,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                             {adjForm.movement_type === 'ADJUST' ? 'Nuevo total' : 'Cantidad'}
                           </label>
                           <NumberInput
-                            int min="0" step="1"
+                            int min="0" step="1" emptyValue={EMPTY_QTY}
                             value={adjForm.quantity}
                             onValueChange={n => setAdjForm(f => ({ ...f, quantity: n }))}
                             className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
@@ -512,7 +521,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                       </div>
                       <button
                         onClick={saveAdjust}
-                        disabled={savingAdj || adjForm.quantity <= 0}
+                        disabled={savingAdj || !adjQtyOk(adjForm)}
                         className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {savingAdj ? 'Guardando…' : 'Registrar movimiento'}
@@ -546,7 +555,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                             {adjForm.movement_type === 'ADJUST' ? 'Nuevo total' : 'Cantidad'}
                           </label>
                           <NumberInput
-                            int min="0" step="1"
+                            int min="0" step="1" emptyValue={EMPTY_QTY}
                             value={adjForm.quantity}
                             onValueChange={n => setAdjForm(f => ({ ...f, quantity: n }))}
                             className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
@@ -564,7 +573,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                       </div>
                       <button
                         onClick={saveAdjust}
-                        disabled={savingAdj || adjForm.quantity <= 0}
+                        disabled={savingAdj || !adjQtyOk(adjForm)}
                         className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {savingAdj ? 'Guardando…' : 'Registrar movimiento'}
