@@ -6,7 +6,7 @@ import { Stepper, KPICard, int, Pagination } from '@/components/ui'
 import { Combobox } from '@/components/ui/Combobox'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
-import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
+import NumberInput from '@/components/ui/NumberInput'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { matchTokens } from '@/lib/search'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
@@ -312,6 +312,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   async function saveOrder(mode: 'close' | 'another' | 'continue' = 'close') {
     if (!formSupplierName.trim()) { setError('Indique un proveedor'); return }
     if (formItems.length === 0) { setError('Agregue al menos un producto'); return }
+    if (formItems.some(i => !(i.quantity >= 1))) { setError('Hay productos con cantidad vacía o en 0'); return }
     setSaving(true); setError('')
     const body = {
       supplier_id: formSupplierId ?? undefined,
@@ -905,18 +906,18 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                             {item.product_name}
                           </td>
                           <td className="px-3 py-1.5">
-                            <input
-                              type="number" min={1} onKeyDown={blockIntKeys}
+                            <NumberInput
+                              int min={1}
                               value={item.quantity}
-                              onChange={e => updateFormItem(idx, 'quantity', e.target.value)}
+                              onValueChange={n => updateFormItem(idx, 'quantity', String(n))}
                               className="w-full text-right border rounded px-2 py-1 text-sm"
                             />
                           </td>
                           <td className="px-3 py-1.5">
-                            <input
-                              type="number" min={0} step="0.01" onKeyDown={blockNumberKeys}
+                            <NumberInput
+                              min={0} step="0.01"
                               value={item.unit_cost_usd}
-                              onChange={e => updateFormItem(idx, 'unit_cost_usd', e.target.value)}
+                              onValueChange={n => updateFormItem(idx, 'unit_cost_usd', String(n))}
                               className="w-full text-right border rounded px-2 py-1 text-sm"
                             />
                           </td>
@@ -989,11 +990,11 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                       </td>
                       <td className="px-3 py-2 text-right text-neutral-500">{item.expected - item.already_received}</td>
                       <td className="px-3 py-2">
-                        <input
-                          type="number" min={0} onKeyDown={blockIntKeys}
+                        <NumberInput
+                          int min={0}
                           value={item.received_qty}
-                          onChange={e => setRecvItems(prev =>
-                            prev.map((r, i) => i === idx ? { ...r, received_qty: parseInt(e.target.value) || 0 } : r)
+                          onValueChange={n => setRecvItems(prev =>
+                            prev.map((r, i) => i === idx ? { ...r, received_qty: n } : r)
                           )}
                           className="w-full text-right border rounded px-2 py-1"
                         />

@@ -4,7 +4,7 @@ import type { ImportOrder, Supplier } from '@/lib/types'
 import { Combobox } from '@/components/ui/Combobox'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { matchTokens } from '@/lib/search'
-import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
+import NumberInput from '@/components/ui/NumberInput'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 
 interface FormItem {
@@ -109,6 +109,7 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
     if (!supplierName.trim()) { setError('Proveedor requerido'); return }
     if (items.length === 0) { setError('Agrega al menos un producto'); return }
     if (items.some(i => i.unit_cost_usd <= 0)) { setError('Todos los productos deben tener costo'); return }
+    if (items.some(i => !(i.quantity >= 1))) { setError('Hay productos con cantidad vacía o en 0'); return }
 
     setBusy(true); setError(null); setOkMsg(null)
     const body = {
@@ -234,13 +235,13 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
                         <div>{it.product_name}</div>
                       </td>
                       <td className="px-2 py-1">
-                        <input type="number" min={1} value={it.quantity} onKeyDown={blockIntKeys}
-                          onChange={e => updateItem(idx, { quantity: parseInt(e.target.value) || 1 })}
+                        <NumberInput int min={1} value={it.quantity}
+                          onValueChange={n => updateItem(idx, { quantity: n })}
                           className="w-full border rounded px-2 py-1 text-sm" />
                       </td>
                       <td className="px-2 py-1">
-                        <input type="number" step="0.01" min={0} value={it.unit_cost_usd} onKeyDown={blockNumberKeys}
-                          onChange={e => updateItem(idx, { unit_cost_usd: parseFloat(e.target.value) || 0 })}
+                        <NumberInput step="0.01" min={0} value={it.unit_cost_usd}
+                          onValueChange={n => updateItem(idx, { unit_cost_usd: n })}
                           className="w-full border rounded px-2 py-1 text-sm" />
                       </td>
                       <td className="px-3 py-2 text-right">${fmt(it.quantity * it.unit_cost_usd)}</td>

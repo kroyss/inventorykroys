@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
-import { blockNumberKeys, blockIntKeys, digitsOnly } from '@/lib/inputGuards'
+import { digitsOnly } from '@/lib/inputGuards'
+import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 import { orderLenLabel, mlOrderError } from '@/lib/orderNumber'
 
@@ -97,6 +98,9 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   // la cantidad, en vez de recién al procesar la venta).
   const stockOf = (productId: number) => products.find(p => p.product_id === productId)?.quantity ?? 0
   const hasInsufficientStock = items.some(i => i.quantity > stockOf(i.product_id))
+  // Cantidad vacía o en 0: el campo se puede borrar (queda en 0), así que hay
+  // que frenar el guardado en vez de forzar un 1 silencioso.
+  const hasInvalidQty = items.some(i => !(i.quantity >= 1))
 
   // Integridad del número de orden ML (no-LOCAL): solo dígitos, largo válido del
   // país. Se muestra en vivo y bloquea el guardado (mismo chequeo que el servidor).
@@ -150,6 +154,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     if (!orderNumber.trim()) { setError('Número de orden requerido'); return }
     if (!customer.trim())    { setError('El nombre del cliente es obligatorio'); return }
     if (items.length === 0)  { setError('Agrega al menos un producto'); return }
+    if (hasInvalidQty)       { setError('Hay productos con cantidad vacía o en 0'); return }
 
     setBusy(true); setError(null)
     const body = {
@@ -315,8 +320,8 @@ export default function VentasForm({ editing, products, country, onClose, onSave
                         <div>{it.product_name}</div>
                       </td>
                       <td className="px-2 py-1 align-top">
-                        <input type="number" min={1} value={it.quantity} onKeyDown={blockIntKeys}
-                          onChange={e => updateItem(idx, { quantity: parseInt(e.target.value) || 1 })}
+                        <NumberInput int min={1} value={it.quantity}
+                          onValueChange={n => updateItem(idx, { quantity: n })}
                           className={`w-full border rounded px-2 py-1 text-sm ${short ? 'border-red-400 focus:ring-1 focus:ring-red-400' : ''}`} />
                         {short && (
                           <p className="text-[10px] text-red-600 mt-0.5 leading-tight whitespace-nowrap">
@@ -325,8 +330,8 @@ export default function VentasForm({ editing, products, country, onClose, onSave
                         )}
                       </td>
                       <td className="px-2 py-1 align-top">
-                        <input type="number" step="0.01" min={0} value={it.unit_price} onKeyDown={blockNumberKeys}
-                          onChange={e => updateItem(idx, { unit_price: parseFloat(e.target.value) || 0 })}
+                        <NumberInput step="0.01" min={0} value={it.unit_price}
+                          onValueChange={n => updateItem(idx, { unit_price: n })}
                           className="w-full border rounded px-2 py-1 text-sm" />
                       </td>
                       <td className="px-3 py-2 text-right">${money(it.quantity * it.unit_price)}</td>
@@ -350,8 +355,8 @@ export default function VentasForm({ editing, products, country, onClose, onSave
           <div className="flex items-end justify-between gap-4">
             <div className="w-20 shrink-0">
               <label className="text-xs text-neutral-500">Desc. %</label>
-              <input type="number" min={0} max={100} step="0.01" value={discount} onKeyDown={blockNumberKeys}
-                onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+              <NumberInput min={0} max={100} step="0.01" value={discount}
+                onValueChange={setDiscount}
                 className="mt-1 w-full border rounded px-2 py-2 text-sm text-center" />
             </div>
             <div className="text-center">
@@ -376,15 +381,15 @@ export default function VentasForm({ editing, products, country, onClose, onSave
         <div className="px-5 py-4 border-t flex justify-end gap-2 bg-neutral-50 shrink-0">
           <button onClick={close} className="btn-secondary text-sm">Cancelar</button>
           {editing ? (
-            <button onClick={() => save('close')} disabled={busy || noCustomer || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
+            <button onClick={() => save('close')} disabled={busy || noCustomer || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
               {busy ? 'Guardando…' : 'Actualizar'}
             </button>
           ) : (
             <>
-              <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-secondary text-sm">
+              <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-secondary text-sm">
                 {busy ? 'Guardando…' : 'Crear venta'}
               </button>
-              <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
+              <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
                 {busy ? 'Guardando…' : 'Crear y continuar'}
               </button>
             </>

@@ -7,6 +7,7 @@ import {
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { matchFuzzy } from '@/lib/search'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import NumberInput from '@/components/ui/NumberInput'
 import * as XLSX from 'xlsx'
 
 type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
@@ -123,7 +124,7 @@ export default function ReportesClient() {
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-3 flex flex-wrap gap-3 items-end">
               <div>
                 <label className="text-xs text-neutral-500 block">Top N</label>
-                <input type="number" value={topN} onChange={e => setTopN(parseInt(e.target.value) || 10)}
+                <NumberInput int min={1} value={topN} emptyValue={10} onValueChange={setTopN}
                   className="mt-1 border rounded px-2 py-1 text-sm w-20" />
               </div>
               <div>

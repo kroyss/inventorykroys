@@ -4,6 +4,7 @@ import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
 import { int } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import Link from 'next/link'
@@ -847,20 +848,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-neutral-600 mb-1">Costo ($)</label>
-                    <input
-                      type="number" min="0" step="0.01"
+                    <NumberInput
+                      min="0" step="0.01"
                       value={form.base_cost}
-                      onChange={e => setForm(f => ({ ...f, base_cost: Number(e.target.value) }))}
+                      onValueChange={n => setForm(f => ({ ...f, base_cost: n }))}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
                                  focus:outline-none focus:ring-2 focus:ring-neutral-800"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-neutral-600 mb-1">Envío ($)</label>
-                    <input
-                      type="number" min="0" step="0.01"
+                    <NumberInput
+                      min="0" step="0.01"
                       value={form.shipping_cost}
-                      onChange={e => setForm(f => ({ ...f, shipping_cost: Number(e.target.value) }))}
+                      onValueChange={n => setForm(f => ({ ...f, shipping_cost: n }))}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
                                  focus:outline-none focus:ring-2 focus:ring-neutral-800"
                     />

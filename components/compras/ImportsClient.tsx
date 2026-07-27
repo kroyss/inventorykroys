@@ -7,6 +7,7 @@ import { Stepper, KPICard, int, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
+import NumberInput from '@/components/ui/NumberInput'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { Combobox } from '@/components/ui/Combobox'
 
@@ -1096,10 +1097,10 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                       <td className="px-3 py-2 text-right">{it.expected}</td>
                       <td className="px-3 py-2 text-right text-neutral-500">{it.already_received}</td>
                       <td className="px-3 py-2 text-right">
-                        <input type="number" min={0} value={it.received_qty} onKeyDown={blockIntKeys}
-                          onChange={e => {
+                        <NumberInput int min={0} value={it.received_qty}
+                          onValueChange={n => {
                             const next = [...recvItems]
-                            next[idx].received_qty = parseInt(e.target.value) || 0
+                            next[idx].received_qty = n
                             setRecvItems(next)
                           }}
                           className="w-20 border rounded px-2 py-1 text-sm text-right" />

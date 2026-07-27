@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
+import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -455,10 +456,11 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                             {rec !== null && <span className="ml-1 text-blue-500">(rec: {rec})</span>}
                           </label>
                           {configEditing ? (
-                            <input
-                              type="number" min="0" step={key === 'sale_price' && !isCO ? '0.01' : '1'}
+                            <NumberInput
+                              min="0" step={key === 'sale_price' && !isCO ? '0.01' : '1'}
+                              int={!(key === 'sale_price' && !isCO)}
                               value={configForm[key]}
-                              onChange={e => setConfigForm(f => ({ ...f, [key]: Number(e.target.value) }))}
+                              onValueChange={n => setConfigForm(f => ({ ...f, [key]: n }))}
                               className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                             />
                           ) : (
@@ -491,10 +493,10 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                           <label className="block text-xs font-medium text-neutral-500 mb-1">
                             {adjForm.movement_type === 'ADJUST' ? 'Nuevo total' : 'Cantidad'}
                           </label>
-                          <input
-                            type="number" min="0" step="1"
+                          <NumberInput
+                            int min="0" step="1"
                             value={adjForm.quantity}
-                            onChange={e => setAdjForm(f => ({ ...f, quantity: Number(e.target.value) }))}
+                            onValueChange={n => setAdjForm(f => ({ ...f, quantity: n }))}
                             className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                           />
                         </div>
@@ -543,10 +545,10 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                           <label className="block text-xs font-medium text-neutral-500 mb-1">
                             {adjForm.movement_type === 'ADJUST' ? 'Nuevo total' : 'Cantidad'}
                           </label>
-                          <input
-                            type="number" min="0" step="1"
+                          <NumberInput
+                            int min="0" step="1"
                             value={adjForm.quantity}
-                            onChange={e => setAdjForm(f => ({ ...f, quantity: Number(e.target.value) }))}
+                            onValueChange={n => setAdjForm(f => ({ ...f, quantity: n }))}
                             className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
                           />
                         </div>
