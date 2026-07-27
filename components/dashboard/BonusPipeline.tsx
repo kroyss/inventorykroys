@@ -49,10 +49,10 @@ export default function BonusPipeline() {
 
   const startDotColor = salesAmount > 0 ? fillColor : '#d1d5db'
 
-  // pb-1.5: solo el aire necesario para la etiqueta del mes anterior, que se
-  // posiciona en absoluto debajo de la barra.
+  // pb-2.5: el aire que necesita la etiqueta del mes anterior, que se posiciona
+  // en absoluto debajo de la barra y sobresale de la fila.
   return (
-    <div className="px-2 pt-2 pb-1.5">
+    <div className="px-2 pt-2 pb-2.5">
       <div className="flex items-center w-full gap-1">
         {/* Start dot */}
         <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: startDotColor }} />
@@ -83,17 +83,17 @@ export default function BonusPipeline() {
                 )}
               </div>
 
-              {/* Node: el monto del bono va DENTRO del círculo, a la altura de
-                  la barra, para que la fila quede en una sola línea. */}
+              {/* Node: píldora con el monto del bono, a la altura de la barra.
+                  El ancho lo da el texto y el alto queda cerca del de la barra
+                  (18px vs 8px), así el hito no compite con la línea. */}
               <div
-                title={`Bono $${node.label}`}
-                className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold leading-none tabular-nums ${
+                className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-bold leading-none tabular-nums ${
                   reached
                     ? 'bg-green-500 text-white'
-                    : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                    : 'bg-neutral-200 text-neutral-500'
                 }`}
               >
-                {node.label}
+                ${node.label}
               </div>
             </span>
           )
