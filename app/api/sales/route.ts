@@ -152,11 +152,26 @@ export async function GET(req: NextRequest) {
   ])
 
   const c = counts.rows[0]
+  // Los conteos de los chips van SIN filtro de estado (para ver el total de cada
+  // uno), pero el total que pagina tiene que respetarlo: si no, con un chip
+  // activo el pie seguía diciendo "1–15 de 5497 · página 1 de 367".
+  const COUNT_BY_STATUS: Record<string, string> = {
+    BORRADOR:         c.count_borrador,
+    PAGO_VERIFICADO:  c.count_verificado,
+    PROCESADA:        c.count_procesada,
+    DESCARGADA:       c.count_descargada,
+    DESCARGADA_LOCAL: c.count_descargada_local,
+    REABIERTA:        c.count_reabierta,
+  }
+  const total = statusFilter
+    ? parseInt(COUNT_BY_STATUS[statusFilter] ?? '0', 10)
+    : parseInt(c.total_all, 10)
+
   return NextResponse.json({
     rows: rows.rows,
     page,
     pageSize,
-    total: parseInt(c.total_all, 10),
+    total,
     counts: {
       all:               parseInt(c.total_all, 10),
       BORRADOR:          parseInt(c.count_borrador, 10),

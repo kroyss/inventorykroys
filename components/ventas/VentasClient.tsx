@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
 import { Pagination } from '@/components/ui'
@@ -168,7 +168,15 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     }
   }, [])
 
+  // Guard de "última petición": al entrar desde el dashboard salen dos consultas
+  // casi juntas (la del montaje sin filtro y la del ?estado=), y al clickear un
+  // chip se encima con la anterior. Sin esto, la respuesta vieja —normalmente la
+  // de "todas", que es la más pesada y tarda más— pisaba a la filtrada y quedaba
+  // el chip marcado con la lista completa. Solo se aplica la más reciente.
+  const reqIdRef = useRef(0)
+
   const fetchSales = useCallback(async () => {
+    const myId = ++reqIdRef.current
     setLoading(true)
     const qs = new URLSearchParams({
       page:     String(page),
@@ -181,6 +189,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     qs.set('sort_by', sortKey)
     qs.set('sort_dir', sortDir)
     const res: SalesResponse = await fetch(`/api/sales?${qs}`).then(r => r.json())
+    if (myId !== reqIdRef.current) return   // respuesta obsoleta: la descarta
     setSales(res.rows)
     setCounts(res.counts ?? EMPTY_COUNTS)
     setTotal(res.total ?? 0)
