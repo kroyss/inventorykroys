@@ -9,6 +9,7 @@ import { KPICard } from '@/components/ui'
 import type { ProfitCategory } from '@/lib/types'
 import { parseLocalDate } from '@/lib/tz'
 import MlBreakdown from '@/components/productos/MlBreakdown'
+import { coPublishedPrice } from '@/lib/coPricing'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -114,6 +115,17 @@ export default function TasasCoClient() {
     }
   }, [simCost, simCat, cats, latest])
 
+  // Parámetros ML tal como están en el form (los mismos que consume MlBreakdown).
+  const mlParams = {
+    ml_comision:     mlComision,
+    ml_umbral_envio: mlUmbral,
+    ml_envio_bajo:   mlEnvioBajo,
+    ml_envio_alto:   mlEnvioAlto,
+    ml_reten:        mlReten ? mlRetenPct : '0',
+  }
+  // Precio a publicar para que, tras ML, quede el precio base de la categoría.
+  const sugeridoPesos = sim ? coPublishedPrice(sim.basePesos, mlParams) : 0
+
   const refresh = async () => {
     setBusy(true); setError(null); setOkMsg(null)
     const res = await fetch('/api/rates/co/fetch')
@@ -179,11 +191,11 @@ export default function TasasCoClient() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-neutral-500">Precio de venta estimado (pesos)</label>
+              <label className="text-xs text-neutral-500">Precio publicado en ML (pesos)</label>
               <input type="text" inputMode="numeric"
                 value={precioPub ? fmtPeso(Number(precioPub)) : ''}
                 onChange={e => setPrecioPub(e.target.value.replace(/\D/g, ''))}
-                placeholder={sim ? fmtPeso(sim.basePesos) : '0'}
+                placeholder={sugeridoPesos ? fmtPeso(sugeridoPesos) : '0'}
                 className="mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
             </div>
           </div>
@@ -234,14 +246,8 @@ export default function TasasCoClient() {
             <MlBreakdown
               country="CO"
               totalCost={parseFloat(simCost) || 0}
-              ml={{
-                ml_comision: mlComision,
-                ml_umbral_envio: mlUmbral,
-                ml_envio_bajo: mlEnvioBajo,
-                ml_envio_alto: mlEnvioAlto,
-                ml_reten: mlReten ? mlRetenPct : '0',
-              }}
-              salePrice={parseFloat(precioPub) || sim?.basePesos || 0}
+              ml={mlParams}
+              salePrice={parseFloat(precioPub) || sugeridoPesos || 0}
               coTrm={latest.trm_rate}
             />
           </div>

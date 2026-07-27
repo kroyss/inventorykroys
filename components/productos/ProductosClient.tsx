@@ -5,6 +5,7 @@ import { int } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
+import { coPublishedPrice } from '@/lib/coPricing'
 import { matchTokens } from '@/lib/search'
 import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import Link from 'next/link'
@@ -257,8 +258,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   const spread  = veRate && veRate.official > 0 ? (veRate.parallel - veRate.official) / veRate.official * 100 : 0
   const priceBs = finalPriceUsd * (veRate?.official ?? 0)
-  // CO: precio de venta sugerido en pesos = precio base (USD) × TRM
-  const suggestedPesos = Math.round(basePriceUsd * coTrm)
+  // CO: precio a PUBLICAR en pesos. El objetivo es que, después de que ML se
+  // lleve comisión + envío + retención, quede el precio base (costo × markup).
+  // Publicar base × TRM a secas se come el markup (ver lib/coPricing.ts).
+  const suggestedPesos = coPublishedPrice(basePriceUsd * coTrm, mlSettings)
 
   // CO: el precio de venta nunca debe quedar en blanco. Si el producto ya trae
   // un valor (nuevo o viejo) se respeta; si está vacío, se autocompleta con el
@@ -964,15 +967,17 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                           <p className="text-[10px] text-neutral-400">Costo × {(1 + profitPct / 100).toFixed(2)}</p>
                         </div>
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                          <p className="text-[11px] text-amber-700 font-medium">Sugerido en pesos</p>
+                          <p className="text-[11px] text-amber-700 font-medium">Sugerido a publicar</p>
                           <p className="text-lg font-bold text-amber-700">${fmtPeso(suggestedPesos)}</p>
-                          <p className="text-[10px] text-neutral-400">Base × TRM {fmtPeso(coTrm)}</p>
+                          <p className="text-[10px] text-neutral-400">
+                            Te deja ${fmtPeso(Math.round(basePriceUsd * coTrm))} tras ML
+                          </p>
                         </div>
                       </div>
                       {/* Precio de venta real (lo que publicas en ML), en pesos */}
                       <div className="bg-green-50 border-2 border-green-400 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] text-green-700 font-medium">Precio de venta (pesos)</label>
+                          <label className="text-[11px] text-green-700 font-medium">Precio publicado en ML (pesos)</label>
                           {suggestedPesos > 0 && (
                             <button type="button"
                               onClick={() => setForm(f => ({ ...f, sale_price: suggestedPesos }))}
