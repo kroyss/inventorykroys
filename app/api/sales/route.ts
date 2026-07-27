@@ -183,6 +183,12 @@ export async function POST(req: NextRequest) {
     const orderErr = mlOrderError(session.user.country, body.ml_order_number)
     if (orderErr) return NextResponse.json({ error: orderErr }, { status: 400 })
 
+    // El cliente es obligatorio: sin nombre la guía del Excel sale incompleta.
+    const customerName = (body.customer_name ?? '').trim()
+    if (!customerName) {
+      return NextResponse.json({ error: 'El nombre del cliente es obligatorio' }, { status: 400 })
+    }
+
     const { rows: dup } = await db.query(
       `SELECT id FROM sales WHERE ml_order_number = $1`,
       [body.ml_order_number]
@@ -203,7 +209,7 @@ export async function POST(req: NextRequest) {
            (ml_order_number, status, customer_name, total_amount, discount_percent, notes, is_flex, created_by)
          VALUES ($1, 'BORRADOR', $2, $3, $4, $5, $6, $7)
          RETURNING id`,
-        [body.ml_order_number, body.customer_name ?? null, total,
+        [body.ml_order_number, customerName, total,
          body.discount_percent, body.notes ?? null, body.is_flex ?? false, userId]
       )
       for (const item of body.items) {

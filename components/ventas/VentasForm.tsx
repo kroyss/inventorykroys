@@ -103,6 +103,10 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   const orderLenText = orderLenLabel(country)
   const orderNumErr = isLocal ? null : (orderNumber.trim() ? mlOrderError(country, orderNumber) : null)
 
+  // El cliente es obligatorio (el servidor también lo exige, al crear/editar y
+  // al avanzar de estado).
+  const noCustomer = !customer.trim()
+
   // VE: el monto que va a la venta es el precio REAL que recibís (oficial→paralelo),
   // congelado a la tasa del momento (snapshot). CO: el precio en pesos. Fallback al base.
   const defaultPrice = (p: InventoryItem) => {
@@ -144,6 +148,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   // mode: 'close' = guardar y cerrar | 'continue' = guardar y abrir detalle para avanzar estados
   const save = async (mode: 'close' | 'continue' = 'close') => {
     if (!orderNumber.trim()) { setError('Número de orden requerido'); return }
+    if (!customer.trim())    { setError('El nombre del cliente es obligatorio'); return }
     if (items.length === 0)  { setError('Agrega al menos un producto'); return }
 
     setBusy(true); setError(null)
@@ -249,7 +254,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               )}
             </div>
             <div>
-              <label className="text-xs text-neutral-500">Cliente</label>
+              <label className="text-xs text-neutral-500">Cliente <span className="text-red-500">*</span></label>
               <div className="mt-1">
                 <Combobox
                   value={customer}
@@ -258,6 +263,9 @@ export default function VentasForm({ editing, products, country, onClose, onSave
                   onChange={name => setCustomer(name)}
                 />
               </div>
+              {noCustomer && (
+                <p className="text-[11px] text-neutral-400 mt-1">Obligatorio: sin cliente la venta no puede avanzar.</p>
+              )}
             </div>
           </div>
 
@@ -368,15 +376,15 @@ export default function VentasForm({ editing, products, country, onClose, onSave
         <div className="px-5 py-4 border-t flex justify-end gap-2 bg-neutral-50 shrink-0">
           <button onClick={close} className="btn-secondary text-sm">Cancelar</button>
           {editing ? (
-            <button onClick={() => save('close')} disabled={busy || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
+            <button onClick={() => save('close')} disabled={busy || noCustomer || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
               {busy ? 'Guardando…' : 'Actualizar'}
             </button>
           ) : (
             <>
-              <button onClick={() => save('close')} disabled={busy || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-secondary text-sm">
+              <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-secondary text-sm">
                 {busy ? 'Guardando…' : 'Crear venta'}
               </button>
-              <button onClick={() => save('continue')} disabled={busy || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
+              <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock} className="btn-primary text-sm">
                 {busy ? 'Guardando…' : 'Crear y continuar'}
               </button>
             </>

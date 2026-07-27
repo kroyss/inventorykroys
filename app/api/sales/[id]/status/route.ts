@@ -62,11 +62,29 @@ export async function PUT(
         )
 
     const { rows: [sale] } = await db.query(
-      `SELECT id, status, ml_order_number, notes, COALESCE(reopen_count, 0) AS reopen_count
-       FROM sales WHERE id = $1`,
+      `SELECT s.id, s.status, s.ml_order_number, s.customer_name, s.notes,
+              COALESCE(s.reopen_count, 0) AS reopen_count,
+              (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.id) AS item_count
+       FROM sales s WHERE s.id = $1`,
       [id]
     )
     if (!sale) return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 })
+
+    // Integridad mínima para AVANZAR (reabrir es una reversión y no la exige):
+    // número de orden, cliente y al menos un producto. Atrapa también las ventas
+    // viejas que se crearon sin nombre, antes de que el campo fuera obligatorio.
+    if (newStatus !== 'REABIERTA') {
+      const missing: string[] = []
+      if (!String(sale.ml_order_number ?? '').trim()) missing.push('el número de orden')
+      if (!String(sale.customer_name   ?? '').trim()) missing.push('el nombre del cliente')
+      if (parseInt(sale.item_count, 10) === 0)        missing.push('al menos un producto')
+      if (missing.length > 0) {
+        return NextResponse.json(
+          { error: `No se puede avanzar: falta ${missing.join(', ')}. Editá la venta y completá los datos.` },
+          { status: 400 }
+        )
+      }
+    }
 
     const current     = sale.status as string
     const reopenCount = parseInt(sale.reopen_count, 10)

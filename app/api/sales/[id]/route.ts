@@ -81,6 +81,12 @@ export async function PUT(
     const orderErr = mlOrderError(session.user.country, body.ml_order_number)
     if (orderErr) return NextResponse.json({ error: orderErr }, { status: 400 })
 
+    // El cliente es obligatorio: sin nombre la guía del Excel sale incompleta.
+    const customerName = (body.customer_name ?? '').trim()
+    if (!customerName) {
+      return NextResponse.json({ error: 'El nombre del cliente es obligatorio' }, { status: 400 })
+    }
+
     const { rows: [sale] } = await db.query(
       `SELECT id, status FROM sales WHERE id = $1`,
       [id]
@@ -114,7 +120,7 @@ export async function PUT(
          SET ml_order_number=$1, customer_name=$2, total_amount=$3,
              discount_percent=$4, notes=$5, is_flex=COALESCE($6, is_flex), updated_at=NOW()
          WHERE id=$7`,
-        [body.ml_order_number, body.customer_name ?? null, total,
+        [body.ml_order_number, customerName, total,
          body.discount_percent, body.notes ?? null, body.is_flex ?? null, id]
       )
       await db.query(`DELETE FROM sale_items WHERE sale_id = $1`, [id])

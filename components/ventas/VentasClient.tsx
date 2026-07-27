@@ -208,6 +208,17 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     reload()
   }
 
+  // Datos mínimos para avanzar de estado (el servidor exige lo mismo). Sirve
+  // sobre todo para ventas viejas, creadas cuando el cliente no era obligatorio.
+  const missingToAdvance = !selected
+    ? []
+    : [
+        ...(!selected.ml_order_number?.trim() ? ['número de orden'] : []),
+        ...(!selected.customer_name?.trim()   ? ['cliente'] : []),
+        ...(selected.items.length === 0       ? ['productos'] : []),
+      ]
+  const canAdvance = missingToAdvance.length === 0
+
   const deleteSale = async () => {
     if (!selected) return
     if (!await confirm({ title: 'Eliminar venta', message: `¿Eliminar la venta ${selected.ml_order_number}? Esta acción no se puede deshacer.`, confirmText: 'Eliminar', danger: true })) return
@@ -525,6 +536,11 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </div>
 
             <div className="p-4 border-t flex flex-wrap gap-2 shrink-0 bg-neutral-50">
+              {!canAdvance && ['BORRADOR','REABIERTA','PAGO_VERIFICADO'].includes(selected.status) && (
+                <div className="w-full text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                  ⚠️ Falta {missingToAdvance.join(', ')}. Editá la venta para poder avanzarla.
+                </div>
+              )}
               {(selected.status === 'BORRADOR' || selected.status === 'REABIERTA') && (
                 <>
                   {selected.status === 'BORRADOR' && (
@@ -533,7 +549,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   <button onClick={() => { setEditing(selected); setShowForm(true) }} className="btn-secondary text-sm">Editar</button>
                   {selected.ml_order_number.startsWith('LOCAL-') ? (
                     // LOCAL: salta a entregada (descuenta inventario) en un paso
-                    <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy} className="btn-primary text-sm">
+                    <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy || !canAdvance} className="btn-primary text-sm">
                       {country === 'CO' ? 'Entregar' : 'Verificar y entregar'}
                     </button>
                   ) : country === 'CO' ? (
@@ -541,11 +557,11 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                     // FLEX → PROCESADA (espera Excel); no FLEX → DESCARGADA directo
                     <button
                       onClick={() => selected.is_flex ? doAction('PROCESADA') : doAction('DESCARGADA')}
-                      disabled={busy} className="btn-primary text-sm">
+                      disabled={busy || !canAdvance} className="btn-primary text-sm">
                       {selected.is_flex ? 'Procesar (FLEX)' : 'Procesar → Descargada'}
                     </button>
                   ) : (
-                    <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy} className="btn-primary text-sm">Verificar pago</button>
+                    <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy || !canAdvance} className="btn-primary text-sm">Verificar pago</button>
                   )}
                 </>
               )}
@@ -553,7 +569,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 <button onClick={() => doAction('REABIERTA')} disabled={busy} className="btn-warning text-sm">Reabrir</button>
               )}
               {selected.status === 'PAGO_VERIFICADO' && (
-                <button onClick={() => doAction('PROCESADA')} disabled={busy} className="btn-primary text-sm">Procesar</button>
+                <button onClick={() => doAction('PROCESADA')} disabled={busy || !canAdvance} className="btn-primary text-sm">Procesar</button>
               )}
               {['PROCESADA','DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
                 <button onClick={() => setSelected(null)} className="btn-secondary text-sm">Salir</button>
