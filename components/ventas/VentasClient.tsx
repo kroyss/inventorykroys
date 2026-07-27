@@ -6,8 +6,15 @@ import { Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { itemsTooltip } from '@/lib/itemsTooltip'
+import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 
 const PAGE_SIZE = 15
+
+// Estados aceptados en ?estado= (deep-link desde las cards del dashboard)
+const DEEP_LINK_STATUSES = [
+  'BORRADOR', 'PAGO_VERIFICADO', 'PROCESADA',
+  'DESCARGADA', 'DESCARGADA_LOCAL', 'REABIERTA',
+] as const
 
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -151,12 +158,14 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     return () => document.removeEventListener('keydown', h)
   }, [showForm, selected])
 
-  // Apply ?new=1 / ?estado= deep-links on first mount
+  // Deep-links desde el dashboard: ?estado= aplica el chip, ?new=1 abre el form.
+  // Con useSearchParams se re-aplica si cambia la URL sin desmontar la pantalla.
+  const [urlEstado] = useDeepLinkParam('estado', DEEP_LINK_STATUSES)
+  useEffect(() => { if (urlEstado) setFilter(urlEstado as Filter) }, [urlEstado])
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('new') === '1') { setEditing(null); setShowForm(true) }
-    const estado = params.get('estado')
-    if (estado) setFilter(estado as Filter)
+    if (new URLSearchParams(window.location.search).get('new') === '1') {
+      setEditing(null); setShowForm(true)
+    }
   }, [])
 
   const fetchSales = useCallback(async () => {

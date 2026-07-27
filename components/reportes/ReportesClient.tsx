@@ -9,8 +9,14 @@ import { matchFuzzy } from '@/lib/search'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import * as XLSX from 'xlsx'
+import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 
 type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
+
+// Valores aceptados en los deep-links ?tab= y ?sub= (en mayúsculas: el hook
+// normaliza, para que el link funcione escrito de cualquier forma).
+const REPORT_TABS = ['VENTAS', 'COMPRAS', 'INVENTARIO', 'STOCK', 'TOP', 'TRANSITO'] as const
+const STOCK_SUBS  = ['REPOSICION', 'REMATE', 'NUEVOS', 'DECLIVE'] as const
 
 const PERIOD_TABS: { key: Tab; label: string }[] = [
   { key: 'ventas',  label: 'Ventas' },
@@ -47,13 +53,14 @@ export default function ReportesClient() {
 
   useEffect(() => {
     fetch('/api/profit-categories').then(r => r.json()).then((cs: any[]) => setCategories(cs.map(c => c.name)))
-    // deep-link from dashboard: ?tab= and ?sub=
-    const params = new URLSearchParams(window.location.search)
-    const t = params.get('tab')
-    if (t && ['ventas', 'compras', 'inventario', 'stock', 'top', 'transito'].includes(t)) setTab(t as Tab)
-    const s = params.get('sub')
-    if (s === 'remate' || s === 'reposicion' || s === 'nuevos' || s === 'declive') setStockSub(s)
   }, [])
+
+  // Deep-links desde las cards del dashboard: ?tab= y ?sub=. Con useSearchParams
+  // se re-aplican si cambia la URL sin desmontar la pantalla.
+  const [urlTab] = useDeepLinkParam('tab', REPORT_TABS)
+  const [urlSub] = useDeepLinkParam('sub', STOCK_SUBS)
+  useEffect(() => { if (urlTab) setTab(urlTab.toLowerCase() as Tab) }, [urlTab])
+  useEffect(() => { if (urlSub) setStockSub(urlSub.toLowerCase() as typeof stockSub) }, [urlSub])
 
   useEffect(() => { load() }, [tab, dateFrom, dateTo, topN, topOrderBy, topCat])
 

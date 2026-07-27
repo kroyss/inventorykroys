@@ -7,6 +7,7 @@ import { Combobox } from '@/components/ui/Combobox'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import NumberInput from '@/components/ui/NumberInput'
+import { useDeepLinkList } from '@/lib/useDeepLinkParam'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { matchTokens } from '@/lib/search'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
@@ -34,6 +35,9 @@ const STATUS_LABELS: Record<string, string> = {
   INCONSISTENTE: 'Inconsistente',
   REABIERTA:     'Reabierta',
 }
+
+// Estados aceptados en ?estado= (deep-link desde las cards del dashboard)
+const PURCHASE_STATUSES = Object.keys(STATUS_LABELS) as readonly string[]
 
 const STATUS_COLORS: Record<string, string> = {
   PENDIENTE:     'bg-neutral-100 text-neutral-700',
@@ -175,6 +179,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     finalizadas:    'Finalizadas',
   }
 
+  // Filtro por estado que llega en la URL desde las cards del dashboard.
+  // Se suma al chip elegido y se puede quitar desde el aviso que aparece arriba.
+  const [urlStatuses, clearUrlStatuses] = useDeepLinkList('estado', PURCHASE_STATUSES)
+
   const baseVisible = orders.filter(o => {
     // Historial (solo lectura): muestra finalizadas/inconsistentes
     if (historyMode) return ['FINALIZADA', 'INCONSISTENTE'].includes(o.status)
@@ -196,6 +204,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   }
 
   const visibleOrders = [...baseVisible.filter(o => {
+    // Deep-link desde el dashboard (?estado=EN_CAMINO, ?estado=RECIBIDA,PARCIAL)
+    if (urlStatuses && !urlStatuses.includes(o.status)) return false
     const grp = CHIP_GROUPS[chipFilter]
     if (grp && !grp.includes(o.status)) return false
     if (!search) return true
@@ -502,6 +512,19 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
 
   return (
     <div className="space-y-4">
+      {/* Filtro que llegó por URL desde el dashboard — visible y quitable, para
+          que no parezca que faltan órdenes. */}
+      {urlStatuses && (
+        <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 py-2">
+          <span>
+            Mostrando solo: <b>{urlStatuses.map(s => STATUS_LABELS[s] ?? s).join(', ')}</b>
+          </span>
+          <button onClick={clearUrlStatuses} className="ml-auto underline hover:no-underline">
+            Ver todas
+          </button>
+        </div>
+      )}
+
       {/* Toolbar: chips + buscador + nueva compra */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
         {!historyMode ? (

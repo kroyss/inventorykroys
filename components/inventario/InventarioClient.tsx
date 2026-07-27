@@ -5,6 +5,7 @@ import { Pagination } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
+import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -93,11 +94,11 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
   const [movPage, setMovPage] = useState(1)
   const MOV_PAGE_SIZE = 15
 
-  // Apply ?estado= filter from URL (deep-link from dashboard)
-  useEffect(() => {
-    const e = new URLSearchParams(window.location.search).get('estado')
-    if (e && ['SIN_STOCK', 'BAJO', 'OK', 'INACTIVO'].includes(e)) setStatusF(e as StockStatus)
-  }, [])
+  // Deep-link ?estado= desde las cards del dashboard. Con useSearchParams se
+  // re-aplica si cambia la URL sin desmontar la pantalla (el efecto de montaje
+  // no volvía a correr y el filtro quedaba sin aplicar).
+  const [urlEstado] = useDeepLinkParam('estado', ['SIN_STOCK', 'BAJO', 'OK', 'INACTIVO'] as const)
+  useEffect(() => { if (urlEstado) setStatusF(urlEstado as StockStatus) }, [urlEstado])
 
   // Esc closes the slide-over
   useEscape(!!selected, () => setSelected(null))

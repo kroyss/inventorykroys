@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
 import NumberInput from '@/components/ui/NumberInput'
+import { useDeepLinkList } from '@/lib/useDeepLinkParam'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { Combobox } from '@/components/ui/Combobox'
 
@@ -44,6 +45,9 @@ const STATUS_LABELS: Record<string, string> = {
   FINALIZADA:          'Finalizada',
   INCONSISTENTE:       'Inconsistente',
 }
+
+// Estados aceptados en ?estado= (deep-link desde las cards del dashboard)
+const IMPORT_STATUSES = Object.keys(STATUS_LABELS) as readonly string[]
 
 const STATUS_COLORS: Record<string, string> = {
   PENDIENTE:           'bg-neutral-100 text-neutral-700',
@@ -233,6 +237,9 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     : ['all','recibir']
 
   // Conjunto base según rol y modo (antes de chip/búsqueda)
+  // Filtro por estado que llega en la URL desde las cards del dashboard.
+  const [urlStatuses, clearUrlStatuses] = useDeepLinkList('estado', IMPORT_STATUSES)
+
   const baseVisible = orders.filter(o => {
     if (historyMode) return ['FINALIZADA', 'INCONSISTENTE'].includes(o.status)
     // Activas: finalizadas e inconsistentes viven solo en Historial
@@ -257,6 +264,8 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   }
 
   const visibleOrders = [...baseVisible.filter(o => {
+    // Deep-link desde el dashboard (?estado=EN_CAMINO, ?estado=RECIBIDA,PARCIAL)
+    if (urlStatuses && !urlStatuses.includes(o.status)) return false
     const grp = CHIP_GROUPS[chipFilter]
     if (grp && !grp.includes(o.status)) return false
     if (!search) return true
@@ -612,6 +621,18 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     <div>
       {error && (
         <div className="mb-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>
+      )}
+
+      {/* Filtro que llegó por URL desde el dashboard — visible y quitable. */}
+      {urlStatuses && (
+        <div className="mb-3 flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 py-2">
+          <span>
+            Mostrando solo: <b>{urlStatuses.map(s => STATUS_LABELS[s] ?? s).join(', ')}</b>
+          </span>
+          <button onClick={clearUrlStatuses} className="ml-auto underline hover:no-underline">
+            Ver todas
+          </button>
+        </div>
       )}
 
       {/* Toolbar: chips + buscador + nueva importación */}

@@ -106,15 +106,20 @@ export default function DashboardUser({ country }: { country: Country }) {
       {/* ───────── Recepciones ───────── */}
       <Panel title="Recepciones">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Cada card filtra por los MISMOS estados que cuenta (ver
+              /api/dashboard/reception-counts), para que la lista de destino
+              muestre exactamente las órdenes del número. */}
           <StatCard label="Local en camino"  value={recv.local}
             accent={recv.local   > 0 ? 'text-purple-600' : undefined}
-            href="/compras" />
+            href="/compras?tab=local&estado=EN_CAMINO" />
           <StatCard label={`Import en camino${recv.imports_boxes > 0 ? ` · ${recv.imports_boxes} cajas` : ''}`} value={recv.imports}
             accent={recv.imports > 0 ? 'text-purple-600' : undefined}
-            href="/compras?tab=import" />
+            href="/compras?tab=import&estado=EN_CAMINO" />
+          {/* "Por finalizar" suma locales + importaciones: abre en locales y el
+              mismo filtro queda aplicado al cambiar de pestaña. */}
           <StatCard label="Por finalizar"    value={recv.por_finalizar}
             accent={recv.por_finalizar > 0 ? 'text-amber-600' : undefined}
-            href="/compras" />
+            href="/compras?tab=local&estado=RECIBIDA,PARCIAL" />
         </div>
       </Panel>
 

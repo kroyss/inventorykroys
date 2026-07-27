@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ComprasClient from './ComprasClient'
@@ -64,10 +65,15 @@ export default function ComprasTabs({
   const importHist   = imports.filter(o => HIST.includes(o.status)).length
   const historyTotal = localHist + importHist
 
-  // deep-link: /compras?tab=import opens the imports tab
+  // deep-link: /compras?tab=import abre la pestaña de importaciones. Con
+  // useSearchParams se re-aplica si cambia la URL sin desmontar la pantalla.
+  // Ojo: la pestaña se recuerda en sessionStorage, así que sin ?tab= explícito
+  // ganaría la última usada — por eso los links del dashboard mandan el tab que
+  // corresponde y acá se respetan los dos valores, no solo 'import'.
+  const tabParam = useSearchParams().get('tab')
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('tab') === 'import') setTab('import')
-  }, [])
+    if (tabParam === 'import' || tabParam === 'local') setTab(tabParam)
+  }, [tabParam])
 
   const tabBtn = (key: typeof tab, label: string) => (
     <button onClick={() => setTab(key)}
