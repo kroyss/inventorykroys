@@ -154,11 +154,17 @@ export default function DashboardAdmin({ country }: { country: Country }) {
         </div>
       </div>
 
-      {/* Bonos: solo VE (no aplica en CO) */}
-      {country === 'VE' && <BonusPipeline />}
+      {/* Bonos: solo VE (no aplica en CO).
+          Los `!` pisan el gap del space-y-6 para que la barra quede más
+          pegada a las cards de arriba y al gráfico de abajo. */}
+      {country === 'VE' && (
+        <div className="mt-3!">
+          <BonusPipeline />
+        </div>
+      )}
 
       {/* Gráfico con métricas integradas arriba */}
-      <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-sm">
+      <div className={`bg-white rounded-xl border border-neutral-200 p-4 shadow-sm ${country === 'VE' ? 'mt-2.5!' : ''}`}>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h3 className="font-semibold text-neutral-800">Evolución Ventas / Costos / Ganancia</h3>
           <div className="flex gap-1 items-center flex-wrap">

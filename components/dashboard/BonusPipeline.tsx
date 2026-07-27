@@ -49,8 +49,10 @@ export default function BonusPipeline() {
 
   const startDotColor = salesAmount > 0 ? fillColor : '#d1d5db'
 
+  // pb-1.5: solo el aire necesario para la etiqueta del mes anterior, que se
+  // posiciona en absoluto debajo de la barra.
   return (
-    <div className="px-2 pt-2 pb-7">
+    <div className="px-2 pt-2 pb-1.5">
       <div className="flex items-center w-full gap-1">
         {/* Start dot */}
         <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: startDotColor }} />
