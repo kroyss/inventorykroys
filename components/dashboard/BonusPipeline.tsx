@@ -13,9 +13,9 @@ const TRACKS = [
   { fromT: 15000, toT: 20000, w: 5  },
 ]
 const NODES = [
-  { t: 10000, label: 'B100' },
-  { t: 15000, label: 'B200' },
-  { t: 20000, label: 'B300' },
+  { t: 10000, label: '100' },
+  { t: 15000, label: '200' },
+  { t: 20000, label: '300' },
 ]
 
 export default function BonusPipeline() {
@@ -83,22 +83,17 @@ export default function BonusPipeline() {
                 )}
               </div>
 
-              {/* Node */}
-              <div className="shrink-0 flex flex-col items-center">
-                <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                  reached ? 'bg-green-500' : 'bg-white border-2 border-neutral-300'
-                }`}>
-                  {reached && (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-                <span className={`mt-1 text-[10px] font-semibold whitespace-nowrap ${
-                  reached ? 'text-green-600' : 'text-neutral-400'
-                }`}>
-                  {node.label}
-                </span>
+              {/* Node: el monto del bono va DENTRO del círculo, a la altura de
+                  la barra, para que la fila quede en una sola línea. */}
+              <div
+                title={`Bono $${node.label}`}
+                className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold leading-none tabular-nums ${
+                  reached
+                    ? 'bg-green-500 text-white'
+                    : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                }`}
+              >
+                {node.label}
               </div>
             </span>
           )
