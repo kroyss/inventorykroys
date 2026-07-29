@@ -9,6 +9,7 @@ import { itemsTooltip } from '@/lib/itemsTooltip'
 import { blockNumberKeys, blockIntKeys } from '@/lib/inputGuards'
 import NumberInput from '@/components/ui/NumberInput'
 import { useDeepLinkList } from '@/lib/useDeepLinkParam'
+import { matchFuzzy, dateTokens } from '@/lib/search'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { Combobox } from '@/components/ui/Combobox'
 
@@ -269,12 +270,15 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     const grp = CHIP_GROUPS[chipFilter]
     if (grp && !grp.includes(o.status)) return false
     if (!search) return true
-    const q = search.toLowerCase()
-    return o.order_number.toLowerCase().includes(q)
-      || (o.supplier_name ?? '').toLowerCase().includes(q)
-      || (o.notes ?? '').toLowerCase().includes(q)
-      || (o.tracking_number ?? '').toLowerCase().includes(q)
-      || o.items.some(i => i.product_name.toLowerCase().includes(q) || i.product_code.toLowerCase().includes(q))
+    // Busca en TODO lo que se ve en la fila (contenedor, transportista, estado
+    // y fechas incluidos) y tolera errores de tipeo en las palabras largas.
+    return matchFuzzy(search,
+      o.order_number, o.supplier_name, o.notes,
+      o.tracking_number, o.container_code, o.origin_country,
+      STATUS_LABELS[o.status] ?? o.status,
+      dateTokens(o.created_at), dateTokens(o.updated_at),
+      ...o.items.flatMap(i => [i.product_name, i.product_code]),
+    )
   })].sort((a, b) => {
     const get = SORT_ACCESSORS[sort.key] ?? SORT_ACCESSORS.updated_at
     const va = get(a), vb = get(b)

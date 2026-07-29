@@ -8,6 +8,21 @@ export function matchTokens(query: string, ...fields: (string | null | undefined
   return q.split(/\s+/).every(tok => hay.includes(tok))
 }
 
+/**
+ * Fechas en varios formatos para meterlas en el "pajar" de búsqueda, y que
+ * encontrar una orden por fecha funcione se escriba como se escriba:
+ * "29/07", "29/07/26", "29/07/2026" o "2026-07-29".
+ */
+export function dateTokens(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (isNaN(d.getTime())) return ''
+  const dd   = String(d.getDate()).padStart(2, '0')
+  const mm   = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = String(d.getFullYear())
+  return `${dd}/${mm}/${yyyy.slice(-2)} ${dd}/${mm}/${yyyy} ${yyyy}-${mm}-${dd}`
+}
+
 // Distancia de Levenshtein (para tolerar errores de tipeo). Suficiente para
 // palabras cortas (nombres de producto), sin depender de una librería externa.
 function levenshtein(a: string, b: string): number {
@@ -48,9 +63,15 @@ export function matchFuzzy(query: string, ...fields: (string | null | undefined)
   if (!q) return true
   const words = fields.filter(Boolean).join(' ').toLowerCase().split(/[^a-z0-9áéíóúñ]+/i).filter(Boolean)
   if (words.length === 0) return false
-  return q.split(/\s+/).every(tok => {
+  // El query se parte con los MISMOS separadores que los campos: si no, buscar
+  // "29/07" o "hdmi-rca" queda como un solo pedazo que nunca coincide con las
+  // palabras sueltas ("29", "07"). Así cada parte se busca por separado.
+  return q.split(/[^a-z0-9áéíóúñ]+/i).filter(Boolean).every(tok => {
     if (words.some(w => w.includes(tok))) return true
-    const tol = maxErrors(tok.length)
+    // Si el término tiene números es un identificador (contenedor, tracking,
+    // código, fecha): ahí NO se tolera diferencia, o buscar CONTENEDOR376
+    // traería el 375. La tolerancia queda para las palabras.
+    const tol = /\d/.test(tok) ? 0 : maxErrors(tok.length)
     if (tol === 0) return false
     return words.some(w => Math.abs(w.length - tok.length) <= tol && levenshtein(tok, w) <= tol)
   })

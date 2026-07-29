@@ -9,7 +9,7 @@ import { itemsTooltip } from '@/lib/itemsTooltip'
 import NumberInput from '@/components/ui/NumberInput'
 import { useDeepLinkList } from '@/lib/useDeepLinkParam'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
-import { matchTokens } from '@/lib/search'
+import { matchTokens, matchFuzzy, dateTokens } from '@/lib/search'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 
 const PAGE_SIZE = 15
@@ -209,11 +209,14 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     const grp = CHIP_GROUPS[chipFilter]
     if (grp && !grp.includes(o.status)) return false
     if (!search) return true
-    const q = search.toLowerCase()
-    return o.order_number.toLowerCase().includes(q)
-      || (o.supplier_name ?? '').toLowerCase().includes(q)
-      || (o.notes ?? '').toLowerCase().includes(q)
-      || o.items.some(i => i.product_name.toLowerCase().includes(q) || i.product_code.toLowerCase().includes(q))
+    // Igual que en importaciones: busca en todo lo visible de la fila (tracking,
+    // estado y fechas incluidos) y tolera errores de tipeo.
+    return matchFuzzy(search,
+      o.order_number, o.supplier_name, o.notes, o.tracking_info,
+      STATUS_LABELS[o.status] ?? o.status,
+      dateTokens(o.created_at), dateTokens(o.updated_at),
+      ...o.items.flatMap(i => [i.product_name, i.product_code]),
+    )
   })].sort((a, b) => {
     const get = SORT_ACCESSORS[sort.key] ?? SORT_ACCESSORS.updated_at
     const va = get(a), vb = get(b)
