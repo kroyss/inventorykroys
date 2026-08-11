@@ -303,7 +303,14 @@ function InventoryReport({ data, search, setSearch }: any) {
         <KPICard compact label="Valor costo" value={`$${money(data.totals.total_cost_value)}`} />
         <KPICard compact label="Valor venta" value={`$${money(data.totals.total_sale_value)}`} accent="text-green-600" />
       </div>
-      <SearchBar value={search} onChange={setSearch} placeholder="Buscar código o producto…" />
+      <div className="flex items-center gap-2">
+        <SearchBar value={search} onChange={setSearch} placeholder="Buscar código o producto…" />
+        <button onClick={() => window.open('/hoja-inventario', '_blank')}
+          title="Hoja configurable: elegís las columnas y la sacás en PDF o Excel (incluye columna en blanco para el conteo físico)"
+          className="shrink-0 px-3 py-2 text-sm bg-white border border-neutral-300 rounded-lg text-neutral-700 hover:bg-neutral-100">
+          🖨 Hoja configurable
+        </button>
+      </div>
       <DataTable columns={cols} rows={rows} exportName="inventario" />
     </div>
   )
