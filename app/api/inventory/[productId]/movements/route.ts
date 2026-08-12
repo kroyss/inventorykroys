@@ -26,7 +26,7 @@ export async function GET(
       LEFT JOIN users u ON im.created_by = u.id
       WHERE im.product_id = $1
     )
-    SELECT * FROM all_movements ORDER BY id DESC LIMIT 100
+    SELECT * FROM all_movements ORDER BY id DESC
   `, [productId])
   return NextResponse.json(rows)
 }
