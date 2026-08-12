@@ -187,13 +187,17 @@ export default function HojaInventario({ items, country, fecha }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 print:bg-white">
+    <div className="hoja-root min-h-screen bg-neutral-100 print:bg-white">
       <style>{`
         @media print {
           /* Márgenes mínimos: se aprovecha casi toda la hoja */
           @page { size: A4 ${horizontal ? 'landscape' : 'portrait'}; margin: 6mm; }
           .no-print { display: none !important; }
           body { background: white !important; }
+          /* Las extensiones del navegador (buscadores de imágenes, traductores,
+             etc.) inyectan botones flotantes en el <body> y salen impresos:
+             en impresión solo se muestra la hoja. */
+          body > *:not(.hoja-root) { display: none !important; }
           .hoja { font-size: 10px; }
           .hoja tr { break-inside: avoid; }
           /* El encabezado de la tabla se repite en cada hoja */
