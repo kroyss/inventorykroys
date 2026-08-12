@@ -1,22 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { parseBonusPhases, type BonusPhase } from '@/lib/bonus'
 
 interface Bonus {
   sales_amount: number
   last_month_sales: number
+  phases?: BonusPhase[]
 }
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-const TRACKS = [
-  { fromT: 0,     toT: 10000, w: 10 },
-  { fromT: 10000, toT: 15000, w: 5  },
-  { fromT: 15000, toT: 20000, w: 5  },
-]
-const NODES = [
-  { t: 10000, label: '100' },
-  { t: 15000, label: '200' },
-  { t: 20000, label: '300' },
-]
 
 export default function BonusPipeline() {
   const [data, setData] = useState<Bonus | null>(null)
@@ -29,6 +21,8 @@ export default function BonusPipeline() {
 
   const salesAmount = data.sales_amount ?? 0
   const lastM       = data.last_month_sales ?? 0
+  // Metas y montos configurables en Ajustes; si la API no los trajo, el default.
+  const phases      = data.phases?.length ? data.phases : parseBonusPhases(null)
 
   // Always green like legacy
   const fillColor = '#22c55e'
@@ -40,10 +34,10 @@ export default function BonusPipeline() {
   const prevMonthLabel = MONTH_NAMES[prev.getMonth()]
 
   // Previous-month marker position inside each track (or null)
-  const markerPcts = TRACKS.map((tr, i) => {
+  const markerPcts = phases.map((p, i) => {
     if (lastM <= 0) return null
-    if (lastM > tr.fromT && lastM <= tr.toT) return ((lastM - tr.fromT) / (tr.toT - tr.fromT)) * 100
-    if (i === TRACKS.length - 1 && lastM > tr.toT) return 100
+    if (lastM > p.start && lastM <= p.end) return ((lastM - p.start) / (p.end - p.start)) * 100
+    if (i === phases.length - 1 && lastM > p.end) return 100
     return null
   })
 
@@ -57,18 +51,17 @@ export default function BonusPipeline() {
         {/* Start dot */}
         <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: startDotColor }} />
 
-        {TRACKS.map((tr, i) => {
-          const segFill = salesAmount >= tr.toT ? 100
-                       : salesAmount >  tr.fromT ? ((salesAmount - tr.fromT) / (tr.toT - tr.fromT)) * 100
+        {phases.map((p, i) => {
+          const segFill = salesAmount >= p.end ? 100
+                       : salesAmount >  p.start ? ((salesAmount - p.start) / (p.end - p.start)) * 100
                        : 0
           const mPct = markerPcts[i]
-          const node = NODES[i]
-          const reached = salesAmount >= node.t
+          const reached = salesAmount >= p.end
 
           return (
             <span key={i} className="contents">
-              {/* Segment */}
-              <div className="relative h-2 bg-neutral-200 rounded-full" style={{ flex: tr.w }}>
+              {/* Segment — el ancho es proporcional al tramo de ventas que cubre */}
+              <div className="relative h-2 bg-neutral-200 rounded-full" style={{ flex: p.end - p.start }}>
                 <div className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700"
                   style={{ width: `${segFill}%`, background: fillColor }} />
                 {mPct !== null && (
@@ -93,7 +86,7 @@ export default function BonusPipeline() {
                     : 'bg-neutral-200 text-neutral-500'
                 }`}
               >
-                ${node.label}
+                ${p.bonus}
               </div>
             </span>
           )

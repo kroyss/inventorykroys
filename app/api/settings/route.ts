@@ -9,6 +9,8 @@ const ALLOWED = new Set([
   'ml_shipping_table',                               // VE (tabla MercadoEnvíos peso→precio mín, JSON)
   'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten', // CO
   'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)
+  'bono_meta_1', 'bono_meta_2', 'bono_meta_3',       // Bonos: metas de ventas del mes
+  'bono_monto_1', 'bono_monto_2', 'bono_monto_3',    // Bonos: monto de cada fase
 ])
 
 // GET /api/settings → { key: value, ... } del país de la sesión

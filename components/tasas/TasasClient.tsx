@@ -10,6 +10,7 @@ import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { parseLocalDate } from '@/lib/tz'
 import { parseShippingTable, type ShipTier } from '@/lib/mlShipping'
 import MlBreakdown from '@/components/productos/MlBreakdown'
+import BonusSettings from '@/components/tasas/BonusSettings'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -431,6 +432,9 @@ export default function TasasClient() {
               </button>
             </div>
           </div>
+
+          {/* Bonos por ventas del mes (metas y montos) */}
+          <BonusSettings />
         </div>
 
         {/* Right column: gráfico + historial (igualan la altura del simulador) */}
