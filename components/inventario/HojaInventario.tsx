@@ -121,6 +121,52 @@ export default function HojaInventario({ items, country, fecha }: Props) {
     localStorage.setItem(LS_KEY, JSON.stringify({ cols, filtro, orden, horizontal, titulo }))
   }, [loaded, cols, filtro, orden, horizontal, titulo])
 
+  // Las extensiones del navegador (buscadores de imágenes, traductores, notas)
+  // inyectan botones flotantes que salían impresos. No siempre cuelgan del
+  // <body> — algunas los pegan al <html> o dentro de un shadow root — así que
+  // el CSS solo no alcanza: antes de imprimir se oculta TODO lo que no sea la
+  // hoja, y al terminar se restaura como estaba.
+  useEffect(() => {
+    const hidden: HTMLElement[] = []
+
+    const hideOutsiders = (parent: Element, root: Element) => {
+      Array.from(parent.children).forEach(el => {
+        if (el === root) return
+        if (el.contains(root)) { hideOutsiders(el, root); return }
+        if (['SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(el.tagName)) return
+        const h = el as HTMLElement
+        hidden.push(h)
+        h.style.setProperty('display', 'none', 'important')
+      })
+    }
+
+    const onBefore = () => {
+      const root = document.querySelector('.hoja-root')
+      if (!root) return
+      hideOutsiders(document.documentElement, root)
+      // Red de seguridad por si la extensión se inyecta DENTRO de la hoja:
+      // la página no usa custom elements ni shadow DOM propios.
+      root.querySelectorAll<HTMLElement>('*').forEach(el => {
+        if (el.tagName.includes('-') || el.shadowRoot) {
+          hidden.push(el)
+          el.style.setProperty('display', 'none', 'important')
+        }
+      })
+    }
+    const onAfter = () => {
+      hidden.forEach(h => h.style.removeProperty('display'))
+      hidden.length = 0
+    }
+
+    window.addEventListener('beforeprint', onBefore)
+    window.addEventListener('afterprint', onAfter)
+    return () => {
+      onAfter()
+      window.removeEventListener('beforeprint', onBefore)
+      window.removeEventListener('afterprint', onAfter)
+    }
+  }, [])
+
   const toggleCol = (k: ColKey) =>
     setCols(prev => prev.includes(k) ? prev.filter(c => c !== k) : [...prev, k])
 
