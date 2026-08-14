@@ -92,7 +92,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
 
   const [orders, setOrders]       = useState<ImportOrder[]>(initialOrders)
   const [selected, setSelected]   = useState<ImportOrder | null>(null)
-  type ChipFilter = 'all' | 'porPagar' | 'transito' | 'recibir' | 'inconsistentes' | 'finalizadas'
+  type ChipFilter = 'all' | 'porPagar' | 'transito' | 'aduana' | 'camino' | 'recibir' | 'parcial' | 'inconsistentes' | 'finalizadas'
   const [chipFilter, setChipFilter] = useState<ChipFilter>('all')
   const [search, setSearch] = useState('')
   const [busy, setBusy]           = useState(false)
@@ -213,11 +213,17 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Un chip por tramo del flujo, en el orden en que se ejecutan. PAGADA va con
+  // tránsito (es la orden ya paga esperando que el proveedor la despache) y
+  // EN_IMPORTADOR_PAGAR con aduana (es el cobro del importador al liberarla).
   const CHIP_GROUPS: Record<ChipFilter, string[] | null> = {
     all:            null,
     porPagar:       ['PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS'],
-    transito:       ['EN_TRANSITO', 'ADUANA', 'EN_IMPORTADOR_PAGAR', 'EN_CAMINO'],
-    recibir:        ['RECIBIDA', 'PARCIAL'],
+    transito:       ['PAGADA', 'EN_TRANSITO'],
+    aduana:         ['ADUANA', 'EN_IMPORTADOR_PAGAR'],
+    camino:         ['EN_CAMINO'],
+    recibir:        ['RECIBIDA'],
+    parcial:        ['PARCIAL'],
     inconsistentes: ['INCONSISTENTE'],
     finalizadas:    ['FINALIZADA'],
   }
@@ -225,7 +231,10 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
     all:            'Todas',
     porPagar:       'Por pagar',
     transito:       'En tránsito',
+    aduana:         'En aduana',
+    camino:         'En camino',
     recibir:        'Por recibir',
+    parcial:        'Parcial',
     inconsistentes: 'Inconsistentes',
     finalizadas:    'Finalizadas',
   }
@@ -234,8 +243,8 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
   const USER_VISIBLE = ['EN_CAMINO', 'RECIBIDA', 'PARCIAL']
   // Finalizadas/Inconsistentes ya no van en chips: viven en la pestaña Historial.
   const CHIP_ORDER_I: ChipFilter[] = isAdmin
-    ? ['all','porPagar','transito','recibir']
-    : ['all','recibir']
+    ? ['all','porPagar','transito','aduana','camino','recibir','parcial']
+    : ['all','camino','recibir','parcial']
 
   // Conjunto base según rol y modo (antes de chip/búsqueda)
   // Filtro por estado que llega en la URL desde las cards del dashboard.

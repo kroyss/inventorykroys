@@ -87,7 +87,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers)
   const [selected, setSelected]   = useState<PurchaseOrder | null>(null)
   // Single chip filter: replaces previous active/all/done + kpi filter
-  type ChipFilter = 'all' | 'pendientes' | 'transito' | 'recibir' | 'inconsistentes' | 'finalizadas'
+  type ChipFilter = 'all' | 'pendientes' | 'pagadas' | 'camino' | 'recibir' | 'parcial' | 'inconsistentes' | 'finalizadas'
   const [chipFilter, setChipFilter] = useState<ChipFilter>('all')
   const [search, setSearch]       = useState('')
   const [saving, setSaving]       = useState(false)
@@ -161,11 +161,15 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   useEffect(() => { if (showForm) loadProducts() }, [showForm, loadProducts])
   useRefetchOnFocus(loadProducts, showForm)
 
+  // Un chip por paso del flujo, en el orden en que se ejecutan:
+  // PENDIENTE → PAGADA → EN_CAMINO → RECIBIDA → FINALIZADA (↘ PARCIAL).
   const CHIP_GROUPS: Record<ChipFilter, string[] | null> = {
     all:            null,
     pendientes:     ['PENDIENTE', 'REABIERTA'],
-    transito:       ['PAGADA', 'EN_CAMINO'],
-    recibir:        ['RECIBIDA', 'PARCIAL'],
+    pagadas:        ['PAGADA'],
+    camino:         ['EN_CAMINO'],
+    recibir:        ['RECIBIDA'],
+    parcial:        ['PARCIAL'],
     inconsistentes: ['INCONSISTENTE'],
     finalizadas:    ['FINALIZADA'],
   }
@@ -173,8 +177,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   const CHIP_LABELS: Record<ChipFilter, string> = {
     all:            'Todas',
     pendientes:     'Pendientes',
-    transito:       'En tránsito',
+    pagadas:        'Pagadas',
+    camino:         'En camino',
     recibir:        'Por recibir',
+    parcial:        'Parcial',
     inconsistentes: 'Inconsistentes',
     finalizadas:    'Finalizadas',
   }
@@ -511,7 +517,11 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   }
 
   // Finalizadas/Inconsistentes ya no van en chips: viven en la pestaña Historial.
-  const CHIP_ORDER: ChipFilter[] = ['all','pendientes','transito','recibir']
+  // El usuario normal solo ve de EN_CAMINO en adelante (ver baseVisible), así que
+  // los chips de los pasos previos le darían siempre 0.
+  const CHIP_ORDER: ChipFilter[] = isAdmin
+    ? ['all','pendientes','pagadas','camino','recibir','parcial']
+    : ['all','camino','recibir','parcial']
 
   return (
     <div className="space-y-4">
