@@ -111,8 +111,14 @@ BEGIN
     RAISE EXCEPTION 'El conteo CONTEO-2026-08 ya fue aplicado';
   END IF;
 
-  SELECT id INTO v_user FROM users WHERE username = 'admin' AND is_active LIMIT 1;
-  IF v_user IS NULL THEN RAISE EXCEPTION 'No se encontro el usuario admin'; END IF;
+  -- Autor de los movimientos: el primer admin activo (el nombre de usuario varia
+  -- entre instalaciones), y si no hubiera ninguno, cualquier usuario activo.
+  SELECT id INTO v_user FROM users WHERE role = 'admin' AND is_active ORDER BY id LIMIT 1;
+  IF v_user IS NULL THEN
+    SELECT id INTO v_user FROM users WHERE is_active ORDER BY id LIMIT 1;
+  END IF;
+  IF v_user IS NULL THEN RAISE EXCEPTION 'No hay ningun usuario activo para firmar los ajustes'; END IF;
+  RAISE NOTICE 'Ajustes firmados por el usuario id=%', v_user;
 
   -- Nombres que no matchean un producto activo (renombrados, desactivados, etc.)
   SELECT string_agg(c.name, E'
