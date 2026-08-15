@@ -87,7 +87,7 @@ INSERT INTO conteo (name, sys, fis) VALUES
   ('Ruedas Sillas Oficina Silicon KIT', 4, 1),
   ('Set 3 Repisas Minimalista (40x3)', 15, 14),
   ('Set 4 Repisas Minimalista Wengue', 17, 27),
-  ('Switch HDMI 3 en 1 (1080) (4K)', 12, 13),
+  ('Switch HDMI 3 en 1  (1080) (4K)', 12, 13),   -- ojo: doble espacio, asi esta en products
   ('TEE HDMI Macho a HDMI Hembra', 17, 12),
   ('Termometro Digital sin Sonda', 27, 24),
   ('Termometro Infrarojo Corporal', 1, 0),
