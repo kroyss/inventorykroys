@@ -11,11 +11,11 @@ import NumberInput from '@/components/ui/NumberInput'
 import * as XLSX from 'xlsx'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 
-type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito'
+type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito' | 'conteos'
 
 // Valores aceptados en los deep-links ?tab= y ?sub= (en mayúsculas: el hook
 // normaliza, para que el link funcione escrito de cualquier forma).
-const REPORT_TABS = ['VENTAS', 'COMPRAS', 'INVENTARIO', 'STOCK', 'TOP', 'TRANSITO'] as const
+const REPORT_TABS = ['VENTAS', 'COMPRAS', 'INVENTARIO', 'STOCK', 'TOP', 'TRANSITO', 'CONTEOS'] as const
 const STOCK_SUBS  = ['REPOSICION', 'REMATE', 'NUEVOS', 'DECLIVE'] as const
 
 const PERIOD_TABS: { key: Tab; label: string }[] = [
@@ -27,6 +27,7 @@ const STATE_TABS: { key: Tab; label: string }[] = [
   { key: 'inventario', label: 'Inventario' },
   { key: 'stock',      label: 'Stock' },
   { key: 'transito',   label: 'En tránsito' },
+  { key: 'conteos',    label: 'Conteos' },
 ]
 
 export default function ReportesClient() {
@@ -84,6 +85,7 @@ export default function ReportesClient() {
     if (tab === 'stock')       url = `/api/reports/stock-analysis`
     if (tab === 'top')         url = `/api/reports/top-products?date_from=${dateFrom}&date_to=${dateTo}&top=${topN}&order_by=${topOrderBy}${topCat ? `&category=${encodeURIComponent(topCat)}` : ''}`
     if (tab === 'transito')    url = `/api/reports/in-transit`
+    if (tab === 'conteos')     url = `/api/reports/counts`
     try {
       const res = await fetch(url)
       if (myId !== reqIdRef.current) return        // respuesta obsoleta: la ignora
@@ -174,6 +176,9 @@ export default function ReportesClient() {
       {!loading && data && tab === 'top'      && Array.isArray(data) && <TopProductsReport rows={data} />}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
         <InTransitReport rows={data} tipo={transTipo} setTipo={setTransTipo} />
+      )}
+      {!loading && data && tab === 'conteos'  && data.items && (
+        <CountsReport data={data} search={search} setSearch={setSearch} />
       )}
     </div>
   )
@@ -312,6 +317,87 @@ function InventoryReport({ data, search, setSearch }: any) {
         </button>
       </div>
       <DataTable columns={cols} rows={rows} exportName="inventario" />
+    </div>
+  )
+}
+
+// ───── conteos físicos ─────
+// Solo lista productos con diferencia: los que coincidieron no generan ajuste,
+// y esa ausencia ya dice que el producto viene sano.
+function CountsReport({ data, search, setSearch }: any) {
+  const conteos: any[] = data.conteos
+  const [ref,   setRef]   = useState<string>(conteos[0]?.reference ?? '')
+  const [soloReinc, setSoloReinc] = useState(false)
+
+  const resumen = conteos.find(c => c.reference === ref)
+
+  const rows = useMemo(() => {
+    let r = (data.items as any[]).filter(x => x.reference === ref)
+    if (soloReinc) r = r.filter(x => x.veces >= 2)
+    if (search) r = r.filter(x => matchFuzzy(search, x.code, x.name))
+    return r
+  }, [data.items, ref, soloReinc, search])
+
+  const cols: Column<any>[] = [
+    { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
+    { key: 'name', label: 'Producto', sortValue: p => p.name },
+    { key: 'delta', label: 'Diferencia', align: 'right', sortValue: p => p.delta,
+      render: p => <span className={p.delta < 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{p.delta > 0 ? '+' : ''}{p.delta}</span>,
+      total: rs => rs.reduce((a, x) => a + x.delta, 0) },
+    { key: 'stock_actual', label: 'Stock actual', align: 'right', sortValue: p => p.stock_actual },
+    { key: 'veces', label: 'Conteos con diferencia', align: 'center', sortValue: p => p.veces,
+      render: p => (
+        <span className={`px-2 py-0.5 rounded text-xs ${p.veces >= 2 ? 'bg-red-100 text-red-700 font-semibold' : 'bg-neutral-100 text-neutral-600'}`}>
+          {p.veces}
+        </span>
+      ) },
+    { key: 'notes', label: 'Nota', render: p => <span className="text-xs text-neutral-500">{p.notes ?? '—'}</span>, sortValue: p => p.notes ?? '' },
+  ]
+
+  if (conteos.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 text-sm text-neutral-500">
+        Todavía no hay conteos registrados. Un conteo aparece acá cuando sus ajustes de stock
+        se guardan con una referencia que empieza con <b>CONTEO</b> (ej. <code>CONTEO-2026-11</code>).
+      </div>
+    )
+  }
+
+  const reincidentes = (data.items as any[]).filter(x => x.reference === ref && x.veces >= 2).length
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPICard compact label="Productos con diferencia" value={resumen?.productos ?? 0} />
+        <KPICard compact label="Unidades faltantes" value={resumen?.faltantes ?? 0} accent="text-red-600" />
+        <KPICard compact label="Unidades sobrantes" value={resumen?.sobrantes ?? 0} accent="text-green-600" />
+        <KPICard compact label="Reincidentes" value={reincidentes} accent={reincidentes > 0 ? 'text-amber-600' : undefined} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={ref} onChange={e => setRef(e.target.value)}
+          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm">
+          {conteos.map(c => (
+            <option key={c.reference} value={c.reference}>
+              {c.reference} · {c.fecha} · {c.productos} productos
+            </option>
+          ))}
+        </select>
+        <SearchBar value={search} onChange={setSearch} placeholder="Buscar código o producto…" />
+        <label className="flex items-center gap-1.5 text-sm text-neutral-600">
+          <input type="checkbox" checked={soloReinc} onChange={e => setSoloReinc(e.target.checked)} />
+          Solo reincidentes
+        </label>
+      </div>
+
+      {reincidentes > 0 && (
+        <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+          <b>{reincidentes}</b> {reincidentes === 1 ? 'producto dio' : 'productos dieron'} diferencia en 2 o más conteos.
+          A esa altura ya no es error de conteo: es consumo sin registrar, variantes que se confunden al vender o pérdida real.
+        </div>
+      )}
+
+      <DataTable columns={cols} rows={rows} exportName={`conteo_${ref}`} />
     </div>
   )
 }

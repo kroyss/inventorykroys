@@ -49,6 +49,86 @@ const EMPTY_QTY = -1
 const adjQtyOk = (f: { movement_type: 'IN' | 'OUT' | 'ADJUST'; quantity: number }) =>
   f.movement_type === 'ADJUST' ? f.quantity >= 0 : f.quantity > 0
 
+interface AdjForm {
+  movement_type: 'IN' | 'OUT' | 'ADJUST'
+  quantity:  number
+  notes:     string
+  reference: string
+}
+const EMPTY_ADJ: AdjForm = { movement_type: 'IN', quantity: EMPTY_QTY, notes: '', reference: '' }
+
+/** Nota que el sistema escribe solo en los ajustes, para no depender de cómo la tipee cada uno. */
+const autoNote = (sistema: number, fisico: number) =>
+  `sistema ${sistema} -> fisico ${fisico} (${fisico > sistema ? '+' : ''}${fisico - sistema})`
+
+// Campos del ajuste de stock. Definido a nivel de módulo a propósito: adentro del
+// componente, React lo trataría como un tipo nuevo en cada tecla y remontaría los
+// inputs, perdiendo el foco letra a letra.
+function AdjustFields({ form, setForm, currentQty }: {
+  form: AdjForm
+  setForm: (fn: (f: AdjForm) => AdjForm) => void
+  currentQty: number
+}) {
+  const isAdjust = form.movement_type === 'ADJUST'
+  const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800'
+  return (
+    <>
+      <div className={`grid gap-3 ${isAdjust ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
+        <div>
+          <label className="block text-xs font-medium text-neutral-500 mb-1">Tipo</label>
+          <select
+            value={form.movement_type}
+            onChange={e => setForm(f => ({ ...f, movement_type: e.target.value as AdjForm['movement_type'] }))}
+            className={`${input} bg-white`}
+          >
+            <option value="IN">Entrada (+)</option>
+            <option value="OUT">Salida (−)</option>
+            <option value="ADJUST">Ajuste (=)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-neutral-500 mb-1">
+            {isAdjust ? 'Nuevo total' : 'Cantidad'}
+          </label>
+          <NumberInput
+            int min="0" step="1" emptyValue={EMPTY_QTY}
+            value={form.quantity}
+            onValueChange={n => setForm(f => ({ ...f, quantity: n }))}
+            className={input}
+          />
+        </div>
+        {isAdjust && (
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1" title="Agrupa los ajustes de un mismo conteo. Con el prefijo CONTEO entran al reporte de conteos.">
+              Referencia
+            </label>
+            <input
+              value={form.reference}
+              onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
+              placeholder="CONTEO-2026-11"
+              className={input}
+            />
+          </div>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-neutral-500 mb-1">Notas</label>
+          <input
+            value={form.notes}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            placeholder="Opcional"
+            className={input}
+          />
+        </div>
+      </div>
+      {isAdjust && form.quantity >= 0 && form.quantity !== currentQty && (
+        <p className="text-[11px] text-neutral-500">
+          Se guardará con la nota: <b>{autoNote(currentQty, form.quantity)}</b>
+        </p>
+      )}
+    </>
+  )
+}
+
 // ─── component ──────────────────────────────────────────────────────────────
 interface Props {
   initialItems: InventoryItem[]
@@ -85,7 +165,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
   const [savingConfig,  setSavingConfig]  = useState(false)
 
   // adjustment panel
-  const [adjForm, setAdjForm] = useState({ movement_type: 'IN' as 'IN' | 'OUT' | 'ADJUST', quantity: EMPTY_QTY, notes: '' })
+  const [adjForm, setAdjForm] = useState<AdjForm>(EMPTY_ADJ)
   const [savingAdj, setSavingAdj] = useState(false)
 
   // movements
@@ -112,7 +192,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
     setMovements([])
     setMsg(null)
     setConfigForm({ min_stock: item.min_stock, max_stock: item.max_stock, sale_price: item.sale_price })
-    setAdjForm({ movement_type: 'IN', quantity: EMPTY_QTY, notes: '' })
+    setAdjForm(EMPTY_ADJ)
     // Use nextTab (not stale `tab` state) to decide whether to load movements immediately
     if (nextTab === 'movimientos' || tab === 'movimientos') await loadMovements(item.product_id)
   }
@@ -163,10 +243,20 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
     if (!adjQtyOk(adjForm)) return
     setSavingAdj(true); setMsg(null)
     try {
+      // En los ajustes la nota la escribe el sistema (sistema X -> fisico Y): así
+      // el historial queda comparable entre conteos sin depender de cómo la
+      // redacte cada uno. Lo que tipeó el usuario se conserva a continuación.
+      const auto  = adjForm.movement_type === 'ADJUST' ? autoNote(selected.quantity, adjForm.quantity) : ''
+      const notes = [auto, adjForm.notes.trim()].filter(Boolean).join(' | ')
       const res = await fetch(`/api/inventory/${selected.product_id}/adjust`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(adjForm),
+        body: JSON.stringify({
+          movement_type: adjForm.movement_type,
+          quantity:      adjForm.quantity,
+          notes:         notes || undefined,
+          reference:     adjForm.reference.trim() || undefined,
+        }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); setMsg({ type: 'error', text: d.error ?? 'Error' }); return }
       const listRes = await fetch('/api/inventory')
@@ -174,7 +264,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
       setItems(updated)
       const fresh = updated.find(i => i.product_id === selected.product_id)
       if (fresh) setSelected(fresh)
-      setAdjForm({ movement_type: 'IN', quantity: EMPTY_QTY, notes: '' })
+      setAdjForm(EMPTY_ADJ)
       if (tab === 'movimientos') await loadMovements(selected.product_id)
       setMsg({ type: 'ok', text: 'Movimiento registrado' })
       setTimeout(() => setMsg(null), 2500)
@@ -486,40 +576,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                   {selected.status !== 'INACTIVO' && (
                     <div className="space-y-3 border-t border-neutral-100 pt-5">
                       <h3 className="font-semibold text-neutral-800">Ajuste de stock</h3>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">Tipo</label>
-                          <select
-                            value={adjForm.movement_type}
-                            onChange={e => setAdjForm(f => ({ ...f, movement_type: e.target.value as typeof f.movement_type }))}
-                            className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          >
-                            <option value="IN">Entrada (+)</option>
-                            <option value="OUT">Salida (−)</option>
-                            <option value="ADJUST">Ajuste (=)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            {adjForm.movement_type === 'ADJUST' ? 'Nuevo total' : 'Cantidad'}
-                          </label>
-                          <NumberInput
-                            int min="0" step="1" emptyValue={EMPTY_QTY}
-                            value={adjForm.quantity}
-                            onValueChange={n => setAdjForm(f => ({ ...f, quantity: n }))}
-                            className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">Notas</label>
-                          <input
-                            value={adjForm.notes}
-                            onChange={e => setAdjForm(f => ({ ...f, notes: e.target.value }))}
-                            placeholder="Opcional"
-                            className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          />
-                        </div>
-                      </div>
+                      <AdjustFields form={adjForm} setForm={setAdjForm} currentQty={selected.quantity} />
                       <button
                         onClick={saveAdjust}
                         disabled={savingAdj || !adjQtyOk(adjForm)}
@@ -538,40 +595,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                   {selected.status !== 'INACTIVO' && (
                     <div className="space-y-3">
                       <h3 className="font-semibold text-neutral-800 text-sm">Ajuste de stock</h3>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">Tipo</label>
-                          <select
-                            value={adjForm.movement_type}
-                            onChange={e => setAdjForm(f => ({ ...f, movement_type: e.target.value as typeof f.movement_type }))}
-                            className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          >
-                            <option value="IN">Entrada (+)</option>
-                            <option value="OUT">Salida (−)</option>
-                            <option value="ADJUST">Ajuste (=)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            {adjForm.movement_type === 'ADJUST' ? 'Nuevo total' : 'Cantidad'}
-                          </label>
-                          <NumberInput
-                            int min="0" step="1" emptyValue={EMPTY_QTY}
-                            value={adjForm.quantity}
-                            onValueChange={n => setAdjForm(f => ({ ...f, quantity: n }))}
-                            className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">Notas</label>
-                          <input
-                            value={adjForm.notes}
-                            onChange={e => setAdjForm(f => ({ ...f, notes: e.target.value }))}
-                            placeholder="Opcional"
-                            className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                          />
-                        </div>
-                      </div>
+                      <AdjustFields form={adjForm} setForm={setAdjForm} currentQty={selected.quantity} />
                       <button
                         onClick={saveAdjust}
                         disabled={savingAdj || !adjQtyOk(adjForm)}
