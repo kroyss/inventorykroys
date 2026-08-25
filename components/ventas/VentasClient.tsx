@@ -199,6 +199,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   }, [page, filter, search, dateFrom, dateTo, sortKey, sortDir])
 
   useEffect(() => { fetchSales() }, [fetchSales])
+  // La pantalla se deja abierta todo el día: sin esto, la lista se queda con lo
+  // que había al abrirla y no se ven las ventas que cargan los demás.
+  useRefetchOnFocus(fetchSales, true, 60_000)
 
   const reload = () => fetchSales()
 

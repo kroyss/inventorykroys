@@ -6,6 +6,7 @@ import { useEscape } from '@/components/ui/useEscape'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -236,6 +237,23 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
       setSavingConfig(false)
     }
   }, [selected, configForm])
+
+  // ── refresco de la lista ──
+  // La lista llega renderizada del servidor y, sin esto, se queda con los datos
+  // del momento en que se abrió la pantalla: si la pestaña queda abierta, las
+  // ventas y recepciones de otros no se ven nunca (solo un F5 las traía).
+  const reloadItems = useCallback(async () => {
+    try {
+      const res = await fetch('/api/inventory', { cache: 'no-store' })
+      if (!res.ok) return
+      const updated: InventoryItem[] = await res.json()
+      setItems(updated)
+      setSelected(prev => (prev ? updated.find(i => i.product_id === prev.product_id) ?? prev : prev))
+    } catch { /* sin red: se reintenta en el próximo foco */ }
+  }, [])
+  // Se pausa mientras se edita la configuración del producto, para no cambiarle
+  // los datos de abajo del formulario a alguien que está tipeando.
+  useRefetchOnFocus(reloadItems, !configEditing, 60_000)
 
   // ── save adjustment ──
   const saveAdjust = useCallback(async () => {

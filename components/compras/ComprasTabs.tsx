@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { usePersistedTab } from '@/lib/usePersistedTab'
+import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ComprasClient from './ComprasClient'
 import ImportsClient from './ImportsClient'
@@ -51,6 +52,9 @@ export default function ComprasTabs({
 
   // Re-consultar al cambiar de pestaña (y al montar).
   useEffect(() => { refresh() }, [tab, refresh])
+  // Y también al volver a la pestaña del navegador o cada minuto: la pantalla
+  // suele quedar abierta y, si no, muestra el estado del momento en que se abrió.
+  useRefetchOnFocus(refresh, true, 60_000)
 
   // Contadores que coinciden con lo que muestra cada pestaña.
   // Activas = no finalizadas/inconsistentes (esas van en Historial). El usuario

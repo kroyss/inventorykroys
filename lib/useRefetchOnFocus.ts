@@ -9,16 +9,28 @@ import { useEffect } from 'react'
 // `refetch` debería ser estable (envuelto en useCallback) para no re-suscribir
 // los listeners en cada render. `enabled` permite escuchar solo cuando hace
 // falta (p.ej. mientras el formulario está abierto).
-export function useRefetchOnFocus(refetch: () => void, enabled = true) {
+// `intervalMs` agrega un refresco periódico mientras la pestaña está VISIBLE.
+// Hace falta para las pantallas que se dejan abiertas todo el día: el foco no
+// vuelve a dispararse nunca y los datos se congelan en el momento de la carga
+// (el caso real: un vendedor mirando stock viejo de hace días sin saberlo).
+export function useRefetchOnFocus(refetch: () => void, enabled = true, intervalMs = 0) {
   useEffect(() => {
     if (!enabled) return
     const onFocus = () => refetch()
     const onVisible = () => { if (document.visibilityState === 'visible') refetch() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisible)
+
+    // Si la pestaña está oculta no se pide nada: al volver, `visibilitychange`
+    // refresca igual, así que no se pierde nada por no sondear en segundo plano.
+    const timer = intervalMs > 0
+      ? setInterval(() => { if (document.visibilityState === 'visible') refetch() }, intervalMs)
+      : null
+
     return () => {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisible)
+      if (timer) clearInterval(timer)
     }
-  }, [refetch, enabled])
+  }, [refetch, enabled, intervalMs])
 }
