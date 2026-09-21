@@ -11,7 +11,7 @@ export async function GET(_: NextRequest) {
   try {
     // CO: el costo (USD) se lleva a pesos (×TRM) para el margen vs precio de venta (pesos).
     const costFactor = await localCostFactor(session.user.country)
-    const [{ rows: products }, { rows: localTransit }, { rows: importTransit }] = await Promise.all([
+    const [{ rows: products }, { rows: localTransit }, { rows: importTransit }, { rows: diasStock }] = await Promise.all([
       db.query(`
         SELECT
           p.id, p.code, p.name,
@@ -80,12 +80,66 @@ export async function GET(_: NextRequest) {
           AND ioi.quantity > GREATEST(COALESCE(ioi.total_received_qty, 0), COALESCE(ioi.received_qty, 0))
         GROUP BY ioi.product_id
       `),
+      // Días CON STOCK por ventana, reconstruyendo el histórico hacia atrás.
+      //
+      // Sin esto, "vendió menos" y "no tuvo qué vender" se confunden: un producto
+      // agotado 3 de los últimos 4 meses aparecía en Declive aunque su demanda
+      // estuviera intacta. El stock al cierre de un día = stock de hoy menos todo
+      // lo que se movió DESPUÉS de ese día (inventory_movements.quantity ya viene
+      // con signo: IN +, OUT −, ADJUST delta).
+      db.query(`
+        WITH dias AS (
+          SELECT generate_series(
+                   date_trunc('day', NOW() - INTERVAL '8 months'),
+                   date_trunc('day', NOW()),
+                   INTERVAL '1 day')::date AS d
+        ),
+        mov AS (
+          SELECT product_id, created_at::date AS d, SUM(quantity)::int AS delta
+          FROM inventory_movements
+          WHERE created_at >= NOW() - INTERVAL '8 months'
+          GROUP BY 1, 2
+        ),
+        base AS (
+          SELECT p.id AS product_id, d.d,
+                 COALESCE(i.quantity, 0)::int AS hoy,
+                 COALESCE(m.delta, 0)         AS delta
+          FROM products p
+          CROSS JOIN dias d
+          LEFT JOIN inventory i ON i.product_id = p.id
+          LEFT JOIN mov m       ON m.product_id = p.id AND m.d = d.d
+          WHERE p.is_active = TRUE
+        ),
+        hist AS (
+          SELECT product_id, d,
+                 hoy - COALESCE(SUM(delta) OVER (
+                   PARTITION BY product_id ORDER BY d DESC
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                 ), 0) AS stock_fin_dia
+          FROM base
+        )
+        SELECT
+          product_id,
+          COUNT(*) FILTER (WHERE stock_fin_dia > 0
+            AND d >= (NOW() - INTERVAL '4 months')::date)::int AS dias_recent,
+          COUNT(*) FILTER (WHERE stock_fin_dia > 0
+            AND d <  (NOW() - INTERVAL '4 months')::date)::int AS dias_prior,
+          COUNT(*) FILTER (WHERE stock_fin_dia > 0
+            AND d >= (NOW() - INTERVAL '6 months')::date)::int AS dias_6m
+        FROM hist
+        GROUP BY product_id
+      `),
     ])
 
     const transitLocal:  Record<number, number> = {}
     const transitImport: Record<number, number> = {}
     for (const r of localTransit)  transitLocal[r.product_id]  = parseInt(r.pending, 10) || 0
     for (const r of importTransit) transitImport[r.product_id] = parseInt(r.pending, 10) || 0
+
+    const diasConStock: Record<number, { recent: number; prior: number; m6: number }> = {}
+    for (const r of diasStock) {
+      diasConStock[r.product_id] = { recent: r.dias_recent, prior: r.dias_prior, m6: r.dias_6m }
+    }
 
     const reposicion: any[] = []
     const remate:     any[] = []
@@ -106,6 +160,13 @@ export async function GET(_: NextRequest) {
     const DECLINE_FACTOR = 2  // anterior >= 2× reciente
     const DECLINE_FLOOR  = 8  // mínimo de unidades en el período anterior
     const NEW_GRACE_MONTHS = 3 // recién llegados: período de prueba antes de juzgarlos
+    // Días con stock mínimos para que una ventana sea comparable. Por debajo de
+    // esto el producto no tuvo oportunidad de vender y su "caída" no significa
+    // nada: es quiebre de stock, no pérdida de demanda.
+    const MIN_DIAS_VENTANA = 30
+    // Un producto solo se juzga como remate si tuvo una oportunidad razonable de
+    // venderse en los últimos 6 meses (~2 de 6 meses con stock).
+    const MIN_DIAS_REMATE  = 60
 
     const now = Date.now()
     for (const r of products) {
@@ -130,16 +191,44 @@ export async function GET(_: NextRequest) {
       const margenUnit   = Math.round((salePrice - cost) * 100) / 100
       const gananciaMensual = Math.round(ventaMensual * margenUnit * 100) / 100
 
-      // Declive real: el período anterior (meses 5-8) vendió al menos el doble
-      // que el reciente (últimos 4 meses), con un piso para descartar ruido.
-      const enDeclive = ventas4mPrev >= DECLINE_FLOOR && ventas4mPrev >= DECLINE_FACTOR * ventas4mRec
+      // Días que el producto REALMENTE estuvo disponible en cada ventana.
+      const dias = diasConStock[r.id] ?? { recent: 0, prior: 0, m6: 0 }
+      // Demanda diaria: unidades por día CON STOCK. Comparar unidades crudas
+      // mezclaba "se vende menos" con "no hubo qué vender".
+      const tasaRec  = dias.recent > 0 ? ventas4mRec  / dias.recent : 0
+      const tasaPrev = dias.prior  > 0 ? ventas4mPrev / dias.prior  : 0
+      // Demanda mensual medida solo sobre los días que hubo stock (30 días).
+      const ventaMensualDisp = dias.m6 > 0
+        ? Math.round((ventas6m / dias.m6) * 30 * 10) / 10
+        : 0
+
+      // Quiebre de stock: en la ventana reciente casi no hubo qué vender, así que
+      // cualquier comparación contra el período anterior no dice nada.
+      const quiebreStock = dias.recent < MIN_DIAS_VENTANA
+
+      // Declive REAL: ambas ventanas tuvieron stock suficiente para comparar y,
+      // aun así, la demanda diaria se partió a la mitad o menos.
+      const enDeclive =
+        !quiebreStock &&
+        dias.prior >= MIN_DIAS_VENTANA &&
+        ventas4mPrev >= DECLINE_FLOOR &&
+        tasaPrev >= DECLINE_FACTOR * tasaRec
+
+      // Demanda para dimensionar la compra. El promedio por calendario subestima
+      // a los productos que estuvieron agotados: si vendió 20 u en los 25 días que
+      // tuvo stock, su demanda es ~24/mes, no 3,3/mes. Solo se confía en la tasa
+      // ajustada cuando hubo al menos un mes de disponibilidad real, para que
+      // unos pocos días de venta no inflen el pedido.
+      const demandaMensual = dias.m6 >= MIN_DIAS_VENTANA
+        ? Math.max(ventaMensual, ventaMensualDisp)
+        : ventaMensual
 
       // Cobertura en meses con stock actual, y contando lo que ya viene en camino.
-      const cobertura      = ventaMensual > 0 ? Math.round((stock / ventaMensual) * 10) / 10 : 999
-      const coberturaTotal = ventaMensual > 0 ? Math.round(((stock + enTransito) / ventaMensual) * 10) / 10 : 999
+      const cobertura      = demandaMensual > 0 ? Math.round((stock / demandaMensual) * 10) / 10 : 999
+      const coberturaTotal = demandaMensual > 0 ? Math.round(((stock + enTransito) / demandaMensual) * 10) / 10 : 999
 
       // Sugerido: llevar hasta TARGET_MONTHS, descontando lo que ya viene en camino.
-      const objetivoUnidades = Math.round((ventaMensual * TARGET_MONTHS))
+      const objetivoUnidades = Math.round((demandaMensual * TARGET_MONTHS))
       const sugerido = Math.max(0, objetivoUnidades - stock - enTransito)
 
       const base: Record<string, unknown> = {
@@ -167,6 +256,12 @@ export async function GET(_: NextRequest) {
         ventas_4m_recent: ventas4mRec,
         ventas_4m_prior:  ventas4mPrev,
         en_declive:       enDeclive,
+        dias_stock_recent: dias.recent,
+        dias_stock_prior:  dias.prior,
+        dias_stock_6m:     dias.m6,
+        venta_mensual_disp: ventaMensualDisp,   // demanda por 30 días CON stock
+        demanda_mensual:    demandaMensual,     // la que se usa para cobertura y pedido
+        quiebre_stock:     quiebreStock,
       }
 
       // Recién llegados: período de prueba, no se juzgan todavía.
@@ -179,7 +274,7 @@ export async function GET(_: NextRequest) {
       // Declive real (venía vendiendo y se cayó): tiene prioridad como señal de
       // "evaluar descontinuar". No se ofrece reponer aunque el promedio dé.
       if (!esNuevo && enDeclive) {
-        base.alerta = `📉 Cayó: ${ventas4mPrev} → ${ventas4mRec} u (últimos 4m vs 4m previos)`
+        base.alerta = `📉 Cayó: ${ventas4mPrev} → ${ventas4mRec} u (con stock los 2 períodos)`
         declive.push(base)
         continue
       }
@@ -187,7 +282,10 @@ export async function GET(_: NextRequest) {
       // Rotación muy baja con stock parado: menos de 6 unidades vendidas en los
       // últimos 6 meses (total crudo, no la tasa adaptada por antigüedad — así un
       // producto de 4 meses con 5 ventas también cae a remate, no solo los de 6+).
-      if (ventas6m < 6 && stock > 0) {
+      // Se exige además que haya tenido stock un tiempo razonable: rematar algo
+      // que estuvo agotado casi todo el semestre es castigarlo por no haber
+      // estado disponible.
+      if (ventas6m < 6 && stock > 0 && dias.m6 >= MIN_DIAS_REMATE) {
         if (esNuevo) nuevos.push(base)
         else         remate.push(base)
         continue
@@ -196,7 +294,7 @@ export async function GET(_: NextRequest) {
       // Reposición: rota lo suficiente (>= MIN_REPOSICION/mes, sin importar stock)
       // y se agota antes del lead time de importación. El umbral de rotación evita
       // ofrecer reponer productos que casi no se venden (aunque estén en stock 0).
-      if (ventaMensual >= MIN_REPOSICION && cobertura < LEAD_MONTHS) {
+      if (demandaMensual >= MIN_REPOSICION && cobertura < LEAD_MONTHS) {
         let prioridad: 'URGENTE' | 'PEDIR' | 'EN_CAMINO'
         if (coberturaTotal >= LEAD_MONTHS)      prioridad = 'EN_CAMINO'   // lo que viene ya lo cubre
         else if (coberturaTotal < URGENT_MONTHS) prioridad = 'URGENTE'
