@@ -517,7 +517,7 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
       categoria:        p => p.categoria_pct ?? -1,
       stock_actual:     p => p.stock_actual,
       en_transito:      p => p.en_transito,
-      venta_mensual:    p => p.venta_mensual,
+      venta_mensual:    p => p.demanda_mensual ?? p.venta_mensual,
       cobertura:        p => p.cobertura,
       cobertura_total:  p => p.cobertura_total,
       ganancia_mensual: p => p.ganancia_mensual,
@@ -545,6 +545,15 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
       { key: 'stock_actual', label: 'Stock', align: 'right', sortValue: p => p.stock_actual },
       { key: 'ventas_4m_prior', label: 'Antes (5-8m)', align: 'right', render: p => `${p.ventas_4m_prior} u`, sortValue: p => p.ventas_4m_prior },
       { key: 'ventas_4m_recent', label: 'Ahora (últ. 4m)', align: 'right', render: p => `${p.ventas_4m_recent} u`, sortValue: p => p.ventas_4m_recent },
+      // Días con stock de cada ventana: es la prueba de que la caída no es por
+      // desabastecimiento. Si acá ves pocos días, el producto no está en declive.
+      { key: 'dias_stock', label: 'Días con stock', align: 'right',
+        render: p => (
+          <span className="text-xs text-neutral-500" title="Días que el producto tuvo stock en cada período (antes → ahora). La caída solo cuenta si tuvo stock en ambos.">
+            {p.dias_stock_prior ?? '—'} → {p.dias_stock_recent ?? '—'}
+          </span>
+        ),
+        sortValue: p => p.dias_stock_recent ?? 0 },
       { key: 'caida', label: 'Caída', align: 'right',
         render: p => { const d = p.ventas_4m_prior > 0 ? Math.round((1 - p.ventas_4m_recent / p.ventas_4m_prior) * 100) : 0; return <span className="text-red-600 font-medium">−{d}%</span> },
         sortValue: p => p.ventas_4m_prior > 0 ? (p.ventas_4m_recent / p.ventas_4m_prior) : 1 },
@@ -559,8 +568,10 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
           <StockSearchBox value={search} onChange={setSearch} />
         </div>
         <p className="text-xs text-neutral-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-          📉 Ventas en caída: los 4 meses previos (5-8) vendieron al menos el <b>doble</b> que los
-          últimos 4. Candidatos a <b>descontinuar</b>. Si ya están en stock 0, podés desactivarlos acá.
+          📉 Ventas en caída: la demanda <b>por día con stock</b> se partió a la mitad o menos
+          respecto de los 4 meses previos. Se descuentan los días sin stock, así que un producto
+          que vendió menos <b>porque estuvo agotado</b> no aparece acá. Candidatos a
+          <b> descontinuar</b>; si ya están en stock 0, podés desactivarlos.
         </p>
         <DataTable columns={cols} rows={rows} exportName="stock_declive" emptyText="Sin productos en declive" />
       </div>
@@ -574,6 +585,13 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
       { key: 'stock_actual', label: 'Stock', align: 'right', sortValue: p => p.stock_actual },
       { key: 'ventas_6m', label: 'Ventas 6m', align: 'right', sortValue: p => p.ventas_6m },
       { key: 'venta_mensual', label: 'V. mensual', align: 'right', sortValue: p => p.venta_mensual },
+      { key: 'dias_stock_6m', label: 'Días con stock', align: 'right',
+        render: p => (
+          <span className="text-xs text-neutral-500" title="Días con stock en los últimos 6 meses. Con menos de 60 el producto no se juzga como remate: no tuvo oportunidad de venderse.">
+            {p.dias_stock_6m ?? '—'}
+          </span>
+        ),
+        sortValue: p => p.dias_stock_6m ?? 0 },
       { key: 'meses_disponible', label: 'Antigüedad', align: 'right', render: p => `${p.meses_disponible} m`, sortValue: p => p.meses_disponible },
       { key: 'meses_duracion', label: 'Duración', align: 'right', render: p => `${p.meses_duracion} m`, sortValue: p => p.meses_duracion },
       // En remate se puede desactivar (stock 0); en nuevos no tiene sentido.
@@ -696,7 +714,15 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
                     </td>
                     <td className="px-3 py-2 text-right">{p.stock_actual}</td>
                     <td className={`px-3 py-2 text-right ${p.en_transito > 0 ? 'text-blue-600 font-medium' : 'text-neutral-300'}`}>{p.en_transito || '—'}</td>
-                    <td className="px-3 py-2 text-right">{p.venta_mensual}</td>
+                    {/* Demanda con la que se calculan cobertura y sugerido. Cuando
+                        difiere del promedio por calendario es porque el producto
+                        estuvo agotado: se marca para que el número no sorprenda. */}
+                    <td className="px-3 py-2 text-right">
+                      {p.demanda_mensual ?? p.venta_mensual}
+                      {p.demanda_mensual > p.venta_mensual && (
+                        <span className="ml-1 text-amber-600" title={`Promedio por calendario: ${p.venta_mensual}/mes. Ajustado a ${p.demanda_mensual}/mes porque solo tuvo stock ${p.dias_stock_6m} días en 6 meses.`}>*</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right">{p.cobertura} m</td>
                     <td className="px-3 py-2 text-right font-medium">{p.cobertura_total} m</td>
                     <td className="px-3 py-2 text-right text-green-600">${money(p.ganancia_mensual)}</td>
