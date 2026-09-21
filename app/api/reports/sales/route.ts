@@ -69,7 +69,15 @@ export async function GET(req: NextRequest) {
         total_cost:       Math.round(totalCost * 100) / 100,
         total_commission: Math.round(totalComm * 100) / 100,
         profit:           Math.round(profit * 100) / 100,
-        profit_pct:       totalCost > 0 ? Math.round((profit / totalCost) * 1000) / 10 : 0,
+        // Margen SOBRE VENTA: es el que se lee sin ambigüedad ("de cada $100 que
+        // vendo me quedan $X"). Antes el % de esta pantalla se calculaba sobre el
+        // costo sin comisión y el del dashboard sobre costo+comisión, así que la
+        // misma ganancia mostraba dos porcentajes distintos según dónde se mirara.
+        margin_pct:       totalAmount > 0 ? Math.round((profit / totalAmount) * 1000) / 10 : 0,
+        // Markup sobre el costo total (mercadería + comisión), para comparar contra
+        // las categorías de ganancia, que están expresadas así.
+        profit_pct:       (totalCost + totalComm) > 0
+          ? Math.round((profit / (totalCost + totalComm)) * 1000) / 10 : 0,
         count:            sales.length,
       },
     })

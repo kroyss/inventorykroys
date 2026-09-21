@@ -104,6 +104,13 @@ export async function GET(req: NextRequest) {
         ventas:       Math.round(totalVentas  * 100) / 100,
         costos:       Math.round(totalCostos  * 100) / 100,
         ganancia:     Math.round((totalVentas - totalCostos) * 100) / 100,
+        // Margen SOBRE VENTA (mismo criterio que el reporte de ventas: antes cada
+        // pantalla dividía por una base distinta y la misma ganancia mostraba
+        // porcentajes que no coincidían).
+        margen_pct:   totalVentas > 0
+          ? Math.round(((totalVentas - totalCostos) / totalVentas) * 1000) / 10
+          : 0,
+        // Markup sobre el costo (mercadería + comisión).
         ganancia_pct: totalCostos > 0
           ? Math.round(((totalVentas - totalCostos) / totalCostos) * 1000) / 10
           : 0,

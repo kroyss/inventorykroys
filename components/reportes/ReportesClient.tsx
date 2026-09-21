@@ -222,7 +222,8 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
         <KPICard compact label="Ventas"   value={`$${money(data.totals.total_amount)}`} />
         <KPICard compact label="Costos"   value={`$${money(data.totals.total_cost)}`} />
         <KPICard compact label="Comisión" value={`$${money(data.totals.total_commission || 0)}`} accent="text-red-500" />
-        <KPICard compact label={`Ganancia · ${data.totals.profit_pct}%`} value={`$${money(data.totals.profit)}`} accent="text-green-600" />
+        <KPICard compact label={`Ganancia · ${data.totals.margin_pct ?? data.totals.profit_pct}% s/venta`}
+          value={`$${money(data.totals.profit)}`} accent="text-green-600" />
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <SearchBar value={search} onChange={setSearch} placeholder="Buscar orden o cliente…" />
