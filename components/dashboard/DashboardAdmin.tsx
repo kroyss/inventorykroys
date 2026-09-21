@@ -35,7 +35,7 @@ interface Summary {
 interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number }
 interface ChartData {
   chart_data: ChartPoint[]
-  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; cantidad: number }
+  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; cantidad: number }
 }
 
 type Period = 'today' | 'month' | 'quarter' | 'year'
@@ -212,7 +212,13 @@ export default function DashboardAdmin({ country }: { country: Country }) {
               <div className="flex items-center gap-1.5 text-xs text-neutral-500">
                 <span className="w-2 h-2 rounded-full bg-blue-500" /> Ganancia
               </div>
-              <div className="text-xl font-bold text-neutral-900 mt-0.5">${money(chart.summary.ganancia)} <span className="text-sm text-neutral-400">({chart.summary.ganancia_pct}%)</span></div>
+              <div className="text-xl font-bold text-neutral-900 mt-0.5">
+                ${money(chart.summary.ganancia)}{' '}
+                <span className="text-sm text-neutral-400"
+                  title={`Margen sobre la venta: de cada $100 vendidos quedan $${chart.summary.margen_pct ?? 0}. Sobre el costo (markup) es ${chart.summary.ganancia_pct}%. No descuenta gastos del mes ni, en VE, la diferencia oficial/paralelo.`}>
+                  ({chart.summary.margen_pct ?? chart.summary.ganancia_pct}% s/venta)
+                </span>
+              </div>
               {period === 'month' && profitDelta && (
                 <div className="text-xs mt-0.5 opacity-70">{profitDelta}</div>
               )}
