@@ -549,8 +549,10 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
       // desabastecimiento. Si acá ves pocos días, el producto no está en declive.
       { key: 'dias_stock', label: 'Días con stock', align: 'right',
         render: p => (
-          <span className="text-xs text-neutral-500" title="Días que el producto tuvo stock en cada período (antes → ahora). La caída solo cuenta si tuvo stock en ambos.">
+          <span className="text-xs text-neutral-500"
+            title={`Días con stock (antes → ahora): ${p.dias_stock_prior} → ${p.dias_stock_recent}.\nStock promedio: ${p.stock_prom_prior} → ${p.stock_prom_recent} unidades.\nPara contar como declive tiene que haber tenido stock más de la mitad del período reciente y en un nivel comparable al anterior.`}>
             {p.dias_stock_prior ?? '—'} → {p.dias_stock_recent ?? '—'}
+            <span className="ml-1 text-neutral-400">({p.stock_prom_prior}→{p.stock_prom_recent} u)</span>
           </span>
         ),
         sortValue: p => p.dias_stock_recent ?? 0 },
