@@ -125,7 +125,14 @@ export async function GET(_: NextRequest) {
           COUNT(*) FILTER (WHERE stock_fin_dia > 0
             AND d <  (NOW() - INTERVAL '4 months')::date)::int AS dias_prior,
           COUNT(*) FILTER (WHERE stock_fin_dia > 0
-            AND d >= (NOW() - INTERVAL '6 months')::date)::int AS dias_6m
+            AND d >= (NOW() - INTERVAL '6 months')::date)::int AS dias_6m,
+          -- Nivel promedio de stock: tener 1 unidad no es estar abastecido.
+          -- Sin esto, un producto que pasó el semestre raspando el cero cuenta
+          -- como "disponible" y su caída de ventas parece falta de demanda.
+          ROUND(AVG(GREATEST(stock_fin_dia, 0)) FILTER (
+            WHERE d >= (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_recent,
+          ROUND(AVG(GREATEST(stock_fin_dia, 0)) FILTER (
+            WHERE d <  (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_prior
         FROM hist
         GROUP BY product_id
       `),
@@ -136,9 +143,14 @@ export async function GET(_: NextRequest) {
     for (const r of localTransit)  transitLocal[r.product_id]  = parseInt(r.pending, 10) || 0
     for (const r of importTransit) transitImport[r.product_id] = parseInt(r.pending, 10) || 0
 
-    const diasConStock: Record<number, { recent: number; prior: number; m6: number }> = {}
+    const diasConStock: Record<number, {
+      recent: number; prior: number; m6: number; promRecent: number; promPrior: number
+    }> = {}
     for (const r of diasStock) {
-      diasConStock[r.product_id] = { recent: r.dias_recent, prior: r.dias_prior, m6: r.dias_6m }
+      diasConStock[r.product_id] = {
+        recent: r.dias_recent, prior: r.dias_prior, m6: r.dias_6m,
+        promRecent: r.stock_prom_recent ?? 0, promPrior: r.stock_prom_prior ?? 0,
+      }
     }
 
     const reposicion: any[] = []
@@ -160,9 +172,18 @@ export async function GET(_: NextRequest) {
     const DECLINE_FACTOR = 2  // anterior >= 2× reciente
     const DECLINE_FLOOR  = 8  // mínimo de unidades en el período anterior
     const NEW_GRACE_MONTHS = 3 // recién llegados: período de prueba antes de juzgarlos
-    // Días con stock mínimos para que una ventana sea comparable. Por debajo de
-    // esto el producto no tuvo oportunidad de vender y su "caída" no significa
-    // nada: es quiebre de stock, no pérdida de demanda.
+    // Para acusar declive, el período RECIENTE tiene que haber tenido stock al
+    // menos la mitad de sus ~122 días: si estuvo agotado la mayor parte, no tuvo
+    // oportunidad de vender y su caída no dice nada sobre la demanda.
+    const MIN_DIAS_RECIENTE = 60
+    // Del período anterior solo se necesita base suficiente para calcular una
+    // tasa; si vendió mucho en pocos días, peor todavía para el reciente.
+    const MIN_DIAS_PREVIO   = 20
+    // Y el estante no puede haber estado mucho más flaco que antes: si el stock
+    // promedio reciente es menos de la mitad del anterior, la caída se explica
+    // por abastecimiento, no por demanda.
+    const MIN_RATIO_STOCK   = 0.5
+    // Umbral general de disponibilidad para confiar en una tasa por día.
     const MIN_DIAS_VENTANA = 30
     // Un producto solo se juzga como remate si tuvo una oportunidad razonable de
     // venderse en los últimos 6 meses (~2 de 6 meses con stock).
@@ -202,15 +223,18 @@ export async function GET(_: NextRequest) {
         ? Math.round((ventas6m / dias.m6) * 30 * 10) / 10
         : 0
 
-      // Quiebre de stock: en la ventana reciente casi no hubo qué vender, así que
-      // cualquier comparación contra el período anterior no dice nada.
-      const quiebreStock = dias.recent < MIN_DIAS_VENTANA
+      // Quiebre de stock: estuvo agotado más de la mitad de la ventana reciente,
+      // o el estante quedó mucho más flaco que antes (ej. venía con 20 unidades
+      // en góndola y ahora vive entre 0 y 2). En cualquiera de los dos casos la
+      // comparación de ventas mide abastecimiento, no demanda.
+      const estanteFlaco = dias.promPrior > 0 && dias.promRecent < MIN_RATIO_STOCK * dias.promPrior
+      const quiebreStock = dias.recent < MIN_DIAS_RECIENTE || estanteFlaco
 
-      // Declive REAL: ambas ventanas tuvieron stock suficiente para comparar y,
-      // aun así, la demanda diaria se partió a la mitad o menos.
+      // Declive REAL: tuvo stock de sobra en el período reciente, en un nivel
+      // comparable al anterior, y aun así la demanda diaria se partió al medio.
       const enDeclive =
         !quiebreStock &&
-        dias.prior >= MIN_DIAS_VENTANA &&
+        dias.prior >= MIN_DIAS_PREVIO &&
         ventas4mPrev >= DECLINE_FLOOR &&
         tasaPrev >= DECLINE_FACTOR * tasaRec
 
@@ -259,6 +283,8 @@ export async function GET(_: NextRequest) {
         dias_stock_recent: dias.recent,
         dias_stock_prior:  dias.prior,
         dias_stock_6m:     dias.m6,
+        stock_prom_recent: dias.promRecent,
+        stock_prom_prior:  dias.promPrior,
         venta_mensual_disp: ventaMensualDisp,   // demanda por 30 días CON stock
         demanda_mensual:    demandaMensual,     // la que se usa para cobertura y pedido
         quiebre_stock:     quiebreStock,
