@@ -48,3 +48,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Documentos personales que no van al repo
+vanessa_dump.txt
+*_dump.txt
