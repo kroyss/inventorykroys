@@ -36,7 +36,7 @@ interface Overview {
   pendientes: { id: number; created_at: string; created_by: string | null; etiquetas: number }[]
   cerradas: {
     id: number; opened_at: string; closed_at: string; total_envios: number; lotes: number
-    closed_by: string | null; bot_csv_at: string | null; reimpresiones: number
+    closed_by: string | null; bot_csv_at: string | null; reimpresiones: number; a_reportar: number
   }[]
 }
 interface Falla { etiqueta_id: number; original_name: string; venta: string | null; detalle: string }
@@ -322,10 +322,17 @@ export default function DespachosClient() {
                   <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
                   <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                     <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">↓ Manifiesto</button>
-                    <button onClick={() => bajarCsv(j)} className="btn-secondary text-xs"
-                      title={j.bot_csv_at ? `Ya se bajó el ${fechaHora(j.bot_csv_at)}` : undefined}>
-                      ↓ CSV Reportador{j.bot_csv_at ? ' ✓' : ''}
-                    </button>
+                    {j.a_reportar === 0 ? (
+                      <button disabled className="btn-secondary text-xs"
+                        title="Todos los envíos son reimpresiones: esos compradores ya fueron reportados">
+                        Nada para reportar
+                      </button>
+                    ) : (
+                      <button onClick={() => bajarCsv(j)} className="btn-secondary text-xs"
+                        title={j.bot_csv_at ? `Ya se bajó el ${fechaHora(j.bot_csv_at)}` : undefined}>
+                        ↓ CSV Reportador ({j.a_reportar}){j.bot_csv_at ? ' ✓' : ''}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
