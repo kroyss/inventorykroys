@@ -22,6 +22,8 @@ export async function readInvoiceConfig(db: Q): Promise<InvoiceConfig> {
     iva:      num(s.factura_iva, 16),
     offset_x: num(s.factura_offset_x, 0),
     offset_y: num(s.factura_offset_y, 0),
+    copy_offset_x: num(s.factura_copia_offset_x, 0),
+    copy_offset_y: num(s.factura_copia_offset_y, 0),
   }
 }
 

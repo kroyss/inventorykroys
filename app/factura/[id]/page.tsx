@@ -21,5 +21,6 @@ export default async function Page({ params, searchParams }: {
   const [invoice, config] = await Promise.all([getInvoice(db, id), readInvoiceConfig(db)])
   if (!invoice) notFound()
 
-  return <FacturaPrintClient invoice={invoice} offsetX={config.offset_x} offsetY={config.offset_y} autoPrint={print === '1'} />
+  return <FacturaPrintClient invoice={invoice} offsetX={config.offset_x} offsetY={config.offset_y}
+    copyOffsetX={config.copy_offset_x} copyOffsetY={config.copy_offset_y} autoPrint={print === '1'} />
 }

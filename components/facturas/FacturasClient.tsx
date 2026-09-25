@@ -455,12 +455,14 @@ function ConfigPanel({ onClose }: { onClose: () => void }) {
   const [iva, setIva]     = useState(16)
   const [ox, setOx]       = useState(0)
   const [oy, setOy]       = useState(0)
+  const [cx, setCx]       = useState(0)
+  const [cy, setCy]       = useState(0)
   const [msg, setMsg]     = useState<string | null>(null)
   const [busy, setBusy]   = useState(false)
 
   useEffect(() => {
     fetch('/api/invoices/config').then(r => r.json()).then(c => {
-      setStart(c.start_number); setNext(c.next_number); setIva(c.iva); setOx(c.offset_x); setOy(c.offset_y)
+      setStart(c.start_number); setNext(c.next_number); setIva(c.iva); setOx(c.offset_x); setOy(c.offset_y); setCx(c.copy_offset_x); setCy(c.copy_offset_y)
       setLoaded(true)
     })
   }, [])
@@ -469,7 +471,7 @@ function ConfigPanel({ onClose }: { onClose: () => void }) {
     setBusy(true); setMsg(null)
     const res = await fetch('/api/invoices/config', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start_number: start, iva, offset_x: ox, offset_y: oy }),
+      body: JSON.stringify({ start_number: start, iva, offset_x: ox, offset_y: oy, copy_offset_x: cx, copy_offset_y: cy }),
     })
     setBusy(false)
     const data = await res.json().catch(() => ({}))
@@ -502,17 +504,32 @@ function ConfigPanel({ onClose }: { onClose: () => void }) {
               <NumberInput value={iva} onValueChange={setIva} className={field} />
             </div>
             <div>
-              <div className="text-xs text-neutral-500">Calibración de impresora (mm)</div>
+              <div className="text-xs text-neutral-500">Calibración de impresora — toda la hoja (mm)</div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] text-neutral-400">Horizontal (+ = derecha)</label>
-                  <NumberInput value={ox} onValueChange={setOx} emptyValue={0} className={field} />
+                  <NumberInput value={ox} onValueChange={setOx} emptyValue={0} signed className={field} />
                 </div>
                 <div>
                   <label className="text-[11px] text-neutral-400">Vertical (+ = abajo)</label>
-                  <NumberInput value={oy} onValueChange={setOy} emptyValue={0} className={field} />
+                  <NumberInput value={oy} onValueChange={setOy} emptyValue={0} signed className={field} />
                 </div>
               </div>
+              <div className="text-xs text-neutral-500 mt-3">Ajuste extra solo para la COPIA (mm)</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-neutral-400">Horizontal (+ = derecha)</label>
+                  <NumberInput value={cx} onValueChange={setCx} emptyValue={0} signed className={field} />
+                </div>
+                <div>
+                  <label className="text-[11px] text-neutral-400">Vertical (− = subir)</label>
+                  <NumberInput value={cy} onValueChange={setCy} emptyValue={0} signed className={field} />
+                </div>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Primero cuadrá el original con “toda la hoja”; después, si la copia sale corrida, movela solo a ella acá
+                (ej.: sale 5 mm más abajo → Vertical −5).
+              </p>
               <p className="text-[11px] text-neutral-400 mt-1">
                 Imprimí la <a href="/factura/prueba" target="_blank" rel="noreferrer" className="underline">hoja de prueba</a> en
                 papel blanco y ponela al trasluz sobre una impresa desde Excel. Si está corrida, medí la diferencia en mm y cargala acá.

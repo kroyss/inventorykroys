@@ -25,18 +25,23 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// PUT /api/invoices/config (admin) → número inicial, IVA y corrimiento de impresión.
+// PUT /api/invoices/config (admin) → número inicial, IVA y corrimiento de impresión
+// (toda la hoja + ajuste extra solo para la copia).
 const PutSchema = z.object({
   start_number: z.number().int().positive().optional(),
   iva:          z.number().min(0).max(100).optional(),
   offset_x:     z.number().min(-30).max(30).optional(),
   offset_y:     z.number().min(-30).max(30).optional(),
+  copy_offset_x: z.number().min(-30).max(30).optional(),
+  copy_offset_y: z.number().min(-30).max(30).optional(),
 })
 const KEY: Record<keyof z.infer<typeof PutSchema>, string> = {
   start_number: 'factura_numero_inicial',
   iva:          'factura_iva',
   offset_x:     'factura_offset_x',
   offset_y:     'factura_offset_y',
+  copy_offset_x: 'factura_copia_offset_x',
+  copy_offset_y: 'factura_copia_offset_y',
 }
 
 export async function PUT(req: NextRequest) {

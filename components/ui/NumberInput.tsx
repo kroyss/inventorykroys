@@ -25,12 +25,14 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 
   onValueChange: (n: number) => void
   /** Cantidades enteras: bloquea también el punto y la coma. */
   int?: boolean
+  /** Permite negativos (deja pasar la tecla "-"). Ej.: calibración de impresión. */
+  signed?: boolean
   /** Valor que representa "campo vacío" y se muestra como placeholder. Default 0. */
   emptyValue?: number
 }
 
 export default function NumberInput({
-  value, onValueChange, int, emptyValue = 0, onKeyDown, placeholder, ...rest
+  value, onValueChange, int, signed, emptyValue = 0, onKeyDown, placeholder, ...rest
 }: Props) {
   const parse = (s: string) => {
     if (s.trim() === '') return emptyValue
@@ -50,7 +52,7 @@ export default function NumberInput({
   }, [value])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    ;(int ? blockIntKeys : blockNumberKeys)(e)
+    if (!(signed && e.key === '-')) (int ? blockIntKeys : blockNumberKeys)(e)
     onKeyDown?.(e)
   }
 
