@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Sale } from '@/lib/types'
 import {
   bs, calcInvoice, normalizeDoc, round2, MAX_INVOICE_LINES,
@@ -23,6 +23,37 @@ interface Props {
   onClose: () => void
   onSaved: (inv: Invoice) => void
 }
+
+/** Lo que se autoguarda mientras se llena "Facturar venta" (invoice_drafts.data). */
+interface Draft {
+  control: string
+  date: string
+  rate: number
+  rateTouched: boolean
+  name: string
+  doc: string
+  address: string
+  phone: string
+  isSpecial: boolean
+  retPct: number
+  withIva: boolean
+  ivaRate: number
+  lines: Line[]
+}
+
+interface DraftResp { data: Partial<Draft>; updated_at: string; updated_by: string | null }
+
+const saleLines = (sale?: Sale): Line[] => {
+  const disc = sale?.discount_percent ?? 0
+  return (sale?.items ?? []).map(i => ({
+    product_id: i.product_id, description: i.product_name, quantity: i.quantity,
+    unit_price_usd: round2(i.unit_price * (1 - disc / 100)),
+  }))
+}
+
+const hhmm = (iso: string) => new Date(iso).toLocaleString('es-VE', {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+})
 
 interface ConfigResp {
   next_number: number
@@ -71,19 +102,44 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
         unit_price_usd: it.unit_price_usd ?? round2(it.unit_price_bs / replaces.exchange_rate),
       }))
     }
-    const disc = sale?.discount_percent ?? 0
-    return (sale?.items ?? []).map(i => ({
-      product_id: i.product_id, description: i.product_name, quantity: i.quantity,
-      unit_price_usd: round2(i.unit_price * (1 - disc / 100)),
-    }))
+    return saleLines(sale)
   })
 
   const [voidReason, setVoidReason] = useState('')
   const saleId = replaces ? replaces.sale_id : sale?.id ?? null
 
-  // Config inicial: próximo número, IVA por defecto, tasa BCV de hoy
+  // Borrador autoguardado (solo al facturar una venta; no al reemitir)
+  const draftSaleId = !replaces && sale ? sale.id : null
+  const [hydrated, setHydrated] = useState(false)
+  const [draftInfo, setDraftInfo] = useState<{ updated_at: string; updated_by: string | null } | null>(null)
+  const [draftState, setDraftState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const lastSavedRef = useRef<string>('')
+  const pendingRef = useRef<string | null>(null)
+
+  const applyDraft = (d: Partial<Draft>) => {
+    if (d.control !== undefined)   setControl(d.control)
+    if (d.date)                    setDate(d.date)
+    if (d.rateTouched && d.rate)   { setRate(d.rate); setRateTouched(true) }
+    if (d.name !== undefined)      setName(d.name)
+    if (d.doc !== undefined)       setDoc(d.doc)
+    if (d.address !== undefined)   setAddress(d.address)
+    if (d.phone !== undefined)     setPhone(d.phone)
+    if (d.isSpecial !== undefined) setIsSpecial(d.isSpecial)
+    if (d.retPct)                  setRetPct(d.retPct)
+    if (d.withIva !== undefined)   setWithIva(d.withIva)
+    if (d.ivaRate !== undefined)   setIvaRate(d.ivaRate)
+    if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines)
+  }
+
+  // Config inicial (próximo número, IVA por defecto, tasa BCV de hoy) y, encima, el borrador
   useEffect(() => {
-    fetch('/api/invoices/config').then(r => r.json()).then((c: ConfigResp) => {
+    const draftReq: Promise<DraftResp | null> = draftSaleId
+      ? fetch(`/api/invoices/drafts/${draftSaleId}`).then(r => r.ok ? r.json() : null).catch(() => null)
+      : Promise.resolve(null)
+    Promise.all([
+      fetch('/api/invoices/config').then(r => r.json()) as Promise<ConfigResp>,
+      draftReq,
+    ]).then(([c, draft]) => {
       setConfig(c)
       setNumber(c.next_number)
       setDate(c.today)
@@ -94,11 +150,16 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
         setRateDate(c.rate_date)
         setIvaRate(c.iva)
       }
+      if (draft?.data) {
+        applyDraft(draft.data)
+        setDraftInfo({ updated_at: draft.updated_at, updated_by: draft.updated_by })
+      }
+      setHydrated(true)
     }).catch(() => setError('No se pudo cargar la configuración de facturación'))
     fetch('/api/invoices/customers').then(r => r.json()).then(rows => {
       if (Array.isArray(rows)) setCustomers(rows)
     }).catch(() => {})
-  }, [replaces])
+  }, [replaces, draftSaleId])
 
   // Al cambiar la fecha, la tasa sigue a la BCV de esa fecha (salvo que se haya editado a mano)
   useEffect(() => {
@@ -145,6 +206,60 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
     ...(replaces && !voidReason.trim() ? ['motivo de la anulación'] : []),
   ]
 
+  // ── Autoguardado ──────────────────────────────────────────────────────────
+  const draftJson = JSON.stringify({
+    control, date, rate, rateTouched, name, doc, address, phone,
+    isSpecial, retPct, withIva, ivaRate, lines,
+  } satisfies Draft)
+
+  const saveDraft = async (json: string, keepalive = false) => {
+    if (!draftSaleId) return
+    const res = await fetch(`/api/invoices/drafts/${draftSaleId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: `{"data":${json}}`, keepalive,
+    }).catch(() => null)
+    if (keepalive) return
+    if (res?.ok) {
+      lastSavedRef.current = json
+      if (pendingRef.current === json) pendingRef.current = null
+      const d = await res.json().catch(() => null)
+      setDraftInfo({ updated_at: d?.updated_at ?? new Date().toISOString(), updated_by: null })
+      setDraftState('saved')
+    } else {
+      setDraftState('error')
+    }
+  }
+
+  useEffect(() => {
+    if (!draftSaleId || !hydrated || saved) return
+    // La primera foto después de cargar es la línea base: no se guarda sin cambios reales.
+    if (!lastSavedRef.current) { lastSavedRef.current = draftJson; return }
+    if (draftJson === lastSavedRef.current) return
+    pendingRef.current = draftJson
+    const t = setTimeout(() => { setDraftState('saving'); saveDraft(draftJson) }, 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftJson, hydrated, draftSaleId, saved])
+
+  // Al cerrar con cambios todavía dentro del debounce, se mandan igual.
+  useEffect(() => () => {
+    if (pendingRef.current) saveDraft(pendingRef.current, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const discardDraft = async () => {
+    if (!draftSaleId) return
+    pendingRef.current = null
+    await fetch(`/api/invoices/drafts/${draftSaleId}`, { method: 'DELETE' }).catch(() => {})
+    // Vuelve a los datos de la venta
+    setControl(''); setDate(config?.today ?? date); setRateTouched(false)
+    setName(sale?.customer_name ?? ''); setDoc(''); setAddress(''); setPhone('')
+    setIsSpecial(false); setRetPct(75); setWithIva(true); setIvaRate(config?.iva ?? 16)
+    setLines(saleLines(sale))
+    lastSavedRef.current = ''
+    setDraftInfo(null); setDraftState('idle')
+  }
+
   const submit = async () => {
     if (problems.length) { setError(`Falta: ${problems.join(', ')}`); return }
     setBusy(true); setError(null)
@@ -171,6 +286,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
     setBusy(false)
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { setError(data.error ?? 'Error al emitir la factura'); return }
+    pendingRef.current = null   // el servidor ya borró el borrador al emitir
     setSaved(data)
     onSaved(data)
   }
@@ -192,6 +308,19 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
             {(sale || replaces?.sale_order_number) && (
               <div className="text-xs text-neutral-500 font-mono">
                 Venta {sale?.ml_order_number ?? replaces?.sale_order_number}
+              </div>
+            )}
+            {draftSaleId && !saved && (
+              <div className="text-[11px] mt-0.5 flex items-center gap-2">
+                <span className={draftState === 'error' ? 'text-red-600' : 'text-neutral-400'}>
+                  {draftState === 'saving' ? 'Guardando borrador…'
+                    : draftState === 'error' ? 'No se pudo guardar el borrador'
+                    : draftInfo ? `Borrador guardado ${hhmm(draftInfo.updated_at)}${draftInfo.updated_by ? ` · ${draftInfo.updated_by}` : ''}`
+                    : 'Los cambios se guardan solos como borrador'}
+                </span>
+                {draftInfo && (
+                  <button onClick={discardDraft} className="text-neutral-500 hover:text-red-600 underline">Descartar borrador</button>
+                )}
               </div>
             )}
           </div>

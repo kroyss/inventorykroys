@@ -187,6 +187,10 @@ export async function POST(req: NextRequest) {
     if (body.replaces_id) {
       await client.query(`UPDATE invoices SET replaced_by = $1 WHERE id = $2`, [inv.id, body.replaces_id])
     }
+    // Emitida: el borrador autoguardado de esa venta ya no sirve.
+    if (body.sale_id) {
+      await client.query(`DELETE FROM invoice_drafts WHERE sale_id = $1`, [body.sale_id])
+    }
 
     await client.query('COMMIT')
     return NextResponse.json(await getInvoice(db, inv.id), { status: 201 })
