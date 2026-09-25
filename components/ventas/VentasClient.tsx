@@ -276,6 +276,25 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     exportIds(res.rows.map(s => s.id))
   }
 
+  // Modo RE: re-descargar TODAS las DESCARGADA del rango de fechas (el servidor
+  // arma el Excel con el filtro; no cambia estados). Sin búsqueda de texto, para
+  // que el número del botón sea exactamente lo que baja.
+  const canRedownloadRange = redownloadMode && !!dateFrom && !!dateTo && !search
+    && counts.DESCARGADA > 0
+  const redownloadRange = async () => {
+    if (!await confirm({
+      title: 'Re-descargar por fechas',
+      message: `Se bajará el Excel de las ${counts.DESCARGADA} ventas DESCARGADA entre ${dateFrom} y ${dateTo}. No cambia el estado de ninguna.`,
+      confirmText: 'Re-descargar',
+    })) return
+    const link = document.createElement('a')
+    link.href = `/api/sales/export-excel?redownload=1&by_filter=1&date_from=${dateFrom}&date_to=${dateTo}`
+    link.download = 'datos.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const toggleSelection = (id: number) => {
     const next = new Set(selection)
     if (next.has(id)) next.delete(id)
@@ -373,6 +392,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             {selection.size > 0 ? (
               <button onClick={exportSelected} className="btn-secondary text-sm whitespace-nowrap">
                 {redownloadMode ? 'Re-descargar' : 'Exportar'} ({selection.size})
+              </button>
+            ) : canRedownloadRange ? (
+              <button onClick={redownloadRange}
+                title="Bajar el Excel de todas las ventas DESCARGADA del rango de fechas"
+                className="px-3 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 whitespace-nowrap">
+                ↺ Re-descargar fechas ({counts.DESCARGADA})
               </button>
             ) : !redownloadMode && processableTotal > 0 && (
               <button onClick={exportAllProcessed}
