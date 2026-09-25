@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
+import FacturaForm from '@/components/facturas/FacturaForm'
+import { bs, type Invoice } from '@/lib/invoices'
 import { Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
@@ -114,6 +116,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const [redownloadMode, setRedownloadMode] = useState(false)
   const [busy, setBusy]         = useState(false)
   const [error, setError]       = useState<string | null>(null)
+  // Facturación (solo VE): facturas de la venta abierta y el form de "Facturar"
+  const [saleInvoices, setSaleInvoices] = useState<Invoice[]>([])
+  const [invoicing, setInvoicing] = useState(false)
 
   // Orden por columna (server-side; default fecha desc)
   type SortKey = 'order_number' | 'customer' | 'units' | 'total' | 'created_at' | 'status'
@@ -151,12 +156,24 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (showForm)      { setShowForm(false); setEditing(null) }
+      if (invoicing)     { setInvoicing(false) }
+      else if (showForm) { setShowForm(false); setEditing(null) }
       else if (selected) { setSelected(null) }
     }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [showForm, selected])
+  }, [showForm, selected, invoicing])
+
+  const selectedId = selected?.id
+  const loadSaleInvoices = useCallback(async (saleId: number) => {
+    const rows = await fetch(`/api/invoices?sale_id=${saleId}`).then(r => r.ok ? r.json() : []).catch(() => [])
+    setSaleInvoices(Array.isArray(rows) ? rows : [])
+  }, [])
+  useEffect(() => {
+    setSaleInvoices([])
+    if (country === 'VE' && selectedId) loadSaleInvoices(selectedId)
+  }, [country, selectedId, loadSaleInvoices])
+  const activeInvoice = saleInvoices.find(i => i.status === 'EMITIDA') ?? null
 
   // Deep-links desde el dashboard: ?estado= aplica el chip, ?new=1 abre el form.
   // Con useSearchParams se re-aplica si cambia la URL sin desmontar la pantalla.
@@ -567,6 +584,35 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </div>
 
             <div className="px-4 py-3 flex-1 overflow-y-auto">
+              {country === 'VE' && (
+                <div className="mb-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                  {activeInvoice ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold">🧾 Factura #{activeInvoice.invoice_number}</div>
+                        <div className="text-xs text-neutral-500 truncate">
+                          {activeInvoice.customer_name} · Bs {bs(activeInvoice.total_bs)}
+                          {activeInvoice.retention_status === 'PENDIENTE' && <span className="text-amber-700"> · retención pendiente</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <a href={`/factura/${activeInvoice.id}?print=1`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">Imprimir</a>
+                        <a href={`/facturas?id=${activeInvoice.id}`} className="btn-secondary text-xs">Ver</a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-neutral-500">Sin factura</span>
+                      <button onClick={() => setInvoicing(true)} className="btn-secondary text-xs">Facturar</button>
+                    </div>
+                  )}
+                  {saleInvoices.some(i => i.status === 'ANULADA') && (
+                    <div className="mt-1 text-[11px] text-neutral-400">
+                      Anuladas: {saleInvoices.filter(i => i.status === 'ANULADA').map(i => `#${i.invoice_number}`).join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="text-xs text-neutral-500 mb-2">Productos ({selected.items.length})</div>
               <div className="space-y-1">
                 {selected.items.map((i: SaleItem) => (
@@ -626,6 +672,14 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </div>
           </div>
         </div>
+      )}
+
+      {invoicing && selected && (
+        <FacturaForm
+          sale={selected}
+          onClose={() => setInvoicing(false)}
+          onSaved={() => loadSaleInvoices(selected.id)}
+        />
       )}
 
       {showForm && (

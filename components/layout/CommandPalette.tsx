@@ -39,6 +39,7 @@ export default function CommandPalette({ role, country }: { role: UserRole; coun
     { label: 'Ir a Ventas',       hint: 'Navegar',   action: go('/ventas'),     roles: ['admin','user'], countries: ['VE','CO'] },
     { label: 'Ir a Inventario',   hint: 'Navegar',   action: go('/inventario'), roles: ['admin','user'], countries: ['VE','CO'] },
     { label: 'Ir a Despachos',    hint: 'Navegar',   action: go('/despachos'),  roles: ['admin','user'], countries: ['VE'] },
+    { label: 'Ir a Facturas',     hint: 'Navegar',   action: go('/facturas'),   roles: ['admin','user'], countries: ['VE'] },
     { label: role === 'user' ? 'Ir a Recepciones' : 'Ir a Compras', hint: 'Navegar', action: go('/compras'), roles: ['admin','user'], countries: ['VE','CO'] },
     { label: 'Ir a Productos',    hint: 'Navegar',   action: go('/productos'),  roles: ['admin'],        countries: ['VE','CO'] },
     { label: 'Ir a Reportes',     hint: 'Navegar',   action: go('/reportes'),   roles: ['admin'],        countries: ['VE','CO'] },
