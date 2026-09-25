@@ -119,6 +119,8 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   // Facturación (solo VE): facturas de la venta abierta y el form de "Facturar"
   const [saleInvoices, setSaleInvoices] = useState<Invoice[]>([])
   const [invoicing, setInvoicing] = useState(false)
+  // Borrador autoguardado de "Facturar venta" (se llenó a medias y se sigue después)
+  const [invoiceDraftAt, setInvoiceDraftAt] = useState<string | null>(null)
 
   // Orden por columna (server-side; default fecha desc)
   type SortKey = 'order_number' | 'customer' | 'units' | 'total' | 'created_at' | 'status'
@@ -166,11 +168,16 @@ export default function VentasClient({ products: initialProducts, userRole, coun
 
   const selectedId = selected?.id
   const loadSaleInvoices = useCallback(async (saleId: number) => {
-    const rows = await fetch(`/api/invoices?sale_id=${saleId}`).then(r => r.ok ? r.json() : []).catch(() => [])
+    const [rows, draft] = await Promise.all([
+      fetch(`/api/invoices?sale_id=${saleId}`).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`/api/invoices/drafts/${saleId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ])
     setSaleInvoices(Array.isArray(rows) ? rows : [])
+    setInvoiceDraftAt(draft?.updated_at ?? null)
   }, [])
   useEffect(() => {
     setSaleInvoices([])
+    setInvoiceDraftAt(null)
     if (country === 'VE' && selectedId) loadSaleInvoices(selectedId)
   }, [country, selectedId, loadSaleInvoices])
   const activeInvoice = saleInvoices.find(i => i.status === 'EMITIDA') ?? null
@@ -602,8 +609,16 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-neutral-500">Sin factura</span>
-                      <button onClick={() => setInvoicing(true)} className="btn-secondary text-xs">Facturar</button>
+                      {invoiceDraftAt ? (
+                        <span className="text-xs text-amber-700">
+                          Factura a medio llenar · {new Date(invoiceDraftAt).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-500">Sin factura</span>
+                      )}
+                      <button onClick={() => setInvoicing(true)} className="btn-secondary text-xs">
+                        {invoiceDraftAt ? 'Continuar factura' : 'Facturar'}
+                      </button>
                     </div>
                   )}
                   {saleInvoices.some(i => i.status === 'ANULADA') && (
@@ -677,7 +692,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       {invoicing && selected && (
         <FacturaForm
           sale={selected}
-          onClose={() => setInvoicing(false)}
+          onClose={() => {
+            setInvoicing(false)
+            // el form manda lo pendiente al cerrarse; se relee un instante después
+            const id = selected.id
+            setTimeout(() => loadSaleInvoices(id), 600)
+          }}
           onSaved={() => loadSaleInvoices(selected.id)}
         />
       )}
