@@ -86,6 +86,9 @@ async function errorDe(res: Response): Promise<ApiBody> {
 
 const TANDA = 60  // PDFs por envío al servidor (MAX_PDFS_POR_SUBIDA)
 
+// Solo PDF (el servidor igual lo revisa por contenido, no por nombre).
+const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+
 // ── Pantalla ────────────────────────────────────────────────────────────────
 export default function DespachosClient() {
   const confirm = useConfirm()
@@ -96,24 +99,46 @@ export default function DespachosClient() {
   const [aviso, setAviso]       = useState<string | null>(null)
   const [fallas, setFallas]     = useState<Falla[]>([])
 
-  const cargar = useCallback(async () => {
-    const res = await fetch('/api/despachos')
+  const cargar = useCallback(() => fetch('/api/despachos').then(async res => {
     if (!res.ok) { setError((await errorDe(res)).error ?? 'Error'); return }
     const ov: Overview = await res.json()
-    setData(ov)
     const detalles = await Promise.all(ov.pendientes.map(p =>
       fetch(`/api/despachos/lotes/${p.id}`).then(r => r.ok ? r.json() as Promise<LoteDetalle> : null)))
+    setData(ov)
     setLotes(Object.fromEntries(detalles.filter((d): d is LoteDetalle => !!d).map(d => [d.id, d])))
-  }, [])
+  }), [])
 
   useEffect(() => { cargar() }, [cargar])
 
+  // Destino de lo que se suelta/pega en la zona principal: el lote pendiente si hay
+  // uno solo (se va armando de a poco), si no un lote nuevo.
+  const loteDestino = data?.pendientes.length === 1 ? data.pendientes[0].id : undefined
+
+  // Ctrl+V: pegar PDFs copiados (Ctrl+C) desde el explorador de archivos. El handler
+  // vive en un ref para que el listener (montado una vez) use siempre el estado actual.
+  const pegarRef = useRef<(files: File[]) => void>(() => {})
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const files = Array.from(e.clipboardData?.files ?? [])
+      if (files.length === 0) return
+      e.preventDefault()
+      pegarRef.current(files)
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [])
+
   // Muchos PDFs se mandan en tandas: la primera crea el lote y las demás se le agregan.
-  const subir = async (files: File[], loteId?: number) => {
-    if (files.length === 0) return
+  const subir = async (todos: File[], loteId?: number) => {
+    const files = todos.filter(esPdf)
+    const ignorados = todos.filter(f => !esPdf(f)).map(f => `${f.name || 'archivo'}: solo se aceptan PDF`)
+    if (files.length === 0) {
+      if (ignorados.length) { setError(`Solo se aceptan PDF. ${ignorados.join(' · ')}`); setAviso(null) }
+      return
+    }
     setBusy('subir'); setError(null); setAviso(null); setFallas([])
     let lote = loteId
-    const rechazados: string[] = []
+    const rechazados: string[] = [...ignorados]
     for (let i = 0; i < files.length; i += TANDA) {
       const fd = new FormData()
       files.slice(i, i + TANDA).forEach(f => fd.append('files', f))
@@ -132,6 +157,10 @@ export default function DespachosClient() {
     if (rechazados.length) setAviso(`No se tomaron: ${rechazados.join(' · ')}`)
     cargar()
   }
+
+  useEffect(() => {
+    pegarRef.current = (files: File[]) => { if (!busy) subir(files, loteDestino) }
+  })
 
   const toggleIncluida = async (loteId: number, e: Etiqueta) => {
     await fetch(`/api/despachos/lotes/${loteId}/etiquetas/${e.id}`, {
@@ -225,7 +254,7 @@ export default function DespachosClient() {
       )}
       {aviso && <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded text-sm">{aviso}</div>}
 
-      <Dropzone onFiles={f => subir(f)} busy={busy === 'subir'} />
+      <Dropzone onFiles={f => subir(f, loteDestino)} busy={busy === 'subir'} agregaALote={loteDestino} />
 
       {pendientes.map(l => (
         <LotePendiente key={l.id} lote={l} busy={busy}
@@ -309,7 +338,9 @@ export default function DespachosClient() {
 }
 
 // ── Subida ──────────────────────────────────────────────────────────────────
-function Dropzone({ onFiles, busy, compact }: { onFiles: (f: File[]) => void; busy: boolean; compact?: boolean }) {
+function Dropzone({ onFiles, busy, compact, agregaALote }: {
+  onFiles: (f: File[]) => void; busy: boolean; compact?: boolean; agregaALote?: number
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   return (
@@ -328,8 +359,13 @@ function Dropzone({ onFiles, busy, compact }: { onFiles: (f: File[]) => void; bu
         : compact
           ? <p className="text-xs text-neutral-600">+ Agregar PDFs a este lote</p>
           : <>
-              <p className="text-sm font-medium text-neutral-800">Arrastra aquí los PDFs de Mercado Envíos, o haz clic para elegirlos</p>
-              <p className="text-xs text-neutral-500 mt-1">Solo PDF, tal cual se descargan (sin convertir ni imprimir a PDF). Se pueden mezclar cuentas.</p>
+              <p className="text-sm font-medium text-neutral-800">
+                Arrastra aquí los PDFs de Mercado Envíos, pégalos con <kbd className="px-1 border border-neutral-300 rounded text-xs">Ctrl</kbd>+<kbd className="px-1 border border-neutral-300 rounded text-xs">V</kbd> o haz clic para elegirlos
+              </p>
+              <p className="text-xs text-neutral-500 mt-1">
+                Solo PDF, tal cual se descargan (sin convertir ni imprimir a PDF). Se pueden mezclar cuentas.
+                {agregaALote && <> Se agregan al lote pendiente #{agregaALote}.</>}
+              </p>
             </>}
     </div>
   )
