@@ -6,6 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 const allLinks = [
   { href: '/dashboard',  label: 'Inicio',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/ventas',     label: 'Ventas',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
+  { href: '/despachos',  label: 'Despachos', roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
   { href: '/inventario', label: 'Inventario',roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/compras',    label: 'Compras',   roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/productos',  label: 'Productos', roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
