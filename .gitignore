@@ -52,3 +52,7 @@ next-env.d.ts
 # Documentos personales que no van al repo
 vanessa_dump.txt
 *_dump.txt
+
+# Python (services/)
+__pycache__/
+*.pyc

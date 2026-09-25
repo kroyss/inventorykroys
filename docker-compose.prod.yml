@@ -21,6 +21,8 @@ services:
     # por zona en código vía lib/tz.ts; toISOString ignora este TZ.)
     environment:
       - TZ=America/Caracas
+      # Servicio de etiquetas del módulo Despachos (ver inventory_etiquetas abajo)
+      - ETIQUETAS_URL=http://inventory_etiquetas:8000
     env_file:
       - .env.production
     volumes:
@@ -44,6 +46,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # Módulo Despachos: arma el PDF 4xA4 de etiquetas y el manifiesto con el MISMO código
+  # de EtiquetasML / generar_manifiesto (PyMuPDF fijado en requirements.txt). Interno:
+  # sin `ports`, solo lo alcanza inventory_next por la red. No guarda nada en disco.
+  inventory_etiquetas:
+    container_name: inventory_etiquetas
+    build:
+      context: ./services/etiquetas
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - inventory_net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=3)\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 networks:
   inventory_net:

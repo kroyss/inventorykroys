@@ -1,0 +1,8 @@
+# Versiones FIJAS: PyMuPDF es la misma con la que se validó la Fase 0
+# (256/256 páginas idénticas al EtiquetasML original). No actualizar sin repetirla.
+pymupdf==1.27.1
+reportlab==4.4.10
+zxing-cpp==3.1.1
+numpy==1.26.4
+fastapi==0.115.6
+uvicorn==0.32.1
