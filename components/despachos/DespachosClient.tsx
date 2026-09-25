@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
@@ -240,6 +241,7 @@ export default function DespachosClient() {
         subtitle={data.jornada
           ? `Jornada abierta desde ${fechaHora(data.jornada.opened_at)} · ${data.jornada.total_envios} envío(s)`
           : 'Sin jornada abierta: se abre sola al generar el primer lote'}
+        actions={<Link href="/despachos/historial" className="btn-secondary text-sm">Historial</Link>}
       />
 
       {error && (
