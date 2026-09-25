@@ -226,8 +226,9 @@ export async function etiquetasValidadas(db: Pool, loteId: number): Promise<Etiq
 
     if (estado === 'OK' && r.page_count > 1) detalle = `El PDF tiene ${r.page_count} páginas: se usa solo la primera`
 
-    const { read_error: _r, ya_impresa: _y, primera_con_guia: _p, ...rest } = r
-    return { ...rest, estado, detalle } as EtiquetaValidada
+    const out = { ...r, estado, detalle }
+    delete out.read_error; delete out.ya_impresa; delete out.primera_con_guia
+    return out as EtiquetaValidada
   })
 }
 
