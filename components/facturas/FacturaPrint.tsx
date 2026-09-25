@@ -10,7 +10,8 @@ import { bs, MAX_INVOICE_LINES } from '@/lib/invoices'
  *   A4 vertical · márgenes izq 2,0 cm / sup 2,5 cm · zoom 90 %.
  * Original (filas 6–25) y copia (filas 41–60) van en la misma hoja; la copia está 417,75 pt
  * más abajo (medido fila a fila; el texto va anclado abajo como en Excel).
- * Si la impresora corre la hoja, se calibra con offset_x/offset_y (mm) en Configuración.
+ * Si la impresora corre la hoja, se calibra con offset_x/offset_y (mm) en Configuración; si
+ * además la copia queda corrida respecto del original, copyOffX/copyOffY la mueven solo a ella.
  */
 
 const ZOOM = 0.9
@@ -72,9 +73,12 @@ interface CellProps {
   children?: ReactNode
 }
 
-function Sheet({ inv, offX, offY }: { inv: PrintableInvoice; offX: number; offY: number }) {
-  const x = (pt: number) => MARGIN_LEFT_PT + pt * ZOOM + offX * PT_PER_MM
-  const y = (pt: number, copy: number) => MARGIN_TOP_PT + (pt + copy * COPY_OFFSET_PT) * ZOOM + offY * PT_PER_MM
+function Sheet({ inv, offX, offY, copyOffX, copyOffY }: {
+  inv: PrintableInvoice; offX: number; offY: number; copyOffX: number; copyOffY: number
+}) {
+  // c = 0 original, 1 copia. La copia suma su propio ajuste encima del de la hoja.
+  const x = (pt: number, c: number) => MARGIN_LEFT_PT + pt * ZOOM + (offX + c * copyOffX) * PT_PER_MM
+  const y = (pt: number, c: number) => MARGIN_TOP_PT + (pt + c * COPY_OFFSET_PT) * ZOOM + (offY + c * copyOffY) * PT_PER_MM
 
   const ivaLabel = `IVA ( ${String(inv.iva_rate).replace('.', ',')} % ):`
   const items = inv.items.slice(0, MAX_INVOICE_LINES)
@@ -85,7 +89,7 @@ function Sheet({ inv, offX, offY }: { inv: PrintableInvoice; offX: number; offY:
       const [lastTop, lastH] = ROW[row + rows - 1]
       const style: CSSProperties = {
         position: 'absolute',
-        left: `${x(COL[from])}pt`, width: `${(COL[to] - COL[from]) * ZOOM}pt`,
+        left: `${x(COL[from], c)}pt`, width: `${(COL[to] - COL[from]) * ZOOM}pt`,
         top: `${y(top, c)}pt`, height: `${(lastTop + lastH - top) * ZOOM}pt`,
         padding: `0 ${CELL_PAD_PT}pt`,
         display: 'flex',
@@ -101,11 +105,11 @@ function Sheet({ inv, offX, offY }: { inv: PrintableInvoice; offX: number; offY:
       return <div style={style}>{children}</div>
     }
     const HLine = ({ x1, x2, at }: { x1: number; x2: number; at: number }) => (
-      <div style={{ position: 'absolute', left: `${x(x1)}pt`, width: `${(x2 - x1) * ZOOM}pt`,
+      <div style={{ position: 'absolute', left: `${x(x1, c)}pt`, width: `${(x2 - x1) * ZOOM}pt`,
         top: `${y(at, c) - BORDER_PT / 2}pt`, borderTop: `${BORDER_PT}pt solid #000` }} />
     )
     const VLine = ({ at, y1, y2 }: { at: number; y1: number; y2: number }) => (
-      <div style={{ position: 'absolute', left: `${x(at) - BORDER_PT / 2}pt`, top: `${y(y1, c)}pt`,
+      <div style={{ position: 'absolute', left: `${x(at, c) - BORDER_PT / 2}pt`, top: `${y(y1, c)}pt`,
         height: `${(y2 - y1) * ZOOM}pt`, borderLeft: `${BORDER_PT}pt solid #000` }} />
     )
 
@@ -180,13 +184,15 @@ interface Props {
   invoice: PrintableInvoice
   offsetX: number
   offsetY: number
+  copyOffsetX?: number
+  copyOffsetY?: number
   /** Se llama cuando se abre el diálogo de impresión (cuenta reimpresiones). */
   onPrint?: () => void
   toolbar?: ReactNode
   autoPrint?: boolean
 }
 
-export default function FacturaPrint({ invoice, offsetX, offsetY, onPrint, toolbar, autoPrint }: Props) {
+export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 0, copyOffsetY = 0, onPrint, toolbar, autoPrint }: Props) {
   const onPrintRef = useRef(onPrint)
   useEffect(() => { onPrintRef.current = onPrint }, [onPrint])
 
@@ -225,7 +231,7 @@ export default function FacturaPrint({ invoice, offsetX, offsetY, onPrint, toolb
       </div>
       <div className="factura-wrap bg-neutral-100 py-6 min-h-screen">
         <div className="mx-auto w-fit shadow-lg factura-page-shadow">
-          <Sheet inv={invoice} offX={offsetX} offY={offsetY} />
+          <Sheet inv={invoice} offX={offsetX} offY={offsetY} copyOffX={copyOffsetX} copyOffY={copyOffsetY} />
         </div>
       </div>
     </>

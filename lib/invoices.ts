@@ -82,6 +82,9 @@ export interface InvoiceConfig {
   iva: number
   offset_x: number
   offset_y: number
+  /** Ajuste EXTRA solo para la copia (mitad inferior), sumado al de toda la hoja. */
+  copy_offset_x: number
+  copy_offset_y: number
   start_number: number
 }
 
