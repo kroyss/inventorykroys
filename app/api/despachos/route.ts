@@ -35,7 +35,9 @@ export async function GET() {
         `SELECT j.id, j.opened_at, j.closed_at, j.total_envios, j.bot_csv_at, u.username AS closed_by,
                 (SELECT COUNT(*)::int FROM despacho_lotes l WHERE l.jornada_id = j.id AND l.status = 'GENERADO') AS lotes,
                 (SELECT COUNT(*)::int FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
-                  WHERE l.jornada_id = j.id AND e.impresa AND e.reimpresion) AS reimpresiones
+                  WHERE l.jornada_id = j.id AND e.impresa AND e.reimpresion) AS reimpresiones,
+                (SELECT COUNT(*)::int FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
+                  WHERE l.jornada_id = j.id AND l.status = 'GENERADO' AND e.impresa AND NOT e.reimpresion) AS a_reportar
          FROM despacho_jornadas j LEFT JOIN users u ON u.id = j.closed_by
          WHERE j.status = 'CERRADA'
          ORDER BY j.closed_at DESC
