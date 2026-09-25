@@ -16,6 +16,7 @@ const PRIMARY: NavItem[] = [
 const MORE: NavItem[] = [
   { href: '/inventario', label: 'Inventario', icon: '📋', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
   { href: '/despachos',  label: 'Despachos',  icon: '🚚', roles: ['admin', 'user'], countries: ['VE'] },
+  { href: '/facturas',   label: 'Facturas',   icon: '🧾', roles: ['admin', 'user'], countries: ['VE'] },
   { href: '/productos',  label: 'Productos',  icon: '🏷️', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: '💰', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: '⚙️', roles: ['admin'],        countries: ['VE', 'CO'] },

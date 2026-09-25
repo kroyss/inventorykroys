@@ -160,6 +160,13 @@ export async function DELETE(
   if (sale.status !== 'BORRADOR') {
     return NextResponse.json({ error: 'Solo se pueden eliminar ventas en estado BORRADOR' }, { status: 409 })
   }
+  // Una factura (aunque esté anulada) es registro fiscal: la venta no se puede borrar.
+  const { rows: [inv] } = await db.query(
+    `SELECT invoice_number FROM invoices WHERE sale_id = $1 LIMIT 1`, [id]
+  )
+  if (inv) {
+    return NextResponse.json({ error: `No se puede eliminar: la venta tiene la factura #${inv.invoice_number}` }, { status: 409 })
+  }
 
   await db.query(`DELETE FROM sale_items WHERE sale_id = $1`, [id])
   await db.query(`DELETE FROM sales WHERE id = $1`, [id])
