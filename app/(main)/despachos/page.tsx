@@ -9,5 +9,5 @@ export default async function DespachosPage() {
   if (session!.user.country !== 'VE') {
     return <p className="text-sm text-neutral-500">Despachos solo está disponible en Venezuela.</p>
   }
-  return <DespachosClient />
+  return <DespachosClient isAdmin={session!.user.role === 'admin'} />
 }
