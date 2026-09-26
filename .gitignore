@@ -56,3 +56,7 @@ vanessa_dump.txt
 # Python (services/)
 __pycache__/
 *.pyc
+
+# Reportador conectado (se compila con PyInstaller)
+reportador/build/
+reportador/dist/

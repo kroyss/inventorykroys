@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import ReportadorPanel from './ReportadorPanel'
 
 // ── Tipos de la API ─────────────────────────────────────────────────────────
 type Estado =
@@ -37,8 +38,14 @@ interface Overview {
   pendientes: { id: number; created_at: string; created_by: string | null; etiquetas: number }[]
   cerradas: {
     id: number; opened_at: string; closed_at: string; total_envios: number; lotes: number
-    closed_by: string | null; bot_csv_at: string | null; reimpresiones: number; a_reportar: number
+    closed_by: string | null; bot_csv_at: string | null; reimpresiones: number
+    a_reportar: number; enviados: number; sin_chat: number; con_problema: number; por_csv: number
   }[]
+}
+interface EnvioReporte {
+  id: number; venta: string; guia: string; remitente: string | null; destinatario: string | null
+  reimpresion: boolean; reporte_estado: string | null; reporte_detalle: string | null
+  reporte_intentos: number; reportado_at: string | null
 }
 interface Falla { etiqueta_id: number; original_name: string; venta: string | null; detalle: string }
 
@@ -91,8 +98,9 @@ const TANDA = 60  // PDFs por envío al servidor (MAX_PDFS_POR_SUBIDA)
 const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
 
 // ── Pantalla ────────────────────────────────────────────────────────────────
-export default function DespachosClient() {
+export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
   const confirm = useConfirm()
+  const [abierta, setAbierta]   = useState<number | null>(null)   // jornada cerrada desplegada
   const [data, setData]         = useState<Overview | null>(null)
   const [lotes, setLotes]       = useState<Record<number, LoteDetalle>>({})
   const [busy, setBusy]         = useState<string | null>(null)
@@ -209,22 +217,21 @@ export default function DespachosClient() {
     }
     if (!res.ok) { setError(body.error ?? 'Error'); cargar(); return }
     descargar(`/api/despachos/jornadas/${body.jornada_id}/manifiesto`)
-    setAviso('Jornada cerrada. Baja también el CSV del Reportador desde "Jornadas cerradas".')
+    setAviso('Jornada cerrada. Sus envíos ya están en la cola del Reportador: abre el programa y toca "Reportar ahora".')
     cargar()
   }
 
-  // Bajar el CSV dos veces y correr el Reportador con los dos = mensajes repetidos.
+  // Respaldo: CSV para el Reportador VIEJO. Lo que se baja queda a su cargo y el
+  // Reportador conectado ya no lo toma (si no, el comprador recibiría dos mensajes).
   const bajarCsv = async (j: Overview['cerradas'][number]) => {
     const partes = [
+      `Solo si vas a usar el Reportador VIEJO (el .exe con CSV). Los ${j.a_reportar} envío(s) pendientes pasan a ese programa y el Reportador conectado ya no los va a tomar.`,
       j.reimpresiones > 0
         ? `${j.reimpresiones} reimpresión(es) no van en el CSV: esos compradores ya fueron reportados.`
         : '',
-      j.bot_csv_at
-        ? `OJO: este CSV ya se bajó el ${fechaHora(j.bot_csv_at)}. Si el Reportador ya lo usó, correrlo otra vez les escribe DOS veces a los compradores.`
-        : '',
     ].filter(Boolean)
-    if (partes.length && !await confirm({
-      title: 'CSV del Reportador', message: partes.join(' '), confirmText: 'Bajar CSV', danger: !!j.bot_csv_at,
+    if (!await confirm({
+      title: 'CSV para el Reportador viejo', message: partes.join(' '), confirmText: 'Bajar CSV', danger: true,
     })) return
     descargar(`/api/despachos/jornadas/${j.id}/bot-csv`)
     setTimeout(cargar, 1500)
@@ -306,6 +313,8 @@ export default function DespachosClient() {
           )}
       </section>
 
+      <ReportadorPanel isAdmin={isAdmin} />
+
       {/* Jornadas cerradas */}
       {data.cerradas.length > 0 && (
         <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
@@ -313,36 +322,112 @@ export default function DespachosClient() {
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr><th className="px-4 py-2 text-left">Cierre</th><th className="px-4 py-2 text-right">Envíos</th>
-                <th className="px-4 py-2 text-right">Lotes</th><th className="px-4 py-2 text-left">Por</th><th /></tr>
+                <th className="px-4 py-2 text-left">Reporte a compradores</th>
+                <th className="px-4 py-2 text-left">Por</th><th /></tr>
             </thead>
             <tbody>
               {data.cerradas.map(j => (
-                <tr key={j.id} className="border-t border-neutral-100">
-                  <td className="px-4 py-2">{fechaHora(j.closed_at)}</td>
-                  <td className="px-4 py-2 text-right">{j.total_envios}</td>
-                  <td className="px-4 py-2 text-right">{j.lotes}</td>
-                  <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
-                  <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
-                    <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">↓ Manifiesto</button>
-                    {j.a_reportar === 0 ? (
-                      <button disabled className="btn-secondary text-xs"
-                        title="Todos los envíos son reimpresiones: esos compradores ya fueron reportados">
-                        Nada para reportar
-                      </button>
-                    ) : (
-                      <button onClick={() => bajarCsv(j)} className="btn-secondary text-xs"
-                        title={j.bot_csv_at ? `Ya se bajó el ${fechaHora(j.bot_csv_at)}` : undefined}>
-                        ↓ CSV Reportador ({j.a_reportar}){j.bot_csv_at ? ' ✓' : ''}
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <FilaJornada key={j.id} j={j} abierta={abierta === j.id}
+                  onToggle={() => setAbierta(abierta === j.id ? null : j.id)}
+                  onCsv={() => bajarCsv(j)} />
               ))}
             </tbody>
           </table>
         </section>
       )}
     </div>
+  )
+}
+
+// ── Jornada cerrada + estado del reporte ────────────────────────────────────
+const REPORTE_UI: Record<string, { label: string; cls: string }> = {
+  ENVIADO:   { label: 'Enviado',        cls: 'bg-green-100 text-green-800' },
+  SIN_CHAT:  { label: 'Sin chat',       cls: 'bg-neutral-200 text-neutral-700' },
+  RECHAZADO: { label: 'Rechazado por ML', cls: 'bg-red-100 text-red-800' },
+  ERROR:     { label: 'Error (se reintenta)', cls: 'bg-amber-100 text-amber-800' },
+  CSV:       { label: 'Por CSV (viejo)', cls: 'bg-neutral-100 text-neutral-600' },
+}
+
+function FilaJornada({ j, abierta, onToggle, onCsv }: {
+  j: Overview['cerradas'][number]; abierta: boolean; onToggle: () => void; onCsv: () => void
+}) {
+  const [envios, setEnvios] = useState<EnvioReporte[] | null>(null)
+  useEffect(() => {
+    if (!abierta) return
+    let vivo = true
+    fetch(`/api/despachos/jornadas/${j.id}/reporte`).then(r => r.ok ? r.json() : []).then(d => { if (vivo) setEnvios(d) })
+    return () => { vivo = false }
+  }, [abierta, j.id, j.enviados, j.a_reportar])
+
+  const partes = [
+    j.enviados     ? <span key="e" className="text-green-700">✓ {j.enviados} enviado(s)</span> : null,
+    j.a_reportar   ? <span key="p" className="text-blue-700">{j.a_reportar} pendiente(s)</span> : null,
+    j.con_problema ? <span key="x" className="text-red-700">⚠ {j.con_problema} con problema</span> : null,
+    j.sin_chat     ? <span key="s" className="text-neutral-500">{j.sin_chat} sin chat</span> : null,
+    j.por_csv      ? <span key="c" className="text-neutral-500">{j.por_csv} por CSV</span> : null,
+  ].filter(Boolean)
+
+  return (
+    <>
+      <tr className="border-t border-neutral-100">
+        <td className="px-4 py-2">{fechaHora(j.closed_at)}</td>
+        <td className="px-4 py-2 text-right">{j.total_envios}</td>
+        <td className="px-4 py-2 text-xs">
+          {partes.length
+            ? <span className="space-x-2">{partes}</span>
+            : <span className="text-neutral-400">{j.reimpresiones ? 'Solo reimpresiones: nada que reportar' : '—'}</span>}
+        </td>
+        <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
+        <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+          <button onClick={onToggle} className="btn-secondary text-xs">{abierta ? 'Ocultar' : 'Detalle'}</button>
+          <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">↓ Manifiesto</button>
+        </td>
+      </tr>
+      {abierta && (
+        <tr className="bg-neutral-50/60">
+          <td colSpan={5} className="px-4 py-3">
+            {!envios ? <p className="text-xs text-neutral-400">Cargando…</p> : (
+              <>
+                <table className="w-full text-xs">
+                  <thead className="text-neutral-500">
+                    <tr><th className="text-left py-1">Venta</th><th className="text-left">Guía</th><th className="text-left">Destinatario</th>
+                      <th className="text-left">Reporte</th><th className="text-left">Detalle</th></tr>
+                  </thead>
+                  <tbody>
+                    {envios.map(e => {
+                      const ui = e.reimpresion
+                        ? { label: 'Reimpresión (ya reportado)', cls: 'bg-neutral-100 text-neutral-600' }
+                        : REPORTE_UI[e.reporte_estado ?? ''] ?? { label: 'Pendiente', cls: 'bg-blue-100 text-blue-800' }
+                      return (
+                        <tr key={e.id} className="border-t border-neutral-100 align-top">
+                          <td className="py-1 font-mono">{e.venta}</td>
+                          <td className="font-mono">{e.guia}</td>
+                          <td>{e.destinatario ?? '—'}</td>
+                          <td><span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span></td>
+                          <td className="text-neutral-500">
+                            {e.reporte_detalle}
+                            {e.reportado_at ? ` ${fechaHora(e.reportado_at)}` : ''}
+                            {e.reporte_intentos > 1 ? ` · ${e.reporte_intentos} intentos` : ''}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {j.a_reportar > 0 && (
+                  <div className="mt-2 text-right">
+                    <button onClick={onCsv} className="text-xs text-neutral-500 underline"
+                      title="Solo para usar el Reportador viejo (.exe con CSV)">
+                      Bajar CSV para el Reportador viejo
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
