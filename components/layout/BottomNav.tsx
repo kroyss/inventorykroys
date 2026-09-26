@@ -20,6 +20,7 @@ const MORE: NavItem[] = [
   { href: '/productos',  label: 'Productos',  icon: '🏷️', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: '💰', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: '⚙️', roles: ['admin'],        countries: ['VE', 'CO'] },
+  { href: '/usuarios',   label: 'Usuarios',   icon: '👥', roles: ['admin'],        countries: ['VE', 'CO'] },
 ]
 
 export default function BottomNav({ role, country }: { role: UserRole; country: Country }) {
