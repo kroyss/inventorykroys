@@ -132,7 +132,12 @@ export async function GET(_: NextRequest) {
           ROUND(AVG(GREATEST(stock_fin_dia, 0)) FILTER (
             WHERE d >= (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_recent,
           ROUND(AVG(GREATEST(stock_fin_dia, 0)) FILTER (
-            WHERE d <  (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_prior
+            WHERE d <  (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_prior,
+          -- Stock mínimo reconstruido. Negativo es imposible: significa que el
+          -- historial de movimientos no explica el stock real (cambios de
+          -- inventario sin su movimiento, reaperturas mal registradas, datos del
+          -- sistema viejo). En ese caso los días con stock no son confiables.
+          MIN(stock_fin_dia)::int AS stock_min
         FROM hist
         GROUP BY product_id
       `),
@@ -144,12 +149,13 @@ export async function GET(_: NextRequest) {
     for (const r of importTransit) transitImport[r.product_id] = parseInt(r.pending, 10) || 0
 
     const diasConStock: Record<number, {
-      recent: number; prior: number; m6: number; promRecent: number; promPrior: number
+      recent: number; prior: number; m6: number; promRecent: number; promPrior: number; min: number
     }> = {}
     for (const r of diasStock) {
       diasConStock[r.product_id] = {
         recent: r.dias_recent, prior: r.dias_prior, m6: r.dias_6m,
         promRecent: r.stock_prom_recent ?? 0, promPrior: r.stock_prom_prior ?? 0,
+        min: r.stock_min ?? 0,
       }
     }
 
@@ -176,9 +182,11 @@ export async function GET(_: NextRequest) {
     // menos la mitad de sus ~122 días: si estuvo agotado la mayor parte, no tuvo
     // oportunidad de vender y su caída no dice nada sobre la demanda.
     const MIN_DIAS_RECIENTE = 60
-    // Del período anterior solo se necesita base suficiente para calcular una
-    // tasa; si vendió mucho en pocos días, peor todavía para el reciente.
-    const MIN_DIAS_PREVIO   = 20
+    // Del período anterior hace falta base suficiente para que la tasa diaria sea
+    // estable: con 20 días, un par de semanas buenas (o un artefacto del
+    // historial) inflaba la demanda pasada y cualquier mes normal parecía un
+    // derrumbe. 45 días ≈ un tercio de la ventana.
+    const MIN_DIAS_PREVIO   = 45
     // Y el estante no puede haber estado mucho más flaco que antes: si el stock
     // promedio reciente es menos de la mitad del anterior, la caída se explica
     // por abastecimiento, no por demanda.
@@ -213,7 +221,16 @@ export async function GET(_: NextRequest) {
       const gananciaMensual = Math.round(ventaMensual * margenUnit * 100) / 100
 
       // Días que el producto REALMENTE estuvo disponible en cada ventana.
-      const dias = diasConStock[r.id] ?? { recent: 0, prior: 0, m6: 0 }
+      const dias = diasConStock[r.id] ?? { recent: 0, prior: 0, m6: 0, promRecent: 0, promPrior: 0, min: 0 }
+      // Si la reconstrucción pasa por stock negativo, el historial no cierra y
+      // todo lo que sale de él (días con stock, promedios, tasa por día) es
+      // ficción. Caso real: Rollos Papel Burbuja, historial desfasado en 84 u,
+      // aparecía con stock solo 22 días del período anterior → la demanda
+      // pasada salía 5× inflada → figuraba en Declive vendiendo 41/mes.
+      // Con historial roto se vuelve a la lógica por calendario y nunca se
+      // acusa declive: sugerir descontinuar por un error de datos es el peor
+      // error que puede cometer este reporte.
+      const historialRoto = dias.min < 0
       // Demanda diaria: unidades por día CON STOCK. Comparar unidades crudas
       // mezclaba "se vende menos" con "no hubo qué vender".
       const tasaRec  = dias.recent > 0 ? ventas4mRec  / dias.recent : 0
@@ -233,6 +250,7 @@ export async function GET(_: NextRequest) {
       // Declive REAL: tuvo stock de sobra en el período reciente, en un nivel
       // comparable al anterior, y aun así la demanda diaria se partió al medio.
       const enDeclive =
+        !historialRoto &&
         !quiebreStock &&
         dias.prior >= MIN_DIAS_PREVIO &&
         ventas4mPrev >= DECLINE_FLOOR &&
@@ -243,7 +261,7 @@ export async function GET(_: NextRequest) {
       // tuvo stock, su demanda es ~24/mes, no 3,3/mes. Solo se confía en la tasa
       // ajustada cuando hubo al menos un mes de disponibilidad real, para que
       // unos pocos días de venta no inflen el pedido.
-      const demandaMensual = dias.m6 >= MIN_DIAS_VENTANA
+      const demandaMensual = !historialRoto && dias.m6 >= MIN_DIAS_VENTANA
         ? Math.max(ventaMensual, ventaMensualDisp)
         : ventaMensual
 
@@ -287,6 +305,8 @@ export async function GET(_: NextRequest) {
         stock_prom_prior:  dias.promPrior,
         venta_mensual_disp: ventaMensualDisp,   // demanda por 30 días CON stock
         demanda_mensual:    demandaMensual,     // la que se usa para cobertura y pedido
+        historial_roto:     historialRoto,
+        historial_desfase:  historialRoto ? -dias.min : 0,
         quiebre_stock:     quiebreStock,
       }
 
@@ -311,7 +331,7 @@ export async function GET(_: NextRequest) {
       // Se exige además que haya tenido stock un tiempo razonable: rematar algo
       // que estuvo agotado casi todo el semestre es castigarlo por no haber
       // estado disponible.
-      if (ventas6m < 6 && stock > 0 && dias.m6 >= MIN_DIAS_REMATE) {
+      if (ventas6m < 6 && stock > 0 && (historialRoto || dias.m6 >= MIN_DIAS_REMATE)) {
         if (esNuevo) nuevos.push(base)
         else         remate.push(base)
         continue

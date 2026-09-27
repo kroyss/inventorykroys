@@ -706,7 +706,15 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
                       <span className={`px-2 py-0.5 rounded text-xs whitespace-nowrap ${meta.badge}`}>{meta.label}</span>
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">{p.code}</td>
-                    <td className="px-3 py-2">{p.name}</td>
+                    <td className="px-3 py-2">
+                      {p.name}
+                      {p.historial_roto && (
+                        <span className="ml-1 text-amber-600 cursor-help"
+                          title={`El historial de movimientos de este producto no cierra con su stock (desfase de ${p.historial_desfase} u). Se analiza con el promedio por calendario, sin ajuste por días con stock.`}>
+                          ⚠
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right">
                       {p.categoria
                         ? <span className="px-2 py-0.5 rounded text-xs whitespace-nowrap"
