@@ -630,6 +630,28 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                   ) : movements.length === 0 ? (
                     <p className="text-sm text-neutral-400">Sin movimientos registrados</p>
                   ) : (
+                    <>
+                    {/* El Total se calcula hacia atrás desde el stock real: si en algún
+                        punto da negativo, el historial no alcanza a explicar el stock
+                        (hubo cambios de inventario sin su movimiento). Se avisa en vez
+                        de mostrar un número inventado. */}
+                    {(() => {
+                      // Stock que el historial implica ANTES del primer movimiento
+                      // (la lista viene del más nuevo al más viejo). Positivo es
+                      // normal: stock inicial cargado sin movimiento. Negativo es
+                      // imposible: el historial registra más entradas netas de las
+                      // que el inventario tiene.
+                      const primero = movements[movements.length - 1] as any
+                      const inicial = Number(primero?.running_total ?? 0) - Number(primero?.quantity ?? 0)
+                      return inicial < 0 ? (
+                        <p className="mb-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+                          ⚠️ El historial de este producto no cierra con el stock: registra <b>{-inicial}</b> unidades
+                          de más en entradas netas. El stock actual es el real (lo respalda el último conteo);
+                          lo que está desfasado es el registro viejo, así que el Total de las filas antiguas
+                          puede verse negativo.
+                        </p>
+                      ) : null
+                    })()}
                     <div className="rounded-lg border border-neutral-200 overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
@@ -671,6 +693,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                       </table>
                       <Pagination total={movements.length} page={movPage} pageSize={MOV_PAGE_SIZE} onChange={setMovPage} />
                     </div>
+                    </>
                   )}
                   </div>
                 </div>

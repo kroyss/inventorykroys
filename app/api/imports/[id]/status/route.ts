@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { revertStock } from '@/lib/inventoryOps'
 
 const IMPORT_FLOW = [
   'PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS', 'PAGADA',
@@ -36,15 +37,7 @@ async function revertImportInventory(
   for (const item of items) {
     const qty = parseInt(item.effective_qty, 10) || 0
     if (qty <= 0) continue
-    await db.query(
-      `UPDATE inventory SET quantity = GREATEST(0, quantity - $1), last_updated=NOW() WHERE product_id=$2`,
-      [qty, item.product_id]
-    )
-    await db.query(
-      `INSERT INTO inventory_movements (product_id, movement_type, quantity, reference, notes, created_by)
-       VALUES ($1, 'OUT', $2, $3, $4, $5)`,
-      [item.product_id, -qty, `Importación #${orderId}`, note, userId]
-    )
+    await revertStock(db, item.product_id, qty, `Importación #${orderId}`, note, userId)
   }
 }
 
@@ -141,15 +134,7 @@ export async function PUT(
             for (const item of items) {
               const qty = parseInt(item.effective_qty, 10) || 0
               if (qty <= 0) continue
-              await db.query(
-                `UPDATE inventory SET quantity = GREATEST(0, quantity - $1), last_updated=NOW() WHERE product_id=$2`,
-                [qty, item.product_id]
-              )
-              await db.query(
-                `INSERT INTO inventory_movements (product_id, movement_type, quantity, reference, notes, created_by)
-                 VALUES ($1, 'OUT', $2, $3, $4, $5)`,
-                [item.product_id, -qty, `Importación #${id}`, 'Reversión por reapertura', userId]
-              )
+              await revertStock(db, item.product_id, qty, `Importación #${id}`, 'Reversión por reapertura', userId)
             }
           }
           await db.query(

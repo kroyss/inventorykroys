@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { revertStock } from '@/lib/inventoryOps'
 
 const Schema = z.object({
   action: z.enum(['advance', 'reopen', 'inconsistente', 'finalize', 'reset_reception', 'undo']),
@@ -29,15 +30,7 @@ async function revertLoadedInventory(
   )
   for (const item of items) {
     if (item.effective_received <= 0) continue
-    await db.query(
-      `UPDATE inventory SET quantity = GREATEST(0, quantity - $1), last_updated = NOW() WHERE product_id = $2`,
-      [item.effective_received, item.product_id]
-    )
-    await db.query(
-      `INSERT INTO inventory_movements (product_id, movement_type, quantity, reference, notes, created_by)
-       VALUES ($1, 'OUT', $2, $3, $4, $5)`,
-      [item.product_id, -item.effective_received, orderNumber, note, userId]
-    )
+    await revertStock(db, item.product_id, item.effective_received, orderNumber, note, userId)
   }
 }
 
@@ -209,19 +202,8 @@ export async function PUT(
           )
           for (const item of items) {
             if (item.effective_received <= 0) continue
-            await db.query(
-              `UPDATE inventory
-               SET quantity = GREATEST(0, quantity - $1), last_updated = NOW()
-               WHERE product_id = $2`,
-              [item.effective_received, item.product_id]
-            )
-            await db.query(
-              `INSERT INTO inventory_movements
-                 (product_id, movement_type, quantity, reference, notes, created_by)
-               VALUES ($1, 'OUT', $2, $3, $4, $5)`,
-              [item.product_id, -item.effective_received, order.order_number,
-               `Reapertura ${order.order_number}`, userId]
-            )
+            await revertStock(db, item.product_id, item.effective_received, order.order_number,
+              `Reapertura ${order.order_number}`, userId)
           }
         }
 
