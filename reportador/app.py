@@ -37,6 +37,10 @@ class App(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.cerrar)
         self.after(150, self.procesar_eventos)
         self.mostrar()
+        if not SIMULAR and Motor.detectar_chrome_major() is None:
+            self.after(300, lambda: messagebox.showwarning("Falta Google Chrome", (
+                "Este programa usa Google Chrome para escribir en MercadoLibre y no se encontró en el equipo.\n\n"
+                "Instálalo desde https://www.google.com/chrome/ y vuelve a abrir el Reportador.")))
 
     # ── pantallas ───────────────────────────────────────────────────────────
     def mostrar(self):
