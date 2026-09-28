@@ -329,6 +329,15 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const processableTotal = counts.PROCESADA
   const borradorCount    = counts.BORRADOR
 
+  // TEMPORAL (sep 2026): en VE las etiquetas salen por Despachos, que pasa la venta
+  // a DESCARGADA al imprimir. Bajar el Excel antes la marcaría DESCARGADA y su etiqueta
+  // saldría como reimpresión (el Reportador no le escribe). Se ocultan los botones
+  // (Procesadas, Exportar, RE, Re-descargar fechas) y las casillas; el código y
+  // /api/sales/export-excel siguen. Si Despachos queda firme, borrar todo esto
+  // (exportIds, exportAllProcessed, redownload*, selection) y la ruta del Excel.
+  // CO no tiene Despachos: ahí se mantiene.
+  const excelVisible = country !== 'VE'
+
   return (
     <div>
       {error && (
@@ -393,7 +402,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </div>
             {/* Modo RE (re-descarga de emergencia): recuperar guías ya descargadas.
                 Va junto a las fechas para distinguirlo de las acciones normales. */}
-            <button
+            {excelVisible && <button
               onClick={() => { setRedownloadMode(m => !m); setSelection(new Set()) }}
               title="Emergencia: habilita seleccionar ventas ya descargadas para volver a bajar su Excel"
               className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap border transition-colors ${
@@ -402,7 +411,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   : 'bg-white border-neutral-300 text-neutral-600 hover:border-neutral-400'
               }`}>
               ↺ RE
-            </button>
+            </button>}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -413,7 +422,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 ⚠ Borradores ({borradorCount})
               </button>
             )}
-            {selection.size > 0 ? (
+            {!excelVisible ? null : selection.size > 0 ? (
               <button onClick={exportSelected} className="btn-secondary text-sm whitespace-nowrap">
                 {redownloadMode ? 'Re-descargar' : 'Exportar'} ({selection.size})
               </button>
@@ -465,7 +474,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   <tr key={s.id} onClick={() => setSelected(s)}
                     className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === s.id ? 'bg-blue-50' : ''}`}>
                     <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                      {(s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA')) && (
+                      {excelVisible && (s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA')) && (
                         <input type="checkbox" checked={selection.has(s.id)} onChange={() => toggleSelection(s.id)} />
                       )}
                     </td>
@@ -511,7 +520,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             const date = s.created_at ? new Date(s.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
             const units = s.items.reduce((a, i) => a + i.quantity, 0)
             const prods = s.items.map(i => `${i.product_name} ×${i.quantity}`).join(' · ')
-            const selectable = s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA')
+            const selectable = excelVisible && (s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA'))
             return (
               <div key={s.id} onClick={() => setSelected(s)}
                 className={`px-4 py-3 active:bg-neutral-50 cursor-pointer ${selected?.id === s.id ? 'bg-blue-50' : ''}`}>
