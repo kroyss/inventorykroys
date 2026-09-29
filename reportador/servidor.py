@@ -18,7 +18,7 @@ import threading
 
 import requests
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SERVIDOR_DEFAULT = "https://inventory.syncsora.com"
 
 BASE = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "SyncsoraReportador")
@@ -156,3 +156,31 @@ class Servidor:
                     break
             _guardar_pendientes(restantes)
             return len(restantes)
+
+
+    # ── Órdenes desde la web (Despachos → "▶ Reportar") ──────────────────────
+    def orden_pendiente(self):
+        """En espera: pregunta si hay una orden. La toma (EN_CURSO) y la devuelve, o None."""
+        return self._req("GET", "/api/reportador/orden").get("orden")
+
+    def iniciar_orden(self):
+        """"Reportar ahora" en el propio programa: se registra como orden para que la web
+        lo muestre y lo pueda detener. Devuelve el id (None si no se pudo)."""
+        try:
+            return self._req("POST", "/api/reportador/orden", json={})["orden"]["id"]
+        except (ErrorServidor, KeyError, TypeError):
+            return None
+
+    def terminar_orden(self, orden_id, resumen):
+        try:
+            self._req("PUT", "/api/reportador/orden", json={"orden_id": orden_id, "resumen": resumen})
+        except ErrorServidor:
+            pass  # si no se pudo, la próxima consulta la marca INTERRUMPIDA; la cola no se afecta
+
+    def actividad(self, texto, orden_id=None):
+        """Cuenta en la web qué está haciendo. Devuelve True si desde la web pidieron detener."""
+        try:
+            return bool(self._req("POST", "/api/reportador/actividad",
+                                  json={"texto": texto, "orden_id": orden_id}).get("detener"))
+        except ErrorServidor:
+            return False

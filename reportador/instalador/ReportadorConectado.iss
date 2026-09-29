@@ -8,7 +8,7 @@
 ; al desinstalar ni al actualizar: reinstalar no obliga a vincular de nuevo.
 
 #define AppName    "Reportador de guías"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppExe     "ReportadorConectado.exe"
 #define Publisher  "Syncsora"
 #define DistDir    "..\dist\ReportadorConectado"
@@ -39,6 +39,9 @@ Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Tasks]
 Name: "escritorio"; Description: "Crear acceso directo en el escritorio"; GroupDescription: "Accesos directos:"
+; Queda en la bandeja esperando las órdenes de Despachos ("▶ Reportar"): si no arranca
+; con Windows, el botón de la web no tiene a quién avisarle.
+Name: "inicio"; Description: "Iniciar con Windows (recomendado: así se puede reportar desde el sistema)"; GroupDescription: "Arranque:"
 
 [Files]
 ; El .exe y su carpeta interna (_internal_reportador_conectado) van juntos, siempre.
@@ -51,6 +54,7 @@ Type: filesandordirs; Name: "{app}\_internal_reportador_conectado"
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: escritorio
+Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; Parameters: "--bandeja"; Tasks: inicio
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Abrir el Reportador ahora"; Flags: nowait postinstall skipifsilent

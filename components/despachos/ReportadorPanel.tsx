@@ -4,11 +4,20 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface Cuenta { nombre: string; filtro: string; pagina: string }
 interface Config { cuentas: Cuenta[]; plantillas: string[]; bloque: string }
+interface Orden {
+  id: number; origen: 'WEB' | 'AUTO' | 'EQUIPO'
+  estado: 'PENDIENTE' | 'EN_CURSO' | 'TERMINADA' | 'CANCELADA' | 'VENCIDA' | 'INTERRUMPIDA'
+  created_at: string; tomada_at: string | null; terminada_at: string | null
+  detener: boolean; resumen: Record<string, number> | null; pedida_por: string | null
+}
 interface Equipo {
   id: number; nombre: string | null; vinculado_at: string | null; last_seen_at: string | null
   version: string | null; codigo: string | null; codigo_expira: string | null
+  en_linea: boolean; auto_reportar: boolean; actividad: string | null; orden: Orden | null
 }
-interface Estado { equipos: Equipo[]; config: Config; problemas: string[]; limite: number }
+interface Estado { equipos: Equipo[]; config: Config; pendientes: number; problemas: string[]; limite: number }
+
+const activa = (o: Orden | null) => !!o && (o.estado === 'PENDIENTE' || o.estado === 'EN_CURSO')
 
 const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -29,7 +38,41 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
   const cargar = useCallback(() => fetch('/api/despachos/reportador').then(async r => {
     if (r.ok) setEstado(await r.json())
   }), [])
-  useEffect(() => { cargar() }, [cargar])
+  // Se refresca solo: rápido mientras un equipo reporta (para ver el avance), lento en espera.
+  const enMarcha = !!estado?.equipos.some(e => activa(e.orden))
+  useEffect(() => {
+    cargar()
+    const t = setInterval(() => { if (!document.hidden) cargar() }, enMarcha ? 5000 : 20000)
+    return () => clearInterval(t)
+  }, [cargar, enMarcha])
+
+  const reportar = async (e: Equipo) => {
+    setError(null)
+    const r = await fetch(`/api/despachos/reportador/equipos/${e.id}/orden`, { method: 'POST' })
+    const body = await r.json().catch(() => ({}))
+    if (!r.ok) { setError(body.error ?? 'Error'); cargar(); return }
+    if (!body.en_linea) {
+      setError(`"${e.nombre ?? 'El equipo'}" no está conectado ahora: el reporte empieza cuando se encienda y abra el Reportador (la orden vence en 12 h).`)
+    }
+    cargar()
+  }
+
+  const detener = async (e: Equipo) => {
+    if (e.orden?.estado === 'EN_CURSO' && !await confirm({
+      title: 'Detener reporte',
+      message: 'Se detiene después del mensaje en curso. Lo que no se alcanzó a enviar queda pendiente para el próximo reporte.',
+      confirmText: 'Detener',
+    })) return
+    await fetch(`/api/despachos/reportador/equipos/${e.id}/orden`, { method: 'DELETE' })
+    cargar()
+  }
+
+  const setAuto = async (e: Equipo, auto: boolean) => {
+    await fetch(`/api/despachos/reportador/equipos/${e.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auto_reportar: auto }),
+    })
+    cargar()
+  }
 
   const vincular = async () => {
     setError(null)
@@ -61,7 +104,7 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
   }
 
   if (!estado) return null
-  const { equipos, config, problemas, limite } = estado
+  const { equipos, config, pendientes, problemas, limite } = estado
   const vinculados = equipos.filter(e => e.vinculado_at)
   const codigos    = equipos.filter(e => !e.vinculado_at && e.codigo)
 
@@ -72,6 +115,9 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
           <h2 className="text-sm font-semibold text-neutral-800">Reportador</h2>
           <p className="text-xs text-neutral-500">
             Programa que le escribe a cada comprador su guía. Toma los envíos de las jornadas cerradas.
+            {' '}<span className={pendientes ? 'text-blue-700 font-medium' : ''}>
+              {pendientes ? `${pendientes} envío(s) por reportar.` : 'Nada pendiente.'}
+            </span>
           </p>
         </div>
         {isAdmin && (
@@ -102,16 +148,9 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
         {vinculados.length === 0
           ? <p className="text-neutral-400">Ningún equipo vinculado todavía.</p>
           : vinculados.map(e => (
-              <div key={e.id} className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="font-medium">{e.nombre ?? `Equipo #${e.id}`}</span>
-                  <span className="text-xs text-neutral-500 ml-2">
-                    {e.last_seen_at ? `última conexión ${fechaHora(e.last_seen_at)}` : 'sin conexión'}
-                    {e.version ? ` · v${e.version}` : ''}
-                  </span>
-                </div>
-                {isAdmin && <button onClick={() => desvincular(e)} className="text-xs text-neutral-400 hover:text-red-600">Desvincular</button>}
-              </div>
+              <FilaEquipo key={e.id} e={e} isAdmin={isAdmin} pendientes={pendientes} configOk={problemas.length === 0}
+                onReportar={() => reportar(e)} onDetener={() => detener(e)}
+                onAuto={v => setAuto(e, v)} onDesvincular={() => desvincular(e)} />
             ))}
       </div>
 
@@ -120,6 +159,77 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
           onGuardar={guardar} onCancelar={() => { setEditando(null); setError(null) }} guardando={guardando} />
       )}
     </section>
+  )
+}
+
+const RESUMEN_TXT: [string, string][] = [
+  ['ENVIADO', 'enviado(s)'], ['SIN_CHAT', 'sin chat'], ['RECHAZADO', 'rechazado(s)'], ['ERROR', 'con error'],
+]
+const ORIGEN_TXT = { WEB: 'desde la web', AUTO: 'al cerrar la jornada', EQUIPO: 'desde el equipo' }
+const FINAL_TXT = {
+  CANCELADA:    'cancelado antes de empezar',
+  VENCIDA:      'el equipo no lo tomó en 12 h',
+  INTERRUMPIDA: 'se cortó (el programa se cerró): lo no enviado sigue pendiente',
+}
+
+function FilaEquipo({ e, isAdmin, pendientes, configOk, onReportar, onDetener, onAuto, onDesvincular }: {
+  e: Equipo; isAdmin: boolean; pendientes: number; configOk: boolean
+  onReportar: () => void; onDetener: () => void; onAuto: (v: boolean) => void; onDesvincular: () => void
+}) {
+  const o = e.orden
+  let linea: React.ReactNode = null
+  if (o?.estado === 'PENDIENTE') {
+    linea = <span className="text-blue-700">
+      Esperando que el equipo lo tome ({ORIGEN_TXT[o.origen]}{o.pedida_por ? ` por ${o.pedida_por}` : ''}, {fechaHora(o.created_at)})
+      {!e.en_linea && ' · el equipo está desconectado'}
+    </span>
+  } else if (o?.estado === 'EN_CURSO') {
+    linea = <span className="text-blue-700 font-medium">
+      ⏳ Reportando{e.actividad ? `: ${e.actividad}` : '…'}{o.detener ? ' · deteniendo…' : ''}
+    </span>
+  } else if (o?.terminada_at) {
+    const r = o.resumen ?? {}
+    const partes = RESUMEN_TXT.filter(([k]) => r[k]).map(([k, t]) => `${r[k]} ${t}`)
+    const txt = o.estado === 'TERMINADA'
+      ? (partes.length ? partes.join(' · ') : 'no había nada que reportar')
+      : FINAL_TXT[o.estado as keyof typeof FINAL_TXT]
+    const mal = o.estado !== 'TERMINADA' || !!(r.ERROR || r.RECHAZADO)
+    linea = <span className={mal ? 'text-amber-700' : 'text-neutral-600'}>
+      Último reporte {fechaHora(o.terminada_at)} ({ORIGEN_TXT[o.origen]}): {txt}
+    </span>
+  }
+
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-2 py-1.5 border-t border-neutral-100 first:border-t-0">
+      <div className="min-w-0">
+        <div>
+          <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${e.en_linea ? 'bg-green-500' : 'bg-neutral-300'}`} />
+          <span className="font-medium">{e.nombre ?? `Equipo #${e.id}`}</span>
+          <span className="text-xs text-neutral-500 ml-2">
+            {e.en_linea ? 'en línea' : e.last_seen_at ? `desconectado · última conexión ${fechaHora(e.last_seen_at)}` : 'sin conexión'}
+            {e.version ? ` · v${e.version}` : ''}
+          </span>
+        </div>
+        {linea && <div className="text-xs mt-0.5 ml-4">{linea}</div>}
+        {isAdmin && (
+          <label className="text-xs text-neutral-500 ml-4 mt-0.5 flex items-center gap-1.5 cursor-pointer w-fit">
+            <input type="checkbox" checked={e.auto_reportar} onChange={ev => onAuto(ev.target.checked)} />
+            Reportar solo al cerrar la jornada
+          </label>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        {activa(o)
+          ? <button onClick={onDetener} disabled={!!o?.detener} className="btn-secondary text-xs">
+              {o?.estado === 'PENDIENTE' ? 'Cancelar' : o?.detener ? 'Deteniendo…' : '■ Detener'}
+            </button>
+          : <button onClick={onReportar} disabled={!pendientes || !configOk} className="btn-primary text-xs"
+              title={!configOk ? 'Corrige la configuración de mensajes' : !pendientes ? 'No hay envíos pendientes' : undefined}>
+              ▶ Reportar{pendientes ? ` (${pendientes})` : ''}
+            </button>}
+        {isAdmin && <button onClick={onDesvincular} className="text-xs text-neutral-400 hover:text-red-600">Desvincular</button>}
+      </div>
+    </div>
   )
 }
 

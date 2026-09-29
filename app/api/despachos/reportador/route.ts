@@ -3,9 +3,12 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { despachosForbidden } from '@/lib/despachos'
-import { leerConfig, LIMITE_CARACTERES, problemasConfig } from '@/lib/reportador'
+import {
+  EN_LINEA_SEGUNDOS, leerConfig, LIMITE_CARACTERES, problemasConfig, SQL_PENDIENTE, SQL_REPORTABLE,
+} from '@/lib/reportador'
 
-/** GET /api/despachos/reportador — equipos vinculados + configuración de mensajes */
+/** GET /api/despachos/reportador — equipos vinculados (en línea, qué hacen, última orden),
+ *  envíos pendientes de reportar y configuración de mensajes */
 export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
@@ -13,17 +16,35 @@ export async function GET() {
   if (denied) return denied
 
   try {
-    const [{ rows: equipos }, config] = await Promise.all([
+    const [{ rows: equipos }, config, { rows: [{ pendientes }] }] = await Promise.all([
       db.query(
-        `SELECT id, nombre, vinculado_at, last_seen_at, version,
-                CASE WHEN token_hash IS NULL THEN codigo END AS codigo,
-                CASE WHEN token_hash IS NULL THEN codigo_expira END AS codigo_expira
-         FROM reportador_equipos
-         WHERE revocado_at IS NULL AND (token_hash IS NOT NULL OR codigo_expira > NOW())
-         ORDER BY id`),
+        `SELECT q.id, q.nombre, q.vinculado_at, q.last_seen_at, q.version, q.auto_reportar,
+                q.last_seen_at > NOW() - make_interval(secs => $1) AS en_linea,
+                CASE WHEN q.actividad_at > NOW() - INTERVAL '10 minutes' THEN q.actividad END AS actividad,
+                CASE WHEN q.token_hash IS NULL THEN q.codigo END AS codigo,
+                CASE WHEN q.token_hash IS NULL THEN q.codigo_expira END AS codigo_expira,
+                o.orden
+         FROM reportador_equipos q
+         LEFT JOIN LATERAL (
+           SELECT json_build_object(
+                    'id', o.id, 'origen', o.origen, 'estado', o.estado, 'created_at', o.created_at,
+                    'tomada_at', o.tomada_at, 'terminada_at', o.terminada_at,
+                    'detener', o.detener_at IS NOT NULL, 'resumen', o.resumen,
+                    'pedida_por', (SELECT COALESCE(u.full_name, u.username) FROM users u WHERE u.id = o.created_by)
+                  ) AS orden
+           FROM reportador_ordenes o WHERE o.equipo_id = q.id ORDER BY o.id DESC LIMIT 1
+         ) o ON TRUE
+         WHERE q.revocado_at IS NULL AND (q.token_hash IS NOT NULL OR q.codigo_expira > NOW())
+         ORDER BY q.id`, [EN_LINEA_SEGUNDOS]),
       leerConfig(db),
+      db.query(
+        `SELECT COUNT(*)::int AS pendientes
+         FROM despacho_etiquetas e
+         JOIN despacho_lotes l    ON l.id = e.lote_id
+         JOIN despacho_jornadas j ON j.id = l.jornada_id
+         WHERE ${SQL_REPORTABLE} AND ${SQL_PENDIENTE}`),
     ])
-    return NextResponse.json({ equipos, config, problemas: problemasConfig(config), limite: LIMITE_CARACTERES })
+    return NextResponse.json({ equipos, config, pendientes, problemas: problemasConfig(config), limite: LIMITE_CARACTERES })
   } catch (err) {
     return apiError(err)
   }

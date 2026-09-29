@@ -16,7 +16,13 @@ export const LIMITE_CARACTERES = 350
 // Reserva de la cola por equipo: si un equipo se cae, otro puede tomarla después de esto.
 export const RESERVA_HORAS = 2
 
-export const ESTADOS_RESULTADO = ['ENVIADO', 'SIN_CHAT', 'RECHAZADO', 'ERROR'] as const
+// Órdenes desde la web (mig 028): el equipo pregunta cada ~30 s. Una orden que nadie tomó
+// en ORDEN_VENCE_HORAS vence (no se dispara a destiempo si el equipo estuvo apagado).
+export const ORDEN_VENCE_HORAS = 12
+// "En línea" = preguntó hace menos de esto (3 consultas perdidas de margen).
+export const EN_LINEA_SEGUNDOS = 100
+
+export const ESTADOS_RESULTADO =['ENVIADO', 'SIN_CHAT', 'RECHAZADO', 'ERROR'] as const
 export type EstadoResultado = typeof ESTADOS_RESULTADO[number]
 
 // Pendiente de reportar: nunca intentado, o intentado con error/rechazo (se reintenta,
@@ -115,4 +121,23 @@ export function problemasConfig(c: ConfigReportador): string[] {
 export function cuentaDe(remitente: string | null, cuentas: Cuenta[]) {
   const r = (remitente?.trim() || REMITENTE_DEFAULT).toUpperCase()
   return cuentas.find(c => r.startsWith(c.filtro.trim().toUpperCase())) ?? null
+}
+
+// ── Órdenes desde la web ────────────────────────────────────────────────────
+/** Al cerrar una jornada con algo que reportar: una orden para cada equipo con
+ *  `auto_reportar` que no tenga ya una en marcha. Si varios equipos la toman, la reserva
+ *  de la cola (tomar) evita que dos le escriban al mismo comprador. */
+export async function crearOrdenesAuto(db: Pick<Pool, 'query'>, jornadaId: number, userId: number) {
+  const { rowCount } = await db.query(
+    `INSERT INTO reportador_ordenes (equipo_id, origen, created_by)
+     SELECT q.id, 'AUTO', $2
+     FROM reportador_equipos q
+     WHERE q.auto_reportar AND q.token_hash IS NOT NULL AND q.revocado_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM reportador_ordenes o
+                       WHERE o.equipo_id = q.id AND o.estado IN ('PENDIENTE', 'EN_CURSO'))
+       AND EXISTS (SELECT 1 FROM despacho_etiquetas e
+                   JOIN despacho_lotes l ON l.id = e.lote_id
+                   WHERE l.jornada_id = $1 AND e.impresa AND NOT e.reimpresion AND l.status = 'GENERADO')`,
+    [jornadaId, userId])
+  return rowCount ?? 0
 }

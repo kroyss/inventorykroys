@@ -1,9 +1,15 @@
 """
-Reportador de guías — ventana (tkinter).
+Reportador de guías — ventana (tkinter) + ícono en la bandeja.
 
-Uso normal: doble clic en ReportadorConectado.exe.
-Pruebas:    python app.py --simular   (sin Chrome; solo contra un servidor local)
+Uso normal: doble clic en ReportadorConectado.exe. Queda en la bandeja (junto al reloj)
+esperando órdenes del sistema: cada CONSULTA_SEG pregunta si desde Despachos pidieron
+"▶ Reportar" y, si hay, reporta solo. Cerrar la ventana lo esconde; "Salir" en el menú
+de la bandeja lo cierra de verdad.
+
+  --bandeja   arranca escondido (lo usa el acceso de inicio de Windows)
+  --simular   sin Chrome ni mensajes reales; solo contra un servidor local
 """
+import ctypes
 import os
 import queue
 import sys
@@ -11,11 +17,61 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+except ImportError:          # sin bandeja: la ventana funciona igual, pero cerrar = salir
+    pystray = None
+
 import servidor as srv
 from corrida import Corrida, es_local
 from motor import Motor, URL_ML
 
 SIMULAR = "--simular" in sys.argv
+BANDEJA = "--bandeja" in sys.argv
+CONSULTA_SEG = 30          # cada cuánto pregunta si hay una orden (en espera)
+REFRESCO_CADA = 10         # cada tantas consultas, refresca también los pendientes
+
+# Una sola copia abierta: la segunda (p.ej. doble clic en el escritorio con el programa ya
+# en la bandeja) solo le avisa a la primera que se muestre, y se cierra.
+_SUFIJO = "_simular" if SIMULAR else ""
+MUTEX = "Local\\SyncsoraReportador" + _SUFIJO
+EVENTO_MOSTRAR = "Local\\SyncsoraReportadorMostrar" + _SUFIJO
+
+
+def _kernel32():
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    # HANDLE es de 64 bits: sin esto ctypes lo trunca a int de 32.
+    for f in (k32.CreateMutexW, k32.CreateEventW, k32.OpenEventW):
+        f.restype = ctypes.c_void_p
+    k32.SetEvent.argtypes = k32.CloseHandle.argtypes = [ctypes.c_void_p]
+    k32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    return k32
+
+
+def ya_abierto():
+    if os.name != "nt":
+        return False
+    k32 = _kernel32()
+    k32.CreateMutexW(None, False, MUTEX)
+    if ctypes.get_last_error() != 183:  # ERROR_ALREADY_EXISTS
+        return False
+    ev = k32.OpenEventW(0x0002, False, EVENTO_MOSTRAR)  # EVENT_MODIFY_STATE
+    if ev:
+        k32.SetEvent(ev)
+        k32.CloseHandle(ev)
+    return True
+
+
+def imagen_icono(trabajando=False):
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((2, 2, 62, 62), radius=14, fill=(29, 78, 216) if trabajando else (23, 23, 23))
+    # Sobre de mensaje
+    d.rectangle((14, 20, 50, 44), outline="white", width=4)
+    d.line((14, 20, 32, 34, 50, 20), fill="white", width=4)
+    return img
+
 
 COLOR = {"ok": "#15803d", "error": "#b91c1c", "warn": "#b45309", "info": "#404040"}
 ESTADO_TXT = {"ENVIADO": "✓ enviado", "SIN_CHAT": "– sin chat", "RECHAZADO": "✗ rechazado por ML", "ERROR": "✗ error"}
@@ -34,9 +90,19 @@ class App(tk.Tk):
         self.srv = None
         self.config_srv = None
         self.contenido = None
-        self.protocol("WM_DELETE_WINDOW", self.cerrar)
+        self.consultando = False
+        self.consultas = 0
+        self.orden_actual = None
+        self.icono = None
+        self.aviso_bandeja = False
+        self.protocol("WM_DELETE_WINDOW", self.esconder)
         self.after(150, self.procesar_eventos)
         self.mostrar()
+        self.iniciar_bandeja()
+        self.escuchar_mostrar()
+        if BANDEJA and self.icono:
+            self.withdraw()
+        self.after(5000, self.consultar_orden)
         if not SIMULAR and Motor.detectar_chrome_major() is None:
             self.after(300, lambda: messagebox.showwarning("Falta Google Chrome", (
                 "Este programa usa Google Chrome para escribir en MercadoLibre y no se encontró en el equipo.\n\n"
@@ -52,6 +118,7 @@ class App(tk.Tk):
             self.srv = srv.Servidor(self.cfg.get("servidor", srv.SERVIDOR_DEFAULT), self.cfg["token"])
             self.pantalla_principal()
         else:
+            self.srv = None  # sin vincular: no consulta órdenes
             self.pantalla_vincular()
 
     def pantalla_vincular(self):
@@ -121,6 +188,98 @@ class App(tk.Tk):
         ttk.Button(pie, text="Desvincular este equipo", command=self.desvincular).pack(side="right")
         self.actualizar()
 
+    # ── bandeja ─────────────────────────────────────────────────────────────
+    def iniciar_bandeja(self):
+        if pystray is None:
+            self.protocol("WM_DELETE_WINDOW", self.cerrar)
+            return
+        ev = lambda nombre: (lambda *_: self.eventos.put((nombre, None)))
+        menu = pystray.Menu(
+            pystray.MenuItem("Abrir", ev("mostrar"), default=True),
+            pystray.MenuItem("Reportar ahora", ev("reportar")),
+            pystray.MenuItem("Salir", ev("salir")),
+        )
+        self.icono = pystray.Icon("SyncsoraReportador", imagen_icono(), "Reportador de guías — en espera", menu)
+        self.icono.run_detached()
+
+    def estado_bandeja(self, texto, trabajando=False):
+        if not self.icono:
+            return
+        try:
+            self.icono.title = ("Reportador de guías — " + texto)[:120]
+            self.icono.icon = imagen_icono(trabajando)
+        except Exception:
+            pass
+
+    def notificar(self, texto):
+        if self.icono and not self.winfo_viewable():
+            try:
+                self.icono.notify(texto, "Reportador de guías")
+            except Exception:
+                pass
+
+    def escuchar_mostrar(self):
+        """Otra copia del programa pidió mostrarse: se muestra esta."""
+        if os.name != "nt":
+            return
+        k32 = _kernel32()
+        ev = k32.CreateEventW(None, False, False, EVENTO_MOSTRAR)
+
+        def esperar():
+            while True:
+                if k32.WaitForSingleObject(ev, 0xFFFFFFFF) == 0:
+                    self.eventos.put(("mostrar", None))
+        threading.Thread(target=esperar, daemon=True).start()
+
+    def mostrar_ventana(self):
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+    def esconder(self):
+        if not self.icono:
+            return self.cerrar()
+        self.withdraw()
+        if not self.aviso_bandeja:
+            self.aviso_bandeja = True
+            try:
+                self.icono.notify("Sigue funcionando junto al reloj, esperando órdenes del sistema. "
+                                  "Para cerrarlo del todo: clic derecho en el ícono → Salir.", "Reportador de guías")
+            except Exception:
+                pass
+
+    # ── órdenes desde el sistema ────────────────────────────────────────────
+    def consultar_orden(self):
+        """En espera, pregunta cada CONSULTA_SEG si desde Despachos pidieron reportar."""
+        self.after(CONSULTA_SEG * 1000, self.consultar_orden)
+        if not self.srv or self.hilo or self.consultando:
+            return
+        self.consultando = True
+        self.consultas += 1
+        refrescar = self.consultas % REFRESCO_CADA == 0
+
+        def trabajo():
+            try:
+                orden = self.srv.orden_pendiente()
+                self.eventos.put(("orden", orden))
+                if refrescar or orden:
+                    self.eventos.put(("conectado", (self.srv.config(), self.srv.estado())))
+            except srv.ErrorServidor as e:
+                self.eventos.put(("sin_conexion", str(e)))
+            finally:
+                self.consultando = False
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def atender_orden(self, orden):
+        if self.hilo:  # carrera rara: ya se estaba reportando; se da por cubierta
+            threading.Thread(target=self.srv.terminar_orden, args=(orden["id"], {}), daemon=True).start()
+            return
+        quien = f" por {orden['pedida_por']}" if orden.get("pedida_por") else ""
+        origen = "al cerrar la jornada" if orden.get("origen") == "AUTO" else "desde el sistema"
+        self.escribir("info", f"Orden recibida {origen}{quien}.")
+        self.notificar(f"Empezó a reportar ({origen}{quien}).")
+        self.reportar(orden_id=orden["id"])
+
     # ── acciones ────────────────────────────────────────────────────────────
     def actualizar(self):
         def trabajo():
@@ -158,15 +317,19 @@ class App(tk.Tk):
         if not self.hilo:
             self.btn_reportar.config(state="normal" if total and not config.get("problemas") else "disabled")
 
-    def reportar(self):
-        if self.hilo:
+    def reportar(self, orden_id=None):
+        if self.hilo or not self.srv:
             return
         if SIMULAR and not es_local(self.srv.url):
+            if orden_id is not None:
+                self.srv.terminar_orden(orden_id, {})
             messagebox.showerror("Simulación", "La simulación solo funciona contra un servidor local."); return
         self.detener.clear()
         self.btn_reportar.config(state="disabled"); self.btn_detener.config(state="normal")
         self.escribir("info", "─" * 60)
-        corrida = Corrida(self.srv, self.cfg, lambda ev, d: self.eventos.put((ev, d)), self.detener, simular=SIMULAR)
+        self.estado_bandeja("reportando…", trabajando=True)
+        corrida = Corrida(self.srv, self.cfg, lambda ev, d: self.eventos.put((ev, d)), self.detener,
+                          simular=SIMULAR, orden_id=orden_id)
         self.hilo = threading.Thread(target=corrida.ejecutar, daemon=True)
         self.hilo.start()
 
@@ -218,19 +381,29 @@ class App(tk.Tk):
         os.startfile(carpeta)
 
     def cerrar(self):
+        """Salir de verdad (menú de la bandeja). Deja de recibir órdenes del sistema."""
         if self.hilo:
+            self.mostrar_ventana()
             if not messagebox.askyesno("Salir", "Está reportando. ¿Detener y salir? Lo que falte queda pendiente."):
                 return
             self.detener.set()
             self.after(500, self.esperar_y_salir)
             return
-        self.destroy()
+        self.salir()
 
     def esperar_y_salir(self):
         if self.hilo and self.hilo.is_alive():
             self.after(500, self.esperar_y_salir)
         else:
-            self.destroy()
+            self.salir()
+
+    def salir(self):
+        if self.icono:
+            try:
+                self.icono.stop()
+            except Exception:
+                pass
+        self.destroy()
 
     # ── eventos del hilo ────────────────────────────────────────────────────
     def escribir(self, nivel, texto):
@@ -249,18 +422,34 @@ class App(tk.Tk):
                     self.escribir(*d)
                 elif ev == "envio":
                     pass  # ya va al log con su color
+                elif ev == "actividad":
+                    self.estado_bandeja("reportando " + d, trabajando=True)
+                elif ev == "orden":
+                    if d:
+                        self.atender_orden(d)
+                elif ev == "mostrar":
+                    self.mostrar_ventana()
+                elif ev == "reportar":
+                    self.reportar()
+                elif ev == "salir":
+                    self.cerrar()
                 elif ev == "conectado":
                     config, estado = d
                     equipo = config.get("equipo") or "este equipo"
-                    self.lbl_conexion.config(text=f"✓ Conectado ({equipo})", foreground=COLOR["ok"])
-                    self.pintar_cuentas(config, estado)
+                    if self.srv and hasattr(self, "lbl_conexion") and self.lbl_conexion.winfo_exists():
+                        self.lbl_conexion.config(text=f"✓ Conectado ({equipo}) · esperando órdenes del sistema",
+                                                 foreground=COLOR["ok"])
+                        self.pintar_cuentas(config, estado)
                 elif ev == "sin_conexion":
-                    self.lbl_conexion.config(text=f"✗ {d}", foreground=COLOR["error"])
+                    if self.srv and hasattr(self, "lbl_conexion") and self.lbl_conexion.winfo_exists():
+                        self.lbl_conexion.config(text=f"✗ {d}", foreground=COLOR["error"])
                     if "desvinculado" in d.lower() or "no vinculado" in d.lower():
                         self.cfg.pop("token", None); srv.guardar_config(self.cfg); self.mostrar()
                 elif ev == "resumen":
                     self.hilo = None
                     self.btn_detener.config(state="disabled")
+                    self.estado_bandeja("en espera")
+                    self.notificar(f"Terminó: {d['ENVIADO']} enviado(s), {d['ERROR'] + d['RECHAZADO']} con problema.")
                     self.escribir("ok" if not d["ERROR"] and not d["RECHAZADO"] else "warn",
                                   f"Terminado: {d['ENVIADO']} enviado(s) · {d['SIN_CHAT']} sin chat · "
                                   f"{d['RECHAZADO']} rechazado(s) · {d['ERROR']} con error")
@@ -271,4 +460,5 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
-    App().mainloop()
+    if not ya_abierto():
+        App().mainloop()

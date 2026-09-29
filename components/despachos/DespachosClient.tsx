@@ -80,7 +80,7 @@ function descargar(href: string) {
   document.body.removeChild(a)
 }
 
-interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; pendientes?: number; lote_id?: number; jornada_id?: number }
+interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number }
 
 // Respuestas que no son JSON las corta el proxy (nginx) antes de llegar a la app.
 async function errorDe(res: Response): Promise<ApiBody> {
@@ -217,7 +217,9 @@ export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
     }
     if (!res.ok) { setError(body.error ?? 'Error'); cargar(); return }
     descargar(`/api/despachos/jornadas/${body.jornada_id}/manifiesto`)
-    setAviso('Jornada cerrada. Sus envíos ya están en la cola del Reportador: abre el programa y toca "Reportar ahora".')
+    setAviso((body.reportando ?? 0) > 0
+      ? 'Jornada cerrada. El Reportador empieza solo a escribirle a los compradores: sigue el avance abajo, en Reportador.'
+      : 'Jornada cerrada. Sus envíos ya están en la cola del Reportador: toca "▶ Reportar" abajo, en Reportador.')
     cargar()
   }
 

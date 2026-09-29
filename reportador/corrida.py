@@ -4,6 +4,8 @@ cada comprador. Misma lógica que run_cuenta() de main_reportador.py (pausas, pa
 larga cada 10, cortacircuito por caja vacía, un reintento al final), con dos cambios:
   - cada resultado se informa al sistema APENAS termina ese mensaje;
   - si la sesión de ML está cerrada, se detiene esa cuenta con un aviso claro.
+Cada corrida es una "orden" en el sistema (pedida desde la web, o registrada al tocar
+"Reportar ahora" aquí): el avance se ve en Despachos y desde ahí se puede detener.
 """
 import os
 import random
@@ -29,8 +31,10 @@ def es_local(url):
 class Corrida:
     """emit(evento, datos): 'log' (nivel, texto) · 'envio' (dict) · 'resumen' (dict)"""
 
-    def __init__(self, servidor, cfg_local, emit, detener, simular=False):
+    def __init__(self, servidor, cfg_local, emit, detener, simular=False, orden_id=None):
         self.srv = servidor
+        self.orden_id = orden_id
+        self.parcial = None  # resumen de la cuenta en curso (si se detiene a mitad)
         self.cfg = cfg_local
         self.emit = emit
         self.detener = detener
@@ -57,10 +61,19 @@ class Corrida:
             self.log("warn", f"Sin conexión: el resultado de {envio['order_id']} se guardó en el equipo y se informará después.")
         self.emit("envio", {**envio, "estado": estado, "detalle": detalle or "", "hora": datetime.now().strftime("%H:%M")})
 
+    def avance(self, texto):
+        """Cuenta el avance en la web; si desde allá pidieron detener, se detiene aquí."""
+        self.emit("actividad", texto)
+        if self.srv.actividad(texto, self.orden_id) and not self.detener.is_set():
+            self.log("warn", "Detener pedido desde el sistema: se corta después del mensaje en curso.")
+            self.detener.set()
+
     # ── corrida completa ────────────────────────────────────────────────────
     def ejecutar(self):
         resumen = {"ENVIADO": 0, "SIN_CHAT": 0, "RECHAZADO": 0, "ERROR": 0}
         try:
+            if self.orden_id is None:
+                self.orden_id = self.srv.iniciar_orden()
             quedan = self.srv.informar_pendientes()
             if quedan:
                 self.log("error", f"Hay {quedan} resultado(s) de una corrida anterior que no se pudieron informar "
@@ -79,9 +92,13 @@ class Corrida:
                 if self.detener.is_set():
                     break
                 parcial = self.ejecutar_cuenta(cuenta, config)
+                self.parcial = None
                 for k in resumen:
                     resumen[k] += parcial.get(k, 0)
         except Detenido:
+            # Lo que alcanzó a hacer la cuenta en curso también cuenta en el resumen.
+            for k in resumen:
+                resumen[k] += (self.parcial or {}).get(k, 0)
             self.log("warn", "Detenido por el operador. Lo que no se alcanzó a enviar sigue pendiente.")
         except srv.ErrorServidor as e:
             self.log("error", str(e))
@@ -89,18 +106,21 @@ class Corrida:
             self.log("error", "Error inesperado:\n" + traceback.format_exc())
         finally:
             self.srv.liberar()
+            if self.orden_id is not None:
+                self.srv.terminar_orden(self.orden_id, resumen)
             self.emit("resumen", resumen)
         return resumen
 
     # ── una cuenta (run_cuenta) ─────────────────────────────────────────────
     def ejecutar_cuenta(self, cuenta, config):
         nombre = cuenta["nombre"]
-        res = {"ENVIADO": 0, "SIN_CHAT": 0, "RECHAZADO": 0, "ERROR": 0}
+        res = self.parcial = {"ENVIADO": 0, "SIN_CHAT": 0, "RECHAZADO": 0, "ERROR": 0}
         envios = self.srv.tomar(nombre)
         if not envios:
             self.log("info", f"[{nombre}] Sin envíos pendientes — no se abre Chrome.")
             return res
         self.log("info", f"[{nombre}] {len(envios)} envío(s) para reportar.")
+        self.avance(f"{nombre} 0/{len(envios)}")
 
         driver = None
         try:
@@ -116,13 +136,14 @@ class Corrida:
             desde_ultima_pausa = 0
             con_error = []
 
-            for envio in envios:
+            for n, envio in enumerate(envios, 1):
                 if self.detener.is_set():
                     raise Detenido()
                 resultado = self.enviar_uno(driver, envio, cuenta, config)
                 if resultado == "SESION":
                     return res
                 res[resultado] += 1
+                self.avance(f"{nombre} {n}/{len(envios)}")
                 if resultado == "ENVIADO":
                     desde_ultima_pausa += 1
                     fallos_caja_seguidos = 0
@@ -148,6 +169,7 @@ class Corrida:
             # Un reintento al final para los errores comunes (no para caja vacía).
             if con_error and not corte_por_caja:
                 self.log("info", f"[{nombre}] Reintentando {len(con_error)} envío(s) con error…")
+                self.avance(f"{nombre}: reintentando {len(con_error)} con error")
                 self.pausa_corta(10, 20)
                 for envio in con_error:
                     if self.detener.is_set():

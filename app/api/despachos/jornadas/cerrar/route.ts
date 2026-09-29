@@ -7,6 +7,7 @@ import { currentDate } from '@/lib/tz'
 import {
   armarManifiesto, despachosForbidden, guardarArchivo, remitenteConfigurado, respuestaServicio,
 } from '@/lib/despachos'
+import { crearOrdenesAuto } from '@/lib/reportador'
 
 const Schema = z.object({ forzar: z.boolean().optional() })
 
@@ -70,7 +71,14 @@ export async function POST(req: NextRequest) {
        WHERE id = $1`,
       [jornada.id, userId, manifestPath, envios.length])
     await client.query('COMMIT')
-    return NextResponse.json({ ok: true, jornada_id: jornada.id, envios: envios.length })
+
+    // Equipos con "reportar al cerrar la jornada": se les deja la orden. Fuera de la
+    // transacción: si falla, la jornada igual quedó cerrada y se puede reportar a mano.
+    const reportando = await crearOrdenesAuto(db, jornada.id, userId).catch(err => {
+      console.error('[despachos] no se pudo crear la orden automática del Reportador', err)
+      return 0
+    })
+    return NextResponse.json({ ok: true, jornada_id: jornada.id, envios: envios.length, reportando })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
     if (manifestPath) await unlink(manifestPath).catch(() => {})
