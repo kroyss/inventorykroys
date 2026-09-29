@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { requestConnection } from '@/lib/requestConnection'
 
 const Schema = z.object({
   add:    z.array(z.number().int().positive()).optional(),
@@ -11,8 +12,10 @@ const Schema = z.object({
 // Asigna / quita órdenes de importación a un contenedor.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { session, db } = await getSessionDb()
-  if (!session || !db) return unauthorized()
+  const { session, db: pool } = await getSessionDb()
+  if (!session || !pool) return unauthorized()
+  // Una sola conexión para todo el request: las transacciones son atómicas.
+  const db = await requestConnection(pool)
   if (session.user.role !== 'admin') return forbidden()
 
   try {

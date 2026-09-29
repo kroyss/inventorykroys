@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { requestConnection } from '@/lib/requestConnection'
 import { mlOrderError } from '@/lib/orderNumber'
 
 const ItemSchema = z.object({
@@ -185,8 +186,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { session, db } = await getSessionDb()
-  if (!session || !db) return unauthorized()
+  const { session, db: pool } = await getSessionDb()
+  if (!session || !pool) return unauthorized()
+  // Una sola conexión para todo el request: las transacciones son atómicas.
+  const db = await requestConnection(pool)
 
   try {
     const body   = CreateSchema.parse(await req.json())

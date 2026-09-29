@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { requestConnection } from '@/lib/requestConnection'
 
 const Schema = z.object({
   status:          z.enum(['FINALIZADA', 'INCONSISTENTE']).default('FINALIZADA'),
@@ -14,8 +15,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const { session, db } = await getSessionDb()
-  if (!session || !db) return unauthorized()
+  const { session, db: pool } = await getSessionDb()
+  if (!session || !pool) return unauthorized()
+  // Una sola conexión para todo el request: las transacciones son atómicas.
+  const db = await requestConnection(pool)
   // Finalizar (cargar inventario) lo puede hacer el receptor, admin o normal.
 
   try {

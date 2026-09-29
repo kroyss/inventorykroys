@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { requestConnection } from '@/lib/requestConnection'
 
 const PRODUCTS_SQL = `
   SELECT
@@ -51,8 +52,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { session, db } = await getSessionDb()
-  if (!session || !db) return unauthorized()
+  const { session, db: pool } = await getSessionDb()
+  if (!session || !pool) return unauthorized()
+  // Una sola conexión para todo el request: las transacciones son atómicas.
+  const db = await requestConnection(pool)
   if (session.user.role !== 'admin') return forbidden()
 
   try {
