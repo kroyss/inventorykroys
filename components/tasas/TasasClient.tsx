@@ -389,7 +389,10 @@ export default function TasasClient() {
                   className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
               </div>
               <div>
-                <label className="text-[11px] text-neutral-500">Envío gratis desde $</label>
+                <label className="text-[11px] text-neutral-500"
+                  title="Solo se usa para productos SIN peso registrado. Los que tienen peso toman el mínimo de su rango en la Tabla MercadoEnvíos.">
+                  Envío gratis desde $ <span className="text-neutral-400">(sin peso)</span>
+                </label>
                 <input type="number" step="0.5" value={veUmbral} onChange={e => setVeUmbral(e.target.value)}
                   className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
               </div>

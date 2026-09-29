@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { localCostFactor } from '@/lib/localCost'
+import { parseShippingTable, shippingCostVE } from '@/lib/mlShipping'
 
 const Schema = z.object({
   // 'REABIERTA' action → reverts sale to BORRADOR
@@ -38,13 +39,18 @@ export async function PUT(
     // Parámetros editables en Ajustes (app_settings). Misma moneda que la venta (VE USD, CO pesos).
     // Resiliente: si app_settings no existe (migración pendiente), usa defaults y no rompe la venta.
     const mlp: Record<string, number> = {}
+    let shipTableRaw: string | null = null
     try {
       const { rows: setRows } = await db.query(`SELECT key, value FROM app_settings`)
-      for (const r of setRows) { const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v }
+      for (const r of setRows) {
+        if (r.key === 'ml_shipping_table') shipTableRaw = r.value   // JSON, no numérico
+        const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v
+      }
     } catch { /* app_settings ausente → defaults */ }
     const saleIsCO = session.user.country === 'CO'
-    const snapshotCommission = () => saleIsCO
-      ? db.query(
+    const snapshotCommission = async () => {
+      if (saleIsCO) {
+        await db.query(
           // $1 = comisión% + retención% (precomputado para evitar "unknown + unknown").
           `UPDATE sale_items SET unit_commission = ROUND(
              unit_price * $1::numeric / 100
@@ -53,13 +59,25 @@ export async function PUT(
           [(mlp.ml_comision ?? 15.5) + (mlp.ml_reten ?? 1.91),
            mlp.ml_umbral_envio ?? 60000, mlp.ml_envio_alto ?? 8000, mlp.ml_envio_bajo ?? 2600, id]
         )
-      : db.query(
-          `UPDATE sale_items SET unit_commission = ROUND(
-             unit_price * $1::numeric / 100
-             + $2::numeric * LEAST(1, unit_price / NULLIF($3::numeric, 0))
-           , 2) WHERE sale_id = $4`,
-          [mlp.ml_comision ?? 12, mlp.ml_envio ?? 0.65, mlp.ml_umbral ?? 5, id]
-        )
+        return
+      }
+      // VE: el envío depende del mínimo de envío gratis del RANGO DE PESO de cada
+      // producto (misma tabla de MercadoEnvíos que limita el descuento), así que se
+      // calcula por línea. Sin peso registrado cae al umbral global de Ajustes.
+      const table = parseShippingTable(shipTableRaw)
+      const { rows: lines } = await db.query(
+        `SELECT si.id, si.unit_price::float AS unit_price, p.weight_kg::float AS weight_kg
+         FROM sale_items si JOIN products p ON p.id = si.product_id
+         WHERE si.sale_id = $1`,
+        [id]
+      )
+      for (const l of lines) {
+        const price = Number(l.unit_price) || 0
+        const envio = shippingCostVE(price, l.weight_kg, table, mlp.ml_envio ?? 0.65, mlp.ml_umbral ?? 5)
+        const commission = Math.round((price * (mlp.ml_comision ?? 12) / 100 + envio) * 100) / 100
+        await db.query(`UPDATE sale_items SET unit_commission = $1 WHERE id = $2`, [commission, l.id])
+      }
+    }
 
     const { rows: [sale] } = await db.query(
       `SELECT s.id, s.status, s.ml_order_number, s.customer_name, s.notes,

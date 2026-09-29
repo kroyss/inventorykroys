@@ -7,7 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import { coPublishedPrice } from '@/lib/coPricing'
 import { matchTokens } from '@/lib/search'
-import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
+import { shipInfo, parseShippingTable, shippingCostVE, type ShipInfo, type ShipTier } from '@/lib/mlShipping'
 import Link from 'next/link'
 import MlBreakdown from './MlBreakdown'
 
@@ -81,8 +81,9 @@ function recDiscountVE(rate: VeRate | null): number {
 
 function mlNetFor(
   country: Country,
-  p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number },
+  p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number; weight_kg?: number | null },
   veRate: VeRate | null, coTrm: number, ml: Record<string, string>, discount?: number,
+  shipTable?: ShipTier[],
 ): { ganancia: number; margen: number; pesos: boolean } | null {
   const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
   if (country === 'CO') {
@@ -101,7 +102,9 @@ function mlNetFor(
   const finalLive = liveFinalVE(p, veRate.excess ?? 0, discount)
   if (!(finalLive > 0)) return null
   const realUsd  = finalLive * veRate.official / veRate.parallel
-  const envio    = num('ml_envio', 0.65) * Math.min(1, finalLive / num('ml_umbral', 5))
+  // Envío según el mínimo del rango de peso del producto (tabla de MercadoEnvíos).
+  const envio    = shippingCostVE(finalLive, p.weight_kg, shipTable ?? parseShippingTable(ml.ml_shipping_table),
+                                  num('ml_envio', 0.65), num('ml_umbral', 5))
   const neto     = realUsd * (1 - num('ml_comision', 12) / 100) - envio
   const ganancia = neto - p.total_cost
   return { ganancia, margen: ganancia / realUsd * 100, pesos: false }
@@ -494,7 +497,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
-    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p))?.margen ?? -Infinity
+    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p), shipTable)?.margen ?? -Infinity
     const valueFor = (p: Product): number | string => {
       switch (sortKey) {
         case 'code':     return p.code
@@ -665,7 +668,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </tr>
               )}
               {displayed.map(p => {
-                const net = mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p))
+                const net = mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p), shipTable)
                 return (
                 <tr key={p.id} onClick={() => openView(p.id)}
                   className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
@@ -749,7 +752,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <p className="px-3 py-8 text-center text-neutral-400">{search ? 'Sin resultados' : 'No hay productos'}</p>
           )}
           {displayed.map(p => {
-            const net = mlNetFor(country, p, veRate, coTrm, mlSettings)
+            const net = mlNetFor(country, p, veRate, coTrm, mlSettings, undefined, shipTable)
             return (
               <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
                 <div className="flex items-start justify-between gap-2">
@@ -1012,6 +1015,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       totalCost={totalCost}
                       ml={mlSettings}
                       finalPriceUsd={finalPriceUsd}
+                      weightKg={formWeight != null && !isNaN(formWeight) ? formWeight : null}
                       veRate={veRate}
                       priceBs={priceBs}
                       salePrice={form.sale_price || suggestedPesos}
@@ -1093,7 +1097,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         const v = viewing
         const vEff  = effDiscountFor(v)
         const vShip = country === 'VE' ? shipFor(v) : null
-        const net = mlNetFor(country, v, veRate, coTrm, mlSettings, vEff)
+        const net = mlNetFor(country, v, veRate, coTrm, mlSettings, vEff, shipTable)
         const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
             <p className="text-[11px] text-neutral-500">{label}</p>
@@ -1163,6 +1167,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     totalCost={v.total_cost}
                     ml={mlSettings}
                     finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0, vEff)}
+                    weightKg={v.weight_kg}
                     veRate={veRate}
                     priceBs={liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0)}
                     salePrice={v.sale_price}

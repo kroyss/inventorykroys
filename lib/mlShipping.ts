@@ -7,7 +7,11 @@
 // producto aguanta sin perder el envío gratis, y limita el descuento global a ese tope.
 //
 // Solo aplica a VE. La tabla cambia cada ~años → editable en Ajustes (app_settings
-// key `ml_shipping_table`, JSON). Acá va el default (tabla vigente 2026).
+// key `ml_shipping_table`, JSON). Acá va el default.
+//
+// La MISMA tabla alimenta dos cosas: el tope de descuento (shipInfo) y el costo
+// de envío que se le imputa a cada venta en la ganancia (shippingCostVE). Así,
+// cuando ML cambia los mínimos, se actualiza en un solo lugar.
 
 export interface ShipTier {
   /** Peso máximo del rango en kg (el mínimo es el maxKg del rango anterior). */
@@ -16,15 +20,19 @@ export interface ShipTier {
   minPrice: number
 }
 
+// Tabla unificada de ML Venezuela vigente desde el 1 de octubre de 2026
+// (reemplaza la de Tealca/Zoom). Valores exactos publicados por ML.
 export const DEFAULT_SHIPPING_TABLE: ShipTier[] = [
-  { maxKg: 0.5,  minPrice: 4.95 },
-  { maxKg: 1,    minPrice: 9.95 },
-  { maxKg: 2,    minPrice: 19.95 },
-  { maxKg: 3,    minPrice: 29.95 },
-  { maxKg: 4,    minPrice: 39.95 },
-  { maxKg: 5,    minPrice: 49.95 },
-  { maxKg: 10,   minPrice: 59.95 },
-  { maxKg: 40,   minPrice: 79.95 },
+  { maxKg: 0.5,  minPrice: 3 },
+  { maxKg: 1,    minPrice: 7 },
+  { maxKg: 1.5,  minPrice: 15 },
+  { maxKg: 2,    minPrice: 20 },
+  { maxKg: 3,    minPrice: 30 },
+  { maxKg: 4,    minPrice: 40 },
+  { maxKg: 5,    minPrice: 50 },
+  { maxKg: 10,   minPrice: 60 },
+  { maxKg: 80,   minPrice: 80 },
+  { maxKg: 999,  minPrice: 200 },  // "más de 80 kg"
 ]
 
 /** Lee la tabla de un objeto de settings; si no hay o es inválida, usa el default. */
@@ -48,6 +56,38 @@ export function tierFor(weightKg: number | null | undefined, table: ShipTier[]):
   if (weightKg == null || !(weightKg > 0)) return null
   for (const t of table) if (weightKg <= t.maxKg) return t
   return null // por encima del rango más grande
+}
+
+/**
+ * Mínimo de envío gratis que se usa para el costo de envío de un producto: el de
+ * su rango de peso según la tabla. Sin peso registrado (o fuera de tabla) cae al
+ * umbral global de Ajustes (`ml_umbral`). `porPeso` dice cuál de los dos se usó.
+ */
+export function shippingThresholdVE(
+  weightKg: number | null | undefined, table: ShipTier[], umbralGlobal: number,
+): { umbral: number; porPeso: boolean } {
+  const t = tierFor(weightKg, table)
+  return t ? { umbral: t.minPrice, porPeso: true } : { umbral: umbralGlobal, porPeso: false }
+}
+
+/**
+ * Costo de envío de ML (VE) imputado a UNA unidad vendida.
+ *
+ * El vendedor paga `envio` por cada envío, pero el envío gratis solo existe si la
+ * compra llega al mínimo. Si el precio es menor, el cliente junta unidades hasta
+ * alcanzarlo y ese costo se reparte entre ellas: envio × mín(1, precio / umbral).
+ *
+ * Antes el umbral era uno solo ($5) para todo el catálogo. Con mínimos distintos
+ * por peso ($3 hasta 0,5 kg, $7 hasta 1 kg, $15 hasta 1,5 kg…) un único número
+ * sobre- o subestimaba el envío según el producto.
+ */
+export function shippingCostVE(
+  price: number, weightKg: number | null | undefined, table: ShipTier[],
+  envio: number, umbralGlobal: number,
+): number {
+  const { umbral } = shippingThresholdVE(weightKg, table, umbralGlobal)
+  if (!(umbral > 0)) return envio
+  return envio * Math.min(1, price / umbral)
 }
 
 /**

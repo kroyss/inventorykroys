@@ -1,5 +1,7 @@
 'use client'
 
+import { parseShippingTable, shippingThresholdVE, shippingCostVE } from '@/lib/mlShipping'
+
 // Cascada "lo que realmente te queda" después de ML — una sola fuente de verdad
 // para Productos (nuevo/edición/vista) y la calculadora de Ajustes, así nunca
 // se desincronizan. Cada país con su lógica:
@@ -35,6 +37,8 @@ export interface MlBreakdownProps {
   ml: Record<string, string>
   // VE
   finalPriceUsd?: number
+  /** Peso del producto (kg): define el mínimo de envío gratis según la tabla de MercadoEnvíos. */
+  weightKg?: number | null
   veRate?: { official: number; parallel: number } | null
   priceBs?: number
   // CO
@@ -91,7 +95,13 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   const realUsd   = final * rate.official / rate.parallel
   const cambiario = final - realUsd
   const comision  = realUsd * comisionPct / 100
-  const envio     = num(p.ml, 'ml_envio', 0.65) * Math.min(1, final / num(p.ml, 'ml_umbral', 5))
+  // Envío según el mínimo de envío gratis del rango de peso del producto (tabla
+  // de MercadoEnvíos); sin peso, el umbral global de Ajustes.
+  const shipTable = parseShippingTable(p.ml?.ml_shipping_table)
+  const envioBase = num(p.ml, 'ml_envio', 0.65)
+  const umbralG   = num(p.ml, 'ml_umbral', 5)
+  const { umbral, porPeso } = shippingThresholdVE(p.weightKg, shipTable, umbralG)
+  const envio     = shippingCostVE(final, p.weightKg, shipTable, envioBase, umbralG)
   const neto      = realUsd - comision - envio
   const ganancia  = neto - p.totalCost
   const margen    = realUsd > 0 ? ganancia / realUsd * 100 : 0
@@ -102,7 +112,8 @@ export default function MlBreakdown(p: MlBreakdownProps) {
         <Row label="Venta con descuento aplicado en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
         <Row label="En dólares reales (paralelo)" value={`$${fmtUsd(realUsd)}`} sub={`−$${fmtUsd(cambiario)} cambiario`} />
         <Row label={`− Comisión ML (${comisionPct}%)`} value={`−$${fmtUsd(comision)}`} neg />
-        <Row label="− Envío ML" value={`−$${fmtUsd(envio)}`} neg />
+        <Row label="− Envío ML" value={`−$${fmtUsd(envio)}`} neg
+          sub={`gratis desde $${fmtUsd(umbral)}${porPeso ? ' por peso' : ' (sin peso)'}`} />
         <Row label="− Tu costo" value={`−$${fmtUsd(p.totalCost)}`} neg />
       </div>
       <div className={`rounded-lg p-2.5 border-2 ${netBg(margen)} flex items-center justify-between`}>
