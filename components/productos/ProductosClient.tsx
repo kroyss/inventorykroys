@@ -7,7 +7,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import { coPublishedPrice } from '@/lib/coPricing'
 import { matchTokens } from '@/lib/search'
-import { shipInfo, parseShippingTable, shippingCostVE, type ShipInfo, type ShipTier } from '@/lib/mlShipping'
+import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
+import { liveBaseVE, liveFinalVE, livePublishedVE, recDiscountVE, mlNetFor, storedPricesVE, type VeRate } from '@/lib/pricingVE'
 import Link from 'next/link'
 import MlBreakdown from './MlBreakdown'
 
@@ -25,7 +26,6 @@ function fmtPeso(n: number) {
   return Number(n).toLocaleString('de-DE', { maximumFractionDigits: 0 })
 }
 
-interface VeRate { official: number; parallel: number; excess: number }
 
 // Cálculo de precios — paridad con el legacy.
 //  Precio base    = costo total × (1 + ganancia%)          (markup sobre costo)
@@ -51,63 +51,6 @@ function calcPrices(
     marginPct   = basePriceUsd > 0 ? (realUsd - basePriceUsd) / basePriceUsd * 100 : 0
   }
   return { totalCost, basePriceUsd, suggestedMl, publishedPriceUsd, finalPriceUsd, recDiscount, realUsd, marginPct, excessPct }
-}
-
-// Margen NETO real por producto (después de comisiones de ML), por país.
-// Reusa las mismas fórmulas que el simulador de Ajustes y la calculadora:
-//   VE: ingreso real = precio final llevado a paralelo; − comisión % − envío (con prorrateo bajo el umbral).
-//   CO: ingreso = precio de venta en pesos; − comisión % − envío por umbral − retención.
-// margen = ganancia ÷ ingreso real (SOBRE VENTA), consistente en ambos países. null si falta dato.
-// Precio final VE calculado EN VIVO desde el costo y la config actual (categoría → base,
-// exceso, descuento), para que catálogo, vista y calculadora coincidan. El final_price_usd
-// guardado queda viejo cuando cambia el exceso/costo y no se re-guarda el producto.
-function liveBaseVE(p: { total_cost: number; profit_percentage: number }): number {
-  return p.total_cost * (1 + (p.profit_percentage ?? 0) / 100)
-}
-// El descuento aplicado es GLOBAL (config en Ajustes); si no se pasa, cae al del producto.
-function liveFinalVE(p: { total_cost: number; profit_percentage: number; discount_percent: number }, excess: number, discount?: number): number {
-  const d = discount ?? p.discount_percent ?? 0
-  return liveBaseVE(p) * (1 + excess / 100) * (1 - d / 100)
-}
-// Precio publicado en ML = base × (1 + exceso), antes del descuento.
-function livePublishedVE(p: { total_cost: number; profit_percentage: number }, excess: number): number {
-  return liveBaseVE(p) * (1 + excess / 100)
-}
-// Descuento recomendado VE (depende solo de exceso + tasas; la base se cancela).
-function recDiscountVE(rate: VeRate | null): number {
-  if (!rate || !(rate.parallel > rate.official) || !(rate.official > 0)) return 0
-  return Math.max(0, (1 - (1.05 * rate.parallel) / ((1 + (rate.excess ?? 0) / 100) * rate.official)) * 100)
-}
-
-function mlNetFor(
-  country: Country,
-  p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number; weight_kg?: number | null },
-  veRate: VeRate | null, coTrm: number, ml: Record<string, string>, discount?: number,
-  shipTable?: ShipTier[],
-): { ganancia: number; margen: number; pesos: boolean } | null {
-  const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
-  if (country === 'CO') {
-    const price = p.sale_price
-    if (!(price > 0) || !(coTrm > 0) || !(p.total_cost > 0)) return null
-    const comision = price * num('ml_comision', 15.5) / 100
-    const envio    = price >= num('ml_umbral_envio', 60000) ? num('ml_envio_alto', 8000) : num('ml_envio_bajo', 2600)
-    const reten    = price * num('ml_reten', 1.91) / 100
-    const ganancia = (price - comision - envio - reten) - p.total_cost * coTrm
-    return { ganancia, margen: ganancia / price * 100, pesos: true }
-  }
-  // VE: precio publicado calculado EN VIVO (base × exceso actual × (1−descuento)), igual que
-  // la calculadora — así no se desincroniza con el final_price_usd guardado (que queda viejo
-  // cuando cambia el exceso o no se re-guardó el producto).
-  if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0)) return null
-  const finalLive = liveFinalVE(p, veRate.excess ?? 0, discount)
-  if (!(finalLive > 0)) return null
-  const realUsd  = finalLive * veRate.official / veRate.parallel
-  // Envío según el mínimo del rango de peso del producto (tabla de MercadoEnvíos).
-  const envio    = shippingCostVE(finalLive, p.weight_kg, shipTable ?? parseShippingTable(ml.ml_shipping_table),
-                                  num('ml_envio', 0.65), num('ml_umbral', 5))
-  const neto     = realUsd * (1 - num('ml_comision', 12) / 100) - envio
-  const ganancia = neto - p.total_cost
-  return { ganancia, margen: ganancia / realUsd * 100, pesos: false }
 }
 
 // Etiqueta de estado de MercadoEnvíos (envío gratis por peso).
@@ -457,11 +400,34 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   // ── batch category ──
   async function handleBatch() {
     if (!batchCat || selected.length === 0) return
-    const res = await fetch('/api/products/batch-category', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product_ids: selected, profit_category_id: batchCat }),
-    })
+    const cat = profitCategories.find(c => c.id === batchCat)
+    let res: Response
+    if (country === 'VE' && veRate && cat) {
+      // VE: además de la categoría, recalcula y guarda los precios (base, publicado,
+      // final, Bs y el precio de inventario). Antes solo cambiaba la categoría: el
+      // catálogo se veía bien porque calcula en vivo, pero ventas, reportes y la hoja
+      // de inventario seguían leyendo el precio viejo guardado.
+      const items = products.filter(p => selected.includes(p.id)).map(p => {
+        const q = { ...p, profit_percentage: cat.profit_percentage }
+        return {
+          product_id: p.id,
+          profit_category_id: cat.id,
+          ...storedPricesVE(p.total_cost, cat.profit_percentage, veRate.excess ?? 0, effDiscountFor(q), veRate.official),
+        }
+      })
+      res = await fetch('/api/products/reprice', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+    } else {
+      // CO: los precios guardados en USD no se usan (el de venta en pesos es manual).
+      res = await fetch('/api/products/batch-category', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_ids: selected, profit_category_id: batchCat }),
+      })
+    }
     if (!res.ok) { alert('Error al actualizar categorías'); return }
     const listRes = await fetch('/api/products')
     setProducts(await listRes.json())
@@ -592,6 +558,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             className="px-3 py-1.5 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 whitespace-nowrap"
           >
             📦 MercadoEnvíos
+          </Link>
+        )}
+        {country === 'VE' && (
+          <Link
+            href="/productos/margenes"
+            title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría"
+            className="px-3 py-1.5 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 whitespace-nowrap"
+          >
+            📉 Márgenes &lt; $5
           </Link>
         )}
 
