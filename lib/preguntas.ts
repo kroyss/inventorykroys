@@ -136,6 +136,7 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
 
 // Revisión del texto: lib/preguntasTexto.ts (se usa también en el navegador).
 export { problemasDelTexto } from '@/lib/preguntasTexto'
+import { leerPlantillas, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 // ── Contexto para la IA ─────────────────────────────────────────────────────
 interface ItemML {
@@ -154,6 +155,7 @@ export interface Contexto {
   producto: { code: string; name: string; stock: number; precio_usd: number | null } | null
   tasa: number | null
   politicas: string
+  plantillas: Plantilla[]
   notas: string[]
   mismoItem: { p: string; r: string }[]
   parecidas: { p: string; r: string }[]
@@ -189,6 +191,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   const { rows: [tasa] } = await db.query(
     `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)
   const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)
+  const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
   const { rows: notas } = await db.query(
     `SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [q.item_id])
   const { rows: mismo } = await db.query(
@@ -207,6 +210,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol?.value ?? '',
+    plantillas: leerPlantillas(pl?.value),
     notas: notas.map(n => n.texto),
     mismoItem: mismo, parecidas,
   }
@@ -253,6 +257,13 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
     L.push('\nSTOCK REAL: esta publicación no está vinculada a un producto del sistema (no afirmes disponibilidad sin verla).')
   }
   if (c.politicas.trim()) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${c.politicas.trim()}`)
+  const precio = c.producto?.precio_usd ?? null
+  const aplican = c.plantillas.filter(p => plantillaAplica(p, precio))
+  if (aplican.length) {
+    L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR que aplican a este producto${precio !== null ? ` (precio $${precio.toFixed(2)})` : ''}. ` +
+      `Si la pregunta es de disponibilidad, precio, envío o retiro, usa la que corresponda casi tal cual (solo ajusta lo mínimo):\n` +
+      aplican.map(p => `- [${p.titulo}] (${condicionPlantilla(p)}): ${p.texto}`).join('\n'))
+  }
   if (c.notas.length) L.push(`\nDATOS QUE EL VENDEDOR ANOTÓ DE ESTA PUBLICACIÓN:\n- ${c.notas.join('\n- ')}`)
   const par = (xs: { p: string; r: string }[]) => xs.map(x => `P: ${x.p}\nR: ${x.r}`).join('\n\n')
   if (c.mismoItem.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR EN ESTA MISMA PUBLICACIÓN:\n${par(c.mismoItem)}`)

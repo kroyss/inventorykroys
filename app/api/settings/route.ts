@@ -10,6 +10,7 @@ const ALLOWED = new Set([
   'ml_cuentas',                                      // cuentas de MercadoLibre de la empresa (JSON)
   'despacho_remitente',                              // remitente del manifiesto (vacío = nombre de la empresa)
   'preguntas_politicas',                             // Preguntas ML: políticas que usa la IA (texto libre)
+  'preguntas_plantillas',                            // Preguntas ML: respuestas rápidas (JSON)
   'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten', // CO
   'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)
   'bono_meta_1', 'bono_meta_2', 'bono_meta_3',       // Bonos: metas de ventas del mes

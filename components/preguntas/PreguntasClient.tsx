@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { problemasDelTexto } from '@/lib/preguntasTexto'
+import { problemasDelTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 interface Pregunta {
   id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null
@@ -12,6 +12,7 @@ interface Pregunta {
   borrador_web: boolean; borrador_at: string | null
   cuenta: string; respondida_por: string | null
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
+  producto_precio: number | null
 }
 
 // Link a la publicación: el que trajo ML o, si ML no dejó leerla, armado con el código.
@@ -47,6 +48,7 @@ interface Datos {
   preguntas: Pregunta[]; total: number; page: number; tam: number
   contadores: { pendientes: number; respondidas: number; cerradas_sin_respuesta: number }
   cuentas: Cuenta[]; configuracion: { ml: boolean; ia: boolean }
+  plantillas: Plantilla[]
 }
 type Vista = 'pendientes' | 'respondidas' | 'cuentas'
 
@@ -145,7 +147,12 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       ]} />
 
       {vista === 'cuentas' ? (
-        datos ? <CuentasYPoliticas cuentas={datos.cuentas} mlListo={datos.configuracion.ml} onCambio={cargar} /> : <Cargando />
+        datos ? (
+          <div className="space-y-4">
+            <Plantillas iniciales={datos.plantillas} onGuardado={cargar} />
+            <CuentasYPoliticas cuentas={datos.cuentas} mlListo={datos.configuracion.ml} onCambio={cargar} />
+          </div>
+        ) : <Cargando />
       ) : !datos ? <Cargando /> : sinCuentas && datos.total === 0 ? (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
           <EmptyState message="Todavía no hay cuentas de MercadoLibre conectadas."
@@ -167,7 +174,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
           ) : vista === 'pendientes' ? (
             <div className="space-y-3">
               {datos.preguntas.map(p => (
-                <TarjetaPendiente key={p.id} p={p} iaLista={datos.configuracion.ia}
+                <TarjetaPendiente key={p.id} p={p} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
                   onRespondida={msg => { setAviso(msg); cargar() }} />
               ))}
             </div>
@@ -186,8 +193,8 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
 }
 
 // ── Pregunta sin responder ─────────────────────────────────────────────────
-function TarjetaPendiente({ p, iaLista, onRespondida }: {
-  p: Pregunta; iaLista: boolean; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
+function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
+  p: Pregunta; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
 }) {
   const confirm = useConfirm()
   const [texto, setTexto] = useState(p.borrador ?? '')
@@ -268,6 +275,26 @@ function TarjetaPendiente({ p, iaLista, onRespondida }: {
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre la rechazaría: {problemas.join(' · ')}</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
+
+      {plantillas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-neutral-400 mr-1">Respuestas rápidas:</span>
+          {plantillas.map((pl, i) => {
+            const aplica = plantillaAplica(pl, p.producto_precio)
+            const condicionada = pl.precio_desde != null || pl.precio_hasta != null
+            return (
+              <button key={i} type="button" onClick={() => { setTexto(pl.texto); setMeta({ confianza: null, falta: null, web: false }) }}
+                title={`${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                  aplica && condicionada ? 'bg-lime-50 border-lime-300 text-lime-900 hover:bg-lime-100'
+                  : aplica ? 'bg-white border-neutral-300 text-neutral-700 hover:border-neutral-500'
+                  : 'bg-white border-neutral-200 text-neutral-400 hover:text-neutral-600'}`}>
+                {aplica && condicionada && '✓ '}{pl.titulo}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <footer className="flex flex-wrap items-center gap-2">
         <button onClick={() => proponer(false)} disabled={!iaLista || !!pidiendo} className="btn-secondary text-sm">
@@ -394,5 +421,67 @@ function CuentasYPoliticas({ cuentas, mlListo, onCambio }: { cuentas: Cuenta[]; 
         </div>
       </section>
     </div>
+  )
+}
+
+// ── Respuestas rápidas (editor) ────────────────────────────────────────────
+function Plantillas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuardado: () => void }) {
+  const [lista, setLista] = useState<Plantilla[]>(iniciales)
+  const [guardando, setGuardando] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+  const num = (v: string) => v.trim() === '' ? null : Number(v.replace(',', '.'))
+  const cambiar = (i: number, c: Partial<Plantilla>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
+
+  const guardar = async () => {
+    const limpias = lista.map(p => ({ ...p, titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
+    const malas = limpias.filter(p => problemasDelTexto(p.texto).length)
+    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto).join(', ')}` }); return }
+    setGuardando(true)
+    const r = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preguntas_plantillas: JSON.stringify(limpias) }),
+    })
+    setGuardando(false)
+    if (!r.ok) { setMsg({ ok: false, t: 'No se pudo guardar' }); return }
+    setLista(limpias); setMsg({ ok: true, t: 'Guardadas' }); onGuardado()
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-neutral-900">Respuestas rápidas</h2>
+          <p className="text-xs text-neutral-500">Salen como botones en cada pregunta (un clic y la puedes retocar). La IA también las usa. Con precio, se marca en verde la que corresponde al producto.</p>
+        </div>
+        <button onClick={() => setLista(l => [...l, { titulo: '', texto: '', precio_desde: null, precio_hasta: null }])}
+          className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
+      </div>
+      {lista.length === 0 && <p className="text-sm text-neutral-400">Todavía no hay respuestas rápidas.</p>}
+      <div className="space-y-3">
+        {lista.map((p, i) => (
+          <div key={i} className="border border-neutral-200 rounded-lg p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto (ej. Disponible + envío gratis)"
+                className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
+              <label className="text-xs text-neutral-500 flex items-center gap-1">desde $
+                <input value={p.precio_desde ?? ''} onChange={e => cambiar(i, { precio_desde: num(e.target.value) })} inputMode="decimal"
+                  className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
+              </label>
+              <label className="text-xs text-neutral-500 flex items-center gap-1">menos de $
+                <input value={p.precio_hasta ?? ''} onChange={e => cambiar(i, { precio_hasta: num(e.target.value) })} inputMode="decimal"
+                  className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
+              </label>
+              <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
+            </div>
+            <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={2000}
+              placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        {msg && <span className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.t}</span>}
+        <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
+      </div>
+    </section>
   )
 }

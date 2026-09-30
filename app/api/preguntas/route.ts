@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlConfigurado } from '@/lib/ml'
 import { iaConfigurada } from '@/lib/preguntas'
+import { leerPlantillas } from '@/lib/preguntasTexto'
 
 // GET /api/preguntas?vista=pendientes|respondidas&page=1&q=
 // Bandeja de la empresa + contadores + cuentas conectadas + qué falta configurar.
@@ -25,16 +26,18 @@ export async function GET(req: NextRequest) {
               p.fecha, p.respuesta, p.respuesta_estado, p.respuesta_fecha,
               p.borrador, p.borrador_confianza, p.borrador_falta, p.borrador_web, p.borrador_at,
               c.nickname AS cuenta, u.full_name AS respondida_por,
-              pr.code AS producto_code, pr.name AS producto_nombre, pr.stock AS producto_stock
+              pr.code AS producto_code, pr.name AS producto_nombre, pr.stock AS producto_stock,
+              pr.precio AS producto_precio
        FROM ml_preguntas p
        JOIN ml_conexiones c ON c.id = p.conexion_id
        LEFT JOIN users u ON u.id = p.respondida_por
        -- Producto del sistema por su código ML (se guarda sin el prefijo: MLV768007052 → 768007052)
        LEFT JOIN LATERAL (
-         SELECT pd.code, pd.name, COALESCE(i.quantity, 0)::int AS stock
+         SELECT pd.code, pd.name, COALESCE(i.quantity, 0)::int AS stock, pp.final_price_usd::float AS precio
          FROM product_ml_codes m
          JOIN products pd ON pd.id = m.product_id
          LEFT JOIN inventory i ON i.product_id = pd.id
+         LEFT JOIN product_pricing pp ON pp.product_id = pd.id
          WHERE m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '')
          ORDER BY pd.is_active DESC LIMIT 1
        ) pr ON TRUE
@@ -48,10 +51,12 @@ export async function GET(req: NextRequest) {
        FROM ml_preguntas`)
     const { rows: [tot] } = await s.db.query(
       `SELECT COUNT(*)::int AS n FROM ml_preguntas p WHERE ${filtroEstado}${filtroTexto}`, params)
+    const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
     const { rows: cuentas } = await s.db.query(
       `SELECT id, nickname, estado, ultima_sync, ultimo_error FROM ml_conexiones ORDER BY nickname`)
     return NextResponse.json({
       preguntas: rows, total: tot.n, page, tam: TAM, contadores: n, cuentas,
+      plantillas: leerPlantillas(pl?.value),
       configuracion: { ml: mlConfigurado(), ia: iaConfigurada() },
     })
   } catch (err) {
