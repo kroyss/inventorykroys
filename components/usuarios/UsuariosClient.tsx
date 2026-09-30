@@ -86,7 +86,7 @@ export default function UsuariosClient({ country }: { country: Country }) {
       />
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
-      {aviso && <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded text-sm">{aviso}</div>}
+      {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
 
       {nuevo && <NuevoUsuario onCancelar={() => setNuevo(false)} onCreado={(msg) => { setNuevo(false); setAviso(msg); cargar() }} />}
       {claveDe && (

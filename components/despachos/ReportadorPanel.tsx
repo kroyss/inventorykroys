@@ -119,7 +119,7 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
           <h2 className="text-sm font-semibold text-neutral-800">Reportador</h2>
           <p className="text-xs text-neutral-500">
             Programa que le escribe a cada comprador su guía. Toma los envíos de las jornadas cerradas.
-            {' '}<span className={pendientes ? 'text-blue-700 font-medium' : ''}>
+            {' '}<span className={pendientes ? 'text-sky-700 font-medium' : ''}>
               {pendientes ? `${pendientes} envío(s) por reportar.` : 'Nada pendiente.'}
             </span>
           </p>
@@ -141,10 +141,10 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="px-4 py-3 space-y-2 text-sm">
         {codigos.map(c => (
-          <div key={c.id} className="flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+          <div key={c.id} className="flex flex-wrap items-center gap-2 bg-neutral-50 border border-neutral-200 rounded px-3 py-2">
             <span>Código para vincular:</span>
             <span className="font-mono text-lg font-bold tracking-widest">{c.codigo}</span>
-            <span className="text-xs text-blue-700">
+            <span className="text-xs text-sky-700">
               Escríbelo en el Reportador del equipo. Vence {c.codigo_expira ? `a las ${new Date(c.codigo_expira).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit' })}` : 'pronto'}.
             </span>
           </div>
@@ -183,12 +183,12 @@ function FilaEquipo({ e, isAdmin, pendientes, configOk, onReportar, onDetener, o
   const o = e.orden
   let linea: React.ReactNode = null
   if (o?.estado === 'PENDIENTE') {
-    linea = <span className="text-blue-700">
+    linea = <span className="text-sky-700">
       Esperando que el equipo lo tome ({ORIGEN_TXT[o.origen]}{o.pedida_por ? ` por ${o.pedida_por}` : ''}, {fechaHora(o.created_at)})
       {!e.en_linea && ' · el equipo está desconectado'}
     </span>
   } else if (o?.estado === 'EN_CURSO') {
-    linea = <span className="text-blue-700 font-medium">
+    linea = <span className="text-sky-700 font-medium">
       ⏳ Reportando{e.actividad ? `: ${e.actividad}` : '…'}{o.detener ? ' · deteniendo…' : ''}
     </span>
   } else if (o?.terminada_at) {

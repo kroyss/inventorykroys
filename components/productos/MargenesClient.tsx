@@ -213,7 +213,7 @@ export default function MargenesClient({ initialProducts, categories }: {
             unidad (en dólares) que tenía.
           </p>
         </div>
-        <Link href="/productos" className="text-sm text-blue-600 hover:underline">← Productos</Link>
+        <Link href="/productos" className="text-sm text-neutral-700 underline underline-offset-2 hover:text-neutral-900">← Productos</Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -223,7 +223,7 @@ export default function MargenesClient({ initialProducts, categories }: {
         <KPICard compact label="Con sugerencia de subir" value={kpi.sugeridos} />
       </div>
 
-      <div className="text-xs bg-blue-50 border border-blue-100 text-blue-800 rounded-lg px-3 py-2 leading-relaxed">
+      <div className="text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded-lg px-3 py-2 leading-relaxed">
         Los que siguen con <b>20% o más</b> no tienen sugerencia a propósito: con el mínimo en $3, tienen envío
         gratis comprando una sola unidad y eso vende más. Podés elegir otra categoría en cualquier fila.
         Sin peso registrado, el envío usa el umbral global de Ajustes.

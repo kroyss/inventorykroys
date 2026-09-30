@@ -7,6 +7,7 @@ import {
 } from '@/lib/invoices'
 import { Combobox } from '@/components/ui/Combobox'
 import NumberInput from '@/components/ui/NumberInput'
+import { DateField } from '@/components/ui/DateField'
 
 interface Line {
   product_id: number | null
@@ -373,7 +374,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                 </div>
                 <div>
                   <label className="text-xs text-neutral-500">Fecha</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+                  <DateField value={date} onChange={(v: string) => setDate(v)} className={inputCls} />
                 </div>
                 <div>
                   <label className="text-xs text-neutral-500">Tasa BCV (Bs/$)</label>

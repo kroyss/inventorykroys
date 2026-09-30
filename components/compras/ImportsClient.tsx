@@ -638,7 +638,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
 
       {/* Filtro que llegó por URL desde el dashboard — visible y quitable. */}
       {urlStatuses && (
-        <div className="mb-3 flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 py-2">
+        <div className="mb-3 flex items-center gap-2 text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded-lg px-3 py-2">
           <span>
             Mostrando solo: <b>{urlStatuses.map(s => STATUS_LABELS[s] ?? s).join(', ')}</b>
           </span>
@@ -718,7 +718,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 const receiving = ['PARCIAL','RECIBIDA'].includes(o.status)
                 return (
                   <tr key={o.id} onClick={() => setSelected(o)}
-                    className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === o.id ? 'bg-blue-50' : ''}`}>
+                    className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === o.id ? 'bg-lime-50/70' : ''}`}>
                     <td className="px-3 py-2 font-mono text-xs font-bold text-neutral-900 whitespace-nowrap">
                       {o.order_number}
                       {o.file_count > 0 && <span className="ml-1 text-neutral-500 font-normal">📎{o.file_count}</span>}
@@ -732,11 +732,11 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                           {i.product_name} <span className="text-neutral-400">x{i.quantity}</span>
                         </span>
                       ))}
-                      {o.notes && <span className="text-purple-600 italic"> · {o.notes}</span>}
+                      {o.notes && <span className="text-neutral-500 italic"> · {o.notes}</span>}
                     </td>
                     <td className="px-1 py-2 text-right whitespace-nowrap">
                       {receiving ? (
-                        <span className={recProds >= prods ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
+                        <span className={recProds >= prods ? 'text-green-600 font-medium' : 'text-amber-500 font-medium'}>
                           {recProds}/{prods}
                         </span>
                       ) : (
@@ -745,7 +745,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     </td>
                     <td className="px-1 py-2 text-right whitespace-nowrap">
                       {receiving ? (
-                        <span className={recUnits >= units ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
+                        <span className={recUnits >= units ? 'text-green-600 font-medium' : 'text-amber-500 font-medium'}>
                           {recUnits}/{units}
                         </span>
                       ) : (
@@ -946,7 +946,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                         </button>
                         <div className="text-[11px] text-neutral-400 mt-1">
                           Completá tracking + contenedor + transportista arriba en "Datos de envío" (≥1 foto también) para poder pasar a <b>tránsito</b>.
-                          {(selected.file_count ?? 0) < 1 && <span className="text-orange-500"> ⚠ Falta adjuntar foto.</span>}
+                          {(selected.file_count ?? 0) < 1 && <span className="text-amber-500"> ⚠ Falta adjuntar foto.</span>}
                         </div>
                       </div>
                     )}
@@ -1044,7 +1044,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                   <div className="text-xs text-neutral-500 mb-2">Notas (guardar sin cambiar estado)</div>
                   <textarea value={notesInput} onChange={e => setNotesInput(e.target.value)}
                     rows={3}
-                    className="w-full border rounded px-3 py-2 text-sm text-purple-600 italic" />
+                    className="w-full border rounded px-3 py-2 text-sm text-neutral-500 italic" />
                   <div className="mt-2 flex justify-end">
                     <button onClick={saveNotes} disabled={busy} className="btn-secondary text-sm">Guardar notas</button>
                   </div>
@@ -1052,7 +1052,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
               ) : selected.notes ? (
                 <div className="bg-white rounded-lg border shadow-sm p-4">
                   <div className="text-xs text-neutral-500 mb-1">Notas</div>
-                  <div className="text-sm text-purple-600 italic whitespace-pre-line">{selected.notes}</div>
+                  <div className="text-sm text-neutral-500 italic whitespace-pre-line">{selected.notes}</div>
                 </div>
               ) : null}
 
@@ -1062,7 +1062,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                   Productos ({selected.items.length})
                 </div>
                 <table className="w-full text-sm">
-                  <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+                  <thead className="bg-neutral-50 text-xs text-neutral-500">
                     <tr>
                       <th className="px-3 py-2 text-left">Producto</th>
                       <th className="px-3 py-2 text-right">Cant.</th>
@@ -1109,7 +1109,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
             </div>
             <div className="p-4">
               <table className="w-full text-sm">
-                <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+                <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
                     <th className="px-3 py-2 text-left">Producto</th>
                     <th className="px-3 py-2 text-right">Pedido</th>
@@ -1221,7 +1221,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                   <div className="flex items-center justify-between mb-3 text-xs">
                     <span className="text-neutral-500">{visSel.size} de {visFiles.length} seleccionadas</span>
                     <div className="flex gap-2">
-                      <button onClick={() => setVisSel(new Set(visFiles.map(f => f.id)))} className="text-blue-600 hover:underline">Todas</button>
+                      <button onClick={() => setVisSel(new Set(visFiles.map(f => f.id)))} className="text-neutral-700 underline underline-offset-2 hover:text-neutral-900">Todas</button>
                       <button onClick={() => setVisSel(new Set())} className="text-neutral-500 hover:underline">Ninguna</button>
                     </div>
                   </div>

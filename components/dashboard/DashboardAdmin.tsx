@@ -12,6 +12,7 @@ import type { Country } from '@/lib/types'
 import { KPICard, PageHeader, Cargando, chipCls } from '@/components/ui'
 import BonusPipeline from './BonusPipeline'
 import RateBar from './RateBar'
+import { DateField } from '@/components/ui/DateField'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -187,10 +188,10 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
               </button>
             ))}
             <span className="w-px h-5 bg-neutral-200 mx-1" />
-            <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)}
+            <DateField value={dateFrom} max={dateTo} onChange={(v: string) => setDateFrom(v)}
               className={`border rounded-lg px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
             <span className="text-xs text-neutral-400">–</span>
-            <input type="date" value={dateTo} min={dateFrom} max={todayStr()} onChange={e => setDateTo(e.target.value)}
+            <DateField value={dateTo} min={dateFrom} max={todayStr()} onChange={(v: string) => setDateTo(v)}
               className={`border rounded-lg px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
             <button onClick={applyCustom} className={chipCls(period === 'custom')}>
               Aplicar

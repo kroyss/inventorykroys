@@ -6,6 +6,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
 import { usePersistedTab } from '@/lib/usePersistedTab'
+import { DateField, MonthField } from '@/components/ui/DateField'
 
 const CURRENCIES = ['USD', 'COP', 'VES'] as const
 
@@ -131,8 +132,7 @@ export default function FinanzasClient() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <input type="month" value={month} onChange={e => setMonth(e.target.value)}
-                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+              <MonthField value={month} onChange={(v: string) => setMonth(v)} />
               {/* switch país */}
               <div className="flex rounded-lg border border-neutral-200 overflow-hidden text-sm">
                 {([['all', 'Ambos'], ['VE', 'VE'], ['CO', 'CO']] as const).map(([v, label]) => (
@@ -155,7 +155,7 @@ export default function FinanzasClient() {
             <KPICard compact label="Sobrante" value={`$${money(neto)}`} tone={neto >= 0 ? 'neutro' : 'problema'} />
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
-            Ventas, compras locales e importaciones se traen automáticamente del sistema (etiqueta <span className="text-blue-600">auto</span>). Agrega a mano sueldos, comisiones, envíos, etc. Todo consolidado en USD · COP/USD {capital?.rates.cop ?? '—'}.
+            Ventas, compras locales e importaciones se traen automáticamente del sistema (etiqueta <span className="text-sky-600">auto</span>). Agrega a mano sueldos, comisiones, envíos, etc. Todo consolidado en USD · COP/USD {capital?.rates.cop ?? '—'}.
           </p>
 
           {/* Tabla — libro de movimientos */}
@@ -183,7 +183,7 @@ export default function FinanzasClient() {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {m.category_name ?? <span className="text-neutral-300">—</span>}
-                        {m.source === 'auto' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">auto</span>}
+                        {m.source === 'auto' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-600">auto</span>}
                       </td>
                       <td className="px-3 py-2 text-neutral-500 max-w-[16rem] truncate" title={[m.description, m.account_name].filter(Boolean).join(' · ')}>
                         {m.description ?? ''}
@@ -224,8 +224,7 @@ export default function FinanzasClient() {
       {tab === 'cierre' && summary && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <input type="month" value={month} onChange={e => setMonth(e.target.value)}
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+            <MonthField value={month} onChange={(v: string) => setMonth(v)} />
             <span className="text-xs text-neutral-400">
               Consolidado en USD · COP/USD {summary.rates.cop} · VES/USD {summary.rates.ves || '—'}
             </span>
@@ -320,7 +319,7 @@ export default function FinanzasClient() {
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Mercancía en tránsito</div>
-              <div className="text-sm">costo <span className="font-bold text-blue-700">${money(capital.transito)}</span></div>
+              <div className="text-sm">costo <span className="font-bold text-sky-700">${money(capital.transito)}</span></div>
               <div className="text-[10px] text-neutral-400">VE ${money(capital.transitoVE)} · CO ${money(capital.transitoCO)}</div>
               <div className="text-sm mt-0.5">venta <span className="font-bold text-green-700">${money(capital.transitoSale)}</span> <span className="text-[10px] text-neutral-400">est. ×{capital.transitoFactor}</span></div>
               <div className="text-[10px] text-neutral-400">importac.+locales 100% pagadas, sin recibir</div>
@@ -331,7 +330,7 @@ export default function FinanzasClient() {
             </div>
             <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
               <div className="text-xs text-neutral-500 mb-1">Deudas / Reservas (−)</div>
-              <div className="text-lg font-bold text-orange-600">${money(capital.reservas)}</div>
+              <div className="text-lg font-bold text-amber-600">${money(capital.reservas)}</div>
             </div>
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
@@ -371,11 +370,11 @@ export default function FinanzasClient() {
                   {capital.accounts.map((a, i) => (
                     <tr key={a.id} className={`border-b border-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                       <td className="px-3 py-2 text-neutral-800">
-                        {a.name}{a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">deuda/reserva</span>}
+                        {a.name}{a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">deuda/reserva</span>}
                       </td>
                       <td className="px-3 py-2 text-center text-neutral-500">{a.currency}</td>
                       <td className="px-3 py-2 text-right text-neutral-600">{money(a.balance)}</td>
-                      <td className={`px-3 py-2 text-right font-semibold ${a.is_reserve ? 'text-orange-600' : 'text-neutral-900'}`}>${money(a.usd)}</td>
+                      <td className={`px-3 py-2 text-right font-semibold ${a.is_reserve ? 'text-amber-600' : 'text-neutral-900'}`}>${money(a.usd)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -394,7 +393,7 @@ export default function FinanzasClient() {
                 <span key={cur}>Liquidez {cur}: <span className="font-semibold text-neutral-900">{money(v)}</span></span>
               ))}
               {Object.entries(reservasPorMoneda).map(([cur, v]) => (
-                <span key={cur}>Deuda/Reserva {cur}: <span className="font-semibold text-orange-600">{money(v)}</span></span>
+                <span key={cur}>Deuda/Reserva {cur}: <span className="font-semibold text-amber-600">{money(v)}</span></span>
               ))}
             </div>
             <button onClick={() => { setAccModal(null); setShowAcc(true) }} className="btn-primary text-sm">+ Cuenta</button>
@@ -419,7 +418,7 @@ export default function FinanzasClient() {
                     <tr key={a.id} className={`border-b border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                       <td className="px-3 py-2 font-medium text-neutral-900">
                         {a.name}
-                        {a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600">deuda/reserva</span>}
+                        {a.is_reserve && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">deuda/reserva</span>}
                       </td>
                       <td className="px-3 py-2 text-center text-neutral-500">{a.currency}</td>
                       <td className="px-3 py-2 text-right font-semibold text-neutral-900 whitespace-nowrap">{money(a.balance)}</td>
@@ -632,7 +631,7 @@ function MovementModal({ initial, categories, accounts, busy, onClose, onSave, o
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-neutral-500 mb-1">Fecha</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              <DateField value={date} onChange={(v: string) => setDate(v)}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
             </div>
             <div>

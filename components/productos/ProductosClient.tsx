@@ -742,7 +742,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           <div className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl flex flex-col transition-transform duration-200 ${mounted ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 shrink-0">
               <h2 className="font-bold text-neutral-900">
-                {modal === 'create' ? 'Nuevo Producto' : 'Editar Producto'}
+                {modal === 'create' ? 'Nuevo producto' : 'Editar producto'}
               </h2>
               <button
                 onClick={closeModal}
@@ -779,7 +779,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
               {/* ── Precios ── */}
               <div className="border border-neutral-200 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Calculadora de precios</p>
+                <p className="text-sm font-semibold text-neutral-800">Calculadora de precios</p>
 
                 {/* costo / envío / total */}
                 <div className="grid grid-cols-3 gap-3">
@@ -840,18 +840,18 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       <p className="text-lg font-bold text-neutral-800">${fmt(totalCost)}</p>
                     </div>
                     {/* Precio Base = precio que se registra en la venta (inventario) */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-                      <p className="text-[11px] text-blue-600 font-medium">Precio de venta (va a Ventas)</p>
-                      <p className="text-lg font-bold text-blue-700">${fmt(basePriceUsd)}</p>
+                    <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+                      <p className="text-[11px] text-neutral-500 font-medium">Precio de venta (va a Ventas)</p>
+                      <p className="text-lg font-bold text-neutral-900">${fmt(basePriceUsd)}</p>
                       <p className="text-[10px] text-neutral-400">Costo Base × {(1 + profitPct / 100).toFixed(2)}</p>
                     </div>
 
                     {country === 'VE' && (
                       <>
                         {/* Precio Exceso ML */}
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
-                          <p className="text-[11px] text-purple-600">Precio Exceso ML ({veRate?.excess ?? 0}%)</p>
-                          <p className="text-lg font-bold text-purple-700">${fmt(suggestedMl)}</p>
+                        <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+                          <p className="text-[11px] text-neutral-500">Precio con exceso ML ({veRate?.excess ?? 0}%)</p>
+                          <p className="text-lg font-bold text-neutral-900">${fmt(suggestedMl)}</p>
                           <p className="text-[10px] text-neutral-400">Base × {(1 + (veRate?.excess ?? 0) / 100).toFixed(2)}</p>
                         </div>
                         {/* Tasas actuales */}
@@ -879,7 +879,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-neutral-700">Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b></span>
-                          <span className="text-[11px] text-blue-600">Rec: {recDiscountLive.toFixed(1)}%</span>
+                          <span className="text-[11px] text-neutral-500">Rec: {recDiscountLive.toFixed(1)}%</span>
                         </div>
                         <div className={`text-[11px] px-2 py-1 rounded border ${shipBadge(formShip).cls}`}>
                           {shipBadge(formShip).label}
@@ -895,9 +895,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     /* Colombia — costo USD, precio de venta en PESOS (sugerido por TRM) */
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-                          <p className="text-[11px] text-blue-600 font-medium">Precio Base (USD)</p>
-                          <p className="text-lg font-bold text-blue-700">${fmt(basePriceUsd)}</p>
+                        <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
+                          <p className="text-[11px] text-neutral-500 font-medium">Precio base (USD)</p>
+                          <p className="text-lg font-bold text-neutral-900">${fmt(basePriceUsd)}</p>
                           <p className="text-[10px] text-neutral-400">Costo × {(1 + profitPct / 100).toFixed(2)}</p>
                         </div>
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
@@ -965,7 +965,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
               {/* ML codes — en una sola línea */}
               <div className="border border-neutral-200 rounded-xl p-4 space-y-2">
-                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                <p className="text-sm font-semibold text-neutral-800">
                   Códigos ML ({country})
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -1059,7 +1059,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
               {/* body */}
               <div className="px-6 py-4 space-y-4 flex-1 overflow-y-auto text-sm">
                 <div>
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Costos</p>
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Costos</p>
                   <div className="grid grid-cols-3 gap-2">
                     <Field label="Costo" value={`$${fmt(v.base_cost)}`} />
                     <Field label="Envío" value={`$${fmt(v.shipping_cost)}`} />
@@ -1068,10 +1068,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Precios</p>
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Precios</p>
                   {country === 'VE' ? (
                     <div className="grid grid-cols-2 gap-2">
-                      <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-blue-700" />
+                      <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-neutral-900" />
                       <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
                       <Field label="Descuento aplicado" value={`${fmt(vEff)}%`} />
                       <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff))}`} accent="text-green-700" />
@@ -1092,7 +1092,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Lo que realmente te queda</p>
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Lo que realmente te queda</p>
                   <MlBreakdown
                     country={country}
                     totalCost={v.total_cost}
@@ -1108,7 +1108,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                 {country === 'VE' && vShip && (
                   <div>
-                    <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">MercadoEnvíos</p>
+                    <p className="text-sm font-semibold text-neutral-800 mb-2">MercadoEnvíos</p>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <label className="text-xs text-neutral-600">Peso (kg)</label>
@@ -1141,7 +1141,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 )}
 
                 <div>
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Inventario</p>
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Inventario</p>
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="Stock" value={int(v.quantity)} accent={v.quantity > 0 ? 'text-neutral-900' : 'text-red-600'} />
                     <Field label="Precio de venta" value={country === 'CO' ? `$${fmtPeso(v.sale_price)}` : `$${fmt(v.sale_price)}`} accent={country === 'CO' ? 'text-green-700' : undefined} />
@@ -1149,7 +1149,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Códigos ML ({country})</p>
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Códigos ML ({country})</p>
                   {v.ml_codes.length > 0 ? (
                     <div className="grid grid-cols-2 gap-2">
                       {v.ml_codes.map(ml => (

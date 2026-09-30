@@ -83,14 +83,14 @@ export default function DashboardUser({ country, bonos }: { country: Country; bo
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Link href="/ventas?new=1"
             className="rounded-xl border-2 border-dashed border-green-300 hover:border-green-500 hover:bg-green-50/30 p-3 transition flex flex-col items-center justify-center text-center">
-            <div className="text-xs font-semibold tracking-wide text-green-700 uppercase">Nueva venta</div>
+            <div className="text-sm font-semibold text-emerald-700">Nueva venta</div>
             <div className="text-2xl font-bold text-green-600 mt-1">+</div>
           </Link>
           <StatCard label="Borrador"        value={saleCounts.borrador}
             accent={saleCounts.borrador   > 0 ? 'text-amber-600' : undefined}
             href="/ventas?estado=BORRADOR" />
           <StatCard label="Pago verificado" value={saleCounts.verificado}
-            accent={saleCounts.verificado > 0 ? 'text-blue-600' : undefined}
+            accent={saleCounts.verificado > 0 ? 'text-neutral-900' : undefined}
             href="/ventas?estado=PAGO_VERIFICADO" />
           <StatCard label="Por descargar"   value={saleCounts.procesada}
             accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
@@ -110,10 +110,10 @@ export default function DashboardUser({ country, bonos }: { country: Country; bo
               /api/dashboard/reception-counts), para que la lista de destino
               muestre exactamente las órdenes del número. */}
           <StatCard label="Local en camino"  value={recv.local}
-            accent={recv.local   > 0 ? 'text-purple-600' : undefined}
+            accent={recv.local   > 0 ? 'text-neutral-900' : undefined}
             href="/compras?tab=local&estado=EN_CAMINO" />
           <StatCard label={`Import en camino${recv.imports_boxes > 0 ? ` · ${recv.imports_boxes} cajas` : ''}`} value={recv.imports}
-            accent={recv.imports > 0 ? 'text-purple-600' : undefined}
+            accent={recv.imports > 0 ? 'text-neutral-900' : undefined}
             href="/compras?tab=import&estado=EN_CAMINO" />
           {/* "Por finalizar" suma locales + importaciones: abre en locales y el
               mismo filtro queda aplicado al cambiar de pestaña. */}
@@ -130,8 +130,8 @@ export default function DashboardUser({ country, bonos }: { country: Country; bo
       {country === 'VE' && rate && (
         <Panel title="Tasas de Cambio">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <RateCard label="Oficial BCV" value={fmt(rate.official_rate)}    sub="Bs/$"   accent="text-blue-600" />
-            <RateCard label="Paralelo"    value={fmt(rate.parallel_rate)}    sub="Bs/$"   accent="text-orange-600" />
+            <RateCard label="Oficial BCV" value={fmt(rate.official_rate)}    sub="Bs/$"   accent="text-neutral-900" />
+            <RateCard label="Paralelo"    value={fmt(rate.parallel_rate)}    sub="Bs/$"   accent="text-amber-600" />
             <RateCard label="Diferencial" value={`${rate.spread_percentage}%`} sub="spread" accent="text-amber-600" />
           </div>
           {rate.rate_date && (
@@ -149,7 +149,7 @@ export default function DashboardUser({ country, bonos }: { country: Country; bo
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4">
-      <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-3">
+      <h2 className="text-sm font-semibold text-neutral-700 mb-3">
         {title}
       </h2>
       {children}

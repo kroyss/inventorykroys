@@ -528,7 +528,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
       {/* Filtro que llegó por URL desde el dashboard — visible y quitable, para
           que no parezca que faltan órdenes. */}
       {urlStatuses && (
-        <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded-lg px-3 py-2">
           <span>
             Mostrando solo: <b>{urlStatuses.map(s => STATUS_LABELS[s] ?? s).join(', ')}</b>
           </span>
@@ -604,7 +604,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               const receiving = ['PARCIAL','RECIBIDA'].includes(o.status)
               return (
                 <tr key={o.id} onClick={() => setSelected(o)}
-                  className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === o.id ? 'bg-blue-50' : ''}`}>
+                  className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === o.id ? 'bg-lime-50/70' : ''}`}>
                   <td className="px-3 py-2 font-mono text-xs font-bold text-neutral-900 whitespace-nowrap">{o.order_number}</td>
                   <td className="px-3 py-2 text-neutral-700 max-w-[12rem] truncate">{o.supplier_name || '—'}</td>
                   <td className="px-3 py-2 text-xs text-neutral-500 max-w-[18rem] truncate cursor-help"
@@ -615,11 +615,11 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                         {i.product_name} <span className="text-neutral-400">x{i.quantity}</span>
                       </span>
                     ))}
-                    {o.notes && <span className="text-purple-600 italic"> · {o.notes}</span>}
+                    {o.notes && <span className="text-neutral-500 italic"> · {o.notes}</span>}
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     {receiving ? (
-                      <span className={recProds >= prods ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
+                      <span className={recProds >= prods ? 'text-green-600 font-medium' : 'text-amber-500 font-medium'}>
                         {recProds}/{prods}
                       </span>
                     ) : (
@@ -628,7 +628,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     {receiving ? (
-                      <span className={recUnits >= units ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
+                      <span className={recUnits >= units ? 'text-green-600 font-medium' : 'text-amber-500 font-medium'}>
                         {recUnits}/{units}
                       </span>
                     ) : (
@@ -671,7 +671,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                 <h3 className="text-xl font-bold text-neutral-800 font-mono">{selected.order_number}</h3>
                 <p className="text-neutral-600 mt-1">{selected.supplier_name}</p>
                 {selected.reopen_count > 0 && (
-                  <p className="text-xs text-orange-600 mt-1">Reabierta {selected.reopen_count} vez(ces)</p>
+                  <p className="text-xs text-amber-600 mt-1">Reabierta {selected.reopen_count} vez(ces)</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -706,7 +706,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               {selected.notes && (
                 <div className="col-span-2">
                   <span className="text-neutral-500">Notas:</span>
-                  <span className="ml-2 text-purple-600 italic">{selected.notes}</span>
+                  <span className="ml-2 text-neutral-500 italic">{selected.notes}</span>
                 </div>
               )}
               {selected.is_incomplete && selected.incomplete_note && (
@@ -802,7 +802,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               <h4 className="font-semibold text-neutral-700 text-sm">Productos ({selected.items.length})</h4>
             </div>
             <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-neutral-500 text-xs uppercase">
+              <thead className="bg-neutral-50 text-neutral-500 text-xs">
                 <tr>
                   <th className="px-4 py-2 text-left">Producto</th>
                   <th className="px-4 py-2 text-right">Cant.</th>
@@ -828,7 +828,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                         const rec = item.total_received_qty || item.received_qty ||
                           (selected.status === 'FINALIZADA' ? item.quantity : 0)
                         return (
-                          <span className={rec >= item.quantity ? 'text-green-600 font-semibold' : 'text-orange-500'}>
+                          <span className={rec >= item.quantity ? 'text-green-600 font-semibold' : 'text-amber-500'}>
                             {rec}/{item.quantity}
                           </span>
                         )
@@ -856,7 +856,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowForm(false)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
             <div className="p-5 border-b flex justify-between shrink-0">
-              <h3 className="font-semibold text-lg">{editId ? 'Editar Orden' : 'Nueva Orden de Compra'}</h3>
+              <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : 'Nueva orden de compra'}</h3>
               <button onClick={() => setShowForm(false)} className="text-neutral-400 hover:text-neutral-700 text-xl">×</button>
             </div>
             <div className="p-5 space-y-4 flex-1 overflow-y-auto">
@@ -921,7 +921,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               {formItems.length > 0 && (
                 <div className="border rounded overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+                    <thead className="bg-neutral-50 text-xs text-neutral-500">
                       <tr>
                         <th className="px-3 py-2 text-left">Producto</th>
                         <th className="px-3 py-2 text-right w-20">Cant.</th>
@@ -1003,7 +1003,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
             <div className="p-5 space-y-4">
               {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
               <table className="w-full text-sm">
-                <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+                <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
                     <th className="px-3 py-2 text-left">Producto</th>
                     <th className="px-3 py-2 text-right">Esperado</th>
@@ -1017,7 +1017,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                         <span className="text-neutral-400 mr-1">{item.product_code}</span>
                         {item.product_name}
                         {item.already_received > 0 && (
-                          <span className="ml-1 text-orange-500">(ya {item.already_received})</span>
+                          <span className="ml-1 text-amber-500">(ya {item.already_received})</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right text-neutral-500">{item.expected - item.already_received}</td>

@@ -1,6 +1,7 @@
 'use client'
 import { ReactNode, useState, useMemo } from 'react'
 import Link from 'next/link'
+import { DateField } from '@/components/ui/DateField'
 
 // ── money / number formatting ──────────────────────────────────────────────
 export const money = (n: number) =>
@@ -312,12 +313,12 @@ export function DateRangeBar({ preset, from, to, onPreset, onFrom, onTo, onApply
         <>
           <div>
             <label className="text-xs text-neutral-500 block">Desde</label>
-            <input type="date" value={from} onChange={e => onFrom(e.target.value)}
+            <DateField value={from} onChange={(v: string) => onFrom(v)}
               className="mt-1 border rounded px-2 py-1 text-sm" />
           </div>
           <div>
             <label className="text-xs text-neutral-500 block">Hasta</label>
-            <input type="date" value={to} onChange={e => onTo(e.target.value)}
+            <DateField value={to} onChange={(v: string) => onTo(v)}
               className="mt-1 border rounded px-2 py-1 text-sm" />
           </div>
           <button onClick={onApply} disabled={loading} className="btn-primary text-sm">

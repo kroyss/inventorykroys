@@ -230,8 +230,8 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard label="Oficial"  value={`Bs ${money(latest.official_rate)}`} />
         <KPICard label="Paralelo" value={`Bs ${money(latest.parallel_rate)}`} />
-        <KPICard label="Spread"   value={`${latest.spread_percentage}%`} accent="text-orange-600" />
-        <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-blue-600" />
+        <KPICard label="Spread"   value={`${latest.spread_percentage}%`} accent="text-amber-600" />
+        <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-neutral-900" />
       </div>
 
       {/* Barra superior (una sola línea): estado+TASA │ edición manual │ tabla envíos │ exceso │ descuento */}
@@ -244,7 +244,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
               <div className="flex items-center gap-2">
                 <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-VE')}</span>
                 {freshness && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                     {freshness.days === 0 ? 'Hoy' : freshness.days === 1 ? 'hace 1 día' : `hace ${freshness.days} días`}
                     {freshness.stale ? ' · desact.' : ''}
                   </span>
@@ -297,7 +297,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
             {excessPreview && (
               <div className="text-sm leading-tight">
                 <div className="text-[10px] text-neutral-500">Desc.</div>
-                <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-blue-600' : 'text-neutral-900'}`}>
+                <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-sky-600' : 'text-neutral-900'}`}>
                   {excessPreview.recommended_discount}%
                 </div>
               </div>
@@ -316,7 +316,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
               className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">OK</button>
             <div className="text-sm leading-tight">
               <div className="text-[10px] text-neutral-500">Rec.</div>
-              <div className="font-bold text-blue-600">{latest.recommended_discount}%</div>
+              <div className="font-bold text-sky-600">{latest.recommended_discount}%</div>
             </div>
           </div>
         </div>
@@ -354,7 +354,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
                 {busy ? 'Guardando…' : '💾 Guardar tabla'}
               </button>
             </div>
-            <a href="/productos/mercadoenvios" className="block mt-3 text-xs text-blue-600 hover:underline">Ir a gestión de pesos →</a>
+            <a href="/productos/mercadoenvios" className="block mt-3 text-xs text-neutral-700 underline underline-offset-2 hover:text-neutral-900">Ir a gestión de pesos →</a>
           </div>
         </div>
       )}
@@ -496,7 +496,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
                     <td className="px-4 py-2 text-right">{r.spread_percentage}%</td>
                     <td className="px-4 py-2 text-right">{r.recommended_discount}%</td>
                     <td className="px-4 py-2 text-center text-xs">
-                      <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{r.source}</span>
+                      <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-sky-100 text-sky-700'}`}>{r.source}</span>
                     </td>
                   </tr>
                 ))}

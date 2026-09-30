@@ -266,7 +266,7 @@ export default function DespachosClient({ isAdmin, reportador }: { isAdmin: bool
           )}
         </div>
       )}
-      {aviso && <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded text-sm">{aviso}</div>}
+      {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
 
       <Dropzone onFiles={f => subir(f, loteDestino)} busy={busy === 'subir'} agregaALote={loteDestino} />
 
@@ -364,7 +364,7 @@ function FilaJornada({ j, abierta, onToggle, onCsv }: {
 
   const partes = [
     j.enviados     ? <span key="e" className="text-green-700">✓ {j.enviados} enviado(s)</span> : null,
-    j.a_reportar   ? <span key="p" className="text-blue-700">{j.a_reportar} pendiente(s)</span> : null,
+    j.a_reportar   ? <span key="p" className="text-sky-700">{j.a_reportar} pendiente(s)</span> : null,
     j.con_problema ? <span key="x" className="text-red-700">⚠ {j.con_problema} con problema</span> : null,
     j.sin_chat     ? <span key="s" className="text-neutral-500">{j.sin_chat} sin chat</span> : null,
     j.por_csv      ? <span key="c" className="text-neutral-500">{j.por_csv} por CSV</span> : null,
@@ -408,7 +408,7 @@ function FilaJornada({ j, abierta, onToggle, onCsv }: {
                     {envios.map(e => {
                       const ui = e.reimpresion
                         ? { label: 'Reimpresión (ya reportado)', cls: 'bg-neutral-100 text-neutral-600' }
-                        : REPORTE_UI[e.reporte_estado ?? ''] ?? { label: 'Pendiente', cls: 'bg-blue-100 text-blue-800' }
+                        : REPORTE_UI[e.reporte_estado ?? ''] ?? { label: 'Pendiente', cls: 'bg-sky-100 text-sky-800' }
                       return (
                         <tr key={e.id} className="border-t border-neutral-100 align-top">
                           <td className="py-1 font-mono">{e.venta}</td>
@@ -537,7 +537,7 @@ function LotePendiente({ lote, busy, onToggle, onRevalidar, onAgregar, onGenerar
                   <td className="px-3 py-2 font-mono text-xs">{e.venta ?? <span className="text-neutral-400">{e.original_name}</span>}</td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {e.guia ?? '—'}
-                    {e.carrier === 'TEALCA' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-sans">Tealca</span>}
+                    {e.carrier === 'TEALCA' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-sans">Tealca</span>}
                   </td>
                   <td className="px-3 py-2 text-xs">{e.remitente?.slice(0, 22) ?? '—'}</td>
                   <td className="px-3 py-2 text-xs">

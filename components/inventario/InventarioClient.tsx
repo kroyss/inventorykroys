@@ -411,8 +411,9 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                     {item.name}
                   </td>
                   <td className={`px-3 py-2 text-right font-semibold num ${item.quantity === 0 && item.status !== 'INACTIVO' ? 'text-red-600' : 'text-neutral-900'}`}>{item.quantity}</td>
-                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-500 num">{item.min_stock || <span className="text-neutral-300">—</span>}</td>}
-                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-500 num">{item.max_stock || <span className="text-neutral-300">—</span>}</td>}
+                  {/* Sin configurar (0): se muestra el recomendado por ventas, en gris y cursiva */}
+                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-600 num">{item.min_stock || <span className="text-neutral-400 italic" title="Sin configurar · recomendado según ventas de 6 meses (4 meses de stock)">{item.min_stock_rec || '—'}</span>}</td>}
+                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-600 num">{item.max_stock || <span className="text-neutral-400 italic" title="Sin configurar · recomendado según ventas de 6 meses (12 meses de stock)">{item.max_stock_rec || '—'}</span>}</td>}
                   <td className="px-3 py-2 text-right text-neutral-700">{priceLabel(item.sale_price || item.final_price_usd)}</td>
                   {isVE && <td className="px-3 py-2 text-right font-medium text-neutral-900 num">${fmt(mlPriceVE(item))}</td>}
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-600">{item.ventas_6m}</td>}
@@ -506,9 +507,9 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
             <div className="flex-1 overflow-y-auto p-5">
               {tab === 'config' && isAdmin && (
                 <div className="space-y-5">
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm">
-                    <p className="font-semibold text-blue-800 mb-1.5">Recomendaciones (ventas 6m: {selected.ventas_6m})</p>
-                    <div className="flex gap-6 text-blue-700">
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 text-sm">
+                    <p className="font-semibold text-neutral-800 mb-1.5">Recomendaciones (ventas 6m: {selected.ventas_6m})</p>
+                    <div className="flex gap-6 text-neutral-700">
                       <span>Min recomendado: <strong>{selected.min_stock_rec}</strong></span>
                       <span>Max recomendado: <strong>{selected.max_stock_rec}</strong></span>
                     </div>
@@ -546,7 +547,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                         <div key={key}>
                           <label className="block text-xs font-medium text-neutral-500 mb-1">
                             {label}
-                            {rec !== null && <span className="ml-1 text-blue-500">(rec: {rec})</span>}
+                            {rec !== null && <span className="ml-1 text-neutral-400">(rec: {rec})</span>}
                           </label>
                           {configEditing ? (
                             <NumberInput
@@ -648,14 +649,14 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                               <td className="px-2 py-1.5">
                                 <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-medium ${
                                   m.movement_type === 'IN'  ? 'bg-green-50 text-green-700' :
-                                  m.movement_type === 'OUT' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'
+                                  m.movement_type === 'OUT' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700'
                                 }`}>
                                   {m.movement_type}
                                 </span>
                               </td>
                               <td className={`px-2 py-1.5 text-right font-medium ${
                                 m.movement_type === 'IN'  ? 'text-green-600' :
-                                m.movement_type === 'OUT' ? 'text-red-600' : 'text-blue-600'
+                                m.movement_type === 'OUT' ? 'text-red-600' : 'text-sky-600'
                               }`}>
                                 {m.movement_type === 'IN' ? '+' : m.movement_type === 'OUT' ? '−' : '='}{Math.abs(m.quantity)}
                               </td>

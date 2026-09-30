@@ -213,12 +213,12 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               {!editing && (
                 <label className={`flex-1 flex items-center gap-2 text-sm rounded-lg border px-3 py-2 cursor-pointer transition-colors font-medium ${
                   isLocal
-                    ? 'bg-orange-500 border-orange-500 text-white'
-                    : 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100'
+                    ? 'bg-amber-500 border-amber-500 text-white'
+                    : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
                 }`}>
                   <input type="checkbox" checked={isLocal}
                     onChange={e => { setIsLocal(e.target.checked); if (e.target.checked) setIsFlex(false) }}
-                    className="accent-orange-600 w-4 h-4" />
+                    className="accent-amber-600 w-4 h-4" />
                   Venta LOCAL
                 </label>
               )}
@@ -283,7 +283,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               <div className="border rounded mt-1 max-h-48 overflow-y-auto bg-white shadow-sm">
                 {filtered.map(p => (
                   <div key={p.product_id} onClick={() => addItem(p)}
-                    className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm flex justify-between border-b last:border-0">
+                    className="px-3 py-2 hover:bg-sky-50 cursor-pointer text-sm flex justify-between border-b last:border-0">
                     <div>
                       <span className="font-mono text-xs text-neutral-400 mr-2">{p.code}</span>
                       {p.name}
@@ -300,7 +300,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
           {items.length > 0 && (
             <div className="border rounded overflow-x-auto">
               <table className="w-full text-sm min-w-[26rem]">
-                <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+                <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
                     <th className="px-3 py-2 text-left">Producto</th>
                     <th className="px-3 py-2 w-20">Cant.</th>

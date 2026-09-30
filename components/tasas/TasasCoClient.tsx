@@ -159,7 +159,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
               <span className="text-neutral-500">Última actualización: </span>
               <span className="font-medium">{parseLocalDate(latest.rate_date).toLocaleDateString('es-CO')}</span>
               {freshness && (
-                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${freshness.stale ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                   {freshness.days === 0 ? 'Hoy' : freshness.days === 1 ? 'hace 1 día' : `hace ${freshness.days} días`}
                   {freshness.stale ? ' · revisar' : ''}
                 </span>
@@ -300,7 +300,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
                     <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-CO') : ''}</td>
                     <td className="px-4 py-2 text-right font-medium">${fmtPeso(r.trm_rate)}</td>
                     <td className="px-4 py-2 text-center text-xs">
-                      <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{r.source}</span>
+                      <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-sky-100 text-sky-700'}`}>{r.source}</span>
                     </td>
                   </tr>
                 ))}

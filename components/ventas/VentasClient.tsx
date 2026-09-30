@@ -9,6 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { itemsTooltip } from '@/lib/itemsTooltip'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
+import { DateField } from '@/components/ui/DateField'
 
 const PAGE_SIZE = 15
 
@@ -369,20 +370,16 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-0 sm:flex-none sm:w-44 focus:outline-none focus:ring-2 focus:ring-neutral-800"
             />
             <div className="flex items-center gap-1">
-              <input
-                type="date"
-                value={dateFrom}
+              <DateField value={dateFrom}
                 max={dateTo || undefined}
-                onChange={e => setDateFrom(e.target.value)}
+                onChange={(v: string) => setDateFrom(v)}
                 title="Desde"
                 className="border border-neutral-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
               />
               <span className="text-neutral-400 text-xs">–</span>
-              <input
-                type="date"
-                value={dateTo}
+              <DateField value={dateTo}
                 min={dateFrom || undefined}
-                onChange={e => setDateTo(e.target.value)}
+                onChange={(v: string) => setDateTo(v)}
                 title="Hasta"
                 className="border border-neutral-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
               />
@@ -463,7 +460,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 const date = s.created_at ? new Date(s.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
                 return (
                   <tr key={s.id} onClick={() => setSelected(s)}
-                    className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === s.id ? 'bg-blue-50' : ''}`}>
+                    className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${idx % 2 ? 'bg-neutral-50/40' : ''} ${selected?.id === s.id ? 'bg-lime-50/70' : ''}`}>
                     <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
                       {excelVisible && (s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA')) && (
                         <input type="checkbox" checked={selection.has(s.id)} onChange={() => toggleSelection(s.id)} />
@@ -479,7 +476,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                           {i.product_name} <span className="text-neutral-400">x{i.quantity}</span>
                         </span>
                       ))}
-                      {s.notes && <span className="text-purple-600 italic"> · {s.notes}</span>}
+                      {s.notes && <span className="text-neutral-500 italic"> · {s.notes}</span>}
                     </td>
                     <td className="px-3 py-2 text-right text-neutral-600 whitespace-nowrap">
                       {s.items.reduce((a, i) => a + i.quantity, 0)}
@@ -512,7 +509,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             const selectable = excelVisible && (s.status === 'PROCESADA' || (redownloadMode && s.status === 'DESCARGADA'))
             return (
               <div key={s.id} onClick={() => setSelected(s)}
-                className={`px-4 py-3 active:bg-neutral-50 cursor-pointer ${selected?.id === s.id ? 'bg-blue-50' : ''}`}>
+                className={`px-4 py-3 active:bg-neutral-50 cursor-pointer ${selected?.id === s.id ? 'bg-lime-50/70' : ''}`}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {selectable && (
@@ -579,7 +576,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               {selected.notes && (
                 <div className="mt-3 text-xs">
                   <div className="text-neutral-500">Notas</div>
-                  <div className="text-purple-600 italic whitespace-pre-line">{selected.notes}</div>
+                  <div className="text-neutral-500 italic whitespace-pre-line">{selected.notes}</div>
                 </div>
               )}
             </div>

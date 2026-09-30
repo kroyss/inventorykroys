@@ -6,6 +6,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import FacturaForm from './FacturaForm'
 import { PageHeader, chipCls } from '@/components/ui'
+import { DateField } from '@/components/ui/DateField'
 
 type Filter = 'all' | 'EMITIDA' | 'ANULADA' | 'RET_PENDIENTE'
 const FILTERS: { key: Filter; label: string }[] = [
@@ -127,7 +128,7 @@ export default function FacturasClient({ userRole }: { userRole: UserRole }) {
               )}
               {!loading && rows.map(r => (
                 <tr key={r.id} onClick={() => openDetail(r.id)}
-                  className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${r.status === 'ANULADA' ? 'text-neutral-400' : ''} ${selected?.id === r.id ? 'bg-blue-50' : ''}`}>
+                  className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${r.status === 'ANULADA' ? 'text-neutral-400' : ''} ${selected?.id === r.id ? 'bg-lime-50/70' : ''}`}>
                   <td className="px-3 py-2 font-mono font-bold">{r.invoice_number}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
                   <td className="px-3 py-2 max-w-[16rem] truncate">
@@ -365,7 +366,7 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
                 </div>
                 <div>
                   <label className="text-xs text-neutral-500">Fecha comprobante</label>
-                  <input type="date" value={retDate} onChange={e => setRetDate(e.target.value)}
+                  <DateField value={retDate} onChange={(v: string) => setRetDate(v)}
                     className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm" />
                 </div>
                 <div>

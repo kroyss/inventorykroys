@@ -405,9 +405,9 @@ function StockSearchBox({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 const PRIO_META: Record<string, { label: string; rank: number; badge: string; row: string }> = {
-  URGENTE:   { label: '🔴 Urgente',  rank: 0, badge: 'bg-red-100 text-red-700',       row: 'bg-red-50/40' },
-  PEDIR:     { label: '🟠 Pedir',    rank: 1, badge: 'bg-orange-100 text-orange-700', row: '' },
-  EN_CAMINO: { label: '🔵 En camino', rank: 2, badge: 'bg-blue-100 text-blue-700',     row: 'opacity-70' },
+  URGENTE:   { label: 'Urgente',  rank: 0, badge: 'bg-red-100 text-red-700',       row: 'bg-red-50/40' },
+  PEDIR:     { label: 'Pedir',    rank: 1, badge: 'bg-amber-100 text-amber-700', row: '' },
+  EN_CAMINO: { label: 'En camino', rank: 2, badge: 'bg-sky-100 text-sky-700',     row: 'opacity-70' },
 }
 
 function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
@@ -598,7 +598,7 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
           <StockSearchBox value={search} onChange={setSearch} />
         </div>
         {sub === 'nuevos' && (
-          <p className="text-xs text-neutral-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+          <p className="text-xs text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2">
             🆕 Recién llegados (menos de 3 meses en inventario). Tienen pocas ventas porque aún
             no tuvieron tiempo de exposición, por eso <b>no</b> se cuentan como remate todavía.
           </p>
@@ -654,7 +654,7 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+            <thead className="bg-neutral-50 text-xs text-neutral-500 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
               <tr>
                 <th className="px-3 py-2 w-8">
                   <input type="checkbox"
@@ -713,7 +713,7 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
                         : <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="px-3 py-2 text-right">{p.stock_actual}</td>
-                    <td className={`px-3 py-2 text-right ${p.en_transito > 0 ? 'text-blue-600 font-medium' : 'text-neutral-300'}`}>{p.en_transito || '—'}</td>
+                    <td className={`px-3 py-2 text-right ${p.en_transito > 0 ? 'text-sky-600 font-medium' : 'text-neutral-300'}`}>{p.en_transito || '—'}</td>
                     {/* Demanda con la que se calculan cobertura y sugerido. Cuando
                         difiere del promedio por calendario es porque el producto
                         estuvo agotado: se marca para que el número no sorprenda. */}
@@ -767,7 +767,7 @@ type StockSub = 'reposicion' | 'remate' | 'nuevos' | 'declive'
 function SubTabs({ sub, setSub, data }: { sub: StockSub; setSub: (s: StockSub) => void; data: any }) {
   return (
     <div className="flex gap-2 flex-wrap">
-      <button onClick={() => setSub('reposicion')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'reposicion' ? 'bg-orange-500 text-white' : 'bg-neutral-100'}`}>
+      <button onClick={() => setSub('reposicion')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'reposicion' ? 'bg-neutral-900 text-white' : 'bg-neutral-100'}`}>
         Reposición ({data.reposicion.length})
       </button>
       <button onClick={() => setSub('declive')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'declive' ? 'bg-amber-500 text-white' : 'bg-neutral-100'}`}>
@@ -776,7 +776,7 @@ function SubTabs({ sub, setSub, data }: { sub: StockSub; setSub: (s: StockSub) =
       <button onClick={() => setSub('remate')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'remate' ? 'bg-red-500 text-white' : 'bg-neutral-100'}`}>
         Remate ({data.remate.length})
       </button>
-      <button onClick={() => setSub('nuevos')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'nuevos' ? 'bg-blue-500 text-white' : 'bg-neutral-100'}`}>
+      <button onClick={() => setSub('nuevos')} className={`px-4 py-2 rounded-lg text-sm ${sub === 'nuevos' ? 'bg-neutral-900 text-white' : 'bg-neutral-100'}`}>
         Nuevos ({(data.nuevos ?? []).length})
       </button>
     </div>
@@ -796,7 +796,7 @@ function TopProductsReport({ rows }: { rows: any[] }) {
     { key: 'total_qty', label: 'Cant.', align: 'right', sortValue: p => p.total_qty,
       render: p => (
         <div className="flex items-center justify-end gap-2">
-          <div className="h-1.5 bg-blue-200 rounded" style={{ width: `${Math.round(p.total_qty / maxQty * 60)}px` }} />
+          <div className="h-1.5 bg-sky-200 rounded" style={{ width: `${Math.round(p.total_qty / maxQty * 60)}px` }} />
           <span>{p.total_qty}</span>
         </div>
       ), total: rs => rs.reduce((a, x) => a + x.total_qty, 0) },
@@ -841,7 +841,7 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
             <option value="import">Solo importación</option>
           </select>
           <span className="text-xs text-neutral-500">
-            {filtered.length} orden{filtered.length === 1 ? '' : 'es'} · <span className="text-orange-600 font-semibold">{totalPend}</span> und pendientes
+            {filtered.length} orden{filtered.length === 1 ? '' : 'es'} · <span className="text-amber-600 font-semibold">{totalPend}</span> und pendientes
           </span>
         </div>
         <button onClick={exportFlat} disabled={filtered.length === 0}
@@ -856,7 +856,7 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
           <div className="overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase text-neutral-500 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+            <thead className="bg-neutral-50 text-xs text-neutral-500 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
               <tr className="border-b border-neutral-100">
                 <th className="px-3 py-2 text-left">Producto</th>
                 <th className="px-3 py-2 text-right w-20">Cant.</th>
@@ -876,7 +876,7 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
                         {o.supplier_name && <span className="text-neutral-500 text-xs"> · {o.supplier_name}</span>}
                         <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-200 text-neutral-700">{o.status}</span>
                       </td>
-                      <td className="px-3 py-1.5 text-right text-xs text-orange-600 font-semibold whitespace-nowrap">{pend} pend.</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-amber-600 font-semibold whitespace-nowrap">{pend} pend.</td>
                     </tr>
                     {o.items.map((i: any, k: number) => (
                       <tr key={k} className="border-t border-neutral-50">

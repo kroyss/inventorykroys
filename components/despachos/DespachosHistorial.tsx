@@ -156,7 +156,7 @@ export default function DespachosHistorial() {
                       <span className="font-medium">
                         {j.closed_at ? fechaHora(j.closed_at) : `Abierta desde ${fechaHora(j.opened_at)}`}
                       </span>
-                      {j.status === 'ABIERTA' && <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-800">En curso</span>}
+                      {j.status === 'ABIERTA' && <span className="px-2 py-0.5 rounded-full text-[10px] bg-sky-100 text-sky-800">En curso</span>}
                       <span className="text-neutral-600">{j.envios} envío(s) · {j.lotes} lote(s)</span>
                       <span className="text-xs text-neutral-400">{j.closed_by ?? j.opened_by ?? ''}</span>
                       <span className="ml-auto" onClick={e => e.stopPropagation()}>

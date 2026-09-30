@@ -93,7 +93,7 @@ export default function SalesMiniChart() {
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4">
       <div className="flex items-baseline justify-between mb-2">
-        <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wide">
+        <h2 className="text-sm font-semibold text-neutral-700">
           Ventas del mes · {data.current_month}
         </h2>
         <div className="text-sm">

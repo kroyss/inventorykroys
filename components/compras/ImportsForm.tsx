@@ -201,7 +201,7 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
               <div className="border rounded mt-1 max-h-48 overflow-y-auto bg-white shadow-sm">
                 {filtered.map(p => (
                   <div key={p.id} onClick={() => addItem(p)}
-                    className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0 flex justify-between gap-2">
+                    className="px-3 py-2 hover:bg-sky-50 cursor-pointer text-sm border-b last:border-0 flex justify-between gap-2">
                     <span className="truncate">
                       <span className="font-mono text-xs text-neutral-400 mr-2">{p.code}</span>
                       {p.name}
@@ -218,7 +218,7 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
           {items.length > 0 && (
             <div className="border rounded">
               <table className="w-full text-sm">
-                <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase">
+                <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr>
                     <th className="px-3 py-2 text-left">Producto</th>
                     <th className="px-3 py-2 w-20">Cant.</th>
