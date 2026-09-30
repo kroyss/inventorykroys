@@ -19,5 +19,5 @@ export const MODULOS_AUTOMATIZACIONES = ['despachos', 'reportador'] as const
 
 // Dirección del Radar (tiempo de ejecución, del lado del servidor).
 export function radarUrl() {
-  return process.env.RADAR_URL ?? 'https://radar.syncsora.com'
+  return process.env.RADAR_URL ?? 'https://radar.elcomerciantedigital.com'
 }
