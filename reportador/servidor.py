@@ -18,8 +18,11 @@ import threading
 
 import requests
 
-VERSION = "1.2.0"
-SERVIDOR_DEFAULT = "https://inventory.syncsora.com"
+VERSION = "1.3.0"
+SERVIDOR_DEFAULT = "https://app.elcomerciantedigital.com"
+# Dominios anteriores del mismo sistema: un equipo vinculado a uno de ellos pasa solo al
+# actual (misma app, misma base, mismo token) la primera vez que abre esta versión.
+SERVIDORES_ANTERIORES = ("https://inventory.syncsora.com",)
 
 BASE = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "SyncsoraReportador")
 CONFIG = os.path.join(BASE, "config.json")
@@ -39,9 +42,13 @@ class ErrorServidor(Exception):
 def leer_config():
     try:
         with open(CONFIG, encoding="utf-8") as f:
-            return json.load(f)
+            cfg = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+    if (cfg.get("servidor") or "").rstrip("/") in SERVIDORES_ANTERIORES:
+        cfg["servidor"] = SERVIDOR_DEFAULT
+        guardar_config(cfg)
+    return cfg
 
 
 def guardar_config(cfg):

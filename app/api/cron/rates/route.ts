@@ -5,7 +5,7 @@ import { refreshVERate, refreshCORate } from '@/lib/ratesRefresh'
 // NO usa sesión. Actualiza AMBOS países en una sola pasada:
 //   - VE: BCV oficial (dolarapi) + paralelo (Binance P2P, fallback dolarapi) → venezuela_exchange_rates
 //   - CO: TRM desde co.dolarapi.com/v1/trm                                  → colombia_exchange_rates
-//   curl -fsS "https://inventory.syncsora.com/api/cron/rates?key=EL_SECRETO"
+//   curl -fsS "https://app.elcomerciantedigital.com/api/cron/rates?key=EL_SECRETO"
 // Cada país en su propio try/catch: si uno falla, el otro igual se actualiza.
 // Idempotente por día: si ya hay una fila 'api' de hoy, la ACTUALIZA (no duplica).
 // La lógica de fetch+upsert vive en lib/ratesRefresh.ts (compartida con el
