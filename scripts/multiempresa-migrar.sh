@@ -67,11 +67,6 @@ echo "$salida" | sed -n 's/.*NOTICE: *//p' | grep -v ': 0 filas' || true
 echo "→ 04 funciones para accesos sin sesión"
 psql_ -d "$NUEVA" < db/multiempresa/04_funciones.sql
 
-if [ "$ENTORNO" = "staging" ]; then
-  echo "→ staging: Reportador y sesiones neutralizados (copia de datos reales)"
-  psql_ -d "$NUEVA" -c "UPDATE reportador_equipos SET token_hash = NULL, codigo = NULL, revocado_at = COALESCE(revocado_at, NOW()); DELETE FROM reportador_ordenes;"
-fi
-
 # ── 3. Clave del rol de la app ────────────────────────────────────────────
 echo "→ clave de inventory_app (desde $ENVFILE)"
 psql_ -d postgres -c "ALTER ROLE inventory_app PASSWORD '$CLAVE_APP';"
@@ -83,5 +78,11 @@ echo "$verif" | grep -E 'FALLA|controles' || true
 if ! echo "$verif" | grep -q ' 0 FALLAS'; then
   echo "✗ La verificación tiene FALLAS: NO seguir con el cambio." >&2
   exit 1
+fi
+# Staging, DESPUÉS de verificar (la verificación compara contra el origen tal cual): la
+# copia trae datos reales, así que el Reportador no puede conectarse ni retomar órdenes.
+if [ "$ENTORNO" = "staging" ]; then
+  echo "→ staging: Reportador neutralizado (copia de datos reales)"
+  psql_ -d "$NUEVA" -c "UPDATE reportador_equipos SET token_hash = NULL, codigo = NULL, revocado_at = COALESCE(revocado_at, NOW()); DELETE FROM reportador_ordenes;"
 fi
 echo "✓ Base $NUEVA lista y verificada en $(( $(date +%s) - T0 )) s"
