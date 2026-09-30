@@ -7,6 +7,7 @@ export const MODULOS = {
   facturas:   'Facturas',
   finanzas:   'Finanzas',
   bonos:      'Bonos del vendedor',
+  preguntas:  'Preguntas de MercadoLibre con IA',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -17,6 +18,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/reportador': 'reportador',
   '/facturas':  'facturas',
   '/finanzas':  'finanzas',
+  '/preguntas': 'preguntas',
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {

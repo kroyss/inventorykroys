@@ -26,8 +26,8 @@ export default async function AutomatizacionesPage() {
       texto: 'Sube las etiquetas de Mercado Envíos (Zoom y Tealca) y salen 4 por hoja con el producto y la nota de cada venta. Manifiesto por transportista.' },
     { href: '/reportador', titulo: 'Reportador', icono: 'reportador', activa: ve && tieneModulo(u, 'despachos') && tieneModulo(u, 'reportador'),
       texto: 'Le escribe a cada comprador su número de guía por la mensajería de MercadoLibre, desde un programa en tu computadora.' },
-    { titulo: 'Preguntas con IA', icono: 'ia', activa: false, pronto: true,
-      texto: 'Central de preguntas de tus publicaciones con respuestas sugeridas por IA, usando tu stock y tus precios.' },
+    { href: '/preguntas', titulo: 'Preguntas con IA', icono: 'ia', activa: tieneModulo(u, 'preguntas'),
+      texto: 'Todas las preguntas de tus cuentas en una bandeja, con respuesta sugerida por IA a partir de tu publicación, tu stock y tus respuestas de siempre.' },
   ]
   return (
     <div className="space-y-5">

@@ -5,7 +5,7 @@
 // El espacio lo decide la ruta; la cuenta, la empresa y los datos son los mismos.
 export type Espacio = 'inventario' | 'automatizaciones'
 
-const RUTAS_AUTOMATIZACIONES = ['/automatizaciones', '/despachos', '/reportador']
+const RUTAS_AUTOMATIZACIONES = ['/automatizaciones', '/despachos', '/reportador', '/preguntas']
 
 export function espacioDe(pathname: string): Espacio {
   return RUTAS_AUTOMATIZACIONES.some(r => pathname === r || pathname.startsWith(r + '/'))
@@ -15,7 +15,7 @@ export function espacioDe(pathname: string): Espacio {
 
 // Módulos que forman el espacio Automatizaciones (si la empresa no tiene ninguno, el
 // espacio no aparece).
-export const MODULOS_AUTOMATIZACIONES = ['despachos', 'reportador'] as const
+export const MODULOS_AUTOMATIZACIONES = ['despachos', 'reportador', 'preguntas'] as const
 
 // Dirección del Radar (tiempo de ejecución, del lado del servidor).
 export function radarUrl() {
