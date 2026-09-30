@@ -25,6 +25,9 @@ services:
       - ETIQUETAS_URL=http://inventory_etiquetas:8000
     env_file:
       - .env.production
+    depends_on:
+      inventory_db:
+        condition: service_healthy
     volumes:
       # Fotos/archivos de importaciones. El legacy las guarda DENTRO del contenedor
       # inventory_backend en /app/uploads (sin volumen). Para que el nuevo las vea,
@@ -47,6 +50,33 @@ services:
       retries: 3
       start_period: 30s
 
+  # Base COMPARTIDA multiempresa (desde el cambio, ver CORTE.md). Contenedor NUEVO y
+  # aparte: las bases viejas inventory_db_ve / inventory_db_co (en /opt/inventory_web) no
+  # se tocan y quedan como vuelta atrás. La app entra con el rol inventory_app (no salta
+  # RLS); postgres solo lo usan los scripts de migración y respaldo.
+  inventory_db:
+    container_name: inventory_db
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${INVENTORY_DB_PASSWORD:?Falta INVENTORY_DB_PASSWORD en /opt/inventory_next/.env}
+      - POSTGRES_DB=postgres
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    networks:
+      - inventory_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   # Módulo Despachos: arma el PDF 4xA4 de etiquetas y el manifiesto con el MISMO código
   # de EtiquetasML / generar_manifiesto (PyMuPDF fijado en requirements.txt). Interno:
   # sin `ports`, solo lo alcanza inventory_next por la red. No guarda nada en disco.
@@ -68,6 +98,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+volumes:
+  inventory_db_data:
 
 networks:
   inventory_net:

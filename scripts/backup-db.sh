@@ -28,6 +28,11 @@ declare -A DBS=(
   [ve]="inventory_db_ve:inventory_ve"
   [co]="inventory_db_co:inventory_co"
 )
+# Base compartida multiempresa (desde el cambio): se respalda si su contenedor existe.
+# Las viejas se siguen respaldando mientras existan (son la vuelta atrás).
+if docker inspect inventory_db >/dev/null 2>&1; then
+  DBS[multi]="inventory_db:inventory"
+fi
 
 ETIQUETA="${1:-}"
 if [ -n "$ETIQUETA" ]; then
