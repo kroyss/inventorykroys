@@ -18,7 +18,7 @@ export default async function ReportadorPage() {
   return (
     <div className="space-y-5">
       <PageHeader title="Reportador" subtitle="Le escribe a cada comprador su número de guía en MercadoLibre." />
-      <GuiasTealca isAdmin={isAdmin} onGuardado={() => {}} />
+      <GuiasTealca isAdmin={isAdmin} />
       <ReportadorPanel isAdmin={isAdmin} />
     </div>
   )

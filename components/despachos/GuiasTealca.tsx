@@ -22,7 +22,7 @@ const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
  * genera Tealca después y se escribe aquí, al lado del nombre del destinatario. Un envío
  * con guía entra a la cola del Reportador; sin guía se queda esperando.
  */
-export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean; onGuardado: () => void }) {
+export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean; onGuardado?: () => void }) {
   const [envios, setEnvios]   = useState<Envio[] | null>(null)
   const [digitos, setDigitos] = useState(8)
   const [valores, setValores] = useState<Record<number, string>>({})
@@ -84,7 +84,7 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
     }
     setAviso(`${body.guardadas} guía(s) guardada(s). Los envíos con guía ya están en la cola del Reportador.`)
     await cargar()
-    onGuardado()
+    onGuardado?.()
   }
 
   const cambiarDigitos = async (n: number) => {
