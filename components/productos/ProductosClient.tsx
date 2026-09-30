@@ -13,11 +13,6 @@ import Link from 'next/link'
 import MlBreakdown from './MlBreakdown'
 
 // ─── helpers ────────────────────────────────────────────────────
-const ML_ACCOUNTS: Record<Country, string[]> = {
-  VE: ['PIKEKE', 'SOLUCION-MC'],
-  CO: ['KROYS', 'VAPERK'],
-}
-
 function fmt(n: number) {
   return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -123,16 +118,17 @@ interface Props {
   initialProducts:  Product[]
   profitCategories: ProfitCategory[]
   country:          Country
+  mlAccounts: string[]   // cuentas ML de la empresa (Ajustes → app_settings ml_cuentas)
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts }: Props) {
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
   const [search,    setSearch]    = useState('')
   const [selected,  setSelected]  = useState<number[]>([])
   const [batchCat,  setBatchCat]  = useState<number | null>(null)
   const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
   const [editId,    setEditId]    = useState<number | null>(null)
-  const [form,      setForm]      = useState<FormState>(emptyForm(ML_ACCOUNTS[country]))
+  const [form,      setForm]      = useState<FormState>(emptyForm(mlAccounts))
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [okMsg,     setOkMsg]     = useState('')
@@ -142,7 +138,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const [viewing,     setViewing]     = useState<ProductDetail | null>(null)
   const [viewMounted, setViewMounted] = useState(false)
 
-  const mlAccounts = ML_ACCOUNTS[country]
   const confirm = useConfirm()
 
   // Tasa VE (para exceso/descuento sugerido). Solo aplica en VE.

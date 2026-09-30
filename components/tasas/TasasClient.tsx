@@ -11,6 +11,7 @@ import { parseLocalDate } from '@/lib/tz'
 import { parseShippingTable, type ShipTier } from '@/lib/mlShipping'
 import MlBreakdown from '@/components/productos/MlBreakdown'
 import BonusSettings from '@/components/tasas/BonusSettings'
+import NegocioSettings from '@/components/tasas/NegocioSettings'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -45,7 +46,7 @@ function ShipRowInputs({ row, onChange, onRemove }: {
   )
 }
 
-export default function TasasClient({ bonos }: { bonos: boolean }) {
+export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: boolean; puedeTasas: boolean; despachos: boolean }) {
   const [latest,   setLatest]   = useState<Rate | null>(null)
   const [history,  setHistory]  = useState<Rate[]>([])
   const [official, setOfficial] = useState('')
@@ -251,13 +252,15 @@ export default function TasasClient({ bonos }: { bonos: boolean }) {
               </div>
             ) : <span className="text-neutral-400">Sin fecha</span>}
           </div>
-          <button onClick={fetchBcv} disabled={busy} className="btn-primary text-sm whitespace-nowrap">
-            {busy ? 'Cargando…' : 'Actualizar TASA'}
-          </button>
+          {puedeTasas && (
+            <button onClick={fetchBcv} disabled={busy} className="btn-primary text-sm whitespace-nowrap">
+              {busy ? 'Cargando…' : 'Actualizar TASA'}
+            </button>
+          )}
         </div>
 
-        {/* Edición manual (bloqueada por defecto, poco usada) */}
-        <div className="border-l border-neutral-200 pl-3 shrink-0">
+        {/* Edición manual (bloqueada por defecto, poco usada; solo el dueño de la plataforma) */}
+        {puedeTasas && <div className="border-l border-neutral-200 pl-3 shrink-0">
           <button type="button" onClick={() => setManualOpen(o => !o)}
             className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-1 mb-1">
             <span>{manualOpen ? '🔓' : '🔒'}</span> Edición manual
@@ -272,7 +275,7 @@ export default function TasasClient({ bonos }: { bonos: boolean }) {
             <button onClick={saveManual} disabled={!manualOpen || busy || !official || !parallel}
               className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Guardar</button>
           </div>
-        </div>
+        </div>}
 
         {/* Tabla MercadoEnvíos (abre modal de edición) */}
         <div className="border-l border-neutral-200 pl-3 self-center shrink-0">
@@ -437,6 +440,8 @@ export default function TasasClient({ bonos }: { bonos: boolean }) {
           </div>
 
           {/* Bonos por ventas del mes (metas y montos) */}
+          <NegocioSettings conDespachos={despachos} />
+
           {bonos && <BonusSettings />}
         </div>
 

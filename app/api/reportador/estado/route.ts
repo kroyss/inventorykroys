@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { autenticarEquipo, cuentaDe, leerConfig, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
+import { remitenteConfigurado } from '@/lib/despachos'
 
 /** GET /api/reportador/estado — pendientes por cuenta (para mostrar antes de reportar) */
 export async function GET(req: NextRequest) {
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
     if ('error' in auth) return auth.error
     const { db } = auth
     const config = await leerConfig(db)
+    const remitenteDefault = await remitenteConfigurado(db)
 
     const { rows } = await db.query(
       `SELECT e.remitente, e.reporte_estado
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
     const pendientes: Record<string, number> = Object.fromEntries(config.cuentas.map(c => [c.nombre, 0]))
     let sinCuenta = 0, reintentos = 0
     for (const r of rows) {
-      const c = cuentaDe(r.remitente, config.cuentas)
+      const c = cuentaDe(r.remitente, config.cuentas, remitenteDefault)
       if (c) pendientes[c.nombre]++
       else sinCuenta++
       if (r.reporte_estado) reintentos++

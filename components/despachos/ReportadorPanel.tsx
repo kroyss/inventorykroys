@@ -258,7 +258,7 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
         <div className="space-y-2">
           {config.cuentas.map((c, i) => (
             <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_2fr_auto] gap-2 items-center">
-              <input className={input} placeholder="Nombre (p.ej. PIKEKE)" value={c.nombre} onChange={e => setCuenta(i, 'nombre', e.target.value)} />
+              <input className={input} placeholder="Nombre (p.ej. MITIENDA)" value={c.nombre} onChange={e => setCuenta(i, 'nombre', e.target.value)} />
               <input className={input} placeholder="Remitente empieza con" value={c.filtro} onChange={e => setCuenta(i, 'filtro', e.target.value)} />
               <input className={input} placeholder="Página de la tienda (opcional)" value={c.pagina} onChange={e => setCuenta(i, 'pagina', e.target.value)} />
               <button onClick={() => onChange({ ...config, cuentas: config.cuentas.filter((_, j) => j !== i) })}

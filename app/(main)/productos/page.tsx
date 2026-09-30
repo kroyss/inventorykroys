@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import ProductosClient from '@/components/productos/ProductosClient'
+import { cuentasML } from '@/lib/mlCuentas'
 import type { Product, ProfitCategory } from '@/lib/types'
 
 export const metadata = { title: 'Productos' }
@@ -47,6 +48,7 @@ export default async function ProductosPage() {
       initialProducts={productsRes.rows as Product[]}
       profitCategories={catsRes.rows as ProfitCategory[]}
       country={session.user.country}
+      mlAccounts={await cuentasML(db)}
     />
   )
 }

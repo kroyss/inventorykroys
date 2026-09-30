@@ -46,7 +46,7 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country, bonos }: { country: Country; bonos: boolean }) {
+export default function DashboardAdmin({ country, bonos, puedeTasas }: { country: Country; bonos: boolean; puedeTasas: boolean }) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [chart,   setChart]   = useState<ChartData | null>(null)
   // Default to 'month' so today's sales show immediately on the chart.
@@ -139,7 +139,7 @@ export default function DashboardAdmin({ country, bonos }: { country: Country; b
         </div>
       </div>
 
-      {country === 'VE' && <RateBar />}
+      {country === 'VE' && <RateBar puedeActualizar={puedeTasas} />}
 
       {/* Requiere atención — clickable */}
       <div>

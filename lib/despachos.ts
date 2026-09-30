@@ -23,13 +23,15 @@ export const MAX_PDFS_POR_SUBIDA = 60               // el cliente parte subidas 
 // Armar + verificar tarda ~0,25 s por etiqueta: 150 ≈ 40 s, por debajo del timeout
 // del proxy (60 s). Lotes reales: 10-50.
 export const MAX_POR_LOTE = 150
-// Remitente cuando el PDF no lo trae (mismo fallback que REMITENTE_DEFAULT del script).
-export const REMITENTE_DEFAULT = 'Marcos Contreras'
-
+// Remitente del manifiesto y del Reportador cuando el PDF no lo trae: el configurado en
+// la empresa (app_settings `despacho_remitente`) o, si no hay, el nombre de la empresa.
 export async function remitenteConfigurado(db: Pick<Pool, 'query'>) {
   const { rows: [cfg] } = await db.query(
-    `SELECT value FROM app_settings WHERE key = 'despacho_remitente'`)
-  return (cfg?.value as string | undefined)?.trim() || REMITENTE_DEFAULT
+    `SELECT COALESCE(
+       (SELECT NULLIF(TRIM(value), '') FROM app_settings WHERE key = 'despacho_remitente'),
+       (SELECT nombre FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int)
+     ) AS r`)
+  return (cfg?.r as string | undefined)?.trim() || 'Remitente'
 }
 
 // Largo exigido de la guía FINAL de Tealca (la que genera Tealca, no la pre-guía de la etiqueta).

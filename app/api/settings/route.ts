@@ -7,6 +7,8 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 const ALLOWED = new Set([
   'ml_comision', 'ml_envio', 'ml_umbral', 'ml_descuento', // VE (ml_descuento = descuento manual global)
   'ml_shipping_table',                               // VE (tabla MercadoEnvíos peso→precio mín, JSON)
+  'ml_cuentas',                                      // cuentas de MercadoLibre de la empresa (JSON)
+  'despacho_remitente',                              // remitente del manifiesto (vacío = nombre de la empresa)
   'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten', // CO
   'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)
   'bono_meta_1', 'bono_meta_2', 'bono_meta_3',       // Bonos: metas de ventas del mes

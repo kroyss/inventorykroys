@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { REMITENTE_DEFAULT } from '@/lib/despachos'
+import { remitenteConfigurado } from '@/lib/despachos'
 import {
   autenticarEquipo, leerConfig, RESERVA_HORAS, SQL_PENDIENTE, SQL_REPORTABLE,
 } from '@/lib/reportador'
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
        RETURNING t.id AS etiqueta_id, t.venta AS order_id, COALESCE(t.guia_final, t.guia) AS guia, t.carrier,
                  t.reporte_estado AS estado_previo,
                  s.closed_at, s.generated_at, s.original_name`,
-      [equipo.id, REMITENTE_DEFAULT, cuenta.filtro, RESERVA_HORAS])
+      [equipo.id, await remitenteConfigurado(db), cuenta.filtro, RESERVA_HORAS])
 
     // Orden de la jornada: lo más viejo primero, como la cola del CSV.
     rows.sort((a, b) =>

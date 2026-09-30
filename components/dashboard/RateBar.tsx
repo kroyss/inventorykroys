@@ -15,7 +15,7 @@ interface Rate {
 const fmt = (n: number) =>
   Math.round(Number(n)).toLocaleString('de-DE')
 
-export default function RateBar() {
+export default function RateBar({ puedeActualizar = false }: { puedeActualizar?: boolean }) {
   const [rate, setRate] = useState<Rate | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -49,10 +49,14 @@ export default function RateBar() {
         <span>Exceso: <span className="font-semibold text-purple-600">{rate.excess_percentage}%</span></span>
       </div>
 
-      <button onClick={fetchBcv} disabled={busy}
-        className="w-full md:w-auto md:ml-auto shrink-0 px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 disabled:opacity-50">
-        {busy ? 'Actualizando…' : 'Actualizar BCV'}
-      </button>
+      {/* La tasa es común a todas las empresas: solo la actualiza el dueño de la plataforma
+          (para el resto la actualiza el cron varias veces al día). */}
+      {puedeActualizar && (
+        <button onClick={fetchBcv} disabled={busy}
+          className="w-full md:w-auto md:ml-auto shrink-0 px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 disabled:opacity-50">
+          {busy ? 'Actualizando…' : 'Actualizar BCV'}
+        </button>
+      )}
     </div>
   )
 }

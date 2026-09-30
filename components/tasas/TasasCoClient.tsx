@@ -1,4 +1,5 @@
 'use client'
+import NegocioSettings from '@/components/tasas/NegocioSettings'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
@@ -19,7 +20,7 @@ interface CoRate { id?: number; trm_rate: number; rate_date: string | null; sour
 
 // Tasas Colombia: solo TRM oficial (sin paralelo/spread/descuento como VE).
 // Se actualiza sola por el cron; aquí se ve, se refresca a mano y hay simulador.
-export default function TasasCoClient() {
+export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
   const [latest,  setLatest]  = useState<CoRate | null>(null)
   const [history, setHistory] = useState<CoRate[]>([])
   const [cats,    setCats]    = useState<ProfitCategory[]>([])
@@ -166,9 +167,11 @@ export default function TasasCoClient() {
             </>
           ) : <span className="text-neutral-400">Sin fecha</span>}
         </div>
-        <button onClick={refresh} disabled={busy} className="btn-primary text-sm">
-          {busy ? 'Cargando…' : 'Actualizar TRM'}
-        </button>
+        {puedeTasas && (
+          <button onClick={refresh} disabled={busy} className="btn-primary text-sm">
+            {busy ? 'Cargando…' : 'Actualizar TRM'}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -311,6 +314,7 @@ export default function TasasCoClient() {
         </div>
       </div>
 
+      <NegocioSettings conDespachos={false} />
     </div>
   )
 }

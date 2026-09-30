@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TasasClient from '@/components/tasas/TasasClient'
 import { tieneModulo } from '@/lib/modulos'
+import { esDuenoPlataforma } from '@/lib/empresa'
 import TasasCoClient from '@/components/tasas/TasasCoClient'
 
 export const metadata = { title: 'Ajustes' }
@@ -13,5 +14,8 @@ export default async function TasasPage() {
   if (session?.user.role !== 'admin' || (country !== 'VE' && country !== 'CO')) {
     redirect('/dashboard')
   }
-  return country === 'CO' ? <TasasCoClient /> : <TasasClient bonos={tieneModulo(session.user, 'bonos')} />
+  const puedeTasas = esDuenoPlataforma(session.user)
+  return country === 'CO'
+    ? <TasasCoClient puedeTasas={puedeTasas} />
+    : <TasasClient bonos={tieneModulo(session.user, 'bonos')} puedeTasas={puedeTasas} despachos={tieneModulo(session.user, 'despachos')} />
 }

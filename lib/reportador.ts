@@ -9,7 +9,6 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import type { Pool } from 'pg'
 import { dbEmpresa, dbGlobal } from '@/lib/db'
-import { REMITENTE_DEFAULT } from '@/lib/despachos'
 import { ES_STAGING, MENSAJE_STAGING_REPORTADOR } from '@/lib/entorno'
 
 // MercadoLibre corta el mensaje en 350 caracteres SIN AVISAR (main_reportador.py).
@@ -138,8 +137,8 @@ export function problemasConfig(c: ConfigReportador): string[] {
 }
 
 /** Cuenta a la que pertenece un envío según el comienzo de su remitente. */
-export function cuentaDe(remitente: string | null, cuentas: Cuenta[]) {
-  const r = (remitente?.trim() || REMITENTE_DEFAULT).toUpperCase()
+export function cuentaDe(remitente: string | null, cuentas: Cuenta[], remitenteDefault: string) {
+  const r = (remitente?.trim() || remitenteDefault).toUpperCase()
   return cuentas.find(c => r.startsWith(c.filtro.trim().toUpperCase())) ?? null
 }
 
