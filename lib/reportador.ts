@@ -30,9 +30,12 @@ export type EstadoResultado = typeof ESTADOS_RESULTADO[number]
 export const SQL_PENDIENTE = `(e.reporte_estado IS NULL OR e.reporte_estado IN ('RECHAZADO', 'ERROR'))`
 
 // Envíos que entran al Reportador: impresos, no reimpresiones (ese comprador ya fue
-// reportado), de jornadas CERRADAS (el paquete ya se entregó a ZOOM).
+// reportado), de jornadas CERRADAS (el paquete ya se entregó al transportista). Los
+// TEALCA solo cuando ya tienen su guía FINAL: la pre-guía de la etiqueta no sirve para
+// rastrear. Los ZOOM entran siempre (su guía ya es la real).
 export const SQL_REPORTABLE = `
-  e.impresa AND NOT e.reimpresion AND e.carrier = 'ZOOM'
+  e.impresa AND NOT e.reimpresion
+  AND (e.carrier = 'ZOOM' OR e.guia_final IS NOT NULL)
   AND l.status = 'GENERADO'
   AND j.status = 'CERRADA'`
 
@@ -92,6 +95,12 @@ export async function leerConfig(db: Pick<Pool, 'query'>): Promise<ConfigReporta
   }
 }
 
+/** Mismo mensaje para Tealca: donde diga ZOOM se pone TEALCA (respeta mayúsculas/minúsculas).
+ *  Espejo de para_tealca() en reportador/corrida.py: si cambia uno, cambia el otro. */
+export function paraTealca(texto: string) {
+  return texto.replace(/zoom/gi, m => (m === m.toUpperCase() ? 'TEALCA' : m[0] === m[0].toUpperCase() ? 'Tealca' : 'tealca'))
+}
+
 export function rellenar(plantilla: string, bloque: string, pagina: string, guia: string) {
   return (plantilla + bloque).split('{pagina}').join(pagina).split('{guia}').join(guia)
 }
@@ -109,7 +118,9 @@ export function problemasConfig(c: ConfigReportador): string[] {
   if (new Set(filtros).size !== filtros.length) p.push('Dos cuentas tienen el mismo comienzo de remitente')
   const paginaLarga = c.cuentas.reduce((a, x) => (x.pagina.length > a.length ? x.pagina : a), '')
   c.plantillas.forEach((t, i) => {
-    const largo = rellenar(t, c.bloque, paginaLarga, '9'.repeat(12)).length
+    // El peor caso incluye la versión Tealca (TEALCA tiene 2 letras más que ZOOM).
+    const armado = rellenar(t, c.bloque, paginaLarga, '9'.repeat(12))
+    const largo = Math.max(armado.length, paraTealca(armado).length)
     if (largo > LIMITE_CARACTERES) {
       p.push(`La plantilla ${i + 1} llega a ${largo} caracteres (máximo ${LIMITE_CARACTERES}): MercadoLibre la cortaría`)
     }

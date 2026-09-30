@@ -8,7 +8,7 @@
 ; al desinstalar ni al actualizar: reinstalar no obliga a vincular de nuevo.
 
 #define AppName    "Reportador de guías"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppExe     "ReportadorConectado.exe"
 #define Publisher  "Syncsora"
 #define DistDir    "..\dist\ReportadorConectado"

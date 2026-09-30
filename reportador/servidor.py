@@ -18,7 +18,7 @@ import threading
 
 import requests
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SERVIDOR_DEFAULT = "https://inventory.syncsora.com"
 
 BASE = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "SyncsoraReportador")

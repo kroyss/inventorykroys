@@ -31,6 +31,14 @@ export async function remitenteConfigurado(db: Pick<Pool, 'query'>) {
   return (cfg?.value as string | undefined)?.trim() || REMITENTE_DEFAULT
 }
 
+// Largo exigido de la guía FINAL de Tealca (la que genera Tealca, no la pre-guía de la etiqueta).
+export const GUIA_TEALCA_DIGITOS_DEFAULT = 8
+export async function digitosGuiaTealca(db: Pick<Pool, 'query'>) {
+  const { rows: [cfg] } = await db.query(`SELECT value FROM app_settings WHERE key = 'tealca_guia_digitos'`)
+  const n = parseInt((cfg?.value as string | undefined) ?? '', 10)
+  return Number.isInteger(n) && n >= 4 && n <= 20 ? n : GUIA_TEALCA_DIGITOS_DEFAULT
+}
+
 // Estados de venta desde los que se puede imprimir (PROCESADA = normal,
 // DESCARGADA = reimpresión, p.ej. ya salió por el flujo viejo de Excel).
 const ESTADOS_IMPRIMIBLES = new Set(['PROCESADA', 'DESCARGADA'])

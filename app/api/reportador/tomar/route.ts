@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
          FOR UPDATE OF e SKIP LOCKED
        ) s
        WHERE t.id = s.id
-       RETURNING t.id AS etiqueta_id, t.venta AS order_id, t.guia, t.reporte_estado AS estado_previo,
+       RETURNING t.id AS etiqueta_id, t.venta AS order_id, COALESCE(t.guia_final, t.guia) AS guia, t.carrier,
+                 t.reporte_estado AS estado_previo,
                  s.closed_at, s.generated_at, s.original_name`,
       [equipo.id, REMITENTE_DEFAULT, cuenta.filtro, RESERVA_HORAS])
 
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
       String(a.original_name).localeCompare(String(b.original_name)))
     return NextResponse.json({
       cuenta: cuenta.nombre,
-      envios: rows.map(r => ({ etiqueta_id: r.etiqueta_id, order_id: r.order_id, guia: r.guia, estado_previo: r.estado_previo })),
+      envios: rows.map(r => ({ etiqueta_id: r.etiqueta_id, order_id: r.order_id, guia: r.guia, carrier: r.carrier, estado_previo: r.estado_previo })),
     })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

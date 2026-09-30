@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     const { rows } = await db.query(
-      `SELECT e.id, e.venta, e.guia, e.remitente, e.destinatario, e.reimpresion,
+      `SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, e.destinatario, e.reimpresion,
               e.reporte_estado, e.reporte_detalle, e.reporte_intentos, e.reportado_at
        FROM despacho_etiquetas e
        JOIN despacho_lotes l ON l.id = e.lote_id

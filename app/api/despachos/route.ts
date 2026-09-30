@@ -39,15 +39,16 @@ export async function GET() {
                 (SELECT COUNT(*)::int FROM despacho_lotes l WHERE l.jornada_id = j.id AND l.status = 'GENERADO') AS lotes,
                 (SELECT COUNT(*)::int FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
                   WHERE l.jornada_id = j.id AND e.impresa AND e.reimpresion) AS reimpresiones,
-                r.a_reportar, r.enviados, r.sin_chat, r.con_problema, r.por_csv
+                r.a_reportar, r.enviados, r.sin_chat, r.con_problema, r.por_csv, r.tealca_sin_guia
          FROM despacho_jornadas j LEFT JOIN users u ON u.id = j.closed_by
          LEFT JOIN LATERAL (
            SELECT
-             COUNT(*) FILTER (WHERE e.carrier = 'ZOOM' AND ${SQL_PENDIENTE})::int                      AS a_reportar,
+             COUNT(*) FILTER (WHERE (e.carrier = 'ZOOM' OR e.guia_final IS NOT NULL) AND ${SQL_PENDIENTE})::int                      AS a_reportar,
              COUNT(*) FILTER (WHERE e.reporte_estado = 'ENVIADO')::int          AS enviados,
              COUNT(*) FILTER (WHERE e.reporte_estado = 'SIN_CHAT')::int         AS sin_chat,
              COUNT(*) FILTER (WHERE e.reporte_estado IN ('RECHAZADO','ERROR'))::int AS con_problema,
-             COUNT(*) FILTER (WHERE e.reporte_estado = 'CSV')::int              AS por_csv
+             COUNT(*) FILTER (WHERE e.reporte_estado = 'CSV')::int              AS por_csv,
+             COUNT(*) FILTER (WHERE e.carrier = 'TEALCA' AND e.guia_final IS NULL AND ${SQL_PENDIENTE})::int AS tealca_sin_guia
            FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
            WHERE l.jornada_id = j.id AND l.status = 'GENERADO' AND e.impresa AND NOT e.reimpresion
          ) r ON TRUE

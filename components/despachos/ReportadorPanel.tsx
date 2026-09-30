@@ -23,6 +23,10 @@ const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
 })
 
+// Igual que lib/reportador.ts paraTealca(): en los envíos Tealca ZOOM pasa a TEALCA.
+const paraTealca = (t: string) =>
+  t.replace(/zoom/gi, m => (m === m.toUpperCase() ? 'TEALCA' : m[0] === m[0].toUpperCase() ? 'Tealca' : 'tealca'))
+
 // Igual que lib/reportador.ts rellenar(): peor caso = página más larga + guía de 12 dígitos.
 const rellenar = (t: string, bloque: string, pagina: string, guia: string) =>
   (t + bloque).split('{pagina}').join(pagina).split('{guia}').join(guia)
@@ -270,13 +274,15 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
 
       <div>
         <h3 className="text-xs font-semibold text-neutral-600 mb-1">Plantillas del mensaje</h3>
+        <p className="text-[11px] text-neutral-500 mb-1">Para los envíos Tealca se usa el mismo mensaje cambiando la palabra ZOOM por TEALCA.</p>
         <p className="text-xs text-neutral-500 mb-2">
           Se elige una al azar por comprador. <code>{'{guia}'}</code> se reemplaza por la guía y <code>{'{pagina}'}</code> por la página de la cuenta.
           MercadoLibre corta en {limite} caracteres sin avisar.
         </p>
         <div className="space-y-2">
           {config.plantillas.map((p, i) => {
-            const largo = rellenar(p, config.bloque, paginaLarga, '9'.repeat(12)).length
+            const armado = rellenar(p, config.bloque, paginaLarga, '9'.repeat(12))
+            const largo = Math.max(armado.length, paraTealca(armado).length)
             return (
               <div key={i} className="flex gap-2 items-start">
                 <textarea className={`${input} min-h-[2.5rem]`} rows={1} value={p} onChange={e => setPlantilla(i, e.target.value)} />

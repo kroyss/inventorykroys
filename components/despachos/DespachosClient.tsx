@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import ReportadorPanel from './ReportadorPanel'
+import GuiasTealca from './GuiasTealca'
 
 // ── Tipos de la API ─────────────────────────────────────────────────────────
 type Estado =
@@ -41,7 +42,7 @@ interface Overview {
     id: number; opened_at: string; closed_at: string; total_envios: number; lotes: number
     tiene_manifiesto: boolean; tiene_manifiesto_tealca: boolean
     closed_by: string | null; bot_csv_at: string | null; reimpresiones: number
-    a_reportar: number; enviados: number; sin_chat: number; con_problema: number; por_csv: number
+    a_reportar: number; enviados: number; sin_chat: number; con_problema: number; por_csv: number; tealca_sin_guia: number
   }[]
 }
 interface EnvioReporte {
@@ -319,6 +320,8 @@ export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
           )}
       </section>
 
+      <GuiasTealca isAdmin={isAdmin} onGuardado={cargar} />
+
       <ReportadorPanel isAdmin={isAdmin} />
 
       {/* Jornadas cerradas */}
@@ -371,6 +374,7 @@ function FilaJornada({ j, abierta, onToggle, onCsv }: {
     j.con_problema ? <span key="x" className="text-red-700">⚠ {j.con_problema} con problema</span> : null,
     j.sin_chat     ? <span key="s" className="text-neutral-500">{j.sin_chat} sin chat</span> : null,
     j.por_csv      ? <span key="c" className="text-neutral-500">{j.por_csv} por CSV</span> : null,
+    j.tealca_sin_guia ? <span key="t" className="text-amber-700">{j.tealca_sin_guia} Tealca sin guía</span> : null,
   ].filter(Boolean)
 
   return (

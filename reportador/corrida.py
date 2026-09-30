@@ -9,6 +9,7 @@ Cada corrida es una "orden" en el sistema (pedida desde la web, o registrada al 
 """
 import os
 import random
+import re
 import traceback
 from datetime import datetime
 from urllib.parse import urlparse
@@ -22,6 +23,15 @@ from motor import (
 
 def rellenar(plantilla, bloque, pagina, guia):
     return (plantilla + bloque).replace("{pagina}", pagina).replace("{guia}", guia)
+
+
+def para_tealca(texto):
+    """Mismo mensaje para los envíos Tealca: donde diga ZOOM se pone TEALCA (respeta
+    mayúsculas/minúsculas). Espejo de paraTealca() en lib/reportador.ts."""
+    def cambia(m):
+        s = m.group(0)
+        return "TEALCA" if s.isupper() else ("Tealca" if s[0].isupper() else "tealca")
+    return re.sub(r"zoom", cambia, texto, flags=re.IGNORECASE)
 
 
 def es_local(url):
@@ -203,6 +213,8 @@ class Corrida:
         envio.pop("_caja_vacia", None)
         order_id, guia = envio["order_id"], envio["guia"]
         mensaje = rellenar(random.choice(config["plantillas"]), config.get("bloque", ""), cuenta.get("pagina", ""), guia)
+        if envio.get("carrier") == "TEALCA":
+            mensaje = para_tealca(mensaje)
         pref = "Reintento " if reintento else ""
         try:
             if self.simular:

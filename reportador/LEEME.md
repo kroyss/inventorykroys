@@ -76,3 +76,12 @@ No hay CSV ni carpetas que preparar: la cola viene del sistema.
 
 `python app.py --simular` no abre Chrome ni escribe a nadie. Solo funciona contra un
 servidor local (`localhost`), porque informa como ENVIADO mensajes que no se mandaron.
+
+## Envíos Tealca (versión 1.2.0)
+
+El sistema le entrega a cada envío su `carrier` (ZOOM o TEALCA) y la guía que hay que mandar: para
+Tealca es la **guía final** (la que escribe el asistente en Despachos → Guías Tealca), nunca la
+pre-guía de la etiqueta. El mensaje es el mismo de las plantillas cambiando ZOOM por TEALCA
+(`para_tealca()` en `corrida.py`; espejo en `lib/reportador.ts`). Hay que instalar la 1.2.0 en los
+equipos: con la 1.1.0 un envío Tealca saldría diciendo "ZOOM".
+
