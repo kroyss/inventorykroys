@@ -34,9 +34,8 @@ export default async function Navbar() {
           <span className="text-[11px] font-semibold text-neutral-500 border border-neutral-200 rounded px-1.5 py-0.5">
             {marca().id === 'ecd' ? session?.user.empresaNombre : country}
           </span>
+          <EspacioSwitcher automatizaciones={conAutomatizaciones} radarUrl={conRadar ? radarUrl() : null} />
         </div>
-
-        <EspacioSwitcher automatizaciones={conAutomatizaciones} radarUrl={conRadar ? radarUrl() : null} />
 
         <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
 
