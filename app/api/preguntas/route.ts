@@ -19,15 +19,25 @@ export async function GET(req: NextRequest) {
     const filtroEstado = vista === 'pendientes' ? `p.estado = 'UNANSWERED'` : `p.estado <> 'UNANSWERED'`
     const params: unknown[] = []
     let filtroTexto = ''
-    if (q) { params.push(`%${q}%`); filtroTexto = ` AND (p.texto ILIKE $1 OR p.item_titulo ILIKE $1 OR p.respuesta ILIKE $1)` }
+    if (q) { params.push(`%${q}%`); filtroTexto = ` AND (p.texto ILIKE $1 OR p.item_titulo ILIKE $1 OR p.respuesta ILIKE $1 OR p.item_id ILIKE $1)` }
     const { rows } = await s.db.query(
       `SELECT p.id::text, p.item_id, p.item_titulo, p.item_permalink, p.item_estado, p.texto, p.estado,
               p.fecha, p.respuesta, p.respuesta_estado, p.respuesta_fecha,
               p.borrador, p.borrador_confianza, p.borrador_falta, p.borrador_web, p.borrador_at,
-              c.nickname AS cuenta, u.full_name AS respondida_por
+              c.nickname AS cuenta, u.full_name AS respondida_por,
+              pr.code AS producto_code, pr.name AS producto_nombre, pr.stock AS producto_stock
        FROM ml_preguntas p
        JOIN ml_conexiones c ON c.id = p.conexion_id
        LEFT JOIN users u ON u.id = p.respondida_por
+       -- Producto del sistema por su código ML (se guarda sin el prefijo: MLV768007052 → 768007052)
+       LEFT JOIN LATERAL (
+         SELECT pd.code, pd.name, COALESCE(i.quantity, 0)::int AS stock
+         FROM product_ml_codes m
+         JOIN products pd ON pd.id = m.product_id
+         LEFT JOIN inventory i ON i.product_id = pd.id
+         WHERE m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '')
+         ORDER BY pd.is_active DESC LIMIT 1
+       ) pr ON TRUE
        WHERE ${filtroEstado}${filtroTexto}
        ORDER BY ${vista === 'pendientes' ? 'p.fecha ASC' : 'COALESCE(p.respuesta_fecha, p.fecha) DESC'}
        LIMIT ${TAM} OFFSET ${(page - 1) * TAM}`, params)

@@ -203,7 +203,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   return {
     conexionId: q.conexion_id,
     pregunta: { id: Number(q.id), texto: q.texto, item_id: q.item_id, fecha: q.fecha },
-    item, titulo: q.item_titulo ?? null, descripcion,
+    item, titulo: q.item_titulo ?? prod?.name ?? null, descripcion,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol?.value ?? '',

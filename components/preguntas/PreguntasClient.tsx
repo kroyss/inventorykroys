@@ -11,6 +11,36 @@ interface Pregunta {
   borrador: string | null; borrador_confianza: 'alta' | 'media' | 'baja' | null; borrador_falta: string | null
   borrador_web: boolean; borrador_at: string | null
   cuenta: string; respondida_por: string | null
+  producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
+}
+
+// Link a la publicación: el que trajo ML o, si ML no dejó leerla, armado con el código.
+function linkPublicacion(p: Pregunta) {
+  if (p.item_permalink) return p.item_permalink
+  const m = /^(ML[A-Z]|MCO)(\d+)$/.exec(p.item_id)
+  if (!m) return null
+  const dominio = m[1] === 'MCO' ? 'com.co' : 'com.ve'
+  return `https://articulo.mercadolibre.${dominio}/${m[1]}-${m[2]}-_JM`
+}
+
+/** Producto de la pregunta: nombre del sistema (o título de ML) + código + stock. */
+function Producto({ p }: { p: Pregunta }) {
+  const nombre = p.producto_nombre ?? p.item_titulo
+  const link = linkPublicacion(p)
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+      {nombre
+        ? <span className="font-medium text-neutral-800 truncate max-w-[30rem]">{nombre}</span>
+        : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
+      {p.producto_code && <span className="font-mono text-neutral-400">{p.producto_code}</span>}
+      {p.producto_stock !== null && (
+        <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'}>
+          {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
+        </span>
+      )}
+      {link && <a href={link} target="_blank" rel="noreferrer" className="font-mono text-neutral-400 hover:text-neutral-800 hover:underline">{p.item_id} ↗</a>}
+    </span>
+  )
 }
 interface Cuenta { id: number; nickname: string; estado: string; ultima_sync: string | null; ultimo_error: string | null }
 interface Datos {
@@ -217,9 +247,7 @@ function TarjetaPendiente({ p, iaLista, onRespondida }: {
     <article className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
         <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{p.cuenta}</span>
-        {p.item_permalink
-          ? <a href={p.item_permalink} target="_blank" rel="noreferrer" className="text-neutral-700 hover:underline truncate max-w-[36rem]">{p.item_titulo ?? p.item_id}</a>
-          : <span className="truncate max-w-[36rem]">{p.item_titulo ?? p.item_id}</span>}
+        <Producto p={p} />
         {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {p.item_estado === 'paused' ? 'pausada' : p.item_estado} · no sale en el panel de ML</span>}
         <span className="ml-auto whitespace-nowrap" title={new Date(p.fecha).toLocaleString('es-VE')}>{hace(p.fecha)}</span>
       </header>
@@ -279,7 +307,7 @@ function FilaHistorial({ p }: { p: Pregunta }) {
     <div className="px-4 py-3 text-sm space-y-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
         <span className="font-semibold text-neutral-700">{p.cuenta}</span>
-        <span className="truncate max-w-[32rem]">{p.item_titulo ?? p.item_id}</span>
+        <Producto p={p} />
         <span className="ml-auto whitespace-nowrap">{new Date(p.respuesta_fecha ?? p.fecha).toLocaleDateString('es-VE')}</span>
         <StatusBadge status={e.status} label={e.label} />
       </div>
