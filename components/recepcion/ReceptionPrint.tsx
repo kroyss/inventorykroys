@@ -31,9 +31,10 @@ interface Props {
   country: 'VE' | 'CO'
   kind: 'local' | 'import'
   photos?: Photo[]
+  titulo?: string   // encabezado: la marca o, en El Comerciante Digital, la empresa
 }
 
-export default function ReceptionPrint({ order, country, kind, photos = [] }: Props) {
+export default function ReceptionPrint({ order, country, kind, photos = [], titulo = 'Syncsora Inventory' }: Props) {
   // Auto-open print dialog. Si hay imágenes, espera a que carguen para que salgan
   // en la impresión (con un fallback por si alguna tarda o falla).
   useEffect(() => {
@@ -128,7 +129,7 @@ export default function ReceptionPrint({ order, country, kind, photos = [] }: Pr
         <div className="border-b-2 border-neutral-900 pb-3 mb-5">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Syncsora Inventory</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{titulo}</h1>
               <p className="text-sm text-neutral-600 mt-1">Lista de recepción de mercancía · {country}</p>
             </div>
             <div className="text-right text-sm">

@@ -1,6 +1,8 @@
 services:
   inventory_next:
     container_name: inventory_next
+    # Imagen con nombre: inventory_ecd usa la MISMA (se compila una sola vez).
+    image: inventory_app:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -44,6 +46,43 @@ services:
       # Usar 127.0.0.1 (IPv4), NO localhost: en Alpine localhost resuelve primero
       # a ::1 (IPv6) y Next escucha en 0.0.0.0 (solo IPv4) → conexión rechazada.
       # -O /dev/null (no --spider): busybox wget da exit≠0 con --spider aunque responda.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # El Comerciante Digital (app.elcomerciantedigital.com): la MISMA app y la MISMA base,
+  # con otra marca (MARCA=ecd) y su propia URL para NextAuth. Sesiones separadas por
+  # dominio; los datos de cada empresa los separa la base (RLS), igual que en inventory.
+  inventory_ecd:
+    container_name: inventory_ecd
+    image: inventory_app:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:8504:3000"
+    env_file:
+      - .env.production
+    environment:
+      - TZ=America/Caracas
+      - ETIQUETAS_URL=http://inventory_etiquetas:8000
+      - MARCA=ecd
+      - NEXTAUTH_URL=https://app.elcomerciantedigital.com
+    depends_on:
+      inventory_next:
+        condition: service_started
+      inventory_db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - inventory_net
+    healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
       interval: 30s
       timeout: 5s

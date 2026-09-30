@@ -4,7 +4,7 @@ import DashboardAdmin from '@/components/dashboard/DashboardAdmin'
 import DashboardUser  from '@/components/dashboard/DashboardUser'
 import { tieneModulo } from '@/lib/modulos'
 
-export const metadata = { title: 'Inicio — Syncsora Inventory' }
+export const metadata = { title: 'Inicio' }
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { esDuenoPlataforma } from '@/lib/empresa'
 import PlataformaClient from '@/components/plataforma/PlataformaClient'
 
-export const metadata = { title: 'Plataforma — Syncsora Inventory' }
+export const metadata = { title: 'Plataforma' }
 
 export default async function PlataformaPage() {
   const session = await getServerSession(authOptions)

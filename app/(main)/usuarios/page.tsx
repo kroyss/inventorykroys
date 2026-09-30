@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import UsuariosClient from '@/components/usuarios/UsuariosClient'
 
-export const metadata = { title: 'Usuarios — Syncsora Inventory' }
+export const metadata = { title: 'Usuarios' }
 
 export default async function UsuariosPage() {
   const session = await getServerSession(authOptions)

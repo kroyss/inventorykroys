@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import MercadoEnviosClient from '@/components/productos/MercadoEnviosClient'
 import type { Product } from '@/lib/types'
 
-export const metadata = { title: 'MercadoEnvíos — Syncsora Inventory' }
+export const metadata = { title: 'MercadoEnvíos' }
 
 export default async function MercadoEnviosPage() {
   const session = await getServerSession(authOptions)

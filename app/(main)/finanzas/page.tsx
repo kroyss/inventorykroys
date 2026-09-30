@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import FinanzasClient from '@/components/finanzas/FinanzasClient'
 import { tieneModulo } from '@/lib/modulos'
 
-export const metadata = { title: 'Finanzas — Syncsora Inventory' }
+export const metadata = { title: 'Finanzas' }
 
 export default async function FinanzasPage() {
   // Módulo global: solo admin. Disponible desde cualquier país (VE o CO).

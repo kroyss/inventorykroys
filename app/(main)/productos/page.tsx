@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import ProductosClient from '@/components/productos/ProductosClient'
 import type { Product, ProfitCategory } from '@/lib/types'
 
-export const metadata = { title: 'Productos — Syncsora Inventory' }
+export const metadata = { title: 'Productos' }
 
 export default async function ProductosPage() {
   const session = await getServerSession(authOptions)

@@ -4,7 +4,7 @@ import { dbDeSesion } from '@/lib/session'
 import VentasClient from '@/components/ventas/VentasClient'
 import type { InventoryItem } from '@/lib/types'
 
-export const metadata = { title: 'Ventas — Syncsora Inventory' }
+export const metadata = { title: 'Ventas' }
 
 export default async function VentasPage() {
   const session = await getServerSession(authOptions)

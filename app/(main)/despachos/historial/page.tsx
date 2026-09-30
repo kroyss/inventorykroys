@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import DespachosHistorial from '@/components/despachos/DespachosHistorial'
 
-export const metadata = { title: 'Historial de despachos — Syncsora Inventory' }
+export const metadata = { title: 'Historial de despachos' }
 
 export default async function DespachosHistorialPage() {
   const session = await getServerSession(authOptions)

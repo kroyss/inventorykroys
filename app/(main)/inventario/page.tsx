@@ -4,7 +4,7 @@ import { dbDeSesion } from '@/lib/session'
 import InventarioClient from '@/components/inventario/InventarioClient'
 import type { InventoryItem } from '@/lib/types'
 
-export const metadata = { title: 'Inventario — Syncsora Inventory' }
+export const metadata = { title: 'Inventario' }
 
 export default async function InventarioPage() {
   const session = await getServerSession(authOptions)

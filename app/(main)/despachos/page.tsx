@@ -4,7 +4,7 @@ import DespachosClient from '@/components/despachos/DespachosClient'
 import { redirect } from 'next/navigation'
 import { tieneModulo } from '@/lib/modulos'
 
-export const metadata = { title: 'Despachos — Syncsora Inventory' }
+export const metadata = { title: 'Despachos' }
 
 export default async function DespachosPage() {
   const session = await getServerSession(authOptions)

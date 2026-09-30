@@ -58,7 +58,7 @@ function Row({ label, value, accent, caption, updatedAt, tz }: {
   )
 }
 
-export default function TasaBoard({ initial }: { initial: PublicRates }) {
+export default function TasaBoard({ initial, marca = 'Syncsora' }: { initial: PublicRates; marca?: string }) {
   const [data, setData]       = useState(initial)
   const [loading, setLoading] = useState(false)
   const [note, setNote]       = useState<string | null>(null)
@@ -93,7 +93,7 @@ export default function TasaBoard({ initial }: { initial: PublicRates }) {
     <div className="min-h-screen bg-[#14171C] text-[#E8E4DA] flex flex-col items-center px-4 py-10">
       <div className="w-full max-w-sm">
         <header className="text-center mb-6">
-          <div className="text-[11px] tracking-[0.3em] text-[#5C636D] uppercase">Syncsora</div>
+          <div className="text-[11px] tracking-[0.3em] text-[#5C636D] uppercase">{marca}</div>
           <h1 className="text-xl font-semibold mt-1">Tasa del día</h1>
         </header>
 

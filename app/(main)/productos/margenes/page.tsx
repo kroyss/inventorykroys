@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import MargenesClient from '@/components/productos/MargenesClient'
 import type { Product, ProfitCategory } from '@/lib/types'
 
-export const metadata = { title: 'Revisión de márgenes — Syncsora Inventory' }
+export const metadata = { title: 'Revisión de márgenes' }
 
 export default async function MargenesPage() {
   const session = await getServerSession(authOptions)

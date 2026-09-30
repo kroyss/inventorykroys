@@ -4,7 +4,7 @@ import { dbDeSesion } from '@/lib/session'
 import ComprasTabs from '@/components/compras/ComprasTabs'
 import type { PurchaseOrder, ImportOrder, Supplier } from '@/lib/types'
 
-export const metadata = { title: 'Compras — Syncsora Inventory' }
+export const metadata = { title: 'Compras' }
 
 export default async function ComprasPage() {
   const session = await getServerSession(authOptions)

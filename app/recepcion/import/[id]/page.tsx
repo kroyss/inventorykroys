@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
+import { marca } from '@/lib/marca'
 import { notFound, redirect } from 'next/navigation'
 import ReceptionPrint from '@/components/recepcion/ReceptionPrint'
 
@@ -52,5 +53,5 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     name: f.file_name as string,
   }))
 
-  return <ReceptionPrint order={order} country={session.user.country} kind="import" photos={photos} />
+  return <ReceptionPrint order={order} country={session.user.country} kind="import" titulo={marca().id === 'ecd' ? session.user.empresaNombre : marca().nombre} photos={photos} />
 }

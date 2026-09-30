@@ -4,7 +4,7 @@ import FacturasClient from '@/components/facturas/FacturasClient'
 import { redirect } from 'next/navigation'
 import { tieneModulo } from '@/lib/modulos'
 
-export const metadata = { title: 'Facturas — Syncsora Inventory' }
+export const metadata = { title: 'Facturas' }
 
 export default async function FacturasPage() {
   const session = await getServerSession(authOptions)

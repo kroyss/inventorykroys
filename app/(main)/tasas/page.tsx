@@ -5,7 +5,7 @@ import TasasClient from '@/components/tasas/TasasClient'
 import { tieneModulo } from '@/lib/modulos'
 import TasasCoClient from '@/components/tasas/TasasCoClient'
 
-export const metadata = { title: 'Ajustes — Syncsora Inventory' }
+export const metadata = { title: 'Ajustes' }
 
 export default async function TasasPage() {
   const session = await getServerSession(authOptions)
