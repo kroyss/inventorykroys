@@ -124,8 +124,11 @@ export async function PUT(
 
       if (body.ml_codes !== undefined) {
         // La tabla product_ml_codes no tiene índice único (product_id, ml_account),
-        // así que no se puede usar ON CONFLICT. Igual que legacy: borrar y reinsertar.
-        await db.query(`DELETE FROM product_ml_codes WHERE product_id = $1`, [id])
+        // así que no se puede usar ON CONFLICT: se borran y reinsertan SOLO las cuentas que
+        // vienen en el formulario. Los códigos de una cuenta que ya no está en Ajustes se
+        // conservan (antes se borraban al guardar el producto).
+        await db.query(`DELETE FROM product_ml_codes WHERE product_id = $1 AND ml_account = ANY($2)`,
+          [id, body.ml_codes.map(c => c.account)])
         for (const { account, code } of body.ml_codes) {
           if (!code.trim()) continue
           await db.query(
