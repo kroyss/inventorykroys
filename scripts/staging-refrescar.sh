@@ -70,8 +70,10 @@ SQL
   # Una consulta que cuenta las filas de cada tabla (armada por Postgres a partir de pg_tables).
   conteo="SELECT string_agg(format('SELECT %L AS t, count(*) AS n FROM %I', tablename, tablename), ' UNION ALL ') FROM pg_tables WHERE schemaname='public'"
   cons="$(docker exec "$prod" psql -U "$PGUSER" -d "$db" -Atc "$conteo")"
-  difs="$(diff <(docker exec "$prod" psql -U "$PGUSER" -d "$db" -Atc "$cons ORDER BY 1") \
-               <(docker exec "$STAGING_DB" psql -U "$PGUSER" -d "$db" -Atc "$cons ORDER BY 1") \
+  # Se ordena fuera de Postgres (LC_ALL=C): producción (Debian) y staging (Alpine) ordenan
+  # texto distinto, y un ORDER BY daría diferencias falsas.
+  difs="$(diff <(docker exec "$prod" psql -U "$PGUSER" -d "$db" -Atc "$cons" | LC_ALL=C sort) \
+               <(docker exec "$STAGING_DB" psql -U "$PGUSER" -d "$db" -Atc "$cons" | LC_ALL=C sort) \
           | grep -E '^[<>]' | grep -v -E '^[<>] (reportador_ordenes|user_sessions)\|' || true)"
   if [ -n "$difs" ]; then
     echo "$difs"
