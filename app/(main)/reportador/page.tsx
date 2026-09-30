@@ -5,6 +5,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { PageHeader } from '@/components/ui'
 import GuiasTealca from '@/components/despachos/GuiasTealca'
 import ReportadorPanel from '@/components/despachos/ReportadorPanel'
+import ReportadorApi from '@/components/despachos/ReportadorApi'
 
 export const metadata = { title: 'Reportador' }
 
@@ -18,6 +19,7 @@ export default async function ReportadorPage() {
   return (
     <div className="space-y-5">
       <PageHeader title="Reportador" subtitle="Le escribe a cada comprador su número de guía en MercadoLibre." />
+      <ReportadorApi />
       <GuiasTealca isAdmin={isAdmin} />
       <ReportadorPanel isAdmin={isAdmin} />
     </div>
