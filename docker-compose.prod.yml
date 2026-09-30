@@ -52,7 +52,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # El Comerciante Digital (inventario.elcomerciantedigital.com): la MISMA app y la MISMA base,
+  # El Comerciante Digital (app.elcomerciantedigital.com, el portal): la MISMA app y la MISMA base,
   # con otra marca (MARCA=ecd) y su propia URL para NextAuth. Sesiones separadas por
   # dominio; los datos de cada empresa los separa la base (RLS), igual que en inventory.
   inventory_ecd:
@@ -72,7 +72,7 @@ services:
       - TZ=America/Caracas
       - ETIQUETAS_URL=http://inventory_etiquetas:8000
       - MARCA=ecd
-      - NEXTAUTH_URL=https://inventario.elcomerciantedigital.com
+      - NEXTAUTH_URL=https://app.elcomerciantedigital.com
     depends_on:
       inventory_next:
         condition: service_started
