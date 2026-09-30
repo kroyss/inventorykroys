@@ -34,7 +34,9 @@ BEGIN
     ORDER BY 1
   LOOP
     FOR emp, src IN SELECT * FROM (VALUES (1, 've_src'), (2, 'co_src')) v LOOP
-      EXECUTE format('SELECT count(*) FROM public.%I WHERE empresa_id = %s', tbl, emp) INTO a;
+      -- (app_settings: ml_exceso lo agrega 01_esquema.sql a la empresa 1; no viene del origen)
+      EXECUTE format('SELECT count(*) FROM public.%I WHERE empresa_id = %s%s', tbl, emp,
+                     CASE WHEN tbl = 'app_settings' THEN $q$ AND key <> 'ml_exceso'$q$ ELSE '' END) INTO a;
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = src AND table_name = tbl) THEN
         EXECUTE format('SELECT count(*) FROM %I.%I', src, tbl) INTO b;
       ELSE
