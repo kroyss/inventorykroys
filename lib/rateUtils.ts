@@ -15,3 +15,12 @@ export function calcSpreadAndDiscount(
     recommended_discount: Math.round(recommended_discount * 100) / 100,
   }
 }
+
+// Exceso % (precio sugerido ML sobre el base): es de CADA EMPRESA (app_settings
+// `ml_exceso`), no de la tasa del día, que es común a todas. Sin valor guardado: 100.
+export const EXCESO_DEFAULT = 100
+export async function excesoEmpresa(db: { query: (sql: string) => Promise<{ rows: { value: string }[] }> }) {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = 'ml_exceso'`)
+  const n = parseFloat(r?.value ?? '')
+  return Number.isFinite(n) && n >= 0 && n <= 500 ? n : EXCESO_DEFAULT
+}

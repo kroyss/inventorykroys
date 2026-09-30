@@ -81,7 +81,7 @@ export default function UsuariosClient({ country }: { country: Country }) {
     <div className="space-y-4">
       <PageHeader
         title="Usuarios"
-        subtitle={`Quién puede entrar al sistema (${country}). Cada país tiene sus propios usuarios.`}
+        subtitle={`Quién puede entrar a esta empresa (${country}). Cada empresa tiene sus propios usuarios.`}
         actions={<button onClick={() => { setNuevo(true); setError(null) }} className="btn-primary text-sm">+ Nuevo usuario</button>}
       />
 

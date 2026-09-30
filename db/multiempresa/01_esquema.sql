@@ -129,6 +129,12 @@ BEGIN
   END LOOP;
 END $$;
 
+-- El exceso % (precio sugerido ML) pasa a ser de cada empresa: SolucionesMC VE conserva
+-- el que tiene hoy la última tasa.
+INSERT INTO app_settings (empresa_id, key, value)
+SELECT 1, 'ml_exceso', excess_percentage::text
+FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1;
+
 -- ── 3. Únicos de negocio: por empresa ─────────────────────────────────────
 ALTER TABLE app_settings     DROP CONSTRAINT app_settings_pkey,     ADD PRIMARY KEY (empresa_id, key);
 ALTER TABLE finance_settings DROP CONSTRAINT finance_settings_pkey, ADD PRIMARY KEY (empresa_id, key);
@@ -192,7 +198,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO inventory
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO inventory_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO inventory_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO inventory_app;
--- Las tablas globales de estructura (empresas, organizaciones) la app solo las lee.
-REVOKE INSERT, UPDATE, DELETE ON organizaciones, empresas FROM inventory_app;
+-- organizaciones / empresas: la app las escribe solo desde Plataforma (dueño de la
+-- plataforma, app/api/plataforma). Nunca se borran: se desactivan.
+REVOKE DELETE ON organizaciones, empresas FROM inventory_app;
 
 COMMIT;

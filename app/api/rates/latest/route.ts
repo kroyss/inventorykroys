@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized } from '@/lib/session'
-import { calcSpreadAndDiscount } from '@/lib/rateUtils'
+import { calcSpreadAndDiscount, excesoEmpresa } from '@/lib/rateUtils'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -29,7 +29,7 @@ export async function GET(_: NextRequest) {
 
     const official = parseFloat(row.official_rate)
     const parallel = parseFloat(row.parallel_rate)
-    const excess   = parseFloat(row.excess_percentage)
+    const excess   = await excesoEmpresa(db)
     const { spread, recommended_discount } = calcSpreadAndDiscount(official, parallel, excess)
 
     return NextResponse.json({

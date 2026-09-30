@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
-import { calcSpreadAndDiscount } from '@/lib/rateUtils'
+import { calcSpreadAndDiscount, excesoEmpresa } from '@/lib/rateUtils'
 
 export async function GET(req: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -22,10 +22,10 @@ export async function GET(req: NextRequest) {
       LIMIT $1
     `, [limit])
 
+    const excess = await excesoEmpresa(db)
     return NextResponse.json(rows.map(r => {
       const official = parseFloat(r.official_rate)
       const parallel = parseFloat(r.parallel_rate)
-      const excess   = parseFloat(r.excess_percentage)
       const { spread, recommended_discount } = calcSpreadAndDiscount(official, parallel, excess)
       return {
         id: r.id,

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import SignOutButton from './SignOutButton'
 import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
-import { empresasDeUsuario } from '@/lib/empresa'
+import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
@@ -26,6 +26,11 @@ export default async function Navbar() {
 
         <div className="flex items-center gap-3 shrink-0 ml-auto">
           <span className="text-xs text-neutral-400 hidden sm:block">{session?.user?.name}</span>
+          {session?.user && esDuenoPlataforma(session.user) && (
+            <Link href="/plataforma" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors hidden md:block">
+              Plataforma
+            </Link>
+          )}
           {role === 'admin' && (
             <Link href="/usuarios" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors hidden md:block">
               Usuarios
