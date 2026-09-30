@@ -120,7 +120,7 @@ export function Tabs<T extends string>({ items, value, onChange, className = '' 
   items: TabItem<T>[]; value: T; onChange: (v: T) => void; className?: string
 }) {
   return (
-    <div className={`flex items-end gap-1 border-b border-neutral-200 overflow-x-auto ${className}`} role="tablist">
+    <div className={`flex items-end gap-1 border-b border-neutral-200 overflow-x-auto overflow-y-hidden [scrollbar-width:none] ${className}`} role="tablist">
       {items.map((t, i) => {
         const on = t.value === value
         const sep = i > 0 && t.group && t.group !== items[i - 1].group
@@ -136,7 +136,7 @@ export function Tabs<T extends string>({ items, value, onChange, className = '' 
                   {t.count}
                 </span>
               )}
-              {on && <span className="absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-[var(--marca-fuerte)]" />}
+              {on && <span className="absolute left-2 right-2 bottom-0 h-0.5 rounded-full bg-[var(--marca-fuerte)]" />}
             </button>
           </div>
         )
