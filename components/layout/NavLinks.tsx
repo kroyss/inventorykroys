@@ -14,7 +14,7 @@ const allLinks: { href: string; label: string; roles: UserRole[]; countries: Cou
   { href: '/productos',  label: 'Productos', roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/reportes',   label: 'Reportes',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/finanzas',   label: 'Finanzas',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/tasas',      label: 'Ajustes',   roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
+  // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/despachos',        label: 'Despachos',  roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },

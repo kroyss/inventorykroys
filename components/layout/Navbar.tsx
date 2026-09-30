@@ -1,14 +1,12 @@
-import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import SignOutButton from './SignOutButton'
+import UserMenu from './UserMenu'
 import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
 import EspacioSwitcher from './EspacioSwitcher'
 import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
-import { marca } from '@/lib/marca'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
@@ -26,36 +24,21 @@ export default async function Navbar() {
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-6">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
 
-        <div className="flex items-center gap-2 mr-2 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={marca().logo} alt={marca().nombre} className={`h-9 w-auto ${marca().logoRedondo ? 'rounded-lg' : ''}`} />
-          <span className="text-[11px] font-semibold text-neutral-500 border border-neutral-200 rounded px-1.5 py-0.5">
-            {marca().id === 'ecd' ? session?.user.empresaNombre : country}
-          </span>
-          <EspacioSwitcher automatizaciones={conAutomatizaciones} radarUrl={conRadar ? radarUrl() : null} />
-        </div>
+        <EspacioSwitcher automatizaciones={conAutomatizaciones} radarUrl={conRadar ? radarUrl() : null} />
 
         <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
 
         <div className="flex items-center gap-3 shrink-0 ml-auto">
-          <span className="text-xs text-neutral-400 hidden sm:block">{session?.user?.name}</span>
-          {session?.user && esDuenoPlataforma(session.user) && (
-            <Link href="/plataforma" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors hidden md:block">
-              Plataforma
-            </Link>
-          )}
-          {role === 'admin' && (
-            <Link href="/usuarios" className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors hidden md:block">
-              Usuarios
-            </Link>
-          )}
           {session?.user.empresaId && (
             <CountrySwitcher actual={session.user.empresaId}
               empresas={empresas.map(e => ({ id: e.id, nombre: e.nombre, country: e.country }))} />
           )}
-          <SignOutButton />
+          {session?.user && (
+            <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
+              ajustes={role === 'admin'} usuarios={role === 'admin'} plataforma={esDuenoPlataforma(session.user)} />
+          )}
         </div>
 
       </div>
