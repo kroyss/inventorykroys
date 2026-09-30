@@ -1,7 +1,7 @@
 // Marca de la instalación. La MISMA app y la MISMA base se sirven con dos marcas, una por
 // contenedor (variable MARCA, se lee en tiempo de ejecución, no al compilar):
-//   inventory.syncsora.com        → syncsora (por defecto)
-//   app.elcomerciantedigital.com  → ecd
+//   app.elcomerciantedigital.com  → ecd (por defecto; Syncsora ya no se usa)
+//   MARCA=syncsora                → la marca vieja, solo si se pide explícitamente
 // Solo cambia lo que se ve (nombre, logo, íconos); los datos y permisos son los mismos.
 export interface Marca {
   id: 'syncsora' | 'ecd'
@@ -35,5 +35,5 @@ const MARCAS: Record<Marca['id'], Marca> = {
 }
 
 export function marca(): Marca {
-  return MARCAS[process.env.MARCA === 'ecd' ? 'ecd' : 'syncsora']
+  return MARCAS[process.env.MARCA === 'syncsora' ? 'syncsora' : 'ecd']
 }
