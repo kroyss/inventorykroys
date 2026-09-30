@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import SignOutButton from './SignOutButton'
 import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
+import EspacioSwitcher from './EspacioSwitcher'
+import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
+import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
 import { marca } from '@/lib/marca'
 
@@ -12,6 +15,14 @@ export default async function Navbar() {
   const role    = session?.user.role    ?? 'user'
   const country = session?.user.country ?? 'VE'
   const empresas = session?.user.id ? await empresasDeUsuario(session.user.id) : []
+  // Espacios: Automatizaciones si la empresa tiene alguno de sus módulos; Radar si la
+  // cuenta tiene ese producto (users.productos).
+  const modulos = session?.user.modulos ?? []
+  const conAutomatizaciones = MODULOS_AUTOMATIZACIONES.some(m => modulos.includes(m))
+  const { rows: [cuenta] } = session?.user.id
+    ? await dbGlobal().query(`SELECT productos FROM users WHERE id = $1`, [session.user.id])
+    : { rows: [] as { productos: string[] }[] }
+  const conRadar = !!cuenta?.productos?.includes('radar')
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
@@ -20,11 +31,12 @@ export default async function Navbar() {
         <div className="flex items-center gap-2 mr-2 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={marca().logo} alt={marca().nombre} className={`h-9 w-auto ${marca().logoRedondo ? 'rounded-lg' : ''}`} />
-          {marca().id === 'ecd' && <span className="text-sm font-semibold text-neutral-800 hidden lg:inline">El Comerciante Digital</span>}
           <span className="text-[11px] font-semibold text-neutral-500 border border-neutral-200 rounded px-1.5 py-0.5">
             {marca().id === 'ecd' ? session?.user.empresaNombre : country}
           </span>
         </div>
+
+        <EspacioSwitcher automatizaciones={conAutomatizaciones} radarUrl={conRadar ? radarUrl() : null} />
 
         <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
 

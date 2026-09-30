@@ -3,8 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import ReportadorPanel from './ReportadorPanel'
-import GuiasTealca from './GuiasTealca'
 
 // ── Tipos de la API ─────────────────────────────────────────────────────────
 type Estado =
@@ -320,9 +318,13 @@ export default function DespachosClient({ isAdmin, reportador }: { isAdmin: bool
           )}
       </section>
 
-      <GuiasTealca isAdmin={isAdmin} onGuardado={cargar} />
-
-      {reportador && <ReportadorPanel isAdmin={isAdmin} />}
+      {reportador && (
+        <Link href="/reportador"
+          className="block bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3 text-sm hover:bg-neutral-50">
+          <span className="font-semibold text-neutral-800">Reportador</span>
+          <span className="text-neutral-500"> · guías finales de Tealca, equipos y mensajes al comprador →</span>
+        </Link>
+      )}
 
       {/* Jornadas cerradas */}
       {data.cerradas.length > 0 && (

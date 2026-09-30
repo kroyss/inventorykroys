@@ -14,6 +14,7 @@ export type Modulo = keyof typeof MODULOS
 // Página → módulo que la habilita (lo que no está aquí es del núcleo).
 export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/despachos': 'despachos',
+  '/reportador': 'reportador',
   '/facturas':  'facturas',
   '/finanzas':  'finanzas',
 }

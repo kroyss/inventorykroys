@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
+import { espacioDe } from '@/lib/espacios'
 
 interface NavItem { href: string; label: string; icon: string; roles: UserRole[]; countries: Country[] }
 
@@ -16,12 +17,22 @@ const PRIMARY: NavItem[] = [
 
 const MORE: NavItem[] = [
   { href: '/inventario', label: 'Inventario', icon: '📋', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/despachos',  label: 'Despachos',  icon: '🚚', roles: ['admin', 'user'], countries: ['VE'] },
+  { href: '/automatizaciones', label: 'Automatizaciones', icon: '🤖', roles: ['admin', 'user'], countries: ['VE'] },
   { href: '/facturas',   label: 'Facturas',   icon: '🧾', roles: ['admin', 'user'], countries: ['VE'] },
   { href: '/productos',  label: 'Productos',  icon: '🏷️', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: '💰', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: '⚙️', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/usuarios',   label: 'Usuarios',   icon: '👥', roles: ['admin'],        countries: ['VE', 'CO'] },
+]
+
+// Espacio Automatizaciones (móvil)
+const PRIMARY_AUTO: NavItem[] = [
+  { href: '/automatizaciones', label: 'Inicio',     icon: '🤖', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
+  { href: '/despachos',        label: 'Despachos',  icon: '🚚', roles: ['admin', 'user'], countries: ['VE'] },
+  { href: '/reportador',       label: 'Reportador', icon: '💬', roles: ['admin', 'user'], countries: ['VE'] },
+]
+const MORE_AUTO: NavItem[] = [
+  { href: '/dashboard',        label: 'Inventario', icon: '📋', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
 ]
 
 export default function BottomNav({ role, country, modulos }: { role: UserRole; country: Country; modulos: string[] }) {
@@ -31,8 +42,10 @@ export default function BottomNav({ role, country, modulos }: { role: UserRole; 
   const visible = (items: NavItem[]) =>
     items.filter(i => i.roles.includes(role) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
 
-  const primary = visible(PRIMARY)
-  const more    = visible(MORE)
+  const auto    = espacioDe(pathname) === 'automatizaciones'
+  const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador')
+  const primary = visible(auto ? PRIMARY_AUTO : PRIMARY)
+  const more    = visible(auto ? MORE_AUTO : MORE).filter(i => i.href !== '/automatizaciones' || tieneAuto)
 
   return (
     <>

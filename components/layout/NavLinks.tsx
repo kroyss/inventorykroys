@@ -3,11 +3,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
+import { espacioDe, type Espacio } from '@/lib/espacios'
 
-const allLinks = [
+const allLinks: { href: string; label: string; roles: UserRole[]; countries: Country[]; espacio?: Espacio }[] = [
   { href: '/dashboard',  label: 'Inicio',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/ventas',     label: 'Ventas',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/despachos',  label: 'Despachos', roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
   { href: '/facturas',   label: 'Facturas',  roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
   { href: '/inventario', label: 'Inventario',roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/compras',    label: 'Compras',   roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
@@ -15,6 +15,10 @@ const allLinks = [
   { href: '/reportes',   label: 'Reportes',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/finanzas',   label: 'Finanzas',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/tasas',      label: 'Ajustes',   roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
+  // ── Automatizaciones ──
+  { href: '/automatizaciones', label: 'Inicio',     roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/despachos',        label: 'Despachos',  roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
+  { href: '/reportador',       label: 'Reportador', roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
 ]
 
 interface Props {
@@ -27,6 +31,7 @@ export default function NavLinks({ role, country, modulos }: Props) {
   const pathname = usePathname()
   const links = allLinks.filter(
     l => l.roles.includes(role) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
+      && (l.espacio ?? 'inventario') === espacioDe(pathname)
   )
 
   return (
@@ -37,7 +42,7 @@ export default function NavLinks({ role, country, modulos }: Props) {
       {links.map(l => {
         const active =
           pathname === l.href ||
-          (l.href !== '/dashboard' && pathname.startsWith(l.href))
+          (l.href !== '/dashboard' && l.href !== '/automatizaciones' && pathname.startsWith(l.href))
         return (
           <Link
             key={l.href}
