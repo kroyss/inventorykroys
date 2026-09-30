@@ -51,22 +51,29 @@ async function buscar(db: Pool, conexionId: number, status: string, maxPaginas: 
   return out
 }
 
-/** Títulos/links/estado de las publicaciones que todavía no los tienen (multiget de 20). */
+/**
+ * Títulos/links/estado de las publicaciones que todavía no los tienen. De a UNA: en MLV
+ * el multiget (/items?ids=) responde 403 (PolicyAgent) y /items/{id}?attributes= no.
+ * Primero las de preguntas pendientes; un tope por pasada para no gastar el cron entero.
+ * Nunca corta la sincronización: si una falla, queda para la próxima.
+ */
 async function completarItems(db: Pool, conexionId: number) {
   const { rows } = await db.query(
-    `SELECT DISTINCT item_id FROM ml_preguntas WHERE conexion_id = $1 AND item_titulo IS NULL LIMIT 200`, [conexionId])
-  const ids = rows.map(r => r.item_id as string)
-  for (let i = 0; i < ids.length; i += 20) {
-    const lote = ids.slice(i, i + 20)
-    const r = await mlFetch<{ code: number; body: { id: string; title: string; permalink: string; status: string } }[]>(
-      db, conexionId, `/items?ids=${lote.join(',')}&attributes=id,title,permalink,status`)
-    for (const it of r) {
-      if (it.code !== 200 || !it.body) continue
+    `SELECT item_id FROM ml_preguntas WHERE conexion_id = $1 AND item_titulo IS NULL
+     GROUP BY item_id ORDER BY bool_or(estado = 'UNANSWERED') DESC, max(fecha) DESC LIMIT 40`, [conexionId])
+  let fallas = 0
+  for (const { item_id } of rows) {
+    try {
+      const it = await mlFetch<{ id: string; title: string; permalink: string; status: string }>(
+        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status`)
       await db.query(
         `UPDATE ml_preguntas SET item_titulo = $2, item_permalink = $3, item_estado = $4 WHERE item_id = $1`,
-        [it.body.id, it.body.title, it.body.permalink, it.body.status])
+        [item_id, it.title, it.permalink, it.status])
+    } catch {
+      if (++fallas >= 3) break          // si ML bloquea a todas, no insistir en esta pasada
     }
   }
+  return fallas
 }
 
 export interface ResultadoSync { cuenta: string; nuevas?: number; error?: string }
@@ -107,8 +114,13 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       if (!c.ultima_sync) {
         for (const q of await buscar(db, c.id, 'ANSWERED', 20)) await guardar(db, c.id, q)
       }
-      await completarItems(db, c.id)
+      // Las preguntas ya quedaron al día: se marca antes de lo opcional (títulos).
       await db.query(`UPDATE ml_conexiones SET ultima_sync = NOW(), ultimo_error = NULL WHERE id = $1`, [c.id])
+      const fallas = await completarItems(db, c.id)
+      if (fallas) {
+        await db.query(`UPDATE ml_conexiones SET ultimo_error = $2 WHERE id = $1`,
+          [c.id, 'MercadoLibre no dejó leer algunas publicaciones (títulos). Las preguntas sí están al día.'])
+      }
       const { rows: [{ n: despues }] } = await db.query(`SELECT COUNT(*)::int AS n FROM ml_preguntas WHERE conexion_id = $1`, [c.id])
       res.push({ cuenta: c.nickname, nuevas: despues - antes })
     } catch (e) {
@@ -137,6 +149,7 @@ interface ItemML {
 export interface Contexto {
   pregunta: { id: number; texto: string; item_id: string; fecha: string }
   item: ItemML | null
+  titulo: string | null            // guardado en la bandeja (si ML no deja leer la publicación)
   descripcion: string | null
   producto: { code: string; name: string; stock: number; precio_usd: number | null } | null
   tasa: number | null
@@ -148,12 +161,16 @@ export interface Contexto {
 
 export async function armarContexto(db: Pool, preguntaId: number, country: string): Promise<Contexto & { conexionId: number }> {
   const { rows: [q] } = await db.query(
-    `SELECT id, conexion_id, item_id, texto, fecha FROM ml_preguntas WHERE id = $1`, [preguntaId])
+    `SELECT id, conexion_id, item_id, item_titulo, texto, fecha FROM ml_preguntas WHERE id = $1`, [preguntaId])
   if (!q) throw new Error('Pregunta no encontrada')
 
   let item: ItemML | null = null
   let descripcion: string | null = null
-  try { item = await mlFetch<ItemML>(db, q.conexion_id, `/items/${q.item_id}`) } catch { /* sin datos de ML */ }
+  // Con `attributes=` explícito: el GET completo lo puede frenar el PolicyAgent de ML.
+  try {
+    item = await mlFetch<ItemML>(db, q.conexion_id, `/items/${q.item_id}?attributes=` +
+      'id,title,price,currency_id,available_quantity,condition,status,permalink,attributes,shipping,warranty')
+  } catch { /* sin datos de ML: la IA trabaja con el resto */ }
   try {
     const d = await mlFetch<{ plain_text?: string }>(db, q.conexion_id, `/items/${q.item_id}/description`)
     descripcion = d.plain_text?.trim() || null
@@ -186,7 +203,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   return {
     conexionId: q.conexion_id,
     pregunta: { id: Number(q.id), texto: q.texto, item_id: q.item_id, fecha: q.fecha },
-    item, descripcion,
+    item, titulo: q.item_titulo ?? null, descripcion,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol?.value ?? '',
@@ -222,6 +239,9 @@ function bloqueContexto(c: Contexto) {
       (c.item.shipping?.free_shipping ? ' · envío gratis' : '') + (c.item.warranty ? ` · garantía: ${c.item.warranty}` : ''))
     const attrs = (c.item.attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`)
     if (attrs.length) L.push(`Ficha técnica: ${attrs.join(' · ')}`)
+  } else if (c.titulo) {
+    L.push(`
+PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   }
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, 4000)}`)
   if (c.producto) {
