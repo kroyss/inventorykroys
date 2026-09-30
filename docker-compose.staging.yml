@@ -1,0 +1,86 @@
+# Staging: copia de pruebas del sistema (etapa 1 del plan multiempresa).
+#
+# Vive en OTRA carpeta del VPS (/opt/inventory_staging, un segundo `git clone`), con su
+# propia base, su propia red y su propio puerto. Por diseño NO puede tocar producción:
+#   - su red (inventory_staging_net) no incluye inventory_db_ve / inventory_db_co;
+#   - su base (inventory_db_staging) es un contenedor aparte con su propio volumen;
+#   - APP_ENV=staging apaga el Reportador (no le escribe a compradores reales).
+# Los datos llegan copiados con scripts/staging-refrescar.sh (solo LEE producción).
+#
+# Levantar / actualizar:  ./deploy-staging.sh [rama]
+name: inventory_staging
+
+services:
+  inventory_next_staging:
+    container_name: inventory_next_staging
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      # Solo local: nginx publica staging.* con clave (ver STAGING.md).
+      - "127.0.0.1:8511:3000"
+    environment:
+      - TZ=America/Caracas
+      - APP_ENV=staging
+      - ETIQUETAS_URL=http://inventory_etiquetas_staging:8000
+    env_file:
+      - .env.staging
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      inventory_db_staging:
+        condition: service_healthy
+    networks:
+      - inventory_staging_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  inventory_etiquetas_staging:
+    container_name: inventory_etiquetas_staging
+    build:
+      context: ./services/etiquetas
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - inventory_staging_net
+
+  inventory_db_staging:
+    container_name: inventory_db_staging
+    # MISMA versión mayor que producción (pg_restore no baja de versión). Verla con:
+    #   docker exec inventory_db_ve postgres -V
+    image: ${STAGING_PG_IMAGE:-postgres:16-alpine}
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${STAGING_DB_PASSWORD:?Falta STAGING_DB_PASSWORD en .env}
+      - POSTGRES_DB=postgres
+    volumes:
+      - inventory_staging_pgdata:/var/lib/postgresql/data
+    networks:
+      - inventory_staging_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  inventory_staging_pgdata:
+
+networks:
+  inventory_staging_net:
+    name: inventory_staging_net

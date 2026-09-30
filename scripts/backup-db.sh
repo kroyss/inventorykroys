@@ -6,6 +6,8 @@
 # Uso en el servidor (Contabo):
 #   chmod +x backup-db.sh
 #   ./backup-db.sh                 # respaldo manual inmediato
+#   ./backup-db.sh antes-031       # respaldo ANTES de una migración: va a
+#                                  # $DEST/antes-de-migrar/ y NO se borra solo
 #
 # Cron diario (3:00 AM):
 #   crontab -e
@@ -27,16 +29,27 @@ declare -A DBS=(
   [co]="inventory_db_co:inventory_co"
 )
 
-mkdir -p "$DEST"
+ETIQUETA="${1:-}"
+if [ -n "$ETIQUETA" ]; then
+  [[ "$ETIQUETA" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Etiqueta inválida: solo letras, números, - y _" >&2; exit 1; }
+  SALIDA="$DEST/antes-de-migrar"
+  SUFIJO="_${ETIQUETA}"
+else
+  SALIDA="$DEST"
+  SUFIJO=""
+fi
+mkdir -p "$SALIDA"
 STAMP="$(date +%F_%H%M)"
 ok=0; fail=0
 
 for key in "${!DBS[@]}"; do
   container="${DBS[$key]%%:*}"
   dbname="${DBS[$key]##*:}"
-  out="$DEST/backup_${key}_${STAMP}.sql.gz"
+  out="$SALIDA/backup_${key}_${STAMP}${SUFIJO}.sql.gz"
 
-  if docker exec "$container" pg_dump -U "$PGUSER" "$dbname" 2>/dev/null | gzip > "$out"; then
+  # pipefail: si pg_dump falla a mitad, el pipe falla (no queda un .gz truncado como bueno).
+  # gzip -t + tamaño mínimo: el archivo se puede descomprimir y no está vacío.
+  if docker exec "$container" pg_dump -U "$PGUSER" "$dbname" | gzip > "$out"      && gzip -t "$out" && [ "$(gzip -cd "$out" | head -c 100000 | wc -c)" -gt 1000 ]; then
     size="$(du -h "$out" | cut -f1)"
     echo "[$(date +%T)] OK  $dbname -> $out ($size)"
     ok=$((ok+1))
@@ -48,7 +61,8 @@ for key in "${!DBS[@]}"; do
 done
 
 # --- Rotación: borra respaldos más viejos que RETENTION_DAYS ---
-find "$DEST" -name 'backup_*.sql.gz' -type f -mtime "+${RETENTION_DAYS}" -delete
+# (solo la carpeta principal: los respaldos "antes-de-migrar" se conservan)
+find "$DEST" -maxdepth 1 -name 'backup_*.sql.gz' -type f -mtime "+${RETENTION_DAYS}" -delete
 
-echo "[$(date +%T)] Respaldo terminado: $ok ok, $fail fallidos. Destino: $DEST"
+echo "[$(date +%T)] Respaldo terminado: $ok ok, $fail fallidos. Destino: $SALIDA"
 [ "$fail" -eq 0 ]

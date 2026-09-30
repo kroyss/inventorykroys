@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getDb } from '@/lib/db'
 import { hashToken, nuevoToken } from '@/lib/reportador'
+import { ES_STAGING, MENSAJE_STAGING_REPORTADOR } from '@/lib/entorno'
 
 const Schema = z.object({
   codigo:  z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3}-?[A-Z0-9]{3}$/, 'Código inválido'),
@@ -16,6 +17,7 @@ const Schema = z.object({
  * queda su hash). Sin sesión: el código de un solo uso y con vencimiento es la llave.
  */
 export async function POST(req: NextRequest) {
+  if (ES_STAGING) return NextResponse.json({ error: MENSAJE_STAGING_REPORTADOR }, { status: 403 })
   try {
     const body = Schema.parse(await req.json())
     const codigo = body.codigo.includes('-') ? body.codigo : `${body.codigo.slice(0, 3)}-${body.codigo.slice(3)}`

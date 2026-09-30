@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import type { Pool } from 'pg'
 import { getDb } from '@/lib/db'
 import { REMITENTE_DEFAULT } from '@/lib/despachos'
+import { ES_STAGING, MENSAJE_STAGING_REPORTADOR } from '@/lib/entorno'
 
 // MercadoLibre corta el mensaje en 350 caracteres SIN AVISAR (main_reportador.py).
 export const LIMITE_CARACTERES = 350
@@ -58,6 +59,7 @@ export interface Equipo { id: number; nombre: string | null }
 /** Autentica al equipo por `Authorization: Bearer <token>`. */
 export async function autenticarEquipo(req: NextRequest):
   Promise<{ db: Pool; equipo: Equipo } | { error: NextResponse }> {
+  if (ES_STAGING) return { error: NextResponse.json({ error: MENSAJE_STAGING_REPORTADOR }, { status: 403 }) }
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
   const m = /^(ve|co)_[0-9a-f]{48}$/.exec(token)
   if (!m) return { error: NextResponse.json({ error: 'Equipo no vinculado' }, { status: 401 }) }

@@ -34,6 +34,7 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.production.example
+!.env.staging.example
 
 # uploads (fotos de importaciones — viven en el server, no en git)
 /uploads
