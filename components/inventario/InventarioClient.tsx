@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useEscape } from '@/components/ui/useEscape'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
@@ -140,6 +141,9 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
   const mlPriceVE = (it: InventoryItem) =>
     it.total_cost * (1 + (it.profit_percentage ?? 0) / 100) * (1 + veExcess / 100)
   const [items,    setItems]    = useState<InventoryItem[]>(initialItems)
+  const confirm = useConfirm()
+  const [aviso, setAviso]       = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+  const [aplicandoRec, setAplicandoRec] = useState(false)
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [search,   setSearch]   = useState('')
   const [statusF,  setStatusF]  = useState<StockStatus | ''>('')
@@ -342,6 +346,28 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
     // Inactivos ya no se listan en Inventario (solo en Productos).
   ]
 
+  // Productos con mín o máx sin configurar (0) que tienen un recomendado por ventas.
+  const sinConfigurar = items.filter(i => i.is_active &&
+    ((i.min_stock === 0 && i.min_stock_rec > 0) || (i.max_stock === 0 && i.max_stock_rec > 0))).length
+
+  const usarRecomendados = async () => {
+    const ok = await confirm({
+      title: 'Usar los recomendados',
+      message: `Se guardará el stock mínimo y máximo recomendado (4 y 12 meses de ventas) en ${sinConfigurar} producto(s) que no lo tienen configurado. Lo que ya tiene un valor no se toca.\n\nDesde ese momento, los productos con stock igual o por debajo de su mínimo pasan a "Stock bajo" (también en las alertas del Inicio).`,
+      confirmText: 'Guardar recomendados',
+    })
+    if (!ok) return
+    setAplicandoRec(true); setAviso(null)
+    try {
+      const res = await fetch('/api/inventory/recomendados', { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setAviso({ type: 'error', text: d.error ?? 'No se pudo guardar' }); return }
+      const listRes = await fetch('/api/inventory')
+      if (listRes.ok) setItems(await listRes.json())
+      setAviso({ type: 'ok', text: `Listo: mínimo y máximo guardados en ${d.productos} producto(s).` })
+    } finally { setAplicandoRec(false) }
+  }
+
   const th = (key: SortKey, label: string, align: 'left' | 'right' | 'center' = 'left') => (
     <th onClick={() => toggleSort(key)}
       className={`px-3 py-2 font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800 ${
@@ -353,7 +379,19 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" />
+      <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={
+        isAdmin && sinConfigurar > 0 && (
+          <button onClick={usarRecomendados} disabled={aplicandoRec} className="btn-secondary text-sm whitespace-nowrap"
+            title="Guarda el mínimo y máximo recomendado en los productos que no lo tienen configurado">
+            {aplicandoRec ? 'Guardando…' : `Usar recomendados (${sinConfigurar})`}
+          </button>
+        )
+      } />
+      {aviso && (
+        <div className={`px-4 py-2 rounded-lg text-sm border ${aviso.type === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          {aviso.text}
+        </div>
+      )}
       {/* KPI cards clickeables (filtran la tabla) */}
       <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}>
         {CHIPS.filter(c => !c.adminOnly || isAdmin).map(c => (
