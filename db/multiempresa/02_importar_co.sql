@@ -103,19 +103,19 @@ INSERT INTO _backfills (name, done_at)
 SELECT s.name, s.done_at FROM co_src._backfills s ON CONFLICT (name) DO NOTHING;
 
 -- ── Secuencias al máximo real ─────────────────────────────────────────────
+-- Las secuencias de estas bases NO están asociadas a su columna (se crearon sin OWNED BY),
+-- así que se ubican por el DEFAULT nextval('...') de cada columna.
 DO $$
 DECLARE r RECORD; m BIGINT;
 BEGIN
   FOR r IN
-    SELECT s.relname AS seq, t.relname AS tabla, a.attname AS col
-    FROM pg_class s
-    JOIN pg_depend d ON d.objid = s.oid AND d.deptype = 'a'
-    JOIN pg_class t ON t.oid = d.refobjid
-    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
-    WHERE s.relkind = 'S' AND s.relnamespace = 'public'::regnamespace
+    SELECT c.table_name AS tabla, c.column_name AS col,
+           substring(c.column_default from $re$nextval\('([^']+)'$re$) AS seq
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public' AND c.column_default LIKE 'nextval(%'
   LOOP
     EXECUTE format('SELECT max(%I) FROM %I', r.col, r.tabla) INTO m;
-    IF m IS NOT NULL THEN PERFORM setval(format('%I', r.seq), m); END IF;
+    IF m IS NOT NULL THEN PERFORM setval(r.seq::regclass, m); END IF;
   END LOOP;
 END $$;
 

@@ -216,6 +216,24 @@ UNION ALL
 SELECT format('E empresa %s no ve la otra', c.emp), c.n = 0, format('ve %s ajenas', c.n)
 FROM e_conteos c WHERE c.tabla = 'otra empresa visible';
 
+-- ── F. Secuencias: el próximo id no choca con uno existente ───────────────
+DO $$
+DECLARE r RECORD; m BIGINT; ultimo BIGINT; malas TEXT := '';
+BEGIN
+  FOR r IN
+    SELECT c.table_name AS tabla, c.column_name AS col,
+           substring(c.column_default from $re$nextval\('([^']+)'$re$) AS seq
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public' AND c.column_default LIKE 'nextval(%'
+  LOOP
+    EXECUTE format('SELECT max(%I) FROM %I', r.col, r.tabla) INTO m;
+    EXECUTE format('SELECT last_value FROM %s', r.seq) INTO ultimo;
+    IF m IS NOT NULL AND ultimo < m THEN malas := malas || format('%s (%s < %s) ', r.tabla, ultimo, m); END IF;
+  END LOOP;
+  INSERT INTO resultado (control, ok, detalle)
+  VALUES ('F secuencias al día', malas = '', CASE WHEN malas = '' THEN 'todas' ELSE malas END);
+END $$;
+
 -- ── Salida ────────────────────────────────────────────────────────────────
 \pset footer off
 SELECT CASE WHEN ok THEN 'OK   ' ELSE 'FALLA' END AS " ", control, detalle FROM resultado
