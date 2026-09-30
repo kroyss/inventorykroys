@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       const { rows: [c] } = await client.query(`
         INSERT INTO invoice_customers (doc_id, name, address, phone, is_special, retention_percent)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (doc_id) DO UPDATE SET
+        ON CONFLICT (empresa_id, doc_id) DO UPDATE SET
           name = EXCLUDED.name, address = EXCLUDED.address, phone = EXCLUDED.phone,
           is_special = EXCLUDED.is_special, retention_percent = EXCLUDED.retention_percent,
           updated_at = NOW()

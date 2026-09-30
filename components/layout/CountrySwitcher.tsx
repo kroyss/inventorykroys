@@ -2,30 +2,34 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 
-// Selector VE/CO para admin: cambia el país de la sesión sin re-loguear.
-// El backend (callback jwt) re-resuelve el id del admin en la DB destino.
-export default function CountrySwitcher({ current }: { current: 'VE' | 'CO' }) {
+export interface EmpresaOpcion { id: number; nombre: string; country: 'VE' | 'CO' }
+
+// Selector de empresa: cambia la empresa de la sesión sin volver a entrar. Solo aparece
+// si el usuario entra a más de una. Si sus empresas son de países distintos (SolucionesMC
+// VE / CO) se muestran como VE / CO, igual que antes; si no, por nombre.
+export default function CountrySwitcher({ actual, empresas }: { actual: number; empresas: EmpresaOpcion[] }) {
   const { update } = useSession()
   const [busy, setBusy] = useState(false)
+  if (empresas.length < 2) return null
 
-  const switchTo = async (c: 'VE' | 'CO') => {
-    if (c === current || busy) return
+  const porPais = new Set(empresas.map(e => e.country)).size === empresas.length
+  const cambiar = async (id: number) => {
+    if (id === actual || busy) return
     setBusy(true)
-    await update({ country: c })
-    // Recarga completa para rehacer server components y datos del nuevo país,
-    // pero manteniendo la pestaña/sección actual (sin query, que puede traer
-    // filtros o ids del país anterior). Las secciones del navbar existen en ambos.
+    await update({ empresaId: id })
+    // Recarga completa para rehacer server components y datos de la otra empresa,
+    // manteniendo la sección (sin query: puede traer filtros o ids de la anterior).
     window.location.assign(window.location.pathname)
   }
 
   return (
-    <div className="flex rounded-lg border border-neutral-200 overflow-hidden text-xs" title="Cambiar de país">
-      {(['VE', 'CO'] as const).map(c => (
-        <button key={c} onClick={() => switchTo(c)} disabled={busy}
+    <div className="flex rounded-lg border border-neutral-200 overflow-hidden text-xs" title="Cambiar de empresa">
+      {empresas.map(e => (
+        <button key={e.id} onClick={() => cambiar(e.id)} disabled={busy} title={e.nombre}
           className={`px-2 py-1 font-semibold transition-colors disabled:opacity-60 ${
-            current === c ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-500 hover:bg-neutral-100'
+            actual === e.id ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-500 hover:bg-neutral-100'
           }`}>
-          {c}
+          {porPais ? e.country : e.nombre}
         </button>
       ))}
     </div>

@@ -119,7 +119,7 @@ export async function PATCH(req: NextRequest) {
     const { digitos } = SchemaDigitos.parse(await req.json())
     await db.query(
       `INSERT INTO app_settings(key, value) VALUES ('tealca_guia_digitos', $1)
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [String(digitos)])
+       ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [String(digitos)])
     return NextResponse.json({ ok: true, digitos })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

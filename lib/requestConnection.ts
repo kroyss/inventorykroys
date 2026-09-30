@@ -1,5 +1,6 @@
 import { after } from 'next/server'
 import type { Pool, PoolClient } from 'pg'
+import { EmpresaDb } from '@/lib/db'
 
 /**
  * Conexión DEDICADA para todo el request, para endpoints que usan transacciones.
@@ -26,6 +27,9 @@ import type { Pool, PoolClient } from 'pg'
  * ROLLBACK antes de devolverla, para que el próximo request no la herede.
  */
 export async function requestConnection(pool: Pool): Promise<PoolClient> {
+  // Multiempresa: la conexión de la empresa YA es dedicada al request y tiene la misma
+  // red de seguridad (ROLLBACK + RESET al final). Se usa esa.
+  if ((pool as unknown) instanceof EmpresaDb) return (pool as unknown as EmpresaDb).connect()
   const client = await pool.connect()
   const original = client.query
   let enTransaccion = false

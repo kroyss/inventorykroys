@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import InventarioClient from '@/components/inventario/InventarioClient'
 import type { InventoryItem } from '@/lib/types'
 
@@ -8,7 +8,7 @@ export const metadata = { title: 'Inventario — Syncsora Inventory' }
 
 export default async function InventarioPage() {
   const session = await getServerSession(authOptions)
-  const db      = getDb(session!.user.country)
+  const db      = dbDeSesion(session!)
 
   const { rows } = await db.query(`
     WITH v AS (

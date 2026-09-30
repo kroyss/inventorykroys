@@ -1,12 +1,33 @@
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
-import { getDb } from '@/lib/db'
+import { dbGlobal } from '@/lib/db'
+import { empresasDeUsuario, type EmpresaAcceso } from '@/lib/empresa'
 import type { NextAuthOptions } from 'next-auth'
 import type { Country, UserRole } from '@/lib/types'
 
-// Versión de sesión del usuario (migración 026). Se lee vía to_jsonb para que el login
-// funcione aunque la columna todavía no exista (deploy antes que la migración): vale 0.
-const SQL_SESSION_VERSION = `COALESCE((to_jsonb(users) ->> 'session_version')::int, 0) AS sv`
+// Multiempresa: el usuario es uno solo (users es global) y entra a una de SUS empresas
+// (usuario_empresas). La sesión guarda esa empresa; su país y su rol salen de ahí.
+
+// Qué empresa abrir al entrar o al cambiar: la pedida por id, si no la del país pedido
+// (el login y el selector VE/CO de siempre siguen funcionando), si no la primera.
+function elegir(empresas: EmpresaAcceso[], empresaId?: unknown, country?: unknown) {
+  const id = Number(empresaId)
+  return empresas.find(e => e.id === id)
+    ?? empresas.find(e => e.country === country)
+    ?? empresas[0]
+    ?? null
+}
+
+function datosEmpresa(e: EmpresaAcceso) {
+  return {
+    empresaId:     e.id,
+    empresaNombre: e.nombre,
+    country:       e.country,
+    role:          e.role,
+    modulos:       e.modulos,
+    organizacionId: e.organizacionId,
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,36 +37,31 @@ export const authOptions: NextAuthOptions = {
         username: { label: 'Usuario',    type: 'text' },
         password: { label: 'Contraseña', type: 'password' },
         country:  { label: 'País',       type: 'text' },
+        empresa:  { label: 'Empresa',    type: 'text' },
       },
       async authorize(credentials) {
-        const country = credentials?.country as Country | undefined
-        if (!credentials?.username || !credentials?.password || !country) return null
-        if (country !== 'VE' && country !== 'CO') return null
+        if (!credentials?.username || !credentials?.password) return null
 
-        const db = getDb(country)
-        const { rows } = await db.query(
-          `SELECT id, username, full_name, password_hash, role, country_access, is_active,
-                  ${SQL_SESSION_VERSION}
+        const db = dbGlobal()
+        const { rows: [user] } = await db.query(
+          `SELECT id, username, full_name, password_hash, is_active, session_version AS sv
            FROM users WHERE username = $1`,
-          [credentials.username.toLowerCase().trim()]
+          [credentials.username.toLowerCase().trim()],
         )
-
-        const user = rows[0]
         if (!user || !user.is_active) return null
-        if (user.country_access !== country) return null
+        if (!(await compare(credentials.password, user.password_hash))) return null
 
-        const valid = await compare(credentials.password, user.password_hash)
-        if (!valid) return null
+        const empresa = elegir(await empresasDeUsuario(user.id), credentials.empresa, credentials.country)
+        if (!empresa) return null   // usuario sin ninguna empresa activa
 
         await db.query(`UPDATE users SET last_login = NOW() WHERE id = $1`, [user.id])
 
         return {
-          id:       String(user.id),
-          email:    user.username,
-          name:     user.full_name,
-          role:     user.role as UserRole,
-          country:  user.country_access as Country,
-          sv:       user.sv,
+          id:    String(user.id),
+          email: user.username,
+          name:  user.full_name,
+          sv:    user.sv ?? 0,
+          ...datosEmpresa(empresa),
         }
       },
     }),
@@ -56,52 +72,54 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        const u = user as { role: UserRole; country: Country; sv?: number }
-        token.role    = u.role
-        token.country = u.country
-        token.sv      = u.sv ?? 0
+        const u = user as { role: UserRole; country: Country; empresaId: number; empresaNombre: string; modulos: string[]; organizacionId: number; sv?: number }
+        token.role          = u.role
+        token.country       = u.country
+        token.empresaId     = u.empresaId
+        token.empresaNombre = u.empresaNombre
+        token.modulos       = u.modulos
+        token.organizacionId = u.organizacionId
+        token.sv            = u.sv ?? 0
       }
 
-      // Cambio de país en caliente (solo admin), vía useSession().update({ country }).
-      // El admin está duplicado por DB con id propio, así que re-resolvemos su id en
-      // la DB destino para no atribuir movimientos al id equivocado.
-      if (trigger === 'update' && token.role === 'admin') {
-        const c = (session as { country?: string } | undefined)?.country
-        if (c === 'VE' || c === 'CO') {
-          const db = getDb(c)
-          const { rows } = await db.query(
-            `SELECT id, role, country_access, ${SQL_SESSION_VERSION}
-             FROM users WHERE username = $1 AND is_active = TRUE`,
-            [String(token.email ?? '').toLowerCase().trim()]
-          )
-          const u = rows[0]
-          if (u && u.role === 'admin' && u.country_access === c) {
-            token.sub     = String(u.id)
-            token.country = c
-            token.sv      = u.sv
-          }
-        }
+      // Una sesión de ANTES del cambio a multiempresa (sin empresa) no sirve: se descarta
+      // y el usuario vuelve a entrar.
+      if (!token.empresaId) throw new Error('Sesión anterior al cambio de sistema')
+
+      // Cada request: el usuario sigue activo, con la misma versión de sesión (contraseña)
+      // y con acceso a la empresa. Rol y módulos se refrescan de la base: un cambio de
+      // permisos o de módulos se aplica sin volver a entrar.
+      const empresas = await empresasDeUsuario(token.sub!)
+      const { rows: [u] } = await dbGlobal().query(
+        `SELECT is_active, session_version AS sv FROM users WHERE id = $1`, [token.sub])
+      if (!u || !u.is_active || u.sv !== (token.sv ?? 0)) {
+        throw new Error('Sesión cerrada: el usuario fue desactivado o cambió su contraseña')
       }
 
-      // La sesión solo sirve mientras el usuario siga activo, con el mismo rol y sin que
-      // le hayan cambiado la contraseña (session_version). Si no, se lanza: NextAuth
-      // descarta la sesión y borra la cookie. Sin esto, un usuario desactivado seguía
-      // entrando mientras tuviera la pestaña abierta (la sesión se renueva sola 12 h).
-      if (token.sub && (token.country === 'VE' || token.country === 'CO')) {
-        const { rows: [u] } = await getDb(token.country as Country).query(
-          `SELECT is_active, role, ${SQL_SESSION_VERSION} FROM users WHERE id = $1`, [token.sub])
-        if (!u || !u.is_active || u.role !== token.role || u.sv !== (token.sv ?? 0)) {
-          throw new Error('Sesión cerrada: el usuario fue desactivado o cambió su acceso')
+      // Cambio de empresa en caliente, vía useSession().update({ empresaId }) — o
+      // update({ country }), el selector VE/CO de siempre.
+      let actual = empresas.find(e => e.id === token.empresaId) ?? null
+      if (trigger === 'update') {
+        const pedido = session as { empresaId?: unknown; country?: unknown } | undefined
+        const otra = elegir(empresas, pedido?.empresaId, pedido?.country)
+        if (otra && (pedido?.empresaId !== undefined ? otra.id === Number(pedido.empresaId) : otra.country === pedido?.country)) {
+          actual = otra
         }
       }
+      if (!actual) throw new Error('Sesión cerrada: ya no tienes acceso a esta empresa')
+
+      Object.assign(token, datosEmpresa(actual))
       return token
     },
     session({ session, token }) {
       if (session.user) {
-        const u = session.user as { id?: string; role?: string; country?: string }
-        u.id      = token.sub
-        u.role    = token.role    as string
-        u.country = token.country as string
+        session.user.id            = token.sub!
+        session.user.role          = token.role
+        session.user.country       = token.country
+        session.user.empresaId     = token.empresaId
+        session.user.empresaNombre = token.empresaNombre
+        session.user.modulos       = token.modulos
+        session.user.organizacionId = token.organizacionId
       }
       return session
     },

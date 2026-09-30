@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import ComprasTabs from '@/components/compras/ComprasTabs'
 import type { PurchaseOrder, ImportOrder, Supplier } from '@/lib/types'
 
@@ -8,7 +8,7 @@ export const metadata = { title: 'Compras — Syncsora Inventory' }
 
 export default async function ComprasPage() {
   const session = await getServerSession(authOptions)
-  const db      = getDb(session!.user.country)
+  const db      = dbDeSesion(session!)
 
   const [{ rows: orders }, { rows: imports }, { rows: localSup }, { rows: importSup }] = await Promise.all([
     db.query(`

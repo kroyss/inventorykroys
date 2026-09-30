@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { esDuenoPlataforma } from '@/lib/empresa'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 
 const Schema = z.object({
@@ -12,7 +13,8 @@ const Schema = z.object({
 export async function POST(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  // La tasa es COMÚN a todas las empresas: solo la cambia el dueño de la plataforma.
+  if (!esDuenoPlataforma(session.user)) return forbidden()
   if (session.user.country !== 'VE') {
     return NextResponse.json({ error: 'Solo disponible para Venezuela' }, { status: 403 })
   }

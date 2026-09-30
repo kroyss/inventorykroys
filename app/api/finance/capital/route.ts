@@ -5,12 +5,12 @@ import { unauthorized, forbidden } from '@/lib/session'
 import { getCapital } from '@/lib/financeData'
 
 export async function GET(_: NextRequest) {
-  const { session, db } = await getFinanceSession()
-  if (!session || !db) return unauthorized()
+  const { session, db, dbs } = await getFinanceSession()
+  if (!session || !db || !dbs) return unauthorized()
   if (session.user.role !== 'admin') return forbidden()
 
   try {
-    return NextResponse.json(await getCapital())
+    return NextResponse.json(await getCapital(dbs))
   } catch (err) {
     return apiError(err)
   }

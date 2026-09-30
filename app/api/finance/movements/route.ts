@@ -20,8 +20,8 @@ const MovementSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { session, db } = await getFinanceSession()
-  if (!session || !db) return unauthorized()
+  const { session, db, dbs } = await getFinanceSession()
+  if (!session || !db || !dbs) return unauthorized()
   if (session.user.role !== 'admin') return forbidden()
 
   const monthRaw = new URL(req.url).searchParams.get('month') ?? ''
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     : currentYearMonth() // YYYY-MM actual (zona VE)
 
   // Libro unificado: compras/importaciones (auto) + ventas + movimientos manuales
-  const data = await getMonthlyMovements(month)
+  const data = await getMonthlyMovements(dbs, month)
   return NextResponse.json(data)
 }
 

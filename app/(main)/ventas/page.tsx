@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import VentasClient from '@/components/ventas/VentasClient'
 import type { InventoryItem } from '@/lib/types'
 
@@ -8,7 +8,7 @@ export const metadata = { title: 'Ventas — Syncsora Inventory' }
 
 export default async function VentasPage() {
   const session = await getServerSession(authOptions)
-  const db      = getDb(session!.user.country)
+  const db      = dbDeSesion(session!)
 
   // Sales are fetched client-side with server pagination (10/page) via /api/sales.
   // Here we only load the active product list for the create/edit form.

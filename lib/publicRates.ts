@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db'
+import { dbGlobal } from '@/lib/db'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 
 // Lectura pública de la última tasa cacheada (VE oficial/paralelo + TRM CO).
@@ -12,12 +12,12 @@ export interface PublicRates {
 
 export async function getPublicRates(): Promise<PublicRates> {
   const [ve, co] = await Promise.allSettled([
-    getDb('VE').query(`
+    dbGlobal().query(`
       SELECT official_rate, parallel_rate, excess_percentage, created_at
       FROM venezuela_exchange_rates
       ORDER BY rate_date DESC, created_at DESC LIMIT 1
     `),
-    getDb('CO').query(`
+    dbGlobal().query(`
       SELECT trm_rate::float AS trm_rate, created_at
       FROM colombia_exchange_rates
       ORDER BY rate_date DESC, created_at DESC LIMIT 1

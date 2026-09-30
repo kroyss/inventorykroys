@@ -1,4 +1,3 @@
-import { getDb } from '@/lib/db'
 import type { Pool } from 'pg'
 import type { FinanceLedgerRow } from '@/lib/types'
 
@@ -8,19 +7,21 @@ import type { FinanceLedgerRow } from '@/lib/types'
 
 export interface FinanceRates { cop: number; ves: number }
 
-const veDb = () => getDb('VE')
-const coDb = () => getDb('CO')
+// Multiempresa: `ve` = la empresa VE de la organización (maestra de Finanzas) y `co` =
+// su empresa hermana de CO, si tiene (ver getFinanceSession en lib/finance.ts).
+export interface FinanceDbs { ve: Pool; co: Pool | null }
 
-// Una query a CO que no rompa si CO aún no está disponible.
-async function coSafe<T>(fn: (db: Pool) => Promise<T>, fallback: T): Promise<T> {
-  try { return await fn(coDb() as unknown as Pool) } catch { return fallback }
+// Una query a CO que no rompa si la organización no tiene CO o no está disponible.
+async function coSafe<T>(dbs: FinanceDbs, fn: (db: Pool) => Promise<T>, fallback: T): Promise<T> {
+  if (!dbs.co) return fallback
+  try { return await fn(dbs.co) } catch { return fallback }
 }
 
-export async function getRates(): Promise<FinanceRates> {
-  const ve = veDb()
+export async function getRates(dbs: FinanceDbs): Promise<FinanceRates> {
+  const ve = dbs.ve
   // COP: TRM automática (cron) desde la DB de CO. La última fila es la vigente;
   // si CO no está disponible o aún no hay tasa, cae a 4000 como último recurso.
-  const cop = await coSafe(async db => {
+  const cop = await coSafe(dbs, async db => {
     const { rows } = await db.query(
       `SELECT trm_rate::float AS r FROM colombia_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`
     )
@@ -57,22 +58,22 @@ export interface MonthlyClose {
   surplus: number; surplusVE: number; surplusCO: number
 }
 
-export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
-  const ve = veDb()
-  const rates = await getRates()
+export async function getMonthlyClose(dbs: FinanceDbs, month: string): Promise<MonthlyClose> {
+  const ve = dbs.ve
+  const rates = await getRates(dbs)
 
   // Ventas (auto) por país
   const salesVE = (await ve.query(
     `SELECT COALESCE(SUM(total_amount),0)::float AS t FROM sales WHERE ${SALES_DONE} AND to_char(${SALES_DATE},'YYYY-MM')=$1`, [month]
   )).rows[0].t as number
-  const salesCO = await coSafe(async db =>
+  const salesCO = await coSafe(dbs, async db =>
     (await db.query(`SELECT COALESCE(SUM(total_amount),0)::float AS t FROM sales WHERE ${SALES_DONE} AND to_char(${SALES_DATE},'YYYY-MM')=$1`, [month])).rows[0].t as number,
     0)
 
   // Compras locales (auto) = lo pagado (total_paid), por fecha de creación
   const purchQ = `SELECT COALESCE(SUM(total_paid),0)::float AS t FROM purchase_orders WHERE order_type='local' AND total_paid > 0 AND to_char(created_at,'YYYY-MM')=$1`
   const purchVE = (await ve.query(purchQ, [month])).rows[0].t as number
-  const purchCO = await coSafe(async db =>
+  const purchCO = await coSafe(dbs, async db =>
     (await db.query(purchQ, [month])).rows[0].t as number, 0)
 
   // Importaciones (auto) = pagos 50%/100% en el mes
@@ -81,12 +82,12 @@ export async function getMonthlyClose(month: string): Promise<MonthlyClose> {
          + COALESCE(SUM(CASE WHEN to_char(paid_100_at,'YYYY-MM')=$1 THEN paid_100_amount ELSE 0 END),0)::float AS t
     FROM import_orders`
   const impVE = (await ve.query(impSql, [month])).rows[0].t as number
-  const impCO = await coSafe(async db => (await db.query(impSql, [month])).rows[0].t as number, 0)
+  const impCO = await coSafe(dbs, async db => (await db.query(impSql, [month])).rows[0].t as number, 0)
 
   // Envíos de importación (auto) = flete pagado en el mes (shipping_paid_at). USD.
   const shipSql = `SELECT COALESCE(SUM(shipping_cost),0)::float AS t FROM import_orders WHERE COALESCE(shipping_cost,0) > 0 AND to_char(shipping_paid_at,'YYYY-MM')=$1`
   const shipVE = (await ve.query(shipSql, [month])).rows[0].t as number
-  const shipCO = await coSafe(async db => (await db.query(shipSql, [month])).rows[0].t as number, 0)
+  const shipCO = await coSafe(dbs, async db => (await db.query(shipSql, [month])).rows[0].t as number, 0)
 
   // Movimientos manuales por categoría/moneda/país (en VE maestra)
   const { rows: mov } = await ve.query(`
@@ -157,15 +158,15 @@ export interface MonthlyMovements {
   surplus: number
 }
 
-export async function getMonthlyMovements(month: string): Promise<MonthlyMovements> {
-  const ve = veDb()
-  const rates = await getRates()
+export async function getMonthlyMovements(dbs: FinanceDbs, month: string): Promise<MonthlyMovements> {
+  const ve = dbs.ve
+  const rates = await getRates(dbs)
   const rows: FinanceLedgerRow[] = []
 
   // ── Ventas (auto, agregado por país: como el "INGRESO BRUTO DEL MES") ──
   const salesQ = `SELECT COALESCE(SUM(total_amount),0)::float AS t FROM sales WHERE ${SALES_DONE} AND to_char(${SALES_DATE},'YYYY-MM')=$1`
   const salesVE = (await ve.query(salesQ, [month])).rows[0].t as number
-  const salesCO = await coSafe(async db => (await db.query(salesQ, [month])).rows[0].t as number, 0)
+  const salesCO = await coSafe(dbs, async db => (await db.query(salesQ, [month])).rows[0].t as number, 0)
   if (salesVE) rows.push({ key: 'sales-ve', id: null, date: null, description: 'Ventas del mes', category_name: 'Ventas', account_name: null, category_id: null, account_id: null, kind: 'income', amount: salesVE, currency: 'USD', usd: salesVE, country: 'VE', source: 'auto' })
   if (salesCO) rows.push({ key: 'sales-co', id: null, date: null, description: 'Ventas del mes', category_name: 'Ventas', account_name: null, category_id: null, account_id: null, kind: 'income', amount: salesCO, currency: 'COP', usd: toUsd(salesCO, 'COP', rates), country: 'CO', source: 'auto' })
 
@@ -191,7 +192,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
     }
   }
   pushPurch((await ve.query(purchSql, [month])).rows, 'VE', 'USD')
-  pushPurch(await coSafe(async db => (await db.query(purchSql, [month])).rows, []), 'CO', 'COP')
+  pushPurch(await coSafe(dbs, async db => (await db.query(purchSql, [month])).rows, []), 'CO', 'COP')
 
   // ── Importaciones (auto, una fila por pago 50%/100% en el mes) ──
   const impSql = `
@@ -217,7 +218,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
     }
   }
   pushImp((await ve.query(impSql, [month])).rows, 'VE', 'USD')
-  pushImp(await coSafe(async db => (await db.query(impSql, [month])).rows, []), 'CO', 'USD')
+  pushImp(await coSafe(dbs, async db => (await db.query(impSql, [month])).rows, []), 'CO', 'USD')
 
   // ── Envíos de importación (auto, una fila por flete pagado en el mes) ──
   const shipSql = `
@@ -239,7 +240,7 @@ export async function getMonthlyMovements(month: string): Promise<MonthlyMovemen
     }
   }
   pushShip((await ve.query(shipSql, [month])).rows, 'VE')
-  pushShip(await coSafe(async db => (await db.query(shipSql, [month])).rows, []), 'CO')
+  pushShip(await coSafe(dbs, async db => (await db.query(shipSql, [month])).rows, []), 'CO')
 
   // ── Movimientos manuales (en VE maestra) ──
   const { rows: mov } = await ve.query(`
@@ -306,9 +307,9 @@ const INV_VAL = `
   JOIN products p ON p.id = i.product_id
   WHERE p.is_active = TRUE`
 
-export async function getCapital(): Promise<Capital> {
-  const ve = veDb()
-  const rates = await getRates()
+export async function getCapital(dbs: FinanceDbs): Promise<Capital> {
+  const ve = dbs.ve
+  const rates = await getRates(dbs)
 
   const veRow = (await ve.query(INV_VAL)).rows[0]
   const mercanciaVE_cost = veRow.cost as number
@@ -316,7 +317,7 @@ export async function getCapital(): Promise<Capital> {
 
   // CO híbrido: el COSTO del inventario ya está en USD (total_cost en USD), no se
   // divide. El PRECIO DE VENTA sigue en pesos (sale_price) → ese sí se convierte.
-  const coRow = await coSafe(async db => (await db.query(INV_VAL)).rows[0] as { cost: number; sale: number }, { cost: 0, sale: 0 })
+  const coRow = await coSafe(dbs, async db => (await db.query(INV_VAL)).rows[0] as { cost: number; sale: number }, { cost: 0, sale: 0 })
   const mercanciaCO_cost = coRow.cost                                  // USD nativo
   const mercanciaCO_sale_cop = coRow.sale                              // pesos nativo
   const mercanciaCO_sale = toUsd(coRow.sale, 'COP', rates)             // pesos → USD
@@ -343,8 +344,8 @@ export async function getCapital(): Promise<Capital> {
 
   const impVE = (await ve.query(impSql)).rows[0].val as number
   const purVE = (await ve.query(purSql)).rows[0].val as number
-  const impCO = await coSafe(async db => (await db.query(impSql)).rows[0].val as number, 0)
-  const purCO = await coSafe(async db => (await db.query(purSql)).rows[0].val as number, 0)
+  const impCO = await coSafe(dbs, async db => (await db.query(impSql)).rows[0].val as number, 0)
+  const purCO = await coSafe(dbs, async db => (await db.query(purSql)).rows[0].val as number, 0)
 
   const transitoVE = impVE + purVE                        // USD nativos
   const transitoCO = impCO                                // importación CO también en USD

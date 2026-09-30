@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import MercadoEnviosClient from '@/components/productos/MercadoEnviosClient'
 import type { Product } from '@/lib/types'
@@ -13,7 +13,7 @@ export default async function MercadoEnviosPage() {
   // Función exclusiva de VE (tabla de envíos por peso de ML Venezuela).
   if (session.user.country !== 'VE') redirect('/productos')
 
-  const db = getDb(session.user.country)
+  const db = dbDeSesion(session)
   const productsRes = await db.query(`
     SELECT
       p.id, p.code, p.name, p.is_active,

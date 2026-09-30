@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import MargenesClient from '@/components/productos/MargenesClient'
 import type { Product, ProfitCategory } from '@/lib/types'
@@ -13,7 +13,7 @@ export default async function MargenesPage() {
   // Depende de la tabla de MercadoEnvíos y de la fuga cambiaria: solo VE.
   if (session.user.country !== 'VE') redirect('/productos')
 
-  const db = getDb(session.user.country)
+  const db = dbDeSesion(session)
   const [productsRes, catsRes] = await Promise.all([
     db.query(`
       SELECT

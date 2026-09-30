@@ -1,13 +1,17 @@
-import { getServerSession } from 'next-auth'
+import { getServerSession, type Session } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbEmpresa } from '@/lib/db'
 import { NextResponse } from 'next/server'
+
+/** Conexión a la empresa de la sesión: todo lo que consulte ve solo esa empresa (RLS). */
+export function dbDeSesion(session: Session) {
+  return dbEmpresa(session.user.empresaId, session.user.country)
+}
 
 export async function getSessionDb() {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return { session: null, db: null }
-  const db = getDb(session.user.country)
-  return { session, db }
+  if (!session?.user?.empresaId) return { session: null, db: null }
+  return { session, db: dbDeSesion(session) }
 }
 
 export function forbidden() {

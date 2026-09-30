@@ -7,7 +7,7 @@
 #   1. inventory_multi = copia de inventory_ve          (VE = empresa 1)
 #   2. db/multiempresa/01_esquema.sql                    (empresa_id, RLS, FK compuestas)
 #   3. db/multiempresa/02_importar_co.sql                (CO = empresa 2, ids +1.000.000)
-#   4. db/multiempresa/03_verificar.sql                  (controles; no cambia nada)
+#   4. db/multiempresa/04_funciones.sql + 03_verificar.sql (controles; no cambia nada)
 # Se puede repetir las veces que haga falta: cada corrida parte de cero.
 #
 # Uso (desde /opt/inventory_staging):  ./scripts/multiempresa-ensayo.sh
@@ -37,6 +37,9 @@ if ! salida="$(psql_ -d "$NUEVA" < db/multiempresa/02_importar_co.sql 2>&1)"; th
   echo "$salida"; echo "Falló la importación de CO" >&2; exit 1
 fi
 echo "$salida" | sed -n 's/.*NOTICE: *//p' 
+
+echo "→ funciones para accesos sin sesión (Reportador)"
+psql_ -d "$NUEVA" < db/multiempresa/04_funciones.sql
 
 echo "→ 4/4 verificación"
 docker exec -i "$DB_CONT" psql -U postgres -v ON_ERROR_STOP=1 -d "$NUEVA" < db/multiempresa/03_verificar.sql

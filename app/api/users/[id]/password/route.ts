@@ -22,8 +22,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const { password } = Schema.parse(await req.json())
     const { rowCount } = await db.query(
       `UPDATE users SET password_hash = $2, session_version = session_version + 1
-       WHERE id = $1 AND country_access = $3`,
-      [id, await hash(password, 10), session.user.country])
+       WHERE id = $1 AND EXISTS (SELECT 1 FROM usuario_empresas ue WHERE ue.user_id = users.id AND ue.empresa_id = $3)`,
+      [id, await hash(password, 10), session.user.empresaId])
     if (!rowCount) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     return NextResponse.json({ ok: true, yo: parseInt(id, 10) === parseInt(session.user.id, 10) })
   } catch (err) {

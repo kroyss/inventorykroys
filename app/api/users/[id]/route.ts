@@ -11,7 +11,8 @@ const Schema = z.object({
 
 /**
  * PUT /api/users/[id] — nombre, rol, activo (admin).
- * Cambiar rol o desactivar cierra las sesiones abiertas de ese usuario (session_version).
+ * El rol es el de ESTA empresa (usuario_empresas) y se aplica en el siguiente request.
+ * Desactivar es global (la persona no entra a ninguna empresa) y cierra sus sesiones.
  * Protecciones: no te puedes desactivar ni quitar el admin a ti mismo, y siempre queda
  * al menos un admin activo (si no, nadie podría volver a administrar).
  */
@@ -25,7 +26,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const body = Schema.parse(await req.json())
     const { rows: [u] } = await db.query(
-      `SELECT id, role, is_active FROM users WHERE id = $1 AND country_access = $2`, [id, session.user.country])
+      `SELECT u.id, ue.role, u.is_active
+       FROM users u JOIN usuario_empresas ue ON ue.user_id = u.id AND ue.empresa_id = $2
+       WHERE u.id = $1`, [id, session.user.empresaId])
     if (!u) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
 
     const esYo = u.id === parseInt(session.user.id, 10)
@@ -36,21 +39,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     if (pierdeAdmin) {
       const { rows: [{ n }] } = await db.query(
-        `SELECT COUNT(*)::int AS n FROM users
-         WHERE role = 'admin' AND is_active AND id <> $1 AND country_access = $2`, [u.id, session.user.country])
+        `SELECT COUNT(*)::int AS n
+         FROM users x JOIN usuario_empresas ue ON ue.user_id = x.id AND ue.empresa_id = $2
+         WHERE ue.role = 'admin' AND x.is_active AND x.id <> $1`, [u.id, session.user.empresaId])
       if (n === 0) return NextResponse.json({ error: 'Tiene que quedar al menos un admin activo' }, { status: 400 })
     }
 
-    const cambiaAcceso = (body.role !== undefined && body.role !== u.role) ||
-                         (body.is_active !== undefined && body.is_active !== u.is_active)
+    const desactiva = body.is_active !== undefined && body.is_active !== u.is_active
+    await db.query('BEGIN')
     await db.query(
       `UPDATE users SET
          full_name = COALESCE($2, full_name),
-         role      = COALESCE($3, role),
-         is_active = COALESCE($4, is_active)
-         ${cambiaAcceso ? ', session_version = session_version + 1' : ''}
+         is_active = COALESCE($3, is_active)
+         ${desactiva ? ', session_version = session_version + 1' : ''}
        WHERE id = $1`,
-      [u.id, body.full_name ?? null, body.role ?? null, body.is_active ?? null])
+      [u.id, body.full_name ?? null, body.is_active ?? null])
+    if (body.role !== undefined) {
+      await db.query(`UPDATE usuario_empresas SET role = $3 WHERE user_id = $1 AND empresa_id = $2`,
+        [u.id, session.user.empresaId, body.role])
+    }
+    await db.query('COMMIT')
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message ?? err.message }, { status: 400 })

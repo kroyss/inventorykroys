@@ -55,7 +55,7 @@ export async function PUT(req: NextRequest) {
       if (v === undefined) continue
       await db.query(`
         INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
       `, [KEY[k as keyof typeof KEY], String(v)])
     }
     return NextResponse.json(await readInvoiceConfig(db))

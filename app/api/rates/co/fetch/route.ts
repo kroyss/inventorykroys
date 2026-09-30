@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { esDuenoPlataforma } from '@/lib/empresa'
 
 // Actualización MANUAL de la TRM desde co.dolarapi.com (admin + CO).
 // Mismo upsert idempotente por día que el cron; útil si la API del cron falló.
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  // La tasa es COMÚN a todas las empresas: solo la cambia el dueño de la plataforma.
+  if (!esDuenoPlataforma(session.user)) return forbidden()
   if (session.user.country !== 'CO') {
     return NextResponse.json({ error: 'Solo disponible para Colombia' }, { status: 403 })
   }

@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db'
+import { dbGlobal } from '@/lib/db'
 import type { Country } from '@/lib/types'
 
 // Factor para expresar el costo (product_pricing.total_cost) en la MONEDA LOCAL
@@ -10,7 +10,7 @@ import type { Country } from '@/lib/types'
 export async function localCostFactor(country: Country): Promise<number> {
   if (country !== 'CO') return 1
   try {
-    const { rows } = await getDb('CO').query(
+    const { rows } = await dbGlobal().query(
       `SELECT trm_rate::float AS r FROM colombia_exchange_rates
        ORDER BY rate_date DESC, created_at DESC LIMIT 1`
     )

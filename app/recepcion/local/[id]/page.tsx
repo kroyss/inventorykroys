@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import { notFound, redirect } from 'next/navigation'
 import ReceptionPrint from '@/components/recepcion/ReceptionPrint'
 
@@ -10,7 +10,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
-  const db = getDb(session.user.country)
+  const db = dbDeSesion(session)
 
   const { rows: [order] } = await db.query(`
     SELECT po.id, po.order_number, po.status, po.notes, po.created_at,

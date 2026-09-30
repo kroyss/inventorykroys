@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import ProductosClient from '@/components/productos/ProductosClient'
 import type { Product, ProfitCategory } from '@/lib/types'
@@ -11,7 +11,7 @@ export default async function ProductosPage() {
   const session = await getServerSession(authOptions)
   if (session?.user.role !== 'admin') redirect('/dashboard')
 
-  const db = getDb(session.user.country)
+  const db = dbDeSesion(session)
   const [productsRes, catsRes] = await Promise.all([
     db.query(`
       SELECT

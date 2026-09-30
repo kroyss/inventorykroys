@@ -8,14 +8,14 @@ import { currentYearMonth } from '@/lib/tz'
 const MONTH_RE = /^\d{4}-\d{2}$/
 
 export async function GET(req: NextRequest) {
-  const { session, db } = await getFinanceSession()
-  if (!session || !db) return unauthorized()
+  const { session, db, dbs } = await getFinanceSession()
+  if (!session || !db || !dbs) return unauthorized()
   if (session.user.role !== 'admin') return forbidden()
 
   try {
     const m = new URL(req.url).searchParams.get('month') ?? ''
     const month = MONTH_RE.test(m) ? m : currentYearMonth()
-    return NextResponse.json(await getMonthlyClose(month))
+    return NextResponse.json(await getMonthlyClose(dbs, month))
   } catch (err) {
     return apiError(err)
   }

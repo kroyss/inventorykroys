@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { esDuenoPlataforma } from '@/lib/empresa'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { fetchVEParallelRate } from '@/lib/binanceP2P'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  // La tasa es COMÚN a todas las empresas: solo la cambia el dueño de la plataforma.
+  if (!esDuenoPlataforma(session.user)) return forbidden()
   if (session.user.country !== 'VE') {
     return NextResponse.json({ error: 'Solo disponible para Venezuela' }, { status: 403 })
   }

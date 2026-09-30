@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import HojaInventario, { type HojaRow } from '@/components/inventario/HojaInventario'
 import { localCostFactor } from '@/lib/localCost'
@@ -14,7 +14,7 @@ export default async function HojaInventarioPage() {
   // Solo admin genera la hoja (mismo criterio que el reporte de inventario).
   if (session.user.role !== 'admin') redirect('/inventario')
 
-  const db = getDb(session.user.country)
+  const db = dbDeSesion(session)
   // CO: el costo (USD) se expresa en pesos (×TRM), igual que en /api/reports/inventory.
   const costFactor = await localCostFactor(session.user.country)
 

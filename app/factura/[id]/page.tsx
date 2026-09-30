@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { notFound, redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getDb } from '@/lib/db'
+import { dbDeSesion } from '@/lib/session'
 import { getInvoice, readInvoiceConfig } from '@/lib/invoicesServer'
 import FacturaPrintClient from '@/components/facturas/FacturaPrintClient'
 
@@ -16,7 +16,7 @@ export default async function Page({ params, searchParams }: {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
   if (session.user.country !== 'VE' || !/^\d+$/.test(id)) notFound()
-  const db = getDb('VE')
+  const db = dbDeSesion(session)
 
   const [invoice, config] = await Promise.all([getInvoice(db, id), readInvoiceConfig(db)])
   if (!invoice) notFound()

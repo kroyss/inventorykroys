@@ -4,12 +4,13 @@ import { authOptions } from '@/lib/auth'
 import SignOutButton from './SignOutButton'
 import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
-import type { Country } from '@/lib/types'
+import { empresasDeUsuario } from '@/lib/empresa'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
   const role    = session?.user.role    ?? 'user'
   const country = session?.user.country ?? 'VE'
+  const empresas = session?.user.id ? await empresasDeUsuario(session.user.id) : []
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
@@ -30,7 +31,10 @@ export default async function Navbar() {
               Usuarios
             </Link>
           )}
-          {role === 'admin' && <CountrySwitcher current={country as Country} />}
+          {session?.user.empresaId && (
+            <CountrySwitcher actual={session.user.empresaId}
+              empresas={empresas.map(e => ({ id: e.id, nombre: e.nombre, country: e.country }))} />
+          )}
           <SignOutButton />
         </div>
 

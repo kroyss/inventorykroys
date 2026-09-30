@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db'
+import { dbGlobal } from '@/lib/db'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { fetchVEParallelRate } from '@/lib/binanceP2P'
 
@@ -7,14 +7,14 @@ import { fetchVEParallelRate } from '@/lib/binanceP2P'
 // "Actualizar" del board público (/api/public/tasa/refresh) — un solo lugar
 // para no triplicar esta lógica.
 
-async function adminId(db: ReturnType<typeof getDb>): Promise<number | null> {
+async function adminId(db: ReturnType<typeof dbGlobal>): Promise<number | null> {
   const { rows } = await db.query(`SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`)
   return rows[0]?.id ?? null
 }
 
 // ───────────────────────── Venezuela (BCV + Binance) ─────────────────────────
 export async function refreshVERate() {
-  const db = getDb('VE')
+  const db = dbGlobal()
 
   const fetchOfficial = async (): Promise<number> => {
     const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', {
@@ -81,7 +81,7 @@ export async function refreshVERate() {
 
 // ───────────────────────── Colombia (TRM) ─────────────────────────
 export async function refreshCORate() {
-  const db = getDb('CO')
+  const db = dbGlobal()
 
   const res = await fetch('https://co.dolarapi.com/v1/trm', {
     headers: { 'User-Agent': 'SyncsoraInventory/rates' },

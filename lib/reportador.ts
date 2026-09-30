@@ -8,7 +8,7 @@ import { createHash, randomBytes, randomInt } from 'crypto'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import type { Pool } from 'pg'
-import { getDb } from '@/lib/db'
+import { dbEmpresa, dbGlobal } from '@/lib/db'
 import { REMITENTE_DEFAULT } from '@/lib/despachos'
 import { ES_STAGING, MENSAJE_STAGING_REPORTADOR } from '@/lib/entorno'
 
@@ -63,7 +63,14 @@ export async function autenticarEquipo(req: NextRequest):
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
   const m = /^(ve|co)_[0-9a-f]{48}$/.exec(token)
   if (!m) return { error: NextResponse.json({ error: 'Equipo no vinculado' }, { status: 401 }) }
-  const db = getDb(m[1].toUpperCase() as 'VE' | 'CO')
+  // El token no dice la empresa: se busca con una función que salta RLS SOLO para esto
+  // (db/multiempresa/04_funciones.sql) y desde ahí se trabaja con la conexión de su empresa.
+  const { rows: [emp] } = await dbGlobal().query(
+    `SELECT empresa_id, country FROM reportador_empresa_por_token($1)`, [hashToken(token)])
+  if (!emp) {
+    return { error: NextResponse.json({ error: 'Este equipo fue desvinculado. Vuelve a vincularlo desde Despachos.' }, { status: 401 }) }
+  }
+  const db = dbEmpresa(emp.empresa_id, emp.country)
   const version = (req.headers.get('x-reportador-version') ?? '').slice(0, 40) || null
   const { rows: [equipo] } = await db.query(
     `UPDATE reportador_equipos SET last_seen_at = NOW(), version = COALESCE($2, version)

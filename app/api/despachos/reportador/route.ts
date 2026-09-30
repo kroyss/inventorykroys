@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest) {
     ]) {
       await db.query(
         `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [key, value])
+         ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [key, value])
     }
     return NextResponse.json({ ok: true })
   } catch (err) {
