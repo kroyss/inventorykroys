@@ -62,7 +62,7 @@ services:
     container_name: inventory_db_staging
     # MISMA versión mayor que producción (pg_restore no baja de versión). Verla con:
     #   docker exec inventory_db_ve postgres -V
-    image: ${STAGING_PG_IMAGE:-postgres:16-alpine}
+    image: ${STAGING_PG_IMAGE:-postgres:15-alpine}
     restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres
