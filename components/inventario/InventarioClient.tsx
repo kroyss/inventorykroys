@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
-import { Pagination } from '@/components/ui'
+import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
@@ -21,22 +21,10 @@ function fmtDate(s: string) {
 }
 
 const STATUS_LABEL: Record<StockStatus, string> = {
-  OK:        'OK',
-  BAJO:      'BAJO',
-  SIN_STOCK: 'SIN STOCK',
-  INACTIVO:  'INACTIVO',
-}
-const STATUS_COLOR: Record<StockStatus, string> = {
-  OK:        'bg-green-50 text-green-700',
-  BAJO:      'bg-yellow-50 text-yellow-700',
-  SIN_STOCK: 'bg-red-50 text-red-700',
-  INACTIVO:  'bg-neutral-100 text-neutral-400',
-}
-const STATUS_DOT: Record<StockStatus, string> = {
-  OK:        'bg-green-500',
-  BAJO:      'bg-yellow-500',
-  SIN_STOCK: 'bg-red-500',
-  INACTIVO:  'bg-neutral-300',
+  OK:        'En nivel',
+  BAJO:      'Stock bajo',
+  SIN_STOCK: 'Sin stock',
+  INACTIVO:  'Inactivo',
 }
 
 type SortKey = 'code' | 'name' | 'quantity' | 'min_stock' | 'max_stock' | 'sale_price' | 'mlprice' | 'ventas_6m' | 'status'
@@ -365,20 +353,14 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
 
   return (
     <div className="space-y-4">
-      {/* KPI cards clickeables */}
-      <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-3'}`}>
-        {CHIPS.filter(c => !c.adminOnly || isAdmin).map(c => {
-          const active = statusF === c.val
-          return (
-            <button key={c.val} onClick={() => setStatusF(c.val as StockStatus)}
-              className={`text-left bg-white rounded-xl border p-3 shadow-sm transition-all hover:border-neutral-400 ${
-                active ? 'border-neutral-900 ring-1 ring-neutral-900' : 'border-neutral-200'
-              }`}>
-              <div className="text-xs text-neutral-500 mb-1">{c.label}</div>
-              <div className="text-xl font-bold text-neutral-900">{c.count}</div>
-            </button>
-          )
-        })}
+      <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" />
+      {/* KPI cards clickeables (filtran la tabla) */}
+      <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}>
+        {CHIPS.filter(c => !c.adminOnly || isAdmin).map(c => (
+          <KPICard key={c.val} compact label={c.label} value={c.count}
+            active={statusF === c.val} onClick={() => setStatusF(c.val as StockStatus)}
+            tone={c.val === 'SIN_STOCK' && c.count > 0 ? 'problema' : c.val === 'BAJO' && c.count > 0 ? 'atencion' : 'neutro'} />
+        ))}
       </div>
 
       {/* Toolbar */}
@@ -386,7 +368,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
         {isAdmin && (
           <div className="text-xs text-neutral-500 flex flex-wrap gap-x-4">
             <span>Valor a costo: <span className="font-semibold text-neutral-800">${fmt(valorCosto)}{isCO ? ' USD' : ''}</span></span>
-            <span>Valor a venta: <span className="font-semibold text-green-700">{priceLabel(valorVenta)}{isCO ? ' pesos' : ''}</span></span>
+            <span>Valor a venta: <span className="font-semibold text-emerald-700">{priceLabel(valorVenta)}{isCO ? ' pesos' : ''}</span></span>
           </div>
         )}
         <input
@@ -424,28 +406,23 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                 <tr key={item.product_id}
                   onClick={() => selectItem(item)}
                   className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-500">{item.code}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{item.code}</td>
                   <td className="px-3 py-2 font-medium text-neutral-900">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[item.status]}`} />
-                      {item.name}
-                    </div>
+                    {item.name}
                   </td>
-                  <td className="px-3 py-2 text-right font-bold text-neutral-900">{item.quantity}</td>
-                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-500">{item.min_stock}</td>}
-                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-500">{item.max_stock}</td>}
+                  <td className={`px-3 py-2 text-right font-semibold num ${item.quantity === 0 && item.status !== 'INACTIVO' ? 'text-red-600' : 'text-neutral-900'}`}>{item.quantity}</td>
+                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-500 num">{item.min_stock || <span className="text-neutral-300">—</span>}</td>}
+                  {isAdmin && <td className="px-3 py-2 text-right text-neutral-500 num">{item.max_stock || <span className="text-neutral-300">—</span>}</td>}
                   <td className="px-3 py-2 text-right text-neutral-700">{priceLabel(item.sale_price || item.final_price_usd)}</td>
-                  {isVE && <td className="px-3 py-2 text-right font-medium text-purple-700">${fmt(mlPriceVE(item))}</td>}
+                  {isVE && <td className="px-3 py-2 text-right font-medium text-neutral-900 num">${fmt(mlPriceVE(item))}</td>}
                   {isAdmin && <td className="px-3 py-2 text-right text-neutral-600">{item.ventas_6m}</td>}
                   <td className="px-3 py-2 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[item.status]}`}>
-                      {STATUS_LABEL[item.status]}
-                    </span>
+                    <StatusBadge status={item.status} label={STATUS_LABEL[item.status]} />
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button
                       onClick={e => { e.stopPropagation(); selectItem(item) }}
-                      className="text-xs px-2 py-1 rounded border border-neutral-200 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 whitespace-nowrap"
+                      className="btn-secondary text-xs px-2.5 py-1 whitespace-nowrap"
                     >
                       Ajustar
                     </button>
@@ -471,9 +448,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                   <p className="text-xs font-mono text-neutral-400 mt-0.5">{selected.code}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[selected.status]}`}>
-                    {STATUS_LABEL[selected.status]}
-                  </span>
+                  <StatusBadge status={selected.status} label={STATUS_LABEL[selected.status]} />
                   <button onClick={() => setSelected(null)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
                 </div>
               </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, UserRole } from '@/lib/types'
-import { Stepper, KPICard, int, Pagination } from '@/components/ui'
+import { Stepper, KPICard, int, Pagination, StatusBadge, chipCls } from '@/components/ui'
 import { Combobox } from '@/components/ui/Combobox'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { itemsTooltip } from '@/lib/itemsTooltip'
@@ -541,14 +541,12 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
       {/* Toolbar: chips + buscador + nueva compra */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
         {!historyMode ? (
-          <div className="flex gap-1.5 overflow-x-auto bg-white rounded-xl border border-neutral-200 shadow-sm p-2">
+          <div className="flex gap-1.5 overflow-x-auto">
             {CHIP_ORDER.map(c => {
               const active = chipFilter === c
               return (
                 <button key={c} onClick={() => setChipFilter(c)}
-                  className={`px-3 py-1 rounded-full border text-xs whitespace-nowrap transition-colors ${
-                    active ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-400'
-                  }`}>
+                  className={chipCls(active)}>
                   {CHIP_LABELS[c]} <span className={active ? 'text-white/60' : 'text-neutral-400'}>{chipCount(c)}</span>
                 </button>
               )
@@ -641,9 +639,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                   {isAdmin && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
                   <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
                   <td className="px-3 py-2 text-center">
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-700">
-                      {STATUS_LABELS[o.status] ?? o.status}
-                    </span>
+                    <StatusBadge status={o.status} label={STATUS_LABELS[o.status]} />
                   </td>
                   {historyMode && (
                     <td className="px-2 py-2 text-center">

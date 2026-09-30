@@ -4,7 +4,7 @@ import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } fro
 import VentasForm from './VentasForm'
 import FacturaForm from '@/components/facturas/FacturaForm'
 import { bs, type Invoice } from '@/lib/invoices'
-import { Pagination } from '@/components/ui'
+import { Pagination, PageHeader, StatusBadge, chipCls } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { itemsTooltip } from '@/lib/itemsTooltip'
@@ -28,15 +28,6 @@ const STATUS_LABELS: Record<SaleStatus, string> = {
   DESCARGADA:       'Descargada',
   DESCARGADA_LOCAL: 'Local entregada',
   REABIERTA:        'Reabierta',
-}
-
-const STATUS_COLORS: Record<SaleStatus, string> = {
-  BORRADOR:         'bg-neutral-100 text-neutral-700',
-  PAGO_VERIFICADO:  'bg-neutral-100 text-neutral-700',
-  PROCESADA:        'bg-neutral-100 text-neutral-700',
-  DESCARGADA:       'bg-neutral-100 text-neutral-700',
-  DESCARGADA_LOCAL: 'bg-neutral-100 text-neutral-700',
-  REABIERTA:        'bg-neutral-100 text-neutral-700',
 }
 
 const CHIP_LABELS: Record<string, string> = {
@@ -340,6 +331,11 @@ export default function VentasClient({ products: initialProducts, userRole, coun
 
   return (
     <div>
+      <PageHeader title="Ventas" subtitle="Órdenes de MercadoLibre y ventas locales" actions={
+        <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn-primary text-sm whitespace-nowrap">
+          Nueva venta
+        </button>
+      } />
       {error && (
         <div className="mb-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded">{error}</div>
       )}
@@ -347,7 +343,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       {/* Toolbar */}
       <div className="mb-4 space-y-2">
         {/* Fila 1: chips de estado */}
-        <div className="flex flex-wrap gap-1.5 bg-white rounded-xl border border-neutral-200 shadow-sm p-2">
+        <div className="flex flex-wrap gap-1.5">
           {(['all','BORRADOR','PAGO_VERIFICADO','PROCESADA','DESCARGADA','DESCARGADA_LOCAL'] as Filter[])
             .filter(f => country !== 'CO' || f !== 'PAGO_VERIFICADO')
             .map(f => {
@@ -355,9 +351,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             const active = filter === f
             return (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-3 py-1 rounded-full border text-xs whitespace-nowrap transition-colors ${
-                  active ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-400'
-                }`}>
+                className={chipCls(active)}>
                 {CHIP_LABELS[f]} <span className={active ? 'text-white/60' : 'text-neutral-400'}>{count}</span>
               </button>
             )
@@ -434,13 +428,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               </button>
             ) : !redownloadMode && processableTotal > 0 && (
               <button onClick={exportAllProcessed}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 whitespace-nowrap">
+                className="btn-secondary text-sm whitespace-nowrap">
                 ↓ Procesadas ({processableTotal})
               </button>
             )}
-            <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn-primary text-sm whitespace-nowrap">
-              Nueva venta
-            </button>
           </div>
         </div>
       </div>
@@ -497,9 +488,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                     <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${money(s.total_amount)}</td>
                     <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[s.status]}`}>
-                        {STATUS_LABELS[s.status]}
-                      </span>
+                      <StatusBadge status={s.status} label={STATUS_LABELS[s.status]} />
                     </td>
                   </tr>
                 )
@@ -533,9 +522,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                     )}
                     <span className="font-mono text-xs font-bold text-neutral-900 truncate">{s.ml_order_number}</span>
                   </div>
-                  <span className={`shrink-0 inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[s.status]}`}>
-                    {STATUS_LABELS[s.status]}
-                  </span>
+                  <span className="shrink-0"><StatusBadge status={s.status} label={STATUS_LABELS[s.status]} /></span>
                 </div>
                 <div className="mt-1 text-sm text-neutral-700 truncate">{s.customer_name || '—'}</div>
                 {prods && <div className="mt-0.5 text-xs text-neutral-500 truncate">{prods}</div>}
@@ -563,9 +550,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   <div className="font-semibold mt-1">{selected.customer_name || 'Sin nombre'}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-xs ${STATUS_COLORS[selected.status]}`}>
-                    {STATUS_LABELS[selected.status]}
-                  </span>
+                  <StatusBadge status={selected.status} label={STATUS_LABELS[selected.status]} />
                   <button onClick={() => setSelected(null)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import {
   DateRangeBar, presetRange, type DatePreset,
   KPICard, DataTable, exportRows, money, type Column,
+  PageHeader, Tabs, StatusBadge, Cargando,
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { matchFuzzy } from '@/lib/search'
@@ -99,27 +100,15 @@ export default function ReportesClient() {
   }
 
   const needsDates = tab === 'ventas' || tab === 'compras' || tab === 'top'
-  const tabBtn = (t: { key: Tab; label: string }) => (
-    <button key={t.key} onClick={() => { setData(null); setTab(t.key) }}
-      className={`px-4 py-2 rounded-lg text-sm ${tab === t.key ? 'bg-neutral-900 text-white' : 'bg-neutral-100 hover:bg-neutral-200'}`}>
-      {t.label}
-    </button>
-  )
 
   return (
     <div className="space-y-4">
-      {/* grouped tabs */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-neutral-400 mr-1">Por período:</span>
-          {PERIOD_TABS.map(tabBtn)}
-        </div>
-        <div className="h-5 w-px bg-neutral-200 hidden md:block" />
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-neutral-400 mr-1">Estado actual:</span>
-          {STATE_TABS.map(tabBtn)}
-        </div>
-      </div>
+      <PageHeader title="Reportes" subtitle="Por período (ventas, compras, más vendidos) o del estado actual del inventario" />
+      {/* pestañas en dos grupos: por período | estado actual */}
+      <Tabs value={tab} onChange={t => { setData(null); setTab(t) }} items={[
+        ...PERIOD_TABS.map(t => ({ value: t.key, label: t.label, group: 'periodo' })),
+        ...STATE_TABS.map(t => ({ value: t.key, label: t.label, group: 'estado' })),
+      ]} />
 
       {/* date filters */}
       {needsDates && (
@@ -159,7 +148,7 @@ export default function ReportesClient() {
       )}
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded">{error}</div>}
-      {loading && <div className="text-neutral-500 text-sm py-4">Cargando…</div>}
+      {loading && <Cargando />}
 
       {!loading && data && tab === 'ventas'     && data.sales       && (
         <SalesReport data={data} search={search} setSearch={setSearch} statusF={ventaStatus} setStatusF={setVentaStatus} />
@@ -208,11 +197,11 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
     { key: 'ml_order_number', label: 'Orden', render: s => <span className="font-mono text-xs">{s.ml_order_number}</span>, sortValue: s => s.ml_order_number },
     { key: 'created_at', label: 'Fecha', render: s => <span className="text-xs">{new Date(s.created_at).toLocaleDateString('es-VE')}</span>, sortValue: s => new Date(s.created_at).getTime() },
     { key: 'customer_name', label: 'Cliente', render: s => s.customer_name || '—', sortValue: s => s.customer_name ?? '' },
-    { key: 'status', label: 'Estado', render: s => <span className="text-xs px-2 py-0.5 bg-neutral-100 rounded">{s.status}</span>, sortValue: s => s.status },
+    { key: 'status', label: 'Estado', render: s => <StatusBadge status={s.status} />, sortValue: s => s.status },
     { key: 'total_amount', label: 'Total', align: 'right', render: s => `$${money(s.total_amount)}`, sortValue: s => s.total_amount, total: rs => `$${money(rs.reduce((a, x) => a + x.total_amount, 0))}`, exportValue: s => s.total_amount },
     { key: 'cost', label: 'Costo', align: 'right', render: s => `$${money(s.cost)}`, sortValue: s => s.cost, total: rs => `$${money(rs.reduce((a, x) => a + x.cost, 0))}`, exportValue: s => s.cost },
-    { key: 'commission', label: 'Comisión', align: 'right', render: s => <span className="text-red-500">${money(s.commission || 0)}</span>, sortValue: s => s.commission || 0, total: rs => `$${money(rs.reduce((a, x) => a + (x.commission || 0), 0))}`, exportValue: s => s.commission || 0 },
-    { key: 'ganancia', label: 'Ganancia', align: 'right', render: s => <span className="text-green-600">${money(s.total_amount - s.cost - (s.commission || 0))}</span>, sortValue: s => s.total_amount - s.cost - (s.commission || 0), total: rs => `$${money(rs.reduce((a, x) => a + (x.total_amount - x.cost - (x.commission || 0)), 0))}`, exportValue: s => s.total_amount - s.cost - (s.commission || 0) },
+    { key: 'commission', label: 'Comisión', align: 'right', render: s => <span className="text-neutral-600">${money(s.commission || 0)}</span>, sortValue: s => s.commission || 0, total: rs => `$${money(rs.reduce((a, x) => a + (x.commission || 0), 0))}`, exportValue: s => s.commission || 0 },
+    { key: 'ganancia', label: 'Ganancia', align: 'right', render: s => <span className="text-emerald-600 font-medium">${money(s.total_amount - s.cost - (s.commission || 0))}</span>, sortValue: s => s.total_amount - s.cost - (s.commission || 0), total: rs => `$${money(rs.reduce((a, x) => a + (x.total_amount - x.cost - (x.commission || 0)), 0))}`, exportValue: s => s.total_amount - s.cost - (s.commission || 0) },
   ]
 
   return (
@@ -221,9 +210,9 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
         <KPICard compact label="Cantidad" value={data.totals.count} />
         <KPICard compact label="Ventas"   value={`$${money(data.totals.total_amount)}`} />
         <KPICard compact label="Costos"   value={`$${money(data.totals.total_cost)}`} />
-        <KPICard compact label="Comisión" value={`$${money(data.totals.total_commission || 0)}`} accent="text-red-500" />
+        <KPICard compact label="Comisión" value={`$${money(data.totals.total_commission || 0)}`} />
         <KPICard compact label={`Ganancia · ${data.totals.margin_pct ?? data.totals.profit_pct}% s/venta`}
-          value={`$${money(data.totals.profit)}`} accent="text-green-600" />
+          value={`$${money(data.totals.profit)}`} tone="bueno" />
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <SearchBar value={search} onChange={setSearch} placeholder="Buscar orden o cliente…" />
@@ -265,7 +254,7 @@ function PurchasesReport({ data, search, setSearch, tipo, setTipo }: any) {
       <div className="grid grid-cols-3 gap-3">
         <KPICard compact label="Órdenes"      value={data.totals.count} />
         <KPICard compact label="Total USD"    value={`$${money(data.totals.total_usd)}`} />
-        <KPICard compact label="Total pagado" value={`$${money(data.totals.total_paid)}`} accent="text-green-600" />
+        <KPICard compact label="Total pagado" value={`$${money(data.totals.total_paid)}`} />
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <SearchBar value={search} onChange={setSearch} placeholder="Buscar orden o proveedor…" />
@@ -297,7 +286,7 @@ function InventoryReport({ data, search, setSearch }: any) {
     { key: 'valor_costo', label: 'Valor costo', align: 'right', render: p => `$${money(p.valor_costo)}`, sortValue: p => p.valor_costo, total: rs => `$${money(rs.reduce((a, x) => a + x.valor_costo, 0))}`, exportValue: p => p.valor_costo },
     { key: 'valor_venta', label: 'Valor venta', align: 'right', render: p => `$${money(p.valor_venta)}`, sortValue: p => p.valor_venta, total: rs => `$${money(rs.reduce((a, x) => a + x.valor_venta, 0))}`, exportValue: p => p.valor_venta },
     { key: 'status', label: 'Estado', align: 'center', render: p => (
-      <span className={`px-2 py-0.5 rounded text-xs ${p.status === 'OK' ? 'bg-green-100 text-green-700' : p.status === 'BAJO' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span>
+      <StatusBadge status={p.status} />
     ), sortValue: p => p.status },
   ]
 
@@ -307,7 +296,7 @@ function InventoryReport({ data, search, setSearch }: any) {
         <KPICard compact label="Productos"   value={data.totals.count} />
         <KPICard compact label="Unidades"    value={data.totals.total_units} />
         <KPICard compact label="Valor costo" value={`$${money(data.totals.total_cost_value)}`} />
-        <KPICard compact label="Valor venta" value={`$${money(data.totals.total_sale_value)}`} accent="text-green-600" />
+        <KPICard compact label="Valor venta" value={`$${money(data.totals.total_sale_value)}`} />
       </div>
       <div className="flex items-center gap-2">
         <SearchBar value={search} onChange={setSearch} placeholder="Buscar código o producto…" />
@@ -370,9 +359,9 @@ function CountsReport({ data, search, setSearch }: any) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard compact label="Productos con diferencia" value={resumen?.productos ?? 0} />
-        <KPICard compact label="Unidades faltantes" value={resumen?.faltantes ?? 0} accent="text-red-600" />
-        <KPICard compact label="Unidades sobrantes" value={resumen?.sobrantes ?? 0} accent="text-green-600" />
-        <KPICard compact label="Reincidentes" value={reincidentes} accent={reincidentes > 0 ? 'text-amber-600' : undefined} />
+        <KPICard compact label="Unidades faltantes" value={resumen?.faltantes ?? 0} tone={(resumen?.faltantes ?? 0) > 0 ? 'problema' : 'neutro'} />
+        <KPICard compact label="Unidades sobrantes" value={resumen?.sobrantes ?? 0} />
+        <KPICard compact label="Reincidentes" value={reincidentes} tone={reincidentes > 0 ? 'atencion' : 'neutro'} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -648,9 +637,9 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
 
       {/* resumen de prioridad */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPICard compact label="🔴 Urgentes"        value={urgentes.length} accent="text-red-600" />
-        <KPICard compact label="🟠 A pedir"          value={aPedir.length} accent="text-orange-600" />
-        <KPICard compact label="🔵 Ya en camino"     value={enCamino.length} accent="text-blue-600" />
+        <KPICard compact label="Urgentes"        value={urgentes.length} tone={urgentes.length > 0 ? 'problema' : 'neutro'} />
+        <KPICard compact label="A pedir"         value={aPedir.length} tone={aPedir.length > 0 ? 'atencion' : 'neutro'} />
+        <KPICard compact label="Ya en camino"    value={enCamino.length} />
         <KPICard compact label="Ganancia/mes en riesgo" value={`$${money(gananciaRiesgo)}`} />
       </div>
 
@@ -813,8 +802,8 @@ function TopProductsReport({ rows }: { rows: any[] }) {
       ), total: rs => rs.reduce((a, x) => a + x.total_qty, 0) },
     { key: 'total_venta', label: 'Venta', align: 'right', render: p => `$${money(p.total_venta)}`, sortValue: p => p.total_venta, total: () => `$${money(totalVenta)}`, exportValue: p => p.total_venta },
     { key: 'total_costo', label: 'Costo', align: 'right', render: p => `$${money(p.total_costo)}`, sortValue: p => p.total_costo, exportValue: p => p.total_costo },
-    { key: 'total_comision', label: 'Comisión', align: 'right', render: p => <span className="text-red-500">${money(p.total_comision || 0)}</span>, sortValue: p => p.total_comision || 0, exportValue: p => p.total_comision || 0 },
-    { key: 'ganancia', label: 'Ganancia', align: 'right', render: p => <span className="text-green-600">${money(p.ganancia)}</span>, sortValue: p => p.ganancia, total: () => `$${money(totalGan)}`, exportValue: p => p.ganancia },
+    { key: 'total_comision', label: 'Comisión', align: 'right', render: p => <span className="text-neutral-600">${money(p.total_comision || 0)}</span>, sortValue: p => p.total_comision || 0, exportValue: p => p.total_comision || 0 },
+    { key: 'ganancia', label: 'Ganancia', align: 'right', render: p => <span className="text-emerald-600 font-medium">${money(p.ganancia)}</span>, sortValue: p => p.ganancia, total: () => `$${money(totalGan)}`, exportValue: p => p.ganancia },
   ]
 
   return (
@@ -822,7 +811,7 @@ function TopProductsReport({ rows }: { rows: any[] }) {
       <div className="grid grid-cols-3 gap-3">
         <KPICard compact label="Productos"     value={rows.length} />
         <KPICard compact label="Venta total"   value={`$${money(totalVenta)}`} />
-        <KPICard compact label="Ganancia total" value={`$${money(totalGan)}`} accent="text-green-600" />
+        <KPICard compact label="Ganancia total" value={`$${money(totalGan)}`} tone="bueno" />
       </div>
       <DataTable columns={cols} rows={rows} exportName="top_productos" emptyText="Sin ventas en el período" />
     </div>

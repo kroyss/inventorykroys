@@ -19,77 +19,161 @@ export async function exportRows(filename: string, rows: Record<string, unknown>
   XLSX.writeFile(wb, filename)
 }
 
-// ── Status colors (shared across ventas/compras/imports) ────────────────────
-export const STATUS_STYLES: Record<string, string> = {
-  // sales
-  BORRADOR:         'bg-slate-100 text-slate-700',
-  PAGO_VERIFICADO:  'bg-amber-100 text-amber-700',
-  PROCESADA:        'bg-blue-100 text-blue-700',
-  DESCARGADA:       'bg-green-100 text-green-700',
-  DESCARGADA_LOCAL: 'bg-emerald-100 text-emerald-700',
-  // purchases / imports shared
-  PENDIENTE:           'bg-slate-100 text-slate-700',
-  PAGADA:              'bg-blue-100 text-blue-700',
-  EN_CAMINO:           'bg-yellow-100 text-yellow-700',
-  RECIBIDA:            'bg-purple-100 text-purple-700',
-  PARCIAL:             'bg-orange-100 text-orange-700',
-  FINALIZADA:          'bg-green-100 text-green-700',
-  INCONSISTENTE:       'bg-red-100 text-red-700',
-  REABIERTA:           'bg-pink-100 text-pink-700',
-  // imports-specific
-  PAGO_PARCIAL:        'bg-sky-100 text-sky-700',
-  ESPERANDO_FOTOS:     'bg-cyan-100 text-cyan-700',
-  EN_TRANSITO:         'bg-violet-100 text-violet-700',
-  ADUANA:              'bg-amber-100 text-amber-700',
-  EN_IMPORTADOR_PAGAR: 'bg-orange-100 text-orange-700',
-  // stock
-  OK:        'bg-green-100 text-green-700',
-  BAJO:      'bg-yellow-100 text-yellow-700',
-  SIN_STOCK: 'bg-red-100 text-red-700',
-  INACTIVO:  'bg-neutral-100 text-neutral-500',
+// ── Estados (ventas / compras / importaciones / stock) ─────────────────────
+// Etiqueta neutra con un punto de color que dice qué significa:
+//   gris = no empezó · celeste = en curso · ámbar = te toca hacer algo
+//   verde = terminado / sano · rojo = problema
+type Tono = 'gris' | 'curso' | 'atencion' | 'ok' | 'problema'
+const TONO_ESTADO: Record<string, Tono> = {
+  BORRADOR: 'gris', PENDIENTE: 'gris', PAGO_PARCIAL: 'gris', INACTIVO: 'gris',
+  PROCESADA: 'curso', PAGADA: 'curso', EN_TRANSITO: 'curso', ADUANA: 'curso', EN_CAMINO: 'curso',
+  PAGO_VERIFICADO: 'atencion', RECIBIDA: 'atencion', PARCIAL: 'atencion', ESPERANDO_FOTOS: 'atencion',
+  EN_IMPORTADOR_PAGAR: 'atencion', REABIERTA: 'atencion', BAJO: 'atencion',
+  DESCARGADA: 'ok', DESCARGADA_LOCAL: 'ok', FINALIZADA: 'ok', OK: 'ok',
+  INCONSISTENTE: 'problema', SIN_STOCK: 'problema',
 }
+const PUNTO: Record<Tono, string> = {
+  gris: 'bg-neutral-400', curso: 'bg-sky-500', atencion: 'bg-amber-500', ok: 'bg-emerald-500', problema: 'bg-red-500',
+}
+// Nombre en español por defecto (cada pantalla puede pasar el suyo en `label`).
+export const STATUS_LABELS: Record<string, string> = {
+  BORRADOR: 'Borrador', PAGO_VERIFICADO: 'Pago verificado', PROCESADA: 'Procesada',
+  DESCARGADA: 'Descargada', DESCARGADA_LOCAL: 'Local entregada', REABIERTA: 'Reabierta',
+  PENDIENTE: 'Pendiente', PAGADA: 'Pagada', EN_CAMINO: 'En camino', RECIBIDA: 'Recibida',
+  PARCIAL: 'Parcial', FINALIZADA: 'Finalizada', INCONSISTENTE: 'Inconsistente',
+  PAGO_PARCIAL: 'Pago 50%', ESPERANDO_FOTOS: 'Esperando fotos', EN_TRANSITO: 'En tránsito',
+  ADUANA: 'En aduana', EN_IMPORTADOR_PAGAR: 'Importador por pagar',
+  OK: 'En nivel', BAJO: 'Stock bajo', SIN_STOCK: 'Sin stock', INACTIVO: 'Inactivo',
+}
+/** @deprecated usar StatusBadge; se deja por compatibilidad. */
+export const STATUS_STYLES: Record<string, string> = Object.fromEntries(
+  Object.keys(TONO_ESTADO).map(k => [k, 'bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200']))
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const tono = TONO_ESTADO[status] ?? 'gris'
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_STYLES[status] ?? 'bg-neutral-100 text-neutral-600'}`}>
-      {label ?? status}
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200">
+      <span className={`w-1.5 h-1.5 rounded-full ${PUNTO[tono]}`} aria-hidden="true" />
+      {label ?? STATUS_LABELS[status] ?? status}
     </span>
   )
 }
 
-// ── KPI Card ────────────────────────────────────────────────────────────────
-export function KPICard({ label, value, sub, accent, href, compact }: {
-  label: string; value: string | number; sub?: ReactNode; accent?: string; href?: string; compact?: boolean
+// ── Tarjeta de número ───────────────────────────────────────────────────────
+// El número va en negro. `tone` solo cuando el color significa algo:
+// problema (rojo), atencion (ámbar), bueno (verde), apagado (gris).
+export type KpiTone = 'neutro' | 'problema' | 'atencion' | 'bueno' | 'apagado'
+const TONO_KPI: Record<KpiTone, string> = {
+  neutro: 'text-neutral-900', problema: 'text-red-600', atencion: 'text-amber-600',
+  bueno: 'text-emerald-600', apagado: 'text-neutral-400',
+}
+export function KPICard({ label, value, sub, accent, tone, href, compact, active, onClick }: {
+  label: string; value: string | number; sub?: ReactNode
+  /** @deprecated usar `tone` */ accent?: string
+  tone?: KpiTone; href?: string; compact?: boolean
+  active?: boolean; onClick?: () => void
 }) {
-  const padding = compact ? 'p-3' : 'p-4'
+  const padding = compact ? 'px-3 py-2.5' : 'px-4 py-3.5'
   const valueSize = compact ? 'text-xl' : 'text-2xl'
+  const color = tone ? TONO_KPI[tone] : (accent ?? 'text-neutral-900')
   const inner = (
     <>
-      <div className="text-xs text-neutral-500 mb-1 flex items-center justify-between">
+      <div className="text-xs font-medium text-neutral-500 mb-1 flex items-center justify-between gap-2">
         {label}
-        {href && <span className="text-neutral-300">→</span>}
+        {(href || onClick) && <span className="text-neutral-300 group-hover:text-neutral-500 transition-colors">→</span>}
       </div>
-      <div className={`${valueSize} font-bold tracking-tight ${accent ?? 'text-neutral-900'}`}>{value}</div>
-      {sub && <div className="text-xs text-neutral-400 mt-1">{sub}</div>}
+      <div className={`${valueSize} font-semibold tracking-tight num ${color}`}>{value}</div>
+      {sub && <div className="text-xs text-neutral-500 mt-1">{sub}</div>}
     </>
   )
-  const base = `bg-white rounded-xl border border-neutral-200 ${padding} shadow-sm`
-  return href
-    ? <Link href={href} className={`${base} block hover:border-neutral-400 hover:shadow-md transition-all`}>{inner}</Link>
-    : <div className={base}>{inner}</div>
+  const base = `group bg-white rounded-xl border ${padding} shadow-sm text-left ${
+    active ? 'border-neutral-900 ring-1 ring-neutral-900' : 'border-neutral-200'}`
+  const hover = 'hover:border-neutral-400 hover:shadow transition-all'
+  if (href) return <Link href={href} className={`${base} ${hover} block`}>{inner}</Link>
+  if (onClick) return <button type="button" onClick={onClick} className={`${base} ${hover} block w-full`}>{inner}</button>
+  return <div className={base}>{inner}</div>
 }
 
-// ── Page Header ─────────────────────────────────────────────────────────────
+// ── Encabezado de página ────────────────────────────────────────────────────
+// Igual en todas las pantallas: título (+ subtítulo) a la izquierda, acciones a la
+// derecha. Una sola acción principal (btn-primary) por pantalla.
 export function PageHeader({ title, subtitle, actions }: {
-  title: string; subtitle?: string; actions?: ReactNode
+  title: ReactNode; subtitle?: ReactNode; actions?: ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between mb-4">
-      <div>
-        <h1 className="text-lg font-bold text-neutral-900">{title}</h1>
+    <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{title}</h1>
         {subtitle && <p className="text-sm text-neutral-500 mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  )
+}
+
+// ── Pestañas (secciones de una pantalla) ────────────────────────────────────
+// Subrayado con el verde de la marca. Para FILTROS usar FilterPills (chips).
+// `group` separa grupos con una rayita (p.ej. Reportes: por período / estado actual).
+export interface TabItem<T extends string> { value: T; label: ReactNode; count?: number; group?: string }
+export function Tabs<T extends string>({ items, value, onChange, className = '' }: {
+  items: TabItem<T>[]; value: T; onChange: (v: T) => void; className?: string
+}) {
+  return (
+    <div className={`flex items-end gap-1 border-b border-neutral-200 overflow-x-auto ${className}`} role="tablist">
+      {items.map((t, i) => {
+        const on = t.value === value
+        const sep = i > 0 && t.group && t.group !== items[i - 1].group
+        return (
+          <div key={t.value} className="flex items-end">
+            {sep && <span className="self-center h-5 w-px bg-neutral-200 mx-2" aria-hidden="true" />}
+            <button type="button" role="tab" aria-selected={on} onClick={() => onChange(t.value)}
+              className={`relative px-3 pb-2.5 pt-1.5 text-sm whitespace-nowrap transition-colors ${
+                on ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-500 hover:text-neutral-800'}`}>
+              {t.label}
+              {t.count !== undefined && (
+                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full num ${on ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
+                  {t.count}
+                </span>
+              )}
+              {on && <span className="absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-[var(--marca-fuerte)]" />}
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Menú de acciones de una fila (⋯) ────────────────────────────────────────
+export function RowMenu({ items }: {
+  items: { label: string; onClick: () => void; danger?: boolean; hidden?: boolean }[]
+}) {
+  const [open, setOpen] = useState(false)
+  const visibles = items.filter(i => !i.hidden)
+  if (visibles.length === 0) return null
+  return (
+    <div className="relative inline-block" onClick={e => e.stopPropagation()}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-label="Acciones" aria-haspopup="menu"
+        className="w-8 h-8 inline-flex items-center justify-center rounded-md text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100">
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute right-0 top-full mt-1 z-30 min-w-[10rem] bg-white border border-neutral-200 rounded-lg shadow-lg p-1">
+            {visibles.map(i => (
+              <button key={i.label} type="button" role="menuitem"
+                onClick={() => { setOpen(false); i.onClick() }}
+                className={`block w-full text-left px-3 py-1.5 text-sm rounded-md ${
+                  i.danger ? 'text-red-600 hover:bg-red-50' : 'text-neutral-700 hover:bg-neutral-100'}`}>
+                {i.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -104,25 +188,32 @@ export function EmptyState({ message, cta }: { message: string; cta?: ReactNode 
   )
 }
 
-// ── Filter pill bar ─────────────────────────────────────────────────────────
+// ── Carga (en vez de "Cargando…" suelto) ────────────────────────────────────
+export function Cargando({ filas = 6 }: { filas?: number }) {
+  return (
+    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3 animate-pulse" aria-label="Cargando">
+      <div className="h-4 w-40 bg-neutral-200 rounded" />
+      {Array.from({ length: filas }, (_, i) => <div key={i} className="h-3 bg-neutral-100 rounded" />)}
+    </div>
+  )
+}
+
+// ── Filtros (chips) ─────────────────────────────────────────────────────────
+export const chipCls = (on: boolean) =>
+  `px-3 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
+    on ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'}`
+
 export function FilterPills<T extends string>({ options, value, onChange }: {
   options: { value: T; label: string; count?: number }[]
   value: T
   onChange: (v: T) => void
 }) {
   return (
-    <div className="flex gap-1 flex-wrap">
+    <div className="flex gap-1.5 flex-wrap">
       {options.map(o => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-            value === o.value
-              ? 'bg-neutral-900 text-white border-neutral-900'
-              : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'
-          }`}
-        >
-          {o.label}{o.count !== undefined ? ` (${o.count})` : ''}
+        <button key={o.value} onClick={() => onChange(o.value)} className={chipCls(value === o.value)}>
+          {o.label}
+          {o.count !== undefined && <span className={`ml-1 num ${value === o.value ? 'text-white/60' : 'text-neutral-400'}`}>{o.count}</span>}
         </button>
       ))}
     </div>
@@ -147,18 +238,18 @@ export function Stepper({ steps, current, terminal }: {
           <div key={s.key} className="flex items-center shrink-0">
             <div className="flex flex-col items-center">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                done ? 'bg-green-500 text-white'
-                  : active ? 'bg-blue-600 text-white ring-2 ring-blue-200'
+                done ? 'bg-emerald-500 text-white'
+                  : active ? 'bg-neutral-900 text-white ring-2 ring-lime-300'
                   : 'bg-neutral-200 text-neutral-400'
               }`}>
                 {done ? '✓' : i + 1}
               </div>
-              <span className={`text-[10px] mt-1 whitespace-nowrap ${active ? 'font-semibold text-blue-700' : 'text-neutral-400'}`}>
+              <span className={`text-[10px] mt-1 whitespace-nowrap ${active ? 'font-semibold text-neutral-900' : 'text-neutral-400'}`}>
                 {s.label}
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={`h-0.5 w-6 mx-0.5 mb-4 ${done ? 'bg-green-500' : 'bg-neutral-200'}`} />
+              <div className={`h-0.5 w-6 mx-0.5 mb-4 ${done ? 'bg-emerald-500' : 'bg-neutral-200'}`} />
             )}
           </div>
         )
@@ -212,9 +303,7 @@ export function DateRangeBar({ preset, from, to, onPreset, onFrom, onTo, onApply
       <div className="flex gap-1 flex-wrap">
         {presets.map(p => (
           <button key={p.value} onClick={() => onPreset(p.value)}
-            className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-              preset === p.value ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'
-            }`}>
+            className={chipCls(preset === p.value)}>
             {p.label}
           </button>
         ))}
@@ -338,7 +427,7 @@ export function DataTable<T extends Record<string, unknown>>({
       )}
       <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-xs text-neutral-500 uppercase sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+          <thead className="bg-neutral-50 text-xs font-medium text-neutral-500 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
               {columns.map(c => (
                 <th key={c.key}
@@ -380,7 +469,7 @@ export function DataTable<T extends Record<string, unknown>>({
       {hasMore && (
         <div className="px-3 py-2 border-t border-neutral-100 text-center">
           <button onClick={() => setVisible(v => v + pageSize)}
-            className="text-xs px-3 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">
+            className="btn-secondary text-xs px-3 py-1">
             Cargar {pageSize} más ({sorted.length - visible} restantes)
           </button>
         </div>

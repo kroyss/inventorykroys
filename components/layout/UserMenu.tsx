@@ -20,7 +20,6 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { setAbierto(false) }, [pathname])
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false) }
@@ -60,7 +59,7 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
           </div>
           {links.length > 0 && <div className="my-1 border-t border-neutral-100" />}
           {links.map(l => (
-            <Link key={l.href} href={l.href} role="menuitem"
+            <Link key={l.href} href={l.href} role="menuitem" onClick={() => setAbierto(false)}
               className={`${fila} ${pathname.startsWith(l.href) ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700 hover:bg-neutral-50'}`}>
               {l.label}
             </Link>

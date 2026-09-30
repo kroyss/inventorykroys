@@ -5,6 +5,7 @@ import { bs, fmtDate, type Invoice } from '@/lib/invoices'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import FacturaForm from './FacturaForm'
+import { PageHeader, chipCls } from '@/components/ui'
 
 type Filter = 'all' | 'EMITIDA' | 'ANULADA' | 'RET_PENDIENTE'
 const FILTERS: { key: Filter; label: string }[] = [
@@ -76,13 +77,16 @@ export default function FacturasClient({ userRole }: { userRole: UserRole }) {
 
   return (
     <div>
+      <PageHeader title="Facturas" subtitle="Facturas fiscales emitidas desde las ventas" actions={<>
+        <a href="/factura/prueba" target="_blank" rel="noreferrer" className="btn-secondary text-sm whitespace-nowrap">Hoja de prueba</a>
+        {isAdmin && (
+          <button onClick={() => setShowConfig(true)} className="btn-secondary text-sm whitespace-nowrap">Configuración</button>
+        )}
+      </>} />
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5 bg-white rounded-xl border border-neutral-200 shadow-sm p-2">
+        <div className="flex flex-wrap gap-1.5">
           {FILTERS.map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-3 py-1 rounded-full border text-xs whitespace-nowrap ${
-                filter === f.key ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-400'
-              }`}>
+            <button key={f.key} onClick={() => setFilter(f.key)} className={chipCls(filter === f.key)}>
               {f.label}
             </button>
           ))}
@@ -90,11 +94,7 @@ export default function FacturasClient({ userRole }: { userRole: UserRole }) {
         <div className="flex items-center gap-2">
           <input type="search" value={searchInput} onChange={e => setSearchInput(e.target.value)}
             placeholder="N°, cliente, RIF u orden…"
-            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full sm:w-60 focus:outline-none focus:ring-2 focus:ring-neutral-800" />
-          <a href="/factura/prueba" target="_blank" rel="noreferrer" className="btn-secondary text-sm whitespace-nowrap">Hoja de prueba</a>
-          {isAdmin && (
-            <button onClick={() => setShowConfig(true)} className="btn-secondary text-sm whitespace-nowrap">Configuración</button>
-          )}
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full sm:w-72" />
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import type { FinanceAccount, FinanceCategory, FinanceLedgerRow, FinanceKind } from '@/lib/types'
-import { money } from '@/components/ui'
+import { money, PageHeader, Tabs, KPICard } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
@@ -118,23 +118,13 @@ export default function FinanzasClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-neutral-900">Finanzas <span className="text-sm font-normal text-neutral-400">global · VE + CO</span></h1>
-      </div>
+      <PageHeader title="Finanzas" subtitle="De toda la organización: Venezuela y Colombia juntas, en USD" />
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white rounded-xl border border-neutral-200 shadow-sm p-1 w-fit overflow-x-auto">
-        {(['movimientos', 'cierre', 'capital', 'cuentas'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === t ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100'
-            }`}>
-            {TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onChange={setTab}
+        items={(['movimientos', 'cierre', 'capital', 'cuentas'] as Tab[]).map(t => ({ value: t, label: TAB_LABELS[t] }))} />
 
       {/* ════════ MOVIMIENTOS ════════ */}
       {tab === 'movimientos' && (
@@ -160,18 +150,9 @@ export default function FinanzasClient() {
 
           {/* Resumen del mes */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
-              <div className="text-xs text-neutral-500 mb-1">Ingresos</div>
-              <div className="text-xl font-bold text-green-600">${money(ingresos)}</div>
-            </div>
-            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
-              <div className="text-xs text-neutral-500 mb-1">Gastos</div>
-              <div className="text-xl font-bold text-red-600">${money(gastos)}</div>
-            </div>
-            <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
-              <div className="text-xs text-neutral-500 mb-1">Sobrante</div>
-              <div className={`text-xl font-bold ${neto >= 0 ? 'text-neutral-900' : 'text-red-600'}`}>${money(neto)}</div>
-            </div>
+            <KPICard compact label="Ingresos" value={`$${money(ingresos)}`} tone="bueno" />
+            <KPICard compact label="Gastos" value={`$${money(gastos)}`} />
+            <KPICard compact label="Sobrante" value={`$${money(neto)}`} tone={neto >= 0 ? 'neutro' : 'problema'} />
           </div>
           <p className="text-xs text-neutral-400 -mt-2">
             Ventas, compras locales e importaciones se traen automáticamente del sistema (etiqueta <span className="text-blue-600">auto</span>). Agrega a mano sueldos, comisiones, envíos, etc. Todo consolidado en USD · COP/USD {capital?.rates.cop ?? '—'}.

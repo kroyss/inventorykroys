@@ -6,6 +6,7 @@ import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ComprasClient from './ComprasClient'
 import ImportsClient from './ImportsClient'
+import { PageHeader, Tabs, chipCls } from '@/components/ui'
 
 interface Props {
   initialOrders: PurchaseOrder[]
@@ -79,30 +80,19 @@ export default function ComprasTabs({
     if (tabParam === 'import' || tabParam === 'local') setTab(tabParam)
   }, [tabParam])
 
-  const tabBtn = (key: typeof tab, label: string) => (
-    <button onClick={() => setTab(key)}
-      className={`px-4 py-2 rounded text-sm font-medium ${tab === key ? 'bg-neutral-900 text-white' : 'bg-neutral-100 hover:bg-neutral-200'}`}>
-      {label}
-    </button>
-  )
   const subBtn = (key: 'local' | 'import', label: string) => (
     <button onClick={() => setHistType(key)}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium border ${histType === key ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'}`}>
+      className={chipCls(histType === key)}>
       {label}
     </button>
   )
 
   return (
     <div>
-      <div className="flex gap-1 mb-4 flex-wrap items-center">
-        {/* Importaciones primero (lo más común) en VE y CO, luego Locales, luego Historial */}
-        {tabBtn('import', `Importaciones (${importActive})`)}
-        {tabBtn('local', `Locales (${localActive})`)}
-        {tabBtn('history', `Historial (${historyTotal})`)}
-
-        {/* Botón unificado "+ Compra" (admin): elige Local o Importación */}
-        {isAdmin && (
-          <div className="relative ml-auto">
+      <PageHeader title={isAdmin ? 'Compras' : 'Recepciones'}
+        subtitle={isAdmin ? 'Importaciones y compras locales, del pago a la recepción' : 'Mercancía que llega y hay que recibir'}
+        actions={isAdmin && (
+          <div className="relative">
             <button onClick={() => setCreateOpen(o => !o)} className="btn-primary text-sm whitespace-nowrap">
               + Compra ▾
             </button>
@@ -118,8 +108,14 @@ export default function ComprasTabs({
               </>
             )}
           </div>
-        )}
-      </div>
+        )} />
+
+      {/* Importaciones primero (lo más común) en VE y CO, luego Locales, luego Historial */}
+      <Tabs className="mb-4" value={tab} onChange={setTab} items={[
+        { value: 'import',  label: 'Importaciones', count: importActive },
+        { value: 'local',   label: 'Locales',       count: localActive },
+        { value: 'history', label: 'Historial',     count: historyTotal },
+      ]} />
 
       {tab === 'local' && (
         <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} userRole={userRole} onChanged={refresh}

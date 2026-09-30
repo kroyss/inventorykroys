@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
-import { int } from '@/components/ui'
+import { int, PageHeader, KPICard, StatusBadge, RowMenu } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
@@ -61,7 +61,7 @@ function shipBadge(info: ShipInfo): { label: string; cls: string } {
 }
 
 // Color del margen neto sobre venta: sano ≥20%, ajustado ≥8%, riesgo/pérdida abajo.
-const netColor = (m: number) => m >= 20 ? 'text-green-600' : m >= 8 ? 'text-amber-600' : 'text-red-600'
+const netColor = (m: number) => m >= 20 ? 'text-emerald-600' : m >= 8 ? 'text-amber-600' : 'text-red-600'
 
 // ─── types ──────────────────────────────────────────────────────
 interface FormState {
@@ -496,25 +496,30 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   return (
     <div className="space-y-4">
+      <PageHeader title="Productos" subtitle="Catálogo, precios y margen neto de cada producto" actions={<>
+        {country === 'VE' && (
+          <Link href="/productos/mercadoenvios" className="btn-secondary text-sm whitespace-nowrap">MercadoEnvíos</Link>
+        )}
+        {country === 'VE' && (
+          <Link href="/productos/margenes" className="btn-secondary text-sm whitespace-nowrap"
+            title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría">
+            Márgenes &lt; $5
+          </Link>
+        )}
+        <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nuevo producto</button>
+      </>} />
+
       {/* KPI header */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {([
-          { label: 'Productos',     value: int(kpis.total),     accent: 'text-neutral-900' },
-          { label: 'Activos',       value: int(kpis.activos),   accent: 'text-green-600' },
-          { label: 'Inactivos',     value: int(kpis.inactivos), accent: kpis.inactivos > 0 ? 'text-neutral-400' : 'text-neutral-900' },
-          { label: 'Sin categoría', value: int(kpis.sinCat),    accent: kpis.sinCat > 0 ? 'text-orange-500' : 'text-neutral-900' },
-          { label: 'Valor catálogo (costo)', value: `$${fmt(kpis.valor)}`, accent: 'text-neutral-900' },
-        ]).map(c => (
-          <div key={c.label} className="bg-white rounded-xl border border-neutral-200 p-3 shadow-sm">
-            <div className="text-xs text-neutral-500 mb-1">{c.label}</div>
-            <div className={`text-xl font-bold ${c.accent}`}>{c.value}</div>
-          </div>
-        ))}
+        <KPICard compact label="Productos" value={int(kpis.total)} />
+        <KPICard compact label="Activos" value={int(kpis.activos)} />
+        <KPICard compact label="Inactivos" value={int(kpis.inactivos)} tone={kpis.inactivos > 0 ? 'apagado' : 'neutro'} />
+        <KPICard compact label="Sin categoría" value={int(kpis.sinCat)} tone={kpis.sinCat > 0 ? 'atencion' : 'neutro'} />
+        <KPICard compact label="Valor catálogo (costo)" value={`$${fmt(kpis.valor)}`} />
       </div>
 
-      {/* ── header ── */}
+      {/* ── barra: búsqueda + acciones en lote ── */}
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold text-neutral-900 mr-auto">Catálogo</h1>
 
         {selected.length > 0 && (
           <div className="flex items-center gap-2">
@@ -544,40 +549,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           placeholder="Buscar…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-neutral-800"
+          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full md:w-72 order-first"
         />
-
-        {country === 'VE' && (
-          <Link
-            href="/productos/mercadoenvios"
-            className="px-3 py-1.5 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 whitespace-nowrap"
-          >
-            📦 MercadoEnvíos
-          </Link>
-        )}
-        {country === 'VE' && (
-          <Link
-            href="/productos/margenes"
-            title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría"
-            className="px-3 py-1.5 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-medium hover:bg-neutral-100 whitespace-nowrap"
-          >
-            📉 Márgenes &lt; $5
-          </Link>
-        )}
-
-        <button
-          onClick={openCreate}
-          className="px-4 py-1.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700"
-        >
-          + Nuevo
-        </button>
       </div>
 
       {/* ── table (desktop) ── */}
-      <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto hidden md:block">
-          <table className="w-full text-sm">
-            <thead>
+          <table className="w-full text-sm [&_th]:whitespace-nowrap">
+            <thead className="text-xs">
               <tr className="border-b border-neutral-100 bg-neutral-50">
                 <th className="w-8 px-3 py-2">
                   <input
@@ -650,11 +630,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       className="cursor-pointer"
                     />
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs text-neutral-500">{p.code}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{p.code}</td>
                   <td className="px-3 py-2 font-medium text-neutral-900">{p.name}</td>
                   <td className="px-3 py-2">
                     {p.category_name ? (
-                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full whitespace-nowrap">
                         {p.category_name} {p.profit_percentage}%
                       </span>
                     ) : (
@@ -666,7 +646,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}
                   </td>
                   {country === 'VE' && (
-                    <td className="px-3 py-2 text-right font-medium text-purple-700">
+                    <td className="px-3 py-2 text-right font-medium text-neutral-900 num">
                       ${fmt(livePublishedVE(p, veRate?.excess ?? 0))}
                     </td>
                   )}
@@ -679,34 +659,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </td>
                   <td className="px-3 py-2 text-right text-neutral-600">{p.quantity}</td>
                   <td className="px-3 py-2 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      p.is_active
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-neutral-100 text-neutral-400'
-                    }`}>
-                      {p.is_active ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <StatusBadge status={p.is_active ? 'OK' : 'INACTIVO'} label={p.is_active ? 'Activo' : 'Inactivo'} />
                   </td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => openEdit(p.id)}
-                        className="text-xs px-2 py-1 rounded hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate')}
-                        className="text-xs px-2 py-1 rounded hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900"
-                      >
-                        {p.is_active ? 'Desactivar' : 'Activar'}
-                      </button>
-                      <button
-                        onClick={() => handleStatus(p.id, 'delete')}
-                        className="text-xs px-2 py-1 rounded hover:bg-red-50 text-neutral-400 hover:text-red-600"
-                      >
-                        Eliminar
-                      </button>
+                    <div className="flex justify-end">
+                      <RowMenu items={[
+                        { label: 'Editar', onClick: () => openEdit(p.id) },
+                        { label: p.is_active ? 'Desactivar' : 'Activar', onClick: () => handleStatus(p.id, p.is_active ? 'deactivate' : 'activate') },
+                        { label: 'Eliminar', danger: true, onClick: () => handleStatus(p.id, 'delete') },
+                      ]} />
                     </div>
                   </td>
                 </tr>
@@ -740,7 +701,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 <div className="flex items-center gap-4 mt-2 text-sm">
                   <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}</span></span>
                   {country === 'VE' && (
-                    <span className="text-neutral-500">ML: <span className="font-medium text-purple-700">${fmt(livePublishedVE(p, veRate?.excess ?? 0))}</span></span>
+                    <span className="text-neutral-500">ML: <span className="font-medium text-neutral-900">${fmt(livePublishedVE(p, veRate?.excess ?? 0))}</span></span>
                   )}
                   {net && (
                     <span className={netColor(net.margen)}>{Math.round(net.margen)}% neto</span>

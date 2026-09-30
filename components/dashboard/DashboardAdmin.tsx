@@ -9,7 +9,7 @@ import {
 import type { ChartOptions } from 'chart.js'
 import Link from 'next/link'
 import type { Country } from '@/lib/types'
-import { KPICard } from '@/components/ui'
+import { KPICard, PageHeader, Cargando, chipCls } from '@/components/ui'
 import BonusPipeline from './BonusPipeline'
 import RateBar from './RateBar'
 
@@ -73,7 +73,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+      legend: { position: 'top', align: 'end', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6, boxHeight: 6, padding: 16, color: '#525252' } },
       tooltip: {
         callbacks: {
           label: ctx => ctx.dataset.yAxisID === 'y1'
@@ -86,20 +86,30 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
       y: {
         beginAtZero: true,
         position: 'left',
-        ticks: { callback: v => '$' + money(Number(v)) },
+        ticks: { callback: v => '$' + Math.round(Number(v)).toLocaleString('de-DE'), color: '#737373' },
         grid: { color: 'rgba(0,0,0,0.05)' },
       },
       y1: {
         beginAtZero: true,
         position: 'right',
-        ticks: { callback: v => `${v} v` },
+        ticks: { callback: v => `${v} v`, color: '#a3a3a3' },
         grid: { drawOnChartArea: false },
       },
-      x: { grid: { display: false } },
+      // Días: "2026-09-14" → "14" (el mes ya se sabe por el período elegido)
+      x: {
+        grid: { display: false },
+        ticks: {
+          color: '#737373', maxRotation: 0, autoSkipPadding: 8,
+          callback(v) {
+            const l = String(this.getLabelForValue(Number(v)))
+            return /^\d{4}-\d{2}-\d{2}$/.test(l) ? String(Number(l.slice(8))) : l
+          },
+        },
+      },
     },
   }), [])
 
-  if (!summary) return <div className="p-8 text-neutral-500">Cargando…</div>
+  if (!summary) return <Cargando />
 
   // Nota comparativa vs el MISMO tramo de días del mes anterior (solo en período 'mes').
   // Devuelve null si no hay base de comparación (mes anterior en 0).
@@ -108,7 +118,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
     const d   = current - previous
     const pct = Math.round((d / previous) * 1000) / 10
     return (
-      <span className={d >= 0 ? 'text-green-600' : 'text-red-600'}>
+      <span className={d >= 0 ? 'text-emerald-600' : 'text-red-600'}>
         {d >= 0 ? '▲' : '▼'} {Math.abs(pct)}%
       </span>
     )
@@ -118,9 +128,8 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
 
   return (
     <div className="space-y-6">
-      {/* Quick actions */}
-      <div className="flex items-center justify-end">
-        <div className="flex gap-2">
+      <PageHeader title="Inicio" subtitle="Cómo va tu negocio este mes" actions={
+        <>
           <Link href="/ventas?new=1" className="btn-primary text-sm">Nueva venta</Link>
           <div className="relative">
             <button onClick={() => setCompraMenu(v => !v)} className="btn-secondary text-sm">
@@ -136,21 +145,21 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
               </>
             )}
           </div>
-        </div>
-      </div>
+        </>
+      } />
 
       {country === 'VE' && <RateBar puedeActualizar={puedeTasas} />}
 
       {/* Requiere atención — clickable */}
       <div>
-        <h2 className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-2">Requiere atención</h2>
+        <h2 className="text-sm font-semibold text-neutral-700 mb-2">Requiere atención</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard label="Reposición"           value={summary.reposicion_count} accent={summary.reposicion_count > 0 ? 'text-blue-600' : undefined} href="/reportes?tab=stock&sub=reposicion" />
-          <KPICard label="Sin stock"            value={summary.no_stock}        accent={summary.no_stock > 0 ? 'text-red-600' : undefined} href="/inventario?estado=SIN_STOCK" />
-          <KPICard label="Stock bajo"           value={summary.low_stock_alerts} accent={summary.low_stock_alerts > 0 ? 'text-orange-500' : undefined} href="/inventario?estado=BAJO" />
-          <KPICard label="Ventas borrador"      value={summary.pending_sales}   accent={summary.pending_sales > 0 ? 'text-amber-600' : undefined} href="/ventas?estado=BORRADOR" />
-          <KPICard label="Compras en tránsito"  value={summary.in_transit}      accent={summary.in_transit > 0 ? 'text-purple-600' : undefined} href="/reportes?tab=transito" />
-          <KPICard label="En revisión (remate)" value={summary.remate_count}    accent={summary.remate_count > 0 ? 'text-amber-600' : undefined} href="/reportes?tab=stock&sub=remate" />
+          <KPICard label="Reposición"           value={summary.reposicion_count} tone={summary.reposicion_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=reposicion" />
+          <KPICard label="Sin stock"            value={summary.no_stock}        tone={summary.no_stock > 0 ? 'problema' : 'apagado'} href="/inventario?estado=SIN_STOCK" />
+          <KPICard label="Stock bajo"           value={summary.low_stock_alerts} tone={summary.low_stock_alerts > 0 ? 'atencion' : 'apagado'} href="/inventario?estado=BAJO" />
+          <KPICard label="Ventas borrador"      value={summary.pending_sales}   tone={summary.pending_sales > 0 ? 'atencion' : 'apagado'} href="/ventas?estado=BORRADOR" />
+          <KPICard label="Compras en tránsito"  value={summary.in_transit}      tone={summary.in_transit > 0 ? 'neutro' : 'apagado'} href="/reportes?tab=transito" />
+          <KPICard label="En revisión (remate)" value={summary.remate_count}    tone={summary.remate_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=remate" />
         </div>
       </div>
 
@@ -166,25 +175,24 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
       {/* Gráfico con métricas integradas arriba */}
       <div className={`bg-white rounded-xl border border-neutral-200 p-4 shadow-sm ${country === 'VE' ? 'mt-2.5!' : ''}`}>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h3 className="font-semibold text-neutral-800">Evolución Ventas / Costos / Ganancia</h3>
-          <div className="flex gap-1 items-center flex-wrap">
+          <h3 className="font-semibold text-neutral-900">Ventas, costos y ganancia</h3>
+          <div className="flex gap-1.5 items-center flex-wrap">
             {(['today','month','quarter','year'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1 text-xs rounded ${period === p ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+                className={chipCls(period === p)}
               >
                 {p === 'today' ? 'Hoy' : p === 'month' ? 'Mes' : p === 'quarter' ? 'Trim.' : 'Año'}
               </button>
             ))}
             <span className="w-px h-5 bg-neutral-200 mx-1" />
             <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)}
-              className={`border rounded px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
+              className={`border rounded-lg px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
             <span className="text-xs text-neutral-400">–</span>
             <input type="date" value={dateTo} min={dateFrom} max={todayStr()} onChange={e => setDateTo(e.target.value)}
-              className={`border rounded px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
-            <button onClick={applyCustom}
-              className={`px-3 py-1 text-xs rounded ${period === 'custom' ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'}`}>
+              className={`border rounded-lg px-2 py-1 text-xs ${period === 'custom' ? 'border-neutral-900' : 'border-neutral-200'}`} />
+            <button onClick={applyCustom} className={chipCls(period === 'custom')}>
               Aplicar
             </button>
           </div>
@@ -195,7 +203,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
               <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-green-500" /> Ventas
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Ventas
               </div>
               <div className="text-xl font-bold text-neutral-900 mt-0.5">${money(chart.summary.ventas)}</div>
               {period === 'month' && salesDelta && (
@@ -204,13 +212,13 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
             </div>
             <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
               <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-red-500" /> Costos
+                <span className="w-2 h-2 rounded-full bg-red-400" /> Costos
               </div>
               <div className="text-xl font-bold text-neutral-900 mt-0.5">${money(chart.summary.costos)}</div>
             </div>
             <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
               <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-blue-500" /> Ganancia
+                <span className="w-2 h-2 rounded-full bg-neutral-900" /> Ganancia
               </div>
               <div className="text-xl font-bold text-neutral-900 mt-0.5">
                 ${money(chart.summary.ganancia)}{' '}
@@ -225,7 +233,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
             </div>
             <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
               <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-purple-500" /> Ventas concretadas
+                <span className="w-2 h-2 rounded-full bg-lime-500" /> Ventas concretadas
               </div>
               <div className="text-xl font-bold text-neutral-900 mt-0.5">{chart.summary.cantidad} <span className="text-sm text-neutral-400">ventas</span></div>
             </div>
@@ -238,10 +246,10 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
               data={{
                 labels: chart.chart_data.map(d => d.label),
                 datasets: [
-                  { label: 'Ventas ($)',  data: chart.chart_data.map(d => d.ventas), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)', fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
-                  { label: 'Costos ($)',  data: chart.chart_data.map(d => d.costos), borderColor: '#ef4444', backgroundColor: 'transparent', borderDash: [5, 4], tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
-                  { label: 'Ganancia ($)', data: chart.chart_data.map(d => d.ventas - d.costos), borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
-                  { label: 'Ventas concretadas', data: chart.chart_data.map(d => d.cantidad), borderColor: '#a855f7', backgroundColor: 'transparent', borderDash: [2, 3], tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y1' },
+                  { label: 'Ventas ($)',  data: chart.chart_data.map(d => d.ventas), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.10)', fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
+                  { label: 'Costos ($)',  data: chart.chart_data.map(d => d.costos), borderColor: '#f87171', backgroundColor: 'transparent', borderDash: [5, 4], tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
+                  { label: 'Ganancia ($)', data: chart.chart_data.map(d => d.ventas - d.costos), borderColor: '#171717', backgroundColor: 'transparent', tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
+                  { label: 'Ventas concretadas', data: chart.chart_data.map(d => d.cantidad), borderColor: '#84cc16', backgroundColor: 'transparent', borderDash: [2, 3], tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y1' },
                 ],
               }}
               options={chartOptions}

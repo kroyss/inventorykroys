@@ -27,7 +27,6 @@ export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automa
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { setAbierto(false) }, [pathname])
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false) }

@@ -318,14 +318,6 @@ export default function DespachosClient({ isAdmin, reportador }: { isAdmin: bool
           )}
       </section>
 
-      {reportador && (
-        <Link href="/reportador"
-          className="block bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3 text-sm hover:bg-neutral-50">
-          <span className="font-semibold text-neutral-800">Reportador</span>
-          <span className="text-neutral-500"> · guías finales de Tealca, equipos y mensajes al comprador →</span>
-        </Link>
-      )}
-
       {/* Jornadas cerradas */}
       {data.cerradas.length > 0 && (
         <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
