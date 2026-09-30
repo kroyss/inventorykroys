@@ -46,7 +46,7 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country }: { country: Country }) {
+export default function DashboardAdmin({ country, bonos }: { country: Country; bonos: boolean }) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [chart,   setChart]   = useState<ChartData | null>(null)
   // Default to 'month' so today's sales show immediately on the chart.
@@ -157,7 +157,7 @@ export default function DashboardAdmin({ country }: { country: Country }) {
       {/* Bonos: solo VE (no aplica en CO).
           Los `!` pisan el gap del space-y-6 para que la barra quede más
           pegada a las cards de arriba y al gráfico de abajo. */}
-      {country === 'VE' && (
+      {country === 'VE' && bonos && (
         <div className="mt-3!">
           <BonusPipeline />
         </div>

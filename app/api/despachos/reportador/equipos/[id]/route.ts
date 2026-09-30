@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
-import { despachosForbidden } from '@/lib/despachos'
+import { reportadorForbidden } from '@/lib/despachos'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  const denied = despachosForbidden(session)
+  const denied = reportadorForbidden(session)
   if (denied) return denied
   if (session.user.role !== 'admin') return forbidden()
 
@@ -35,7 +35,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  const denied = despachosForbidden(session)
+  const denied = reportadorForbidden(session)
   if (denied) return denied
   if (session.user.role !== 'admin') return forbidden()
 

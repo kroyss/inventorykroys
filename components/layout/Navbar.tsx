@@ -22,7 +22,7 @@ export default async function Navbar() {
           <span className="text-[11px] font-semibold text-neutral-500 border border-neutral-200 rounded px-1.5 py-0.5">{country}</span>
         </div>
 
-        <NavLinks role={role} country={country} />
+        <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
 
         <div className="flex items-center gap-3 shrink-0 ml-auto">
           <span className="text-xs text-neutral-400 hidden sm:block">{session?.user?.name}</span>

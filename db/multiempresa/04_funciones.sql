@@ -12,18 +12,22 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+-- (DROP: CREATE OR REPLACE no puede cambiar las columnas que devuelve)
+DROP FUNCTION IF EXISTS reportador_empresa_por_token(TEXT);
+DROP FUNCTION IF EXISTS reportador_empresa_por_codigo(TEXT);
+
 CREATE OR REPLACE FUNCTION reportador_empresa_por_token(p_token_hash TEXT)
-RETURNS TABLE (empresa_id INTEGER, country VARCHAR)
+RETURNS TABLE (empresa_id INTEGER, country VARCHAR, modulos TEXT[])
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT q.empresa_id, e.country
+  SELECT q.empresa_id, e.country, e.modulos
   FROM reportador_equipos q JOIN empresas e ON e.id = q.empresa_id
   WHERE q.token_hash = p_token_hash AND q.revocado_at IS NULL AND e.is_active
 $$;
 
 CREATE OR REPLACE FUNCTION reportador_empresa_por_codigo(p_codigo TEXT)
-RETURNS TABLE (empresa_id INTEGER, country VARCHAR)
+RETURNS TABLE (empresa_id INTEGER, country VARCHAR, modulos TEXT[])
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT q.empresa_id, e.country
+  SELECT q.empresa_id, e.country, e.modulos
   FROM reportador_equipos q JOIN empresas e ON e.id = q.empresa_id
   WHERE q.codigo = p_codigo AND q.codigo_expira > NOW() AND q.revocado_at IS NULL
     AND q.token_hash IS NULL AND e.is_active

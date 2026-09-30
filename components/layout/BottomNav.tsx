@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
+import { rutaHabilitada } from '@/lib/modulos'
 
 interface NavItem { href: string; label: string; icon: string; roles: UserRole[]; countries: Country[] }
 
@@ -23,12 +24,12 @@ const MORE: NavItem[] = [
   { href: '/usuarios',   label: 'Usuarios',   icon: '👥', roles: ['admin'],        countries: ['VE', 'CO'] },
 ]
 
-export default function BottomNav({ role, country }: { role: UserRole; country: Country }) {
+export default function BottomNav({ role, country, modulos }: { role: UserRole; country: Country; modulos: string[] }) {
   const pathname = usePathname()
   const [showMore, setShowMore] = useState(false)
 
   const visible = (items: NavItem[]) =>
-    items.filter(i => i.roles.includes(role) && i.countries.includes(country))
+    items.filter(i => i.roles.includes(role) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
 
   const primary = visible(PRIMARY)
   const more    = visible(MORE)

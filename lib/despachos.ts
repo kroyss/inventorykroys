@@ -12,6 +12,7 @@ import path from 'path'
 import type { Pool } from 'pg'
 import type { Session } from 'next-auth'
 import { NextResponse } from 'next/server'
+import { tieneModulo } from '@/lib/modulos'
 
 const ETIQUETAS_URL = process.env.ETIQUETAS_URL ?? 'http://inventory_etiquetas:8000'
 const UPLOAD_DIR    = process.env.UPLOAD_DIR ?? './uploads'
@@ -48,7 +49,17 @@ export function despachosForbidden(session: Session) {
   if (session.user.country !== 'VE') {
     return NextResponse.json({ error: 'Despachos solo está disponible en Venezuela' }, { status: 403 })
   }
+  if (!tieneModulo(session.user, 'despachos')) {
+    return NextResponse.json({ error: 'Tu empresa no tiene el módulo Despachos' }, { status: 403 })
+  }
   return null
+}
+
+// El panel del Reportador (dentro de Despachos) además pide su propio módulo.
+export function reportadorForbidden(session: Session) {
+  return despachosForbidden(session) ?? (tieneModulo(session.user, 'reportador')
+    ? null
+    : NextResponse.json({ error: 'Tu empresa no tiene el módulo Reportador' }, { status: 403 }))
 }
 
 // ── Servicio ────────────────────────────────────────────────────────────────

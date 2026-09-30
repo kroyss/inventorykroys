@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { UserRole, Country } from '@/lib/types'
+import { rutaHabilitada } from '@/lib/modulos'
 
 const allLinks = [
   { href: '/dashboard',  label: 'Inicio',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
@@ -19,12 +20,13 @@ const allLinks = [
 interface Props {
   role: UserRole
   country: Country
+  modulos: string[]
 }
 
-export default function NavLinks({ role, country }: Props) {
+export default function NavLinks({ role, country, modulos }: Props) {
   const pathname = usePathname()
   const links = allLinks.filter(
-    l => l.roles.includes(role) && l.countries.includes(country)
+    l => l.roles.includes(role) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
   )
 
   return (

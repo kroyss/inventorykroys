@@ -39,7 +39,7 @@ interface Rate {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
-export default function DashboardUser({ country }: { country: Country }) {
+export default function DashboardUser({ country, bonos }: { country: Country; bonos: boolean }) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [saleCounts, setSaleCounts] = useState<SaleStateCounts>({ borrador: 0, verificado: 0, procesada: 0 })
   const [recv, setRecv] = useState<ReceptionCounts>({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
@@ -96,7 +96,7 @@ export default function DashboardUser({ country }: { country: Country }) {
             accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
             href="/ventas?estado=PROCESADA" />
         </div>
-        {country === 'VE' && (
+        {country === 'VE' && bonos && (
           <div className="mt-4">
             <BonusPipeline />
           </div>

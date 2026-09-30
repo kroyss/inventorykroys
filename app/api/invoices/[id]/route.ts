@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 import { getInvoice } from '@/lib/invoicesServer'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -11,7 +12,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   try {
     const inv = await getInvoice(db, id)
@@ -49,7 +50,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   try {
     const body = EditSchema.parse(await req.json())

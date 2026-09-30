@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { dbEmpresa } from '@/lib/db'
 import { empresaHermana } from '@/lib/empresa'
 import type { FinanceDbs } from '@/lib/financeData'
+import { tieneModulo } from '@/lib/modulos'
 
 // Finanzas es de la ORGANIZACIÓN, no de un país: sus cuentas y movimientos viven en la
 // empresa VE de la organización (la "maestra", como antes la DB de VE) y suma la
@@ -11,6 +12,7 @@ import type { FinanceDbs } from '@/lib/financeData'
 export async function getFinanceSession() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.empresaId) return { session: null, db: null, dbs: null }
+  if (!tieneModulo(session.user, 'finanzas')) return { session, db: null, dbs: null }
   const [ve, co] = await Promise.all([
     empresaHermana(session.user.empresaId, 'VE'),
     empresaHermana(session.user.empresaId, 'CO'),

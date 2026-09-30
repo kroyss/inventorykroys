@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 import { getInvoice } from '@/lib/invoicesServer'
 
 // POST /api/invoices/[id]/void { reason } → anula SIN reemplazo (p.ej. se facturó la venta
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   try {
     const { reason } = z.object({

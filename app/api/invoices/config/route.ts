@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 import { currentDate, COUNTRY_TZ } from '@/lib/tz'
 import { bcvRateFor, readInvoiceConfig } from '@/lib/invoicesServer'
 
@@ -12,7 +13,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 export async function GET(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   try {
     const qd = req.nextUrl.searchParams.get('date') ?? ''
@@ -47,7 +48,7 @@ const KEY: Record<keyof z.infer<typeof PutSchema>, string> = {
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE' || session.user.role !== 'admin') return forbidden()
+  if (!facturasHabilitadas(session.user) || session.user.role !== 'admin') return forbidden()
 
   try {
     const body = PutSchema.parse(await req.json())

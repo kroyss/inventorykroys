@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 
 // GET /api/invoices/customers → clientes ya facturados con RIF/CI (autocompletado del form).
 export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   try {
     const { rows } = await db.query(`

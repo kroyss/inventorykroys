@@ -66,8 +66,8 @@ export async function autenticarEquipo(req: NextRequest):
   // El token no dice la empresa: se busca con una función que salta RLS SOLO para esto
   // (db/multiempresa/04_funciones.sql) y desde ahí se trabaja con la conexión de su empresa.
   const { rows: [emp] } = await dbGlobal().query(
-    `SELECT empresa_id, country FROM reportador_empresa_por_token($1)`, [hashToken(token)])
-  if (!emp) {
+    `SELECT empresa_id, country, modulos FROM reportador_empresa_por_token($1)`, [hashToken(token)])
+  if (!emp || !emp.modulos?.includes('reportador')) {
     return { error: NextResponse.json({ error: 'Este equipo fue desvinculado. Vuelve a vincularlo desde Despachos.' }, { status: 401 }) }
   }
   const db = dbEmpresa(emp.empresa_id, emp.country)

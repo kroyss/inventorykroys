@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import TasasClient from '@/components/tasas/TasasClient'
+import { tieneModulo } from '@/lib/modulos'
 import TasasCoClient from '@/components/tasas/TasasCoClient'
 
 export const metadata = { title: 'Ajustes — Syncsora Inventory' }
@@ -12,5 +13,5 @@ export default async function TasasPage() {
   if (session?.user.role !== 'admin' || (country !== 'VE' && country !== 'CO')) {
     redirect('/dashboard')
   }
-  return country === 'CO' ? <TasasCoClient /> : <TasasClient />
+  return country === 'CO' ? <TasasCoClient /> : <TasasClient bonos={tieneModulo(session.user, 'bonos')} />
 }

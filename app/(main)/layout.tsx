@@ -13,6 +13,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   if (!session?.user) redirect('/login')
   const role    = session?.user.role    ?? 'user'
   const country = session?.user.country ?? 'VE'
+  const modulos = session?.user.modulos ?? []
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -25,8 +26,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <main className="max-w-7xl mx-auto px-4 py-6 pb-24 md:pb-6">
         {children}
       </main>
-      <BottomNav role={role} country={country} />
-      <CommandPalette role={role} country={country} />
+      <BottomNav role={role} country={country} modulos={modulos} />
+      <CommandPalette role={role} country={country} modulos={modulos} />
     </div>
   )
 }

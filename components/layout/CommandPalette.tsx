@@ -11,7 +11,7 @@ interface Command {
   countries: string[]
 }
 
-export default function CommandPalette({ role, country }: { role: UserRole; country: Country }) {
+export default function CommandPalette({ role, country, modulos }: { role: UserRole; country: Country; modulos: string[] }) {
   const router = useRouter()
   const [open, setOpen]   = useState(false)
   const [query, setQuery] = useState('')
@@ -48,7 +48,9 @@ export default function CommandPalette({ role, country }: { role: UserRole; coun
     { label: 'Nueva venta',       hint: 'Acción',    action: go('/ventas?new=1'),    roles: ['admin','user'], countries: ['VE','CO'] },
     { label: 'Nueva compra',      hint: 'Acción',    action: go('/compras?new=1'),   roles: ['admin'],        countries: ['VE','CO'] },
     { label: 'Nuevo producto',    hint: 'Acción',    action: go('/productos?new=1'), roles: ['admin'],        countries: ['VE','CO'] },
-  ].filter(c => c.roles.includes(role) && c.countries.includes(country)), [role, country, router])
+  ].filter(c => c.roles.includes(role) && c.countries.includes(country)
+      && !(c.label === 'Ir a Despachos' && !modulos.includes('despachos'))
+      && !(c.label === 'Ir a Facturas' && !modulos.includes('facturas'))), [role, country, modulos, router])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

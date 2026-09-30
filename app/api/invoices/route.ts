@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 import { calcInvoice, normalizeDoc, round2, MAX_INVOICE_LINES } from '@/lib/invoices'
 import { getInvoice, listInvoices, nextInvoiceNumber } from '@/lib/invoicesServer'
 
@@ -11,7 +12,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 export async function GET(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   try {
     const sp = req.nextUrl.searchParams
@@ -79,7 +80,7 @@ const CreateSchema = z.object({
 export async function POST(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.country !== 'VE') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()
 
   let body: z.infer<typeof CreateSchema>
   try {

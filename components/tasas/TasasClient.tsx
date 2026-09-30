@@ -45,7 +45,7 @@ function ShipRowInputs({ row, onChange, onRemove }: {
   )
 }
 
-export default function TasasClient() {
+export default function TasasClient({ bonos }: { bonos: boolean }) {
   const [latest,   setLatest]   = useState<Rate | null>(null)
   const [history,  setHistory]  = useState<Rate[]>([])
   const [official, setOfficial] = useState('')
@@ -437,7 +437,7 @@ export default function TasasClient() {
           </div>
 
           {/* Bonos por ventas del mes (metas y montos) */}
-          <BonusSettings />
+          {bonos && <BonusSettings />}
         </div>
 
         {/* Right column: gráfico + historial (igualan la altura del simulador) */}

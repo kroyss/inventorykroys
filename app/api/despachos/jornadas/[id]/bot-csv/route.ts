@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
-import { despachosForbidden, remitenteConfigurado } from '@/lib/despachos'
+import { reportadorForbidden, remitenteConfigurado } from '@/lib/despachos'
 import { SQL_PENDIENTE } from '@/lib/reportador'
 
 // Mismo formato que escribía EtiquetasML (append_to_bot_csv): el Reportador lo usa
@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  const denied = despachosForbidden(session)
+  const denied = reportadorForbidden(session)
   if (denied) return denied
 
   try {

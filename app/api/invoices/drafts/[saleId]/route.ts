@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 
 // Borrador de "Facturar venta": se autoguarda mientras se llena el formulario.
 // El contenido lo define el form (lib/invoices → InvoiceDraft); acá solo se valida la forma
@@ -14,7 +15,7 @@ async function ctx({ params }: Params) {
   if (!/^\d+$/.test(saleId)) return { error: NextResponse.json({ error: 'ID inválido' }, { status: 400 }) }
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: unauthorized() }
-  if (session.user.country !== 'VE') return { error: forbidden() }
+  if (!facturasHabilitadas(session.user)) return { error: forbidden() }
   return { saleId, session, db }
 }
 

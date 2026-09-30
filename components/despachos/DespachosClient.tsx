@@ -101,7 +101,7 @@ const TANDA = 60  // PDFs por envío al servidor (MAX_PDFS_POR_SUBIDA)
 const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
 
 // ── Pantalla ────────────────────────────────────────────────────────────────
-export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
+export default function DespachosClient({ isAdmin, reportador }: { isAdmin: boolean; reportador: boolean }) {
   const confirm = useConfirm()
   const [abierta, setAbierta]   = useState<number | null>(null)   // jornada cerrada desplegada
   const [data, setData]         = useState<Overview | null>(null)
@@ -322,7 +322,7 @@ export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
 
       <GuiasTealca isAdmin={isAdmin} onGuardado={cargar} />
 
-      <ReportadorPanel isAdmin={isAdmin} />
+      {reportador && <ReportadorPanel isAdmin={isAdmin} />}
 
       {/* Jornadas cerradas */}
       {data.cerradas.length > 0 && (

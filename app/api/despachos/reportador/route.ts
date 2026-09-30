@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
-import { despachosForbidden } from '@/lib/despachos'
+import { reportadorForbidden } from '@/lib/despachos'
 import {
   EN_LINEA_SEGUNDOS, leerConfig, LIMITE_CARACTERES, problemasConfig, SQL_PENDIENTE, SQL_REPORTABLE,
 } from '@/lib/reportador'
@@ -12,7 +12,7 @@ import {
 export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  const denied = despachosForbidden(session)
+  const denied = reportadorForbidden(session)
   if (denied) return denied
 
   try {
@@ -65,7 +65,7 @@ const Schema = z.object({
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  const denied = despachosForbidden(session)
+  const denied = reportadorForbidden(session)
   if (denied) return denied
   if (session.user.role !== 'admin') return forbidden()
 

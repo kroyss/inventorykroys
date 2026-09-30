@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readFile, unlink } from 'fs/promises'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { facturasHabilitadas } from '@/lib/modulos'
 
 type Params = { params: Promise<{ id: string; fileId: string }> }
 
@@ -10,7 +11,7 @@ async function findFile(req: NextRequest, { params }: Params) {
   if (!/^\d+$/.test(id) || !/^\d+$/.test(fileId)) return { error: NextResponse.json({ error: 'ID inválido' }, { status: 400 }) }
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: unauthorized() }
-  if (session.user.country !== 'VE') return { error: forbidden() }
+  if (!facturasHabilitadas(session.user)) return { error: forbidden() }
   const { rows: [file] } = await db.query(
     `SELECT id, file_name, file_path, file_type FROM invoice_files WHERE id = $1 AND invoice_id = $2`,
     [fileId, id]

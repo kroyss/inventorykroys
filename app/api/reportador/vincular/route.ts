@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
 
     // El código no dice la empresa: se busca con la función que salta RLS solo para esto.
     const { rows: [emp] } = await dbGlobal().query(
-      `SELECT empresa_id, country FROM reportador_empresa_por_codigo($1)`, [codigo])
-    if (emp) {
+      `SELECT empresa_id, country, modulos FROM reportador_empresa_por_codigo($1)`, [codigo])
+    if (emp?.modulos?.includes('reportador')) {
       const db = dbEmpresa(emp.empresa_id, emp.country)
       const token = nuevoToken(emp.country)
       const { rows: [eq] } = await db.query(

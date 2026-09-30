@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { notFound, redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
+import { tieneModulo } from '@/lib/modulos'
 import { readInvoiceConfig } from '@/lib/invoicesServer'
 import FacturaPrint from '@/components/facturas/FacturaPrint'
 
@@ -27,7 +28,7 @@ const SAMPLE = {
 export default async function Page() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
-  if (session.user.country !== 'VE') notFound()
+  if (session.user.country !== 'VE' || !tieneModulo(session.user, 'facturas')) notFound()
   const config = await readInvoiceConfig(dbDeSesion(session))
 
   return (
