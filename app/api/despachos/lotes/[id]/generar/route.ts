@@ -65,7 +65,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     const pdfs  = await Promise.all(aImprimir.map(e => leerOriginal(e.file_path, e.sha256)))
     const filas = filasDeVentas(aImprimir)
-    const { pdf, paginas, verificacion } = await armarLote(pdfs, filas)
+    const { pdf, paginas, verificacion } = await armarLote(pdfs, filas, aImprimir.map(e => e.venta ?? ''))
 
     const fallas = verificacion
       .filter(v => v.esperados === 0 || v.faltan.length > 0)

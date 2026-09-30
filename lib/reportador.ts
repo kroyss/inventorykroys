@@ -32,7 +32,7 @@ export const SQL_PENDIENTE = `(e.reporte_estado IS NULL OR e.reporte_estado IN (
 // Envíos que entran al Reportador: impresos, no reimpresiones (ese comprador ya fue
 // reportado), de jornadas CERRADAS (el paquete ya se entregó a ZOOM).
 export const SQL_REPORTABLE = `
-  e.impresa AND NOT e.reimpresion
+  e.impresa AND NOT e.reimpresion AND e.carrier = 'ZOOM'
   AND l.status = 'GENERADO'
   AND j.status = 'CERRADA'`
 

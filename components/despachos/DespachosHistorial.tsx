@@ -10,6 +10,7 @@ interface Jornada {
   closed_at: string | null
   bot_csv_at: string | null
   tiene_manifiesto: boolean
+  tiene_manifiesto_tealca: boolean
   opened_by: string | null
   closed_by: string | null
   lotes: number
@@ -160,7 +161,12 @@ export default function DespachosHistorial() {
                       <span className="text-xs text-neutral-400">{j.closed_by ?? j.opened_by ?? ''}</span>
                       <span className="ml-auto" onClick={e => e.stopPropagation()}>
                         {j.tiene_manifiesto && (
-                          <button onClick={() => bajar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">↓ Manifiesto</button>
+                          <button onClick={() => bajar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">
+                            ↓ Manifiesto{j.tiene_manifiesto_tealca ? ' Zoom' : ''}
+                          </button>
+                        )}
+                        {j.tiene_manifiesto_tealca && (
+                          <button onClick={() => bajar(`/api/despachos/jornadas/${j.id}/manifiesto?transportista=TEALCA`)} className="btn-secondary text-xs ml-2">↓ Manifiesto Tealca</button>
                         )}
                       </span>
                     </div>

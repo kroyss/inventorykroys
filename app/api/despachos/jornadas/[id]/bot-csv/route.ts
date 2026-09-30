@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       `UPDATE despacho_etiquetas e SET reporte_estado = 'CSV', reporte_tomado_por = NULL, reporte_tomado_at = NULL
        FROM despacho_lotes l
        WHERE l.id = e.lote_id AND l.jornada_id = $1 AND l.status = 'GENERADO'
-         AND e.impresa AND NOT e.reimpresion AND ${SQL_PENDIENTE}
+         AND e.impresa AND NOT e.reimpresion AND e.carrier = 'ZOOM' AND ${SQL_PENDIENTE}
        RETURNING e.venta, e.guia, COALESCE(NULLIF(e.remitente, ''), $2) AS remitente,
                  l.generated_at, e.original_name, e.id`,
       [id, await remitenteConfigurado(db)])

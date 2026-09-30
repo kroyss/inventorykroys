@@ -13,6 +13,7 @@ type Estado =
 interface Etiqueta {
   id: number
   original_name: string
+  carrier: 'ZOOM' | 'TEALCA'
   venta: string | null
   guia: string | null
   remitente: string | null
@@ -38,6 +39,7 @@ interface Overview {
   pendientes: { id: number; created_at: string; created_by: string | null; etiquetas: number }[]
   cerradas: {
     id: number; opened_at: string; closed_at: string; total_envios: number; lotes: number
+    tiene_manifiesto: boolean; tiene_manifiesto_tealca: boolean
     closed_by: string | null; bot_csv_at: string | null; reimpresiones: number
     a_reportar: number; enviados: number; sin_chat: number; con_problema: number; por_csv: number
   }[]
@@ -80,7 +82,7 @@ function descargar(href: string) {
   document.body.removeChild(a)
 }
 
-interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number }
+interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number; manifiestos?: string[] }
 
 // Respuestas que no son JSON las corta el proxy (nginx) antes de llegar a la app.
 async function errorDe(res: Response): Promise<ApiBody> {
@@ -200,7 +202,7 @@ export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
   const cerrarJornada = async (forzar = false): Promise<void> => {
     if (!forzar && !await confirm({
       title: 'Cerrar jornada',
-      message: `Se genera el manifiesto con los ${data?.jornada?.total_envios ?? 0} envíos de la jornada y se cierra.`,
+      message: `Se genera el manifiesto (uno por transportista: Zoom / Tealca) con los ${data?.jornada?.total_envios ?? 0} envíos de la jornada y se cierra.`,
       confirmText: 'Generar manifiesto',
     })) return
     setBusy('cerrar'); setError(null); setAviso(null)
@@ -216,7 +218,9 @@ export default function DespachosClient({ isAdmin }: { isAdmin: boolean }) {
       return
     }
     if (!res.ok) { setError(body.error ?? 'Error'); cargar(); return }
-    descargar(`/api/despachos/jornadas/${body.jornada_id}/manifiesto`)
+    // Un manifiesto por transportista (van a lugares distintos): se bajan uno tras otro.
+    ;(body.manifiestos ?? ['ZOOM']).forEach((t, k) => setTimeout(
+      () => descargar(`/api/despachos/jornadas/${body.jornada_id}/manifiesto?transportista=${t}`), k * 600))
     setAviso((body.reportando ?? 0) > 0
       ? 'Jornada cerrada. El Reportador empieza solo a escribirle a los compradores: sigue el avance abajo, en Reportador.'
       : 'Jornada cerrada. Sus envíos ya están en la cola del Reportador: toca "▶ Reportar" abajo, en Reportador.')
@@ -382,7 +386,14 @@ function FilaJornada({ j, abierta, onToggle, onCsv }: {
         <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
         <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
           <button onClick={onToggle} className="btn-secondary text-xs">{abierta ? 'Ocultar' : 'Detalle'}</button>
-          <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">↓ Manifiesto</button>
+          {j.tiene_manifiesto && (
+            <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">
+              ↓ Manifiesto{j.tiene_manifiesto_tealca ? ' Zoom' : ''}
+            </button>
+          )}
+          {j.tiene_manifiesto_tealca && (
+            <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto?transportista=TEALCA`)} className="btn-secondary text-xs">↓ Manifiesto Tealca</button>
+          )}
         </td>
       </tr>
       {abierta && (
@@ -507,7 +518,7 @@ function LotePendiente({ lote, busy, onToggle, onRevalidar, onAgregar, onGenerar
             <tr>
               <th className="px-3 py-2 w-8" title="Incluir en el PDF" />
               <th className="px-3 py-2 text-left">Venta</th>
-              <th className="px-3 py-2 text-left">Guía ZOOM</th>
+              <th className="px-3 py-2 text-left">Guía</th>
               <th className="px-3 py-2 text-left">Remitente</th>
               <th className="px-3 py-2 text-left">Productos (del sistema)</th>
               <th className="px-3 py-2 text-left">Nota</th>
@@ -526,7 +537,10 @@ function LotePendiente({ lote, busy, onToggle, onRevalidar, onAgregar, onGenerar
                     )}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">{e.venta ?? <span className="text-neutral-400">{e.original_name}</span>}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{e.guia ?? '—'}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {e.guia ?? '—'}
+                    {e.carrier === 'TEALCA' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-sans">Tealca</span>}
+                  </td>
                   <td className="px-3 py-2 text-xs">{e.remitente?.slice(0, 22) ?? '—'}</td>
                   <td className="px-3 py-2 text-xs">
                     {e.items.length === 0 ? '—' : e.items.map((i, k) => <div key={k}>{i.quantity} - {i.product_name}</div>)}

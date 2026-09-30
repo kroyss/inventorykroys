@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Lote inválido' }, { status: 400 })
     }
 
-    const leidas = await leerEtiquetas(datos.map(d => d.data))
+    const leidas = await leerEtiquetas(datos.map(d => d.data), datos.map(d => d.name))
 
     // Archivos primero (fuera de la transacción); si la transacción falla quedan
     // huérfanos en disco, que es inofensivo.
@@ -78,10 +78,11 @@ export async function POST(req: NextRequest) {
         await client.query(
           `INSERT INTO despacho_etiquetas
              (lote_id, original_name, file_path, sha256, page_count, venta, guia,
-              remitente, remitente_limpio, destinatario, read_error)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+              remitente, remitente_limpio, destinatario, read_error, carrier)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [loteId, datos[i].name, paths[i], sha256(datos[i].data), e.paginas ?? null, e.venta ?? null,
-           e.guia ?? null, e.remitente ?? null, e.remitente_limpio ?? null, e.destinatario_limpio ?? null, e.error],
+           e.guia ?? null, e.remitente ?? null, e.remitente_limpio ?? null, e.destinatario_limpio ?? null, e.error,
+           e.carrier ?? 'ZOOM'],
         )
       }
       await client.query('COMMIT')

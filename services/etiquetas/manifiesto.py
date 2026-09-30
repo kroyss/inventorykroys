@@ -19,9 +19,10 @@ def short_remitente(nombre):
     return str(nombre)[:20]
 
 
-def armar_manifiesto(filas, remitente, fecha_hoy):
+def armar_manifiesto(filas, remitente, fecha_hoy, transportista=None):
     """filas: [{fecha, remitente, venta, guia, destinatario}] (texto ya limpio).
-    Se ordenan por REMITENTE y FECHA, como el script."""
+    Se ordenan por REMITENTE y FECHA, como el script. `transportista` (ZOOM / TEALCA) va
+    en el título: cada transportista tiene su propio manifiesto."""
     filas = sorted(filas, key=lambda f: (f["remitente"], f["fecha"]))
 
     buf = io.BytesIO()
@@ -37,7 +38,8 @@ def armar_manifiesto(filas, remitente, fecha_hoy):
 
     elements = []
 
-    elements.append(Paragraph("<b>REPORTE DE ENVÍOS</b>", styles["Title"]))
+    titulo = "REPORTE DE ENVÍOS" + (f" · {transportista}" if transportista else "")
+    elements.append(Paragraph(f"<b>{titulo}</b>", styles["Title"]))
     elements.append(Spacer(1, 5))
 
     fecha_min = min(f["fecha"] for f in filas)
@@ -51,7 +53,7 @@ def armar_manifiesto(filas, remitente, fecha_hoy):
     elements.append(Paragraph(header_text, style_center))
     elements.append(Spacer(1, 8))
 
-    data = [["#", "REMITENTE", "FECHA", "VENTA", "GUIA", "DESTINATARIO", "✔"]]
+    data = [["#", "REMITENTE", "FECHA", "VENTA", "PRE-GUIA" if transportista == "TEALCA" else "GUIA", "DESTINATARIO", "✔"]]
 
     for contador, f in enumerate(filas, 1):
         data.append([

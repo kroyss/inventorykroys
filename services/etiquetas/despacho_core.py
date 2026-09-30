@@ -17,6 +17,8 @@ import unicodedata
 
 import fitz  # PyMuPDF
 
+import tealca
+
 # ===== Constantes: idénticas a etiquetas_ml.py =====
 OUTPUT_PAPER = "a4"
 PAGE_MARGIN_PT = 18
@@ -134,11 +136,15 @@ def clip_text(s, max_chars=TEXT_MAX_CHARS):
 
 
 # ===== API del servicio =====
-def leer_etiqueta(pdf_bytes):
-    """Datos de una etiqueta (primera página, como el script)."""
+def leer_etiqueta(pdf_bytes, nombre=None):
+    """Datos de una etiqueta (primera página, como el script). `nombre` es el del archivo:
+    las etiquetas Tealca no traen el número de venta, solo el nombre."""
     with fitz.open(stream=pdf_bytes, filetype="pdf") as src:
         sp = src[0]
+        if tealca.es_tealca(sp):
+            return tealca.leer(sp, src.page_count, nombre)
         return {
+            "carrier": "ZOOM",
             "paginas": src.page_count,
             "venta": extract_sale_number(sp),
             "guia": extract_guia(sp),
@@ -160,13 +166,17 @@ def armar_sales_map(filas):
     return sales_map
 
 
-def armar_pdf(etiquetas, sales_map):
+def armar_pdf(etiquetas, sales_map, ventas=None):
     """etiquetas: [pdf_bytes] en el orden de impresión. Devuelve el PDF 4xA4 en bytes.
-    Cuerpo del Paso 2/3 de etiquetas_ml.py main(), sin cambios en el armado."""
+    Cuerpo del Paso 2/3 de etiquetas_ml.py main(), sin cambios en el armado ZOOM.
+    Las etiquetas Tealca (ver tealca.py) ocupan su celda con otro dibujo; como no traen
+    número de venta, `ventas` (una por etiqueta, en el mismo orden) lo da."""
+    ventas = ventas or []
     out = fitz.open()
     out_rect = fitz.paper_rect(OUTPUT_PAPER)
     grid = compute_grid(out_rect)
     fuentes = []  # se cierran después de guardar: show_pdf_page las referencia
+    hay_tealca = False
 
     i = 0
     while i < len(etiquetas):
@@ -179,6 +189,13 @@ def armar_pdf(etiquetas, sales_map):
             fuentes.append(src)
             i += 1
             sp = src[0]
+
+            if tealca.es_tealca(sp):
+                hay_tealca = True
+                lineas_producto, linea_nota = sales_map[ventas[i - 1]]
+                tealca.celda(out_page, grid[cell_idx], etiquetas[i - 1],
+                             lineas_producto, linea_nota, fuentes)
+                continue
 
             clip = find_label_border_rect(sp)
             dest = place_rect(clip.width, clip.height, grid[cell_idx])
@@ -215,7 +232,9 @@ def armar_pdf(etiquetas, sales_map):
                     fontname=TEXT_FONT,
                 )
 
-    data = out.tobytes()
+    # El logo de Tealca pesa ~800 KB y se repetiría en cada etiqueta: garbage=4 junta los
+    # duplicados (sin pérdida). Con solo ZOOM se guarda como siempre.
+    data = out.tobytes(garbage=4, deflate=True) if hay_tealca else out.tobytes()
     out.close()
     for s in fuentes:
         s.close()

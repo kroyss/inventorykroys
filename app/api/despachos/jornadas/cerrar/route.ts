@@ -6,6 +6,7 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import { currentDate } from '@/lib/tz'
 import {
   armarManifiesto, despachosForbidden, guardarArchivo, remitenteConfigurado, respuestaServicio,
+  type Transportista,
 } from '@/lib/despachos'
 import { crearOrdenesAuto } from '@/lib/reportador'
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   const userId = parseInt(session.user.id, 10)
   const client = await db.connect()
-  let manifestPath: string | null = null
+  const manifiestos: Partial<Record<Transportista, string>> = {}
   try {
     const { forzar } = Schema.parse(await req.json().catch(() => ({})))
     await client.query('BEGIN')
@@ -51,7 +52,8 @@ export async function POST(req: NextRequest) {
     const { rows: envios } = await client.query(
       `SELECT to_char(l.generated_at, 'YYYY-MM-DD') AS fecha,
               COALESCE(NULLIF(e.remitente_limpio, ''), $2) AS remitente,
-              e.venta, e.guia, COALESCE(e.destinatario, '') AS destinatario
+              e.venta, e.guia, e.carrier,
+              COALESCE(e.destinatario, '') AS destinatario
        FROM despacho_etiquetas e
        JOIN despacho_lotes l ON l.id = e.lote_id
        WHERE l.jornada_id = $1 AND l.status = 'GENERADO' AND e.impresa
@@ -62,14 +64,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'La jornada no tiene envíos' }, { status: 400 })
     }
 
-    const pdf = await armarManifiesto(remitente, currentDate('America/Caracas'), envios)
-    manifestPath = await guardarArchivo('manifiestos', `manifiesto_jornada_${jornada.id}.pdf`, pdf)
+    // Un manifiesto por transportista: van a lugares distintos.
+    const hoy = currentDate('America/Caracas')
+    for (const t of ['ZOOM', 'TEALCA'] as const) {
+      const delT = envios.filter(e => e.carrier === t)
+      if (delT.length === 0) continue
+      const pdf = await armarManifiesto(remitente, hoy, delT, t)
+      const nombre = t === 'ZOOM' ? `manifiesto_jornada_${jornada.id}.pdf` : `manifiesto_tealca_jornada_${jornada.id}.pdf`
+      manifiestos[t] = await guardarArchivo('manifiestos', nombre, pdf)
+    }
 
     await client.query(
       `UPDATE despacho_jornadas
-       SET status = 'CERRADA', closed_at = NOW(), closed_by = $2, manifest_path = $3, total_envios = $4
+       SET status = 'CERRADA', closed_at = NOW(), closed_by = $2, manifest_path = $3, manifest_tealca_path = $4,
+           total_envios = $5
        WHERE id = $1`,
-      [jornada.id, userId, manifestPath, envios.length])
+      [jornada.id, userId, manifiestos.ZOOM ?? null, manifiestos.TEALCA ?? null, envios.length])
     await client.query('COMMIT')
 
     // Equipos con "reportar al cerrar la jornada": se les deja la orden. Fuera de la
@@ -78,10 +88,13 @@ export async function POST(req: NextRequest) {
       console.error('[despachos] no se pudo crear la orden automática del Reportador', err)
       return 0
     })
-    return NextResponse.json({ ok: true, jornada_id: jornada.id, envios: envios.length, reportando })
+    return NextResponse.json({
+      ok: true, jornada_id: jornada.id, envios: envios.length, reportando,
+      manifiestos: Object.keys(manifiestos),
+    })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
-    if (manifestPath) await unlink(manifestPath).catch(() => {})
+    for (const f of Object.values(manifiestos)) await unlink(f).catch(() => {})
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })
     return respuestaServicio(err) ?? apiError(err)
   } finally {

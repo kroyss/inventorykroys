@@ -2,7 +2,7 @@
 Servicio de etiquetas del módulo Despachos (uso interno: solo lo llama
 inventory_next dentro de la red de Docker; no publica puertos).
 
-  POST /leer        PDFs de Mercado Envíos -> venta, guía, remitente, destinatario
+  POST /leer        PDFs de Mercado Envíos (ZOOM o TEALCA) -> carrier, venta, guía, remitente, destinatario
   POST /armar       PDFs + productos/nota por venta -> PDF 4xA4 + verificación de códigos
   POST /manifiesto  envíos de la jornada -> PDF del manifiesto
   GET  /salud
@@ -30,14 +30,15 @@ def _bytes(b64: str) -> bytes:
 
 class LeerIn(BaseModel):
     pdfs: list[str]  # base64
+    nombres: list[str] = []  # nombre de cada archivo (Tealca trae la venta solo ahí)
 
 
 @app.post("/leer")
 def leer(body: LeerIn):
     out = []
-    for b64 in body.pdfs:
+    for n, b64 in enumerate(body.pdfs):
         try:
-            d = leer_etiqueta(_bytes(b64))
+            d = leer_etiqueta(_bytes(b64), body.nombres[n] if n < len(body.nombres) else None)
             d["remitente_limpio"] = clean_text(d["remitente"])
             d["destinatario_limpio"] = clean_text(d["destinatario"])
             d["error"] = None
@@ -57,6 +58,7 @@ class Fila(BaseModel):
 class ArmarIn(BaseModel):
     pdfs: list[str]  # base64, en orden de impresión
     filas: list[Fila]
+    ventas: list[str] = []  # venta de cada etiqueta, en el mismo orden (las Tealca no la traen)
 
 
 @app.post("/armar")
@@ -64,8 +66,8 @@ def armar(body: ArmarIn):
     etiquetas = [_bytes(b) for b in body.pdfs]
     sales_map = armar_sales_map([f.model_dump() for f in body.filas])
     try:
-        pdf = armar_pdf(etiquetas, sales_map)
-    except KeyError as e:
+        pdf = armar_pdf(etiquetas, sales_map, body.ventas)
+    except (KeyError, IndexError) as e:
         raise HTTPException(400, f"Venta sin productos: {e}")
     with fitz.open(stream=pdf, filetype="pdf") as d:
         paginas = d.page_count
@@ -88,13 +90,15 @@ class ManifiestoIn(BaseModel):
     remitente: str
     fecha_hoy: str
     envios: list[EnvioManifiesto]
+    transportista: str = ""
 
 
 @app.post("/manifiesto")
 def manifiesto(body: ManifiestoIn):
     if not body.envios:
         raise HTTPException(400, "Sin envíos")
-    pdf = armar_manifiesto([e.model_dump() for e in body.envios], body.remitente, body.fecha_hoy)
+    pdf = armar_manifiesto([e.model_dump() for e in body.envios], body.remitente, body.fecha_hoy,
+                           body.transportista or None)
     return {"pdf": _b64(pdf)}
 
 

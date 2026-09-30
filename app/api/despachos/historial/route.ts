@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
       db.query(`
         SELECT j.id, j.status, j.opened_at, j.closed_at, j.bot_csv_at,
                (j.manifest_path IS NOT NULL) AS tiene_manifiesto,
+               (j.manifest_tealca_path IS NOT NULL) AS tiene_manifiesto_tealca,
                uo.username AS opened_by, uc.username AS closed_by,
                COUNT(l.id)::int AS lotes,
                COALESCE(SUM(l.label_count), 0)::int AS envios

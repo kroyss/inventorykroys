@@ -74,6 +74,7 @@ async function llamar<T>(ruta: string, body: unknown, timeoutMs: number): Promis
 }
 
 export interface EtiquetaLeida {
+  carrier?: 'ZOOM' | 'TEALCA'
   paginas?: number
   venta?: string | null
   guia?: string | null
@@ -84,27 +85,33 @@ export interface EtiquetaLeida {
   error: string | null
 }
 
-export function leerEtiquetas(pdfs: Buffer[]) {
+// `nombres`: las etiquetas TEALCA no traen el número de venta, solo el nombre del archivo.
+export function leerEtiquetas(pdfs: Buffer[], nombres: string[]) {
   return llamar<{ etiquetas: EtiquetaLeida[] }>(
-    '/leer', { pdfs: pdfs.map(b => b.toString('base64')) }, 60_000,
+    '/leer', { pdfs: pdfs.map(b => b.toString('base64')), nombres }, 60_000,
   ).then(r => r.etiquetas)
 }
 
 export interface FilaVenta { venta: string; producto: string; cantidad: number; nota: string }
 export interface Verificacion { indice: number; esperados: number; faltan: string[] }
 
-export async function armarLote(pdfs: Buffer[], filas: FilaVenta[]) {
+// `ventas`: la venta de cada PDF, en el mismo orden (las etiquetas TEALCA no la traen).
+export async function armarLote(pdfs: Buffer[], filas: FilaVenta[], ventas: string[]) {
   const r = await llamar<{ pdf: string; paginas: number; verificacion: Verificacion[] }>(
-    '/armar', { pdfs: pdfs.map(b => b.toString('base64')), filas }, 300_000,
+    '/armar', { pdfs: pdfs.map(b => b.toString('base64')), filas, ventas }, 300_000,
   )
   return { pdf: Buffer.from(r.pdf, 'base64'), paginas: r.paginas, verificacion: r.verificacion }
 }
 
 export interface EnvioManifiesto { fecha: string; remitente: string; venta: string; guia: string; destinatario: string }
 
-export async function armarManifiesto(remitente: string, fechaHoy: string, envios: EnvioManifiesto[]) {
+export type Transportista = 'ZOOM' | 'TEALCA'
+
+export async function armarManifiesto(
+  remitente: string, fechaHoy: string, envios: EnvioManifiesto[], transportista: Transportista,
+) {
   const r = await llamar<{ pdf: string }>(
-    '/manifiesto', { remitente, fecha_hoy: fechaHoy, envios }, 120_000,
+    '/manifiesto', { remitente, fecha_hoy: fechaHoy, envios, transportista }, 120_000,
   )
   return Buffer.from(r.pdf, 'base64')
 }
@@ -145,7 +152,7 @@ export type EstadoEtiqueta =
   | 'OK'            // lista para imprimir
   | 'REIMPRESION'   // venta DESCARGADA: se imprime, avisando
   | 'ERROR_PDF'     // no se pudo abrir
-  | 'NO_ETIQUETA'   // sin número de venta o sin guía ZOOM
+  | 'NO_ETIQUETA'   // sin número de venta o sin guía (ZOOM / TEALCA)
   | 'SIN_VENTA'     // la venta no está cargada en el sistema
   | 'ESTADO'        // venta en un estado que no se imprime (BORRADOR, etc.)
   | 'SIN_PRODUCTOS'
@@ -164,6 +171,7 @@ export interface EtiquetaValidada {
   file_path: string
   sha256: string
   page_count: number | null
+  carrier: 'ZOOM' | 'TEALCA'
   venta: string | null
   guia: string | null
   remitente: string | null
@@ -184,7 +192,7 @@ export interface EtiquetaValidada {
 // (por eso "Revalidar" es simplemente volver a pedir el lote).
 export async function etiquetasValidadas(db: Pool, loteId: number): Promise<EtiquetaValidada[]> {
   const { rows } = await db.query(
-    `SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.venta, e.guia,
+    `SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
             e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
             e.incluida, e.impresa,
             s.id AS sale_id, s.status AS sale_status, s.customer_name, s.notes AS sale_notes,
@@ -215,7 +223,14 @@ export async function etiquetasValidadas(db: Pool, loteId: number): Promise<Etiq
     let estado: EstadoEtiqueta = 'OK'
     let detalle: string | null = null
     if (r.read_error)                          { estado = 'ERROR_PDF';   detalle = r.read_error }
-    else if (!r.venta || !r.guia)              { estado = 'NO_ETIQUETA'; detalle = !r.venta ? 'No tiene número de venta' : 'No tiene guía ZOOM' }
+    else if (!r.venta || !r.guia)              {
+      estado = 'NO_ETIQUETA'
+      detalle = !r.venta
+        ? (r.carrier === 'TEALCA'
+            ? 'Etiqueta TEALCA sin número de venta en el nombre del archivo (debe llamarse guide-2000….pdf)'
+            : 'No tiene número de venta')
+        : `No tiene guía ${r.carrier}`
+    }
     else if (r.impresa)                        { estado = 'OK' }
     else if (r.ya_impresa)                     { estado = 'YA_IMPRESA';  detalle = `La guía ${r.guia} ya se imprimió en otro lote` }
     else if (r.primera_con_guia !== r.id)      { estado = 'DUPLICADA';   detalle = 'La misma guía está dos veces en este lote' }
