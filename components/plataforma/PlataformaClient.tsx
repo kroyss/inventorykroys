@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui'
+import CuentasPanel from './CuentasPanel'
 
 interface Empresa {
   id: number
@@ -30,6 +31,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [nueva, setNueva]       = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
+  const [vista, setVista]       = useState<'empresas' | 'cuentas'>('empresas')
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/plataforma/empresas')
@@ -57,9 +59,22 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     <div className="space-y-4">
       <PageHeader
         title="Plataforma"
-        subtitle="Empresas que usan el sistema, sus módulos y su acceso. Solo lo ves tú."
-        actions={<button onClick={() => { setNueva(true); setError(null) }} className="btn-primary text-sm">+ Nueva empresa</button>}
+        subtitle="Empresas, módulos y cuentas de El Comerciante Digital. Solo lo ves tú."
+        actions={vista === 'empresas'
+          ? <button onClick={() => { setNueva(true); setError(null) }} className="btn-primary text-sm">+ Nueva empresa</button>
+          : undefined}
       />
+
+      <div className="flex gap-1 border-b border-neutral-200">
+        {(['empresas', 'cuentas'] as const).map(v => (
+          <button key={v} onClick={() => setVista(v)}
+            className={`px-3 py-1.5 text-sm -mb-px border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
+            {v === 'empresas' ? 'Empresas' : 'Cuentas'}
+          </button>
+        ))}
+      </div>
+
+      {vista === 'cuentas' ? <CuentasPanel /> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded text-sm">{aviso}</div>}
@@ -123,6 +138,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
         Inicio, Ventas, Inventario, Compras, Productos, Reportes, Ajustes y Usuarios los tienen todas las empresas.
         Tocar un módulo lo prende o lo apaga. Desactivar una empresa saca a sus usuarios; sus datos se conservan.
       </p>
+      </>}
     </div>
   )
 }
