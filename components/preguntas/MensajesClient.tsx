@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -85,7 +85,24 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [archivos, setArchivos] = useState<File[]>([])
   const fin = useRef<HTMLDivElement>(null)
+  const elegir = useRef<HTMLInputElement>(null)
+
+  // Fotos/PDF para mandar: con el clip o pegando (Ctrl+V) una captura en el cuadro de texto.
+  const agregar = (lista: File[]) => {
+    setError(null)
+    const malos = lista.filter(f => !TIPOS_OK.test(f.type) || f.size > MAX_MB * 1024 * 1024)
+    if (malos.length) setError(`"${malos[0].name}": solo fotos JPG/PNG o PDF de hasta ${MAX_MB} MB`)
+    const buenos = lista.filter(f => !malos.includes(f)).map(nombrar)
+    setArchivos(a => [...a, ...buenos].slice(0, 5))
+  }
+  const pegar = (e: React.ClipboardEvent) => {
+    const imgs = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'))
+    if (!imgs.length) return
+    e.preventDefault()
+    agregar(imgs)
+  }
 
   const leer = useCallback(async (marcar = false) => {
     const r = await fetch(`/api/mensajes/${c.pack_id}${marcar ? '?leida=1' : ''}`)
@@ -102,12 +119,19 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const enviar = async () => {
     setEnviando(true); setError(null)
     try {
-      const r = await fetch(`/api/mensajes/${c.pack_id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }),
-      })
+      let init: RequestInit
+      if (archivos.length) {
+        const form = new FormData()
+        form.append('texto', texto)
+        archivos.forEach(f => form.append('archivo', f, f.name))
+        init = { method: 'POST', body: form }
+      } else {
+        init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) }
+      }
+      const r = await fetch(`/api/mensajes/${c.pack_id}`, init)
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
-      setMensajes(d.mensajes); setTexto(''); onCambio()
+      setMensajes(d.mensajes); setTexto(''); setArchivos([]); onCambio()
       const ultimo = (d.mensajes as Mensaje[]).filter(m => m.propio).pop()
       if (ultimo?.moderacion && ultimo.moderacion !== 'clean') setError(`MercadoLibre moderó el mensaje (${ultimo.moderacion})`)
     } finally { setEnviando(false) }
@@ -163,19 +187,57 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       <footer className="border-t border-neutral-100 p-3 space-y-2">
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && texto.trim() && !problemas.length) enviar() }}
-          placeholder="Escribe la respuesta… (Ctrl+Enter para enviar)"
+          onPaste={pegar}
+          placeholder="Escribe la respuesta… (Ctrl+V pega una foto · Ctrl+Enter para enviar)"
           className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
+        {archivos.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {archivos.map((f, i) => <Previa key={i} f={f} onQuitar={() => setArchivos(a => a.filter((_, j) => j !== i))} />)}
+          </div>
+        )}
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre lo rechazaría: {problemas.join(' · ')}</p>}
         {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-neutral-400">{texto.length}/350</span>
-          <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => elegir.current?.click()} disabled={archivos.length >= 5}
+              className="btn-ghost text-xs px-2 py-1" title="Adjuntar fotos o PDF (también puedes pegarlas con Ctrl+V)">📎 Adjuntar</button>
+            <input ref={elegir} type="file" multiple accept="image/jpeg,image/png,application/pdf" className="hidden"
+              onChange={e => { agregar([...(e.target.files ?? [])]); e.target.value = '' }} />
+            <span className="text-xs text-neutral-400">{texto.length}/350</span>
+          </div>
+          <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm"
+            title={!texto.trim() && archivos.length ? 'Escribe un mensaje para acompañar el archivo' : undefined}>
             {enviando ? 'Enviando…' : 'Responder'}
           </button>
         </div>
       </footer>
     </section>
+  )
+}
+
+// Adjuntos que se pueden mandar (ML acepta JPG, PNG, PDF y TXT; nginx corta en 20 MB).
+const MAX_MB = 15
+const TIPOS_OK = /^(image\/(jpeg|png)|application\/pdf)$/
+// Una captura pegada llega como "image.png": se le pone un nombre con fecha para no repetir.
+function nombrar(f: File) {
+  if (f.name && f.name !== 'image.png') return f
+  const ext = f.type === 'image/jpeg' ? 'jpg' : 'png'
+  return new File([f], `captura-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${Math.random().toString(36).slice(2, 6)}.${ext}`, { type: f.type })
+}
+
+function Previa({ f, onQuitar }: { f: File; onQuitar: () => void }) {
+  const url = useMemo(() => (f.type.startsWith('image/') ? URL.createObjectURL(f) : null), [f])
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url) }, [url])
+  return (
+    <div className="relative group">
+      {url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={url} alt={f.name} className="h-16 w-16 object-cover rounded-md border border-neutral-200" />
+        : <div className="h-16 w-28 rounded-md border border-neutral-200 bg-neutral-50 text-[11px] text-neutral-600 p-1.5 break-all overflow-hidden">📄 {f.name}</div>}
+      <button type="button" onClick={onQuitar} title="Quitar"
+        className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-neutral-900 text-white text-xs leading-5 text-center">×</button>
+    </div>
   )
 }
 

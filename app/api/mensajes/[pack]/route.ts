@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML } from '@/lib/ml'
-import { leerHilo, responderHilo } from '@/lib/mensajesML'
+import { leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 
 async function conversacion(db: import('pg').Pool, pack: string) {
@@ -33,21 +33,37 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
   }
 }
 
-const Body = z.object({ texto: z.string().trim().min(1).max(350), dejarSinLeer: z.boolean().optional() })
+const Body = z.object({ texto: z.string().trim().min(1, 'Escribe un mensaje').max(350), dejarSinLeer: z.boolean().optional() })
+const MAX_MB = 15
+const EXT_OK = /\.(jpe?g|png|pdf|txt)$/i
 
+// POST: JSON { texto } o multipart (texto + `archivo` repetido, hasta 5) para mandar fotos/PDF.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ pack: string }> }) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   const { pack } = await params
   if (!/^\d+$/.test(pack)) return NextResponse.json({ error: 'Conversación inválida' }, { status: 400 })
   try {
-    const { texto, dejarSinLeer } = Body.parse(await req.json())
+    let raw: unknown, archivos: File[] = []
+    if ((req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
+      const form = await req.formData()
+      raw = { texto: form.get('texto') ?? '' }
+      archivos = form.getAll('archivo').filter((f): f is File => f instanceof File && f.size > 0)
+    } else raw = await req.json()
+    const { texto, dejarSinLeer } = Body.parse(raw)
+    if (archivos.length > 5) return NextResponse.json({ error: 'Máximo 5 archivos por mensaje' }, { status: 400 })
+    for (const f of archivos) {
+      if (!EXT_OK.test(f.name)) return NextResponse.json({ error: `"${f.name}": solo fotos JPG/PNG, PDF o TXT` }, { status: 400 })
+      if (f.size > MAX_MB * 1024 * 1024) return NextResponse.json({ error: `"${f.name}" pesa más de ${MAX_MB} MB` }, { status: 400 })
+    }
     const problemas = problemasDelTexto(texto, 'mensaje')
     if (problemas.length) return NextResponse.json({ error: 'MercadoLibre rechazaría este mensaje', problemas }, { status: 422 })
     const c = await conversacion(s.db, pack)
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
     try {
-      const h = await responderHilo(s.db, c.conexion_id, pack, texto, dejarSinLeer)
+      const ids: string[] = []
+      for (const f of archivos) ids.push(await subirAdjunto(s.db, c.conexion_id, f))
+      const h = await responderHilo(s.db, c.conexion_id, pack, texto, dejarSinLeer, ids)
       return NextResponse.json({ cuenta: c.nickname, ...h })
     } catch (e) {
       if (e instanceof ErrorML) return NextResponse.json({ error: e.message, detalle: e.datos }, { status: 502 })

@@ -107,12 +107,15 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
 /** Responde en la conversación y la deja al día en la bandeja. Con `dejarSinLeer` no se
  *  marca como leída en ML (ML no permite volver a "no leída", así que se evita marcarla);
  *  después se consulta a ML si de verdad quedó sin leer. */
-export async function responderHilo(db: Pool, conexionId: number, pack: string, texto: string, dejarSinLeer = false) {
+export async function responderHilo(db: Pool, conexionId: number, pack: string, texto: string, dejarSinLeer = false, adjuntos: string[] = []) {
   const seller = await sellerDe(db, conexionId)
   const antes = await leerHilo(db, conexionId, pack, seller, !dejarSinLeer)
   if (!antes.comprador) throw new Error('No se pudo identificar al comprador de esta conversación')
   await mlFetch(db, conexionId, `/messages/packs/${pack}/sellers/${seller}?tag=post_sale`, {
-    method: 'POST', body: { from: { user_id: seller }, to: { user_id: antes.comprador }, text: texto },
+    method: 'POST', body: {
+      from: { user_id: seller }, to: { user_id: antes.comprador }, text: texto,
+      ...(adjuntos.length ? { attachments: adjuntos } : {}),
+    },
   })
   const despues = await leerHilo(db, conexionId, pack, seller, !dejarSinLeer)
   const ultimo = despues.mensajes[despues.mensajes.length - 1]
@@ -144,4 +147,21 @@ export async function adjuntoDeHilo(db: Pool, conexionId: number, pack: string, 
   if (r.status === 401) r = await fetch(url, { headers: { Authorization: `Bearer ${await tokenVigente(db, conexionId, true)}` }, cache: 'no-store' })
   if (!r.ok) throw new ErrorML(r.status, null, `MercadoLibre respondió ${r.status} al pedir el adjunto`)
   return r
+}
+
+/** Sube un archivo (JPG, PNG, PDF o TXT) a ML para mandarlo en un mensaje: devuelve su id.
+ *  ML lo borra si no se usa en 48 h, así que se sube justo antes de responder. */
+export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) {
+  const { rows: [c] } = await db.query(`SELECT site_id FROM ml_conexiones WHERE id = $1`, [conexionId])
+  const url = `${ML_API}/messages/attachments?tag=post_sale&site_id=${c.site_id || 'MLV'}`
+  const enviar = async (forzar: boolean) => {
+    const form = new FormData()
+    form.append('file', archivo, archivo.name)
+    return fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${await tokenVigente(db, conexionId, forzar)}` }, body: form, cache: 'no-store' })
+  }
+  let r = await enviar(false)
+  if (r.status === 401) r = await enviar(true)
+  const d = await r.json().catch(() => null) as { id?: string; message?: string } | null
+  if (!r.ok || !d?.id) throw new ErrorML(r.status, d, `MercadoLibre no aceptó "${archivo.name}"${d?.message ? `: ${d.message}` : ` (${r.status})`}`)
+  return d.id
 }
