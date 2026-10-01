@@ -25,7 +25,15 @@ function linkPublicacion(p: Pregunta) {
 }
 
 /** Producto de la pregunta: nombre del sistema (o título de ML) + código + stock. */
-function Producto({ p }: { p: Pregunta }) {
+// Límite de precio de las respuestas rápidas (p. ej. "menos de $3 → mínimo 2 unidades"):
+// debajo de él el precio se resalta para responder con la regla correcta.
+function umbralDe(plantillas: Plantilla[]) {
+  const h = plantillas.map(p => p.precio_hasta).filter((x): x is number => typeof x === 'number' && x > 0)
+  return h.length ? Math.min(...h) : null
+}
+const usd = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null }) {
   const nombre = p.producto_nombre ?? p.item_titulo
   const link = linkPublicacion(p)
   return (
@@ -34,6 +42,12 @@ function Producto({ p }: { p: Pregunta }) {
         ? <span className="font-medium text-neutral-800 truncate max-w-[30rem]">{nombre}</span>
         : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
       {p.producto_code && <span className="font-mono text-neutral-400">{p.producto_code}</span>}
+      {p.producto_precio !== null && p.producto_precio > 0 && (
+        umbral !== null && p.producto_precio < umbral
+          ? <span className="font-semibold text-amber-800 bg-amber-50 ring-1 ring-inset ring-amber-200 rounded-full px-2 py-0.5 num"
+              title={`Menos de $${umbral}: usa la respuesta rápida para productos baratos`}>${usd(p.producto_precio)} · menos de ${umbral}</span>
+          : <span className="font-semibold text-neutral-800 num">${usd(p.producto_precio)}</span>
+      )}
       {p.producto_stock !== null && (
         <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'}>
           {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
@@ -254,7 +268,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
     <article className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
         <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{p.cuenta}</span>
-        <Producto p={p} />
+        <Producto p={p} umbral={umbralDe(plantillas)} />
         {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {p.item_estado === 'paused' ? 'pausada' : p.item_estado} · no sale en el panel de ML</span>}
         <span className="ml-auto whitespace-nowrap" title={new Date(p.fecha).toLocaleString('es-VE')}>{hace(p.fecha)}</span>
       </header>
