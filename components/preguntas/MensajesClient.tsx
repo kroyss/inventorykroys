@@ -232,7 +232,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       </div>
       <footer className="border-t border-neutral-100 p-3 space-y-2">
         {ultimoEsComprador && !texto.trim() && (
-          <Sugerencias lista={sugerencias} etiqueta="Ya respondiste algo parecido:" onUsar={t => { setTexto(t); setMeta(null) }} />
+          <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setMeta(null) }} />
         )}
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && texto.trim() && !problemas.length) enviar() }}

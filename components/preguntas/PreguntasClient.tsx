@@ -323,7 +323,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
 
-      <Sugerencias lista={sugerencias} etiqueta="Ya respondiste algo parecido:"
+      <Sugerencias lista={sugerencias} etiqueta="Parecidas:"
         onUsar={t => { setTexto(t); setMeta({ confianza: null, falta: null, web: false }) }} />
 
       {plantillas.length > 0 && (
