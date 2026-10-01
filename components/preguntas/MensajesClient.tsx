@@ -79,8 +79,6 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
-  const [dejarSinLeer, setDejarSinLeer] = useState(false)
   const [notas, setNotas] = useState<{ notas: NotaML[]; intentos: { fuente: string; error: string | null }[] } | null>(null)
   const fin = useRef<HTMLDivElement>(null)
 
@@ -102,17 +100,14 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const problemas = texto.trim() ? problemasDelTexto(texto) : []
   const avisosTexto = texto.trim() ? revisarTexto(texto).avisos : []
   const enviar = async () => {
-    setEnviando(true); setError(null); setAviso(null)
+    setEnviando(true); setError(null)
     try {
       const r = await fetch(`/api/mensajes/${c.pack_id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, dejarSinLeer }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
       setMensajes(d.mensajes); setTexto(''); onCambio()
-      if (dejarSinLeer) setAviso(d.sinLeer > 0
-        ? 'Respondido. Sigue sin leer en MercadoLibre.'
-        : 'Respondido, pero MercadoLibre la marcó como leída igual al responder.')
       const ultimo = (d.mensajes as Mensaje[]).filter(m => m.propio).pop()
       if (ultimo?.moderacion && ultimo.moderacion !== 'clean') setError(`MercadoLibre moderó el mensaje (${ultimo.moderacion})`)
     } finally { setEnviando(false) }
@@ -172,14 +167,8 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre lo rechazaría: {problemas.join(' · ')}</p>}
         {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
-        {aviso && <p className="text-xs text-sky-700">{aviso}</p>}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between">
           <span className="text-xs text-neutral-400">{texto.length}/350</span>
-          <label className="ml-auto flex items-center gap-1.5 text-xs text-neutral-600 cursor-pointer"
-            title="Responde sin marcar la conversación como leída en MercadoLibre, para volver a ella después">
-            <input type="checkbox" checked={dejarSinLeer} onChange={e => setDejarSinLeer(e.target.checked)} />
-            Dejar sin leer en ML
-          </label>
           <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm">
             {enviando ? 'Enviando…' : 'Responder'}
           </button>
