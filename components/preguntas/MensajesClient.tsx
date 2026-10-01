@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { Sugerencias, UsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -40,7 +41,8 @@ export default function MensajesClient() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mensajes" subtitle="Mensajes de tus ventas en MercadoLibre, de todas tus cuentas, para que ninguno quede sin respuesta" />
+      <PageHeader title="Mensajes" subtitle="Mensajes de tus ventas en MercadoLibre, de todas tus cuentas, para que ninguno quede sin respuesta"
+        actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null) }} items={[
         { value: 'sin_leer', label: 'Sin leer', count: cont?.conversaciones },
@@ -91,6 +93,28 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [archivos, setArchivos] = useState<File[]>([])
   const [ampliada, setAmpliada] = useState<{ url: string; nombre: string } | null>(null)
+  const [sugerencias, setSugerencias] = useState<Sugerencia[]>([])
+  const [pensando, setPensando] = useState(false)
+  const [meta, setMeta] = useState<{ confianza: 'alta' | 'media' | 'baja'; falta: string | null } | null>(null)
+  // Sugerencias gratis: se piden cuando la conversación ya se leyó (y quedó guardada).
+  const leida = mensajes !== null
+  const ultimoEsComprador = !!mensajes?.length && !mensajes[mensajes.length - 1].propio
+  useEffect(() => {
+    if (!leida) return
+    let vivo = true
+    fetch(`/api/mensajes/${c.pack_id}/sugerencias`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setSugerencias(d.sugerencias) })
+    return () => { vivo = false }
+  }, [leida, ultimoEsComprador, c.pack_id])
+  const proponer = async () => {
+    setPensando(true); setError(null)
+    try {
+      const r = await fetch(`/api/mensajes/${c.pack_id}/borrador`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(d.error ?? 'La IA no respondió'); return }
+      setTexto(d.borrador.respuesta)
+      setMeta({ confianza: d.borrador.confianza, falta: d.borrador.falta_dato })
+    } finally { setPensando(false) }
+  }
   const fin = useRef<HTMLDivElement>(null)
   const elegir = useRef<HTMLInputElement>(null)
 
@@ -138,7 +162,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       const r = await fetch(`/api/mensajes/${c.pack_id}`, init)
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
-      setMensajes(d.mensajes); setTexto(''); setArchivos([]); onCambio()
+      setMensajes(d.mensajes); setTexto(''); setArchivos([]); setMeta(null); setSugerencias([]); onCambio()
       const ultimo = (d.mensajes as Mensaje[]).filter(m => m.propio).pop()
       if (ultimo?.moderacion && ultimo.moderacion !== 'clean') setError(`MercadoLibre moderó el mensaje (${ultimo.moderacion})`)
     } finally { setEnviando(false) }
@@ -207,6 +231,9 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         <div ref={fin} />
       </div>
       <footer className="border-t border-neutral-100 p-3 space-y-2">
+        {ultimoEsComprador && !texto.trim() && (
+          <Sugerencias lista={sugerencias} etiqueta="Ya respondiste algo parecido:" onUsar={t => { setTexto(t); setMeta(null) }} />
+        )}
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && texto.trim() && !problemas.length) enviar() }}
           onPaste={pegar}
@@ -219,6 +246,13 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         )}
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre lo rechazaría: {problemas.join(' · ')}</p>}
         {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
+        {meta && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className={`rounded-full px-2 py-0.5 ring-1 ring-inset ${meta.confianza === 'alta' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+              : meta.confianza === 'media' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-red-50 text-red-700 ring-red-200'}`}>Confianza {meta.confianza}</span>
+            {meta.falta && <span className="text-neutral-600">No encontré: <b>{meta.falta}</b></span>}
+          </div>
+        )}
         {error && <p className="text-xs text-red-600">{error}</p>}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -228,6 +262,10 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
               onChange={e => { agregar([...(e.target.files ?? [])]); e.target.value = '' }} />
             <span className="text-xs text-neutral-400">{texto.length}/350</span>
           </div>
+          <button type="button" onClick={proponer} disabled={pensando || !mensajes?.length} className="btn-secondary text-sm ml-auto mr-2"
+            title="La IA lee la conversación, la nota y la venta, y propone una respuesta (no envía nada)">
+            {pensando ? 'Pensando…' : texto ? 'Proponer otra' : 'Proponer con IA'}
+          </button>
           <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm"
             title={!texto.trim() && archivos.length ? 'Escribe un mensaje para acompañar el archivo' : undefined}>
             {enviando ? 'Enviando…' : 'Responder'}

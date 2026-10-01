@@ -9,6 +9,7 @@ import { mlFetch, ErrorML, ML_API, tokenVigente } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
 
 interface MensajeApi {
+  id: string
   from: { user_id: number }; to?: { user_id: number }; text: string
   message_date: { created: string; read: string | null }
   message_moderation?: { status: string }
@@ -38,6 +39,8 @@ export async function leerHilo(db: Pool, conexionId: number, pack: string, selle
     propio: m.from.user_id === sellerId, texto: m.text, fecha: m.message_date.created, leido: m.message_date.read,
     moderacion: m.message_moderation?.status ?? null, adjuntos: (m.message_attachments ?? []).map(a => ({ archivo: a.filename, nombre: a.original_filename || a.filename, tipo: a.type ?? null })),
   })).sort((a, b) => a.fecha.localeCompare(b.fecha))
+  // Copia para las sugerencias (lo que ya se respondió a mensajes parecidos). Si falla, no importa.
+  await guardarMensajes(db, conexionId, pack, msgs, sellerId).catch(e => console.error('[ml_mensajes]', e))
   // El comprador: quien escribió y no es el vendedor, o a quien le escribió el vendedor.
   const comprador = msgs.find(m => m.from.user_id !== sellerId)?.from.user_id
     ?? msgs.find(m => m.from.user_id === sellerId)?.to?.user_id ?? null
@@ -148,6 +151,15 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
     const v = await datosDeVenta(db, conexionId, pack_id)
     await guardarComprador(db, pack_id, v.nick ?? '', v.nombre)
   }
+  // Historia para las sugerencias: las conversaciones de las ventas de los últimos 90 días
+  // (ml_ordenes, de Calificaciones), de a 15 por vuelta, de la más nueva. Solo lee (no marca).
+  const { rows: historia } = await db.query(
+    `SELECT DISTINCT COALESCE(pack_id, id)::text AS venta, MAX(fecha) AS f FROM ml_ordenes
+     WHERE conexion_id = $1 AND mensajes_at IS NULL GROUP BY 1 ORDER BY f DESC LIMIT 15`, [conexionId])
+  for (const { venta } of historia) {
+    await leerHilo(db, conexionId, venta, seller, false).catch(() => null)
+    await db.query(`UPDATE ml_ordenes SET mensajes_at = NOW() WHERE COALESCE(pack_id, id)::text = $1`, [venta])
+  }
   return vistos.length
 }
 
@@ -226,4 +238,56 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
     return { id: i.item.id, titulo: i.item.title, cantidad: i.quantity, link }
   })
   return { items, comprador }
+}
+
+// ── Sugerencias (gratis, sin IA): lo que ya se respondió a mensajes parecidos ────────────────
+/** Texto plano para comparar (sin links ni etiquetas de ML). */
+export const textoPlano = (t: string) =>
+  t.replace(/<br\s*\/?>/gi, ' ').replace(/<a\s[^>]*>(.*?)<\/a>/gi, '$1').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+
+async function guardarMensajes(db: Pool, conexionId: number, pack: string, msgs: MensajeApi[], sellerId: number) {
+  const filas = msgs.filter(m => m.id && m.text?.trim())
+  if (!filas.length) return
+  await db.query(
+    `INSERT INTO ml_mensajes (msg_id, pack_id, conexion_id, propio, texto, fecha)
+     SELECT * FROM unnest($1::text[], $2::bigint[], $3::int[], $4::bool[], $5::text[], $6::timestamptz[])
+     ON CONFLICT (empresa_id, msg_id) DO NOTHING`,
+    [filas.map(m => m.id), filas.map(() => pack), filas.map(() => conexionId), filas.map(m => m.from.user_id === sellerId),
+     filas.map(m => textoPlano(m.text)), filas.map(m => m.message_date.created)])
+}
+
+// Mensajes automáticos del vendedor que NO son respuestas (no se sugieren): el aviso de ML con
+// la guía, el mensaje de bienvenida y los del Reportador.
+const AUTOMATICOS = '(n[uú]mero de gu[ií]a para tu env[ií]o|gracias por preferirnos|gu[ií]a (zoom|tealca)|gu[ií]a de rastreo|podr[aá]s validar el paso a paso)'
+
+export interface Sugerencia { pregunta: string; respuesta: string; parecido: number }
+
+/** Para lo último que escribió el comprador: qué se le respondió a mensajes parecidos en
+ *  otras ventas (la primera respuesta del vendedor dentro de los 3 días). Hasta 3, sin repetir. */
+export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Promise<{ consulta: string | null; sugerencias: Sugerencia[] }> {
+  const { rows } = await db.query(
+    `SELECT propio, texto FROM ml_mensajes WHERE pack_id = $1 ORDER BY fecha DESC LIMIT 10`, [pack])
+  const ultimos: string[] = []
+  for (const m of rows) { if (m.propio) break; ultimos.unshift(m.texto) }
+  const consulta = ultimos.join(' ').trim().slice(0, 500)
+  if (!consulta) return { consulta: null, sugerencias: [] }
+  const { rows: pares } = await db.query(
+    `SELECT b.texto AS pregunta, r.texto AS respuesta, similarity(b.texto, $1)::float AS parecido
+     FROM ml_mensajes b
+     JOIN LATERAL (
+       SELECT texto FROM ml_mensajes r
+       WHERE r.pack_id = b.pack_id AND r.propio AND r.fecha > b.fecha AND r.fecha < b.fecha + INTERVAL '3 days'
+       ORDER BY r.fecha LIMIT 1) r ON TRUE
+     WHERE NOT b.propio AND b.pack_id <> $2 AND b.texto % $1 AND r.texto !~* $3
+     ORDER BY parecido DESC LIMIT 30`, [consulta, pack, AUTOMATICOS])
+  const vistas = new Set<string>()
+  const sugerencias: Sugerencia[] = []
+  for (const x of pares) {
+    const clave = x.respuesta.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/g, ' ').trim()
+    if (vistas.has(clave)) continue
+    vistas.add(clave)
+    sugerencias.push(x)
+    if (sugerencias.length === limite) break
+  }
+  return { consulta, sugerencias }
 }

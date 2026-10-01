@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { armarContexto, iaConfigurada, pedirBorrador } from '@/lib/preguntas'
+import { registrarUso } from '@/lib/ia'
 
 const Body = z.object({ web: z.boolean().optional() })
 
@@ -18,12 +19,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { web } = Body.parse(await req.json().catch(() => ({})))
     const ctx = await armarContexto(s.db, Number(id), s.session.user.country)
     const b = await pedirBorrador(ctx, !!web)
+    await registrarUso(s.db, 'preguntas', b.modelo, b.uso, s.session.user.id)
     await s.db.query(
       `UPDATE ml_preguntas SET borrador = $2, borrador_confianza = $3, borrador_falta = $4,
                                borrador_web = $5, borrador_at = NOW()
        WHERE id = $1`, [id, b.respuesta, b.confianza, b.falta_dato, b.web])
     return NextResponse.json({
-      borrador: b,
+      borrador: { respuesta: b.respuesta, confianza: b.confianza, falta_dato: b.falta_dato, web: b.web },
       contexto: {
         vinculado: !!ctx.producto, stock: ctx.producto?.stock ?? null,
         ejemplos: ctx.mismoItem.length + ctx.parecidas.length, descripcion: !!ctx.descripcion,

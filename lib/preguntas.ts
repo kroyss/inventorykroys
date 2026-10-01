@@ -7,6 +7,7 @@
 //   - ML descarta textos con links externos o datos de contacto: se revisan antes;
 //   - las preguntas de publicaciones pausadas no salen en el panel de ML pero la API sí
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
+import { llamarClaude, type UsoIA } from '@/lib/ia'
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
@@ -260,9 +261,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
 // ── Borrador con Claude ─────────────────────────────────────────────────────
 export const MEMORIA_POR_CUENTA = 1000
 
-export const MODELO_PREGUNTAS = process.env.PREGUNTAS_MODELO ?? 'claude-haiku-4-5-20251001'
-
-export function iaConfigurada() { return !!process.env.ANTHROPIC_API_KEY }
+export { MODELO_IA as MODELO_PREGUNTAS, iaConfigurada } from '@/lib/ia'
 
 const SISTEMA = `Eres quien responde las preguntas de los compradores en las publicaciones de MercadoLibre de un vendedor venezolano. Escribes el BORRADOR; una persona lo revisa antes de publicarlo.
 
@@ -334,38 +333,48 @@ const HERRAMIENTA = {
 }
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar). */
-export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador> {
-  const tools: unknown[] = [HERRAMIENTA]
-  if (web) tools.unshift({ type: 'web_search_20250305', name: 'web_search', max_uses: 3 })
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODELO_PREGUNTAS,
-      max_tokens: 1024,
-      system: SISTEMA + (web
-        ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
-        : ''),
-      tools,
-      tool_choice: web ? { type: 'auto' } : { type: 'tool', name: 'proponer_respuesta' },
-      messages: [{ role: 'user', content: bloqueContexto(c) }],
-    }),
-    cache: 'no-store',
+export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador & { uso: UsoIA; modelo: string }> {
+  const { resultado: b, uso, modelo } = await llamarClaude<Borrador>({
+    sistema: SISTEMA + (web
+      ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
+      : ''),
+    contenido: bloqueContexto(c), herramienta: HERRAMIENTA, web,
   })
-  const d = await r.json().catch(() => null)
-  if (!r.ok) throw new Error(`IA ${r.status}: ${d?.error?.message ?? 'sin detalle'}`)
-  const uso = (d.content as { type: string; name?: string; input?: Borrador }[])
-    .filter(b => b.type === 'tool_use' && b.name === 'proponer_respuesta').pop()
-  if (!uso?.input) throw new Error('La IA no devolvió un borrador')
-  const b = uso.input
   return {
     respuesta: String(b.respuesta ?? '').trim(),
     confianza: ['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja',
     falta_dato: b.falta_dato || null,
-    web,
+    web, uso, modelo,
   }
+}
+
+// ── Sugerencias (gratis, sin IA): respuestas ya dadas a preguntas parecidas ──────────────────
+export interface SugerenciaPregunta { pregunta: string; respuesta: string; parecido: number; mismaPublicacion: boolean; titulo: string | null }
+
+/** Hasta 3 respuestas propias a preguntas parecidas (las de la misma publicación pesan más),
+ *  de la misma memoria que usa la IA. Sin repetir respuestas. */
+export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise<SugerenciaPregunta[]> {
+  const { rows } = await db.query(
+    `WITH q AS (SELECT id, item_id, texto FROM ml_preguntas WHERE id = $1),
+          memoria AS (SELECT id FROM (
+            SELECT id, row_number() OVER (PARTITION BY conexion_id ORDER BY fecha DESC) AS n
+            FROM ml_preguntas WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL) m
+          WHERE m.n <= ${MEMORIA_POR_CUENTA})
+     SELECT p.texto AS pregunta, p.respuesta, similarity(p.texto, q.texto)::float AS parecido,
+            p.item_id = q.item_id AS "mismaPublicacion", p.item_titulo AS titulo
+     FROM ml_preguntas p, q
+     WHERE p.id <> q.id AND p.id IN (SELECT id FROM memoria)
+       AND (p.texto % q.texto OR (p.item_id = q.item_id AND similarity(p.texto, q.texto) > 0.15))
+     ORDER BY similarity(p.texto, q.texto) + CASE WHEN p.item_id = q.item_id THEN 0.15 ELSE 0 END DESC, p.fecha DESC
+     LIMIT 30`, [preguntaId])
+  const vistas = new Set<string>()
+  const out: SugerenciaPregunta[] = []
+  for (const x of rows) {
+    const clave = x.respuesta.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/g, ' ').trim()
+    if (vistas.has(clave)) continue
+    vistas.add(clave)
+    out.push(x)
+    if (out.length === 3) break
+  }
+  return out
 }

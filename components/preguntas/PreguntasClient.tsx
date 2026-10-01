@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
+import { Sugerencias, UsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
@@ -158,11 +159,12 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="space-y-4">
       <PageHeader title="Preguntas" subtitle="Todas las preguntas de tus cuentas de MercadoLibre en una bandeja, con respuesta sugerida por IA"
-        actions={
+        actions={<>
+          <UsoIA />
           <button onClick={sincronizar} disabled={sincronizando || !!sinCuentas} className="btn-secondary text-sm">
             {sincronizando ? 'Actualizando…' : 'Actualizar ahora'}
           </button>
-        } />
+        </>} />
 
       {datos && (!datos.configuracion.ml || !datos.configuracion.ia) && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg text-sm">
@@ -240,6 +242,12 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [nota, setNota] = useState<string | null>(null)
+  const [sugerencias, setSugerencias] = useState<Sugerencia[]>([])
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/preguntas/${p.id}/sugerencias`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setSugerencias(d.sugerencias) })
+    return () => { vivo = false }
+  }, [p.id])
   const problemas = texto.trim() ? problemasDelTexto(texto) : []
   const avisosTexto = texto.trim() ? revisarTexto(texto).avisos : []
   const pausada = p.item_estado && p.item_estado !== 'active'
@@ -314,6 +322,9 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
+
+      <Sugerencias lista={sugerencias} etiqueta="Ya respondiste algo parecido:"
+        onUsar={t => { setTexto(t); setMeta({ confianza: null, falta: null, web: false }) }} />
 
       {plantillas.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
