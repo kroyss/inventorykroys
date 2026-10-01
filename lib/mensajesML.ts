@@ -262,6 +262,8 @@ const AUTOMATICOS = '(n[uú]mero de gu[ií]a para tu env[ií]o|gracias por prefe
 
 export interface Sugerencia { pregunta: string; respuesta: string; parecido: number }
 
+const SOLO_SALUDO = /^((hola|holis|buenas|buenos|buen|dias|dia|tardes|noches|saludos|que tal|como esta[s]?|amigo|amiga|hey)\s*)+$/
+
 /** Para lo último que escribió el comprador: qué se le respondió a mensajes parecidos en
  *  otras ventas (la primera respuesta del vendedor dentro de los 3 días). Hasta 3, sin repetir. */
 export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Promise<{ consulta: string | null; sugerencias: Sugerencia[] }> {
@@ -271,6 +273,11 @@ export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Pr
   for (const m of rows) { if (m.propio) break; ultimos.unshift(m.texto) }
   const consulta = ultimos.join(' ').trim().slice(0, 500)
   if (!consulta) return { consulta: null, sugerencias: [] }
+  // Un saludo solo ("Hola", "Buenas tardes") no dice qué quiere: lo que se respondió a otros
+  // saludos depende de cada caso, así que no se sugiere nada.
+  if (SOLO_SALUDO.test(consulta.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, ' ').trim())) {
+    return { consulta, sugerencias: [] }
+  }
   const { rows: pares } = await db.query(
     `SELECT b.texto AS pregunta, r.texto AS respuesta, similarity(b.texto, $1)::float AS parecido
      FROM ml_mensajes b
