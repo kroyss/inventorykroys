@@ -92,16 +92,17 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   for (const e of rows) {
     const cuenta = cuentaDe(e.remitente, config.cuentas, remitenteDefault)
     const base = { venta: String(e.venta), guia: String(e.guia), carrier: String(e.carrier), cuenta: cuenta?.nombre ?? null }
-    const cerrar = async (estado: 'ENVIADO' | 'SIN_CHAT' | 'RECHAZADO' | 'ERROR', detalle: string | null) => {
+    const cerrar = async (estado: 'ENVIADO' | 'SIN_CHAT' | 'RECHAZADO' | 'ERROR', detalle: string | null, texto: string | null = null) => {
       if (simular) return
       const final = estado === 'ENVIADO' || estado === 'SIN_CHAT'
       await db.query(
         `UPDATE despacho_etiquetas
          SET reporte_estado = $2, reporte_detalle = $3, reporte_intentos = reporte_intentos + 1,
+             reporte_mensaje = COALESCE($5, reporte_mensaje),
              reportado_at = CASE WHEN $4 THEN NOW() ELSE reportado_at END,
              reporte_tomado_por = NULL, reporte_tomado_at = NULL
          WHERE id = $1 AND (reporte_estado IS NULL OR reporte_estado IN ('RECHAZADO', 'ERROR'))`,
-        [e.id, estado, detalle ? `API: ${detalle}`.slice(0, 500) : 'API', final])
+        [e.id, estado, detalle ? `API: ${detalle}`.slice(0, 500) : 'API', final, texto])
     }
     const soltar = async () => {
       if (!simular) await db.query(`UPDATE despacho_etiquetas SET reporte_tomado_at = NULL WHERE id = $1`, [e.id])
@@ -123,8 +124,9 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       if (base.carrier === 'TEALCA') mensaje = paraTealca(mensaje)
 
       const antes = await mensajesDeOrden(db, orden.conexionId, orden.orden)
-      if (antes.some(m => esReporteNuestro(m, base.guia))) {
-        await cerrar('ENVIADO', 'ya tenía la guía en la conversación')
+      const previo = antes.find(m => esReporteNuestro(m, base.guia))
+      if (previo) {
+        await cerrar('ENVIADO', 'ya tenía la guía en la conversación', previo.texto)
         procesados.push({ ...base, resultado: 'YA_ENVIADO', detalle: 'El comprador ya tenía esta guía en la conversación', mensaje: null })
         continue
       }
@@ -142,10 +144,10 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       const nuestro = despues.filter(m => esReporteNuestro(m, base.guia)).pop()
       const mod = nuestro?.moderacion ?? null
       if (mod && !['clean', 'non_moderated'].includes(mod)) {
-        await cerrar('RECHAZADO', `moderación ${mod}`)
+        await cerrar('RECHAZADO', `moderación ${mod}`, mensaje)
         procesados.push({ ...base, resultado: 'RECHAZADO', detalle: `MercadoLibre lo moderó (${mod})`, mensaje })
       } else {
-        await cerrar('ENVIADO', mod ? `moderación ${mod}` : null)
+        await cerrar('ENVIADO', mod ? `moderación ${mod}` : null, mensaje)
         procesados.push({ ...base, resultado: 'ENVIADO', detalle: `Desde ${orden.cuenta}`, mensaje })
       }
       await pausa(1200)

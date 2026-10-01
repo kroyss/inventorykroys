@@ -43,11 +43,6 @@ interface Overview {
     a_reportar: number; enviados: number; sin_chat: number; con_problema: number; por_csv: number; tealca_sin_guia: number
   }[]
 }
-interface EnvioReporte {
-  id: number; venta: string; guia: string; remitente: string | null; destinatario: string | null
-  reimpresion: boolean; reporte_estado: string | null; reporte_detalle: string | null
-  reporte_intentos: number; reportado_at: string | null
-}
 interface Falla { etiqueta_id: number; original_name: string; venta: string | null; detalle: string }
 
 const IMPRIMIBLE: Record<Estado, boolean> = {
@@ -101,7 +96,6 @@ const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().
 // ── Pantalla ────────────────────────────────────────────────────────────────
 export default function DespachosClient({ isAdmin, reportador }: { isAdmin: boolean; reportador: boolean }) {
   const confirm = useConfirm()
-  const [abierta, setAbierta]   = useState<number | null>(null)   // jornada cerrada desplegada
   const [data, setData]         = useState<Overview | null>(null)
   const [lotes, setLotes]       = useState<Record<number, LoteDetalle>>({})
   const [busy, setBusy]         = useState<string | null>(null)
@@ -330,9 +324,7 @@ export default function DespachosClient({ isAdmin, reportador }: { isAdmin: bool
             </thead>
             <tbody>
               {data.cerradas.map(j => (
-                <FilaJornada key={j.id} j={j} abierta={abierta === j.id}
-                  onToggle={() => setAbierta(abierta === j.id ? null : j.id)}
-                  onCsv={() => bajarCsv(j)} />
+                <FilaJornada key={j.id} j={j} onCsv={() => bajarCsv(j)} />
               ))}
             </tbody>
           </table>
@@ -342,26 +334,8 @@ export default function DespachosClient({ isAdmin, reportador }: { isAdmin: bool
   )
 }
 
-// ── Jornada cerrada + estado del reporte ────────────────────────────────────
-const REPORTE_UI: Record<string, { label: string; cls: string }> = {
-  ENVIADO:   { label: 'Enviado',        cls: 'bg-green-100 text-green-800' },
-  SIN_CHAT:  { label: 'Sin chat',       cls: 'bg-neutral-200 text-neutral-700' },
-  RECHAZADO: { label: 'Rechazado por ML', cls: 'bg-red-100 text-red-800' },
-  ERROR:     { label: 'Error (se reintenta)', cls: 'bg-amber-100 text-amber-800' },
-  CSV:       { label: 'Por CSV (viejo)', cls: 'bg-neutral-100 text-neutral-600' },
-}
-
-function FilaJornada({ j, abierta, onToggle, onCsv }: {
-  j: Overview['cerradas'][number]; abierta: boolean; onToggle: () => void; onCsv: () => void
-}) {
-  const [envios, setEnvios] = useState<EnvioReporte[] | null>(null)
-  useEffect(() => {
-    if (!abierta) return
-    let vivo = true
-    fetch(`/api/despachos/jornadas/${j.id}/reporte`).then(r => r.ok ? r.json() : []).then(d => { if (vivo) setEnvios(d) })
-    return () => { vivo = false }
-  }, [abierta, j.id, j.enviados, j.a_reportar])
-
+// ── Jornada cerrada + resumen del reporte (el detalle vive en Reportador → Historial) ──
+function FilaJornada({ j, onCsv }: { j: Overview['cerradas'][number]; onCsv: () => void }) {
   const partes = [
     j.enviados     ? <span key="e" className="text-green-700">✓ {j.enviados} enviado(s)</span> : null,
     j.a_reportar   ? <span key="p" className="text-sky-700">{j.a_reportar} pendiente(s)</span> : null,
@@ -372,73 +346,30 @@ function FilaJornada({ j, abierta, onToggle, onCsv }: {
   ].filter(Boolean)
 
   return (
-    <>
-      <tr className="border-t border-neutral-100">
-        <td className="px-4 py-2">{fechaHora(j.closed_at)}</td>
-        <td className="px-4 py-2 text-right">{j.total_envios}</td>
-        <td className="px-4 py-2 text-xs">
-          {partes.length
-            ? <span className="space-x-2">{partes}</span>
-            : <span className="text-neutral-400">{j.reimpresiones ? 'Solo reimpresiones: nada que reportar' : '—'}</span>}
-        </td>
-        <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
-        <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
-          <button onClick={onToggle} className="btn-secondary text-xs">{abierta ? 'Ocultar' : 'Detalle'}</button>
-          {j.tiene_manifiesto && (
-            <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">
-              ↓ Manifiesto{j.tiene_manifiesto_tealca ? ' Zoom' : ''}
-            </button>
-          )}
-          {j.tiene_manifiesto_tealca && (
-            <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto?transportista=TEALCA`)} className="btn-secondary text-xs">↓ Manifiesto Tealca</button>
-          )}
-        </td>
-      </tr>
-      {abierta && (
-        <tr className="bg-neutral-50/60">
-          <td colSpan={5} className="px-4 py-3">
-            {!envios ? <p className="text-xs text-neutral-400">Cargando…</p> : (
-              <>
-                <table className="w-full text-xs">
-                  <thead className="text-neutral-500">
-                    <tr><th className="text-left py-1">Venta</th><th className="text-left">Guía</th><th className="text-left">Destinatario</th>
-                      <th className="text-left">Reporte</th><th className="text-left">Detalle</th></tr>
-                  </thead>
-                  <tbody>
-                    {envios.map(e => {
-                      const ui = e.reimpresion
-                        ? { label: 'Reimpresión (ya reportado)', cls: 'bg-neutral-100 text-neutral-600' }
-                        : REPORTE_UI[e.reporte_estado ?? ''] ?? { label: 'Pendiente', cls: 'bg-sky-100 text-sky-800' }
-                      return (
-                        <tr key={e.id} className="border-t border-neutral-100 align-top">
-                          <td className="py-1 font-mono">{e.venta}</td>
-                          <td className="font-mono">{e.guia}</td>
-                          <td>{e.destinatario ?? '—'}</td>
-                          <td><span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span></td>
-                          <td className="text-neutral-500">
-                            {e.reporte_detalle}
-                            {e.reportado_at ? ` ${fechaHora(e.reportado_at)}` : ''}
-                            {e.reporte_intentos > 1 ? ` · ${e.reporte_intentos} intentos` : ''}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                {j.a_reportar > 0 && (
-                  <div className="mt-2 text-right">
-                    <button onClick={onCsv} className="text-xs text-neutral-500 underline"
-                      title="Solo para usar el Reportador viejo (.exe con CSV)">
-                      Bajar CSV para el Reportador viejo
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
+    <tr className="border-t border-neutral-100">
+      <td className="px-4 py-2">{fechaHora(j.closed_at)}</td>
+      <td className="px-4 py-2 text-right">{j.total_envios}</td>
+      <td className="px-4 py-2 text-xs">
+        {partes.length
+          ? <span className="space-x-2">{partes}</span>
+          : <span className="text-neutral-400">{j.reimpresiones ? 'Solo reimpresiones: nada que reportar' : '—'}</span>}
+        {j.a_reportar > 0 && (
+          <button onClick={onCsv} className="ml-2 text-neutral-400 underline" title="Solo para usar el Reportador viejo (.exe con CSV)">CSV viejo</button>
+        )}
+      </td>
+      <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
+      <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+        <Link href={`/reportador?vista=historial&jornada=${j.id}`} className="btn-secondary text-xs">Ver reporte</Link>
+        {j.tiene_manifiesto && (
+          <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">
+            ↓ Manifiesto{j.tiene_manifiesto_tealca ? ' Zoom' : ''}
+          </button>
+        )}
+        {j.tiene_manifiesto_tealca && (
+          <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto?transportista=TEALCA`)} className="btn-secondary text-xs">↓ Manifiesto Tealca</button>
+        )}
+      </td>
+    </tr>
   )
 }
 

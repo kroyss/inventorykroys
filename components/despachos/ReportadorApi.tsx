@@ -79,7 +79,6 @@ export default function ReportadorApi() {
         <div>
           <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
             Reportar por API
-            <span className="text-[11px] font-medium bg-lime-100 text-lime-800 rounded-full px-2 py-0.5">Nuevo · sin programa</span>
           </h2>
           <p className="text-xs text-neutral-500 mt-0.5">
             El sistema le escribe la guía a cada comprador directamente por MercadoLibre, con las mismas plantillas. No hace falta la PC prendida.
@@ -108,7 +107,7 @@ export default function ReportadorApi() {
       </div>
       <p className="text-xs text-neutral-500">
         Cuentas conectadas a la API: {conectadas.length ? <b className="text-neutral-800">{conectadas.join(', ')}</b> : 'ninguna'}
-        {' · '}las ventas de otras cuentas quedan para el programa de escritorio.{' '}
+        {' · '}las ventas de otras cuentas quedan para el programa de escritorio (abajo, de respaldo).{' '}
         <Link href="/preguntas" className="underline underline-offset-2 hover:text-neutral-800">Conectar cuentas</Link>
       </p>
 

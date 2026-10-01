@@ -31,7 +31,7 @@ const paraTealca = (t: string) =>
 const rellenar = (t: string, bloque: string, pagina: string, guia: string) =>
   (t + bloque).split('{pagina}').join(pagina).split('{guia}').join(guia)
 
-/** Panel del Reportador conectado: equipos vinculados y mensajes (Despachos). */
+/** Mensajes y cuentas del Reportador + programa de escritorio (respaldo de la API). */
 export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
   const confirm = useConfirm()
   const [estado, setEstado]   = useState<Estado | null>(null)
@@ -112,57 +112,77 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
   const vinculados = equipos.filter(e => e.vinculado_at)
   const codigos    = equipos.filter(e => !e.vinculado_at && e.codigo)
 
+  const enUso = vinculados.some(e => activa(e.orden) || e.auto_reportar) || codigos.length > 0
+
   return (
-    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-neutral-100">
-        <div>
-          <h2 className="text-sm font-semibold text-neutral-800">Reportador</h2>
-          <p className="text-xs text-neutral-500">
-            Programa que le escribe a cada comprador su guía. Toma los envíos de las jornadas cerradas.
-            {' '}<span className={pendientes ? 'text-sky-700 font-medium' : ''}>
-              {pendientes ? `${pendientes} envío(s) por reportar.` : 'Nada pendiente.'}
-            </span>
-          </p>
+    <>
+      {/* Mensajes y cuentas: los usan la API y el programa de escritorio. */}
+      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-neutral-800">Mensajes y cuentas</h2>
+            <p className="text-xs text-neutral-500">
+              {config.plantillas.length} plantilla(s) que se eligen al azar · cuentas: {config.cuentas.map(c => c.nombre).join(', ') || 'ninguna'}.
+              {' '}Las usan el reporte por API y el programa de escritorio.
+            </p>
+          </div>
+          {isAdmin && !editando && (
+            <button onClick={() => setEditando(structuredClone(config))} className="btn-secondary text-xs">Editar mensajes y cuentas</button>
+          )}
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => setEditando(structuredClone(config))} className="btn-secondary text-xs">Mensajes y cuentas</button>
-            <button onClick={vincular} className="btn-secondary text-xs">+ Vincular equipo</button>
+        {problemas.length > 0 && !editando && (
+          <div className="mx-4 mb-3 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
+            Configuración incompleta: {problemas.join(' · ')}
           </div>
         )}
-      </div>
+        {editando && (
+          <EditorConfig config={editando} limite={limite} onChange={setEditando}
+            onGuardar={guardar} onCancelar={() => { setEditando(null); setError(null) }} guardando={guardando} />
+        )}
+      </section>
 
-      {error && <div className="mx-4 mt-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
-      {problemas.length > 0 && !editando && (
-        <div className="mx-4 mt-3 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
-          Configuración incompleta: {problemas.join(' · ')}
-        </div>
-      )}
-
-      <div className="px-4 py-3 space-y-2 text-sm">
-        {codigos.map(c => (
-          <div key={c.id} className="flex flex-wrap items-center gap-2 bg-neutral-50 border border-neutral-200 rounded px-3 py-2">
-            <span>Código para vincular:</span>
-            <span className="font-mono text-lg font-bold tracking-widest">{c.codigo}</span>
-            <span className="text-xs text-sky-700">
-              Escríbelo en el Reportador del equipo. Vence {c.codigo_expira ? `a las ${new Date(c.codigo_expira).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit' })}` : 'pronto'}.
-            </span>
+      {/* Programa de escritorio: queda de respaldo por si la API falla algún día. */}
+      <details open={enUso} className="bg-white rounded-xl border border-neutral-200 shadow-sm group">
+        <summary className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 cursor-pointer list-none">
+          <div>
+            <h2 className="text-sm font-semibold text-neutral-800">
+              <span className="inline-block text-neutral-400 mr-1 transition-transform group-open:rotate-90">›</span>
+              Programa de escritorio <span className="font-normal text-neutral-500">(respaldo)</span>
+            </h2>
+            <p className="text-xs text-neutral-500 ml-4">
+              Úsalo solo si el reporte por API falla. {vinculados.length} equipo(s) vinculado(s)
+              {vinculados.some(e => e.en_linea) ? ' · uno en línea' : ''}.
+            </p>
           </div>
-        ))}
-        {vinculados.length === 0
-          ? <p className="text-neutral-400">Ningún equipo vinculado todavía.</p>
-          : vinculados.map(e => (
-              <FilaEquipo key={e.id} e={e} isAdmin={isAdmin} pendientes={pendientes} configOk={problemas.length === 0}
-                onReportar={() => reportar(e)} onDetener={() => detener(e)}
-                onAuto={v => setAuto(e, v)} onDesvincular={() => desvincular(e)} />
+        </summary>
+        <div className="border-t border-neutral-100">
+          {isAdmin && (
+            <div className="flex justify-end px-4 pt-3">
+              <button onClick={vincular} className="btn-secondary text-xs">+ Vincular equipo</button>
+            </div>
+          )}
+          <div className="px-4 py-3 space-y-2 text-sm">
+            {codigos.map(c => (
+              <div key={c.id} className="flex flex-wrap items-center gap-2 bg-neutral-50 border border-neutral-200 rounded px-3 py-2">
+                <span>Código para vincular:</span>
+                <span className="font-mono text-lg font-bold tracking-widest">{c.codigo}</span>
+                <span className="text-xs text-sky-700">
+                  Escríbelo en el Reportador del equipo. Vence {c.codigo_expira ? `a las ${new Date(c.codigo_expira).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: '2-digit', minute: '2-digit' })}` : 'pronto'}.
+                </span>
+              </div>
             ))}
-      </div>
-
-      {editando && (
-        <EditorConfig config={editando} limite={limite} onChange={setEditando}
-          onGuardar={guardar} onCancelar={() => { setEditando(null); setError(null) }} guardando={guardando} />
-      )}
-    </section>
+            {vinculados.length === 0
+              ? <p className="text-neutral-400">Ningún equipo vinculado.</p>
+              : vinculados.map(e => (
+                  <FilaEquipo key={e.id} e={e} isAdmin={isAdmin} pendientes={pendientes} configOk={problemas.length === 0}
+                    onReportar={() => reportar(e)} onDetener={() => detener(e)}
+                    onAuto={v => setAuto(e, v)} onDesvincular={() => desvincular(e)} />
+                ))}
+          </div>
+        </div>
+      </details>
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
+    </>
   )
 }
 
