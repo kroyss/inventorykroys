@@ -10,7 +10,9 @@ interface Bonus {
 
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
-export default function BonusPipeline() {
+// `detalle` (solo administradores): título con lo vendido, lo ganado y lo que falta.
+// El usuario normal ve SOLO la barra, sin montos.
+export default function BonusPipeline({ detalle = false }: { detalle?: boolean }) {
   const [data, setData] = useState<Bonus | null>(null)
 
   useEffect(() => {
@@ -49,8 +51,8 @@ export default function BonusPipeline() {
   // pb-2.5: el aire que necesita la etiqueta del mes anterior, que se posiciona
   // en absoluto debajo de la barra y sobresale de la fila.
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-4 pt-3 pb-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-2.5 text-sm">
+    <div className={detalle ? 'bg-white rounded-xl border border-neutral-200 shadow-sm px-4 pt-3 pb-4' : 'px-2 pt-2 pb-2.5'}>
+      {detalle && <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-2.5 text-sm">
         <span className="font-semibold text-neutral-900">Bono del mes</span>
         <span className="text-neutral-500">
           Vendido <b className="text-neutral-900 num">${usd(salesAmount)}</b>
@@ -59,7 +61,7 @@ export default function BonusPipeline() {
             ? <> · faltan <b className="text-neutral-900 num">${usd(proximo.end - salesAmount)}</b> para +${proximo.bonus}</>
             : <> · ¡todas las metas cumplidas!</>}
         </span>
-      </div>
+      </div>}
       <div className="flex items-center w-full gap-1">
         {/* Start dot */}
         <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: startDotColor }} />

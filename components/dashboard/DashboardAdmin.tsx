@@ -169,7 +169,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
           pegada a las cards de arriba y al gráfico de abajo. */}
       {country === 'VE' && bonos && (
         <div className="mt-3!">
-          <BonusPipeline />
+          <BonusPipeline detalle />
         </div>
       )}
 
