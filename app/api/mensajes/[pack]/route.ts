@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML } from '@/lib/ml'
-import { leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
+import { itemsDeVenta, leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 
 async function conversacion(db: import('pg').Pool, pack: string) {
@@ -25,9 +25,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
     const c = await conversacion(s.db, pack)
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
     const marcar = new URL(req.url).searchParams.get('leida') === '1'
-    const h = await leerHilo(s.db, c.conexion_id, pack, Number(c.ml_user_id), marcar)
+    const [h, items] = await Promise.all([
+      leerHilo(s.db, c.conexion_id, pack, Number(c.ml_user_id), marcar),
+      itemsDeVenta(s.db, c.conexion_id, pack).catch(() => null),   // para el link a cada publicación
+    ])
     if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
-    return NextResponse.json({ cuenta: c.nickname, ...h })
+    return NextResponse.json({ cuenta: c.nickname, ...h, items })
   } catch (err) {
     return apiError(err)
   }

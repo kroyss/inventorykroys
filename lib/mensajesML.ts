@@ -165,3 +165,23 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
   if (!r.ok || !d?.id) throw new ErrorML(r.status, d, `MercadoLibre no aceptó "${archivo.name}"${d?.message ? `: ${d.message}` : ` (${r.status})`}`)
   return d.id
 }
+
+export interface ItemVenta { id: string; titulo: string; cantidad: number; link: string | null }
+
+/** Productos de la venta (orden suelta o pack) con el link a cada publicación. */
+export async function itemsDeVenta(db: Pool, conexionId: number, pack: string): Promise<ItemVenta[]> {
+  type Orden = { order_items: { item: { id: string; title: string }; quantity: number }[] }
+  let ordenes: Orden[]
+  try {
+    ordenes = [await mlFetch<Orden>(db, conexionId, `/orders/${pack}`)]
+  } catch (e) {
+    if (!(e instanceof ErrorML)) throw e
+    const p = await mlFetch<{ orders: { id: number }[] }>(db, conexionId, `/packs/${pack}`)
+    ordenes = await Promise.all(p.orders.slice(0, 5).map(o => mlFetch<Orden>(db, conexionId, `/orders/${o.id}`)))
+  }
+  return ordenes.flatMap(o => o.order_items).map(i => {
+    const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
+    const link = m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` : null
+    return { id: i.item.id, titulo: i.item.title, cantidad: i.quantity, link }
+  })
+}

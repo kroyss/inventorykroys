@@ -82,6 +82,7 @@ export default function MensajesClient() {
 
 function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
+  const [items, setItems] = useState<{ id: string; titulo: string; cantidad: number; link: string | null }[] | null>(null)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,6 +110,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo leer'); return }
     setMensajes(d.mensajes)
+    if (d.items) setItems(d.items)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
@@ -150,7 +152,20 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
             <button onClick={() => leer(true)} className="ml-auto btn-ghost text-xs px-2 py-1">Marcar como leída</button>
           )}
         </div>
-        {c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
+        {items?.length ? (
+          <p className="text-sm font-medium text-neutral-900">
+            {items.map((it, i) => (
+              <span key={it.id + i}>
+                {i > 0 && <span className="text-neutral-300"> · </span>}
+                {it.cantidad} ×{' '}
+                {it.link
+                  ? <a href={it.link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
+                      className="hover:underline underline-offset-2">{it.titulo} <span className="text-neutral-400">↗</span></a>
+                  : it.titulo}
+              </span>
+            ))}
+          </p>
+        ) : c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
         <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
         <NotasVenta pack={c.pack_id} onCambio={onCambio} />
       </header>

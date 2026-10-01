@@ -45,9 +45,14 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
   const link = linkPublicacion(p)
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
-      {nombre
-        ? <span className="font-medium text-neutral-800 truncate max-w-[30rem]">{nombre}</span>
-        : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
+      {link
+        ? <a href={link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
+            className={`truncate max-w-[30rem] hover:underline underline-offset-2 ${nombre ? 'font-medium text-neutral-800' : 'text-neutral-500'}`}>
+            {nombre ?? 'Publicación sin vincular a un producto'} <span className="text-neutral-400">↗</span>
+          </a>
+        : nombre
+          ? <span className="font-medium text-neutral-800 truncate max-w-[30rem]">{nombre}</span>
+          : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
       {p.producto_code && <span className="font-mono text-neutral-400">{p.producto_code}</span>}
       <Precio p={p} umbral={umbral} />
       {p.producto_stock !== null && (
@@ -55,7 +60,7 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
           {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
         </span>
       )}
-      {link && <a href={link} target="_blank" rel="noreferrer" className="font-mono text-neutral-400 hover:text-neutral-800 hover:underline">{p.item_id} ↗</a>}
+      <span className="font-mono text-neutral-400">{p.item_id}</span>
     </span>
   )
 }
