@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { Cargando, EmptyState, FilterPills } from '@/components/ui'
+import { Cargando, EmptyState, FilterPills, Tabs } from '@/components/ui'
 
 interface Envio {
   id: number; venta: string; guia: string; carrier: string; destinatario: string | null; cuenta: string | null
@@ -39,6 +39,7 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
   const [periodo, setPeriodo] = useState(jornadaInicial ? `j${jornadaInicial}` : 'd30')
   const [envios, setEnvios] = useState<Envio[] | null>(null)
   const [q, setQ] = useState('')
+  const [carrier, setCarrier] = useState<'todos' | 'ZOOM' | 'TEALCA'>('todos')
   const [abiertos, setAbiertos] = useState<Set<number>>(() => new Set(jornadaInicial ? [jornadaInicial] : []))
 
   useEffect(() => {
@@ -53,13 +54,15 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
   const dias = useMemo(() => {
     const m = new Map<number, Dia>()
     for (const e of envios ?? []) {
+      if (carrier !== 'todos' && e.carrier !== carrier) continue
       if (filtro && !`${e.venta} ${e.guia} ${e.destinatario ?? ''}`.toLowerCase().includes(filtro)) continue
       const d = m.get(e.jornada_id) ?? { jornada: e.jornada_id, closed_at: e.closed_at, envios: [] }
       d.envios.push(e)
       m.set(e.jornada_id, d)
     }
     return [...m.values()]
-  }, [envios, filtro])
+  }, [envios, filtro, carrier])
+  const nCarrier = (c: string) => (envios ?? []).filter(e => !e.reimpresion && e.carrier === c).length
 
   const alternar = (id: number) => setAbiertos(s => {
     const n = new Set(s)
@@ -82,6 +85,12 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
           className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 md:max-w-80" />
       </div>
 
+      <Tabs value={carrier} onChange={setCarrier} items={[
+        { value: 'todos', label: 'Todos' },
+        { value: 'ZOOM', label: 'ZOOM', count: nCarrier('ZOOM') },
+        { value: 'TEALCA', label: 'TEALCA', count: nCarrier('TEALCA') },
+      ]} />
+
       {dias.length === 0 ? (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
           <EmptyState message={filtro ? 'Ningún envío coincide con la búsqueda.' : 'No hay jornadas cerradas en este período.'} />
@@ -89,7 +98,7 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
       ) : (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
           {dias.map(d => (
-            <FilaDia key={d.jornada} d={d} abierto={abiertos.has(d.jornada) || !!filtro} onToggle={() => alternar(d.jornada)} />
+            <FilaDia key={`${d.jornada}-${carrier}`} d={d} abierto={abiertos.has(d.jornada) || !!filtro} onToggle={() => alternar(d.jornada)} />
           ))}
         </div>
       )}
