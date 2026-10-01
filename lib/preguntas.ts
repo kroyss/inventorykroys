@@ -9,6 +9,7 @@
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
+import { sincronizarMensajes } from '@/lib/mensajesML'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 interface PreguntaML {
@@ -116,6 +117,10 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       }
       // Las preguntas ya quedaron al día: se marca antes de lo opcional (títulos).
       await db.query(`UPDATE ml_conexiones SET ultima_sync = NOW(), ultimo_error = NULL WHERE id = $1`, [c.id])
+      // Mensajes post-venta sin leer (bandeja Mensajes). No corta la sync de preguntas.
+      try { await sincronizarMensajes(db, c.id) } catch (e) {
+        console.error('[ML mensajes]', c.nickname, e instanceof Error ? e.message : e)
+      }
       const fallas = await completarItems(db, c.id)
       if (fallas) {
         await db.query(`UPDATE ml_conexiones SET ultimo_error = $2 WHERE id = $1`,

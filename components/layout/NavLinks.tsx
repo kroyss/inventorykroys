@@ -20,6 +20,7 @@ const allLinks: { href: string; label: string; roles: UserRole[]; countries: Cou
   { href: '/despachos',        label: 'Despachos',  roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/reportador',       label: 'Reportador', roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/preguntas',        label: 'Preguntas',  roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/mensajes',         label: 'Mensajes',   roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
 interface Props {

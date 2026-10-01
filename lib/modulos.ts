@@ -19,6 +19,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/facturas':  'facturas',
   '/finanzas':  'finanzas',
   '/preguntas': 'preguntas',
+  '/mensajes':  'preguntas',
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {
