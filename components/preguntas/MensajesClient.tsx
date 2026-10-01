@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
-  ultimo_at: string | null; productos: string | null; cuenta: string; venta_estado: string | null
+  ultimo_at: string | null; productos: string | null; cuenta: string; venta_estado: string | null; notas: string | null
 }
 interface Mensaje { propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: number }
 
@@ -20,9 +21,9 @@ function hace(fecha: string | null) {
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
 export default function MensajesClient() {
-  const [vista, setVista] = useState<'sin_leer' | 'todas'>('sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'con_nota' | 'todas'>('sin_leer')
   const [lista, setLista] = useState<Conversacion[] | null>(null)
-  const [cont, setCont] = useState<{ conversaciones: number; mensajes: number } | null>(null)
+  const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,13 +42,14 @@ export default function MensajesClient() {
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null) }} items={[
         { value: 'sin_leer', label: 'Sin leer', count: cont?.conversaciones },
+        { value: 'con_nota', label: 'Con nota', count: cont?.con_nota },
         { value: 'todas', label: 'Recientes' },
       ]} />
       {!lista ? <Cargando /> : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
             {lista.length === 0 ? (
-              <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : 'Todavía no hay conversaciones.'} />
+              <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : vista === 'con_nota' ? 'Ninguna venta con nota.' : 'Todavía no hay conversaciones.'} />
             ) : lista.map(c => (
               <button key={c.pack_id} onClick={() => setAbierta(c)}
                 className={`w-full text-left px-4 py-3 space-y-1 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
@@ -58,8 +60,13 @@ export default function MensajesClient() {
                 </div>
                 <p className="text-sm font-medium text-neutral-900 truncate">{c.productos ?? `Venta ${c.pack_id}`}</p>
                 <p className={`text-sm truncate ${c.sin_leer > 0 ? 'text-neutral-900' : 'text-neutral-500'}`}>
-                  {c.ultimo_de_comprador === false && <span className="text-neutral-400">Tú: </span>}{c.ultimo_texto ?? '—'}
+                  {c.ultimo_de_comprador === false && <span className="text-neutral-400">Tú: </span>}{c.ultimo_texto ? sinEtiquetas(c.ultimo_texto) : '—'}
                 </p>
+                {c.notas && (
+                  <p className="text-xs text-amber-800 truncate">
+                    <span className="font-semibold bg-amber-100 rounded px-1.5 py-0.5 mr-1.5">Nota</span>{c.notas}
+                  </p>
+                )}
               </button>
             ))}
           </div>
@@ -72,14 +79,11 @@ export default function MensajesClient() {
   )
 }
 
-interface NotaML { id: string; texto: string; fecha: string; origen: string | null }
-
 function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notas, setNotas] = useState<{ notas: NotaML[]; intentos: { fuente: string; error: string | null }[] } | null>(null)
   const fin = useRef<HTMLDivElement>(null)
 
   const leer = useCallback(async (marcar = false) => {
@@ -90,11 +94,6 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
-  useEffect(() => {
-    let vivo = true
-    fetch(`/api/mensajes/${c.pack_id}/notas`).then(r => r.ok ? r.json() : null).then(d => { if (vivo) setNotas(d) })
-    return () => { vivo = false }
-  }, [c.pack_id])
   useEffect(() => { fin.current?.scrollIntoView({ block: 'end' }) }, [mensajes])
 
   const problemas = texto.trim() ? problemasDelTexto(texto) : []
@@ -128,27 +127,12 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         </div>
         {c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
         <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
-        {notas && (notas.notas.length > 0 ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-1">
-            <p className="text-[11px] font-semibold text-amber-800">Notas de la venta en MercadoLibre</p>
-            {notas.notas.map(n => (
-              <p key={n.id} className="text-sm text-amber-900 whitespace-pre-line">
-                {n.texto} <span className="text-[11px] text-amber-700/70">· {new Date(n.fecha).toLocaleDateString('es-VE')}</span>
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[11px] text-neutral-400">
-            {notas.intentos.every(i => i.error)
-              ? `No se pudieron leer las notas de ML (${notas.intentos.map(i => `${i.fuente}: ${i.error}`).join(' · ')})`
-              : 'Sin notas en la venta.'}
-          </p>
-        ))}
+        <NotasVenta pack={c.pack_id} onCambio={onCambio} />
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[12rem]">
         {!mensajes ? <p className="text-sm text-neutral-400">Cargando…</p> : mensajes.map((m, i) => (
           <div key={i} className={`text-sm rounded-lg px-3 py-2 max-w-[85%] whitespace-pre-line ${m.propio ? 'ml-auto bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-900'}`}>
-            {m.texto}
+            <TextoConLinks texto={m.texto} />
             {m.adjuntos > 0 && <span className="block text-xs opacity-70 mt-1">📎 {m.adjuntos} adjunto(s): míralo en MercadoLibre</span>}
             <div className={`text-[11px] mt-1 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
               {new Date(m.fecha).toLocaleString('es-VE')}
@@ -175,5 +159,101 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         </div>
       </footer>
     </section>
+  )
+}
+
+// Los mensajes de ML traen los links como <a href="…">texto</a>: se muestran como links.
+const LINK = /<a\s[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi
+const sinEtiquetas = (t: string) => t.replace(LINK, '$2').replace(/<[^>]+>/g, '')
+
+function TextoConLinks({ texto }: { texto: string }) {
+  const partes: React.ReactNode[] = []
+  let desde = 0
+  for (const m of texto.matchAll(LINK)) {
+    partes.push(texto.slice(desde, m.index).replace(/<[^>]+>/g, ''))
+    partes.push(<a key={m.index} href={m[1]} target="_blank" rel="noreferrer" className="underline underline-offset-2">{m[2]}</a>)
+    desde = m.index + m[0].length
+  }
+  partes.push(texto.slice(desde).replace(/<[^>]+>/g, ''))
+  return <>{partes}</>
+}
+
+interface NotaML { id: string; texto: string; fecha: string; fuente: 'orden' | 'pack' }
+
+/** Notas de la venta en MercadoLibre: se ven, se agregan, se cambian y se borran (el
+ *  comprador no las ve). Las ventas con nota quedan en la pestaña "Con nota". */
+function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) {
+  const [datos, setDatos] = useState<{ notas: NotaML[]; error: string | null } | null>(null)
+  const [editando, setEditando] = useState<{ id: string | null; texto: string } | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const confirm = useConfirm()
+
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/mensajes/${pack}/notas`).then(r => r.ok ? r.json() : null).then(d => { if (vivo) setDatos(d) })
+    return () => { vivo = false }
+  }, [pack])
+
+  const enviar = async (method: 'POST' | 'PUT' | 'DELETE', body: object) => {
+    setGuardando(true); setError(null)
+    try {
+      const r = await fetch(`/api/mensajes/${pack}/notas`, {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(d.error ?? 'No se pudo guardar la nota'); return }
+      setDatos(d); setEditando(null); onCambio()
+    } finally { setGuardando(false) }
+  }
+  const guardar = () => {
+    if (!editando) return
+    const n = datos?.notas.find(x => x.id === editando.id)
+    if (n) enviar('PUT', { id: n.id, fuente: n.fuente, texto: editando.texto })
+    else enviar('POST', { texto: editando.texto })
+  }
+  const borrar = async (n: NotaML) => {
+    if (!await confirm({ title: 'Borrar nota', message: `Se borra de la venta en MercadoLibre: “${n.texto}”`, confirmText: 'Borrar', danger: true })) return
+    enviar('DELETE', { id: n.id, fuente: n.fuente })
+  }
+
+  if (!datos) return null
+  const editor = editando && (
+    <div className="space-y-1.5">
+      <textarea value={editando.texto} onChange={e => setEditando({ ...editando, texto: e.target.value })} rows={2} maxLength={300} autoFocus
+        placeholder="Ej.: el comprador cambia a la talla L · garantía, espera fotos…"
+        className="w-full border border-amber-300 rounded-lg px-2.5 py-1.5 text-sm bg-white resize-y" />
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-amber-700/70">{editando.texto.length}/300 · el comprador no la ve</span>
+        <button onClick={() => setEditando(null)} className="ml-auto btn-ghost text-xs px-2 py-1">Cancelar</button>
+        <button onClick={guardar} disabled={guardando || !editando.texto.trim()} className="btn-primary text-xs px-3 py-1">
+          {guardando ? 'Guardando…' : 'Guardar en ML'}
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className={`rounded-lg px-3 py-2 space-y-1.5 ${datos.notas.length || editando ? 'bg-amber-50 border border-amber-200' : ''}`}>
+      <div className="flex items-center gap-2">
+        <p className={`text-[11px] font-semibold ${datos.notas.length ? 'text-amber-800' : 'text-neutral-400'}`}>
+          {datos.notas.length ? 'Notas de la venta en MercadoLibre' : datos.error ? `No se pudieron leer las notas (${datos.error})` : 'Sin notas en la venta'}
+        </p>
+        {!editando && (
+          <button onClick={() => setEditando({ id: null, texto: '' })} className="ml-auto text-xs text-amber-800 underline underline-offset-2">+ Agregar nota</button>
+        )}
+      </div>
+      {datos.notas.map(n => editando?.id === n.id ? <div key={n.id}>{editor}</div> : (
+        <div key={n.id} className="flex items-start gap-2 text-sm text-amber-900">
+          <p className="whitespace-pre-line flex-1">{n.texto} <span className="text-[11px] text-amber-700/70">· {new Date(n.fecha).toLocaleDateString('es-VE')}</span></p>
+          {!editando && <>
+            <button onClick={() => setEditando({ id: n.id, texto: n.texto })} className="text-[11px] text-amber-800 hover:underline">Editar</button>
+            <button onClick={() => borrar(n)} className="text-[11px] text-amber-700/70 hover:text-red-600">Borrar</button>
+          </>}
+        </div>
+      ))}
+      {editando && editando.id === null && editor}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
   )
 }

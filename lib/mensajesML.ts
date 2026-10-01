@@ -6,6 +6,7 @@
 // al responder o con el botón "Marcar como leída".
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
+import { copiarNotas, leerNotas } from '@/lib/notasML'
 
 interface MensajeApi {
   from: { user_id: number }; to?: { user_id: number }; text: string
@@ -86,6 +87,8 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
          productos = COALESCE(ml_conversaciones.productos, EXCLUDED.productos), actualizada_at = NOW()`,
       [pack, conexionId, x.count, ultimo?.texto ?? null, ultimo ? !ultimo.propio : null, ultimo?.fecha ?? null,
        hilo.comprador, productos])
+    // Copia de las notas de la venta (para la pestaña "Con nota"); si falla, no importa.
+    await leerNotas(db, conexionId, pack).then(r => copiarNotas(db, pack, r.notas)).catch(() => {})
   }
   await db.query(
     `UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW()
@@ -120,28 +123,4 @@ export async function sinLeerEnML(db: Pool, conexionId: number, pack: string, se
       `/messages/unread/packs/${pack}/sellers/${seller}?tag=post_sale`)
     return r.results?.reduce((a, x) => a + x.count, 0) ?? 0
   } catch { return 0 }
-}
-
-export interface NotaML { id: string; texto: string; fecha: string; origen: string | null }
-
-/** Notas de la venta en ML (las de "Notas" en el detalle de la venta). Prueba primero las del
- *  pack y después las de la orden: en MLV todavía no se sabe cuál usa la pantalla de ML. */
-export async function notasDeVenta(db: Pool, conexionId: number, pack: string) {
-  const intentos: { fuente: string; error: string | null }[] = []
-  const notas: NotaML[] = []
-  type Nota = { id: string; note: string; date_created: string; date_last_updated?: string; source_bu?: string | null }
-  try {
-    const r = await mlFetch<{ results?: Nota[] }[] | { results?: Nota[] }>(db, conexionId, `/packs/${pack}/notes`, { headers: { 'X-Public': 'true' } })
-    for (const g of Array.isArray(r) ? r : [r]) for (const n of g.results ?? [])
-      notas.push({ id: n.id, texto: n.note, fecha: n.date_last_updated ?? n.date_created, origen: n.source_bu ?? null })
-    intentos.push({ fuente: 'pack', error: null })
-  } catch (e) { intentos.push({ fuente: 'pack', error: e instanceof Error ? e.message : String(e) }) }
-  try {
-    const r = await mlFetch<{ results?: Nota[] }[] | { results?: Nota[] } | Nota[]>(db, conexionId, `/orders/${pack}/notes`)
-    const lista: Nota[] = Array.isArray(r) ? r.flatMap(g => ('results' in g ? (g.results ?? []) : [g as Nota])) : (r.results ?? [])
-    for (const n of lista) if (!notas.some(x => x.id === n.id))
-      notas.push({ id: n.id, texto: n.note, fecha: n.date_last_updated ?? n.date_created, origen: n.source_bu ?? null })
-    intentos.push({ fuente: 'orden', error: null })
-  } catch (e) { intentos.push({ fuente: 'orden', error: e instanceof Error ? e.message : String(e) }) }
-  return { notas, intentos }
 }

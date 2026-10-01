@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { mlOrderError } from '@/lib/orderNumber'
+import { tieneModulo } from '@/lib/modulos'
+import { notaAlGuardarVenta } from '@/lib/notasML'
 
 const ItemSchema = z.object({
   product_id:   z.number().int().positive(),
@@ -239,7 +241,10 @@ export async function POST(req: NextRequest) {
         )
       }
       await db.query('COMMIT')
-      return NextResponse.json({ id: sale.id, message: 'Venta registrada en BORRADOR' }, { status: 201 })
+      // Nota de la venta ↔ notas de MercadoLibre (la que se dejó en Mensajes se trae sola).
+      const notaML = tieneModulo(session.user, 'preguntas')
+        ? await notaAlGuardarVenta(pool, sale.id, body.ml_order_number, body.notes ?? null, null) : null
+      return NextResponse.json({ id: sale.id, message: 'Venta registrada en BORRADOR', nota_ml: notaML }, { status: 201 })
     } catch (e) {
       await db.query('ROLLBACK')
       throw e

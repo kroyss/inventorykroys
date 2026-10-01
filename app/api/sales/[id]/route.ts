@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { mlOrderError } from '@/lib/orderNumber'
+import { tieneModulo } from '@/lib/modulos'
+import { notaAlGuardarVenta } from '@/lib/notasML'
 
 export async function GET(
   _: NextRequest,
@@ -91,7 +93,7 @@ export async function PUT(
     }
 
     const { rows: [sale] } = await db.query(
-      `SELECT id, status FROM sales WHERE id = $1`,
+      `SELECT id, status, notes FROM sales WHERE id = $1`,
       [id]
     )
     if (!sale) return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 })
@@ -136,7 +138,10 @@ export async function PUT(
         )
       }
       await db.query('COMMIT')
-      return NextResponse.json({ ok: true })
+      // Nota de la venta ↔ notas de MercadoLibre: si se cambió acá, se cambia en ML.
+      const notaML = tieneModulo(session.user, 'preguntas')
+        ? await notaAlGuardarVenta(pool, id, body.ml_order_number, body.notes ?? null, sale.notes) : null
+      return NextResponse.json({ ok: true, nota_ml: notaML })
     } catch (e) {
       await db.query('ROLLBACK')
       throw e
