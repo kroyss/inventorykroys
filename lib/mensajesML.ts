@@ -14,7 +14,10 @@ interface MensajeApi {
   message_moderation?: { status: string }
   message_attachments?: { filename: string; original_filename?: string; type?: string }[] | null
 }
-interface Hilo { messages?: MensajeApi[]; conversation_status?: { status: string; substatus: string | null } }
+interface Hilo {
+  messages?: MensajeApi[]; conversation_status?: { status: string; substatus: string | null }
+  paging?: { total: number; offset: number; limit: number }
+}
 
 export interface Mensaje {
   propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: Adjunto[]
@@ -22,9 +25,15 @@ export interface Mensaje {
 export interface Adjunto { archivo: string; nombre: string; tipo: string | null }
 
 export async function leerHilo(db: Pool, conexionId: number, pack: string, sellerId: number, marcarLeido = false) {
-  const h = await mlFetch<Hilo>(db, conexionId,
-    `/messages/packs/${pack}/sellers/${sellerId}?tag=post_sale&mark_as_read=${marcarLeido}&limit=50`)
-  const msgs = (h.messages ?? [])
+  // Conversación COMPLETA, de a 50 (ML solo marca como leídos los mensajes que devuelve).
+  const msgs: MensajeApi[] = []
+  let h: Hilo = {}
+  for (let offset = 0, pagina = 0; pagina < 10; pagina++, offset += 50) {
+    h = await mlFetch<Hilo>(db, conexionId,
+      `/messages/packs/${pack}/sellers/${sellerId}?tag=post_sale&mark_as_read=${marcarLeido}&limit=50&offset=${offset}`)
+    msgs.push(...(h.messages ?? []))
+    if (!h.messages?.length || offset + 50 >= (h.paging?.total ?? 0)) break
+  }
   const mensajes: Mensaje[] = msgs.map(m => ({
     propio: m.from.user_id === sellerId, texto: m.text, fecha: m.message_date.created, leido: m.message_date.read,
     moderacion: m.message_moderation?.status ?? null, adjuntos: (m.message_attachments ?? []).map(a => ({ archivo: a.filename, nombre: a.original_filename || a.filename, tipo: a.type ?? null })),
@@ -71,29 +80,33 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
     const pack = m[1]
     vistos.push(pack)
     const { rows: [prev] } = await db.query(
-      `SELECT sin_leer, productos FROM ml_conversaciones WHERE pack_id = $1`, [pack])
+      `SELECT sin_leer_ml, productos FROM ml_conversaciones WHERE pack_id = $1`, [pack])
     // Solo se relee el hilo si cambió la cantidad (ahorra llamadas a ML).
-    if (prev && prev.sin_leer === x.count && prev.productos !== null) continue
+    if (prev && prev.sin_leer_ml === x.count && prev.productos !== null) continue
     const hilo = await leerHilo(db, conexionId, pack, seller, false)
+    // ML a veces cuenta un mensaje que no muestra (moderado): si no hay ninguno del comprador
+    // VISIBLE sin leer, la bandeja no lo cuenta (no se puede marcar y volvía cada minuto).
+    const visibles = hilo.mensajes.filter(m => !m.propio && !m.leido).length
+    const sinLeer = Math.min(x.count, visibles)
     const ultimo = hilo.mensajes[hilo.mensajes.length - 1]
     const productos = prev?.productos ?? await productosDe(db, conexionId, pack)
     await db.query(
       `INSERT INTO ml_conversaciones (pack_id, conexion_id, sin_leer, ultimo_texto, ultimo_de_comprador, ultimo_at,
-                                      comprador_id, productos, actualizada_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+                                      comprador_id, productos, sin_leer_ml, actualizada_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
        ON CONFLICT (empresa_id, pack_id) DO UPDATE SET
-         sin_leer = EXCLUDED.sin_leer, ultimo_texto = EXCLUDED.ultimo_texto,
+         sin_leer = EXCLUDED.sin_leer, sin_leer_ml = EXCLUDED.sin_leer_ml, ultimo_texto = EXCLUDED.ultimo_texto,
          ultimo_de_comprador = EXCLUDED.ultimo_de_comprador, ultimo_at = EXCLUDED.ultimo_at,
          comprador_id = COALESCE(EXCLUDED.comprador_id, ml_conversaciones.comprador_id),
          productos = COALESCE(ml_conversaciones.productos, EXCLUDED.productos), actualizada_at = NOW()`,
-      [pack, conexionId, x.count, ultimo?.texto ?? null, ultimo ? !ultimo.propio : null, ultimo?.fecha ?? null,
-       hilo.comprador, productos])
+      [pack, conexionId, sinLeer, ultimo?.texto ?? null, ultimo ? !ultimo.propio : null, ultimo?.fecha ?? null,
+       hilo.comprador, productos, x.count])
     // Copia de las notas de la venta (para la pestaña "Con nota"); si falla, no importa.
     await leerNotas(db, conexionId, pack).then(r => copiarNotas(db, pack, r.notas)).catch(() => {})
   }
   await db.query(
-    `UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW()
-     WHERE conexion_id = $1 AND sin_leer > 0 AND NOT (pack_id::text = ANY($2::text[]))`, [conexionId, vistos])
+    `UPDATE ml_conversaciones SET sin_leer = 0, sin_leer_ml = 0, actualizada_at = NOW()
+     WHERE conexion_id = $1 AND (sin_leer > 0 OR sin_leer_ml > 0) AND NOT (pack_id::text = ANY($2::text[]))`, [conexionId, vistos])
   // Conversaciones cuyas notas nunca se miraron (las de antes de la pestaña "Con nota"): de a 10.
   const { rows: sinMirar } = await db.query(
     `SELECT pack_id::text FROM ml_conversaciones WHERE conexion_id = $1 AND notas_at IS NULL
