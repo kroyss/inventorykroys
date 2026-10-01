@@ -36,5 +36,6 @@ declare module 'next-auth/jwt' {
     modulos:       string[]
     organizacionId: number
     sv?:           number   // versión de sesión: si no coincide con la base, la sesión se descarta
+    loginAt?:      number   // ms del inicio de sesión: a las 12 h se pide la contraseña de nuevo
   }
 }

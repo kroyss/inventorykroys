@@ -10,6 +10,7 @@ interface Envio {
 }
 type FiltroEstado = 'todos' | 'enviados' | 'problema' | 'pendientes'
 interface Dia { jornada: number; closed_at: string; envios: Envio[] }
+interface Mes { mes: string; dias: number; envios: number }
 
 const ESTADO_UI: Record<string, { label: string; cls: string }> = {
   ENVIADO:   { label: 'Enviado',              cls: 'bg-green-100 text-green-800' },
@@ -33,36 +34,52 @@ function grupo(e: Envio): FiltroEstado | null {
   return 'problema'
 }
 
-/** Reportador → Historial: un renglón por jornada (día de despacho) con el resumen; al abrirlo,
- *  a quién se le reportó la guía, cuándo, por dónde y con qué texto. */
+const nombreMes = (m: string) => {
+  const [a, mm] = m.split('-').map(Number)
+  const t = new Date(a, mm - 1, 15).toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })
+  return t[0].toUpperCase() + t.slice(1)
+}
+
+/** Reportador → Historial en carpetas: meses arriba, un renglón por día (jornada) con el
+ *  resumen y, al abrirlo, a quién se le reportó la guía, cuándo, por dónde y con qué texto.
+ *  El buscador busca en todos los meses. */
 export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial: number | null }) {
-  const [periodo, setPeriodo] = useState(jornadaInicial ? `j${jornadaInicial}` : 'd30')
-  const [envios, setEnvios] = useState<Envio[] | null>(null)
+  const [mes, setMes] = useState<string | null>(null)
+  const [datos, setDatos] = useState<{ meses: Mes[]; mes: string | null; envios: Envio[] } | null>(null)
   const [q, setQ] = useState('')
+  const [buscado, setBuscado] = useState('')
   const [carrier, setCarrier] = useState<'todos' | 'ZOOM' | 'TEALCA'>('todos')
   const [abiertos, setAbiertos] = useState<Set<number>>(() => new Set(jornadaInicial ? [jornadaInicial] : []))
 
+  // Búsqueda en el servidor (todos los meses), medio segundo después de dejar de escribir.
+  useEffect(() => {
+    const t = setTimeout(() => setBuscado(q.trim().length >= 3 ? q.trim() : ''), 400)
+    return () => clearTimeout(t)
+  }, [q])
+
   useEffect(() => {
     let vivo = true
-    const qs = periodo.startsWith('j') ? `jornada=${periodo.slice(1)}` : `dias=${periodo.slice(1)}`
-    fetch(`/api/despachos/reportador/historial?${qs}`).then(r => r.ok ? r.json() : null)
-      .then(d => { if (vivo && d) setEnvios(d.envios) })
+    const p = new URLSearchParams()
+    if (buscado) p.set('q', buscado)
+    else if (mes) p.set('mes', mes)
+    else if (jornadaInicial) p.set('jornada', String(jornadaInicial))
+    fetch(`/api/despachos/reportador/historial?${p}`).then(r => r.ok ? r.json() : null)
+      .then(d => { if (vivo && d) setDatos(d) })
     return () => { vivo = false }
-  }, [periodo])
+  }, [mes, buscado, jornadaInicial])
 
-  const filtro = q.trim().toLowerCase()
+  const envios = useMemo(() => datos?.envios ?? [], [datos])
   const dias = useMemo(() => {
     const m = new Map<number, Dia>()
-    for (const e of envios ?? []) {
+    for (const e of envios) {
       if (carrier !== 'todos' && e.carrier !== carrier) continue
-      if (filtro && !`${e.venta} ${e.guia} ${e.destinatario ?? ''}`.toLowerCase().includes(filtro)) continue
       const d = m.get(e.jornada_id) ?? { jornada: e.jornada_id, closed_at: e.closed_at, envios: [] }
       d.envios.push(e)
       m.set(e.jornada_id, d)
     }
     return [...m.values()]
-  }, [envios, filtro, carrier])
-  const nCarrier = (c: string) => (envios ?? []).filter(e => !e.reimpresion && e.carrier === c).length
+  }, [envios, carrier])
+  const nCarrier = (c: string) => envios.filter(e => !e.reimpresion && e.carrier === c).length
 
   const alternar = (id: number) => setAbiertos(s => {
     const n = new Set(s)
@@ -70,20 +87,28 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
     return n
   })
 
-  if (!envios) return <Cargando />
+  if (!datos) return <Cargando />
+  const mesActual = buscado ? null : datos.mes
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <select value={periodo} onChange={e => setPeriodo(e.target.value)}
-          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white">
-          {jornadaInicial && <option value={`j${jornadaInicial}`}>Solo la jornada elegida</option>}
-          <option value="d7">Últimos 7 días</option>
-          <option value="d30">Últimos 30 días</option>
-          <option value="d90">Últimos 90 días</option>
-        </select>
-        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar venta, guía o comprador…"
-          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 md:max-w-80" />
+        {datos.meses.map(m => (
+          <button key={m.mes} onClick={() => { setQ(''); setBuscado(''); setMes(m.mes) }}
+            className={`text-left rounded-lg border px-3 py-1.5 transition-colors ${
+              mesActual === m.mes ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 hover:border-neutral-400'}`}>
+            <div className="text-sm font-medium">📁 {nombreMes(m.mes)}</div>
+            <div className={`text-[11px] ${mesActual === m.mes ? 'text-neutral-300' : 'text-neutral-400'}`}>{m.dias} día(s) · {m.envios} envíos</div>
+          </button>
+        ))}
+        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar venta, guía o comprador (todos los meses)…"
+          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-56 md:max-w-96 md:ml-auto" />
       </div>
+      {buscado && (
+        <p className="text-xs text-neutral-500">
+          Resultados de “{buscado}” en todos los meses{envios.length >= 300 ? ' (primeros 300)' : ''} ·{' '}
+          <button onClick={() => setQ('')} className="underline underline-offset-2">volver al mes</button>
+        </p>
+      )}
 
       <Tabs value={carrier} onChange={setCarrier} items={[
         { value: 'todos', label: 'Todos' },
@@ -93,12 +118,12 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
 
       {dias.length === 0 ? (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
-          <EmptyState message={filtro ? 'Ningún envío coincide con la búsqueda.' : 'No hay jornadas cerradas en este período.'} />
+          <EmptyState message={buscado ? 'Ningún envío coincide con la búsqueda.' : 'No hay jornadas cerradas en este mes.'} />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
           {dias.map(d => (
-            <FilaDia key={`${d.jornada}-${carrier}`} d={d} abierto={abiertos.has(d.jornada) || !!filtro} onToggle={() => alternar(d.jornada)} />
+            <FilaDia key={`${d.jornada}-${carrier}`} d={d} abierto={abiertos.has(d.jornada) || !!buscado} onToggle={() => alternar(d.jornada)} />
           ))}
         </div>
       )}

@@ -29,6 +29,8 @@ function datosEmpresa(e: EmpresaAcceso) {
   }
 }
 
+const SESION_HORAS = 12
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -66,9 +68,9 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  // Sesión de 12h (jornada). Es "rolling": updateAge re-emite el token mientras
-  // se use, así las 12h cuentan desde la última actividad, no desde el login.
-  session: { strategy: 'jwt', maxAge: 12 * 60 * 60, updateAge: 60 * 60 },
+  // Sesión de 12 h FIJAS desde el inicio de sesión (token.loginAt), se use o no: a las 12 h
+  // se pide la contraseña de nuevo. maxAge/updateAge solo mantienen viva la cookie hasta ahí.
+  session: { strategy: 'jwt', maxAge: SESION_HORAS * 60 * 60, updateAge: 60 * 60 },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
@@ -80,6 +82,14 @@ export const authOptions: NextAuthOptions = {
         token.modulos       = u.modulos
         token.organizacionId = u.organizacionId
         token.sv            = u.sv ?? 0
+        token.loginAt       = Date.now()
+      }
+
+      // 12 h desde el login, sin importar el uso. Las sesiones de antes de esta regla
+      // (sin loginAt) cuentan desde ahora.
+      token.loginAt ??= Date.now()
+      if (Date.now() - token.loginAt > SESION_HORAS * 60 * 60 * 1000) {
+        throw new Error('Sesión vencida: pasaron 12 horas desde que iniciaste sesión')
       }
 
       // Una sesión de ANTES del cambio a multiempresa (sin empresa) no sirve: se descarta
