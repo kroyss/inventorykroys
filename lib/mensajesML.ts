@@ -93,6 +93,13 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
   await db.query(
     `UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW()
      WHERE conexion_id = $1 AND sin_leer > 0 AND NOT (pack_id::text = ANY($2::text[]))`, [conexionId, vistos])
+  // Conversaciones cuyas notas nunca se miraron (las de antes de la pestaña "Con nota"): de a 10.
+  const { rows: sinMirar } = await db.query(
+    `SELECT pack_id::text FROM ml_conversaciones WHERE conexion_id = $1 AND notas_at IS NULL
+     ORDER BY ultimo_at DESC NULLS LAST LIMIT 10`, [conexionId])
+  for (const { pack_id } of sinMirar) {
+    await leerNotas(db, conexionId, pack_id).then(r => copiarNotas(db, pack_id, r.notas)).catch(() => {})
+  }
   return vistos.length
 }
 
