@@ -8,7 +8,8 @@ interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
   ultimo_at: string | null; productos: string | null; cuenta: string; venta_estado: string | null; notas: string | null
 }
-interface Mensaje { propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: number }
+interface Adjunto { archivo: string; nombre: string; tipo: string | null }
+interface Mensaje { propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: Adjunto[] }
 
 function hace(fecha: string | null) {
   if (!fecha) return ''
@@ -133,7 +134,23 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         {!mensajes ? <p className="text-sm text-neutral-400">Cargando…</p> : mensajes.map((m, i) => (
           <div key={i} className={`text-sm rounded-lg px-3 py-2 max-w-[85%] whitespace-pre-line ${m.propio ? 'ml-auto bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-900'}`}>
             <TextoConLinks texto={m.texto} />
-            {m.adjuntos > 0 && <span className="block text-xs opacity-70 mt-1">📎 {m.adjuntos} adjunto(s): míralo en MercadoLibre</span>}
+            {m.adjuntos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {m.adjuntos.map(a => {
+                  const url = `/api/mensajes/${c.pack_id}/adjunto?f=${encodeURIComponent(a.archivo)}`
+                  const imagen = a.tipo?.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(a.archivo)
+                  return imagen ? (
+                    <a key={a.archivo} href={url} target="_blank" rel="noreferrer" title={a.nombre}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={a.nombre} className="max-h-48 max-w-full rounded-md border border-black/10 bg-white" />
+                    </a>
+                  ) : (
+                    <a key={a.archivo} href={url} target="_blank" rel="noreferrer"
+                      className="text-xs underline underline-offset-2 opacity-80 hover:opacity-100">📎 {a.nombre}</a>
+                  )
+                })}
+              </div>
+            )}
             <div className={`text-[11px] mt-1 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
               {new Date(m.fecha).toLocaleString('es-VE')}
               {m.propio && m.moderacion && m.moderacion !== 'clean' ? ` · ${m.moderacion}` : ''}
@@ -164,9 +181,11 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
 
 // Los mensajes de ML traen los links como <a href="…">texto</a>: se muestran como links.
 const LINK = /<a\s[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi
-const sinEtiquetas = (t: string) => t.replace(LINK, '$2').replace(/<[^>]+>/g, '')
+const BR = /<br\s*\/?>/gi
+const sinEtiquetas = (t: string) => t.replace(BR, ' ').replace(LINK, '$2').replace(/<[^>]+>/g, '')
 
-function TextoConLinks({ texto }: { texto: string }) {
+function TextoConLinks({ texto: crudo }: { texto: string }) {
+  const texto = crudo.replace(BR, '\n')
   const partes: React.ReactNode[] = []
   let desde = 0
   for (const m of texto.matchAll(LINK)) {

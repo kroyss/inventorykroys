@@ -5,20 +5,21 @@
 // mark_as_read=false NO la marca como leída (así ML sigue avisando en su app); se marca
 // al responder o con el botón "Marcar como leída".
 import type { Pool } from 'pg'
-import { mlFetch, ErrorML } from '@/lib/ml'
+import { mlFetch, ErrorML, ML_API, tokenVigente } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
 
 interface MensajeApi {
   from: { user_id: number }; to?: { user_id: number }; text: string
   message_date: { created: string; read: string | null }
   message_moderation?: { status: string }
-  message_attachments?: unknown[]
+  message_attachments?: { filename: string; original_filename?: string; type?: string }[] | null
 }
 interface Hilo { messages?: MensajeApi[]; conversation_status?: { status: string; substatus: string | null } }
 
 export interface Mensaje {
-  propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: number
+  propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: Adjunto[]
 }
+export interface Adjunto { archivo: string; nombre: string; tipo: string | null }
 
 export async function leerHilo(db: Pool, conexionId: number, pack: string, sellerId: number, marcarLeido = false) {
   const h = await mlFetch<Hilo>(db, conexionId,
@@ -26,7 +27,7 @@ export async function leerHilo(db: Pool, conexionId: number, pack: string, selle
   const msgs = (h.messages ?? [])
   const mensajes: Mensaje[] = msgs.map(m => ({
     propio: m.from.user_id === sellerId, texto: m.text, fecha: m.message_date.created, leido: m.message_date.read,
-    moderacion: m.message_moderation?.status ?? null, adjuntos: m.message_attachments?.length ?? 0,
+    moderacion: m.message_moderation?.status ?? null, adjuntos: (m.message_attachments ?? []).map(a => ({ archivo: a.filename, nombre: a.original_filename || a.filename, tipo: a.type ?? null })),
   })).sort((a, b) => a.fecha.localeCompare(b.fecha))
   // El comprador: quien escribió y no es el vendedor, o a quien le escribió el vendedor.
   const comprador = msgs.find(m => m.from.user_id !== sellerId)?.from.user_id
@@ -130,4 +131,17 @@ export async function sinLeerEnML(db: Pool, conexionId: number, pack: string, se
       `/messages/unread/packs/${pack}/sellers/${seller}?tag=post_sale`)
     return r.results?.reduce((a, x) => a + x.count, 0) ?? 0
   } catch { return 0 }
+}
+
+/** Descarga un adjunto de la conversación (foto, PDF…) desde ML, para mostrarlo en el sistema.
+ *  Solo si el archivo es de ESA conversación (no se puede pedir cualquier archivo). */
+export async function adjuntoDeHilo(db: Pool, conexionId: number, pack: string, archivo: string) {
+  const { rows: [c] } = await db.query(`SELECT ml_user_id, site_id FROM ml_conexiones WHERE id = $1`, [conexionId])
+  const hilo = await leerHilo(db, conexionId, pack, Number(c.ml_user_id), false)
+  if (!hilo.mensajes.some(m => m.adjuntos.some(a => a.archivo === archivo))) return null
+  const url = `${ML_API}/messages/attachments/${encodeURIComponent(archivo)}?tag=post_sale&site_id=${c.site_id || 'MLV'}`
+  let r = await fetch(url, { headers: { Authorization: `Bearer ${await tokenVigente(db, conexionId)}` }, cache: 'no-store' })
+  if (r.status === 401) r = await fetch(url, { headers: { Authorization: `Bearer ${await tokenVigente(db, conexionId, true)}` }, cache: 'no-store' })
+  if (!r.ok) throw new ErrorML(r.status, null, `MercadoLibre respondió ${r.status} al pedir el adjunto`)
+  return r
 }
