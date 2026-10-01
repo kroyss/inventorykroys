@@ -39,9 +39,9 @@ export default function LoginForm({ marca }: { marca: Marca }) {
   const revisarMayus = (e: KeyboardEvent<HTMLInputElement>) => setMayus(e.getModifierState('CapsLock'))
   const campo = 'w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
   const productos = [
-    { t: 'Inventario',       d: 'Stock, ventas, compras y márgenes reales' },
-    { t: 'Automatizaciones', d: 'Etiquetas, despachos y reportes de MercadoLibre' },
-    { t: 'Radar',            d: 'Qué se vende y dónde está la oportunidad' },
+    { t: 'Inventario',       d: 'Stock, ventas, compras, facturas y márgenes reales' },
+    { t: 'Automatizaciones', d: 'Preguntas con IA, mensajes, despachos, guías y calificaciones de todas tus cuentas' },
+    { t: 'Radar',            d: 'Qué se vende en MercadoLibre y dónde está la oportunidad' },
   ]
 
   return (

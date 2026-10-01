@@ -26,7 +26,7 @@ const MARCAS: Record<Marca['id'], Marca> = {
   ecd: {
     id: 'ecd',
     nombre: 'El Comerciante Digital',
-    lema: 'Inventario, ventas y despachos para vendedores de MercadoLibre',
+    lema: 'Inventario, automatizaciones e inteligencia de mercado para vendedores de MercadoLibre',
     logo: '/marca/ecd.png',
     logoRedondo: true,
     favicon: '/marca/ecd-favicon-32x32.png',
