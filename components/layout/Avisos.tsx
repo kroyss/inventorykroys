@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 // Numeritos del menú: preguntas sin responder, mensajes sin leer y guías por reportar.
 // Se piden cada minuto (el cron trae lo nuevo de ML cada minuto) y al volver a la pestaña.
 // El total urgente (preguntas + mensajes) también va en el título de la pestaña: "(5) Ventas".
-export interface Avisos { preguntas: number; mensajes: number; reportador: number; calificaciones: number }
-const VACIO: Avisos = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0 }
+export interface Avisos { preguntas: number; mensajes: number; reportador: number; calificaciones: number; despachos: number }
+const VACIO: Avisos = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0 }
 const Ctx = createContext<Avisos>(VACIO)
 
 export function useAvisos() { return useContext(Ctx) }
@@ -14,6 +14,7 @@ export function useAvisos() { return useContext(Ctx) }
 export const AVISO_DE_RUTA: Record<string, { clave: keyof Avisos; urgente: boolean }> = {
   '/preguntas':  { clave: 'preguntas',  urgente: true },
   '/mensajes':   { clave: 'mensajes',   urgente: true },
+  '/despachos':  { clave: 'despachos',  urgente: false },
   '/reportador': { clave: 'reportador', urgente: false },
   '/calificaciones': { clave: 'calificaciones', urgente: false },
 }

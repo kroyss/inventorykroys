@@ -33,7 +33,8 @@ export default async function AutomatizacionesPage() {
     {
       titulo: 'Después de la venta', texto: 'Despachar, avisar la guía y cerrar cada venta con su calificación.',
       items: [
-        { href: '/despachos', titulo: 'Despachos', icono: 'despachos', activa: despachos,
+        { href: '/despachos', titulo: 'Despachos', icono: 'despachos', activa: despachos, aviso: 'despachos',
+          pendiente: 'impresos, falta cerrar jornada',
           texto: 'Subes las etiquetas de Mercado Envíos (Zoom y Tealca) y salen 4 por hoja con el producto y la nota de cada venta. Manifiesto por transportista.' },
         { href: '/reportador', titulo: 'Reportador', icono: 'reportador', activa: reportador, aviso: 'reportador',
           pendiente: 'guías por avisar',

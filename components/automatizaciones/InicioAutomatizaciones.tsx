@@ -42,7 +42,7 @@ export default function InicioAutomatizaciones({ grupos }: { grupos: { titulo: s
         {todas.length === 0 ? null : pendientes.length === 0 ? (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">✓</span>
-            <p className="text-sm text-neutral-700">Todo al día: no hay preguntas, mensajes, guías ni calificaciones pendientes.</p>
+            <p className="text-sm text-neutral-700">Todo al día: no hay preguntas, mensajes, despachos, guías ni calificaciones pendientes.</p>
           </div>
         ) : (
           <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
