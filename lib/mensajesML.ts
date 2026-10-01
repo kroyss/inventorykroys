@@ -93,18 +93,55 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
   return vistos.length
 }
 
-/** Responde en la conversación y la deja al día en la bandeja. */
-export async function responderHilo(db: Pool, conexionId: number, pack: string, texto: string) {
+/** Responde en la conversación y la deja al día en la bandeja. Con `dejarSinLeer` no se
+ *  marca como leída en ML (ML no permite volver a "no leída", así que se evita marcarla);
+ *  después se consulta a ML si de verdad quedó sin leer. */
+export async function responderHilo(db: Pool, conexionId: number, pack: string, texto: string, dejarSinLeer = false) {
   const seller = await sellerDe(db, conexionId)
-  const antes = await leerHilo(db, conexionId, pack, seller, true)   // al responder, se da por leída
+  const antes = await leerHilo(db, conexionId, pack, seller, !dejarSinLeer)
   if (!antes.comprador) throw new Error('No se pudo identificar al comprador de esta conversación')
   await mlFetch(db, conexionId, `/messages/packs/${pack}/sellers/${seller}?tag=post_sale`, {
     method: 'POST', body: { from: { user_id: seller }, to: { user_id: antes.comprador }, text: texto },
   })
-  const despues = await leerHilo(db, conexionId, pack, seller, true)
+  const despues = await leerHilo(db, conexionId, pack, seller, !dejarSinLeer)
   const ultimo = despues.mensajes[despues.mensajes.length - 1]
+  const sinLeer = dejarSinLeer ? await sinLeerEnML(db, conexionId, pack, seller) : 0
   await db.query(
-    `UPDATE ml_conversaciones SET sin_leer = 0, ultimo_texto = $2, ultimo_de_comprador = FALSE, ultimo_at = $3,
-            actualizada_at = NOW() WHERE pack_id = $1`, [pack, ultimo?.texto ?? texto, ultimo?.fecha ?? new Date().toISOString()])
-  return despues
+    `UPDATE ml_conversaciones SET sin_leer = $4, ultimo_texto = $2, ultimo_de_comprador = FALSE, ultimo_at = $3,
+            actualizada_at = NOW() WHERE pack_id = $1`, [pack, ultimo?.texto ?? texto, ultimo?.fecha ?? new Date().toISOString(), sinLeer])
+  return { ...despues, sinLeer }
+}
+
+/** Cuántos mensajes del comprador siguen sin leer en ML en esta conversación. */
+export async function sinLeerEnML(db: Pool, conexionId: number, pack: string, sellerId?: number) {
+  const seller = sellerId ?? await sellerDe(db, conexionId)
+  try {
+    const r = await mlFetch<{ results?: { count: number }[] }>(db, conexionId,
+      `/messages/unread/packs/${pack}/sellers/${seller}?tag=post_sale`)
+    return r.results?.reduce((a, x) => a + x.count, 0) ?? 0
+  } catch { return 0 }
+}
+
+export interface NotaML { id: string; texto: string; fecha: string; origen: string | null }
+
+/** Notas de la venta en ML (las de "Notas" en el detalle de la venta). Prueba primero las del
+ *  pack y después las de la orden: en MLV todavía no se sabe cuál usa la pantalla de ML. */
+export async function notasDeVenta(db: Pool, conexionId: number, pack: string) {
+  const intentos: { fuente: string; error: string | null }[] = []
+  const notas: NotaML[] = []
+  type Nota = { id: string; note: string; date_created: string; date_last_updated?: string; source_bu?: string | null }
+  try {
+    const r = await mlFetch<{ results?: Nota[] }[] | { results?: Nota[] }>(db, conexionId, `/packs/${pack}/notes`, { headers: { 'X-Public': 'true' } })
+    for (const g of Array.isArray(r) ? r : [r]) for (const n of g.results ?? [])
+      notas.push({ id: n.id, texto: n.note, fecha: n.date_last_updated ?? n.date_created, origen: n.source_bu ?? null })
+    intentos.push({ fuente: 'pack', error: null })
+  } catch (e) { intentos.push({ fuente: 'pack', error: e instanceof Error ? e.message : String(e) }) }
+  try {
+    const r = await mlFetch<{ results?: Nota[] }[] | { results?: Nota[] } | Nota[]>(db, conexionId, `/orders/${pack}/notes`)
+    const lista: Nota[] = Array.isArray(r) ? r.flatMap(g => ('results' in g ? (g.results ?? []) : [g as Nota])) : (r.results ?? [])
+    for (const n of lista) if (!notas.some(x => x.id === n.id))
+      notas.push({ id: n.id, texto: n.note, fecha: n.date_last_updated ?? n.date_created, origen: n.source_bu ?? null })
+    intentos.push({ fuente: 'orden', error: null })
+  } catch (e) { intentos.push({ fuente: 'orden', error: e instanceof Error ? e.message : String(e) }) }
+  return { notas, intentos }
 }

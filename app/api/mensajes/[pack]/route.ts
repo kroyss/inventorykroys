@@ -15,7 +15,7 @@ async function conversacion(db: import('pg').Pool, pack: string) {
 
 // GET  /api/mensajes/[pack]            → la conversación completa (no la marca como leída)
 // GET  /api/mensajes/[pack]?leida=1    → y la marca como leída en ML
-// POST /api/mensajes/[pack] { texto }  → responde (y queda leída)
+// POST /api/mensajes/[pack] { texto, dejarSinLeer? } → responde (y queda leída, salvo dejarSinLeer)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ pack: string }> }) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
   }
 }
 
-const Body = z.object({ texto: z.string().trim().min(1).max(350) })
+const Body = z.object({ texto: z.string().trim().min(1).max(350), dejarSinLeer: z.boolean().optional() })
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ pack: string }> }) {
   const s = await sesionPreguntas()
@@ -41,13 +41,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
   const { pack } = await params
   if (!/^\d+$/.test(pack)) return NextResponse.json({ error: 'Conversación inválida' }, { status: 400 })
   try {
-    const { texto } = Body.parse(await req.json())
+    const { texto, dejarSinLeer } = Body.parse(await req.json())
     const problemas = problemasDelTexto(texto)
     if (problemas.length) return NextResponse.json({ error: 'MercadoLibre rechazaría este mensaje', problemas }, { status: 422 })
     const c = await conversacion(s.db, pack)
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
     try {
-      const h = await responderHilo(s.db, c.conexion_id, pack, texto)
+      const h = await responderHilo(s.db, c.conexion_id, pack, texto, dejarSinLeer)
       return NextResponse.json({ cuenta: c.nickname, ...h })
     } catch (e) {
       if (e instanceof ErrorML) return NextResponse.json({ error: e.message, detalle: e.datos }, { status: 502 })

@@ -141,7 +141,7 @@ export class ErrorML extends Error {
 const espera = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 /** GET/POST a la API con el token de la conexión. Reintenta 429/5xx y renueva ante 401. */
-export async function mlFetch<T = unknown>(db: Pool, conexionId: number, ruta: string, init?: { method?: string; body?: unknown }): Promise<T> {
+export async function mlFetch<T = unknown>(db: Pool, conexionId: number, ruta: string, init?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<T> {
   let token = await tokenVigente(db, conexionId)
   let renovado = false
   for (let intento = 0; ; intento++) {
@@ -150,6 +150,7 @@ export async function mlFetch<T = unknown>(db: Pool, conexionId: number, ruta: s
       headers: {
         Authorization: `Bearer ${token}`, Accept: 'application/json',
         ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...init?.headers,
       },
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
       cache: 'no-store',
