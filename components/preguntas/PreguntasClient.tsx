@@ -13,6 +13,13 @@ interface Pregunta {
   cuenta: string; respondida_por: string | null
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
   producto_precio: number | null
+  item_precio: number | null; item_precio_original: number | null; item_moneda: string | null
+}
+
+// Precio para decidir (regla de los $3, respuesta rápida en verde): SOLO el de MercadoLibre
+// (el que ve el comprador, con la promoción). El del inventario no aplica aquí.
+function precioUSD(p: Pregunta) {
+  return p.item_precio && (p.item_moneda ?? 'USD') === 'USD' ? p.item_precio : null
 }
 
 // Link a la publicación: el que trajo ML o, si ML no dejó leerla, armado con el código.
@@ -42,12 +49,7 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
         ? <span className="font-medium text-neutral-800 truncate max-w-[30rem]">{nombre}</span>
         : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
       {p.producto_code && <span className="font-mono text-neutral-400">{p.producto_code}</span>}
-      {p.producto_precio !== null && p.producto_precio > 0 && (
-        umbral !== null && p.producto_precio < umbral
-          ? <span className="font-semibold text-amber-800 bg-amber-50 ring-1 ring-inset ring-amber-200 rounded-full px-2 py-0.5 num"
-              title={`Menos de $${umbral}: usa la respuesta rápida para productos baratos`}>${usd(p.producto_precio)} · menos de ${umbral}</span>
-          : <span className="font-semibold text-neutral-800 num">${usd(p.producto_precio)}</span>
-      )}
+      <Precio p={p} umbral={umbral} />
       {p.producto_stock !== null && (
         <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'}>
           {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
@@ -57,6 +59,22 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
     </span>
   )
 }
+/** Precio en MercadoLibre ahora (con la promoción; el anterior, tachado). */
+function Precio({ p, umbral }: { p: Pregunta; umbral: number | null }) {
+  if (!p.item_precio) return null
+  const simbolo = (p.item_moneda ?? 'USD') === 'USD' ? '$' : `${p.item_moneda} `
+  const ref = precioUSD(p)
+  const bajo = umbral !== null && ref !== null && ref < umbral
+  return (
+    <span className="inline-flex items-center gap-1.5" title="Precio en MercadoLibre ahora (con la promoción, si hay)">
+      <span className={`font-semibold num ${bajo ? 'text-amber-800 bg-amber-50 ring-1 ring-inset ring-amber-200 rounded-full px-2 py-0.5' : 'text-neutral-800'}`}>
+        {simbolo}{usd(p.item_precio)}{bajo && ` · menos de $${umbral}`}
+      </span>
+      {p.item_precio_original && <span className="text-xs text-neutral-400 line-through num">{simbolo}{usd(p.item_precio_original)}</span>}
+    </span>
+  )
+}
+
 interface Cuenta { id: number; nickname: string; estado: string; ultima_sync: string | null; ultimo_error: string | null }
 interface Datos {
   preguntas: Pregunta[]; total: number; page: number; tam: number
@@ -296,7 +314,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-neutral-400 mr-1">Respuestas rápidas:</span>
           {plantillas.map((pl, i) => {
-            const aplica = plantillaAplica(pl, p.producto_precio)
+            const aplica = plantillaAplica(pl, precioUSD(p))
             const condicionada = pl.precio_desde != null || pl.precio_hasta != null
             return (
               <button key={i} type="button" onClick={() => { setTexto(pl.texto); setMeta({ confianza: null, falta: null, web: false }) }}

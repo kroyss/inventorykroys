@@ -60,17 +60,32 @@ async function buscar(db: Pool, conexionId: number, status: string, maxPaginas: 
  * Nunca corta la sincronización: si una falla, queda para la próxima.
  */
 async function completarItems(db: Pool, conexionId: number) {
+  // Sin título todavía, o pendiente con el precio de hace más de 30 min (las promociones cambian).
   const { rows } = await db.query(
-    `SELECT item_id FROM ml_preguntas WHERE conexion_id = $1 AND item_titulo IS NULL
+    `SELECT item_id FROM ml_preguntas
+     WHERE conexion_id = $1
+       AND (item_titulo IS NULL
+            OR (estado = 'UNANSWERED' AND (item_actualizado_at IS NULL OR item_actualizado_at < NOW() - INTERVAL '30 minutes')))
      GROUP BY item_id ORDER BY bool_or(estado = 'UNANSWERED') DESC, max(fecha) DESC LIMIT 40`, [conexionId])
   let fallas = 0
   for (const { item_id } of rows) {
     try {
-      const it = await mlFetch<{ id: string; title: string; permalink: string; status: string }>(
-        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status`)
+      const it = await mlFetch<{ id: string; title: string; permalink: string; status: string
+                                 price: number | null; original_price: number | null; currency_id: string | null }>(
+        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status,price,original_price,currency_id`)
+      // El precio con la promoción vigente: /sale_price es la fuente nueva de ML; si no
+      // responde (permiso / sitio), queda el price del ítem.
+      let precio = it.price, original = it.original_price, moneda = it.currency_id
+      try {
+        const sp = await mlFetch<{ amount: number | null; regular_amount: number | null; currency_id: string | null }>(
+          db, conexionId, `/items/${item_id}/sale_price?context=channel_marketplace`)
+        if (sp?.amount) { precio = sp.amount; original = sp.regular_amount ?? original; moneda = sp.currency_id ?? moneda }
+      } catch { /* sin sale_price: se usa el del ítem */ }
       await db.query(
-        `UPDATE ml_preguntas SET item_titulo = $2, item_permalink = $3, item_estado = $4 WHERE item_id = $1`,
-        [item_id, it.title, it.permalink, it.status])
+        `UPDATE ml_preguntas SET item_titulo = $2, item_permalink = $3, item_estado = $4,
+                item_precio = $5, item_precio_original = $6, item_moneda = $7, item_actualizado_at = NOW()
+         WHERE item_id = $1`,
+        [item_id, it.title, it.permalink, it.status, precio, original && original > (precio ?? 0) ? original : null, moneda])
     } catch {
       if (++fallas >= 3) break          // si ML bloquea a todas, no insistir en esta pasada
     }
@@ -161,6 +176,7 @@ export interface Contexto {
   pregunta: { id: number; texto: string; item_id: string; fecha: string }
   item: ItemML | null
   titulo: string | null            // guardado en la bandeja (si ML no deja leer la publicación)
+  precioML: { precio: number; original: number | null; moneda: string } | null   // con la promoción vigente
   descripcion: string | null
   producto: { code: string; name: string; stock: number; precio_usd: number | null } | null
   tasa: number | null
@@ -173,7 +189,7 @@ export interface Contexto {
 
 export async function armarContexto(db: Pool, preguntaId: number, country: string): Promise<Contexto & { conexionId: number }> {
   const { rows: [q] } = await db.query(
-    `SELECT id, conexion_id, item_id, item_titulo, texto, fecha FROM ml_preguntas WHERE id = $1`, [preguntaId])
+    `SELECT id, conexion_id, item_id, item_titulo, item_precio::float, item_precio_original::float, item_moneda, texto, fecha FROM ml_preguntas WHERE id = $1`, [preguntaId])
   if (!q) throw new Error('Pregunta no encontrada')
 
   let item: ItemML | null = null
@@ -224,6 +240,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     conexionId: q.conexion_id,
     pregunta: { id: Number(q.id), texto: q.texto, item_id: q.item_id, fecha: q.fecha },
     item, titulo: q.item_titulo ?? prod?.name ?? null, descripcion,
+    precioML: q.item_precio ? { precio: q.item_precio, original: q.item_precio_original, moneda: q.item_moneda ?? 'USD' } : null,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol?.value ?? '',
@@ -258,7 +275,7 @@ function bloqueContexto(c: Contexto) {
   L.push(`PREGUNTA DEL COMPRADOR: "${c.pregunta.texto}"`)
   if (c.item) {
     L.push(`\nPUBLICACIÓN: ${c.item.title}`)
-    L.push(`Precio publicado: ${c.item.price} ${c.item.currency_id} · condición: ${c.item.condition} · estado: ${c.item.status}` +
+    L.push(`Condición: ${c.item.condition} · estado: ${c.item.status}` +
       (c.item.shipping?.free_shipping ? ' · envío gratis' : '') + (c.item.warranty ? ` · garantía: ${c.item.warranty}` : ''))
     const attrs = (c.item.attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`)
     if (attrs.length) L.push(`Ficha técnica: ${attrs.join(' · ')}`)
@@ -266,17 +283,20 @@ function bloqueContexto(c: Contexto) {
     L.push(`
 PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   }
+  // Precio: SOLO el de MercadoLibre (el que ve el comprador, con la promoción vigente).
+  const pml = c.precioML ?? (c.item?.price ? { precio: c.item.price, original: null, moneda: c.item.currency_id } : null)
+  if (pml) {
+    const bs = pml.moneda === 'USD' && c.tasa ? ` ≈ Bs ${(pml.precio * c.tasa).toFixed(2)} a tasa BCV ${c.tasa}` : ''
+    L.push(`PRECIO EN MERCADOLIBRE AHORA: ${pml.precio} ${pml.moneda}${bs}` + (pml.original ? ` (en promoción; antes ${pml.original})` : ''))
+  }
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, 4000)}`)
   if (c.producto) {
     L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)
-    if (c.producto.precio_usd && c.tasa) {
-      L.push(`Precio final: $${c.producto.precio_usd.toFixed(2)} ≈ Bs ${(c.producto.precio_usd * c.tasa).toFixed(2)} a tasa BCV ${c.tasa}`)
-    }
   } else {
     L.push('\nSTOCK REAL: esta publicación no está vinculada a un producto del sistema (no afirmes disponibilidad sin verla).')
   }
   if (c.politicas.trim()) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${c.politicas.trim()}`)
-  const precio = c.producto?.precio_usd ?? null
+  const precio = pml && pml.moneda === 'USD' ? pml.precio : null
   const aplican = c.plantillas.filter(p => plantillaAplica(p, precio))
   if (aplican.length) {
     L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR que aplican a este producto${precio !== null ? ` (precio $${precio.toFixed(2)})` : ''}. ` +
