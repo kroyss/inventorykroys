@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const jornada = /^\d+$/.test(sp.get('jornada') ?? '') ? Number(sp.get('jornada')) : null
   const dias = Math.min(Math.max(Number(sp.get('dias')) || 7, 1), 120)
   try {
-    const [config, remitenteDefault, { rows }, { rows: jornadas }] = await Promise.all([
+    const [config, remitenteDefault, { rows }] = await Promise.all([
       leerConfig(db),
       remitenteConfigurado(db),
       db.query(
@@ -29,13 +29,10 @@ export async function GET(req: NextRequest) {
          WHERE e.impresa AND l.status = 'GENERADO' AND j.status = 'CERRADA'
            AND ${jornada ? 'j.id = $1' : `j.closed_at >= NOW() - make_interval(days => $1)`}
          ORDER BY j.closed_at DESC, COALESCE(e.reportado_at, j.closed_at) DESC, e.id DESC
-         LIMIT 2000`, [jornada ?? dias]),
-      db.query(
-        `SELECT id, closed_at, total_envios FROM despacho_jornadas
-         WHERE status = 'CERRADA' ORDER BY closed_at DESC LIMIT 60`),
+         LIMIT 6000`, [jornada ?? dias]),
     ])
     const envios = rows.map(r => ({ ...r, cuenta: cuentaDe(r.remitente, config.cuentas, remitenteDefault)?.nombre ?? null }))
-    return NextResponse.json({ envios, jornadas })
+    return NextResponse.json({ envios })
   } catch (err) {
     return apiError(err)
   }
