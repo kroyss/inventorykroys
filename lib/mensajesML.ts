@@ -275,7 +275,7 @@ export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Pr
   if (!consulta) return { consulta: null, sugerencias: [] }
   // Un saludo solo ("Hola", "Buenas tardes") no dice qué quiere: lo que se respondió a otros
   // saludos depende de cada caso, así que no se sugiere nada.
-  if (SOLO_SALUDO.test(consulta.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, ' ').trim())) {
+  if (SOLO_SALUDO.test(consulta.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-z ]/g, ' ').trim())) {
     return { consulta, sugerencias: [] }
   }
   const { rows: pares } = await db.query(
