@@ -8,7 +8,7 @@ import { DIAS_VENTAS, SQL_COMPARACION, UMBRAL_BAJO } from '@/lib/stockML'
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
 //   preguntas: sin responder · mensajes: conversaciones con mensajes sin leer
 //   reportador: guías de jornadas cerradas que todavía no se le avisaron al comprador
-//   calificaciones: ventas de ML listas para calificar (solo administradores)
+//   calificaciones: ventas de ML listas para calificar
 //   stock: productos a reponer en ML o publicados de más (stock real vs publicado)
 //   despachos: envíos ya impresos en la jornada ABIERTA (falta cerrar jornada → manifiesto;
 //              hasta entonces el Reportador no tiene nada que avisar)
@@ -28,7 +28,7 @@ export async function GET() {
       const { rows: [st] } = await db.query(
         `SELECT COUNT(*)::int AS n FROM (${SQL_COMPARACION}) c WHERE alerta <> 'ok'`, [DIAS_VENTAS, UMBRAL_BAJO])
       out.stock = st.n
-      if (u.role === 'admin') {
+      {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
         const { rows: [c] } = await db.query(
           `SELECT COUNT(*)::int AS n FROM (${SQL_BANDEJA}) b WHERE sugerencia <> 'esperar'`,

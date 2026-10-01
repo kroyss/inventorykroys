@@ -7,7 +7,7 @@ import { leerPlantillasCal, SQL_BANDEJA } from '@/lib/calificacionesML'
 //   listas    → sin calificar con sugerencia (concretada / no concretada)
 //   esperando → todavía no se sabe (recién vendida, o en borrador en el sistema)
 export async function GET(req: NextRequest) {
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas()
   if ('error' in s) return s.error
   const vista = new URL(req.url).searchParams.get('vista') === 'esperando' ? 'esperando' : 'listas'
   try {

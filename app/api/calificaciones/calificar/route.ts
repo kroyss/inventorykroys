@@ -16,7 +16,7 @@ const Body = z.object({
 // (la pantalla repite). Usa los textos de la empresa; relee cada una para confirmar.
 // Calificar es PÚBLICO en ML: lo dispara el administrador desde la pantalla, con confirmación.
 export async function POST(req: NextRequest) {
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas()
   if ('error' in s) return s.error
   try {
     const { ordenes } = Body.parse(await req.json())

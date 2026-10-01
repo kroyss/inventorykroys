@@ -28,7 +28,7 @@ const MOTIVOS: Record<string, string> = {
 }
 
 /** Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema. */
-export default function CalificacionesClient() {
+export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) {
   const confirm = useConfirm()
   const [vista, setVista] = useState<'listas' | 'esperando' | 'textos'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -106,7 +106,7 @@ export default function CalificacionesClient() {
       <Tabs value={vista} onChange={setVista} items={[
         { value: 'listas', label: 'Por calificar', count: datos ? datos.contadores.concretadas + datos.contadores.no_concretadas : undefined },
         { value: 'esperando', label: 'Esperando', count: datos?.contadores.esperando },
-        { value: 'textos', label: 'Textos' },
+        ...(isAdmin ? [{ value: 'textos' as const, label: 'Textos' }] : []),
       ]} />
 
       {!datos ? <Cargando /> : vista === 'textos' ? <Textos plantillas={datos.plantillas} onGuardado={cargar} /> : (

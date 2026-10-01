@@ -6,9 +6,9 @@ import CalificacionesClient from '@/components/preguntas/CalificacionesClient'
 
 export const metadata = { title: 'Calificaciones' }
 
-// Automatizaciones → Calificaciones (solo administradores, módulo `preguntas`).
+// Automatizaciones → Calificaciones (módulo `preguntas`). Califican todos; los textos los edita el admin.
 export default async function CalificacionesPage() {
   const session = await getServerSession(authOptions)
-  if (!tieneModulo(session?.user, 'preguntas') || session?.user.role !== 'admin') redirect('/automatizaciones')
-  return <CalificacionesClient />
+  if (!tieneModulo(session?.user, 'preguntas')) redirect('/automatizaciones')
+  return <CalificacionesClient isAdmin={session?.user.role === 'admin'} />
 }

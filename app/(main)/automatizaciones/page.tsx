@@ -13,7 +13,6 @@ export default async function AutomatizacionesPage() {
   const session = await getServerSession(authOptions)
   const u = session!.user
   const ve = u.country === 'VE'
-  const admin = u.role === 'admin'
   const ml = tieneModulo(u, 'preguntas')
   const despachos = ve && tieneModulo(u, 'despachos')
   const reportador = despachos && tieneModulo(u, 'reportador')
@@ -41,10 +40,10 @@ export default async function AutomatizacionesPage() {
           texto: 'Subes las etiquetas de Mercado Envíos (Zoom y Tealca) y salen 4 por hoja con el producto y la nota de cada venta. Manifiesto por transportista.' },
         { href: '/reportador', titulo: 'Reportador', icono: 'reportador', activa: reportador, aviso: 'reportador',
           pendiente: 'guías por avisar',
-          texto: 'Le escribe a cada comprador su número de guía al cerrar la jornada: por la API, sin programa, o con el programa de la PC.' },
-        ...(admin ? [{ href: '/calificaciones', titulo: 'Calificaciones', icono: 'calificaciones' as const, activa: ml, aviso: 'calificaciones' as const,
+          texto: 'Le escribe a cada comprador su número de guía después de cerrar la jornada: por la API, sin programa, o con el programa de la PC.' },
+        { href: '/calificaciones', titulo: 'Calificaciones', icono: 'calificaciones', activa: ml, aviso: 'calificaciones',
           pendiente: 'ventas por calificar',
-          texto: 'Las ventas sin calificar cruzadas con el sistema: lo cargado se concretó (positiva), lo que nunca entró no. Calificas en bloque.' }] : []),
+          texto: 'Las ventas sin calificar cruzadas con el sistema: lo cargado se concretó (positiva), lo que nunca entró no. Calificas en bloque.' },
       ],
     },
   ]

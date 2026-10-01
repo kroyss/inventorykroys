@@ -5,7 +5,7 @@ import { sincronizarOrdenes } from '@/lib/calificacionesML'
 
 // POST /api/calificaciones/sincronizar → trae ya las ventas de ML de todas las cuentas.
 export async function POST() {
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas()
   if ('error' in s) return s.error
   try {
     const { rows: cuentas } = await s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa'`)
