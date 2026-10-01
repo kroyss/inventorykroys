@@ -59,7 +59,11 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
         [o.id, conexionId, o.pack_id, o.date_created, o.buyer?.nickname ?? null,
          o.order_items.map(i => `${i.quantity} × ${i.item.title}`).join(' · '),
          o.total_amount, o.currency_id,
-         o.feedback?.seller?.rating ?? null, o.feedback?.seller?.fulfilled ?? null, o.feedback?.buyer?.rating ?? null])
+         // En la búsqueda ML marca que la calificación EXISTE (objeto no nulo) pero no siempre
+         // trae el detalle: existir = ya calificada (verificado: las calificadas a mano vienen así).
+         o.feedback?.seller ? (o.feedback.seller.rating ?? 'calificada') : null,
+         o.feedback?.seller?.fulfilled ?? null,
+         o.feedback?.buyer ? (o.feedback.buyer.rating ?? 'calificada') : null])
       n++
     }
     if (viejas || lote.length < 50) break
