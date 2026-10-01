@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import VentaMLPanel from './VentaMLPanel'
 import { problemasDelTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 interface Pregunta {
@@ -51,7 +50,7 @@ interface Datos {
   cuentas: Cuenta[]; configuracion: { ml: boolean; ia: boolean }
   plantillas: Plantilla[]
 }
-type Vista = 'pendientes' | 'respondidas' | 'ventas' | 'cuentas'
+type Vista = 'pendientes' | 'respondidas' | 'cuentas'
 
 function hace(fecha: string) {
   const min = Math.round((Date.now() - new Date(fecha).getTime()) / 60000)
@@ -144,10 +143,10 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       <Tabs value={vista} onChange={v => { setVista(v); setPage(1) }} items={[
         { value: 'pendientes', label: 'Sin responder', count: cont?.pendientes },
         { value: 'respondidas', label: 'Historial', count: cont?.respondidas },
-        ...(isAdmin ? [{ value: 'ventas' as const, label: 'Calificar y mensajes' }, { value: 'cuentas' as const, label: 'Cuentas y políticas' }] : []),
+        ...(isAdmin ? [{ value: 'cuentas' as const, label: 'Cuentas y políticas' }] : []),
       ]} />
 
-      {vista === 'ventas' ? <VentaMLPanel /> : vista === 'cuentas' ? (
+      {vista === 'cuentas' ? (
         datos ? (
           <div className="space-y-4">
             <Plantillas iniciales={datos.plantillas} onGuardado={cargar} />

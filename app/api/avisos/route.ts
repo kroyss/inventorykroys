@@ -2,23 +2,32 @@ import { NextResponse } from 'next/server'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
+import { leerPlantillasCal, SQL_BANDEJA } from '@/lib/calificacionesML'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
 //   preguntas: sin responder · mensajes: conversaciones con mensajes sin leer
 //   reportador: guías de jornadas cerradas que todavía no se le avisaron al comprador
+//   calificaciones: ventas de ML listas para calificar (solo administradores)
 // Solo cuenta lo de los módulos que tiene la empresa. Nunca falla en voz alta: con un
 // error devuelve ceros (es un adorno del menú, no puede romper la página).
 export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
   const u = session.user
-  const out = { preguntas: 0, mensajes: 0, reportador: 0 }
+  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0 }
   try {
     if (tieneModulo(u, 'preguntas')) {
       const { rows: [r] } = await db.query(
         `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS p,
                 (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS m`)
       out.preguntas = r.p; out.mensajes = r.m
+      if (u.role === 'admin') {
+        const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
+        const { rows: [c] } = await db.query(
+          `SELECT COUNT(*)::int AS n FROM (${SQL_BANDEJA}) b WHERE sugerencia <> 'esperar'`,
+          [leerPlantillasCal(pl?.value).noConcretada.dias])
+        out.calificaciones = c.n
+      }
     }
     if (u.country === 'VE' && tieneModulo(u, 'despachos') && tieneModulo(u, 'reportador')) {
       const { rows: [r] } = await db.query(
