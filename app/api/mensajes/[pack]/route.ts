@@ -25,12 +25,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
     const c = await conversacion(s.db, pack)
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
     const marcar = new URL(req.url).searchParams.get('leida') === '1'
-    const [h, items] = await Promise.all([
+    const [h, venta] = await Promise.all([
       leerHilo(s.db, c.conexion_id, pack, Number(c.ml_user_id), marcar),
       itemsDeVenta(s.db, c.conexion_id, pack).catch(() => null),   // para el link a cada publicación
     ])
     if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
-    return NextResponse.json({ cuenta: c.nickname, ...h, items })
+    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null })
   } catch (err) {
     return apiError(err)
   }

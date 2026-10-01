@@ -7,6 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
   ultimo_at: string | null; productos: string | null; cuenta: string; venta_estado: string | null; notas: string | null
+  comprador_nick: string | null; comprador_nombre: string | null
 }
 interface Adjunto { archivo: string; nombre: string; tipo: string | null }
 interface Mensaje { propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: Adjunto[] }
@@ -56,6 +57,7 @@ export default function MensajesClient() {
                 className={`w-full text-left px-4 py-3 space-y-1 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
                 <div className="flex items-center gap-2 text-xs text-neutral-500">
                   <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{c.cuenta}</span>
+                  <Comprador nick={c.comprador_nick} nombre={c.comprador_nombre} />
                   {c.sin_leer > 0 && <span className="bg-red-500 text-white rounded-full px-1.5 py-0.5 text-[11px] font-semibold num">{c.sin_leer}</span>}
                   <span className="ml-auto whitespace-nowrap">{hace(c.ultimo_at)}</span>
                 </div>
@@ -82,6 +84,7 @@ export default function MensajesClient() {
 
 function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
+  const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; cantidad: number; link: string | null }[] | null>(null)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -111,6 +114,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
     if (!r.ok) { setError(d.error ?? 'No se pudo leer'); return }
     setMensajes(d.mensajes)
     if (d.items) setItems(d.items)
+    if (d.comprador) setComprador(d.comprador)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
@@ -144,6 +148,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       <header className="px-4 py-3 border-b border-neutral-100 space-y-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
           <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{c.cuenta}</span>
+          <Comprador nick={comprador?.nick ?? c.comprador_nick} nombre={comprador?.nombre ?? c.comprador_nombre} grande />
           <span className="font-mono">{c.pack_id}</span>
           {c.venta_estado
             ? <StatusBadge status={c.venta_estado} label={STATUS_LABELS[c.venta_estado]} />
@@ -351,5 +356,16 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
       {editando && editando.id === null && editor}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
+  )
+}
+
+/** Comprador: nombre (si ML lo da) y nick. */
+function Comprador({ nick, nombre, grande = false }: { nick: string | null; nombre: string | null; grande?: boolean }) {
+  if (!nick && !nombre) return null
+  return (
+    <span className={`truncate min-w-0 ${grande ? 'text-neutral-800' : 'text-neutral-600'}`} title={[nombre, nick].filter(Boolean).join(' · ')}>
+      {nombre && <span className="font-medium">{nombre}</span>}
+      {nick && <span className="text-neutral-400">{nombre ? ' · ' : ''}{nick}</span>}
+    </span>
   )
 }

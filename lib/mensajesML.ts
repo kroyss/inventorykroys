@@ -49,23 +49,47 @@ async function sellerDe(db: Pool, conexionId: number): Promise<number> {
   return Number(c.ml_user_id)
 }
 
-/** Títulos de la venta (pack o venta suelta), para mostrar en la bandeja. */
-async function productosDe(db: Pool, conexionId: number, pack: string) {
+type OrdenVenta = {
+  order_items: { item: { id: string; title: string }; quantity: number }[]
+  buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
+}
+
+/** Las órdenes de una venta (orden suelta o pack). */
+async function ordenesDeVenta(db: Pool, conexionId: number, pack: string): Promise<OrdenVenta[]> {
   try {
-    const o = await mlFetch<{ order_items: { item: { title: string }; quantity: number }[] }>(db, conexionId, `/orders/${pack}`)
-    return o.order_items.map(i => `${i.quantity} × ${i.item.title}`).join(' · ')
+    return [await mlFetch<OrdenVenta>(db, conexionId, `/orders/${pack}`)]
   } catch (e) {
     if (!(e instanceof ErrorML)) throw e
-    try {
-      const p = await mlFetch<{ orders: { id: number }[] }>(db, conexionId, `/packs/${pack}`)
-      const titulos: string[] = []
-      for (const o of p.orders.slice(0, 5)) {
-        const d = await mlFetch<{ order_items: { item: { title: string }; quantity: number }[] }>(db, conexionId, `/orders/${o.id}`)
-        titulos.push(...d.order_items.map(i => `${i.quantity} × ${i.item.title}`))
-      }
-      return titulos.join(' · ') || null
-    } catch { return null }
+    const p = await mlFetch<{ orders: { id: number }[] }>(db, conexionId, `/packs/${pack}`)
+    return Promise.all(p.orders.slice(0, 5).map(o => mlFetch<OrdenVenta>(db, conexionId, `/orders/${o.id}`)))
   }
+}
+
+const compradorDe = (ordenes: OrdenVenta[]) => {
+  const b = ordenes.find(o => o.buyer)?.buyer
+  return {
+    nick: b?.nickname ?? null,
+    nombre: [b?.first_name, b?.last_name].filter(Boolean).join(' ').trim() || null,
+  }
+}
+
+/** Títulos de la venta y comprador (nick y nombre), para la bandeja. */
+async function datosDeVenta(db: Pool, conexionId: number, pack: string) {
+  try {
+    const ordenes = await ordenesDeVenta(db, conexionId, pack)
+    return {
+      productos: ordenes.flatMap(o => o.order_items).map(i => `${i.quantity} × ${i.item.title}`).join(' · ') || null,
+      ...compradorDe(ordenes),
+    }
+  } catch { return { productos: null, nick: null, nombre: null } }
+}
+
+/** Guarda nick/nombre del comprador de la conversación (los que se conozcan). */
+async function guardarComprador(db: Pool, pack: string, nick: string | null, nombre: string | null) {
+  if (nick === null && nombre === null) return
+  await db.query(
+    `UPDATE ml_conversaciones SET comprador_nick = COALESCE($2, comprador_nick), comprador_nombre = COALESCE($3, comprador_nombre)
+     WHERE pack_id::text = $1`, [pack, nick, nombre])
 }
 
 /** Sincroniza los sin leer de una cuenta. Las que ya no están sin leer pasan a 0. */
@@ -80,7 +104,7 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
     const pack = m[1]
     vistos.push(pack)
     const { rows: [prev] } = await db.query(
-      `SELECT sin_leer_ml, productos FROM ml_conversaciones WHERE pack_id = $1`, [pack])
+      `SELECT sin_leer_ml, productos, comprador_nick FROM ml_conversaciones WHERE pack_id = $1`, [pack])
     // Solo se relee el hilo si cambió la cantidad (ahorra llamadas a ML).
     if (prev && prev.sin_leer_ml === x.count && prev.productos !== null) continue
     const hilo = await leerHilo(db, conexionId, pack, seller, false)
@@ -89,7 +113,8 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
     const visibles = hilo.mensajes.filter(m => !m.propio && !m.leido).length
     const sinLeer = Math.min(x.count, visibles)
     const ultimo = hilo.mensajes[hilo.mensajes.length - 1]
-    const productos = prev?.productos ?? await productosDe(db, conexionId, pack)
+    const venta = prev?.productos && prev.comprador_nick !== null ? null : await datosDeVenta(db, conexionId, pack)
+    const productos = prev?.productos ?? venta?.productos ?? null
     await db.query(
       `INSERT INTO ml_conversaciones (pack_id, conexion_id, sin_leer, ultimo_texto, ultimo_de_comprador, ultimo_at,
                                       comprador_id, productos, sin_leer_ml, actualizada_at)
@@ -101,6 +126,7 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
          productos = COALESCE(ml_conversaciones.productos, EXCLUDED.productos), actualizada_at = NOW()`,
       [pack, conexionId, sinLeer, ultimo?.texto ?? null, ultimo ? !ultimo.propio : null, ultimo?.fecha ?? null,
        hilo.comprador, productos, x.count])
+    if (venta) await guardarComprador(db, pack, venta.nick, venta.nombre)
     // Copia de las notas de la venta (para la pestaña "Con nota"); si falla, no importa.
     await leerNotas(db, conexionId, pack).then(r => copiarNotas(db, pack, r.notas)).catch(() => {})
   }
@@ -113,6 +139,14 @@ export async function sincronizarMensajes(db: Pool, conexionId: number) {
      ORDER BY ultimo_at DESC NULLS LAST LIMIT 10`, [conexionId])
   for (const { pack_id } of sinMirar) {
     await leerNotas(db, conexionId, pack_id).then(r => copiarNotas(db, pack_id, r.notas)).catch(() => {})
+  }
+  // Y las que todavía no tienen el comprador: de a 10 ('' = ML no lo dio, no se reintenta).
+  const { rows: sinComprador } = await db.query(
+    `SELECT pack_id::text FROM ml_conversaciones WHERE conexion_id = $1 AND comprador_nick IS NULL
+     ORDER BY ultimo_at DESC NULLS LAST LIMIT 10`, [conexionId])
+  for (const { pack_id } of sinComprador) {
+    const v = await datosDeVenta(db, conexionId, pack_id)
+    await guardarComprador(db, pack_id, v.nick ?? '', v.nombre)
   }
   return vistos.length
 }
@@ -181,20 +215,15 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
 
 export interface ItemVenta { id: string; titulo: string; cantidad: number; link: string | null }
 
-/** Productos de la venta (orden suelta o pack) con el link a cada publicación. */
-export async function itemsDeVenta(db: Pool, conexionId: number, pack: string): Promise<ItemVenta[]> {
-  type Orden = { order_items: { item: { id: string; title: string }; quantity: number }[] }
-  let ordenes: Orden[]
-  try {
-    ordenes = [await mlFetch<Orden>(db, conexionId, `/orders/${pack}`)]
-  } catch (e) {
-    if (!(e instanceof ErrorML)) throw e
-    const p = await mlFetch<{ orders: { id: number }[] }>(db, conexionId, `/packs/${pack}`)
-    ordenes = await Promise.all(p.orders.slice(0, 5).map(o => mlFetch<Orden>(db, conexionId, `/orders/${o.id}`)))
-  }
-  return ordenes.flatMap(o => o.order_items).map(i => {
+/** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
+export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
+  const ordenes = await ordenesDeVenta(db, conexionId, pack)
+  const comprador = compradorDe(ordenes)
+  await guardarComprador(db, pack, comprador.nick, comprador.nombre)
+  const items: ItemVenta[] = ordenes.flatMap(o => o.order_items).map(i => {
     const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
     const link = m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` : null
     return { id: i.item.id, titulo: i.item.title, cantidad: i.quantity, link }
   })
+  return { items, comprador }
 }

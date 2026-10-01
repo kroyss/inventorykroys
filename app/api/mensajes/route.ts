@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   try {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
+              NULLIF(c.comprador_nick, '') AS comprador_nick, c.comprador_nombre,
               x.nickname AS cuenta, v.status AS venta_estado
        FROM ml_conversaciones c
        JOIN ml_conexiones x ON x.id = c.conexion_id
