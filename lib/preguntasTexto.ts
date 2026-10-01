@@ -36,7 +36,9 @@ export function condicionPlantilla(p: Plantilla) {
 const URL_RE = /(https?:\/\/[^\s]+|www\.[^\s]+|\b[\w-]+(\.[\w-]+)*\.(com|net|org|ve|co|ly|me|io|app|link)\b(\/[^\s]*)?)/gi
 const ES_ML = /(^|\.|\/\/)(mercadolibre\.com(\.ve|\.co|\.ar|\.mx)?|mercadolibre\.co|meli\.la|mlstatic\.com)(\/|$|\b)/i
 
-export function revisarTexto(t: string): { bloqueantes: string[]; avisos: string[] } {
+// `mensaje` = postventa (Mensajes): en MLV ahí SÍ se permiten teléfonos (pago móvil, etc.).
+// Las preguntas son públicas y ML rechaza cualquier teléfono.
+export function revisarTexto(t: string, tipo: 'pregunta' | 'mensaje' = 'pregunta'): { bloqueantes: string[]; avisos: string[] } {
   const bloqueantes: string[] = []
   const avisos: string[] = []
   const s = t.trim()
@@ -47,12 +49,12 @@ export function revisarTexto(t: string): { bloqueantes: string[]; avisos: string
   const sinUrls = s.replace(URL_RE, ' ').replace(/\bM[A-Z]{2}-?\d+\b/g, ' ')
   if (urls.some(u => !ES_ML.test(u))) avisos.push('Tiene un link que no es de MercadoLibre: puede que ML no lo deje publicar')
   if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(s)) bloqueantes.push('Tiene un correo')
-  if (/(\+?\d[\d\s().-]{8,}\d)/.test(sinUrls.replace(/\b\d{1,3}([.,]\d{3})+([.,]\d+)?\b/g, ''))) bloqueantes.push('Parece tener un número de teléfono')
+  if (tipo === 'pregunta' && /(\+?\d[\d\s().-]{8,}\d)/.test(sinUrls.replace(/\b\d{1,3}([.,]\d{3})+([.,]\d+)?\b/g, ''))) bloqueantes.push('Parece tener un número de teléfono')
   if (/\b(whats\s*app|wasap|instagram|insta|facebook|telegram|tiktok)\b|(^|\s)@\w{3,}/i.test(sinUrls)) bloqueantes.push('Menciona redes sociales o un usuario de contacto')
   return { bloqueantes, avisos }
 }
 
 /** Lo que impide publicar (compatibilidad: los avisos no bloquean). */
-export function problemasDelTexto(t: string): string[] {
-  return revisarTexto(t).bloqueantes
+export function problemasDelTexto(t: string, tipo: 'pregunta' | 'mensaje' = 'pregunta'): string[] {
+  return revisarTexto(t, tipo).bloqueantes
 }

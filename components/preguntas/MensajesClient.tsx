@@ -96,8 +96,8 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   useEffect(() => { leer() }, [leer])
   useEffect(() => { fin.current?.scrollIntoView({ block: 'end' }) }, [mensajes])
 
-  const problemas = texto.trim() ? problemasDelTexto(texto) : []
-  const avisosTexto = texto.trim() ? revisarTexto(texto).avisos : []
+  const problemas = texto.trim() ? problemasDelTexto(texto, 'mensaje') : []
+  const avisosTexto = texto.trim() ? revisarTexto(texto, 'mensaje').avisos : []
   const enviar = async () => {
     setEnviando(true); setError(null)
     try {

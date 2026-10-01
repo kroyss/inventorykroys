@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
   if (!/^\d+$/.test(pack)) return NextResponse.json({ error: 'Conversación inválida' }, { status: 400 })
   try {
     const { texto, dejarSinLeer } = Body.parse(await req.json())
-    const problemas = problemasDelTexto(texto)
+    const problemas = problemasDelTexto(texto, 'mensaje')
     if (problemas.length) return NextResponse.json({ error: 'MercadoLibre rechazaría este mensaje', problemas }, { status: 422 })
     const c = await conversacion(s.db, pack)
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
