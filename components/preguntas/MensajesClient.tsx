@@ -90,6 +90,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [archivos, setArchivos] = useState<File[]>([])
+  const [ampliada, setAmpliada] = useState<{ url: string; nombre: string } | null>(null)
   const fin = useRef<HTMLDivElement>(null)
   const elegir = useRef<HTMLInputElement>(null)
 
@@ -145,6 +146,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
 
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col max-h-[75vh]">
+      {ampliada && <VisorFoto {...ampliada} onCerrar={() => setAmpliada(null)} />}
       <header className="px-4 py-3 border-b border-neutral-100 space-y-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
           <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{c.cuenta}</span>
@@ -184,10 +186,10 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
                   const url = `/api/mensajes/${c.pack_id}/adjunto?f=${encodeURIComponent(a.archivo)}`
                   const imagen = a.tipo?.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(a.archivo)
                   return imagen ? (
-                    <a key={a.archivo} href={url} target="_blank" rel="noreferrer" title={a.nombre}>
+                    <button key={a.archivo} type="button" onClick={() => setAmpliada({ url, nombre: a.nombre })} title="Ampliar">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={a.nombre} className="max-h-48 max-w-full rounded-md border border-black/10 bg-white" />
-                    </a>
+                      <img src={url} alt={a.nombre} className="max-h-48 max-w-full rounded-md border border-black/10 bg-white cursor-zoom-in" />
+                    </button>
                   ) : (
                     <a key={a.archivo} href={url} target="_blank" rel="noreferrer"
                       className="text-xs underline underline-offset-2 opacity-80 hover:opacity-100">📎 {a.nombre}</a>
@@ -367,5 +369,27 @@ function Comprador({ nick, nombre, grande = false }: { nick: string | null; nomb
       {nombre && <span className="font-medium">{nombre}</span>}
       {nick && <span className="text-neutral-400">{nombre ? ' · ' : ''}{nick}</span>}
     </span>
+  )
+}
+
+/** Foto ampliada en la misma página: se cierra con la ✕, con Escape o tocando afuera. */
+function VisorFoto({ url, nombre, onCerrar }: { url: string; nombre: string; onCerrar: () => void }) {
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
+    window.addEventListener('keydown', tecla)
+    const antes = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', tecla); document.body.style.overflow = antes }
+  }, [onCerrar])
+  return (
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4" onClick={onCerrar} role="dialog" aria-label={nombre}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={nombre} onClick={e => e.stopPropagation()}
+        className="max-h-[90vh] max-w-[95vw] object-contain rounded-lg shadow-2xl bg-white" />
+      <button type="button" onClick={onCerrar} title="Cerrar (Esc)"
+        className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/15 hover:bg-white/30 text-white text-2xl leading-10 text-center">×</button>
+      <a href={url} download={nombre} onClick={e => e.stopPropagation()}
+        className="absolute bottom-4 right-4 text-xs text-white/80 hover:text-white underline underline-offset-2">Descargar</a>
+    </div>
   )
 }
