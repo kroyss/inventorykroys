@@ -1,11 +1,18 @@
 #!/bin/sh
-# Carga las claves secretas de Preguntas ML en staging SIN editar archivos a mano.
-# Se corre desde la PC:   ssh -t root@85.239.249.43 /opt/inventory_staging/scripts/staging-claves.sh
-# Pregunta cada clave (lo que pegas no se ve en pantalla), la guarda en .env.staging
-# (reemplaza la anterior si ya había una) y reinicia el contenedor. Enter vacío = no cambiar.
+# Carga las claves secretas de MercadoLibre / IA SIN editar archivos a mano.
+# Se corre desde la PC:
+#   ssh -t root@85.239.249.43 /opt/inventory_staging/scripts/staging-claves.sh          (staging)
+#   ssh -t root@85.239.249.43 /opt/inventory_next/scripts/staging-claves.sh produccion  (producción)
+# Pregunta cada clave (lo que pegas no se ve en pantalla), la guarda en el .env del entorno
+# (reemplaza la anterior si ya había una) y reinicia. Enter vacío = no cambiar.
 set -e
-ENV=/opt/inventory_staging/.env.staging
-cd /opt/inventory_staging
+if [ "$1" = "produccion" ]; then
+  DIR=/opt/inventory_next; ENV=$DIR/.env.production; COMPOSE=docker-compose.prod.yml; CONT=inventory_ecd
+else
+  DIR=/opt/inventory_staging; ENV=$DIR/.env.staging; COMPOSE=docker-compose.staging.yml; CONT=inventory_next_staging
+fi
+cd "$DIR"
+echo "Entorno: $DIR"
 
 poner() {
   clave=$1; texto=$2; empieza=$3
@@ -32,12 +39,12 @@ poner ML_CLIENT_SECRET  "Clave secreta de la app de MercadoLibre (DevCenter → 
 poner ANTHROPIC_API_KEY "Clave de la API de Anthropic (console.anthropic.com → API Keys)"             "sk-ant-"
 
 if [ "$CAMBIO" = 1 ]; then
-  echo; echo "Reiniciando staging…"
-  docker compose -f docker-compose.staging.yml up -d >/dev/null 2>&1
-  i=0; until docker ps --filter name=inventory_next_staging --format '{{.Status}}' | grep -q healthy; do
+  echo; echo "Reiniciando…"
+  docker compose -f "$COMPOSE" up -d >/dev/null 2>&1
+  i=0; until docker ps --filter "name=^$CONT\$" --format '{{.Status}}' | grep -q healthy; do
     i=$((i+1)); [ $i -gt 40 ] && { echo "✗ No arrancó a tiempo: avísale a Claude"; exit 1; }; sleep 3
   done
-  echo "✓ Listo. Staging ya usa las claves nuevas."
+  echo "✓ Listo. Ya usa las claves nuevas."
 else
   echo; echo "No se cambió nada."
 fi
