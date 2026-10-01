@@ -194,13 +194,20 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
   const { rows: notas } = await db.query(
     `SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [q.item_id])
+  // Memoria de la IA = las últimas MEMORIA_POR_CUENTA respuestas de CADA cuenta (decisión
+  // del dueño: la logística y las políticas cambian; lo viejo deja de servir de ejemplo).
+  // El historial completo se conserva en la base, solo no se usa para imitar.
+  const memoria = `(SELECT id FROM (
+       SELECT id, row_number() OVER (PARTITION BY conexion_id ORDER BY fecha DESC) AS n
+       FROM ml_preguntas WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL) m
+     WHERE m.n <= ${MEMORIA_POR_CUENTA})`
   const { rows: mismo } = await db.query(
     `SELECT texto AS p, respuesta AS r FROM ml_preguntas
-     WHERE item_id = $1 AND id <> $2 AND respuesta IS NOT NULL AND estado = 'ANSWERED'
+     WHERE item_id = $1 AND id <> $2 AND id IN ${memoria}
      ORDER BY similarity(texto, $3) DESC, fecha DESC LIMIT 6`, [q.item_id, q.id, q.texto])
   const { rows: parecidas } = await db.query(
     `SELECT texto AS p, respuesta AS r FROM ml_preguntas
-     WHERE item_id <> $1 AND respuesta IS NOT NULL AND estado = 'ANSWERED' AND texto % $2
+     WHERE item_id <> $1 AND texto % $2 AND id IN ${memoria}
      ORDER BY similarity(texto, $2) DESC, fecha DESC LIMIT 8`, [q.item_id, q.texto])
 
   return {
@@ -217,6 +224,8 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
 }
 
 // ── Borrador con Claude ─────────────────────────────────────────────────────
+export const MEMORIA_POR_CUENTA = 1000
+
 export const MODELO_PREGUNTAS = process.env.PREGUNTAS_MODELO ?? 'claude-haiku-4-5-20251001'
 
 export function iaConfigurada() { return !!process.env.ANTHROPIC_API_KEY }
