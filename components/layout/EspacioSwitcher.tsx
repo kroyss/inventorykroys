@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { espacioDe } from '@/lib/espacios'
+import { useAvisos, Numerito } from './Avisos'
 
 // Íconos de trazo (24x24), heredan el color del texto.
 const ICONOS = {
@@ -25,6 +26,9 @@ export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automa
   const pathname = usePathname()
   const actual = espacioDe(pathname)
   const [abierto, setAbierto] = useState(false)
+  const avisos = useAvisos()
+  const urgentesAuto = avisos.preguntas + avisos.mensajes
+  const totalAuto = urgentesAuto + avisos.reportador
   const caja = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -51,6 +55,10 @@ export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automa
           abierto ? 'bg-neutral-100' : 'hover:bg-neutral-100'}`}>
         <Icono de={actual} />
         <span>{NOMBRES[actual]}</span>
+        {/* Estando en otro espacio: punto si Automatizaciones tiene algo pendiente */}
+        {actual !== 'automatizaciones' && totalAuto > 0 && (
+          <span className={`w-2 h-2 rounded-full ${urgentesAuto > 0 ? 'bg-red-500' : 'bg-amber-400'}`} title="Hay pendientes en Automatizaciones" />
+        )}
         <svg viewBox="0 0 24 24" className={`w-4 h-4 text-neutral-400 transition-transform ${abierto ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>
@@ -63,7 +71,10 @@ export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automa
               className={`${fila} ${actual === o.id ? 'bg-neutral-100' : 'hover:bg-neutral-50'}`}>
               <span className="text-neutral-700"><Icono de={o.id} /></span>
               <span className="flex-1 min-w-0">
-                <span className="block text-sm font-semibold text-neutral-800">{NOMBRES[o.id]}</span>
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-neutral-800">
+                  {NOMBRES[o.id]}
+                  {o.id === 'automatizaciones' && <Numerito n={totalAuto} urgente={urgentesAuto > 0} />}
+                </span>
                 <span className="block text-xs text-neutral-500">{o.desc}</span>
               </span>
               {actual === o.id && (

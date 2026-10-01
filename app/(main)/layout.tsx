@@ -5,6 +5,7 @@ import Navbar from '@/components/layout/Navbar'
 import BottomNav from '@/components/layout/BottomNav'
 import CommandPalette from '@/components/layout/CommandPalette'
 import { ES_STAGING } from '@/lib/entorno'
+import { AvisosProvider } from '@/components/layout/Avisos'
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -16,6 +17,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   const modulos = session?.user.modulos ?? []
 
   return (
+    <AvisosProvider>
     <div className="min-h-screen bg-neutral-50">
       {ES_STAGING && (
         <div className="bg-amber-400 text-amber-950 text-center text-xs font-semibold py-1">
@@ -32,5 +34,6 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <BottomNav role={role} country={country} modulos={modulos} />
       <CommandPalette role={role} country={country} modulos={modulos} />
     </div>
+    </AvisosProvider>
   )
 }

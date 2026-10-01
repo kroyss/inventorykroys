@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { espacioDe, type Espacio } from '@/lib/espacios'
+import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
 
 const allLinks: { href: string; label: string; roles: UserRole[]; countries: Country[]; espacio?: Espacio }[] = [
   { href: '/dashboard',  label: 'Inicio',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
@@ -31,6 +32,7 @@ interface Props {
 
 export default function NavLinks({ role, country, modulos }: Props) {
   const pathname = usePathname()
+  const avisos = useAvisos()
   const links = allLinks.filter(
     l => l.roles.includes(role) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
       && (l.espacio ?? 'inventario') === espacioDe(pathname)
@@ -49,13 +51,16 @@ export default function NavLinks({ role, country, modulos }: Props) {
           <Link
             key={l.href}
             href={l.href}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               active
                 ? 'bg-neutral-900 text-white'
                 : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'
             }`}
           >
             {l.href === '/compras' && role === 'user' ? 'Recepciones' : l.label}
+            {AVISO_DE_RUTA[l.href] && (
+              <Numerito n={avisos[AVISO_DE_RUTA[l.href].clave]} urgente={AVISO_DE_RUTA[l.href].urgente} />
+            )}
           </Link>
         )
       })}
