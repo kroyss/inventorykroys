@@ -11,6 +11,7 @@ import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
+import { sincronizarPublicaciones } from '@/lib/stockML'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 interface PreguntaML {
@@ -154,6 +155,12 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
         await db.query(`UPDATE ml_conexiones SET ultimo_error = $2 WHERE id = $1`, [c.id, msg.slice(0, 500)])
       }
       res.push({ cuenta: c.nickname, error: msg })
+    }
+  }
+  // Stock publicado en ML (de a poco: un lote por pasada). No corta nada si falla.
+  if (cuentas.length) {
+    try { await sincronizarPublicaciones(db) } catch (e) {
+      console.error('[ML stock]', e instanceof Error ? e.message : e)
     }
   }
   return res

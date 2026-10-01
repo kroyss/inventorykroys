@@ -9,6 +9,7 @@ const ICONOS = {
   calificaciones: <><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" /></>,
   despachos: <><path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></>,
   reportador: <><path d="M3 11l18-8-8 18-2-8-8-2z" /></>,
+  stock: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
 }
 
 export interface Herramienta {
@@ -42,7 +43,7 @@ export default function InicioAutomatizaciones({ grupos }: { grupos: { titulo: s
         {todas.length === 0 ? null : pendientes.length === 0 ? (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">✓</span>
-            <p className="text-sm text-neutral-700">Todo al día: no hay preguntas, mensajes, despachos, guías ni calificaciones pendientes.</p>
+            <p className="text-sm text-neutral-700">Todo al día: no hay preguntas, mensajes, stock, despachos, guías ni calificaciones pendientes.</p>
           </div>
         ) : (
           <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
