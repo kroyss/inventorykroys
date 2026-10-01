@@ -5,7 +5,7 @@
 // El espacio lo decide la ruta; la cuenta, la empresa y los datos son los mismos.
 export type Espacio = 'inventario' | 'automatizaciones'
 
-const RUTAS_AUTOMATIZACIONES = ['/automatizaciones', '/despachos', '/reportador', '/preguntas', '/mensajes']
+const RUTAS_AUTOMATIZACIONES = ['/automatizaciones', '/despachos', '/reportador', '/preguntas', '/mensajes', '/calificaciones']
 
 export function espacioDe(pathname: string): Espacio {
   return RUTAS_AUTOMATIZACIONES.some(r => pathname === r || pathname.startsWith(r + '/'))

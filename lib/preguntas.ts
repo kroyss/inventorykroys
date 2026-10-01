@@ -10,6 +10,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
+import { sincronizarOrdenes } from '@/lib/calificacionesML'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 interface PreguntaML {
@@ -120,6 +121,10 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       // Mensajes post-venta sin leer (bandeja Mensajes). No corta la sync de preguntas.
       try { await sincronizarMensajes(db, c.id) } catch (e) {
         console.error('[ML mensajes]', c.nickname, e instanceof Error ? e.message : e)
+      }
+      // Ventas para calificar (cada SYNC_MINUTOS; adentro decide si toca).
+      try { await sincronizarOrdenes(db, c.id) } catch (e) {
+        console.error('[ML ventas]', c.nickname, e instanceof Error ? e.message : e)
       }
       const fallas = await completarItems(db, c.id)
       if (fallas) {
