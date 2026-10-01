@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
-import { problemasDelTexto } from '@/lib/preguntasTexto'
+import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -90,6 +90,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   useEffect(() => { fin.current?.scrollIntoView({ block: 'end' }) }, [mensajes])
 
   const problemas = texto.trim() ? problemasDelTexto(texto) : []
+  const avisosTexto = texto.trim() ? revisarTexto(texto).avisos : []
   const enviar = async () => {
     setEnviando(true); setError(null)
     try {
@@ -139,6 +140,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
           placeholder="Escribe la respuesta… (Ctrl+Enter para enviar)"
           className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre lo rechazaría: {problemas.join(' · ')}</p>}
+        {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
         <div className="flex items-center justify-between">
           <span className="text-xs text-neutral-400">{texto.length}/350</span>

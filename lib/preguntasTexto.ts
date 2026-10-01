@@ -27,15 +27,32 @@ export function condicionPlantilla(p: Plantilla) {
 }
 
 // ── Revisión del texto antes de enviarlo ───────────────────────────────────
-// ML rechaza (o descarta en silencio) links externos y datos de contacto.
-export function problemasDelTexto(t: string): string[] {
-  const p: string[] = []
+// Dos niveles (corregido 2026-10-01 con la experiencia del dueño en MLV):
+//   bloqueantes → correos, teléfonos, redes sociales: ML los borra; no se deja publicar.
+//   avisos      → links que NO son de MercadoLibre: ML a veces los deja y a veces no (en la
+//                 mensajería se rechazó Facebook, pasaron YouTube y Telegram). Se avisa,
+//                 se puede publicar igual, y la relectura dice si ML la borró.
+// Los links de MercadoLibre (artículo, listado, tienda) se permiten siempre.
+const URL_RE = /(https?:\/\/[^\s]+|www\.[^\s]+|\b[\w-]+(\.[\w-]+)*\.(com|net|org|ve|co|ly|me|io|app|link)\b(\/[^\s]*)?)/gi
+const ES_ML = /(^|\.|\/\/)(mercadolibre\.com(\.ve|\.co|\.ar|\.mx)?|mercadolibre\.co|meli\.la|mlstatic\.com)(\/|$|\b)/i
+
+export function revisarTexto(t: string): { bloqueantes: string[]; avisos: string[] } {
+  const bloqueantes: string[] = []
+  const avisos: string[] = []
   const s = t.trim()
-  if (!s) p.push('La respuesta está vacía')
-  if (s.length > 2000) p.push('Pasa de 2000 caracteres (límite de MercadoLibre)')
-  if (/https?:\/\/|www\.|\b[\w-]+\.(com|net|org|ve|co|ly|me|io|app|link)\b/i.test(s)) p.push('Tiene un link o una página web')
-  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(s)) p.push('Tiene un correo')
-  if (/(\+?\d[\d\s().-]{8,}\d)/.test(s.replace(/\b\d{1,3}([.,]\d{3})+([.,]\d+)?\b/g, ''))) p.push('Parece tener un número de teléfono')
-  if (/\b(whats\s*app|wasap|instagram|insta|facebook|telegram|tiktok)\b|(^|\s)@\w{3,}/i.test(s)) p.push('Menciona redes sociales o un usuario de contacto')
-  return p
+  if (!s) bloqueantes.push('La respuesta está vacía')
+  if (s.length > 2000) bloqueantes.push('Pasa de 2000 caracteres (límite de MercadoLibre)')
+  const urls = s.match(URL_RE) ?? []
+  // Sin los links ni los códigos de publicación: así MLV-1011813036 no parece un teléfono.
+  const sinUrls = s.replace(URL_RE, ' ').replace(/\bM[A-Z]{2}-?\d+\b/g, ' ')
+  if (urls.some(u => !ES_ML.test(u))) avisos.push('Tiene un link que no es de MercadoLibre: puede que ML no lo deje publicar')
+  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(s)) bloqueantes.push('Tiene un correo')
+  if (/(\+?\d[\d\s().-]{8,}\d)/.test(sinUrls.replace(/\b\d{1,3}([.,]\d{3})+([.,]\d+)?\b/g, ''))) bloqueantes.push('Parece tener un número de teléfono')
+  if (/\b(whats\s*app|wasap|instagram|insta|facebook|telegram|tiktok)\b|(^|\s)@\w{3,}/i.test(sinUrls)) bloqueantes.push('Menciona redes sociales o un usuario de contacto')
+  return { bloqueantes, avisos }
+}
+
+/** Lo que impide publicar (compatibilidad: los avisos no bloquean). */
+export function problemasDelTexto(t: string): string[] {
+  return revisarTexto(t).bloqueantes
 }

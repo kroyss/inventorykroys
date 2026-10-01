@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { problemasDelTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
+import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 interface Pregunta {
   id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null
@@ -218,6 +218,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
   const [error, setError] = useState<string | null>(null)
   const [nota, setNota] = useState<string | null>(null)
   const problemas = texto.trim() ? problemasDelTexto(texto) : []
+  const avisosTexto = texto.trim() ? revisarTexto(texto).avisos : []
   const pausada = p.item_estado && p.item_estado !== 'active'
 
   const proponer = async (web: boolean) => {
@@ -287,6 +288,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
           </div>
         )}
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre la rechazaría: {problemas.join(' · ')}</p>}
+        {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
 
