@@ -11,10 +11,18 @@
 // son reales (repetirles la guía sería un error visible).
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, CuentaDesconectada } from '@/lib/ml'
-import { buscarOrden, mensajesDeOrden } from '@/lib/ventasML'
+import { buscarOrden, mensajesDeOrden, type MensajeML } from '@/lib/ventasML'
 import { cuentaDe, leerConfig, paraTealca, problemasConfig, rellenar, RESERVA_HORAS, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { remitenteConfigurado } from '@/lib/despachos'
 import { ES_STAGING } from '@/lib/entorno'
+
+// MercadoLibre manda solo, A NOMBRE DEL VENDEDOR, "Gracias por tu compra. El número de guía
+// para tu envío es: …" cuando el comprador llena el formulario. Tiene la misma guía pero NO es
+// nuestro reporte: si se contara, nunca se le escribiría a nadie.
+const AVISO_AUTOMATICO_ML = /n[uú]mero de gu[ií]a para tu env[ií]o es/i
+function esReporteNuestro(m: MensajeML, guia: string) {
+  return m.propio && m.texto.includes(guia) && !AVISO_AUTOMATICO_ML.test(m.texto)
+}
 
 export type ResultadoApi = 'ENVIADO' | 'YA_ENVIADO' | 'SIN_CHAT' | 'RECHAZADO' | 'ERROR' | 'SIN_CONEXION' | 'SIMULADO'
 
@@ -115,7 +123,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       if (base.carrier === 'TEALCA') mensaje = paraTealca(mensaje)
 
       const antes = await mensajesDeOrden(db, orden.conexionId, orden.orden)
-      if (antes.some(m => m.propio && m.texto.includes(base.guia))) {
+      if (antes.some(m => esReporteNuestro(m, base.guia))) {
         await cerrar('ENVIADO', 'ya tenía la guía en la conversación')
         procesados.push({ ...base, resultado: 'YA_ENVIADO', detalle: 'El comprador ya tenía esta guía en la conversación', mensaje: null })
         continue
@@ -131,7 +139,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       })
       // Relectura: la moderación de ML dice si el comprador lo recibe.
       const despues = await mensajesDeOrden(db, orden.conexionId, o).catch(() => [])
-      const nuestro = despues.filter(m => m.propio && m.texto.includes(base.guia)).pop()
+      const nuestro = despues.filter(m => esReporteNuestro(m, base.guia)).pop()
       const mod = nuestro?.moderacion ?? null
       if (mod && !['clean', 'non_moderated'].includes(mod)) {
         await cerrar('RECHAZADO', `moderación ${mod}`)
