@@ -96,7 +96,7 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
           <button key={m.mes} onClick={() => { setQ(''); setBuscado(''); setMes(m.mes) }}
             className={`text-left rounded-lg border px-3 py-1.5 transition-colors ${
               mesActual === m.mes ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 hover:border-neutral-400'}`}>
-            <div className="text-sm font-medium">📁 {nombreMes(m.mes)}</div>
+            <div className="text-sm font-medium">{nombreMes(m.mes)}</div>
             <div className={`text-[11px] ${mesActual === m.mes ? 'text-neutral-300' : 'text-neutral-400'}`}>{m.dias} día(s) · {m.envios} envíos</div>
           </button>
         ))}
