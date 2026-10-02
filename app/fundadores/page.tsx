@@ -1,6 +1,5 @@
 import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
-import { marca } from '@/lib/marca'
 import { RONDA_ACTUAL, fechaTanda } from '@/lib/fundadores'
 import FormularioFundadores from '@/components/fundadores/FormularioFundadores'
 
@@ -27,7 +26,6 @@ const INCLUYE = [
 // (5 + 5 = 10 pioneros) y el formulario. Lo de la base se lee en cada visita.
 export default async function FundadoresPage() {
   await connection()
-  const m = marca()
   const { rows: tandas } = await dbGlobal().query<Tanda>(
     `SELECT t.numero, t.cupos, t.abierta, to_char(t.inicia, 'YYYY-MM-DD') AS inicia,
             (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
@@ -44,15 +42,11 @@ export default async function FundadoresPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 w-[24rem] h-[24rem] rounded-full border border-lime-400/20" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 w-[14rem] h-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
 
-        <div className="relative max-w-5xl mx-auto px-5 sm:px-8 pt-8 pb-14 sm:pb-20">
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={m.logo} alt="" className={`h-10 w-10 ${m.logoRedondo ? 'rounded-xl' : ''}`} />
-            <span className="text-base font-semibold tracking-tight">{m.nombre}</span>
-          </div>
-
-          <div className="mt-12 sm:mt-16 max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">Programa Fundadores</p>
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-8 pt-10 sm:pt-14 pb-14 sm:pb-20">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">
+              Programa Fundadores <span className="text-neutral-500">·</span> El Comerciante Digital
+            </p>
             <h1 className="mt-3 text-4xl sm:text-5xl font-semibold leading-[1.1] tracking-tight">
               Sé uno de los <span className="text-lime-400">10 primeros.</span>
             </h1>
