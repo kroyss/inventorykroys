@@ -45,7 +45,7 @@ function Respuestas({ s }: { s: Solicitud }) {
                 <span key={o.valor} className={`rounded-md px-2 py-0.5 text-[13px] ${
                   'descarta' in o && o.descarta ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200'
                   : o.puntos > 0 ? 'bg-lime-50 text-lime-900 ring-1 ring-inset ring-lime-300'
-                  : 'bg-neutral-100 text-neutral-600'}`}>{o.texto}</span>
+                  : 'bg-white text-neutral-600 ring-1 ring-inset ring-neutral-300'}`}>{o.texto}</span>
               ))}
             </dd>
             <dd className={`text-xs text-right py-0.5 num ${pts > 0 ? 'text-lime-700 font-medium' : 'text-neutral-300'}`}>+{pts}</dd>
@@ -182,6 +182,13 @@ export default function FundadoresPanel() {
           <button onClick={() => setAviso(null)} aria-label="Cerrar" className="ml-auto text-lime-700 hover:text-lime-900">✕</button>
         </div>
       )}
+
+      <p className="text-xs text-neutral-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+        Las pastillas son lo que marcó:
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-lime-50 ring-1 ring-inset ring-lime-300" />suma puntos</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-white ring-1 ring-inset ring-neutral-300" />marcada, no suma</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-50 ring-1 ring-inset ring-red-200" />descarta (&lt; 30 ventas)</span>
+      </p>
 
       {lista.length === 0 ? (
         <p className="text-sm text-neutral-400 py-6 text-center">No hay solicitudes en esta vista.</p>
