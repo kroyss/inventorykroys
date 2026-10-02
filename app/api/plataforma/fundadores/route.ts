@@ -12,7 +12,7 @@ export async function GET() {
     const db = dbGlobal()
     const [{ rows: solicitudes }, { rows: tandas }] = await Promise.all([
       db.query(
-        `SELECT id, nombre, telegram, nick_ml, mensaje, ventas_mes, cuentas, despacho, dolor, inventario, puntaje, estado,
+        `SELECT id, nombre, telegram, nick_ml, mensaje, ventas_mes, cuentas, despacho, dolor, inventario, compromiso, puntaje, estado,
                 tanda, sospechosa, ml_verificado, notas, created_at, revisada_at
          FROM fundadores_solicitudes WHERE ronda = $1
          ORDER BY CASE estado WHEN 'calificado' THEN 0 WHEN 'aprobado' THEN 1 WHEN 'rechazado' THEN 2 ELSE 3 END,

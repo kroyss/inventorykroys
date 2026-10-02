@@ -16,6 +16,7 @@ function navegadorId() {
 
 interface Props {
   abierta: boolean            // hoy cae en los días de inscripción de una tanda
+  previa?: boolean            // /fundadores?vista=previa: se ve el formulario completo pero no se envía
   proxima: string | null      // "domingo 11 y lunes 12 de octubre" (próxima inscripción)
   resultados: string | null   // "martes 6 de octubre" (cuándo se anuncia la selección)
 }
@@ -23,7 +24,7 @@ interface Props {
 // Un paso por pregunta (las de una opción avanzan solas al elegir) y un último paso de contacto.
 const PASOS = PREGUNTAS.length + 1
 
-export default function FormularioFundadores({ abierta, proxima, resultados }: Props) {
+export default function FormularioFundadores({ abierta, previa = false, proxima, resultados }: Props) {
   const [paso, setPaso] = useState(0)
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
   const [contacto, setContacto] = useState({ nombre: '', telegram: '', nick_ml: '', mensaje: '' })
@@ -58,6 +59,7 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
     setError(null)
     const faltan = PREGUNTAS.findIndex(p => !resp[p.campo]?.length)
     if (faltan >= 0) { setPaso(faltan); setError('Falta responder esta pregunta'); return }
+    if (previa) { setError('Vista previa: la solicitud no se envía.'); return }
     setEnviando(true)
     try {
       const body = {
@@ -94,7 +96,7 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
     )
   }
 
-  if (!abierta) {
+  if (!abierta && !previa) {
     return (
       <section id="solicitud" className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm self-start">
         <h2 className="text-xl font-semibold text-neutral-900">Solicitud</h2>
@@ -128,6 +130,11 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
         <div className="h-full bg-lime-400 transition-[width] duration-300" style={{ width: `${((paso + 1) / PASOS) * 100}%` }} />
       </div>
 
+      {previa && (
+        <p className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs px-6 py-2">
+          Vista previa: puedes recorrer todas las preguntas, pero la solicitud no se envía.
+        </p>
+      )}
       <div className="p-6 sm:p-8">
         <div className="flex items-center justify-between text-xs text-neutral-400">
           <span className="font-semibold uppercase tracking-[0.15em] text-neutral-500">Solicitud</span>
@@ -143,7 +150,7 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
           <fieldset key={pregunta.campo} className="mt-4">
             <legend className="text-lg font-semibold text-neutral-900 leading-snug">{pregunta.texto}</legend>
             <p className="mt-1 text-sm text-neutral-400">
-              {pregunta.multiple ? 'Puedes marcar varias.' : paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.'}
+              {pregunta.ayuda ?? (pregunta.multiple ? 'Puedes marcar varias.' : paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.')}
             </p>
             <div className="mt-5 space-y-2" role={pregunta.multiple ? 'group' : 'radiogroup'}>
               {pregunta.opciones.map(o => {

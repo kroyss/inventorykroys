@@ -9,7 +9,11 @@
 
 export interface Opcion { valor: string; texto: string; puntos: number; descarta?: boolean }
 // multiple: se marcan varias (se guardan separadas por coma y suman los puntos de cada una).
-export interface Pregunta { campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario'; texto: string; opciones: Opcion[]; multiple?: boolean }
+// ayuda: explicación corta bajo la pregunta (en lugar de "Elige una.").
+export interface Pregunta {
+  campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario' | 'compromiso'
+  texto: string; ayuda?: string; opciones: Opcion[]; multiple?: boolean
+}
 
 export const PREGUNTAS: Pregunta[] = [
   {
@@ -47,13 +51,25 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'que_vender', texto: 'Saber qué vender o qué traer', puntos: 0 },
     ],
   },
+  // Qué usa hoy (columna `inventario`): solo informativa, para preparar la configuración. Lo que
+  // pesa es el compromiso de abajo (decidido con el dueño, 2026-10-02): el que no usa nada y el que
+  // ya tiene sistema pueden sacar el máximo si se comprometen a llevar TODO aquí.
   {
-    campo: 'inventario', texto: '¿Cómo llevas tu inventario hoy?',
+    campo: 'inventario', texto: '¿Hoy usas algún sistema para llevar tu negocio?',
     opciones: [
-      { valor: 'excel', texto: 'En Excel o un cuaderno', puntos: 1 },
-      { valor: 'nada', texto: 'No lo llevo', puntos: 1 },
-      { valor: 'sistema_basico', texto: 'En otro sistema o app no oficial', puntos: 1 },
-      { valor: 'facturacion_oficial', texto: 'En un sistema de facturación oficial', puntos: 0 },
+      { valor: 'ninguno', texto: 'No, lo llevo en Excel, en un cuaderno o no lo llevo', puntos: 0 },
+      { valor: 'facturacion_oficial', texto: 'Sí, un sistema de facturación oficial', puntos: 0 },
+      { valor: 'otro_sistema', texto: 'Sí, otro sistema o app', puntos: 0 },
+    ],
+  },
+  {
+    campo: 'compromiso', texto: '¿Llevarías tus ventas y tu stock dentro del sistema?',
+    ayuda: 'Para que te ahorre tiempo de verdad, tus ventas de MercadoLibre y tu stock tienen que estar dentro del sistema. Cargar una venta es poner el número de orden: el sistema completa el resto.',
+    opciones: [
+      { valor: 'todo', texto: 'Sí, llevaría todas mis ventas y mi stock en el sistema', puntos: 3 },
+      { valor: 'ademas', texto: 'Ya tengo otro sistema, pero igual cargaría todas mis ventas aquí', puntos: 3 },
+      { valor: 'partes', texto: 'Solo quiero usar algunas partes (preguntas, guías…)', puntos: 0 },
+      { valor: 'no', texto: 'Prefiero no cargar mis ventas', puntos: 0, descarta: true },
     ],
   },
 ]

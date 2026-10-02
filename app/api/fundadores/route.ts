@@ -55,6 +55,7 @@ const Solicitud = z.object({
   despacho: opciones('despacho'),
   dolor: opciones('dolor'),
   inventario: opcion('inventario'),
+  compromiso: opcion('compromiso'),
   navegador_id: z.string().max(64).optional(),
   sitio: z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena
 })
@@ -113,12 +114,12 @@ export async function POST(req: NextRequest) {
     await db.query(
       `INSERT INTO fundadores_solicitudes
          (ronda, nombre, telegram, nick_ml, ventas_mes, cuentas, despacho, dolor, inventario,
-          puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje, compromiso)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (ronda, telegram) DO NOTHING`,
       [RONDA_ACTUAL, s.nombre, s.telegram, s.nick_ml, s.ventas_mes, s.cuentas, s.despacho, s.dolor, s.inventario,
        puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null,
-       s.mensaje])
+       s.mensaje, s.compromiso])
     return NextResponse.json({ ok: true })
   } catch (err) {
     return apiError(err)

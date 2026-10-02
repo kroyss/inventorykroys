@@ -9,7 +9,7 @@ interface Verif {
 }
 interface Solicitud {
   id: number; nombre: string; telegram: string; nick_ml: string | null; mensaje: string | null
-  ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string
+  ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; compromiso: string | null
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'rechazado'; tanda: number | null
   sospechosa: string | null; ml_verificado: Verif | null; notas: string | null; created_at: string
 }
@@ -32,14 +32,14 @@ const FILTRO: Record<Filtro, string> = {
 
 // Respuestas en filas: etiqueta corta + una pastilla por opción (verde = suma puntos) + los puntos de la fila.
 const ETIQUETA: Record<Pregunta['campo'], string> = {
-  ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Inventario',
+  ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Usa sistema', compromiso: 'Compromiso',
 }
 
 function Respuestas({ s }: { s: Solicitud }) {
   return (
     <dl className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 text-sm">
-      {PREGUNTAS.map(p => {
-        const elegidas = s[p.campo].split(',').map(v => p.opciones.find(o => o.valor === v) ?? { valor: v, texto: v, puntos: 0 })
+      {PREGUNTAS.filter(p => s[p.campo] != null).map(p => {
+        const elegidas = s[p.campo]!.split(',').map(v => p.opciones.find(o => o.valor === v) ?? { valor: v, texto: v, puntos: 0 })
         const pts = elegidas.reduce((a, o) => a + o.puntos, 0)
         return (
           <div key={p.campo} className="contents">

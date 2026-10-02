@@ -34,7 +34,10 @@ const INCLUYE = [
 
 // Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas
 // (5 + 5 = 10 pioneros) y el formulario. Lo de la base se lee en cada visita.
-export default async function FundadoresPage() {
+// ?vista=previa: muestra el formulario aunque la inscripción esté cerrada, sin poder enviarlo
+// (para revisar cómo quedan las preguntas).
+export default async function FundadoresPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
+  const previa = (await searchParams).vista === 'previa'
   await connection()
   const { rows: tandas } = await dbGlobal().query<Tanda>(
     `SELECT t.numero, t.cupos, t.abierta, to_char(t.inscribe_desde, 'YYYY-MM-DD') AS inscribe_desde,
@@ -163,6 +166,7 @@ export default async function FundadoresPage() {
 
         <FormularioFundadores
           abierta={!!abiertaHoy}
+          previa={previa && !abiertaHoy}
           proxima={proxima ? diasInscripcion(proxima) : null}
           resultados={abiertaHoy ? fechaTanda(diaResultados(abiertaHoy)) : null} />
       </main>
