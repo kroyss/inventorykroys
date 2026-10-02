@@ -4,11 +4,11 @@ import { PageHeader } from '@/components/ui'
 
 interface Video {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string
-  visto_seg: number; duracion_seg: number; completado: boolean
+  visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
 }
 
 // API de YouTube (iframe), lo mínimo que se usa.
-interface YTPlayer { getCurrentTime(): number; getDuration(): number; getPlayerState(): number; destroy(): void }
+interface YTPlayer { getCurrentTime(): number; getDuration(): number; getPlayerState(): number; setPlaybackRate(r: number): void; destroy(): void }
 declare global {
   interface Window {
     YT?: { Player: new (el: HTMLElement, o: object) => YTPlayer; PlayerState: { PLAYING: number; ENDED: number; PAUSED: number } }
@@ -28,7 +28,7 @@ function cargarApiYoutube() {
   return apiYoutube
 }
 
-const COMPLETO = 0.9
+const COMPLETO = 0.8
 const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto_seg / v.duracion_seg * 100)) : 0)
 
 /** Aprendizaje: videos en orden (el siguiente se habilita al completar el anterior), dentro de la web. */
@@ -146,36 +146,64 @@ export default function AprendizajeClient() {
   )
 }
 
-/** Video de YouTube incrustado que cuenta los segundos REALMENTE reproducidos (saltar no suma) y
- *  los guarda cada 10 s, al pausar y al terminar. */
+/** Video de YouTube incrustado que cuenta los segundos REALMENTE reproducidos (saltar no suma; a 2x
+ *  cuenta igual), sigue desde donde quedó y guarda cada 5 s, al pausar y al cerrar/recargar la página. */
+const VELOCIDADES = [1, 1.25, 1.5, 2]
+
 function Reproductor({ video, onAvance }: {
   video: Video; onAvance: (id: number, visto: number, duracion: number, completado: boolean) => void
 }) {
   const caja = useRef<HTMLDivElement>(null)
+  const playerRef = useRef<YTPlayer | null>(null)
+  const [velocidad, setVelocidad] = useState(1)
   const avanceRef = useRef(onAvance)
   useEffect(() => { avanceRef.current = onAvance }, [onAvance])
-  // Lo visto antes se toma UNA vez al montar: el avance de este mismo video no debe recrear el reproductor.
-  const inicial = useRef({ visto: video.visto_seg, completado: video.completado })
+  // Lo de antes se toma UNA vez al montar: el avance de este mismo video no debe recrear el reproductor.
+  const inicial = useRef({ visto: video.visto_seg, completado: video.completado, posicion: video.posicion_seg, duracion: video.duracion_seg })
+
+  const cambiarVelocidad = (v: number) => {
+    setVelocidad(v)
+    try { playerRef.current?.setPlaybackRate(v) } catch { /* todavía no cargó */ }
+  }
 
   useEffect(() => {
     let player: YTPlayer | null = null
     let visto = inicial.current.visto    // lo ya visto antes (en el servidor)
-    let ultimo = -1, guardado = visto, completado = inicial.current.completado
+    let ultimo = -1, guardado = -1, completado = inicial.current.completado
     let vivo = true
 
-    const guardar = async () => {
-      if (!player) return
+    const cuerpo = () => {
+      if (!player) return null
       const duracion = Math.round(player.getDuration() || 0)
-      if (duracion <= 0 || Math.floor(visto) <= guardado) return
-      guardado = Math.floor(visto)
+      if (duracion <= 0) return null
+      return { video_id: video.id, visto_seg: Math.floor(visto), duracion_seg: duracion,
+               posicion_seg: Math.floor(player.getCurrentTime?.() ?? 0) }
+    }
+    const guardar = async () => {
+      const b = cuerpo()
+      if (!b) return
+      const clave = b.visto_seg * 100000 + b.posicion_seg
+      if (clave === guardado) return
+      guardado = clave
       const r = await fetch('/api/aprendizaje/progreso', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_id: video.id, visto_seg: guardado, duracion_seg: duracion }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b),
       }).catch(() => null)
       const d = r?.ok ? await r.json().catch(() => null) : null
       if (d?.completado) completado = true
-      if (vivo) avanceRef.current(video.id, guardado, duracion, completado)
+      if (vivo) avanceRef.current(video.id, b.visto_seg, b.duracion_seg, completado)
     }
+    // Al recargar (F5) o cerrar la pestaña: se manda igual (sendBeacon no espera respuesta).
+    const alSalir = () => {
+      const b = cuerpo()
+      if (b) navigator.sendBeacon?.('/api/aprendizaje/progreso', new Blob([JSON.stringify(b)], { type: 'application/json' }))
+    }
+    const alOcultar = () => { if (document.visibilityState === 'hidden') alSalir() }
+    window.addEventListener('pagehide', alSalir)
+    document.addEventListener('visibilitychange', alOcultar)
+
+    // Sigue desde donde quedó (si no lo terminó y no está al final).
+    const { posicion, duracion: durAntes } = inicial.current
+    const desde = !inicial.current.completado && posicion > 3 && (!durAntes || posicion < durAntes - 5) ? posicion : 0
 
     let tick: ReturnType<typeof setInterval> | undefined
     let cuenta = 0
@@ -187,7 +215,7 @@ function Reproductor({ video, onAvance }: {
         videoId: video.youtube_id,
         host: 'https://www.youtube-nocookie.com',
         width: '100%', height: '100%',
-        playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+        playerVars: { rel: 0, modestbranding: 1, playsinline: 1, ...(desde ? { start: Math.floor(desde) } : {}) },
         events: {
           onStateChange: (e: { data: number }) => {
             const S = window.YT!.PlayerState
@@ -195,15 +223,16 @@ function Reproductor({ video, onAvance }: {
           },
         },
       })
+      playerRef.current = player
       tick = setInterval(() => {
         if (!player || !window.YT) return
         const t = player.getCurrentTime?.() ?? 0
         if (player.getPlayerState?.() === window.YT.PlayerState.PLAYING) {
           const d = t - ultimo
-          if (ultimo >= 0 && d > 0 && d <= 2.5) visto += d    // solo avance normal: un salto no suma
+          if (ultimo >= 0 && d > 0 && d <= 2.5) visto += d    // avance normal (hasta 2x): un salto no suma
           const duracion = player.getDuration() || 0
           if (duracion > 0) visto = Math.min(visto, duracion)
-          if (++cuenta % 10 === 0) guardar()
+          if (++cuenta % 5 === 0) guardar()
         }
         ultimo = t
       }, 1000)
@@ -211,10 +240,26 @@ function Reproductor({ video, onAvance }: {
 
     return () => {
       vivo = false
+      window.removeEventListener('pagehide', alSalir)
+      document.removeEventListener('visibilitychange', alOcultar)
       if (tick) clearInterval(tick)
+      playerRef.current = null
       guardar().finally(() => { try { player?.destroy() } catch { /* ya no está */ } })
     }
   }, [video.id, video.youtube_id])
 
-  return <div ref={caja} className="aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 [&>*]:w-full [&>*]:h-full" />
+  return (
+    <div className="space-y-2">
+      <div ref={caja} className="aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 [&>*]:w-full [&>*]:h-full" />
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+        Velocidad:
+        {VELOCIDADES.map(v => (
+          <button key={v} onClick={() => cambiarVelocidad(v)}
+            className={`px-2 py-0.5 rounded-full border ${velocidad === v ? 'bg-neutral-900 text-white border-neutral-900' : 'border-neutral-300 hover:border-neutral-500'}`}>
+            {v}x
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }

@@ -1,12 +1,12 @@
 // Alertas de stock (migración 052): lo que queda publicado en MercadoLibre, por publicación y por
 // variante. Lee TODAS las publicaciones activas (y las pausadas por falta de stock: ML las pausa
 // solo al llegar a 0) de cada cuenta conectada; no depende de los códigos ML de los productos.
-// Solo lee de MercadoLibre. Lo corre el cron de preguntas, una vez por hora por cuenta.
+// Solo lee de MercadoLibre. Lo corre el cron de preguntas, cada 2 horas por cuenta.
 import type { Pool } from 'pg'
 import { mlFetch } from '@/lib/ml'
 
 export const UMBRAL_DEFAULT = 3            // "por agotarse" = menos de esto (por empresa en Ajustes del módulo)
-export const MINUTOS_ENTRE_REVISIONES = 60
+export const MINUTOS_ENTRE_REVISIONES = 120   // cada 2 h por cuenta: cuida las llamadas a ML al crecer
 const POR_MULTIGET = 20                    // máximo de ML en /items?ids=
 
 interface ItemML {
@@ -101,7 +101,7 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
   return { publicaciones }
 }
 
-/** Para el cron: revisa UNA cuenta por pasada, la más atrasada, si pasó la hora. */
+/** Para el cron: revisa UNA cuenta por pasada, la más atrasada, si pasaron las 2 horas. */
 export async function revisarStockPendiente(db: Pool) {
   const { rows: [c] } = await db.query(
     `SELECT id FROM ml_conexiones

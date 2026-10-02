@@ -42,7 +42,10 @@ export default function AlertasStockClient() {
 
   const revisar = async () => {
     setRevisando(true)
-    try { await fetch('/api/alertas-stock/revisar', { method: 'POST' }) } finally { setRevisando(false); setVez(n => n + 1) }
+    try {
+      const r = await fetch('/api/alertas-stock/revisar', { method: 'POST' })
+      if (r.status === 429) alert('Ya se revisó hace menos de 10 minutos. Vuelve a intentarlo en un rato.')
+    } finally { setRevisando(false); setVez(n => n + 1) }
   }
   const guardarUmbral = async () => {
     const n = parseInt(umbral, 10)
@@ -62,7 +65,7 @@ export default function AlertasStockClient() {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
         <span>
-          Se revisa sola cada hora{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
+          Se revisa sola cada 2 horas{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
         </span>
         {datos?.esAdmin && (
           <label className="flex items-center gap-1.5">

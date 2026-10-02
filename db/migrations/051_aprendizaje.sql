@@ -21,10 +21,13 @@ CREATE TABLE IF NOT EXISTS aprendizaje_progreso (
   video_id      INTEGER NOT NULL REFERENCES aprendizaje_videos(id) ON DELETE CASCADE,
   visto_seg     INTEGER NOT NULL DEFAULT 0,   -- segundos REALMENTE reproducidos (saltar no suma)
   duracion_seg  INTEGER NOT NULL DEFAULT 0,
-  completado_at TIMESTAMPTZ,                  -- al llegar al 90%
+  posicion_seg  INTEGER NOT NULL DEFAULT 0,   -- dónde quedó (para seguir desde ahí al volver)
+  completado_at TIMESTAMPTZ,                  -- al llegar al 80%
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, video_id)
 );
+
+ALTER TABLE aprendizaje_progreso ADD COLUMN IF NOT EXISTS posicion_seg INTEGER NOT NULL DEFAULT 0;
 
 -- Ajustes de la plataforma (globales): p. ej. el link de "Agenda tu configuración".
 CREATE TABLE IF NOT EXISTS plataforma_ajustes (
