@@ -80,7 +80,12 @@ export default async function FundadoresPage() {
               )
             })}
           </div>
-          <p className="mt-3 text-xs text-neutral-500">{tomados} de {total} pioneros confirmados</p>
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <a href="#solicitud" className="inline-flex items-center gap-2 bg-lime-400 text-neutral-950 px-5 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors">
+              Quiero mi cupo <span aria-hidden="true">↓</span>
+            </a>
+            <span className="text-xs text-neutral-500">{tomados} de {total} pioneros confirmados</span>
+          </div>
         </div>
       </section>
 

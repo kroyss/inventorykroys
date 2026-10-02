@@ -63,7 +63,7 @@ export default function FormularioFundadores() {
 
   const campo = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
   return (
-    <form onSubmit={enviar} className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm space-y-6 self-start">
+    <form id="solicitud" onSubmit={enviar} className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm space-y-6 self-start">
       <div>
         <h2 className="text-xl font-semibold text-neutral-900">Solicitud</h2>
         <p className="mt-1 text-sm text-neutral-500">Toma 2 minutos. Una solicitud por persona.</p>
