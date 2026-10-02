@@ -64,7 +64,7 @@ export const PREGUNTAS: Pregunta[] = [
   },
   {
     campo: 'compromiso', texto: '¿Llevarías tus ventas y tu stock dentro del sistema?',
-    ayuda: 'Para que te ahorre tiempo de verdad, tus ventas de MercadoLibre y tu stock tienen que estar dentro del sistema. Cargar una venta es poner el número de orden: el sistema completa el resto.',
+    ayuda: 'Para que te ahorre tiempo de verdad, tus ventas de MercadoLibre y tu stock tienen que estar dentro del sistema.',
     opciones: [
       { valor: 'todo', texto: 'Sí, llevaría mis ventas y mi stock en el sistema', puntos: 3 },
       { valor: 'ademas', texto: 'Ya tengo otro sistema, pero igual cargaría mis ventas aquí', puntos: 3 },
