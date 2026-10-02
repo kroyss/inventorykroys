@@ -1,5 +1,5 @@
 'use client'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { MENSAJE_MAX, PREGUNTAS, type Pregunta } from '@/lib/fundadores'
 
 type Campo = Pregunta['campo']
@@ -20,24 +20,49 @@ interface Props {
   resultados: string | null   // "martes 6 de octubre" (cuándo se anuncia la selección)
 }
 
+// Un paso por pregunta (las de una opción avanzan solas al elegir) y un último paso de contacto.
+const PASOS = PREGUNTAS.length + 1
+
 export default function FormularioFundadores({ abierta, proxima, resultados }: Props) {
+  const [paso, setPaso] = useState(0)
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
-  const [mensaje, setMensaje] = useState('')
+  const [contacto, setContacto] = useState({ nombre: '', telegram: '', nick_ml: '', mensaje: '' })
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hecho, setHecho] = useState<{ nombre: string; telegram: string; repetida: boolean } | null>(null)
+  const caja = useRef<HTMLFormElement>(null)
+  const avance = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // Al cambiar de paso, si el inicio del formulario quedó fuera de la pantalla (celular), volver a él.
+  useEffect(() => {
+    const el = caja.current
+    if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [paso])
+  useEffect(() => () => clearTimeout(avance.current), [])
+
+  const ir = (n: number) => { clearTimeout(avance.current); setError(null); setPaso(Math.max(0, Math.min(PASOS - 1, n))) }
+
+  function elegir(p: Pregunta, valor: string) {
+    const ya = resp[p.campo] ?? []
+    if (p.multiple) {
+      setResp(r => ({ ...r, [p.campo]: ya.includes(valor) ? ya.filter(v => v !== valor) : [...ya, valor] }))
+      return
+    }
+    setResp(r => ({ ...r, [p.campo]: [valor] }))
+    clearTimeout(avance.current)
+    avance.current = setTimeout(() => setPaso(n => Math.min(PASOS - 1, n + 1)), 220)
+  }
 
   async function enviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
-    const f = new FormData(e.currentTarget)
-    const faltan = PREGUNTAS.filter(p => !resp[p.campo]?.length)
-    if (faltan.length) { setError(`Falta responder: ${faltan[0].texto}`); return }
+    const faltan = PREGUNTAS.findIndex(p => !resp[p.campo]?.length)
+    if (faltan >= 0) { setPaso(faltan); setError('Falta responder esta pregunta'); return }
     setEnviando(true)
     try {
       const body = {
-        nombre: String(f.get('nombre') ?? ''), telegram: String(f.get('telegram') ?? ''),
-        nick_ml: String(f.get('nick_ml') ?? ''), sitio: String(f.get('sitio') ?? ''), mensaje,
+        ...contacto,
+        sitio: String(new FormData(e.currentTarget).get('sitio') ?? ''),
         navegador_id: navegadorId(),
         ...Object.fromEntries(PREGUNTAS.map(p => [p.campo, p.multiple ? resp[p.campo] : resp[p.campo]?.[0]])),
       }
@@ -90,86 +115,117 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
     )
   }
 
+  const pregunta = PREGUNTAS[paso] as Pregunta | undefined
+  const listo = pregunta ? !!resp[pregunta.campo]?.length : true
   const campo = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
+  const set = (k: keyof typeof contacto) => (e: { target: { value: string } }) => setContacto(c => ({ ...c, [k]: e.target.value }))
+
   return (
-    <form id="solicitud" onSubmit={enviar} className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm space-y-6 self-start">
-      <div>
-        <h2 className="text-xl font-semibold text-neutral-900">Solicitud</h2>
-        <p className="mt-1 text-sm text-neutral-500">
-          Toma 2 minutos. Una solicitud por persona.{resultados && ` La selección se anuncia el ${resultados}.`}
-        </p>
+    <form ref={caja} id="solicitud" onSubmit={enviar}
+      className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white shadow-sm self-start overflow-hidden">
+      {/* Progreso */}
+      <div className="h-1 bg-neutral-100" aria-hidden="true">
+        <div className="h-full bg-lime-400 transition-[width] duration-300" style={{ width: `${((paso + 1) / PASOS) * 100}%` }} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor="nombre" className="block text-sm font-medium text-neutral-700 mb-1">Tu nombre</label>
-          <input id="nombre" name="nombre" required maxLength={80} autoComplete="name" className={campo} />
+      <div className="p-6 sm:p-8">
+        <div className="flex items-center justify-between text-xs text-neutral-400">
+          <span className="font-semibold uppercase tracking-[0.15em] text-neutral-500">Solicitud</span>
+          <span className="num">Paso {paso + 1} de {PASOS}</span>
         </div>
-        <div>
-          <label htmlFor="telegram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Telegram</label>
-          <input id="telegram" name="telegram" required maxLength={80} placeholder="@tuusuario"
-            autoCapitalize="none" spellCheck={false} className={campo} />
-          <p className="mt-1 text-xs text-neutral-400">Por aquí te escribimos si quedas.</p>
-        </div>
-        <div>
-          <label htmlFor="nick_ml" className="block text-sm font-medium text-neutral-700 mb-1">
-            Nick de MercadoLibre <span className="font-normal text-neutral-400">(opcional)</span>
-          </label>
-          <input id="nick_ml" name="nick_ml" maxLength={40} autoCapitalize="none" spellCheck={false} className={campo} />
-          <p className="mt-1 text-xs text-neutral-400">Solo para ver tu reputación pública. No accedemos a tu cuenta.</p>
-        </div>
-      </div>
 
-      {/* Trampa para bots: invisible para personas */}
-      <div aria-hidden="true" className="absolute -left-[9999px] w-px h-px overflow-hidden">
-        <label>Sitio web <input name="sitio" tabIndex={-1} autoComplete="off" /></label>
-      </div>
+        {/* Trampa para bots: invisible para personas */}
+        <div aria-hidden="true" className="absolute -left-[9999px] w-px h-px overflow-hidden">
+          <label>Sitio web <input name="sitio" tabIndex={-1} autoComplete="off" /></label>
+        </div>
 
-      {PREGUNTAS.map((p, i) => (
-        <fieldset key={p.campo}>
-          <legend className="text-sm font-medium text-neutral-800">
-            {i + 1}. {p.texto}
-            {p.multiple && <span className="ml-1.5 font-normal text-neutral-400">(puedes marcar varias)</span>}
-          </legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {p.opciones.map(o => {
-              const on = !!resp[p.campo]?.includes(o.valor)
-              return (
-                <label key={o.valor}
-                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm cursor-pointer transition-colors ${
-                    on ? 'border-lime-500 bg-lime-50 text-neutral-900' : 'border-neutral-200 text-neutral-700 hover:border-neutral-400'}`}>
-                  <input type={p.multiple ? 'checkbox' : 'radio'} name={p.campo} value={o.valor} checked={on}
-                    onChange={() => setResp(r => {
-                      const ya = r[p.campo] ?? []
-                      return { ...r, [p.campo]: !p.multiple ? [o.valor] : on ? ya.filter(v => v !== o.valor) : [...ya, o.valor] }
-                    })}
-                    className="accent-lime-600" />
-                  {o.texto}
+        {pregunta ? (
+          <fieldset key={pregunta.campo} className="mt-4">
+            <legend className="text-lg font-semibold text-neutral-900 leading-snug">{pregunta.texto}</legend>
+            <p className="mt-1 text-sm text-neutral-400">
+              {pregunta.multiple ? 'Puedes marcar varias.' : paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.'}
+            </p>
+            <div className="mt-5 space-y-2" role={pregunta.multiple ? 'group' : 'radiogroup'}>
+              {pregunta.opciones.map(o => {
+                const on = !!resp[pregunta.campo]?.includes(o.valor)
+                return (
+                  <button key={o.valor} type="button" onClick={() => elegir(pregunta, o.valor)}
+                    role={pregunta.multiple ? 'checkbox' : 'radio'} aria-checked={on}
+                    className={`w-full flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-[15px] transition-colors ${
+                      on ? 'border-lime-500 bg-lime-50 text-neutral-900 font-medium' : 'border-neutral-200 text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50'}`}>
+                    {o.texto}
+                    <span aria-hidden="true" className={`grid place-items-center w-5 h-5 shrink-0 border transition-colors ${
+                      pregunta.multiple ? 'rounded-md' : 'rounded-full'} ${on ? 'bg-lime-500 border-lime-500 text-white' : 'border-neutral-300'}`}>
+                      {on && <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3.5 8.5 3 3 6-7" /></svg>}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+        ) : (
+          <div className="mt-4">
+            <h3 className="text-lg font-semibold text-neutral-900">¿Dónde te escribimos?</h3>
+            <p className="mt-1 text-sm text-neutral-400">Si quedas seleccionado, te contactamos por Telegram.</p>
+            <div className="mt-5 space-y-4">
+              <div>
+                <label htmlFor="nombre" className="block text-sm font-medium text-neutral-700 mb-1">Tu nombre</label>
+                <input id="nombre" value={contacto.nombre} onChange={set('nombre')} required maxLength={80} autoComplete="name" className={campo} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="telegram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Telegram</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400" aria-hidden="true">@</span>
+                    <input id="telegram" value={contacto.telegram} onChange={set('telegram')} required maxLength={80} placeholder="tuusuario"
+                      autoCapitalize="none" spellCheck={false} className={`${campo} pl-7`} />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="nick_ml" className="block text-sm font-medium text-neutral-700 mb-1">
+                    Nick de MercadoLibre <span className="font-normal text-neutral-400">(opcional)</span>
+                  </label>
+                  <input id="nick_ml" value={contacto.nick_ml} onChange={set('nick_ml')} maxLength={40}
+                    autoCapitalize="none" spellCheck={false} className={campo} />
+                </div>
+              </div>
+              <p className="-mt-2 text-xs text-neutral-400">Con el nick solo vemos tu reputación pública: no accedemos a tu cuenta.</p>
+              <div>
+                <label htmlFor="mensaje" className="block text-sm font-medium text-neutral-700 mb-1">
+                  ¿Algo más que quieras contarnos? <span className="font-normal text-neutral-400">(opcional)</span>
                 </label>
-              )
-            })}
+                <textarea id="mensaje" rows={3} maxLength={MENSAJE_MAX} value={contacto.mensaje} onChange={set('mensaje')}
+                  placeholder="Qué vendes, qué te gustaría resolver, por qué quieres ser Fundador…"
+                  className={`${campo} resize-none`} />
+                <p className={`mt-1 text-right text-xs num ${contacto.mensaje.length >= MENSAJE_MAX ? 'text-amber-600' : 'text-neutral-400'}`}>
+                  {contacto.mensaje.length}/{MENSAJE_MAX}
+                </p>
+              </div>
+            </div>
           </div>
-        </fieldset>
-      ))}
+        )}
 
-      <div>
-        <label htmlFor="mensaje" className="block text-sm font-medium text-neutral-800">
-          ¿Algo más que quieras contarnos? <span className="font-normal text-neutral-400">(opcional)</span>
-        </label>
-        <textarea id="mensaje" rows={3} maxLength={MENSAJE_MAX} value={mensaje} onChange={e => setMensaje(e.target.value)}
-          placeholder="Qué vendes, qué te gustaría resolver, por qué quieres ser Fundador…"
-          className={`${campo} mt-2 resize-none`} />
-        <p className={`mt-1 text-right text-xs num ${mensaje.length >= MENSAJE_MAX ? 'text-amber-600' : 'text-neutral-400'}`}>
-          {mensaje.length}/{MENSAJE_MAX}
-        </p>
+        {error && <p role="alert" className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+
+        <div className="mt-6 flex items-center justify-between gap-3">
+          {paso > 0
+            ? <button type="button" onClick={() => ir(paso - 1)} className="text-sm text-neutral-500 hover:text-neutral-900 px-1 py-2">← Atrás</button>
+            : <span />}
+          {pregunta ? (
+            (pregunta.multiple || listo) && (
+              <button type="button" disabled={!listo} onClick={() => ir(paso + 1)}
+                className="bg-neutral-900 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-neutral-700 transition-colors disabled:opacity-30">
+                Continuar
+              </button>
+            )
+          ) : (
+            <button type="submit" disabled={enviando}
+              className="bg-lime-400 text-neutral-950 px-6 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors disabled:opacity-50">
+              {enviando ? 'Enviando…' : 'Enviar solicitud'}
+            </button>
+          )}
+        </div>
       </div>
-
-      {error && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-
-      <button type="submit" disabled={enviando}
-        className="w-full bg-lime-400 text-neutral-950 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors disabled:opacity-50">
-        {enviando ? 'Enviando…' : 'Enviar solicitud'}
-      </button>
     </form>
   )
 }
