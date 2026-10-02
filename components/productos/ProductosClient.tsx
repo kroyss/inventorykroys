@@ -11,6 +11,7 @@ import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import { liveBaseVE, liveFinalVE, livePublishedVE, recDiscountVE, mlNetFor, storedPricesVE, type VeRate } from '@/lib/pricingVE'
 import Link from 'next/link'
 import MlBreakdown from './MlBreakdown'
+import { etiquetaCategoria } from '@/lib/categoriasGanancia'
 
 // ─── helpers ────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -532,7 +533,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             >
               <option value="">Cambiar categoría…</option>
               {profitCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.name} {c.profit_percentage}%</option>
+                <option key={c.id} value={c.id}>{etiquetaCategoria(c.name, c.profit_percentage)}</option>
               ))}
             </select>
             <button
@@ -636,7 +637,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   <td className="px-3 py-2">
                     {p.category_name ? (
                       <span className="text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {p.category_name} {p.profit_percentage}%
+                        {etiquetaCategoria(p.category_name, p.profit_percentage)}
                       </span>
                     ) : (
                       <span className="text-neutral-300">—</span>
@@ -692,7 +693,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <div className="font-mono text-xs text-neutral-400">{p.code}</div>
                     <div className="font-medium text-neutral-900 truncate">{p.name}</div>
                     {p.category_name && (
-                      <span className="inline-block mt-1 text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{p.category_name} {p.profit_percentage}%</span>
+                      <span className="inline-block mt-1 text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{etiquetaCategoria(p.category_name, p.profit_percentage)}</span>
                     )}
                   </div>
                   <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${p.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
@@ -824,7 +825,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <option value="">Sin categoría</option>
                     {profitCategories.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.name} — {c.profit_percentage}%
+                        {etiquetaCategoria(c.name, c.profit_percentage, ' — ')}
                       </option>
                     ))}
                   </select>
@@ -1056,7 +1057,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       {v.is_active ? 'Activo' : 'Inactivo'}
                     </span>
                     {v.category_name && (
-                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{v.category_name} {v.profit_percentage}%</span>
+                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{etiquetaCategoria(v.category_name, v.profit_percentage)}</span>
                     )}
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import type { ProfitCategory } from '@/lib/types'
 import { parseLocalDate } from '@/lib/tz'
 import MlBreakdown from '@/components/productos/MlBreakdown'
 import { coPublishedPrice } from '@/lib/coPricing'
+import { etiquetaCategoria } from '@/lib/categoriasGanancia'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -190,7 +191,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
               <select value={simCat ?? ''} onChange={e => setSimCat(Number(e.target.value) || null)}
                 className="mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-neutral-800">
                 <option value="">—</option>
-                {cats.map(c => <option key={c.id} value={c.id}>{c.name} {c.profit_percentage}%</option>)}
+                {cats.map(c => <option key={c.id} value={c.id}>{etiquetaCategoria(c.name, c.profit_percentage)}</option>)}
               </select>
             </div>
             <div>

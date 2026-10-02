@@ -7,6 +7,7 @@ import { KPICard, exportRows } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { matchTokens } from '@/lib/search'
 import { shipInfo, parseShippingTable, type ShipTier } from '@/lib/mlShipping'
+import { etiquetaCategoria } from '@/lib/categoriasGanancia'
 import {
   liveFinalVE, livePublishedVE, globalDiscountVE, mlNetFor, storedPricesVE, type VeRate,
 } from '@/lib/pricingVE'
@@ -314,7 +315,7 @@ export default function MargenesClient({ initialProducts, categories }: {
                       className="border border-neutral-300 rounded px-1.5 py-1 text-xs bg-white">
                       {categories.map(c => (
                         <option key={c.id} value={c.id}>
-                          {c.name} ({c.profit_percentage}%){c.id === r.p.profit_category_id ? ' · actual' : ''}
+                          {etiquetaCategoria(c.name, c.profit_percentage)}{c.id === r.p.profit_category_id ? ' · actual' : ''}
                         </option>
                       ))}
                     </select>
