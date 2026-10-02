@@ -23,6 +23,7 @@ const MORE: NavItem[] = [
   { href: '/finanzas',   label: 'Finanzas',   icon: '💰', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: '⚙️', roles: ['admin'],        countries: ['VE', 'CO'] },
   { href: '/usuarios',   label: 'Usuarios',   icon: '👥', roles: ['admin'],        countries: ['VE', 'CO'] },
+  { href: '/aprendizaje', label: 'Aprendizaje', icon: '🎓', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
 ]
 
 // Espacio Automatizaciones (móvil)
@@ -33,6 +34,7 @@ const PRIMARY_AUTO: NavItem[] = [
 ]
 const MORE_AUTO: NavItem[] = [
   { href: '/dashboard',        label: 'Inventario', icon: '📋', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
+  { href: '/aprendizaje',      label: 'Aprendizaje', icon: '🎓', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
 ]
 
 export default function BottomNav({ role, country, modulos }: { role: UserRole; country: Country; modulos: string[] }) {

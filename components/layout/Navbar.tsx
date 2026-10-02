@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import UserMenu from './UserMenu'
 import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
+import AprendizajeNav from './AprendizajeNav'
 import EspacioSwitcher from './EspacioSwitcher'
 import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
@@ -31,6 +32,7 @@ export default async function Navbar() {
         <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
 
         <div className="flex items-center gap-3 shrink-0 ml-auto">
+          <AprendizajeNav />
           {session?.user.empresaId && (
             <CountrySwitcher actual={session.user.empresaId}
               empresas={empresas.map(e => ({ id: e.id, nombre: e.nombre, country: e.country }))} />
