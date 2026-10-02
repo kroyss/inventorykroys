@@ -13,7 +13,7 @@ export function UsoIA() {
   if (!uso) return null
   return (
     <span className="text-xs text-neutral-500 whitespace-nowrap" title="Costo de los borradores de la IA en Preguntas y Mensajes este mes">
-      IA este mes: <b className="text-neutral-800 num">${uso.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+      IA este mes: <b className="text-neutral-800 num">${uso.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: uso.total > 0 && uso.total < 0.995 ? 4 : 2 })}</b>
       {' '}· {uso.borradores} borrador{uso.borradores === 1 ? '' : 'es'}
     </span>
   )

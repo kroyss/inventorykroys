@@ -9,7 +9,8 @@ interface Fila {
 }
 interface Empresa { id: number; nombre: string; porMes: Record<string, { costo: number; borradores: number; preguntas: number; mensajes: number }> }
 
-const usd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+// Montos chicos (centavos de dólar) con más decimales: si no, $0,0026 se vería como $0,00.
+const usd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: n > 0 && n < 0.995 ? 4 : 2 })}`
 const nombreMes = (m: string) => new Intl.DateTimeFormat('es-VE', { month: 'short', year: '2-digit', timeZone: 'UTC' })
   .format(new Date(`${m}-15T12:00:00Z`)).replace('.', '')
 
