@@ -13,7 +13,15 @@ export const metadata = {
 }
 
 // Lo que reciben los Fundadores además del mes gratis.
-const BENEFICIOS = ['Atención personalizada 1 a 1', 'Configuración gratis', 'Adiestramiento gratis']
+// Íconos de trazo (24×24): conversación, engranaje, birrete.
+const BENEFICIOS = [
+  { t: 'Atención personalizada', s: '1 a 1, por Telegram',
+    d: 'M7 8h10M7 12h6m-9 8 3-3h11a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12z' },
+  { t: 'Configuración', s: 'gratis, contigo',
+    d: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-2-1.2L14.5 3h-4l-.4 2.6a7.5 7.5 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7.5 7.5 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z' },
+  { t: 'Adiestramiento', s: 'gratis, para tu equipo',
+    d: 'M22 9 12 4 2 9l10 5 10-5zM6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5' },
+]
 
 const INCLUYE = [
   { t: 'Preguntas con IA', d: 'Las preguntas de todas tus cuentas en una bandeja, con la respuesta sugerida.' },
@@ -63,10 +71,20 @@ export default async function FundadoresPage() {
               usarlo de verdad. Cada tanda tiene <b className="text-white">días fijos de inscripción</b> y la selección
               se anuncia al día siguiente. Después decides si te quedas.
             </p>
-            <ul className="mt-5 flex flex-wrap gap-2" aria-label="Solo para Fundadores">
+            {/* Beneficios: sin caja (las cajas son de las tandas), ícono + título + bajada */}
+            <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Solo para Fundadores</p>
+            <ul className="mt-3 grid gap-4 sm:grid-cols-3 sm:gap-6">
               {BENEFICIOS.map(x => (
-                <li key={x} className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-3 py-1.5 text-sm font-medium text-lime-100">
-                  <span className="text-lime-400" aria-hidden="true">✓</span>{x}
+                <li key={x.t} className="flex items-center gap-3">
+                  <span className="grid place-items-center w-10 h-10 shrink-0 rounded-full bg-lime-400 text-neutral-950" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={x.d} />
+                    </svg>
+                  </span>
+                  <span className="leading-tight">
+                    <span className="block text-sm font-semibold text-white">{x.t}</span>
+                    <span className="block text-xs text-neutral-400 mt-0.5">{x.s}</span>
+                  </span>
                 </li>
               ))}
             </ul>

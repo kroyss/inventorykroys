@@ -63,7 +63,7 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
             : <>Recibimos tu solicitud. La selección se anuncia el <b>{resultados ?? 'día siguiente al cierre'}</b>: si quedas, te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
         </p>
         <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
-          Si esta vez no se da, te avisamos cuando abramos nuevos cupos para tu perfil.
+          Si esta vez no se da, no te preocupes: se abrirán nuevas oportunidades para tu perfil.
         </p>
       </section>
     )
