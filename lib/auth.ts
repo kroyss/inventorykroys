@@ -2,6 +2,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, type EmpresaAcceso } from '@/lib/empresa'
+import { CUENTA_VENCIDA } from '@/lib/cuenta'
 import type { NextAuthOptions } from 'next-auth'
 import type { Country, UserRole } from '@/lib/types'
 
@@ -53,8 +54,13 @@ export const authOptions: NextAuthOptions = {
         if (!user || !user.is_active) return null
         if (!(await compare(credentials.password, user.password_hash))) return null
 
-        const empresa = elegir(await empresasDeUsuario(user.id), credentials.empresa, credentials.country)
-        if (!empresa) return null   // usuario sin ninguna empresa activa
+        const todas = await empresasDeUsuario(user.id, { incluirVencidas: true })
+        const empresa = elegir(todas.filter(e => e.habilitada), credentials.empresa, credentials.country)
+        if (!empresa) {
+          // Tiene empresas pero su cuenta venció (prueba terminada o sin pago): se le dice.
+          if (todas.length) throw new Error(CUENTA_VENCIDA)
+          return null   // usuario sin ninguna empresa activa
+        }
 
         await db.query(`UPDATE users SET last_login = NOW() WHERE id = $1`, [user.id])
 
@@ -116,7 +122,7 @@ export const authOptions: NextAuthOptions = {
           actual = otra
         }
       }
-      if (!actual) throw new Error('Sesión cerrada: ya no tienes acceso a esta empresa')
+      if (!actual) throw new Error('Sesión cerrada: ya no tienes acceso a esta empresa (o su cuenta venció)')
 
       Object.assign(token, datosEmpresa(actual))
       return token

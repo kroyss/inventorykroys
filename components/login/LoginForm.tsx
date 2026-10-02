@@ -1,5 +1,6 @@
 'use client'
 import { signIn } from 'next-auth/react'
+import { CUENTA_VENCIDA } from '@/lib/cuenta'
 import { useRouter } from 'next/navigation'
 import { useState, FormEvent, KeyboardEvent } from 'react'
 
@@ -31,7 +32,9 @@ export default function LoginForm({ marca }: { marca: Marca }) {
       router.push('/')
       router.refresh()
     } else {
-      setError('Usuario o contraseña incorrectos')
+      setError(result?.error === CUENTA_VENCIDA
+        ? 'Tu período de prueba terminó. Escríbenos por Telegram para seguir usando el sistema: tus datos siguen guardados.'
+        : 'Usuario o contraseña incorrectos')
       setLoading(false)
     }
   }

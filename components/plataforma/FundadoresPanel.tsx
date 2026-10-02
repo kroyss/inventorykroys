@@ -263,7 +263,7 @@ export default function FundadoresPanel() {
         </div>
       )}
       <p className="text-xs text-neutral-400">
-        Aprobar asigna a la ronda en cuyos días se inscribió (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas”.
+        Aprobar asigna a la ronda en cuyos días se inscribió (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
       </p>
     </div>
   )

@@ -1,6 +1,7 @@
 // Empresas y acceso de usuarios (tablas GLOBALES: se leen con dbGlobal()).
 import { dbGlobal } from '@/lib/db'
 import type { Country, UserRole } from '@/lib/types'
+import { SQL_CUENTA_HABILITADA } from '@/lib/cuenta'
 
 export interface EmpresaAcceso {
   id: number
@@ -9,14 +10,19 @@ export interface EmpresaAcceso {
   modulos: string[]
   role: UserRole
   organizacionId: number
+  habilitada: boolean      // la cuenta de su organización está al día (no vencida)
 }
 
-/** Empresas activas a las que entra un usuario, con su rol en cada una. */
-export async function empresasDeUsuario(userId: number | string): Promise<EmpresaAcceso[]> {
+/** Empresas activas a las que entra un usuario, con su rol en cada una. Por defecto solo las
+ *  de cuentas habilitadas (lib/cuenta.ts); `incluirVencidas` las trae todas (el login lo usa para
+ *  decir "tu prueba terminó" en vez de "usuario o contraseña incorrectos"). */
+export async function empresasDeUsuario(userId: number | string, { incluirVencidas = false } = {}): Promise<EmpresaAcceso[]> {
   const { rows } = await dbGlobal().query(
-    `SELECT e.id, e.nombre, e.country, e.modulos, ue.role, e.organizacion_id AS "organizacionId"
+    `SELECT e.id, e.nombre, e.country, e.modulos, ue.role, e.organizacion_id AS "organizacionId",
+            ${SQL_CUENTA_HABILITADA} AS habilitada
      FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
-     WHERE ue.user_id = $1 AND e.is_active
+     JOIN organizaciones o ON o.id = e.organizacion_id
+     WHERE ue.user_id = $1 AND e.is_active ${incluirVencidas ? '' : `AND ${SQL_CUENTA_HABILITADA}`}
      ORDER BY e.id`,
     [userId],
   )

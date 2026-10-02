@@ -9,6 +9,8 @@ import { esDuenoPlataforma } from '@/lib/empresa'
 import { MODULOS } from '@/lib/modulos'
 import { forbidden, unauthorized } from '@/lib/session'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
+import { DIAS_PRUEBA } from '@/lib/cuenta'
+import { currentDate } from '@/lib/tz'
 
 // Plataforma: alta y listado de empresas clientes. Solo el dueño de la plataforma.
 async function soloDueno() {
@@ -26,13 +28,14 @@ export async function GET() {
     const { rows } = await dbGlobal().query(
       `SELECT e.id, e.nombre, e.country, e.modulos, e.is_active, e.created_at,
               o.id AS organizacion_id, o.nombre AS organizacion,
+              o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.fundador,
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
               (SELECT string_agg(u.username, ', ' ORDER BY u.username)
                  FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
                  WHERE ue.empresa_id = e.id AND ue.role = 'admin') AS admins
        FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
        ORDER BY o.nombre, e.id`)
-    return NextResponse.json({ empresas: rows, modulos: MODULOS })
+    return NextResponse.json({ empresas: rows, modulos: MODULOS, hoy: currentDate() })
   } catch (err) {
     return apiError(err)
   }
@@ -43,6 +46,7 @@ const CreateSchema = z.object({
   nombre:   z.string().trim().min(2, 'Falta el nombre de la empresa').max(80),
   country:  z.enum(['VE', 'CO']),
   modulos:  z.array(z.enum(modulosValidos)).max(20),
+  alta:     z.enum(['fundador', 'prueba', 'activo']).default('fundador'),   // lib/cuenta.ts
   admin: z.object({
     username:  z.string().trim().toLowerCase().regex(USERNAME_RE, 'Usuario: 3 a 30 caracteres, solo letras, números, punto, guion o guion bajo'),
     full_name: z.string().trim().min(2, 'Falta el nombre del administrador').max(100),
@@ -74,8 +78,13 @@ export async function POST(req: NextRequest) {
     const { rows: [dupU] } = await client.query(`SELECT 1 FROM users WHERE username = $1`, [body.admin.username])
     if (dupU) { await client.query('ROLLBACK'); return NextResponse.json({ error: `El usuario "${body.admin.username}" ya existe. Elige otro.` }, { status: 400 }) }
 
+    // Cuenta: Fundador = 30 días gratis + marca permanente; Prueba = 15 días; Activo = ya paga.
+    const dias = body.alta === 'fundador' ? DIAS_PRUEBA.fundador : body.alta === 'prueba' ? DIAS_PRUEBA.normal : null
     const { rows: [org] } = await client.query(
-      `INSERT INTO organizaciones (nombre) VALUES ($1) RETURNING id`, [body.nombre])
+      `INSERT INTO organizaciones (nombre, estado, prueba_hasta, fundador)
+       VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $3::int END, $4)
+       RETURNING id`,
+      [body.nombre, dias ? 'prueba' : 'activo', dias, body.alta === 'fundador'])
     const { rows: [emp] } = await client.query(
       `INSERT INTO empresas (organizacion_id, nombre, country, modulos) VALUES ($1, $2, $3, $4) RETURNING id`,
       [org.id, body.nombre, body.country, body.modulos])

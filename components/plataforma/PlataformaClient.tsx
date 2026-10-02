@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/ui'
 import CuentasPanel from './CuentasPanel'
 import FundadoresPanel from './FundadoresPanel'
 import InternoPanel from './InternoPanel'
+import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 
 interface Empresa {
   id: number
@@ -16,6 +17,9 @@ interface Empresa {
   organizacion: string
   usuarios: number
   admins: string | null
+  estado: EstadoCuenta
+  prueba_hasta: string | null
+  fundador: boolean
 }
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
@@ -34,12 +38,13 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
   const [vista, setVista]       = useState<'empresas' | 'cuentas' | 'fundadores' | 'interno'>('empresas')
+  const [hoy, setHoy]           = useState('')
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/plataforma/empresas')
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
-    setEmpresas(d.empresas); setModulos(d.modulos)
+    setEmpresas(d.empresas); setModulos(d.modulos); setHoy(d.hoy)
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
@@ -92,6 +97,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>
               <th className="px-4 py-2 text-left">Empresa</th>
+              <th className="px-4 py-2 text-left">Cuenta</th>
               <th className="px-4 py-2 text-left">País</th>
               <th className="px-4 py-2 text-left">Admins</th>
               <th className="px-4 py-2 text-right">Usuarios</th>
@@ -106,6 +112,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                   <div className="font-medium">{e.nombre}</div>
                   {e.organizacion !== e.nombre && <div className="text-xs text-neutral-400">{e.organizacion}</div>}
                 </td>
+                <td className="px-4 py-2"><Cuenta e={e} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} /></td>
                 <td className="px-4 py-2">{e.country}</td>
                 <td className="px-4 py-2 font-mono text-xs">{e.admins ?? '—'}</td>
                 <td className="px-4 py-2 text-right">{e.usuarios}</td>
@@ -139,6 +146,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       <p className="text-xs text-neutral-500">
         Inicio, Ventas, Inventario, Compras, Productos, Reportes, Ajustes y Usuarios los tienen todas las empresas.
         Tocar un módulo lo prende o lo apaga. Desactivar una empresa saca a sus usuarios; sus datos se conservan.
+        Cuenta: una prueba vence sola al pasar su fecha (sus usuarios ya no entran, los datos quedan); tócala para cambiarla.
       </p>
       </>}
     </div>
@@ -150,6 +158,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
 }) {
   const [f, setF] = useState({
     nombre: '', country: 'VE' as 'VE' | 'CO', modulos: ['despachos', 'reportador'],
+    alta: 'fundador' as 'fundador' | 'prueba' | 'activo',
     username: '', full_name: '', password: claveInicial(),
   })
   const [guardando, setGuardando] = useState(false)
@@ -160,7 +169,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
     const r = await fetch('/api/plataforma/empresas', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nombre: f.nombre, country: f.country, modulos: f.modulos,
+        nombre: f.nombre, country: f.country, modulos: f.modulos, alta: f.alta,
         admin: { username: f.username, full_name: f.full_name, password: f.password },
       }),
     })
@@ -182,6 +191,13 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
           <select className={input} value={f.country} onChange={e => setF({ ...f, country: e.target.value as 'VE' | 'CO' })}>
             <option value="VE">Venezuela</option>
             <option value="CO">Colombia</option>
+          </select>
+        </label>
+        <label className="text-xs text-neutral-600">Cuenta
+          <select className={input} value={f.alta} onChange={e => setF({ ...f, alta: e.target.value as typeof f.alta })}>
+            <option value="fundador">⭐ Fundador: {DIAS_PRUEBA.fundador} días gratis</option>
+            <option value="prueba">Prueba: {DIAS_PRUEBA.normal} días gratis</option>
+            <option value="activo">Activo (ya paga)</option>
           </select>
         </label>
         <label className="text-xs text-neutral-600">Administrador: nombre completo
@@ -215,5 +231,85 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
         <button onClick={crear} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Creando…' : 'Crear empresa'}</button>
       </div>
     </section>
+  )
+}
+
+const COLOR_ESTADO: Record<EstadoCuenta, string> = {
+  propietario: 'bg-neutral-900 text-white',
+  prueba:      'bg-sky-100 text-sky-800',
+  activo:      'bg-green-100 text-green-800',
+  vencido:     'bg-red-100 text-red-700',
+}
+const ddmm = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/')
+
+/** Estado de la cuenta de la organización (lib/cuenta.ts): pastilla + editor al tocarla. */
+function Cuenta({ e, hoy, onGuardada, onError }: {
+  e: Empresa; hoy: string; onGuardada: (msg: string) => void; onError: (msg: string) => void
+}) {
+  const [editando, setEditando] = useState(false)
+  const [f, setF] = useState({ estado: e.estado, prueba_hasta: e.prueba_hasta ?? '', fundador: e.fundador })
+  const ef = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
+  const dias = e.prueba_hasta && ef === 'prueba'
+    ? Math.round((Date.parse(`${e.prueba_hasta}T12:00:00Z`) - Date.parse(`${hoy}T12:00:00Z`)) / 86_400_000) : null
+
+  const pastilla = (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${COLOR_ESTADO[ef]}`}>
+        {ETIQUETA_ESTADO[ef]}
+        {ef === 'prueba' && e.prueba_hasta ? ` · hasta ${ddmm(e.prueba_hasta)}` : ''}
+        {ef === 'vencido' && e.estado === 'prueba' && e.prueba_hasta ? ` · el ${ddmm(e.prueba_hasta)}` : ''}
+      </span>
+      {e.fundador && <span className="text-xs text-amber-700 whitespace-nowrap" title="Programa Fundadores: precio especial">⭐ Fundador</span>}
+      {dias != null && dias <= 5 && <span className="text-[11px] text-amber-700 whitespace-nowrap">quedan {dias} día{dias === 1 ? '' : 's'}</span>}
+    </span>
+  )
+  if (e.estado === 'propietario') return pastilla
+
+  const guardar = async () => {
+    const r = await fetch(`/api/plataforma/organizaciones/${e.organizacion_id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: f.estado, fundador: f.fundador, prueba_hasta: f.estado === 'prueba' ? (f.prueba_hasta || null) : undefined }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { onError(d.error ?? 'No se pudo guardar'); return }
+    setEditando(false)
+    onGuardada(`${e.organizacion}: cuenta actualizada. Sus usuarios lo notan en su próximo clic.`)
+  }
+  const sumar = (n: number) => {
+    const d = new Date(`${hoy}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n)
+    setF({ ...f, estado: 'prueba', prueba_hasta: d.toISOString().slice(0, 10) })
+  }
+
+  if (!editando) {
+    return (
+      <button onClick={() => { setF({ estado: e.estado, prueba_hasta: e.prueba_hasta ?? '', fundador: e.fundador }); setEditando(true) }}
+        title="Cambiar la cuenta" className="text-left hover:opacity-80">{pastilla}</button>
+    )
+  }
+  return (
+    <div className="space-y-1.5 min-w-[13rem] text-xs">
+      <select className={input} value={f.estado} onChange={ev => setF({ ...f, estado: ev.target.value as EstadoCuenta })}>
+        <option value="prueba">En prueba</option>
+        <option value="activo">Activo (paga)</option>
+        <option value="vencido">Vencido (no entra)</option>
+      </select>
+      {f.estado === 'prueba' && (
+        <div className="space-y-1">
+          <input type="date" className={input} value={f.prueba_hasta} onChange={ev => setF({ ...f, prueba_hasta: ev.target.value })} />
+          <div className="flex gap-1">
+            {[DIAS_PRUEBA.normal, DIAS_PRUEBA.fundador].map(n => (
+              <button key={n} type="button" onClick={() => sumar(n)} className="btn-ghost px-1.5 py-0.5 text-[11px]">hoy + {n}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      <label className="flex items-center gap-1.5 text-neutral-600">
+        <input type="checkbox" checked={f.fundador} onChange={ev => setF({ ...f, fundador: ev.target.checked })} /> ⭐ Fundador
+      </label>
+      <div className="flex gap-1.5">
+        <button onClick={guardar} className="btn-primary text-xs px-2 py-1">Guardar</button>
+        <button onClick={() => setEditando(false)} className="btn-secondary text-xs px-2 py-1">Cancelar</button>
+      </div>
+    </div>
   )
 }
