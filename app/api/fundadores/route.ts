@@ -5,7 +5,7 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  diasInscripcion, evaluar, normalizarTelegram, PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo,
+  diasInscripcion, evaluar, MENSAJE_MAX, normalizarTelegram, PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo,
   TELEGRAM_RE, TZ_FUNDADORES, type Tanda,
 } from '@/lib/fundadores'
 
@@ -48,6 +48,8 @@ const Solicitud = z.object({
   telegram: z.string().max(80).transform(normalizarTelegram)
     .refine(t => TELEGRAM_RE.test(t), 'Revisa tu usuario de Telegram (5 a 32 letras, números o _)'),
   nick_ml: z.string().trim().max(40).optional().transform(v => v?.replace(/^@/, '').trim() || null),
+  mensaje: z.string().trim().max(MENSAJE_MAX, `El mensaje tiene un máximo de ${MENSAJE_MAX} caracteres`).optional()
+    .transform(v => v || null),
   ventas_mes: opcion('ventas_mes'),
   cuentas: opcion('cuentas'),
   despacho: opciones('despacho'),
@@ -111,11 +113,12 @@ export async function POST(req: NextRequest) {
     await db.query(
       `INSERT INTO fundadores_solicitudes
          (ronda, nombre, telegram, nick_ml, ventas_mes, cuentas, despacho, dolor, inventario,
-          puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        ON CONFLICT (ronda, telegram) DO NOTHING`,
       [RONDA_ACTUAL, s.nombre, s.telegram, s.nick_ml, s.ventas_mes, s.cuentas, s.despacho, s.dolor, s.inventario,
-       puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null])
+       puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null,
+       s.mensaje])
     return NextResponse.json({ ok: true })
   } catch (err) {
     return apiError(err)

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS fundadores_solicitudes (
   nombre       TEXT    NOT NULL,
   telegram     TEXT    NOT NULL,            -- sin @, en minúsculas (clave anti-duplicados)
   nick_ml      TEXT,                        -- opcional (+1 punto)
+  mensaje      TEXT,                        -- opcional: lo que quiera agregar (máx. 280, no suma puntos)
   ventas_mes   TEXT    NOT NULL,            -- '<30' | '30-100' | '100-300' | '300+'
   cuentas      TEXT    NOT NULL,            -- '1' | '2-3' | '4+'
   despacho     TEXT    NOT NULL,            -- varias, separadas por coma: 'zoom_tealca,retiro,delivery,otro'

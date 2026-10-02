@@ -61,9 +61,15 @@ export default async function FundadoresPage() {
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a
               10 vendedores con movimiento real, en dos tandas de 5, con <b className="text-white">un mes gratis</b> para
               usarlo de verdad. Cada tanda tiene <b className="text-white">días fijos de inscripción</b> y la selección
-              se anuncia al día siguiente. Como Fundador tienes <b className="text-white">atención personalizada</b> y la{' '}
-              <b className="text-white">configuración y el adiestramiento gratis</b>. Después decides si te quedas.
+              se anuncia al día siguiente. Después decides si te quedas.
             </p>
+            <ul className="mt-5 flex flex-wrap gap-2" aria-label="Solo para Fundadores">
+              {BENEFICIOS.map(x => (
+                <li key={x} className="inline-flex items-center gap-1.5 rounded-full border border-lime-400/40 bg-lime-400/10 px-3 py-1.5 text-sm font-medium text-lime-100">
+                  <span className="text-lime-400" aria-hidden="true">✓</span>{x}
+                </li>
+              ))}
+            </ul>
           </div>
 
           {/* Tandas */}
@@ -88,7 +94,7 @@ export default async function FundadoresPage() {
                   {dias && (
                     <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
                       Inscripción: <span className="text-neutral-200">{dias}</span>
-                      {res && <><br />Resultados: <span className="text-neutral-200">{fechaTanda(res)}</span></>}
+                      {res && <><br />Seleccionados: <span className="text-neutral-200">{fechaTanda(res)}</span></>}
                     </p>
                   )}
                   <div className="mt-3 flex gap-1.5" aria-label={`${t.tomados} de ${t.cupos} cupos tomados`}>
@@ -122,16 +128,6 @@ export default async function FundadoresPage() {
                     <span className="block text-sm font-semibold text-neutral-900">{x.t}</span>
                     <span className="block text-sm text-neutral-500">{x.d}</span>
                   </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className="rounded-xl border border-lime-300 bg-lime-50/60 p-5">
-            <h2 className="text-sm font-semibold text-neutral-900">Solo para Fundadores</h2>
-            <ul className="mt-3 space-y-2">
-              {BENEFICIOS.map(x => (
-                <li key={x} className="flex gap-2.5 text-sm font-medium text-neutral-900">
-                  <span className="text-lime-700 font-semibold" aria-hidden="true">✓</span>{x}
                 </li>
               ))}
             </ul>

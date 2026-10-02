@@ -1,6 +1,6 @@
 'use client'
 import { useState, type FormEvent } from 'react'
-import { PREGUNTAS, type Pregunta } from '@/lib/fundadores'
+import { MENSAJE_MAX, PREGUNTAS, type Pregunta } from '@/lib/fundadores'
 
 type Campo = Pregunta['campo']
 
@@ -22,6 +22,7 @@ interface Props {
 
 export default function FormularioFundadores({ abierta, proxima, resultados }: Props) {
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
+  const [mensaje, setMensaje] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hecho, setHecho] = useState<{ nombre: string; telegram: string; repetida: boolean } | null>(null)
@@ -36,7 +37,7 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
     try {
       const body = {
         nombre: String(f.get('nombre') ?? ''), telegram: String(f.get('telegram') ?? ''),
-        nick_ml: String(f.get('nick_ml') ?? ''), sitio: String(f.get('sitio') ?? ''),
+        nick_ml: String(f.get('nick_ml') ?? ''), sitio: String(f.get('sitio') ?? ''), mensaje,
         navegador_id: navegadorId(),
         ...Object.fromEntries(PREGUNTAS.map(p => [p.campo, p.multiple ? resp[p.campo] : resp[p.campo]?.[0]])),
       }
@@ -150,6 +151,18 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
           </div>
         </fieldset>
       ))}
+
+      <div>
+        <label htmlFor="mensaje" className="block text-sm font-medium text-neutral-800">
+          ¿Algo más que quieras contarnos? <span className="font-normal text-neutral-400">(opcional)</span>
+        </label>
+        <textarea id="mensaje" rows={3} maxLength={MENSAJE_MAX} value={mensaje} onChange={e => setMensaje(e.target.value)}
+          placeholder="Qué vendes, qué te gustaría resolver, por qué quieres ser Fundador…"
+          className={`${campo} mt-2 resize-none`} />
+        <p className={`mt-1 text-right text-xs num ${mensaje.length >= MENSAJE_MAX ? 'text-amber-600' : 'text-neutral-400'}`}>
+          {mensaje.length}/{MENSAJE_MAX}
+        </p>
+      </div>
 
       {error && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
 

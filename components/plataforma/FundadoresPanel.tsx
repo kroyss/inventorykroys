@@ -8,7 +8,7 @@ interface Verif {
   ventas_total?: number | null; ventas_periodo?: number | null; periodo?: string | null; desde?: string | null
 }
 interface Solicitud {
-  id: number; nombre: string; telegram: string; nick_ml: string | null
+  id: number; nombre: string; telegram: string; nick_ml: string | null; mensaje: string | null
   ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'rechazado'; tanda: number | null
   sospechosa: string | null; ml_verificado: Verif | null; notas: string | null; created_at: string
@@ -169,6 +169,9 @@ export default function FundadoresPanel() {
                       </button>
                     </> : <span className="text-neutral-400">Sin nick de ML</span>}
                   </div>
+                  {s.mensaje && (
+                    <p className="text-sm text-neutral-700 bg-neutral-50 border-l-2 border-lime-500 rounded-r px-3 py-1.5 whitespace-pre-line">“{s.mensaje}”</p>
+                  )}
                   {s.sospechosa && <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">⚠ Ojo: {s.sospechosa}</p>}
                   <input defaultValue={s.notas ?? ''} placeholder="Nota interna…" maxLength={1000}
                     onBlur={e => { if ((e.target.value || null) !== s.notas) accion(s, { accion: 'nota', notas: e.target.value }) }}

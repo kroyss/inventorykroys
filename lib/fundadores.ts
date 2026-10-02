@@ -92,6 +92,9 @@ export function normalizarTelegram(t: string) {
 }
 export const TELEGRAM_RE = /^[a-z0-9_]{5,32}$/
 
+/** Mensaje libre opcional del formulario (corto: no es una carta, es "algo más que quieras contarnos"). */
+export const MENSAJE_MAX = 280
+
 export const RONDA_ACTUAL = 1
 
 /** Las fechas del programa son de Venezuela: "hoy" es el día en Caracas, no el del servidor. */
