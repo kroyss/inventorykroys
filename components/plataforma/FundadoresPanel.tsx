@@ -143,7 +143,7 @@ export default function FundadoresPanel() {
                   </div>
                   <p className="text-sm text-neutral-600">
                     {textoOpcion('ventas_mes', s.ventas_mes)} ventas/mes · {textoOpcion('cuentas', s.cuentas)} cuenta(s) ·{' '}
-                    {textoOpcion('despacho', s.despacho)} · le quita tiempo: {textoOpcion('dolor', s.dolor).toLowerCase()} ·{' '}
+                    {textoOpcion('despacho', s.despacho)} · le quita tiempo: {textoOpcion('dolor', s.dolor).toLowerCase().replace(/, (?=[^,]*$)/, ' y ')} ·{' '}
                     inventario: {textoOpcion('inventario', s.inventario).toLowerCase()}
                   </p>
                   <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">

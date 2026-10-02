@@ -15,7 +15,7 @@ function navegadorId() {
 }
 
 export default function FormularioFundadores() {
-  const [resp, setResp] = useState<Partial<Record<Campo, string>>>({})
+  const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hecho, setHecho] = useState<{ nombre: string; telegram: string; repetida: boolean } | null>(null)
@@ -24,14 +24,15 @@ export default function FormularioFundadores() {
     e.preventDefault()
     setError(null)
     const f = new FormData(e.currentTarget)
-    const faltan = PREGUNTAS.filter(p => !resp[p.campo])
+    const faltan = PREGUNTAS.filter(p => !resp[p.campo]?.length)
     if (faltan.length) { setError(`Falta responder: ${faltan[0].texto}`); return }
     setEnviando(true)
     try {
       const body = {
         nombre: String(f.get('nombre') ?? ''), telegram: String(f.get('telegram') ?? ''),
         nick_ml: String(f.get('nick_ml') ?? ''), sitio: String(f.get('sitio') ?? ''),
-        navegador_id: navegadorId(), ...resp,
+        navegador_id: navegadorId(),
+        ...Object.fromEntries(PREGUNTAS.map(p => [p.campo, p.multiple ? resp[p.campo] : resp[p.campo]?.[0]])),
       }
       const r = await fetch('/api/fundadores', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -96,16 +97,22 @@ export default function FormularioFundadores() {
 
       {PREGUNTAS.map((p, i) => (
         <fieldset key={p.campo}>
-          <legend className="text-sm font-medium text-neutral-800">{i + 1}. {p.texto}</legend>
+          <legend className="text-sm font-medium text-neutral-800">
+            {i + 1}. {p.texto}
+            {p.multiple && <span className="ml-1.5 font-normal text-neutral-400">(puedes marcar varias)</span>}
+          </legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {p.opciones.map(o => {
-              const on = resp[p.campo] === o.valor
+              const on = !!resp[p.campo]?.includes(o.valor)
               return (
                 <label key={o.valor}
                   className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm cursor-pointer transition-colors ${
                     on ? 'border-lime-500 bg-lime-50 text-neutral-900' : 'border-neutral-200 text-neutral-700 hover:border-neutral-400'}`}>
-                  <input type="radio" name={p.campo} value={o.valor} checked={on}
-                    onChange={() => setResp(r => ({ ...r, [p.campo]: o.valor }))}
+                  <input type={p.multiple ? 'checkbox' : 'radio'} name={p.campo} value={o.valor} checked={on}
+                    onChange={() => setResp(r => {
+                      const ya = r[p.campo] ?? []
+                      return { ...r, [p.campo]: !p.multiple ? [o.valor] : on ? ya.filter(v => v !== o.valor) : [...ya, o.valor] }
+                    })}
                     className="accent-lime-600" />
                   {o.texto}
                 </label>

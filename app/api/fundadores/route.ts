@@ -22,10 +22,17 @@ export async function GET() {
   }
 }
 
-const opcion = (campo: string) =>
+const valores = (campo: string) =>
   z.enum(PREGUNTAS.find(p => p.campo === campo)!.opciones.map(o => o.valor) as [string, ...string[]], {
     message: 'Responde todas las preguntas',
   })
+const opcion = valores
+// Varias opciones: llega una lista; se guarda sin repetir, en el orden de la pregunta, separada por coma.
+const opciones = (campo: string) => {
+  const orden = PREGUNTAS.find(p => p.campo === campo)!.opciones.map(o => o.valor)
+  return z.array(valores(campo)).min(1, 'Responde todas las preguntas').max(orden.length)
+    .transform(v => orden.filter(o => v.includes(o)).join(','))
+}
 
 const Solicitud = z.object({
   nombre: z.string().trim().min(2, 'Escribe tu nombre').max(80),
@@ -35,7 +42,7 @@ const Solicitud = z.object({
   ventas_mes: opcion('ventas_mes'),
   cuentas: opcion('cuentas'),
   despacho: opcion('despacho'),
-  dolor: opcion('dolor'),
+  dolor: opciones('dolor'),
   inventario: opcion('inventario'),
   navegador_id: z.string().max(64).optional(),
   sitio: z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena

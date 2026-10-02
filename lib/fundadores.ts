@@ -6,7 +6,8 @@
 // dejó afuera). El resto se ordena por puntaje y el dueño aprueba desde Plataforma.
 
 export interface Opcion { valor: string; texto: string; puntos: number; descarta?: boolean }
-export interface Pregunta { campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario'; texto: string; opciones: Opcion[] }
+// multiple: se marcan varias (se guardan separadas por coma y suman los puntos de cada una).
+export interface Pregunta { campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario'; texto: string; opciones: Opcion[]; multiple?: boolean }
 
 export const PREGUNTAS: Pregunta[] = [
   {
@@ -36,7 +37,7 @@ export const PREGUNTAS: Pregunta[] = [
     ],
   },
   {
-    campo: 'dolor', texto: '¿Qué te quita más tiempo hoy?',
+    campo: 'dolor', texto: '¿Qué te quita más tiempo hoy?', multiple: true,
     opciones: [
       { valor: 'preguntas', texto: 'Responder preguntas', puntos: 2 },
       { valor: 'mensajes_guias', texto: 'Mensajes de las ventas y enviar las guías', puntos: 2 },
@@ -49,15 +50,17 @@ export const PREGUNTAS: Pregunta[] = [
     opciones: [
       { valor: 'excel', texto: 'En Excel o un cuaderno', puntos: 1 },
       { valor: 'nada', texto: 'No lo llevo', puntos: 1 },
-      { valor: 'sistema_basico', texto: 'En otro sistema o app', puntos: 1 },
-      { valor: 'facturacion_oficial', texto: 'En un sistema de facturación oficial que no puedo dejar', puntos: 0 },
+      { valor: 'sistema_basico', texto: 'En otro sistema o app no oficial', puntos: 1 },
+      { valor: 'facturacion_oficial', texto: 'En un sistema de facturación oficial', puntos: 0 },
     ],
   },
 ]
 
 /** El nick de MercadoLibre es opcional: si lo da, suma 1 (permite verificar su reputación). */
 export const PUNTO_NICK = 1
-export const PUNTAJE_MAXIMO = PREGUNTAS.reduce((a, p) => a + Math.max(...p.opciones.map(o => o.puntos)), 0) + PUNTO_NICK
+const maximoDe = (p: Pregunta) =>
+  p.multiple ? p.opciones.reduce((a, o) => a + o.puntos, 0) : Math.max(...p.opciones.map(o => o.puntos))
+export const PUNTAJE_MAXIMO = PREGUNTAS.reduce((a, p) => a + maximoDe(p), 0) + PUNTO_NICK
 
 export type Respuestas = Record<Pregunta['campo'], string>
 
@@ -65,16 +68,21 @@ export function evaluar(r: Respuestas, nick: string | null) {
   let puntaje = nick ? PUNTO_NICK : 0
   let descartada = false
   for (const p of PREGUNTAS) {
-    const o = p.opciones.find(x => x.valor === r[p.campo])
-    if (!o) throw new Error(`Respuesta inválida en "${p.texto}"`)
-    puntaje += o.puntos
-    if (o.descarta) descartada = true
+    const valores = p.multiple ? (r[p.campo] ?? '').split(',') : [r[p.campo]]
+    for (const v of valores) {
+      const o = p.opciones.find(x => x.valor === v)
+      if (!o) throw new Error(`Respuesta inválida en "${p.texto}"`)
+      puntaje += o.puntos
+      if (o.descarta) descartada = true
+    }
   }
   return { puntaje, estado: descartada ? 'descartado' as const : 'calificado' as const }
 }
 
-export const textoOpcion = (campo: Pregunta['campo'], valor: string) =>
-  PREGUNTAS.find(p => p.campo === campo)?.opciones.find(o => o.valor === valor)?.texto ?? valor
+export const textoOpcion = (campo: Pregunta['campo'], valor: string) => {
+  const p = PREGUNTAS.find(x => x.campo === campo)
+  return valor.split(',').map(v => p?.opciones.find(o => o.valor === v)?.texto ?? v).join(', ')
+}
 
 /** "@Pedro_Ventas " → "pedro_ventas" (también acepta el link t.me/…). */
 export function normalizarTelegram(t: string) {
