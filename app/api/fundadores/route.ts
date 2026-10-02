@@ -3,20 +3,29 @@ import { createHash } from 'crypto'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
-import { evaluar, normalizarTelegram, PREGUNTAS, RONDA_ACTUAL, TELEGRAM_RE } from '@/lib/fundadores'
+import { currentDate } from '@/lib/tz'
+import {
+  diasInscripcion, evaluar, normalizarTelegram, PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo,
+  TELEGRAM_RE, TZ_FUNDADORES, type Tanda,
+} from '@/lib/fundadores'
 
 // Programa Fundadores (PÚBLICO, sin login; el proxy no protege /api).
 //   GET  → estado de las tandas (cupos y cuántos ya entraron), para la página.
-//   POST → solicitud. La respuesta es SIEMPRE la misma para el vendedor (calificado o no):
+//   POST → solicitud. Solo en los días de inscripción de una tanda (hora Caracas). La respuesta es SIEMPRE la misma para el vendedor (calificado o no):
 //          así nadie sabe qué respuesta lo dejó afuera ni prueba de nuevo con otra.
+
+async function leerTandas() {
+  const { rows } = await dbGlobal().query<Tanda>(
+    `SELECT t.numero, t.cupos, t.abierta, to_char(t.inscribe_desde, 'YYYY-MM-DD') AS inscribe_desde,
+            to_char(t.inscribe_hasta, 'YYYY-MM-DD') AS inscribe_hasta,
+            (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
+     FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
+  return rows
+}
 
 export async function GET() {
   try {
-    const { rows } = await dbGlobal().query(
-      `SELECT t.numero, t.cupos, t.abierta, to_char(t.inicia, 'YYYY-MM-DD') AS inicia,
-              (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
-       FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
-    return NextResponse.json({ tandas: rows }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ tandas: await leerTandas() }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
     return apiError(err)
   }
@@ -59,6 +68,16 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Datos inválidos' }, { status: 400 })
     const s = parsed.data
     if (s.sitio) return NextResponse.json({ ok: true })      // bot: se le dice que sí y no se guarda
+
+    // Solo en los días de inscripción de una tanda (hora de Caracas).
+    const tandas = await leerTandas()
+    const hoy = currentDate(TZ_FUNDADORES)
+    if (!tandaInscribiendo(tandas, hoy)) {
+      const prox = proximaInscripcion(tandas, hoy)
+      return NextResponse.json({
+        error: prox ? `La inscripción es el ${diasInscripcion(prox)}.` : 'Las inscripciones están cerradas.',
+      }, { status: 403 })
+    }
 
     const db = dbGlobal()
     const ip = ipDe(req)

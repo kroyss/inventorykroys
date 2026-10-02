@@ -14,11 +14,12 @@ CREATE TABLE IF NOT EXISTS fundadores_tandas (
   ronda      INTEGER NOT NULL DEFAULT 1,
   cupos      INTEGER NOT NULL,
   abierta    BOOLEAN NOT NULL DEFAULT TRUE, -- acepta aprobaciones (se llena la primera con cupo)
-  inicia     DATE                           -- día en que arranca esa tanda (página pública)
+  inscribe_desde DATE,                      -- días en que se aceptan solicitudes para esa tanda (hora
+  inscribe_hasta DATE                       -- Caracas); la selección se avisa al día siguiente del cierre
 );
-INSERT INTO fundadores_tandas (numero, cupos, abierta, inicia) VALUES
-  (1, 5, TRUE, '2026-10-04'),
-  (2, 5, TRUE, '2026-10-11')
+INSERT INTO fundadores_tandas (numero, cupos, abierta, inscribe_desde, inscribe_hasta) VALUES
+  (1, 5, TRUE, '2026-10-04', '2026-10-05'),
+  (2, 5, TRUE, '2026-10-11', '2026-10-12')
 ON CONFLICT (numero) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS fundadores_solicitudes (

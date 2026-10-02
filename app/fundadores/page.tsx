@@ -1,14 +1,16 @@
 import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
-import { RONDA_ACTUAL, fechaTanda } from '@/lib/fundadores'
+import { currentDate } from '@/lib/tz'
+import {
+  RONDA_ACTUAL, TZ_FUNDADORES, diaResultados, diasInscripcion, fechaTanda, proximaInscripcion, tandaInscribiendo,
+  type Tanda,
+} from '@/lib/fundadores'
 import FormularioFundadores from '@/components/fundadores/FormularioFundadores'
 
 export const metadata = {
   title: 'Programa Fundadores',
   description: '10 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis, configuración y adiestramiento sin costo.',
 }
-
-interface Tanda { numero: number; cupos: number; abierta: boolean; inicia: string | null; tomados: number }
 
 // Lo que reciben los Fundadores además del mes gratis.
 const BENEFICIOS = ['Atención personalizada 1 a 1', 'Configuración gratis', 'Adiestramiento gratis']
@@ -27,12 +29,17 @@ const INCLUYE = [
 export default async function FundadoresPage() {
   await connection()
   const { rows: tandas } = await dbGlobal().query<Tanda>(
-    `SELECT t.numero, t.cupos, t.abierta, to_char(t.inicia, 'YYYY-MM-DD') AS inicia,
+    `SELECT t.numero, t.cupos, t.abierta, to_char(t.inscribe_desde, 'YYYY-MM-DD') AS inscribe_desde,
+              to_char(t.inscribe_hasta, 'YYYY-MM-DD') AS inscribe_hasta,
             (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
      FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
   const total = tandas.reduce((a, t) => a + t.cupos, 0)
   const tomados = tandas.reduce((a, t) => a + Math.min(t.tomados, t.cupos), 0)
   const anio = new Date().getFullYear()
+  const hoy = currentDate(TZ_FUNDADORES)
+  const abiertaHoy = tandaInscribiendo(tandas, hoy)
+  const proxima = proximaInscripcion(tandas, hoy)
+  const destacada = (abiertaHoy ?? proxima)?.numero      // la que inscribe hoy o, si no, la próxima en abrir
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -53,7 +60,8 @@ export default async function FundadoresPage() {
             <p className="mt-4 text-neutral-400 leading-relaxed">
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a
               10 vendedores con movimiento real, en dos tandas de 5, con <b className="text-white">un mes gratis</b> para
-              usarlo de verdad. Como Fundador tienes <b className="text-white">atención personalizada</b> y la{' '}
+              usarlo de verdad. Cada tanda tiene <b className="text-white">días fijos de inscripción</b> y la selección
+              se anuncia al día siguiente. Como Fundador tienes <b className="text-white">atención personalizada</b> y la{' '}
               <b className="text-white">configuración y el adiestramiento gratis</b>. Después decides si te quedas.
             </p>
           </div>
@@ -62,17 +70,27 @@ export default async function FundadoresPage() {
           <div className="mt-10 grid gap-3 sm:grid-cols-2 max-w-2xl">
             {tandas.map(t => {
               const llena = t.tomados >= t.cupos
-              // La que se está llenando es la primera abierta con cupo (las aprobaciones van en orden).
-              const actual = t.numero === tandas.find(x => x.abierta && x.tomados < x.cupos)?.numero
-              const estado = llena ? 'Completa' : actual ? 'Cupos disponibles' : t.abierta ? 'Próxima' : 'Cerrada'
-              const fecha = fechaTanda(t.inicia)
+              const actual = t.numero === destacada
+              const cerro = !!t.inscribe_desde && (t.inscribe_hasta ?? t.inscribe_desde) < hoy
+              const estado = llena ? 'Completa'
+                : t.numero === abiertaHoy?.numero ? 'Inscripción abierta'
+                : !t.abierta ? 'Cerrada'
+                : cerro ? 'Inscripción cerrada'
+                : 'Próxima'
+              const dias = diasInscripcion(t)
+              const res = diaResultados(t)
               return (
                 <div key={t.numero} className={`rounded-xl border p-4 ${actual ? 'border-lime-400/50 bg-lime-400/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}>
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-semibold">Tanda {t.numero}</span>
                     <span className={`text-xs font-medium ${actual ? 'text-lime-400' : 'text-neutral-500'}`}>{estado}</span>
                   </div>
-                  {fecha && <p className="mt-0.5 text-xs text-neutral-400">Arranca el <span className="text-neutral-200">{fecha}</span></p>}
+                  {dias && (
+                    <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+                      Inscripción: <span className="text-neutral-200">{dias}</span>
+                      {res && <><br />Resultados: <span className="text-neutral-200">{fechaTanda(res)}</span></>}
+                    </p>
+                  )}
                   <div className="mt-3 flex gap-1.5" aria-label={`${t.tomados} de ${t.cupos} cupos tomados`}>
                     {Array.from({ length: t.cupos }, (_, i) => (
                       <span key={i} className={`h-2.5 flex-1 rounded-full ${i < t.tomados ? 'bg-lime-400' : 'bg-white/10'}`} />
@@ -85,7 +103,7 @@ export default async function FundadoresPage() {
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <a href="#solicitud" className="inline-flex items-center gap-2 bg-lime-400 text-neutral-950 px-5 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors">
-              Quiero mi cupo <span aria-hidden="true">↓</span>
+              {abiertaHoy ? 'Quiero mi cupo' : 'Ver la solicitud'} <span aria-hidden="true">↓</span>
             </a>
             <span className="text-xs text-neutral-500">{tomados} de {total} pioneros confirmados</span>
           </div>
@@ -121,15 +139,18 @@ export default async function FundadoresPage() {
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-neutral-900">Cómo funciona</h2>
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
-              <li>Llenas la solicitud (2 minutos).</li>
+              <li>En los días de inscripción de la tanda llenas la solicitud (2 minutos).</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
-              <li>Si quedas seleccionado, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
+              <li>Al día siguiente anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
             </ol>
           </section>
         </div>
 
-        <FormularioFundadores />
+        <FormularioFundadores
+          abierta={!!abiertaHoy}
+          proxima={proxima ? diasInscripcion(proxima) : null}
+          resultados={abiertaHoy ? fechaTanda(diaResultados(abiertaHoy)) : null} />
       </main>
 
       <footer className="border-t border-neutral-200 py-6 text-center text-xs text-neutral-400">

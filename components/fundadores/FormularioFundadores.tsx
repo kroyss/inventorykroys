@@ -14,7 +14,13 @@ function navegadorId() {
   } catch { return undefined }
 }
 
-export default function FormularioFundadores() {
+interface Props {
+  abierta: boolean            // hoy cae en los días de inscripción de una tanda
+  proxima: string | null      // "domingo 11 y lunes 12 de octubre" (próxima inscripción)
+  resultados: string | null   // "martes 6 de octubre" (cuándo se anuncia la selección)
+}
+
+export default function FormularioFundadores({ abierta, proxima, resultados }: Props) {
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,11 +59,32 @@ export default function FormularioFundadores() {
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           {hecho.repetida
             ? <>Ya recibimos una solicitud de <b>@{hecho.telegram}</b> en esta ronda. No hace falta enviarla de nuevo.</>
-            : <>Recibimos tu solicitud. Si quedas seleccionado te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
+            : <>Recibimos tu solicitud. La selección se anuncia el <b>{resultados ?? 'día siguiente al cierre'}</b>: si quedas, te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
         </p>
         <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
           Si esta vez no se da, te avisamos cuando abramos nuevos cupos para tu perfil.
         </p>
+      </section>
+    )
+  }
+
+  if (!abierta) {
+    return (
+      <section id="solicitud" className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm self-start">
+        <h2 className="text-xl font-semibold text-neutral-900">Solicitud</h2>
+        {proxima ? <>
+          <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+            La inscripción es el <b className="text-neutral-900">{proxima}</b>. Esos días aparece aquí mismo el
+            formulario: toma 2 minutos.
+          </p>
+          <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
+            Ten a mano tu usuario de Telegram y, si quieres, tu nick de MercadoLibre.
+          </p>
+        </> : (
+          <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+            Las inscripciones de esta ronda están cerradas. Pronto abriremos nuevos cupos.
+          </p>
+        )}
       </section>
     )
   }
@@ -67,7 +94,9 @@ export default function FormularioFundadores() {
     <form id="solicitud" onSubmit={enviar} className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm space-y-6 self-start">
       <div>
         <h2 className="text-xl font-semibold text-neutral-900">Solicitud</h2>
-        <p className="mt-1 text-sm text-neutral-500">Toma 2 minutos. Una solicitud por persona.</p>
+        <p className="mt-1 text-sm text-neutral-500">
+          Toma 2 minutos. Una solicitud por persona.{resultados && ` La selección se anuncia el ${resultados}.`}
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

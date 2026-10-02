@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { textoOpcion } from '@/lib/fundadores'
 
-interface Tanda { numero: number; cupos: number; abierta: boolean; inicia: string | null; tomados: number }
+interface Tanda { numero: number; cupos: number; abierta: boolean; inscribe_desde: string | null; inscribe_hasta: string | null; tomados: number }
 interface Verif {
   encontrado: boolean; motivo?: string; nickname?: string; nivel?: string | null; lider?: string | null
   ventas_total?: number | null; ventas_periodo?: number | null; periodo?: string | null; desde?: string | null
@@ -67,7 +67,7 @@ export default function FundadoresPanel() {
       await cargar()
     } finally { setOcupado(null) }
   }
-  const tanda = async (t: Tanda, cambio: { abierta?: boolean; inicia?: string | null }) => {
+  const tanda = async (t: Tanda, cambio: { abierta?: boolean; inscribe_desde?: string | null; inscribe_hasta?: string | null }) => {
     await fetch(`/api/plataforma/fundadores/tandas/${t.numero}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambio),
     })
@@ -94,11 +94,16 @@ export default function FundadoresPanel() {
               <span className="font-semibold text-neutral-900">Tanda {t.numero}</span>
               <span className={`text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'Abierta' : 'Cerrada'}</span>
             </div>
-            <label className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
-              Inicia
-              <input type="date" defaultValue={t.inicia ?? ''} onChange={e => tanda(t, { inicia: e.target.value || null })}
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+              Inscripción
+              <input type="date" aria-label="Inscripción desde" defaultValue={t.inscribe_desde ?? ''}
+                onChange={e => tanda(t, { inscribe_desde: e.target.value || null })}
                 className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
-            </label>
+              al
+              <input type="date" aria-label="Inscripción hasta" defaultValue={t.inscribe_hasta ?? ''}
+                onChange={e => tanda(t, { inscribe_hasta: e.target.value || null })}
+                className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
+            </div>
             <div className="mt-2 flex gap-1">
               {Array.from({ length: t.cupos }, (_, i) => (
                 <span key={i} className={`h-2 flex-1 rounded-full ${i < t.tomados ? 'bg-lime-500' : 'bg-neutral-200'}`} />
@@ -188,7 +193,7 @@ export default function FundadoresPanel() {
         </div>
       )}
       <p className="text-xs text-neutral-400">
-        Aprobar asigna a la primera tanda abierta con cupo. Al aprobar, escríbele por Telegram y crea su empresa en “Empresas”.
+        Aprobar asigna a la tanda en cuyos días se inscribió (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas”.
       </p>
     </div>
   )
