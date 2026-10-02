@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-/** Lo gastado en IA este mes (solo lo ve un administrador; a los demás no les aparece). */
+/** Lo gastado en IA este mes. Solo lo ve el dueño de la plataforma (la API responde 403 a los demás
+ *  y entonces no aparece nada). */
 export function UsoIA() {
   const [uso, setUso] = useState<{ total: number; borradores: number } | null>(null)
   useEffect(() => {

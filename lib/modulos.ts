@@ -1,6 +1,10 @@
 // Módulos por empresa (empresas.modulos). El núcleo (Inicio, Ventas, Inventario, Compras,
 // Productos, Reportes, Ajustes, Usuarios) lo tienen todas; estos se prenden por empresa.
 // Un módulo apagado no aparece en el menú, su página redirige y su API responde 403.
+//
+// Así se libera a los clientes de a poco: la empresa de la plataforma (SolucionesMC) tiene
+// todo y a cada cliente se le prende lo que corresponda en Plataforma → Empresas. Lo nuevo o
+// en pruebas entra como módulo propio (apagado para los clientes) y no como un "if" escondido.
 export const MODULOS = {
   despachos:  'Despachos (etiquetas Zoom/Tealca 4 por hoja y manifiesto)',
   reportador: 'Reportador (mensaje de guía al comprador)',
@@ -8,6 +12,7 @@ export const MODULOS = {
   finanzas:   'Finanzas',
   bonos:      'Bonos del vendedor',
   preguntas:  'Preguntas de MercadoLibre con IA',
+  stock_ml:   'Stock en ML (stock real vs publicado) · en pruebas',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -21,7 +26,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/preguntas': 'preguntas',
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
-  '/stock-ml':  'preguntas',
+  '/stock-ml':  'stock_ml',
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {

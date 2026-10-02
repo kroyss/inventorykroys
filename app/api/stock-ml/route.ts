@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { sesionPreguntas } from '@/lib/preguntasSesion'
+import { sesionStockML } from '@/lib/preguntasSesion'
 import { DIAS_VENTAS, SQL_COMPARACION, UMBRAL_BAJO } from '@/lib/stockML'
 
 // GET /api/stock-ml?vista=alertas|todos → stock real vs publicado en cada cuenta de ML.
 export async function GET(req: NextRequest) {
-  const s = await sesionPreguntas()
+  const s = await sesionStockML()
   if ('error' in s) return s.error
   const todos = new URL(req.url).searchParams.get('vista') === 'todos'
   try {

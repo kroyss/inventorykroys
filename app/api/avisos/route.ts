@@ -25,9 +25,11 @@ export async function GET() {
         `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS p,
                 (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS m`)
       out.preguntas = r.p; out.mensajes = r.m
-      const { rows: [st] } = await db.query(
-        `SELECT COUNT(*)::int AS n FROM (${SQL_COMPARACION}) c WHERE alerta <> 'ok'`, [DIAS_VENTAS, UMBRAL_BAJO])
-      out.stock = st.n
+      if (tieneModulo(u, 'stock_ml')) {
+        const { rows: [st] } = await db.query(
+          `SELECT COUNT(*)::int AS n FROM (${SQL_COMPARACION}) c WHERE alerta <> 'ok'`, [DIAS_VENTAS, UMBRAL_BAJO])
+        out.stock = st.n
+      }
       {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
         const { rows: [c] } = await db.query(

@@ -8,7 +8,7 @@ export const metadata = { title: 'Automatizaciones' }
 
 // Inicio del espacio Automatizaciones: lo pendiente ahora + todas las herramientas sobre
 // MercadoLibre, agrupadas por momento de la venta. Lo que la empresa no tiene se muestra
-// apagado (para saber que existe).
+// apagado (para saber que existe), salvo los módulos en pruebas, que ni aparecen.
 export default async function AutomatizacionesPage() {
   const session = await getServerSession(authOptions)
   const u = session!.user
@@ -16,6 +16,7 @@ export default async function AutomatizacionesPage() {
   const ml = tieneModulo(u, 'preguntas')
   const despachos = ve && tieneModulo(u, 'despachos')
   const reportador = despachos && tieneModulo(u, 'reportador')
+  const stock = ml && tieneModulo(u, 'stock_ml')     // en pruebas: si no lo tiene, no aparece
 
   const grupos: { titulo: string; texto: string; items: Herramienta[] }[] = [
     {
@@ -24,9 +25,9 @@ export default async function AutomatizacionesPage() {
         { href: '/preguntas', titulo: 'Preguntas con IA', icono: 'preguntas', activa: ml, aviso: 'preguntas', urgente: true,
           pendiente: 'sin responder',
           texto: 'Las preguntas de todas tus cuentas en una bandeja. La IA propone la respuesta con tu publicación, tu stock y tus respuestas de siempre; tú publicas.' },
-        { href: '/stock-ml', titulo: 'Stock en ML', icono: 'stock', activa: ml, aviso: 'stock',
+        ...(!stock ? [] : [{ href: '/stock-ml', titulo: 'Stock en ML', icono: 'stock', activa: stock, aviso: 'stock',
           pendiente: 'productos para revisar',
-          texto: 'Tu stock real contra lo publicado en cada cuenta: qué reponer (pocas unidades activas o pausadas) y qué está publicado de más.' },
+          texto: 'Tu stock real contra lo publicado en cada cuenta: qué reponer (pocas unidades activas o pausadas) y qué está publicado de más.' } satisfies Herramienta]),
         { href: '/mensajes', titulo: 'Mensajes', icono: 'mensajes', activa: ml, aviso: 'mensajes', urgente: true,
           pendiente: 'conversaciones sin leer',
           texto: 'Los mensajes de tus ventas sin leer, de todas las cuentas, con el producto y el estado de la venta. Respondes desde aquí.' },

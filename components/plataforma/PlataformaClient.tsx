@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui'
 import CuentasPanel from './CuentasPanel'
 import FundadoresPanel from './FundadoresPanel'
+import InternoPanel from './InternoPanel'
 
 interface Empresa {
   id: number
@@ -32,7 +33,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [nueva, setNueva]       = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
-  const [vista, setVista]       = useState<'empresas' | 'cuentas' | 'fundadores'>('empresas')
+  const [vista, setVista]       = useState<'empresas' | 'cuentas' | 'fundadores' | 'interno'>('empresas')
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/plataforma/empresas')
@@ -67,15 +68,15 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       />
 
       <div className="flex gap-1 border-b border-neutral-200">
-        {(['empresas', 'cuentas', 'fundadores'] as const).map(v => (
+        {(['empresas', 'cuentas', 'fundadores', 'interno'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)}
             className={`px-3 py-1.5 text-sm -mb-px border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
-            {v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : 'Fundadores'}
+            {v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : 'Interno'}
           </button>
         ))}
       </div>
 
-      {vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : <>
+      {vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'interno' ? <InternoPanel /> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
