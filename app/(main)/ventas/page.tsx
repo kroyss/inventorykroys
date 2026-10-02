@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth'
+import { facturasHabilitadas } from '@/lib/modulos'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import VentasClient from '@/components/ventas/VentasClient'
@@ -30,6 +31,7 @@ export default async function VentasPage() {
       products={productsRes.rows as InventoryItem[]}
       userRole={session!.user.role}
       country={session!.user.country}
+      facturas={facturasHabilitadas(session!.user)}
     />
   )
 }

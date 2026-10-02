@@ -429,7 +429,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
           {finanzas && <div className="mt-1 border-t border-neutral-100 pt-4">
             <p className="text-sm font-semibold text-neutral-700 mb-1">Finanzas · Mercancía en tránsito</p>
             <p className="text-[11px] text-neutral-500 mb-2">
-              Factor con el que se estima el <b>valor de venta</b> de la mercancía pagada que aún no recibís,
+              Factor con el que se estima el <b>valor de venta</b> de la mercancía pagada que aún no recibes,
               en el <b>Capital a venta · potencial</b> de Finanzas. Ej: <b>1.4</b> = +40%. Es global (VE + CO).
             </p>
             <div className="flex items-end gap-2">

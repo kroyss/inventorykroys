@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { Sugerencias, UsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -109,7 +110,9 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
 }
 
 export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
-  const [vista, setVista] = useState<Vista>('pendientes')
+  // ?vista=cuentas (desde el aviso de "primer paso" de Automatizaciones) abre Cuentas y políticas.
+  const pedida = useSearchParams().get('vista')
+  const [vista, setVista] = useState<Vista>(isAdmin && pedida === 'cuentas' ? 'cuentas' : 'pendientes')
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [datos, setDatos] = useState<Datos | null>(null)

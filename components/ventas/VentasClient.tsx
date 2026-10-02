@@ -62,6 +62,7 @@ interface Props {
   products: InventoryItem[]  // snapshot inicial cargado en el server
   userRole: UserRole
   country: Country
+  facturas: boolean   // módulo Facturas (solo VE): sin él no se muestra el cuadro de factura
 }
 
 type Filter = 'all' | SaleStatus
@@ -71,7 +72,7 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas }: Props) {
   // Productos en estado (no solo el prop del server): se refrescan al volver el
   // foco a la pestaña, para detectar stock ajustado o productos nuevos creados
   // en paralelo sin recargar la página.
@@ -170,7 +171,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   useEffect(() => {
     setSaleInvoices([])
     setInvoiceDraftAt(null)
-    if (country === 'VE' && selectedId) loadSaleInvoices(selectedId)
+    if (facturas && selectedId) loadSaleInvoices(selectedId)
   }, [country, selectedId, loadSaleInvoices])
   const activeInvoice = saleInvoices.find(i => i.status === 'EMITIDA') ?? null
 
@@ -582,7 +583,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </div>
 
             <div className="px-4 py-3 flex-1 overflow-y-auto">
-              {country === 'VE' && (
+              {facturas && (
                 <div className="mb-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
                   {activeInvoice ? (
                     <div className="flex items-center justify-between gap-2">

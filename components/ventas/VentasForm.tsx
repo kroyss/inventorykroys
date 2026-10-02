@@ -433,7 +433,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
 
           {country === 'VE' && veRate && items.length > 0 && (
             <p className="text-[11px] text-neutral-400 -mt-1">
-              El precio es <b>lo que recibís en paralelo</b> (real, ya descontado el cambiario), congelado a la tasa de hoy. Editable por línea.
+              El precio es <b>lo que recibes al paralelo</b> (real, ya descontado el cambiario), congelado a la tasa de hoy. Editable por línea.
             </p>
           )}
 

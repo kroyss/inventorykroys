@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { tieneModulo } from '@/lib/modulos'
+import { dbDeSesion } from '@/lib/session'
 import { PageHeader } from '@/components/ui'
 import InicioAutomatizaciones, { type Herramienta } from '@/components/automatizaciones/InicioAutomatizaciones'
 
@@ -17,6 +18,10 @@ export default async function AutomatizacionesPage() {
   const despachos = ve && tieneModulo(u, 'despachos')
   const reportador = despachos && tieneModulo(u, 'reportador')
   const stock = ml && tieneModulo(u, 'stock_ml')     // en pruebas: si no lo tiene, no aparece
+
+  // Primer paso de una empresa nueva: sin cuentas de MercadoLibre conectadas casi nada funciona.
+  const sinCuentas = ml && (await dbDeSesion(session!).query(
+    `SELECT 1 FROM ml_conexiones WHERE estado = 'activa' LIMIT 1`)).rowCount === 0
 
   const grupos: { titulo: string; texto: string; items: Herramienta[] }[] = [
     {
@@ -52,7 +57,7 @@ export default async function AutomatizacionesPage() {
   return (
     <div>
       <PageHeader title="Automatizaciones" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones" />
-      <InicioAutomatizaciones grupos={grupos} />
+      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={u.role === 'admin'} />
     </div>
   )
 }

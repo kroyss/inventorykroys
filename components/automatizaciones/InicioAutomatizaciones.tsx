@@ -30,7 +30,11 @@ function Icono({ de, activa }: { de: keyof typeof ICONOS; activa: boolean }) {
  * Inicio de Automatizaciones: arriba lo que está pendiente HOY (con los mismos numeritos
  * del menú, en vivo), abajo todas las herramientas agrupadas por momento de la venta.
  */
-export default function InicioAutomatizaciones({ grupos }: { grupos: { titulo: string; texto: string; items: Herramienta[] }[] }) {
+export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esAdmin = false }: {
+  grupos: { titulo: string; texto: string; items: Herramienta[] }[]
+  sinCuentas?: boolean   // la empresa todavía no conectó ninguna cuenta de MercadoLibre
+  esAdmin?: boolean
+}) {
   const avisos = useAvisos()
   const todas = grupos.flatMap(g => g.items).filter(h => h.activa && h.aviso)
   const pendientes = todas.filter(h => avisos[h.aviso!] > 0)
@@ -39,11 +43,22 @@ export default function InicioAutomatizaciones({ grupos }: { grupos: { titulo: s
     <div className="space-y-8">
       {/* ── Pendiente hoy ── */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-neutral-700">Pendiente ahora</h2>
-        {todas.length === 0 ? null : pendientes.length === 0 ? (
+        <h2 className="text-sm font-semibold text-neutral-700">{sinCuentas ? 'Primer paso' : 'Pendiente ahora'}</h2>
+        {sinCuentas ? (
+          <div className="bg-lime-50 border border-lime-300 rounded-xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-neutral-900">Conecta tus cuentas de MercadoLibre</p>
+              <p className="text-sm text-neutral-600 mt-0.5">
+                Preguntas, Mensajes, Calificaciones y el Reportador trabajan con tus cuentas: conéctalas una vez y listo.
+                {!esAdmin && ' Lo hace un administrador de tu empresa.'}
+              </p>
+            </div>
+            {esAdmin && <Link href="/preguntas?vista=cuentas" className="btn-primary text-sm whitespace-nowrap">Conectar cuentas</Link>}
+          </div>
+        ) : todas.length === 0 ? null : pendientes.length === 0 ? (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">✓</span>
-            <p className="text-sm text-neutral-700">Todo al día: no hay preguntas, mensajes, stock, despachos, guías ni calificaciones pendientes.</p>
+            <p className="text-sm text-neutral-700">Todo al día: no hay {todas.map(h => h.titulo.replace(/ con IA| en ML/, '').toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' ni $1')} pendientes.</p>
           </div>
         ) : (
           <div className="grid gap-3 grid-cols-2 md:grid-cols-4">

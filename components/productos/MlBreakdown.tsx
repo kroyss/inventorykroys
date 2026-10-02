@@ -52,7 +52,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
     const price = p.salePrice ?? 0
     const coTrm = p.coTrm ?? 0
     if (!(price > 0) || !(coTrm > 0)) {
-      return <p className="text-xs text-neutral-400 px-1">Cargá precio de venta y TRM para ver la ganancia neta.</p>
+      return <p className="text-xs text-neutral-400 px-1">Carga el precio de venta y la TRM para ver la ganancia neta.</p>
     }
     const comisionPct = num(p.ml, 'ml_comision', 15.5)
     const retenPct    = num(p.ml, 'ml_reten', 1.91)
@@ -89,7 +89,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   const final = p.finalPriceUsd ?? 0
   const rate  = p.veRate
   if (!rate || !(rate.parallel > 0) || !(rate.official > 0) || !(final > 0)) {
-    return <p className="text-xs text-neutral-400 px-1">Cargá precio y tasa para ver la ganancia neta.</p>
+    return <p className="text-xs text-neutral-400 px-1">Carga el costo y la categoría para ver la ganancia neta.</p>
   }
   const comisionPct = num(p.ml, 'ml_comision', 12)
   const realUsd   = final * rate.official / rate.parallel
@@ -109,7 +109,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   return (
     <div className="space-y-2">
       <div className="text-sm space-y-0.5">
-        <Row label="Venta con descuento aplicado en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
+        <Row label="Precio final en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
         <Row label="En dólares reales (paralelo)" value={`$${fmtUsd(realUsd)}`} sub={`−$${fmtUsd(cambiario)} cambiario`} />
         <Row label={`− Comisión ML (${comisionPct}%)`} value={`−$${fmtUsd(comision)}`} neg />
         <Row label="− Envío ML" value={`−$${fmtUsd(envio)}`} neg
