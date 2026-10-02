@@ -63,7 +63,7 @@ export const PREGUNTAS: Pregunta[] = [
     ],
   },
   {
-    campo: 'compromiso', texto: '¿Llevarías tus ventas y tu stock dentro del sistema?',
+    campo: 'compromiso', texto: '¿Llevarías tus ventas de MercadoLibre dentro del sistema?',
     ayuda: 'Para que te ahorre tiempo de verdad, tus ventas de MercadoLibre tienen que estar dentro del sistema.',
     opciones: [
       { valor: 'todo', texto: 'Sí, llevaría mis ventas en el sistema', puntos: 3 },
