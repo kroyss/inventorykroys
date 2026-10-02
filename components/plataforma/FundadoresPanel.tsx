@@ -13,7 +13,11 @@ interface Solicitud {
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'rechazado'; tanda: number | null
   sospechosa: string | null; ml_verificado: Verif | null; notas: string | null; created_at: string
 }
-type Filtro = 'calificado' | 'aprobado' | 'rechazado' | 'descartado' | 'todas'
+type Filtro = 'calificado' | 'aprobado' | 'rechazado' | 'descartado' | 'todas' | 'radar'
+
+// Marcó "Saber qué vender o qué traer": no suma para Fundadores, pero es público para el Radar
+// (también si quedó descartado o rechazado).
+const quiereRadar = (s: Solicitud) => s.dolor.split(',').includes('que_vender')
 
 const ESTADO: Record<Solicitud['estado'], { t: string; c: string }> = {
   calificado: { t: 'Por revisar', c: 'bg-sky-50 text-sky-800 ring-sky-200' },
@@ -23,7 +27,7 @@ const ESTADO: Record<Solicitud['estado'], { t: string; c: string }> = {
 }
 
 const FILTRO: Record<Filtro, string> = {
-  calificado: 'Por revisar', aprobado: 'Aprobados', rechazado: 'Rechazados', descartado: 'Descartados', todas: 'Todas',
+  calificado: 'Por revisar', aprobado: 'Aprobados', rechazado: 'Rechazados', descartado: 'Descartados', todas: 'Todas', radar: '📡 Interés Radar',
 }
 
 // Respuestas en filas: etiqueta corta + una pastilla por opción (verde = suma puntos) + los puntos de la fila.
@@ -117,8 +121,11 @@ export default function FundadoresPanel() {
   }
 
   if (!datos) return <p className="text-sm text-neutral-400">Cargando…</p>
-  const cuenta = (e: Filtro) => e === 'todas' ? datos.solicitudes.length : datos.solicitudes.filter(s => s.estado === e).length
-  const lista = filtro === 'todas' ? datos.solicitudes : datos.solicitudes.filter(s => s.estado === filtro)
+  const de = (e: Filtro) => e === 'todas' ? datos.solicitudes
+    : e === 'radar' ? datos.solicitudes.filter(quiereRadar)
+    : datos.solicitudes.filter(s => s.estado === e)
+  const cuenta = (e: Filtro) => de(e).length
+  const lista = de(filtro)
   const enlace = typeof window !== 'undefined' ? `${window.location.origin}/fundadores` : '/fundadores'
 
   return (
@@ -162,7 +169,7 @@ export default function FundadoresPanel() {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {(['calificado', 'aprobado', 'rechazado', 'descartado', 'todas'] as const).map(f => (
+        {(['calificado', 'aprobado', 'rechazado', 'descartado', 'todas', 'radar'] as const).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
             className={`px-3 py-1 text-xs font-medium rounded-full border ${filtro === f ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'}`}>
             {FILTRO[f]} ({cuenta(f)})
@@ -209,6 +216,10 @@ export default function FundadoresPanel() {
                     <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ${ESTADO[s.estado].c}`}>
                       {ESTADO[s.estado].t}{s.estado === 'aprobado' && s.tanda ? ` · tanda ${s.tanda}` : ''}
                     </span>
+                    {quiereRadar(s) && (
+                      <span title="Marcó “Saber qué vender o qué traer”: posible cliente del Radar"
+                        className="text-[11px] rounded-full px-2 py-0.5 bg-violet-50 text-violet-800 ring-1 ring-inset ring-violet-200">📡 Interés Radar</span>
+                    )}
                     <span className="text-xs text-neutral-400">{fecha(s.created_at)}</span>
                   </div>
                   <div className="pt-1"><Respuestas s={s} /></div>
