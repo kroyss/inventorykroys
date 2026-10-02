@@ -66,6 +66,7 @@ export default function AlertasStockClient() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
         <span>
           Se revisa sola cada 2 horas{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
+          {' '}El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).
         </span>
         {datos?.esAdmin && (
           <label className="flex items-center gap-1.5">
@@ -116,7 +117,7 @@ export default function AlertasStockClient() {
                   {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
                 </p>
                 <p className="text-[11px] text-neutral-400">
-                  {vista === 'agotadas' ? hace(f.agotada_desde) : hace(f.bajo_desde)}
+                  {vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
                 </p>
               </div>
             </li>
