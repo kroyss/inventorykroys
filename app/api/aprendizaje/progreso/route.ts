@@ -22,13 +22,13 @@ export async function POST(req: NextRequest) {
     const visto = Math.min(b.visto_seg, b.duracion_seg)
     const { rows: [r] } = await dbGlobal().query(
       `INSERT INTO aprendizaje_progreso (user_id, video_id, visto_seg, duracion_seg, completado_at)
-       SELECT $1, v.id, $3, $4, CASE WHEN $3 >= $4 * $5 THEN NOW() END
-       FROM aprendizaje_videos v WHERE v.id = $2 AND v.activo
+       SELECT $1::int, v.id, $3::int, $4::int, CASE WHEN $3::int >= $4::int * $5::numeric THEN NOW() END
+       FROM aprendizaje_videos v WHERE v.id = $2::int AND v.activo
        ON CONFLICT (user_id, video_id) DO UPDATE SET
          visto_seg     = GREATEST(aprendizaje_progreso.visto_seg, EXCLUDED.visto_seg),
          duracion_seg  = EXCLUDED.duracion_seg,
          completado_at = COALESCE(aprendizaje_progreso.completado_at,
-                                  CASE WHEN GREATEST(aprendizaje_progreso.visto_seg, EXCLUDED.visto_seg) >= EXCLUDED.duracion_seg * $5
+                                  CASE WHEN GREATEST(aprendizaje_progreso.visto_seg, EXCLUDED.visto_seg) >= EXCLUDED.duracion_seg * $5::numeric
                                        THEN NOW() END),
          updated_at    = NOW()
        RETURNING completado_at IS NOT NULL AS completado`,
