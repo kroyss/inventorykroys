@@ -31,7 +31,7 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
 
 interface OrdenBusqueda {
   id: number; pack_id: number | null; date_created: string; total_amount: number; currency_id: string
-  buyer: { nickname?: string }; order_items: { item: { title: string }; quantity: number }[]
+  buyer: { nickname?: string }; order_items: { item: { id: string; title: string; variation_id?: number | null }; quantity: number }[]
   feedback: { seller: { rating?: string; fulfilled?: boolean } | null; buyer: { rating?: string } | null } | null
 }
 
@@ -51,9 +51,9 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
       if (new Date(o.date_created).getTime() < desde) { viejas = true; break }
       await db.query(
         `INSERT INTO ml_ordenes (id, conexion_id, pack_id, fecha, comprador, productos, total, moneda,
-                                 cal_vendedor, cal_concretada, cal_comprador, actualizada_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
-         ON CONFLICT (empresa_id, id) DO UPDATE SET
+                                 cal_vendedor, cal_concretada, cal_comprador, items, actualizada_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+         ON CONFLICT (empresa_id, id) DO UPDATE SET items = EXCLUDED.items,
            cal_vendedor = EXCLUDED.cal_vendedor, cal_concretada = EXCLUDED.cal_concretada,
            cal_comprador = EXCLUDED.cal_comprador, actualizada_at = NOW()`,
         [o.id, conexionId, o.pack_id, o.date_created, o.buyer?.nickname ?? null,
@@ -63,7 +63,9 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
          // trae el detalle: existir = ya calificada (verificado: las calificadas a mano vienen así).
          o.feedback?.seller ? (o.feedback.seller.rating ?? 'calificada') : null,
          o.feedback?.seller?.fulfilled ?? null,
-         o.feedback?.buyer ? (o.feedback.buyer.rating ?? 'calificada') : null])
+         o.feedback?.buyer ? (o.feedback.buyer.rating ?? 'calificada') : null,
+         // Qué se vendió: "MLV123" y, si tiene variante, también "MLV123:456" (para el módulo Stock).
+         o.order_items.flatMap(i => i.item.variation_id ? [i.item.id, `${i.item.id}:${i.item.variation_id}`] : [i.item.id])])
       n++
     }
     if (viejas || lote.length < 50) break

@@ -28,7 +28,7 @@ export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automa
   const [abierto, setAbierto] = useState(false)
   const avisos = useAvisos()
   const urgentesAuto = avisos.preguntas + avisos.mensajes
-  const totalAuto = urgentesAuto + avisos.reportador + avisos.calificaciones + avisos.despachos + avisos.stock
+  const totalAuto = urgentesAuto + avisos.reportador + avisos.calificaciones + avisos.despachos
   const caja = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

@@ -3,7 +3,6 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { leerPlantillasCal, SQL_BANDEJA } from '@/lib/calificacionesML'
-import { DIAS_VENTAS, SQL_COMPARACION, UMBRAL_BAJO } from '@/lib/stockML'
 import { contarAlertas } from '@/lib/alertasStock'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
@@ -20,19 +19,14 @@ export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
   const u = session.user
-  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, stock: 0, alertas: 0 }
+  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0 }
   try {
     if (tieneModulo(u, 'preguntas')) {
       const { rows: [r] } = await db.query(
         `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS p,
                 (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS m`)
       out.preguntas = r.p; out.mensajes = r.m
-      { const a = await contarAlertas(db); out.alertas = a.agotadas + a.bajas }
-      if (tieneModulo(u, 'stock_ml')) {
-        const { rows: [st] } = await db.query(
-          `SELECT COUNT(*)::int AS n FROM (${SQL_COMPARACION}) c WHERE alerta <> 'ok'`, [DIAS_VENTAS, UMBRAL_BAJO])
-        out.stock = st.n
-      }
+      if (tieneModulo(u, 'alertas_stock')) { const a = await contarAlertas(db); out.alertas = a.agotadas + a.bajas }
       {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
         const { rows: [c] } = await db.query(

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (!mlConfigurado()) return NextResponse.json({ omitido: 'ML sin configurar' })
 
   const { rows: empresas } = await dbGlobal().query(
-    `SELECT id, country FROM empresas WHERE is_active AND 'preguntas' = ANY(modulos) ORDER BY id`)
+    `SELECT id, country, 'alertas_stock' = ANY(modulos) AS stock FROM empresas WHERE is_active AND 'preguntas' = ANY(modulos) ORDER BY id`)
   const resultado: Record<number, unknown> = {}
   for (const e of empresas) {
     try {
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   // Alertas de stock: una cuenta por empresa y por pasada, si pasó la hora (lib/alertasStock.ts).
   // En segundo plano (después de responder) para no atrasar preguntas y mensajes.
   after(async () => {
-    for (const e of empresas) {
+    for (const e of empresas.filter(x => x.stock)) {
       try {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
       } catch (err) {

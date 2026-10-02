@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { sesionPreguntas } from '@/lib/preguntasSesion'
+import { sesionStock } from '@/lib/preguntasSesion'
 import { revisarStockCuenta } from '@/lib/alertasStock'
 
 // POST /api/alertas-stock/revisar → revisa YA el stock publicado de todas las cuentas conectadas
 // (sin esperar la hora del cron). Solo lee de MercadoLibre.
 export async function POST() {
-  const s = await sesionPreguntas()
+  const s = await sesionStock()
   if ('error' in s) return s.error
   try {
     // Como máximo una vez cada 10 minutos por empresa (cuida las llamadas a MercadoLibre).

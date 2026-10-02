@@ -15,12 +15,12 @@ export async function sesionPreguntas(soloAdmin = false) {
   return { session, db } as const
 }
 
-/** Stock en ML: sesión de Preguntas (conexiones de ML) + su propio módulo `stock_ml` (en pruebas). */
-export async function sesionStockML() {
-  const s = await sesionPreguntas()
+/** Stock (alertas de stock): sesión de Preguntas (conexiones de ML) + su módulo `alertas_stock`. */
+export async function sesionStock(soloAdmin = false) {
+  const s = await sesionPreguntas(soloAdmin)
   if ('error' in s) return s
-  if (!tieneModulo(s.session.user, 'stock_ml')) {
-    return { error: NextResponse.json({ error: 'Tu empresa no tiene el módulo Stock en ML' }, { status: 403 }) } as const
+  if (!tieneModulo(s.session.user, 'alertas_stock')) {
+    return { error: NextResponse.json({ error: 'Tu empresa no tiene el módulo Stock' }, { status: 403 }) } as const
   }
   return s
 }

@@ -23,8 +23,7 @@ const allLinks: { href: string; label: string; roles: UserRole[]; countries: Cou
   { href: '/preguntas',        label: 'Preguntas',  roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/mensajes',         label: 'Mensajes',   roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/calificaciones',   label: 'Calificaciones', roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/alertas-stock',    label: 'Alertas stock', roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/stock-ml',         label: 'Stock ML',   roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/alertas-stock',    label: 'Stock',         roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
 interface Props {

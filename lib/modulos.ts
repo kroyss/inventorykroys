@@ -12,7 +12,7 @@ export const MODULOS = {
   finanzas:   'Finanzas',
   bonos:      'Bonos del vendedor',
   preguntas:  'Preguntas de MercadoLibre con IA',
-  stock_ml:   'Stock en ML (stock real vs publicado) · en pruebas',
+  alertas_stock: 'Stock: publicaciones de ML agotadas o por agotarse (vendidas en los últimos 30 días)',
   descuento_ml:   'Descuento ML: descuento global sobre el exceso, tope por MercadoEnvíos y Márgenes < $5 (VE)',
   importaciones:  'Importaciones: compras al exterior (pagos 50/100, fotos, aduana, contenedores)',
   analisis_stock: 'Análisis de stock y conteos: reposición, declive, remate y conteos físicos (Reportes)',
@@ -29,8 +29,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/preguntas': 'preguntas',
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
-  '/stock-ml':  'stock_ml',
-  '/alertas-stock': 'preguntas',
+  '/alertas-stock': 'alertas_stock',
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
 }

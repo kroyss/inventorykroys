@@ -2,7 +2,7 @@
 //
 // Es la lista para no olvidar qué está escondido y por qué; se muestra en Plataforma → Interno.
 // OJO: las funciones que se le van liberando a cada cliente NO van aquí: son MÓDULOS
-// (lib/modulos.ts) y se prenden por empresa en Plataforma → Empresas (p. ej. Stock en ML).
+// (lib/modulos.ts) y se prenden por empresa en Plataforma → Empresas (p. ej. descuento_ml).
 // Aquí va solo lo que es de la plataforma en sí.
 
 export interface FuncionInterna {

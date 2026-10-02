@@ -17,7 +17,7 @@ export default async function AutomatizacionesPage() {
   const ml = tieneModulo(u, 'preguntas')
   const despachos = ve && tieneModulo(u, 'despachos')
   const reportador = despachos && tieneModulo(u, 'reportador')
-  const stock = ml && tieneModulo(u, 'stock_ml')     // en pruebas: si no lo tiene, no aparece
+  const stock = ml && tieneModulo(u, 'alertas_stock')
 
   // Primer paso de una empresa nueva: sin cuentas de MercadoLibre conectadas casi nada funciona.
   const sinCuentas = ml && (await dbDeSesion(session!).query(
@@ -30,12 +30,9 @@ export default async function AutomatizacionesPage() {
         { href: '/preguntas', titulo: 'Preguntas con IA', icono: 'preguntas', activa: ml, aviso: 'preguntas', urgente: true,
           pendiente: 'sin responder',
           texto: 'Las preguntas de todas tus cuentas en una bandeja. La IA propone la respuesta con tu publicación, tu stock y tus respuestas de siempre; tú publicas.' },
-        ...(!stock ? [] : [{ href: '/stock-ml', titulo: 'Stock en ML', icono: 'stock', activa: stock, aviso: 'stock',
-          pendiente: 'productos para revisar',
-          texto: 'Tu stock real contra lo publicado en cada cuenta: qué reponer (pocas unidades activas o pausadas) y qué está publicado de más.' } satisfies Herramienta]),
-        { href: '/alertas-stock', titulo: 'Alertas de stock', icono: 'stock', activa: ml, aviso: 'alertas',
+        { href: '/alertas-stock', titulo: 'Stock', icono: 'stock', activa: stock, aviso: 'alertas',
           pendiente: 'agotadas o por agotarse',
-          texto: 'Las publicaciones (y cada variante) que se agotaron o están por agotarse en tus cuentas. Se revisa sola cada 2 horas.' },
+          texto: 'Lo que vendiste en los últimos 30 días y ya se agotó o está por agotarse en tus cuentas (por variante). Se revisa sola cada 2 horas.' },
         { href: '/mensajes', titulo: 'Mensajes', icono: 'mensajes', activa: ml, aviso: 'mensajes', urgente: true,
           pendiente: 'conversaciones sin leer',
           texto: 'Los mensajes de tus ventas sin leer, de todas las cuentas, con el producto y el estado de la venta. Respondes desde aquí.' },

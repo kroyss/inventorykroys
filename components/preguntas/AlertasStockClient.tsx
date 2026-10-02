@@ -8,10 +8,10 @@ interface Fila {
   ultima_agotada_at: string | null; cuenta: string
 }
 interface Datos {
-  filas: Fila[]; contadores: { agotadas: number; bajas: number; semana: number }; umbral: number
+  filas: Fila[]; contadores: { agotadas: number; bajas: number }; umbral: number
   revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean
 }
-type Vista = 'agotadas' | 'bajas' | 'semana'
+type Vista = 'agotadas' | 'bajas'
 
 const hace = (s: string | null) => {
   if (!s) return '—'
@@ -22,7 +22,7 @@ const hace = (s: string | null) => {
   return `hace ${d} día${d === 1 ? '' : 's'}`
 }
 
-/** Automatizaciones → Alertas de stock: publicaciones (y variantes) de MercadoLibre agotadas o por agotarse. */
+/** Automatizaciones → Stock: publicaciones (y variantes) de MercadoLibre vendidas en 30 días, agotadas o por agotarse. */
 export default function AlertasStockClient() {
   const [vista, setVista] = useState<Vista>('agotadas')
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -59,8 +59,8 @@ export default function AlertasStockClient() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Alertas de stock"
-        subtitle="Lo que se agotó o está por agotarse en tus publicaciones de MercadoLibre, por variante"
+      <PageHeader title="Stock"
+        subtitle="Lo que vendiste en los últimos 30 días y se agotó o está por agotarse en MercadoLibre, por variante"
         actions={<button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
@@ -82,7 +82,6 @@ export default function AlertasStockClient() {
         <Tabs value={vista} onChange={setVista} items={[
           { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
           { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
-          { value: 'semana', label: 'Agotadas en 7 días', count: datos?.contadores.semana },
         ]} />
         <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar publicación, variante o cuenta…"
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
@@ -90,7 +89,7 @@ export default function AlertasStockClient() {
 
       {!datos ? <p className="text-sm text-neutral-400">Cargando…</p> : filas.length === 0 ? (
         <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">
-          {vista === 'agotadas' ? 'Ninguna publicación agotada. 👌' : vista === 'bajas' ? 'Nada por agotarse.' : 'Nada se agotó en los últimos 7 días.'}
+          {vista === 'agotadas' ? 'Nada de lo vendido en 30 días está agotado. 👌' : 'Nada de lo vendido en 30 días está por agotarse.'}
         </p>
       ) : (
         <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
@@ -117,8 +116,7 @@ export default function AlertasStockClient() {
                   {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
                 </p>
                 <p className="text-[11px] text-neutral-400">
-                  {vista === 'agotadas' ? hace(f.agotada_desde) : vista === 'bajas' ? hace(f.bajo_desde)
-                    : f.disponible > 0 ? `repuesta · se agotó ${hace(f.ultima_agotada_at)}` : hace(f.agotada_desde)}
+                  {vista === 'agotadas' ? hace(f.agotada_desde) : hace(f.bajo_desde)}
                 </p>
               </div>
             </li>

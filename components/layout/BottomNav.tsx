@@ -34,7 +34,7 @@ const PRIMARY_AUTO: NavItem[] = [
 ]
 const MORE_AUTO: NavItem[] = [
   { href: '/dashboard',        label: 'Inventario', icon: '📋', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/alertas-stock',    label: 'Alertas stock', icon: '📉', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
+  { href: '/alertas-stock',    label: 'Stock', icon: '📉', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
   { href: '/aprendizaje',      label: 'Aprendizaje', icon: '🎓', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
 ]
 

@@ -2,11 +2,22 @@
 // variante. Lee TODAS las publicaciones activas (y las pausadas por falta de stock: ML las pausa
 // solo al llegar a 0) de cada cuenta conectada; no depende de los códigos ML de los productos.
 // Solo lee de MercadoLibre. Lo corre el cron de preguntas, cada 2 horas por cuenta.
+//
+// Filtro (decisión del dueño, 2026-10-02): solo cuenta lo que se VENDIÓ en los últimos 30 días
+// (la variante, o la publicación si no tiene variantes), según las ventas que ya se traen de ML
+// para Calificaciones (ml_ordenes.items). Lo que no se vende hace rato ya "murió" hasta reponerlo.
 import type { Pool } from 'pg'
 import { mlFetch } from '@/lib/ml'
 
 export const UMBRAL_DEFAULT = 3            // "por agotarse" = menos de esto (por empresa en Ajustes del módulo)
 export const MINUTOS_ENTRE_REVISIONES = 120   // cada 2 h por cuenta: cuida las llamadas a ML al crecer
+export const DIAS_VENDIDAS = 30
+
+/** Condición SQL sobre ml_stock_alertas `a`: se vendió en los últimos DIAS_VENDIDAS días. */
+export const SQL_VENDIDA = `EXISTS (
+  SELECT 1 FROM ml_ordenes o
+  WHERE o.fecha > NOW() - INTERVAL '${DIAS_VENDIDAS} days'
+    AND (CASE WHEN a.variante_id = 0 THEN a.item_id ELSE a.item_id || ':' || a.variante_id END) = ANY(o.items))`
 const POR_MULTIGET = 20                    // máximo de ML en /items?ids=
 
 interface ItemML {
@@ -92,12 +103,8 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
        filas.map(f => f.item), filas.map(f => f.var), filas.map(f => f.titulo), filas.map(f => f.variante),
        filas.map(f => f.disp), filas.map(f => f.estado), filas.map(f => f.link), filas.map(f => f.img)])
   }
-  // Lo que ya no está publicado (cerrado, borrado, pausado a mano): fuera, salvo que se haya
-  // agotado en los últimos 7 días (sigue en ese filtro).
-  await db.query(
-    `DELETE FROM ml_stock_alertas
-     WHERE conexion_id = $1 AND actualizado_at < $2
-       AND (ultima_agotada_at IS NULL OR ultima_agotada_at < NOW() - INTERVAL '7 days')`, [conexionId, inicio])
+  // Lo que ya no está publicado (cerrado, borrado, pausado a mano): fuera.
+  await db.query(`DELETE FROM ml_stock_alertas WHERE conexion_id = $1 AND actualizado_at < $2`, [conexionId, inicio])
   return { publicaciones }
 }
 
@@ -111,12 +118,12 @@ export async function revisarStockPendiente(db: Pool) {
   return c ? revisarStockCuenta(db, c.id) : null
 }
 
-/** Cuántas alertas hay ahora (agotadas + por agotarse), para el numerito del menú. */
+/** Cuántas alertas hay ahora (agotadas + por agotarse, vendidas en 30 días), para el numerito del menú. */
 export async function contarAlertas(db: Pool) {
   const umbral = await umbralStock(db)
   const { rows: [r] } = await db.query(
-    `SELECT COUNT(*) FILTER (WHERE disponible <= 0 AND estado IN ('active', 'paused'))::int AS agotadas,
-            COUNT(*) FILTER (WHERE disponible > 0 AND disponible < $1)::int AS bajas
-     FROM ml_stock_alertas WHERE actualizado_at > NOW() - INTERVAL '1 day'`, [umbral])
+    `SELECT COUNT(*) FILTER (WHERE a.disponible <= 0)::int AS agotadas,
+            COUNT(*) FILTER (WHERE a.disponible > 0 AND a.disponible < $1)::int AS bajas
+     FROM ml_stock_alertas a WHERE a.actualizado_at > NOW() - INTERVAL '1 day' AND ${SQL_VENDIDA}`, [umbral])
   return { agotadas: r.agotadas as number, bajas: r.bajas as number }
 }
