@@ -9,10 +9,42 @@ import { mlFetch, ErrorML } from '@/lib/ml'
 
 export interface OrdenML {
   id: number; pack_id: number | null; status: string; date_created: string; tags: string[]
-  seller: { id: number }; buyer: { id: number; nickname?: string }
+  seller: { id: number }; buyer: { id: number; nickname?: string; first_name?: string; last_name?: string }
   order_items: { item: { id: string; title: string }; quantity: number }[]
   total_amount: number; currency_id: string
   feedback: { seller: unknown; buyer: unknown }
+}
+
+/** Para el formulario de Ventas: con el número de la venta (orden o pack/carrito), la cuenta, el
+ *  comprador y lo que compró. Se prueba en las cuentas conectadas: la que responde es la dueña. */
+export async function ventaParaFormulario(db: Pool, numero: string) {
+  const { rows: cuentas } = await db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
+  const noEsDeEsta = (e: unknown) => e instanceof ErrorML && [400, 401, 403, 404].includes(e.status)
+  for (const c of cuentas) {
+    let ordenes: OrdenML[] = []
+    try {
+      ordenes = [await mlFetch<OrdenML>(db, c.id, `/orders/${numero}`)]
+    } catch (e) {
+      if (!noEsDeEsta(e)) throw e
+      try {
+        const p = await mlFetch<{ orders: { id: number }[] }>(db, c.id, `/packs/${numero}`)
+        ordenes = await Promise.all(p.orders.slice(0, 10).map(o => mlFetch<OrdenML>(db, c.id, `/orders/${o.id}`)))
+      } catch (e2) {
+        if (!noEsDeEsta(e2)) throw e2
+      }
+    }
+    if (!ordenes.length) continue
+    const b = ordenes.find(o => o.buyer)?.buyer
+    return {
+      cuenta: c.nickname as string,
+      comprador: {
+        nombre: [b?.first_name, b?.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || null,
+        nick: b?.nickname ?? null,
+      },
+      items: ordenes.flatMap(o => o.order_items).map(i => ({ itemId: i.item.id, titulo: i.item.title, cantidad: i.quantity })),
+    }
+  }
+  return null
 }
 
 /** Busca la orden en las cuentas conectadas de la empresa (la que responda es la dueña). */

@@ -25,6 +25,12 @@ interface Props {
   onContinue?: (id: number) => void   // guardar y abrir el detalle para avanzar estados
 }
 
+interface MlVenta {
+  cuenta: string
+  comprador: { nombre: string | null; nick: string | null }
+  items: { itemId: string; titulo: string; cantidad: number; producto: { id: number; code: string; name: string } | null }[]
+}
+
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -79,6 +85,34 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     return () => clearTimeout(t)
   }, [orderNumber, isLocal, editing])
 
+  // Venta de MercadoLibre: con el número completo se trae el comprador (llena el Cliente si está
+  // vacío) y lo que compró (con botón para agregar los productos que tienen su código ML cargado).
+  // Sin cuentas conectadas la API responde 404 y no se muestra nada: todo sigue manual.
+  const [ml, setMl] = useState<{ numero: string; venta: MlVenta | null; buscando: boolean } | null>(null)
+  const numeroCompleto = !isLocal && orderNumber.trim() !== '' && !mlOrderError(country, orderNumber)
+  useEffect(() => {
+    if (!numeroCompleto) return
+    const numero = orderNumber.trim()
+    let vivo = true
+    const t = setTimeout(() => {
+      setMl({ numero, venta: null, buscando: true })
+      fetch(`/api/sales/ml-orden?numero=${encodeURIComponent(numero)}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((d: MlVenta | null) => {
+          if (!vivo) return
+          setMl({ numero, venta: d, buscando: false })
+          const nombre = d?.comprador.nombre ?? d?.comprador.nick
+          if (nombre) setCustomer(c => (c.trim() ? c : nombre))
+        })
+        .catch(() => { if (vivo) setMl({ numero, venta: null, buscando: false }) })
+    }, 500)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [numeroCompleto, orderNumber])
+  // Solo vale lo encontrado para el número que está escrito ahora.
+  const mlActual = numeroCompleto && ml?.numero === orderNumber.trim() ? ml : null
+  const mlVenta = mlActual?.venta ?? null
+  const buscandoMl = !!mlActual?.buscando
+
   // slide-in on mount
   useEffect(() => { setMounted(true) }, [])
 
@@ -130,6 +164,17 @@ export default function VentasForm({ editing, products, country, onClose, onSave
       unit_price:   defaultPrice(p),
     }])
     setSearch('')
+  }
+
+  // Agrega los productos de la venta de ML que tienen su código cargado (con la cantidad comprada).
+  const agregarDeMl = (lista: MlVenta['items']) => {
+    const nuevos: FormItem[] = []
+    for (const i of lista) {
+      const p = i.producto && products.find(x => x.product_id === i.producto!.id)
+      if (!p || items.some(x => x.product_id === p.product_id) || nuevos.some(x => x.product_id === p.product_id)) continue
+      nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad, unit_price: defaultPrice(p) })
+    }
+    if (nuevos.length) setItems([...items, ...nuevos])
   }
 
   const updateItem = (idx: number, patch: Partial<FormItem>) => {
@@ -268,11 +313,51 @@ export default function VentasForm({ editing, products, country, onClose, onSave
                   onChange={name => setCustomer(name)}
                 />
               </div>
-              {noCustomer && (
+              {buscandoMl && <p className="text-[11px] text-neutral-400 mt-1">Buscando en MercadoLibre…</p>}
+              {!buscandoMl && mlVenta && (
+                <p className="text-[11px] text-neutral-500 mt-1">
+                  En MercadoLibre ({mlVenta.cuenta}): <b className="text-neutral-700">{mlVenta.comprador.nombre ?? '—'}</b>
+                  {mlVenta.comprador.nick && <span className="text-neutral-400"> · @{mlVenta.comprador.nick}</span>}
+                  {(() => {
+                    const n = mlVenta.comprador.nombre ?? mlVenta.comprador.nick
+                    return n && n !== customer.trim()
+                      ? <button type="button" onClick={() => setCustomer(n)} className="ml-1.5 underline underline-offset-2 text-sky-700">usar</button>
+                      : null
+                  })()}
+                </p>
+              )}
+              {noCustomer && !mlVenta && (
                 <p className="text-[11px] text-neutral-400 mt-1">Obligatorio: sin cliente la venta no puede avanzar.</p>
               )}
             </div>
           </div>
+
+          {/* Lo que compró en MercadoLibre */}
+          {mlVenta && mlVenta.items.length > 0 && (() => {
+            const faltan = mlVenta.items.filter(i => i.producto && !items.some(x => x.product_id === i.producto!.id))
+            return (
+              <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sky-900">Compró en MercadoLibre</span>
+                  {faltan.length > 1 && (
+                    <button type="button" onClick={() => agregarDeMl(faltan)} className="underline underline-offset-2 text-sky-700">Agregar todos</button>
+                  )}
+                </div>
+                {mlVenta.items.map((i, k) => {
+                  const ya = i.producto && items.some(x => x.product_id === i.producto!.id)
+                  return (
+                    <div key={k} className="flex items-baseline justify-between gap-2">
+                      <span className="text-neutral-700 min-w-0 truncate" title={i.titulo}>{i.cantidad} × {i.titulo}</span>
+                      {i.producto ? (ya
+                        ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
+                        : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)
+                        : <span className="shrink-0 text-neutral-400" title="Ningún producto tiene este código ML: búscalo abajo">sin vincular</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           {/* Items */}
           <div>
