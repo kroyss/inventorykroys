@@ -96,9 +96,9 @@ export default function FundadoresPanel() {
       const d = await r.json().catch(() => ({}))
       if (!r.ok) setError(d.error ?? 'No se pudo')
       else if ('accion' in body && body.accion === 'aprobar')
-        setAviso({ texto: `${s.nombre} aprobado en la tanda ${d.tanda}. Pasó a “Aprobados”: escríbele por Telegram.`, telegram: s.telegram })
+        setAviso({ texto: `${s.nombre} aprobado en la ronda ${d.tanda}. Pasó a “Aprobados”: escríbele por Telegram.`, telegram: s.telegram })
       else if ('accion' in body && body.accion === 'rechazar')
-        setAviso({ texto: `${s.nombre} ${s.estado === 'aprobado' ? 'salió de su tanda y quedó' : 'quedó'} en “Rechazados”. No se le avisa nada.` })
+        setAviso({ texto: `${s.nombre} ${s.estado === 'aprobado' ? 'salió de su ronda y quedó' : 'quedó'} en “Rechazados”. No se le avisa nada.` })
       else if ('accion' in body && body.accion === 'reconsiderar')
         setAviso({ texto: `${s.nombre} volvió a “Por revisar”.` })
       await cargar()
@@ -140,7 +140,7 @@ export default function FundadoresPanel() {
         {datos.tandas.map(t => (
           <div key={t.numero} className={`rounded-xl border p-4 bg-white ${t.abierta ? 'border-lime-400' : 'border-neutral-200'}`}>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-neutral-900">Tanda {t.numero}</span>
+              <span className="font-semibold text-neutral-900">Ronda {t.numero}</span>
               <span className={`text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'Abierta' : 'Cerrada'}</span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
@@ -214,7 +214,7 @@ export default function FundadoresPanel() {
                     <span className="font-semibold text-neutral-900">{s.nombre}</span>
                     <a href={`https://t.me/${s.telegram}`} target="_blank" rel="noreferrer" className="text-sm text-sky-700 hover:underline">@{s.telegram}</a>
                     <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ${ESTADO[s.estado].c}`}>
-                      {ESTADO[s.estado].t}{s.estado === 'aprobado' && s.tanda ? ` · tanda ${s.tanda}` : ''}
+                      {ESTADO[s.estado].t}{s.estado === 'aprobado' && s.tanda ? ` · ronda ${s.tanda}` : ''}
                     </span>
                     {quiereRadar(s) && (
                       <span title="Marcó “Saber qué vender o qué traer”: posible cliente del Radar"
@@ -263,7 +263,7 @@ export default function FundadoresPanel() {
         </div>
       )}
       <p className="text-xs text-neutral-400">
-        Aprobar asigna a la tanda en cuyos días se inscribió (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas”.
+        Aprobar asigna a la ronda en cuyos días se inscribió (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas”.
       </p>
     </div>
   )

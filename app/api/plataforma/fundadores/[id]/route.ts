@@ -47,8 +47,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       ? tandas.find(t => t.numero === b.tanda)
       : tandas.find(t => t.abierta && t.tomados < t.cupos && t.desde && t.desde <= sol.dia && sol.dia <= t.hasta)
         ?? tandas.find(t => t.abierta && t.tomados < t.cupos)
-    if (!destino) return NextResponse.json({ error: 'No hay una tanda abierta con cupo. Abre la siguiente tanda primero.' }, { status: 409 })
-    if (destino.tomados >= destino.cupos) return NextResponse.json({ error: `La tanda ${destino.numero} ya está completa` }, { status: 409 })
+    if (!destino) return NextResponse.json({ error: 'No hay una ronda abierta con cupo. Abre la siguiente ronda primero.' }, { status: 409 })
+    if (destino.tomados >= destino.cupos) return NextResponse.json({ error: `La ronda ${destino.numero} ya está completa` }, { status: 409 })
     await db.query(
       `UPDATE fundadores_solicitudes SET estado = 'aprobado', tanda = $2, revisada_at = NOW() WHERE id = $1`, [id, destino.numero])
     return NextResponse.json({ ok: true, tanda: destino.numero })
