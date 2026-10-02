@@ -23,7 +23,7 @@ const ESTADO: Record<Solicitud['estado'], { t: string; c: string }> = {
   calificado: { t: 'Por revisar', c: 'bg-sky-50 text-sky-800 ring-sky-200' },
   aprobado:   { t: 'Aprobado', c: 'bg-lime-50 text-lime-800 ring-lime-300' },
   rechazado:  { t: 'Rechazado', c: 'bg-neutral-100 text-neutral-600 ring-neutral-200' },
-  descartado: { t: 'Descartado (< 30 ventas)', c: 'bg-neutral-100 text-neutral-500 ring-neutral-200' },
+  descartado: { t: 'Descartado', c: 'bg-neutral-100 text-neutral-500 ring-neutral-200' },
 }
 
 const FILTRO: Record<Filtro, string> = {
@@ -194,7 +194,7 @@ export default function FundadoresPanel() {
         Las pastillas son lo que marcó:
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-lime-50 ring-1 ring-inset ring-lime-300" />suma puntos</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-white ring-1 ring-inset ring-neutral-300" />marcada, no suma</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-50 ring-1 ring-inset ring-red-200" />descarta (&lt; 30 ventas)</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-50 ring-1 ring-inset ring-red-200" />descarta (&lt; 30 ventas o no cargaría sus ventas)</span>
       </p>
 
       {lista.length === 0 ? (
