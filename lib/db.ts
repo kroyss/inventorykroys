@@ -102,6 +102,48 @@ export class EmpresaDb {
   }
 }
 
+/**
+ * Conexión a una empresa FUERA de un request (tareas en segundo plano, p. ej. el Reportador por
+ * API, que sigue aunque se cierre la pantalla). Misma idea que EmpresaDb pero se libera al
+ * terminar `fn`, no con `after()`: ROLLBACK si quedó algo abierto, RESET ALL, y si eso falla la
+ * conexión se destruye en vez de volver al pool.
+ */
+export async function conEmpresa<T>(empresaId: number, country: Country, fn: (db: Pool) => Promise<T>): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `SELECT set_config('app.empresa_id', $1, false), set_config('TimeZone', $2, false)`,
+      [String(empresaId), COUNTRY_TZ[country]],
+    )
+  } catch (e) {
+    client.release(e instanceof Error ? e : new Error(String(e)))
+    throw e
+  }
+  const db = {
+    query: client.query.bind(client),
+    connect: async () => new Proxy(client, {
+      get: (target, prop) => {
+        if (prop === 'release') return () => {}
+        const v = Reflect.get(target, prop)
+        return typeof v === 'function' ? v.bind(target) : v
+      },
+    }),
+  } as unknown as Pool
+  try {
+    return await fn(db)
+  } finally {
+    let rota: Error | undefined
+    try {
+      await client.query('ROLLBACK')        // sin transacción abierta es solo un aviso
+      await client.query('RESET ALL')
+    } catch (e) {
+      rota = e instanceof Error ? e : new Error(String(e))
+    } finally {
+      client.release(rota)
+    }
+  }
+}
+
 /** Conexión del request a una empresa. Ver EmpresaDb. Tipada como Pool para que los
  *  helpers existentes (que reciben `Pool`) la acepten sin cambios: usan query y connect. */
 export function dbEmpresa(empresaId: number, country: Country): Pool {
