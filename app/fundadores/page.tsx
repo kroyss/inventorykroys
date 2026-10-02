@@ -21,7 +21,8 @@ const BENEFICIOS = [
 const INCLUYE = [
   { t: 'Preguntas con IA', d: 'Las preguntas de todas tus cuentas en una bandeja, con la respuesta sugerida.' },
   { t: 'Mensajes de tus ventas', d: 'Los mensajes sin leer de todas tus cuentas, con notas para no olvidar ningún detalle.' },
-  { t: 'Despachos y guías', d: 'Etiquetas listas para imprimir y la guía a cada comprador sin escribirla a mano.' },
+  { t: 'Guías y despachos', d: 'Imprimes todas las guías del día de una vez, cada una identificada con tus productos para no confundir paquetes, y sacas el manifiesto de envíos para ZOOM o Tealca.' },
+  { t: 'Reporte de guías', d: 'Cada comprador recibe su número de guía sin que lo escribas a mano.' },
   { t: 'Calificaciones', d: 'Calificas a tus compradores en bloque, no venta por venta.' },
   { t: 'Ventas e inventario', d: 'Tu stock y tus ventas al día, sin cuaderno ni Excel.' },
 ]
@@ -137,7 +138,7 @@ export default async function FundadoresPage() {
               <li>Llenas la solicitud (2 minutos).</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
               <li>Si quedas seleccionado, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
-              <li>Un mes gratis. Al terminar, decides si te suscribes.</li>
+              <li>Un mes gratis. Después decides si te quedas.</li>
             </ol>
             <p className="mt-4 text-xs text-neutral-500">
               A cambio solo te pedimos usarlo y contarnos qué te sirve y qué no: así lo hacemos a la medida de los vendedores venezolanos.
