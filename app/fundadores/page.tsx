@@ -12,11 +12,7 @@ export const metadata = {
 interface Tanda { numero: number; cupos: number; abierta: boolean; inicia: string | null; tomados: number }
 
 // Lo que reciben los Fundadores además del mes gratis.
-const BENEFICIOS = [
-  { t: 'Atención personalizada', d: 'Hablas directo con nosotros por Telegram, no con un bot ni con un ticket.' },
-  { t: 'Configuración gratis', d: 'Conectamos tus cuentas de MercadoLibre y dejamos el sistema listo contigo.' },
-  { t: 'Adiestramiento gratis', d: 'Te enseñamos a usarlo, a ti y a quien te ayude con las ventas.' },
-]
+const BENEFICIOS = ['Atención personalizada 1 a 1', 'Configuración gratis', 'Adiestramiento gratis']
 
 const INCLUYE = [
   { t: 'Preguntas con IA', d: 'Las preguntas de todas tus cuentas en una bandeja, con la respuesta sugerida.' },
@@ -120,14 +116,10 @@ export default async function FundadoresPage() {
           </section>
           <section className="rounded-xl border border-lime-300 bg-lime-50/60 p-5">
             <h2 className="text-sm font-semibold text-neutral-900">Solo para Fundadores</h2>
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-3 space-y-2">
               {BENEFICIOS.map(x => (
-                <li key={x.t} className="flex gap-2.5">
-                  <span className="mt-0.5 text-lime-700 font-semibold" aria-hidden="true">✓</span>
-                  <span>
-                    <span className="block text-sm font-semibold text-neutral-900">{x.t}</span>
-                    <span className="block text-sm text-neutral-600">{x.d}</span>
-                  </span>
+                <li key={x} className="flex gap-2.5 text-sm font-medium text-neutral-900">
+                  <span className="text-lime-700 font-semibold" aria-hidden="true">✓</span>{x}
                 </li>
               ))}
             </ul>
