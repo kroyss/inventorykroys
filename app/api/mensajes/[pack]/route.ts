@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML } from '@/lib/ml'
 import { itemsDeVenta, leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
+import { preguntasDeComprador } from '@/lib/preguntasComprador'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 
 async function conversacion(db: import('pg').Pool, pack: string) {
@@ -30,7 +31,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
       itemsDeVenta(s.db, c.conexion_id, pack).catch(() => null),   // para el link a cada publicación
     ])
     if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
-    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null })
+    // Lo que este comprador preguntó antes (de lo ya sincronizado en Preguntas).
+    const preguntas = venta?.comprador.id ? await preguntasDeComprador(s.db, venta.comprador.id).catch(() => []) : []
+    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas })
   } catch (err) {
     return apiError(err)
   }

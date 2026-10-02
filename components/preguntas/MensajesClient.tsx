@@ -1,5 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
+import type { PreguntaPrevia } from '@/lib/preguntasComprador'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -88,6 +90,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; cantidad: number; link: string | null }[] | null>(null)
+  const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,6 +143,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
     setMensajes(d.mensajes)
     if (d.items) setItems(d.items)
     if (d.comprador) setComprador(d.comprador)
+    if (Array.isArray(d.preguntas)) setPrevias(d.preguntas)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
@@ -197,7 +201,10 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
             ))}
           </p>
         ) : c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
-        <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
+          <PreguntasPrevias n={previas.length} lista={previas} etiqueta="Preguntó antes de comprar" />
+        </div>
         <NotasVenta pack={c.pack_id} onCambio={onCambio} />
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[12rem]">

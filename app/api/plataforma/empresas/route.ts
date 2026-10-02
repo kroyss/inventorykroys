@@ -110,10 +110,11 @@ export async function POST(req: NextRequest) {
         `SELECT key, value FROM app_settings WHERE key = ANY($1)`, [AJUSTES_DE_MERCADO])).rows
     }
     await client.query(`SELECT set_config('app.empresa_id', $1, true)`, [String(emp.id)])
-    // Categorías: las mismas escalas de ganancia, pero nombradas solo con su % ("120%"), sin los
-    // nombres propios de la plataforma (ULTRA, SUPER…). "Sin asignación" (0%) queda igual.
+    // Categorías: las mismas escalas de ganancia, nombradas con su % ("120%"). La de 0% no se copia:
+    // "sin categoría" ya es no tener categoría (migración 050).
     for (const c of categorias) {
       const pct = Number(c.profit_percentage)
+      if (!(pct > 0)) continue
       await client.query(
         `INSERT INTO profit_categories (name, profit_percentage, display_order, color, description, is_active)
          VALUES ($1, $2, $3, $4, $5, TRUE)`,

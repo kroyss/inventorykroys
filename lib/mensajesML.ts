@@ -71,6 +71,7 @@ async function ordenesDeVenta(db: Pool, conexionId: number, pack: string): Promi
 const compradorDe = (ordenes: OrdenVenta[]) => {
   const b = ordenes.find(o => o.buyer)?.buyer
   return {
+    id: b?.id ?? null,
     nick: b?.nickname ?? null,
     nombre: [b?.first_name, b?.last_name].filter(Boolean).join(' ').trim() || null,
   }

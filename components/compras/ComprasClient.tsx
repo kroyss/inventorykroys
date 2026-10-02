@@ -386,6 +386,45 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
     await reload()
   }
 
+  // Atajo "Ya la tengo": para la compra que ya está en la mano (p. ej. comprada en una tienda) hace
+  // de una vez los pasos que faltan: pagada → en camino → recibida COMPLETA → finalizada (carga el
+  // inventario). Usa los mismos pasos de siempre; el proceso paso a paso sigue disponible igual.
+  async function yaLaTengo() {
+    if (!selected) return
+    if (!await confirm({
+      title: 'Ya la tengo',
+      message: 'Se marca pagada, se recibe completa (todas las cantidades de la orden) y se finaliza: el stock entra ahora al inventario. ¿Continuar?',
+      confirmText: 'Sí, cargar al inventario',
+    })) return
+    const o = selected
+    const paso = async (ruta: string, body: object, method = 'PUT') => {
+      const r = await fetch(`/api/purchases/${o.id}/${ruta}`, {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error ?? 'Error')
+    }
+    setSaving(true); setError('')
+    try {
+      let st = o.status
+      if (st === 'PENDIENTE') { await paso('status', { action: 'advance' }); st = 'PAGADA' }
+      if (st === 'PAGADA') { await paso('status', { action: 'advance' }); st = 'EN_CAMINO' }
+      if (st === 'EN_CAMINO') {
+        await paso('receive', {
+          partial: false,
+          items: o.items.map(i => ({ product_id: i.product_id, received_qty: i.quantity - (i.total_received_qty ?? 0) })),
+        }, 'POST')
+        st = 'RECIBIDA'
+      }
+      if (st === 'RECIBIDA') await paso('status', { action: 'finalize' })
+    } catch (e) {
+      setError(`Se avanzó hasta donde se pudo: ${e instanceof Error ? e.message : 'error'}`)
+    } finally {
+      setSaving(false)
+      await reload()
+    }
+  }
+
   // Recepción: deshacer último paso (vuelve un estado atrás)
   async function undoLast() {
     if (!selected) return
@@ -734,14 +773,26 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                   <>
                     <button onClick={() => openEdit(selected)} className="btn-secondary text-sm">Editar</button>
                     <button onClick={() => doAction('advance')} disabled={saving} className="btn-primary text-sm">Marcar Pagada</button>
+                    {selected.status === 'PENDIENTE' && (
+                      <button onClick={yaLaTengo} disabled={saving} className="btn-secondary text-sm"
+                        title="La compra ya está en tu mano: la marca pagada, recibida completa y finalizada (carga el inventario)">✓ Ya la tengo</button>
+                    )}
                     <button onClick={deleteOrder} disabled={saving} className="btn-danger text-sm">Eliminar</button>
                   </>
                 )}
                 {selected.status === 'PAGADA' && (
-                  <button onClick={() => doAction('advance')} disabled={saving} className="btn-primary text-sm">En Camino</button>
+                  <>
+                    <button onClick={() => doAction('advance')} disabled={saving} className="btn-primary text-sm">En Camino</button>
+                    <button onClick={yaLaTengo} disabled={saving} className="btn-secondary text-sm"
+                      title="Ya la recibiste: la marca recibida completa y finalizada (carga el inventario)">✓ Ya la tengo</button>
+                  </>
                 )}
                 {selected.status === 'EN_CAMINO' && (
-                  <button onClick={openReceive} className="btn-primary text-sm">Recibir</button>
+                  <>
+                    <button onClick={openReceive} className="btn-primary text-sm">Recibir</button>
+                    <button onClick={yaLaTengo} disabled={saving} className="btn-secondary text-sm"
+                      title="Llegó completa: la recibe con todas las cantidades y la finaliza (carga el inventario)">✓ Llegó completa</button>
+                  </>
                 )}
                 {selected.status === 'RECIBIDA' && (
                   <>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { Sugerencias, UsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
+import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
@@ -15,6 +16,7 @@ interface Pregunta {
   cuenta: string; respondida_por: string | null
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
   producto_precio: number | null
+  comprador_id: string | null; previas: number
   item_precio: number | null; item_precio_original: number | null; item_moneda: string | null
 }
 
@@ -306,6 +308,10 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         <Producto p={p} umbral={umbralDe(plantillas)} />
         {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {p.item_estado === 'paused' ? 'pausada' : p.item_estado} · no sale en el panel de ML</span>}
         <span className="ml-auto whitespace-nowrap" title={new Date(p.fecha).toLocaleString('es-VE')}>{hace(p.fecha)}</span>
+        {p.comprador_id && (
+          <PreguntasPrevias n={p.previas} cargar={() =>
+            fetch(`/api/preguntas/comprador?id=${p.comprador_id}&excluir=${p.id}`).then(r => (r.ok ? r.json() : []))} />
+        )}
       </header>
 
       <p className="text-base text-neutral-900">{p.texto}</p>
