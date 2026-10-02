@@ -182,8 +182,8 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="nick_ml" className="block text-sm font-medium text-neutral-700 mb-1">
-                    Nick de MercadoLibre <span className="font-normal text-neutral-400">(opcional)</span>
+                  <label htmlFor="nick_ml" className="flex items-baseline justify-between gap-2 whitespace-nowrap text-sm font-medium text-neutral-700 mb-1">
+                    Nick de MercadoLibre <span className="text-xs font-normal text-neutral-400">opcional</span>
                   </label>
                   <input id="nick_ml" value={contacto.nick_ml} onChange={set('nick_ml')} maxLength={40}
                     autoCapitalize="none" spellCheck={false} className={campo} />
@@ -191,8 +191,8 @@ export default function FormularioFundadores({ abierta, proxima, resultados }: P
               </div>
               <p className="-mt-2 text-xs text-neutral-400">Con el nick solo vemos tu reputación pública: no accedemos a tu cuenta.</p>
               <div>
-                <label htmlFor="mensaje" className="block text-sm font-medium text-neutral-700 mb-1">
-                  ¿Algo más que quieras contarnos? <span className="font-normal text-neutral-400">(opcional)</span>
+                <label htmlFor="mensaje" className="flex items-baseline justify-between gap-2 text-sm font-medium text-neutral-700 mb-1">
+                  ¿Algo más que quieras contarnos? <span className="text-xs font-normal text-neutral-400 whitespace-nowrap">opcional</span>
                 </label>
                 <textarea id="mensaje" rows={3} maxLength={MENSAJE_MAX} value={contacto.mensaje} onChange={set('mensaje')}
                   placeholder="Qué vendes, qué te gustaría resolver, por qué quieres ser Fundador…"
