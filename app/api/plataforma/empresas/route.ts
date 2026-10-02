@@ -110,11 +110,25 @@ export async function POST(req: NextRequest) {
         `SELECT key, value FROM app_settings WHERE key = ANY($1)`, [AJUSTES_DE_MERCADO])).rows
     }
     await client.query(`SELECT set_config('app.empresa_id', $1, true)`, [String(emp.id)])
+    // Categorías: las mismas escalas de ganancia, pero nombradas solo con su % ("120%"), sin los
+    // nombres propios de la plataforma (ULTRA, SUPER…). "Sin asignación" (0%) queda igual.
     for (const c of categorias) {
+      const pct = Number(c.profit_percentage)
       await client.query(
         `INSERT INTO profit_categories (name, profit_percentage, display_order, color, description, is_active)
          VALUES ($1, $2, $3, $4, $5, TRUE)`,
-        [c.name, c.profit_percentage, c.display_order, c.color, c.description])
+        [pct > 0 ? `${pct}%` : c.name, c.profit_percentage, c.display_order, c.color, pct > 0 ? null : c.description])
+    }
+    // VE: exceso inicial = diferencial oficial/paralelo del día, redondeado hacia arriba de a 5
+    // (protección cambiaria). Se ajusta con el cliente en la configuración (Ajustes → Exceso ML).
+    if (body.country === 'VE') {
+      const { rows: [t] } = await client.query(
+        `SELECT official_rate::float AS o, parallel_rate::float AS p FROM venezuela_exchange_rates
+         ORDER BY rate_date DESC, id DESC LIMIT 1`)
+      if (t?.o > 0 && t.p > t.o) {
+        ajustes = [...ajustes.filter(a => a.key !== 'ml_exceso'),
+                   { key: 'ml_exceso', value: String(Math.ceil(((t.p - t.o) / t.o * 100) / 5) * 5) }]
+      }
     }
     for (const a of ajustes) {
       await client.query(`INSERT INTO app_settings (key, value) VALUES ($1, $2)`, [a.key, a.value])

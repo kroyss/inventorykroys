@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import ComprasTabs from '@/components/compras/ComprasTabs'
+import { tieneModulo } from '@/lib/modulos'
 import type { PurchaseOrder, ImportOrder, Supplier } from '@/lib/types'
 
 export const metadata = { title: 'Compras' }
@@ -145,6 +146,7 @@ export default async function ComprasPage() {
       importSuppliers={importSup as Supplier[]}
       userRole={session!.user.role}
       country={session!.user.country}
+      importaciones={tieneModulo(session!.user, 'importaciones')}
     />
   )
 }

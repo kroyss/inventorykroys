@@ -47,7 +47,10 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country, bonos, puedeTasas }: { country: Country; bonos: boolean; puedeTasas: boolean }) {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock }: {
+  country: Country; bonos: boolean; puedeTasas: boolean
+  descuento: boolean; importaciones: boolean; analisisStock: boolean   // módulos (lib/modulos.ts)
+}) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [chart,   setChart]   = useState<ChartData | null>(null)
   // Default to 'month' so today's sales show immediately on the chart.
@@ -132,7 +135,9 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
       <PageHeader title="Inicio" subtitle="Cómo va tu negocio este mes" actions={
         <>
           <Link href="/ventas?new=1" className="btn-primary text-sm">Nueva venta</Link>
-          <div className="relative">
+          {!importaciones ? (
+            <Link href="/compras?new=1" className="btn-secondary text-sm">Nueva compra</Link>
+          ) : <div className="relative">
             <button onClick={() => setCompraMenu(v => !v)} className="btn-secondary text-sm">
               Nueva compra ▾
             </button>
@@ -145,22 +150,22 @@ export default function DashboardAdmin({ country, bonos, puedeTasas }: { country
                 </div>
               </>
             )}
-          </div>
+          </div>}
         </>
       } />
 
-      {country === 'VE' && <RateBar puedeActualizar={puedeTasas} />}
+      {country === 'VE' && <RateBar puedeActualizar={puedeTasas} descuento={descuento} />}
 
       {/* Requiere atención — clickable */}
       <div>
         <h2 className="text-sm font-semibold text-neutral-700 mb-2">Requiere atención</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KPICard label="Reposición"           value={summary.reposicion_count} tone={summary.reposicion_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=reposicion" />
+        <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 ${analisisStock ? 'lg:grid-cols-6' : 'lg:grid-cols-4'}`}>
+          {analisisStock && <KPICard label="Reposición"           value={summary.reposicion_count} tone={summary.reposicion_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=reposicion" />}
           <KPICard label="Sin stock"            value={summary.no_stock}        tone={summary.no_stock > 0 ? 'problema' : 'apagado'} href="/inventario?estado=SIN_STOCK" />
           <KPICard label="Stock bajo"           value={summary.low_stock_alerts} tone={summary.low_stock_alerts > 0 ? 'atencion' : 'apagado'} href="/inventario?estado=BAJO" />
           <KPICard label="Ventas borrador"      value={summary.pending_sales}   tone={summary.pending_sales > 0 ? 'atencion' : 'apagado'} href="/ventas?estado=BORRADOR" />
           <KPICard label="Compras en tránsito"  value={summary.in_transit}      tone={summary.in_transit > 0 ? 'neutro' : 'apagado'} href="/reportes?tab=transito" />
-          <KPICard label="En revisión (remate)" value={summary.remate_count}    tone={summary.remate_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=remate" />
+          {analisisStock && <KPICard label="En revisión (remate)" value={summary.remate_count}    tone={summary.remate_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=remate" />}
         </div>
       </div>
 

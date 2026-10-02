@@ -15,7 +15,8 @@ interface Rate {
 const fmt = (n: number) =>
   Math.round(Number(n)).toLocaleString('de-DE')
 
-export default function RateBar({ puedeActualizar = false }: { puedeActualizar?: boolean }) {
+// descuento: módulo Descuento ML. Sin él no se muestra el descuento sugerido (solo tasas y exceso).
+export default function RateBar({ puedeActualizar = false, descuento = true }: { puedeActualizar?: boolean; descuento?: boolean }) {
   const [rate, setRate] = useState<Rate | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -33,13 +34,13 @@ export default function RateBar({ puedeActualizar = false }: { puedeActualizar?:
   return (
     <div className="bg-white border border-neutral-200 shadow-sm rounded-xl px-4 py-3 text-sm flex flex-col md:flex-row md:items-center gap-3">
       {/* Descuento sugerido destacado */}
-      <div className="flex items-center gap-2 shrink-0">
+      {descuento && <div className="flex items-center gap-2 shrink-0">
         <span className="text-sm font-medium text-neutral-500">Descuento ML sugerido</span>
         <span className="text-2xl font-semibold tracking-tight text-neutral-900 num">{rate.recommended_discount}%</span>
-      </div>
+      </div>}
 
       {/* Detalles — envuelven en móvil */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-neutral-600 md:border-l md:border-neutral-200 md:pl-4">
+      <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-neutral-600 ${descuento ? 'md:border-l md:border-neutral-200 md:pl-4' : ''}`}>
         <span>Oficial: <span className="font-semibold text-neutral-800">Bs {fmt(rate.official_rate)}</span></span>
         <span>Paralelo: <span className="font-semibold text-neutral-800">Bs {fmt(rate.parallel_rate)}</span></span>
         {rate.rate_date && (

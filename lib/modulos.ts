@@ -13,6 +13,9 @@ export const MODULOS = {
   bonos:      'Bonos del vendedor',
   preguntas:  'Preguntas de MercadoLibre con IA',
   stock_ml:   'Stock en ML (stock real vs publicado) · en pruebas',
+  descuento_ml:   'Descuento ML: descuento global sobre el exceso, tope por MercadoEnvíos y Márgenes < $5 (VE)',
+  importaciones:  'Importaciones: compras al exterior (pagos 50/100, fotos, aduana, contenedores)',
+  analisis_stock: 'Análisis de stock y conteos: reposición, declive, remate y conteos físicos (Reportes)',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -27,6 +30,8 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
   '/stock-ml':  'stock_ml',
+  '/productos/mercadoenvios': 'descuento_ml',
+  '/productos/margenes':      'descuento_ml',
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {

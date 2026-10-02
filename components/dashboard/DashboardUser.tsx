@@ -39,7 +39,7 @@ interface Rate {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
-export default function DashboardUser({ country, bonos }: { country: Country; bonos: boolean }) {
+export default function DashboardUser({ country, bonos, importaciones }: { country: Country; bonos: boolean; importaciones: boolean }) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [saleCounts, setSaleCounts] = useState<SaleStateCounts>({ borrador: 0, verificado: 0, procesada: 0 })
   const [recv, setRecv] = useState<ReceptionCounts>({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
@@ -105,16 +105,16 @@ export default function DashboardUser({ country, bonos }: { country: Country; bo
 
       {/* ───────── Recepciones ───────── */}
       <Panel title="Recepciones">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 gap-3 ${importaciones ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
           {/* Cada card filtra por los MISMOS estados que cuenta (ver
               /api/dashboard/reception-counts), para que la lista de destino
               muestre exactamente las órdenes del número. */}
           <StatCard label="Local en camino"  value={recv.local}
             accent={recv.local   > 0 ? 'text-neutral-900' : undefined}
             href="/compras?tab=local&estado=EN_CAMINO" />
-          <StatCard label={`Import en camino${recv.imports_boxes > 0 ? ` · ${recv.imports_boxes} cajas` : ''}`} value={recv.imports}
+          {importaciones && <StatCard label={`Import en camino${recv.imports_boxes > 0 ? ` · ${recv.imports_boxes} cajas` : ''}`} value={recv.imports}
             accent={recv.imports > 0 ? 'text-neutral-900' : undefined}
-            href="/compras?tab=import&estado=EN_CAMINO" />
+            href="/compras?tab=import&estado=EN_CAMINO" />}
           {/* "Por finalizar" suma locales + importaciones: abre en locales y el
               mismo filtro queda aplicado al cambiar de pestaña. */}
           <StatCard label="Por finalizar"    value={recv.por_finalizar}

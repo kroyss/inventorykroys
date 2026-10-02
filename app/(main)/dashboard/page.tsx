@@ -14,6 +14,11 @@ export default async function DashboardPage() {
 
   const bonos   = tieneModulo(session!.user, 'bonos')
 
-  if (role === 'admin') return <DashboardAdmin country={country} bonos={bonos} puedeTasas={esDuenoPlataforma(session!.user)} />
-  return <DashboardUser country={country} bonos={bonos} />
+  const importaciones = tieneModulo(session!.user, 'importaciones')
+  if (role === 'admin') return (
+    <DashboardAdmin country={country} bonos={bonos} puedeTasas={esDuenoPlataforma(session!.user)}
+      descuento={tieneModulo(session!.user, 'descuento_ml')} importaciones={importaciones}
+      analisisStock={tieneModulo(session!.user, 'analisis_stock')} />
+  )
+  return <DashboardUser country={country} bonos={bonos} importaciones={importaciones} />
 }

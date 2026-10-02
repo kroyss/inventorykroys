@@ -31,8 +31,12 @@ const STATE_TABS: { key: Tab; label: string }[] = [
   { key: 'conteos',    label: 'Conteos' },
 ]
 
-export default function ReportesClient() {
-  const [tab,      setTab]      = usePersistedTab<Tab>('tab:reportes', 'ventas')
+// analisisStock: módulo. Sin él no están Stock (reposición/declive/remate, calibrado a importaciones)
+// ni Conteos (conteos físicos).
+export default function ReportesClient({ analisisStock }: { analisisStock: boolean }) {
+  const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', 'ventas')
+  const tab = !analisisStock && (tabGuardada === 'stock' || tabGuardada === 'conteos') ? 'ventas' : tabGuardada
+  const stateTabs = analisisStock ? STATE_TABS : STATE_TABS.filter(t => t.key !== 'stock' && t.key !== 'conteos')
   const [preset,   setPreset]   = useState<DatePreset>('last90')
   const [dateFrom, setDateFrom] = useState(presetRange('last90').from)
   const [dateTo,   setDateTo]   = useState(presetRange('last90').to)
@@ -107,7 +111,7 @@ export default function ReportesClient() {
       {/* pestañas en dos grupos: por período | estado actual */}
       <Tabs value={tab} onChange={t => { setData(null); setTab(t) }} items={[
         ...PERIOD_TABS.map(t => ({ value: t.key, label: t.label, group: 'periodo' })),
-        ...STATE_TABS.map(t => ({ value: t.key, label: t.label, group: 'estado' })),
+        ...stateTabs.map(t => ({ value: t.key, label: t.label, group: 'estado' })),
       ]} />
 
       {/* date filters */}

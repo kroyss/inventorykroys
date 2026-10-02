@@ -46,7 +46,11 @@ function ShipRowInputs({ row, onChange, onRemove }: {
   )
 }
 
-export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: boolean; puedeTasas: boolean; despachos: boolean }) {
+// descuento / finanzas: módulos (lib/modulos.ts). Sin Descuento ML no se ven el descuento global, el
+// recomendado ni la tabla de MercadoEnvíos (queda el exceso); sin Finanzas, su factor de tránsito.
+export default function TasasClient({ bonos, puedeTasas, despachos, descuento, finanzas }: {
+  bonos: boolean; puedeTasas: boolean; despachos: boolean; descuento: boolean; finanzas: boolean
+}) {
   const [latest,   setLatest]   = useState<Rate | null>(null)
   const [history,  setHistory]  = useState<Rate[]>([])
   const [official, setOfficial] = useState('')
@@ -227,11 +231,11 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
       {okMsg && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded">{okMsg}</div>}
 
       {/* KPI header */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 gap-3 ${descuento ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
         <KPICard label="Oficial"  value={`Bs ${money(latest.official_rate)}`} />
         <KPICard label="Paralelo" value={`Bs ${money(latest.parallel_rate)}`} />
         <KPICard label="Spread"   value={`${latest.spread_percentage}%`} accent="text-amber-600" />
-        <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-neutral-900" />
+        {descuento && <KPICard label="Descuento recom." value={`${latest.recommended_discount}%`} accent="text-neutral-900" />}
       </div>
 
       {/* Barra superior (una sola línea): estado+TASA │ edición manual │ tabla envíos │ exceso │ descuento */}
@@ -278,23 +282,25 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
         </div>}
 
         {/* Tabla MercadoEnvíos (abre modal de edición) */}
-        <div className="border-l border-neutral-200 pl-3 self-center shrink-0">
+        {descuento && <div className="border-l border-neutral-200 pl-3 self-center shrink-0">
           <button type="button" onClick={() => setShipOpen(true)}
             title="Editar la tabla de envío gratis por peso de MercadoLibre (se abre solo al hacer clic)"
             className="text-sm px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 whitespace-nowrap">
             📦 Tabla MercadoEnvíos
           </button>
-        </div>
+        </div>}
 
         {/* Config Exceso ML */}
         <div className="border-l border-neutral-200 pl-3 shrink-0">
-          <label className="text-[11px] text-neutral-500 block mb-1 whitespace-nowrap" title="Margen del precio publicado sobre el base. Afecta el descuento recomendado.">Exceso ML</label>
+          <label className="text-[11px] text-neutral-500 block mb-1 whitespace-nowrap"
+            title={descuento ? 'Margen del precio publicado sobre el base. Afecta el descuento recomendado.'
+              : 'Cuánto subes el precio publicado sobre lo que quieres recibir, para cubrir el diferencial: MercadoLibre te paga en bolívares a tasa oficial y tú los cambias al paralelo.'}>Exceso ML</label>
           <div className="flex items-end gap-1.5">
             <input type="number" step="0.1" min={0} max={500} value={excess} onChange={e => setExcess(e.target.value)}
               className="w-16 border rounded px-2 py-1.5 text-sm" />
             <button onClick={saveExcess} disabled={busy}
               className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 disabled:opacity-50 whitespace-nowrap">OK</button>
-            {excessPreview && (
+            {descuento && excessPreview && (
               <div className="text-sm leading-tight">
                 <div className="text-[10px] text-neutral-500">Desc.</div>
                 <div className={`font-bold ${Math.abs(excessPreview.recommended_discount - latest.recommended_discount) > 0.01 ? 'text-sky-600' : 'text-neutral-900'}`}>
@@ -306,7 +312,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
         </div>
 
         {/* Config Descuento ML (manual GLOBAL) — se aplica a TODOS los productos */}
-        <div className="border-l border-neutral-200 pl-3 shrink-0">
+        {descuento && <div className="border-l border-neutral-200 pl-3 shrink-0">
           <label className="text-[11px] text-neutral-500 block mb-1 whitespace-nowrap" title="Descuento general aplicado a TODOS los productos. Si lo dejás vacío, se usa el recomendado.">Descuento ML</label>
           <div className="flex items-end gap-1.5">
             <input type="number" step="0.1" min={0} max={99} value={veDescuento} onChange={e => setVeDescuento(e.target.value)}
@@ -319,7 +325,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
               <div className="font-bold text-sky-600">{latest.recommended_discount}%</div>
             </div>
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Tabla MercadoEnvíos — modal (se abre solo al hacer clic en el botón de la barra) */}
@@ -420,7 +426,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
           </div>
 
           {/* Finanzas: factor de venta de la mercancía en tránsito (global) */}
-          <div className="mt-1 border-t border-neutral-100 pt-4">
+          {finanzas && <div className="mt-1 border-t border-neutral-100 pt-4">
             <p className="text-sm font-semibold text-neutral-700 mb-1">Finanzas · Mercancía en tránsito</p>
             <p className="text-[11px] text-neutral-500 mb-2">
               Factor con el que se estima el <b>valor de venta</b> de la mercancía pagada que aún no recibís,
@@ -437,7 +443,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
                 {busy ? 'Guardando…' : '💾 Guardar'}
               </button>
             </div>
-          </div>
+          </div>}
 
           {/* Bonos por ventas del mes (metas y montos) */}
           <NegocioSettings conDespachos={despachos} />
@@ -483,7 +489,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
                   <th className="px-4 py-2 text-right">Oficial</th>
                   <th className="px-4 py-2 text-right">Paralelo</th>
                   <th className="px-4 py-2 text-right">Spread</th>
-                  <th className="px-4 py-2 text-right">Descuento</th>
+                  {descuento && <th className="px-4 py-2 text-right">Descuento</th>}
                   <th className="px-4 py-2 text-center">Fuente</th>
                 </tr>
               </thead>
@@ -494,7 +500,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos }: { bonos: b
                     <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
                     <td className="px-4 py-2 text-right">Bs {money(r.parallel_rate)}</td>
                     <td className="px-4 py-2 text-right">{r.spread_percentage}%</td>
-                    <td className="px-4 py-2 text-right">{r.recommended_discount}%</td>
+                    {descuento && <td className="px-4 py-2 text-right">{r.recommended_discount}%</td>}
                     <td className="px-4 py-2 text-center text-xs">
                       <span className={`px-2 py-0.5 rounded ${r.source === 'api' ? 'bg-green-100 text-green-700' : 'bg-sky-100 text-sky-700'}`}>{r.source}</span>
                     </td>

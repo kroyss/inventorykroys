@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { tieneModulo, type Modulo } from '@/lib/modulos'
+
+// Claves que solo existen con su módulo: sin él no se guardan (y ml_descuento se lee como 0).
+const DE_MODULO: Record<string, Modulo> = {
+  ml_descuento: 'descuento_ml', ml_shipping_table: 'descuento_ml',
+  transito_sale_factor: 'finanzas',
+  bono_meta_1: 'bonos', bono_meta_2: 'bonos', bono_meta_3: 'bonos',
+  bono_monto_1: 'bonos', bono_monto_2: 'bonos', bono_monto_3: 'bonos',
+}
 
 // Claves permitidas (parámetros de costos ML por país). Evita escrituras arbitrarias.
 const ALLOWED = new Set([
@@ -28,6 +37,8 @@ export async function GET() {
     const { rows } = await db.query(`SELECT key, value FROM app_settings`)
     const out: Record<string, string> = {}
     for (const r of rows) out[r.key] = r.value
+    // Sin el módulo Descuento ML, el descuento global es 0: publicado = final en todas las pantallas.
+    if (!tieneModulo(session.user, 'descuento_ml')) out.ml_descuento = '0'
     return NextResponse.json(out)
   } catch (err) {
     return apiError(err)
@@ -42,7 +53,8 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = z.record(z.string(), z.union([z.string(), z.number()])).parse(await req.json())
-    const entries = Object.entries(body).filter(([k]) => ALLOWED.has(k))
+    const entries = Object.entries(body)
+      .filter(([k]) => ALLOWED.has(k) && (!DE_MODULO[k] || tieneModulo(session.user, DE_MODULO[k])))
     if (entries.length === 0) {
       return NextResponse.json({ error: 'Sin claves válidas' }, { status: 400 })
     }

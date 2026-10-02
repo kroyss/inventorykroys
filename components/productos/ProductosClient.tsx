@@ -118,10 +118,11 @@ interface Props {
   initialProducts:  Product[]
   profitCategories: ProfitCategory[]
   country:          Country
-  mlAccounts: string[]   // cuentas ML de la empresa (Ajustes → app_settings ml_cuentas)
+  mlAccounts: string[]   // cuentas ML de la empresa (Ajustes o, si no hay, las conectadas)
+  descuento: boolean     // módulo Descuento ML: sin él el descuento vale 0 (/api/settings) y no se muestra
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento }: Props) {
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
   const [search,    setSearch]    = useState('')
   const [selected,  setSelected]  = useState<number[]>([])
@@ -497,10 +498,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   return (
     <div className="space-y-4">
       <PageHeader title="Productos" subtitle="Catálogo, precios y margen neto de cada producto" actions={<>
-        {country === 'VE' && (
+        {country === 'VE' && descuento && (
           <Link href="/productos/mercadoenvios" className="btn-secondary text-sm whitespace-nowrap">MercadoEnvíos</Link>
         )}
-        {country === 'VE' && (
+        {country === 'VE' && descuento && (
           <Link href="/productos/margenes" className="btn-secondary text-sm whitespace-nowrap"
             title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría">
             Márgenes &lt; $5
@@ -877,17 +878,23 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                             className="w-28 border border-neutral-300 rounded px-2 py-1 text-sm text-right
                                        focus:outline-none focus:ring-2 focus:ring-neutral-800" />
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-700">Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b></span>
-                          <span className="text-[11px] text-neutral-500">Rec: {recDiscountLive.toFixed(1)}%</span>
-                        </div>
-                        <div className={`text-[11px] px-2 py-1 rounded border ${shipBadge(formShip).cls}`}>
-                          {shipBadge(formShip).label}
-                          {formShip.status === 'capped' && (
-                            <span className="block text-neutral-500">Se aplica {formEffDiscount.toFixed(1)}% (no {globalDiscount.toFixed(1)}%) para no perder envío gratis.</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-neutral-400">Descuento global en Ajustes; el peso limita cuánto se aplica sin perder envío gratis.</p>
+                        {descuento ? <>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-neutral-700">Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b></span>
+                            <span className="text-[11px] text-neutral-500">Rec: {recDiscountLive.toFixed(1)}%</span>
+                          </div>
+                          <div className={`text-[11px] px-2 py-1 rounded border ${shipBadge(formShip).cls}`}>
+                            {shipBadge(formShip).label}
+                            {formShip.status === 'capped' && (
+                              <span className="block text-neutral-500">Se aplica {formEffDiscount.toFixed(1)}% (no {globalDiscount.toFixed(1)}%) para no perder envío gratis.</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-neutral-400">Descuento global en Ajustes; el peso limita cuánto se aplica sin perder envío gratis.</p>
+                        </> : (
+                          <p className="text-[10px] text-neutral-400">
+                            El peso define cuánto te cobra MercadoLibre por el envío, y eso se descuenta de tu ganancia.
+                          </p>
+                        )}
                       </div>
 
                     </>
@@ -1073,8 +1080,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-neutral-900" />
                       <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
-                      <Field label="Descuento aplicado" value={`${fmt(vEff)}%`} />
-                      <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff))}`} accent="text-green-700" />
+                      {descuento && <>
+                        <Field label="Descuento aplicado" value={`${fmt(vEff)}%`} />
+                        <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff))}`} accent="text-green-700" />
+                      </>}
                       <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0))}`} />
                       {net && (
                         <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
