@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { textoOpcion } from '@/lib/fundadores'
+import { PREGUNTAS, PUNTO_NICK, type Pregunta } from '@/lib/fundadores'
 
 interface Tanda { numero: number; cupos: number; abierta: boolean; inscribe_desde: string | null; inscribe_hasta: string | null; tomados: number }
 interface Verif {
@@ -26,6 +26,36 @@ const FILTRO: Record<Filtro, string> = {
   calificado: 'Por revisar', aprobado: 'Aprobados', rechazado: 'Rechazados', descartado: 'Descartados', todas: 'Todas',
 }
 
+// Respuestas en filas: etiqueta corta + una pastilla por opción (verde = suma puntos) + los puntos de la fila.
+const ETIQUETA: Record<Pregunta['campo'], string> = {
+  ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Inventario',
+}
+
+function Respuestas({ s }: { s: Solicitud }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 text-sm">
+      {PREGUNTAS.map(p => {
+        const elegidas = s[p.campo].split(',').map(v => p.opciones.find(o => o.valor === v) ?? { valor: v, texto: v, puntos: 0 })
+        const pts = elegidas.reduce((a, o) => a + o.puntos, 0)
+        return (
+          <div key={p.campo} className="contents">
+            <dt className="text-neutral-500 py-0.5">{ETIQUETA[p.campo]}</dt>
+            <dd className="flex flex-wrap gap-1">
+              {elegidas.map(o => (
+                <span key={o.valor} className={`rounded-md px-2 py-0.5 text-[13px] ${
+                  'descarta' in o && o.descarta ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200'
+                  : o.puntos > 0 ? 'bg-lime-50 text-lime-900 ring-1 ring-inset ring-lime-300'
+                  : 'bg-neutral-100 text-neutral-600'}`}>{o.texto}</span>
+              ))}
+            </dd>
+            <dd className={`text-xs text-right py-0.5 num ${pts > 0 ? 'text-lime-700 font-medium' : 'text-neutral-300'}`}>+{pts}</dd>
+          </div>
+        )
+      })}
+    </dl>
+  )
+}
+
 const fecha = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 /** Plataforma → Fundadores: solicitudes del Programa Fundadores, por puntaje, y las tandas. */
@@ -34,6 +64,12 @@ export default function FundadoresPanel() {
   const [filtro, setFiltro] = useState<Filtro>('calificado')
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<number | null>(null)
+  const [aviso, setAviso] = useState<{ texto: string; telegram?: string } | null>(null)
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 8000)
+    return () => clearTimeout(t)
+  }, [aviso])
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/plataforma/fundadores')
@@ -47,7 +83,7 @@ export default function FundadoresPanel() {
     return () => { vivo = false }
   }, [])
 
-  const accion = async (s: Solicitud, body: object) => {
+  const accion = async (s: Solicitud, body: { accion: string; notas?: string }) => {
     setError(null); setOcupado(s.id)
     try {
       const r = await fetch(`/api/plataforma/fundadores/${s.id}`, {
@@ -55,6 +91,12 @@ export default function FundadoresPanel() {
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) setError(d.error ?? 'No se pudo')
+      else if ('accion' in body && body.accion === 'aprobar')
+        setAviso({ texto: `${s.nombre} aprobado en la tanda ${d.tanda}. Pasó a “Aprobados”: escríbele por Telegram.`, telegram: s.telegram })
+      else if ('accion' in body && body.accion === 'rechazar')
+        setAviso({ texto: `${s.nombre} ${s.estado === 'aprobado' ? 'salió de su tanda y quedó' : 'quedó'} en “Rechazados”. No se le avisa nada.` })
+      else if ('accion' in body && body.accion === 'reconsiderar')
+        setAviso({ texto: `${s.nombre} volvió a “Por revisar”.` })
       await cargar()
     } finally { setOcupado(null) }
   }
@@ -129,6 +171,17 @@ export default function FundadoresPanel() {
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
+      {aviso && (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-lime-50 border border-lime-300 text-lime-900 px-4 py-2 rounded text-sm">
+          <span>✓ {aviso.texto}</span>
+          {aviso.telegram && (
+            <a href={`https://t.me/${aviso.telegram}`} target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+              Abrir @{aviso.telegram} en Telegram
+            </a>
+          )}
+          <button onClick={() => setAviso(null)} aria-label="Cerrar" className="ml-auto text-lime-700 hover:text-lime-900">✕</button>
+        </div>
+      )}
 
       {lista.length === 0 ? (
         <p className="text-sm text-neutral-400 py-6 text-center">No hay solicitudes en esta vista.</p>
@@ -151,14 +204,10 @@ export default function FundadoresPanel() {
                     </span>
                     <span className="text-xs text-neutral-400">{fecha(s.created_at)}</span>
                   </div>
-                  <p className="text-sm text-neutral-600">
-                    {textoOpcion('ventas_mes', s.ventas_mes)} ventas/mes · {textoOpcion('cuentas', s.cuentas)} cuenta(s) ·{' '}
-                    {textoOpcion('despacho', s.despacho)} · le quita tiempo: {textoOpcion('dolor', s.dolor).toLowerCase().replace(/, (?=[^,]*$)/, ' y ')} ·{' '}
-                    inventario: {textoOpcion('inventario', s.inventario).toLowerCase()}
-                  </p>
+                  <div className="pt-1"><Respuestas s={s} /></div>
                   <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">
                     {s.nick_ml ? <>
-                      <span>Nick ML: <b className="text-neutral-700">{s.nick_ml}</b></span>
+                      <span>Nick ML: <b className="text-neutral-700">{s.nick_ml}</b> <span className="text-lime-700">+{PUNTO_NICK}</span></span>
                       {v ? (v.encontrado
                         ? <span className="text-emerald-700">✓ {v.nickname} · {v.ventas_total != null ? `${v.ventas_total.toLocaleString('de-DE')} ventas en total` : 'sin dato de ventas'}
                             {v.ventas_periodo != null ? ` · ${v.ventas_periodo} en ${v.periodo === '60 days' ? '60 días' : v.periodo}` : ''}
