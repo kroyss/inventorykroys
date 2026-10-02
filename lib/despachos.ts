@@ -150,8 +150,13 @@ export async function guardarArchivo(sub: string, nombre: string, data: Buffer) 
 
 // Entrega un PDF generado TAL CUAL está en disco, como descarga (para abrirlo en el
 // visor de siempre e imprimir a tamaño real, no en la vista previa del navegador).
-export async function descargaPdf(filePath: string, nombre: string) {
-  const data = await readFile(filePath)
+export async function descargaPdf(filePath: string | null, nombre: string) {
+  // Los PDF se borran a los 6 meses (lib/limpiezaDespachos.ts): en la base sigue todo.
+  const data = filePath ? await readFile(filePath).catch(() => null) : null
+  if (!data) {
+    return NextResponse.json(
+      { error: 'Este PDF ya no está guardado: los archivos de despacho se borran a los 6 meses.' }, { status: 410 })
+  }
   return new NextResponse(data as unknown as BodyInit, {
     headers: {
       'Content-Type':        'application/pdf',

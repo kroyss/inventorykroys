@@ -17,6 +17,7 @@ docker compose -f docker-compose.staging.yml up -d --build
 
 echo "→ limpiando imágenes viejas"
 docker image prune -f >/dev/null
+docker builder prune -af --max-used-space 5GB >/dev/null
 
 echo "✓ Staging OK en la rama $RAMA ($(git rev-parse --short HEAD))"
 docker compose -f docker-compose.staging.yml ps

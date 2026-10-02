@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from 'next/server'
 import { conEmpresa, dbEmpresa, dbGlobal } from '@/lib/db'
 import { revisarStockPendiente } from '@/lib/alertasStock'
+import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
 import { mlConfigurado } from '@/lib/ml'
 import type { Country } from '@/lib/types'
@@ -38,6 +39,23 @@ export async function GET(req: NextRequest) {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
       } catch (err) {
         console.error('[alertas stock]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Limpieza de PDF viejos de Despachos: una vez al día (la primera pasada que lo logra marcar).
+    const { rowCount } = await dbGlobal().query(
+      `INSERT INTO plataforma_ajustes (key, value) VALUES ('limpieza_despachos_at', NOW()::text)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+       WHERE plataforma_ajustes.value::timestamptz < NOW() - INTERVAL '1 day'`)
+    if (rowCount) {
+      const { rows: conDespachos } = await dbGlobal().query(
+        `SELECT id, country FROM empresas WHERE 'despachos' = ANY(modulos) ORDER BY id`)
+      for (const e of conDespachos) {
+        try {
+          const r = await conEmpresa(e.id, e.country as Country, db => limpiarDespachos(db))
+          if (r.archivos) console.log('[limpieza despachos]', e.id, r)
+        } catch (err) {
+          console.error('[limpieza despachos]', e.id, err instanceof Error ? err.message : err)
+        }
       }
     }
   })
