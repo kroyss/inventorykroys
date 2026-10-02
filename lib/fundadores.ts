@@ -29,7 +29,7 @@ export const PREGUNTAS: Pregunta[] = [
     ],
   },
   {
-    campo: 'despacho', texto: '¿Cómo despachas la mayoría de tus ventas?',
+    campo: 'despacho', texto: '¿Cómo despachas tus ventas?', multiple: true,
     opciones: [
       { valor: 'zoom_tealca', texto: 'MercadoEnvíos (ZOOM / Tealca)', puntos: 2 },
       { valor: 'retiro', texto: 'Retiro personal', puntos: 0 },

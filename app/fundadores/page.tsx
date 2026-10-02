@@ -140,9 +140,6 @@ export default async function FundadoresPage() {
               <li>Si quedas seleccionado, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
             </ol>
-            <p className="mt-4 text-xs text-neutral-500">
-              A cambio solo te pedimos usarlo y contarnos qué te sirve y qué no: así lo hacemos a la medida de los vendedores venezolanos.
-            </p>
           </section>
         </div>
 

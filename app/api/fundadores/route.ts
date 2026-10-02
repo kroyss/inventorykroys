@@ -41,7 +41,7 @@ const Solicitud = z.object({
   nick_ml: z.string().trim().max(40).optional().transform(v => v?.replace(/^@/, '').trim() || null),
   ventas_mes: opcion('ventas_mes'),
   cuentas: opcion('cuentas'),
-  despacho: opcion('despacho'),
+  despacho: opciones('despacho'),
   dolor: opciones('dolor'),
   inventario: opcion('inventario'),
   navegador_id: z.string().max(64).optional(),

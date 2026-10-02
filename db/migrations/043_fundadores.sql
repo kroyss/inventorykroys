@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS fundadores_solicitudes (
   nick_ml      TEXT,                        -- opcional (+1 punto)
   ventas_mes   TEXT    NOT NULL,            -- '<30' | '30-100' | '100-300' | '300+'
   cuentas      TEXT    NOT NULL,            -- '1' | '2-3' | '4+'
-  despacho     TEXT    NOT NULL,            -- 'zoom_tealca' | 'retiro' | 'delivery' | 'otro'
+  despacho     TEXT    NOT NULL,            -- varias, separadas por coma: 'zoom_tealca,retiro,delivery,otro'
   dolor        TEXT    NOT NULL,            -- varias, separadas por coma: 'preguntas,mensajes_guias,stock,que_vender'
   inventario   TEXT    NOT NULL,            -- 'excel' | 'nada' | 'sistema_basico' | 'facturacion_oficial'
   puntaje      INTEGER NOT NULL,
