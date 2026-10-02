@@ -3,23 +3,22 @@
 -- Página pública /fundadores (sin login) con 5 preguntas + contacto por Telegram. Cada
 -- solicitud se puntúa sola; las de menos de 30 ventas al mes quedan DESCARTADAS en la ronda
 -- (el aviso al vendedor es el mismo para todos: así nadie sabe qué respuesta lo dejó afuera).
--- El dueño de la plataforma aprueba desde Plataforma → Fundadores, por tandas (4 + 3 + 3).
+-- El dueño de la plataforma aprueba desde Plataforma → Fundadores, por tandas (5 + 5).
 --
 -- GLOBALES (de la plataforma, no de una empresa): sin empresa_id ni RLS, como `users`.
 -- Idempotente.
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS fundadores_tandas (
-  numero     INTEGER PRIMARY KEY,           -- 1, 2, 3
+  numero     INTEGER PRIMARY KEY,           -- 1, 2
   ronda      INTEGER NOT NULL DEFAULT 1,
   cupos      INTEGER NOT NULL,
-  abierta    BOOLEAN NOT NULL DEFAULT FALSE,
-  abre_texto TEXT                           -- "próxima semana", para la página pública
+  abierta    BOOLEAN NOT NULL DEFAULT TRUE, -- acepta aprobaciones (se llena la primera con cupo)
+  inicia     DATE                           -- día en que arranca esa tanda (página pública)
 );
-INSERT INTO fundadores_tandas (numero, cupos, abierta, abre_texto) VALUES
-  (1, 4, TRUE,  NULL),
-  (2, 3, FALSE, 'la semana siguiente'),
-  (3, 3, FALSE, 'en dos semanas')
+INSERT INTO fundadores_tandas (numero, cupos, abierta, inicia) VALUES
+  (1, 5, TRUE, '2026-10-04'),
+  (2, 5, TRUE, '2026-10-11')
 ON CONFLICT (numero) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS fundadores_solicitudes (

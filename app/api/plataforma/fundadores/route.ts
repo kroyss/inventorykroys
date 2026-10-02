@@ -18,7 +18,7 @@ export async function GET() {
          ORDER BY CASE estado WHEN 'calificado' THEN 0 WHEN 'aprobado' THEN 1 WHEN 'rechazado' THEN 2 ELSE 3 END,
                   puntaje DESC, created_at`, [RONDA_ACTUAL]),
       db.query(
-        `SELECT t.numero, t.cupos, t.abierta, t.abre_texto,
+        `SELECT t.numero, t.cupos, t.abierta, to_char(t.inicia, 'YYYY-MM-DD') AS inicia,
                 (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
          FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL]),
     ])

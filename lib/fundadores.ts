@@ -1,6 +1,7 @@
 // Programa Fundadores: preguntas, puntaje y descarte (página pública /fundadores).
 //
-// Decidido con el dueño (2026-10-01): 10 pioneros en 3 tandas (4 + 3 + 3), 1 mes gratis.
+// Decidido con el dueño (2026-10-01): 10 pioneros en 2 tandas de 5 (arrancan dom 4 y dom 11 de octubre), 1 mes gratis,
+// atención personalizada y configuración + adiestramiento gratis.
 // Requisito: movimiento real. Menos de 30 ventas al mes = descartado en la ronda (sin
 // decírselo en pantalla: el mensaje es el mismo para todos, así nadie sabe qué respuesta lo
 // dejó afuera). El resto se ordena por puntaje y el dueño aprueba desde Plataforma.
@@ -91,3 +92,10 @@ export function normalizarTelegram(t: string) {
 export const TELEGRAM_RE = /^[a-z0-9_]{5,32}$/
 
 export const RONDA_ACTUAL = 1
+
+/** '2026-10-04' → "domingo 4 de octubre" (inicio de una tanda; la columna DATE viaja como texto). */
+export function fechaTanda(iso: string | null) {
+  if (!iso) return null
+  return new Intl.DateTimeFormat('es-VE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+    .format(new Date(`${iso}T12:00:00Z`)).replace(',', '')
+}

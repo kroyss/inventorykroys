@@ -13,7 +13,7 @@ import { evaluar, normalizarTelegram, PREGUNTAS, RONDA_ACTUAL, TELEGRAM_RE } fro
 export async function GET() {
   try {
     const { rows } = await dbGlobal().query(
-      `SELECT t.numero, t.cupos, t.abierta, t.abre_texto,
+      `SELECT t.numero, t.cupos, t.abierta, to_char(t.inicia, 'YYYY-MM-DD') AS inicia,
               (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
        FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
     return NextResponse.json({ tandas: rows }, { headers: { 'Cache-Control': 'no-store' } })

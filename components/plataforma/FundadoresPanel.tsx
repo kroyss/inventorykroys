@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { textoOpcion } from '@/lib/fundadores'
 
-interface Tanda { numero: number; cupos: number; abierta: boolean; abre_texto: string | null; tomados: number }
+interface Tanda { numero: number; cupos: number; abierta: boolean; inicia: string | null; tomados: number }
 interface Verif {
   encontrado: boolean; motivo?: string; nickname?: string; nivel?: string | null; lider?: string | null
   ventas_total?: number | null; ventas_periodo?: number | null; periodo?: string | null; desde?: string | null
@@ -67,9 +67,9 @@ export default function FundadoresPanel() {
       await cargar()
     } finally { setOcupado(null) }
   }
-  const tanda = async (t: Tanda, abierta: boolean) => {
+  const tanda = async (t: Tanda, cambio: { abierta?: boolean; inicia?: string | null }) => {
     await fetch(`/api/plataforma/fundadores/tandas/${t.numero}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abierta }),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambio),
     })
     cargar()
   }
@@ -87,13 +87,18 @@ export default function FundadoresPanel() {
         <button onClick={() => navigator.clipboard?.writeText(enlace)} className="btn-ghost text-xs px-2 py-1">Copiar</button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {datos.tandas.map(t => (
           <div key={t.numero} className={`rounded-xl border p-4 bg-white ${t.abierta ? 'border-lime-400' : 'border-neutral-200'}`}>
             <div className="flex items-center justify-between">
               <span className="font-semibold text-neutral-900">Tanda {t.numero}</span>
               <span className={`text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'Abierta' : 'Cerrada'}</span>
             </div>
+            <label className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+              Inicia
+              <input type="date" defaultValue={t.inicia ?? ''} onChange={e => tanda(t, { inicia: e.target.value || null })}
+                className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
+            </label>
             <div className="mt-2 flex gap-1">
               {Array.from({ length: t.cupos }, (_, i) => (
                 <span key={i} className={`h-2 flex-1 rounded-full ${i < t.tomados ? 'bg-lime-500' : 'bg-neutral-200'}`} />
@@ -101,7 +106,7 @@ export default function FundadoresPanel() {
             </div>
             <div className="mt-2 flex items-center justify-between text-xs text-neutral-500">
               <span>{t.tomados} de {t.cupos} cupos</span>
-              <button onClick={() => tanda(t, !t.abierta)} className="underline underline-offset-2 hover:text-neutral-800">
+              <button onClick={() => tanda(t, { abierta: !t.abierta })} className="underline underline-offset-2 hover:text-neutral-800">
                 {t.abierta ? 'Cerrar' : 'Abrir'}
               </button>
             </div>

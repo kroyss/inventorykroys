@@ -1,15 +1,22 @@
 import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { marca } from '@/lib/marca'
-import { RONDA_ACTUAL } from '@/lib/fundadores'
+import { RONDA_ACTUAL, fechaTanda } from '@/lib/fundadores'
 import FormularioFundadores from '@/components/fundadores/FormularioFundadores'
 
 export const metadata = {
   title: 'Programa Fundadores',
-  description: '10 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis para probar El Comerciante Digital.',
+  description: '10 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis, configuración y adiestramiento sin costo.',
 }
 
-interface Tanda { numero: number; cupos: number; abierta: boolean; abre_texto: string | null; tomados: number }
+interface Tanda { numero: number; cupos: number; abierta: boolean; inicia: string | null; tomados: number }
+
+// Lo que reciben los Fundadores además del mes gratis.
+const BENEFICIOS = [
+  { t: 'Atención personalizada', d: 'Hablas directo con nosotros por Telegram, no con un bot ni con un ticket.' },
+  { t: 'Configuración gratis', d: 'Conectamos tus cuentas de MercadoLibre y dejamos el sistema listo contigo.' },
+  { t: 'Adiestramiento gratis', d: 'Te enseñamos a usarlo, a ti y a quien te ayude con las ventas.' },
+]
 
 const INCLUYE = [
   { t: 'Preguntas con IA', d: 'Las preguntas de todas tus cuentas en una bandeja, con la respuesta sugerida.' },
@@ -19,13 +26,13 @@ const INCLUYE = [
   { t: 'Ventas e inventario', d: 'Tu stock y tus ventas al día, sin cuaderno ni Excel.' },
 ]
 
-// Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 3 tandas
-// (4 + 3 + 3 = 10 pioneros) y el formulario. Lo de la base se lee en cada visita.
+// Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas
+// (5 + 5 = 10 pioneros) y el formulario. Lo de la base se lee en cada visita.
 export default async function FundadoresPage() {
   await connection()
   const m = marca()
   const { rows: tandas } = await dbGlobal().query<Tanda>(
-    `SELECT t.numero, t.cupos, t.abierta, t.abre_texto,
+    `SELECT t.numero, t.cupos, t.abierta, to_char(t.inicia, 'YYYY-MM-DD') AS inicia,
             (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
      FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
   const total = tandas.reduce((a, t) => a + t.cupos, 0)
@@ -54,22 +61,27 @@ export default async function FundadoresPage() {
             </h1>
             <p className="mt-4 text-neutral-400 leading-relaxed">
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a
-              10 vendedores con movimiento real. Entran por tandas, con <b className="text-white">un mes gratis</b> para
-              usarlo de verdad. Después decides si te quedas.
+              10 vendedores con movimiento real, en dos tandas de 5, con <b className="text-white">un mes gratis</b> para
+              usarlo de verdad. Como Fundador tienes <b className="text-white">atención personalizada</b> y la{' '}
+              <b className="text-white">configuración y el adiestramiento gratis</b>. Después decides si te quedas.
             </p>
           </div>
 
           {/* Tandas */}
-          <div className="mt-10 grid gap-3 sm:grid-cols-3">
+          <div className="mt-10 grid gap-3 sm:grid-cols-2 max-w-2xl">
             {tandas.map(t => {
               const llena = t.tomados >= t.cupos
-              const estado = llena ? 'Completa' : t.abierta ? 'Abierta' : `Abre ${t.abre_texto ?? 'pronto'}`
+              // La que se está llenando es la primera abierta con cupo (las aprobaciones van en orden).
+              const actual = t.numero === tandas.find(x => x.abierta && x.tomados < x.cupos)?.numero
+              const estado = llena ? 'Completa' : actual ? 'Cupos disponibles' : t.abierta ? 'Próxima' : 'Cerrada'
+              const fecha = fechaTanda(t.inicia)
               return (
-                <div key={t.numero} className={`rounded-xl border p-4 ${t.abierta && !llena ? 'border-lime-400/50 bg-lime-400/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}>
+                <div key={t.numero} className={`rounded-xl border p-4 ${actual ? 'border-lime-400/50 bg-lime-400/[0.07]' : 'border-white/10 bg-white/[0.03]'}`}>
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-semibold">Tanda {t.numero}</span>
-                    <span className={`text-xs font-medium ${t.abierta && !llena ? 'text-lime-400' : 'text-neutral-500'}`}>{estado}</span>
+                    <span className={`text-xs font-medium ${actual ? 'text-lime-400' : 'text-neutral-500'}`}>{estado}</span>
                   </div>
+                  {fecha && <p className="mt-0.5 text-xs text-neutral-400">Arranca el <span className="text-neutral-200">{fecha}</span></p>}
                   <div className="mt-3 flex gap-1.5" aria-label={`${t.tomados} de ${t.cupos} cupos tomados`}>
                     {Array.from({ length: t.cupos }, (_, i) => (
                       <span key={i} className={`h-2.5 flex-1 rounded-full ${i < t.tomados ? 'bg-lime-400' : 'bg-white/10'}`} />
@@ -105,12 +117,26 @@ export default async function FundadoresPage() {
               ))}
             </ul>
           </section>
+          <section className="rounded-xl border border-lime-300 bg-lime-50/60 p-5">
+            <h2 className="text-sm font-semibold text-neutral-900">Solo para Fundadores</h2>
+            <ul className="mt-3 space-y-3">
+              {BENEFICIOS.map(x => (
+                <li key={x.t} className="flex gap-2.5">
+                  <span className="mt-0.5 text-lime-700 font-semibold" aria-hidden="true">✓</span>
+                  <span>
+                    <span className="block text-sm font-semibold text-neutral-900">{x.t}</span>
+                    <span className="block text-sm text-neutral-600">{x.d}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-neutral-900">Cómo funciona</h2>
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
               <li>Llenas la solicitud (2 minutos).</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
-              <li>Si quedas seleccionado, te escribimos por Telegram y te damos acceso.</li>
+              <li>Si quedas seleccionado, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Al terminar, decides si te suscribes.</li>
             </ol>
             <p className="mt-4 text-xs text-neutral-500">
