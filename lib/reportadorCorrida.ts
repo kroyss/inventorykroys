@@ -32,6 +32,12 @@ export async function ultimaCorrida(db: Pool) {
 export async function iniciarCorrida(db: Pool, quien: { empresaId: number; country: Country; userId: number }, simular: boolean) {
   const actual = await ultimaCorrida(db)
   if (actual?.estado === 'corriendo') return { corrida: actual, nueva: false }
+  // Sin corrida en curso, una reserva hecha por la API (reporte_tomado_por NULL; las de un equipo
+  // de escritorio tienen su id) es un resto de un corte: un lote que se tomó y no terminó (antes,
+  // la pantalla cerrada a mitad de lote; ahora, un reinicio del servidor). Se libera para reportarla.
+  await db.query(
+    `UPDATE despacho_etiquetas SET reporte_tomado_at = NULL
+     WHERE reporte_tomado_por IS NULL AND reporte_tomado_at IS NOT NULL AND reporte_estado IS NULL`)
   const { total } = await pendientesApi(db)
   let id: number
   try {
