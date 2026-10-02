@@ -1,0 +1,127 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { PageHeader, Tabs } from '@/components/ui'
+
+interface Fila {
+  item_id: string; variante_id: string; titulo: string; variante: string | null; disponible: number; estado: string
+  permalink: string | null; imagen: string | null; agotada_desde: string | null; bajo_desde: string | null
+  ultima_agotada_at: string | null; cuenta: string
+}
+interface Datos {
+  filas: Fila[]; contadores: { agotadas: number; bajas: number; semana: number }; umbral: number
+  revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean
+}
+type Vista = 'agotadas' | 'bajas' | 'semana'
+
+const hace = (s: string | null) => {
+  if (!s) return '—'
+  const h = (Date.now() - new Date(s).getTime()) / 3_600_000
+  if (h < 1) return 'hace menos de 1 h'
+  if (h < 24) return `hace ${Math.floor(h)} h`
+  const d = Math.floor(h / 24)
+  return `hace ${d} día${d === 1 ? '' : 's'}`
+}
+
+/** Automatizaciones → Alertas de stock: publicaciones (y variantes) de MercadoLibre agotadas o por agotarse. */
+export default function AlertasStockClient() {
+  const [vista, setVista] = useState<Vista>('agotadas')
+  const [datos, setDatos] = useState<Datos | null>(null)
+  const [buscar, setBuscar] = useState('')
+  const [revisando, setRevisando] = useState(false)
+  const [umbral, setUmbral] = useState('')
+  const [vez, setVez] = useState(0)
+
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/alertas-stock?vista=${vista}`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: Datos | null) => { if (vivo && d) { setDatos(d); setUmbral(u => u || String(d.umbral)) } })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [vista, vez])
+
+  const revisar = async () => {
+    setRevisando(true)
+    try { await fetch('/api/alertas-stock/revisar', { method: 'POST' }) } finally { setRevisando(false); setVez(n => n + 1) }
+  }
+  const guardarUmbral = async () => {
+    const n = parseInt(umbral, 10)
+    if (!(n >= 1 && n <= 100)) return
+    await fetch('/api/alertas-stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ umbral: n }) })
+    setVez(x => x + 1)
+  }
+
+  const q = buscar.trim().toLowerCase()
+  const filas = (datos?.filas ?? []).filter(f => !q || `${f.titulo} ${f.variante ?? ''} ${f.item_id} ${f.cuenta}`.toLowerCase().includes(q))
+
+  return (
+    <div className="space-y-4">
+      <PageHeader title="Alertas de stock"
+        subtitle="Lo que se agotó o está por agotarse en tus publicaciones de MercadoLibre, por variante"
+        actions={<button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>} />
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+        <span>
+          Se revisa sola cada hora{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
+        </span>
+        {datos?.esAdmin && (
+          <label className="flex items-center gap-1.5">
+            Por agotarse = menos de
+            <input type="number" min={1} max={100} value={umbral} onChange={e => setUmbral(e.target.value)}
+              className="w-14 border border-neutral-300 rounded px-1.5 py-0.5 text-neutral-800" />
+            unidades
+            {datos && umbral !== String(datos.umbral) && <button onClick={guardarUmbral} className="underline underline-offset-2 text-sky-700">guardar</button>}
+          </label>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Tabs value={vista} onChange={setVista} items={[
+          { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
+          { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
+          { value: 'semana', label: 'Agotadas en 7 días', count: datos?.contadores.semana },
+        ]} />
+        <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar publicación, variante o cuenta…"
+          className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
+      </div>
+
+      {!datos ? <p className="text-sm text-neutral-400">Cargando…</p> : filas.length === 0 ? (
+        <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">
+          {vista === 'agotadas' ? 'Ninguna publicación agotada. 👌' : vista === 'bajas' ? 'Nada por agotarse.' : 'Nada se agotó en los últimos 7 días.'}
+        </p>
+      ) : (
+        <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
+          {filas.map(f => (
+            <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex items-center gap-3">
+              {f.imagen
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="w-11 h-11 rounded object-cover bg-neutral-100 shrink-0" />
+                : <span className="w-11 h-11 rounded bg-neutral-100 shrink-0" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-neutral-900 truncate">
+                  {f.permalink
+                    ? <a href={f.permalink} target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">{f.titulo} <span className="text-neutral-400">↗</span></a>
+                    : f.titulo}
+                </p>
+                <p className="text-xs text-neutral-500 truncate">
+                  {f.variante && <span className="text-neutral-700 font-medium">{f.variante} · </span>}
+                  {f.cuenta} · {f.item_id}
+                  {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML</span>}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
+                  {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
+                </p>
+                <p className="text-[11px] text-neutral-400">
+                  {vista === 'agotadas' ? hace(f.agotada_desde) : vista === 'bajas' ? hace(f.bajo_desde)
+                    : f.disponible > 0 ? `repuesta · se agotó ${hace(f.ultima_agotada_at)}` : hace(f.agotada_desde)}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}

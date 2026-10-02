@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { dbEmpresa, dbGlobal } from '@/lib/db'
+import { after, NextRequest, NextResponse } from 'next/server'
+import { conEmpresa, dbEmpresa, dbGlobal } from '@/lib/db'
+import { revisarStockPendiente } from '@/lib/alertasStock'
 import { sincronizarEmpresa } from '@/lib/preguntas'
 import { mlConfigurado } from '@/lib/ml'
 import type { Country } from '@/lib/types'
@@ -29,5 +30,16 @@ export async function GET(req: NextRequest) {
       resultado[e.id] = { error: err instanceof Error ? err.message : String(err) }
     }
   }
+  // Alertas de stock: una cuenta por empresa y por pasada, si pasó la hora (lib/alertasStock.ts).
+  // En segundo plano (después de responder) para no atrasar preguntas y mensajes.
+  after(async () => {
+    for (const e of empresas) {
+      try {
+        await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
+      } catch (err) {
+        console.error('[alertas stock]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+  })
   return NextResponse.json({ ok: true, resultado })
 }

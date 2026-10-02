@@ -4,12 +4,14 @@ import { tieneModulo } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { leerPlantillasCal, SQL_BANDEJA } from '@/lib/calificacionesML'
 import { DIAS_VENTAS, SQL_COMPARACION, UMBRAL_BAJO } from '@/lib/stockML'
+import { contarAlertas } from '@/lib/alertasStock'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
 //   preguntas: sin responder · mensajes: conversaciones con mensajes sin leer
 //   reportador: guías de jornadas cerradas que todavía no se le avisaron al comprador
 //   calificaciones: ventas de ML listas para calificar
 //   stock: productos a reponer en ML o publicados de más (stock real vs publicado)
+//   alertas: publicaciones/variantes de ML agotadas o por agotarse (Alertas de stock)
 //   despachos: envíos ya impresos en la jornada ABIERTA (falta cerrar jornada → manifiesto;
 //              hasta entonces el Reportador no tiene nada que avisar)
 // Solo cuenta lo de los módulos que tiene la empresa. Nunca falla en voz alta: con un
@@ -18,13 +20,14 @@ export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
   const u = session.user
-  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, stock: 0 }
+  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, stock: 0, alertas: 0 }
   try {
     if (tieneModulo(u, 'preguntas')) {
       const { rows: [r] } = await db.query(
         `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS p,
                 (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS m`)
       out.preguntas = r.p; out.mensajes = r.m
+      { const a = await contarAlertas(db); out.alertas = a.agotadas + a.bajas }
       if (tieneModulo(u, 'stock_ml')) {
         const { rows: [st] } = await db.query(
           `SELECT COUNT(*)::int AS n FROM (${SQL_COMPARACION}) c WHERE alerta <> 'ok'`, [DIAS_VENTAS, UMBRAL_BAJO])

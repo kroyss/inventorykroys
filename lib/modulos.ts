@@ -30,6 +30,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
   '/stock-ml':  'stock_ml',
+  '/alertas-stock': 'preguntas',
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
 }
