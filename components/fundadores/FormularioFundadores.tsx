@@ -154,8 +154,12 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
           <fieldset key={pregunta.campo} className="mt-4">
             <legend className="text-lg font-semibold text-neutral-900 leading-snug">{pregunta.texto}</legend>
             {pregunta.multiple && !pregunta.ayuda ? (
-              <p className="mt-1 text-sm text-neutral-500">
-                Marca <b className="font-semibold text-neutral-900">todas las que apliquen</b>.
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-lime-700">
+                <svg viewBox="0 0 16 16" className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="1.5" y="1.5" width="6" height="6" rx="1.5" /><path d="m3 4.5 1.2 1.2L6.2 3.4" />
+                  <rect x="8.5" y="8.5" width="6" height="6" rx="1.5" /><path d="m10 11.5 1.2 1.2 2-2.3" />
+                </svg>
+                Puedes marcar varias
               </p>
             ) : <p className="mt-1 text-sm text-neutral-400">
               {pregunta.ayuda ?? (paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.')}
