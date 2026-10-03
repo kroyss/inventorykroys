@@ -6,8 +6,9 @@
 // publicó manda (y queda en la ficha para no repetir el error). Las contradicciones (p. ej. el
 // mínimo para envío gratis dicho de dos formas) van aparte en "dudas", para revisarlas.
 //
-// Se rehace SOLO cuando la publicación suma 3+ respuestas nuevas (sin respuestas nuevas no hay nada
-// que cambie; rehacerlas cada 30 días costaba ~$2/mes por las ~360 fichas sin aportar nada).
+// Solo publicaciones ACTIVAS (a las pausadas no les llegan preguntas). Se rehace SOLO cuando la
+// publicación suma 3+ respuestas nuevas (sin respuestas nuevas no hay nada que cambie; rehacerlas
+// cada 30 días costaba ~$2/mes por las ~360 fichas sin aportar nada).
 // La corre el cron de preguntas en segundo plano por la API de LOTES (mitad de precio; nadie
 // espera la respuesta): un lote abierto por empresa a la vez (tabla ia_lotes, migración 060).
 import type { Pool } from 'pg'
@@ -84,7 +85,7 @@ export async function generarFichasPendientes(db: Pool) {
        JOIN LATERAL (SELECT COUNT(*)::int AS n FROM ml_preguntas q
                      WHERE q.item_id = c.item_id AND q.estado = 'ANSWERED' AND q.respuesta IS NOT NULL) r ON TRUE
        LEFT JOIN ml_item_fichas f ON f.item_id = c.item_id
-       WHERE r.n >= ${MINIMO_RESPUESTAS}
+       WHERE r.n >= ${MINIMO_RESPUESTAS} AND c.estado = 'active'
          AND (c.ficha_pedida_at IS NULL OR c.ficha_pedida_at < NOW() - INTERVAL '26 hours')
          AND (f.item_id IS NULL OR r.n >= f.n_preguntas + 3)
        ORDER BY (f.item_id IS NULL) DESC, r.n DESC

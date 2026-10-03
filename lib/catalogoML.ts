@@ -1,6 +1,9 @@
 // Catálogo del vendedor e historial completo de preguntas (migración 059): más contexto para la IA.
 //
-//   - Catálogo: todas las publicaciones activas/pausadas de cada cuenta, con su ficha resumida.
+//   - Catálogo: las publicaciones CON MOVIMIENTO de cada cuenta, con su ficha resumida: todas las
+//     activas + las pausadas que tuvieron una venta o una pregunta en los últimos DIAS_MOVIMIENTO
+//     días (las pausadas viejas son "basura": en la cuenta del dueño 650 de 1.176). Si una vuelve
+//     a activarse, entra sola en el siguiente refresco.
 //     Sirve para que la IA recomiende OTRO modelo del vendedor cuando el de la pregunta no cumple
 //     (el dueño lo hace a mano: "este no se empareja; el PRO sí: <link>"). Cada 6 h por cuenta.
 //   - Historial: la búsqueda general de ML corta en 1.000 preguntas por cuenta; por publicación
@@ -12,6 +15,7 @@ import { idsDe } from '@/lib/alertasStock'
 import { guardarPregunta, type PreguntaML } from '@/lib/preguntas'
 
 export const HORAS_CATALOGO = 6
+const DIAS_MOVIMIENTO = 90
 const POR_MULTIGET = 20
 const HISTORIAL_POR_PASADA = 4             // publicaciones por pasada del cron (cada minuto)
 
@@ -58,8 +62,15 @@ export async function actualizarCatalogo(db: Pool, conexionId: number) {
       n++
     }
   }
-  // Lo que ya no está activo ni pausado (finalizado, borrado) sale del catálogo.
+  // Sale del catálogo lo que ya no está activo ni pausado (finalizado, borrado) y lo pausado sin
+  // movimiento (ni ventas ni preguntas en DIAS_MOVIMIENTO días).
   await db.query(`DELETE FROM ml_catalogo WHERE conexion_id = $1 AND actualizado_at < $2`, [conexionId, inicio])
+  const { rowCount: quietas } = await db.query(
+    `DELETE FROM ml_catalogo c WHERE c.conexion_id = $1 AND c.estado = 'paused'
+       AND NOT EXISTS (SELECT 1 FROM ml_preguntas q WHERE q.item_id = c.item_id AND q.fecha > NOW() - make_interval(days => $2))
+       AND NOT EXISTS (SELECT 1 FROM ml_ordenes o WHERE o.conexion_id = c.conexion_id AND o.fecha > NOW() - make_interval(days => $2)
+                         AND c.item_id = ANY(o.items))`, [conexionId, DIAS_MOVIMIENTO])
+  n -= quietas ?? 0
   return n
 }
 
