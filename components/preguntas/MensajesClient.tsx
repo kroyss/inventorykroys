@@ -5,7 +5,7 @@ import type { PreguntaPrevia } from '@/lib/preguntasComprador'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { Sugerencias, UsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
+import { Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -115,6 +115,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       if (!r.ok) { setError(d.error ?? 'La IA no respondió'); return }
       setTexto(d.borrador.respuesta)
       setMeta({ confianza: d.borrador.confianza, falta: d.borrador.falta_dato })
+      avisarUsoIA()
     } finally { setPensando(false) }
   }
   const fin = useRef<HTMLDivElement>(null)

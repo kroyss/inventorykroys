@@ -21,6 +21,7 @@ interface Empresa {
   estado: EstadoCuenta
   prueba_hasta: string | null
   fundador: boolean
+  ia_limite_mes: number | null
 }
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
@@ -49,7 +50,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
-  const actualizar = async (e: Empresa, cambios: Partial<Pick<Empresa, 'modulos' | 'is_active'>>) => {
+  const actualizar = async (e: Empresa, cambios: Partial<Pick<Empresa, 'modulos' | 'is_active' | 'ia_limite_mes'>>) => {
     setError(null); setAviso(null)
     const r = await fetch(`/api/plataforma/empresas/${e.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
@@ -103,6 +104,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
               <th className="px-4 py-2 text-left">Admins</th>
               <th className="px-4 py-2 text-right">Usuarios</th>
               <th className="px-4 py-2 text-left">Módulos</th>
+              <th className="px-4 py-2 text-right" title="Borradores con IA (Preguntas + Mensajes) por mes. Vacío = sin límite">IA/mes</th>
               <th className="px-4 py-2 text-left">Estado</th>
             </tr>
           </thead>
@@ -130,6 +132,11 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                       </button>
                     ))}
                   </div>
+                </td>
+                <td className="px-4 py-2 text-right">
+                  {e.estado === 'propietario'
+                    ? <span className="text-xs text-neutral-400" title="El dueño de la plataforma no tiene límite">sin límite</span>
+                    : <LimiteIA key={`${e.id}-${e.ia_limite_mes}`} valor={e.ia_limite_mes} onGuardar={v => actualizar(e, { ia_limite_mes: v })} />}
                 </td>
                 <td className="px-4 py-2">
                   <button disabled={e.id === empresaActual}
@@ -244,6 +251,23 @@ const COLOR_ESTADO: Record<EstadoCuenta, string> = {
 const ddmm = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/')
 
 /** Estado de la cuenta de la organización (lib/cuenta.ts): pastilla + editor al tocarla. */
+/** Límite de borradores de IA por mes: se guarda al salir del campo (vacío = sin límite). Se
+ *  rearma (key) cuando cambia el valor guardado. */
+function LimiteIA({ valor, onGuardar }: { valor: number | null; onGuardar: (v: number | null) => void }) {
+  const [v, setV] = useState(valor == null ? '' : String(valor))
+  const guardar = () => {
+    const n = v.trim() === '' ? null : Math.max(0, Math.round(Number(v)))
+    if (n !== null && !Number.isFinite(n)) { setV(valor == null ? '' : String(valor)); return }
+    if (n !== valor) onGuardar(n)
+  }
+  return (
+    <input value={v} onChange={ev => setV(ev.target.value.replace(/[^0-9]/g, ''))} onBlur={guardar}
+      onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur() }}
+      inputMode="numeric" placeholder="sin límite" title="Borradores con IA por mes (vacío = sin límite)"
+      className="w-20 border border-neutral-200 rounded px-1.5 py-0.5 text-xs text-right num" />
+  )
+}
+
 function Cuenta({ e, hoy, onGuardada, onError }: {
   e: Empresa; hoy: string; onGuardada: (msg: string) => void; onError: (msg: string) => void
 }) {

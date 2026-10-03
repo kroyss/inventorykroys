@@ -1,19 +1,34 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-/** Lo gastado en IA este mes. Solo lo ve el dueño de la plataforma (la API responde 403 a los demás
- *  y entonces no aparece nada). */
+/** Avisa a <UsoIA /> que se pidió un borrador (para que actualice el contador). */
+export const avisarUsoIA = () => window.dispatchEvent(new Event('uso-ia'))
+
+/** Borradores de IA usados este mes. El cliente ve "usados de su límite"; el dueño de la plataforma
+ *  (sin límite) ve además lo que costaron. */
 export function UsoIA() {
-  const [uso, setUso] = useState<{ total: number; borradores: number } | null>(null)
+  const [uso, setUso] = useState<{ total?: number; borradores: number; limite: number | null } | null>(null)
   useEffect(() => {
     let vivo = true
-    fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
-    return () => { vivo = false }
+    const cargar = () => fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
+    cargar()
+    window.addEventListener('uso-ia', cargar)
+    return () => { vivo = false; window.removeEventListener('uso-ia', cargar) }
   }, [])
   if (!uso) return null
+  if (uso.limite !== null) {
+    const quedan = Math.max(0, uso.limite - uso.borradores)
+    return (
+      <span className={`text-xs whitespace-nowrap ${quedan <= uso.limite * 0.1 ? 'text-amber-700' : 'text-neutral-500'}`}
+        title="Borradores con IA en Preguntas y Mensajes este mes. Las respuestas parecidas y las rápidas no cuentan. Se renueva el día 1.">
+        IA este mes: <b className="num">{uso.borradores}</b> de {uso.limite}
+      </span>
+    )
+  }
+  const total = uso.total ?? 0
   return (
-    <span className="text-xs text-neutral-500 whitespace-nowrap" title="Costo de los borradores de la IA en Preguntas y Mensajes este mes">
-      IA este mes: <b className="text-neutral-800 num">${uso.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: uso.total > 0 && uso.total < 0.995 ? 4 : 2 })}</b>
+    <span className="text-xs text-neutral-500 whitespace-nowrap" title="Costo de los borradores de la IA en Preguntas y Mensajes este mes (más las fichas, en segundo plano)">
+      IA este mes: <b className="text-neutral-800 num">${total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: total > 0 && total < 0.995 ? 4 : 2 })}</b>
       {' '}· {uso.borradores} borrador{uso.borradores === 1 ? '' : 'es'}
     </span>
   )

@@ -13,10 +13,12 @@ const Schema = z.object({
   nombre:    z.string().trim().min(2).max(80).optional(),
   modulos:   z.array(z.enum(modulosValidos)).max(20).optional(),
   is_active: z.boolean().optional(),
+  // Borradores de IA por mes (null = sin límite).
+  ia_limite_mes: z.number().int().min(0).max(100000).nullable().optional(),
 })
 
 /**
- * PUT /api/plataforma/empresas/[id] — módulos, nombre, activa (solo el dueño de la
+ * PUT /api/plataforma/empresas/[id] — módulos, nombre, activa, límite de IA (solo el dueño de la
  * plataforma). Los cambios de módulos se aplican en el siguiente request de sus usuarios
  * (la sesión los relee); desactivar la empresa los saca en el siguiente request.
  */
@@ -37,9 +39,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       `UPDATE empresas SET
          nombre    = COALESCE($2, nombre),
          modulos   = COALESCE($3, modulos),
-         is_active = COALESCE($4, is_active)
+         is_active = COALESCE($4, is_active),
+         ia_limite_mes = CASE WHEN $5 THEN $6::int ELSE ia_limite_mes END
        WHERE id = $1`,
-      [id, body.nombre ?? null, body.modulos ?? null, body.is_active ?? null])
+      [id, body.nombre ?? null, body.modulos ?? null, body.is_active ?? null,
+       body.ia_limite_mes !== undefined, body.ia_limite_mes ?? null])
     if (!rowCount) return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (err) {

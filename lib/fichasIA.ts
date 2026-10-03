@@ -7,12 +7,13 @@
 // mínimo para envío gratis dicho de dos formas) van aparte en "dudas", para revisarlas.
 //
 // Se rehace cuando la publicación suma 3+ respuestas nuevas o la ficha tiene más de 30 días.
-// La corre el cron de preguntas en segundo plano, de a pocas por pasada.
+// La corre el cron de preguntas en segundo plano por la API de LOTES (mitad de precio; nadie
+// espera la respuesta): un lote abierto por empresa a la vez (tabla ia_lotes, migración 060).
 import type { Pool } from 'pg'
-import { llamarClaude, registrarUso } from '@/lib/ia'
+import { enviarLote, inputDeHerramienta, leerLote, registrarUso } from '@/lib/ia'
 
 const MINIMO_RESPUESTAS = 3
-const FICHAS_POR_PASADA = 2
+const FICHAS_POR_LOTE = 50
 const MAX_PARES = 150                      // las más recientes (la ficha sale de ahí)
 
 const SISTEMA = `Resumes lo que un vendedor venezolano de MercadoLibre ya respondió sobre UNA publicación, para que otra IA responda las próximas preguntas con su conocimiento.
@@ -39,9 +40,42 @@ const HERRAMIENTA = {
   },
 }
 
-/** Genera (o rehace) unas pocas fichas pendientes de la empresa de `db`. Devuelve cuántas. */
+/** Avanza las fichas de la empresa de `db`: si hay un lote abierto y terminó, guarda sus fichas;
+ *  si no hay ninguno abierto, manda uno nuevo con las pendientes. Devuelve cuántas guardó. */
 export async function generarFichasPendientes(db: Pool) {
+  let guardadas = 0
+  const { rows: [abierto] } = await db.query(
+    `SELECT id, batch_id, datos FROM ia_lotes WHERE modulo = 'fichas' AND estado = 'enviado' ORDER BY id LIMIT 1`)
+  if (abierto) {
+    const resultados = await leerLote(abierto.batch_id)
+    if (!resultados) return 0                                    // sigue procesando
+    const totales = abierto.datos as Record<string, number>
+    for (const r of resultados) {
+      const msg = r.result.type === 'succeeded' ? r.result.message : null
+      try {
+        if (!msg) throw new Error(r.result.type)
+        await registrarUso(db, 'fichas', [{ modelo: msg.model, uso: msg.usage, lote: true }])
+        const f = inputDeHerramienta<{ datos: string; dudas: string | null }>(
+          msg.content as { type: string; name?: string; input?: { datos: string; dudas: string | null } }[], HERRAMIENTA.name)
+        const datos = String(f.datos ?? '').trim().slice(0, 1500)
+        if (!datos) throw new Error('ficha vacía')
+        await db.query(
+          `INSERT INTO ml_item_fichas (item_id, texto, dudas, n_preguntas, generada_at) VALUES ($1, $2, $3, $4, NOW())
+           ON CONFLICT (empresa_id, item_id) DO UPDATE SET texto = EXCLUDED.texto, dudas = EXCLUDED.dudas,
+             n_preguntas = EXCLUDED.n_preguntas, generada_at = NOW()`,
+          [r.custom_id, datos, f.dudas?.trim() || null, totales[r.custom_id] ?? 0])
+        guardadas++
+      } catch (e) {
+        // Queda libre para el próximo lote.
+        await db.query(`UPDATE ml_catalogo SET ficha_pedida_at = NULL WHERE item_id = $1`, [r.custom_id])
+        console.error('[fichas IA]', r.custom_id, e instanceof Error ? e.message : e)
+      }
+    }
+    await db.query(`UPDATE ia_lotes SET estado = 'terminado', terminado_at = NOW() WHERE id = $1`, [abierto.id])
+  }
+
   // Reserva atómica: publicaciones del catálogo con suficientes respuestas y ficha vieja o sin ficha.
+  // Un lote puede tardar hasta 24 h: la reserva vence a las 26 h por si el lote se perdió.
   const { rows } = await db.query(
     `UPDATE ml_catalogo SET ficha_pedida_at = NOW()
      WHERE (empresa_id, item_id) IN (
@@ -50,46 +84,41 @@ export async function generarFichasPendientes(db: Pool) {
                      WHERE q.item_id = c.item_id AND q.estado = 'ANSWERED' AND q.respuesta IS NOT NULL) r ON TRUE
        LEFT JOIN ml_item_fichas f ON f.item_id = c.item_id
        WHERE r.n >= ${MINIMO_RESPUESTAS}
-         AND (c.ficha_pedida_at IS NULL OR c.ficha_pedida_at < NOW() - INTERVAL '15 minutes')
+         AND (c.ficha_pedida_at IS NULL OR c.ficha_pedida_at < NOW() - INTERVAL '26 hours')
          AND (f.item_id IS NULL OR r.n >= f.n_preguntas + 3 OR f.generada_at < NOW() - INTERVAL '30 days')
        ORDER BY (f.item_id IS NULL) DESC, r.n DESC
-       LIMIT ${FICHAS_POR_PASADA} FOR UPDATE OF c SKIP LOCKED)
+       LIMIT ${FICHAS_POR_LOTE} FOR UPDATE OF c SKIP LOCKED)
      RETURNING item_id, titulo, ficha`)
+  if (!rows.length) return guardadas
   // n_preguntas guarda el TOTAL respondido (no solo las MAX_PARES leídas): si no, una publicación
   // con más de MAX_PARES respuestas se rehace en cada pasada.
-  let hechas = 0
+  const totales: Record<string, number> = {}
+  const pedidos = []
   for (const it of rows) {
-    try {
-      const { rows: [{ total }] } = await db.query(
-        `SELECT COUNT(*)::int AS total FROM ml_preguntas WHERE item_id = $1 AND estado = 'ANSWERED' AND respuesta IS NOT NULL`,
-        [it.item_id])
-      const { rows: pares } = await db.query(
-        `SELECT to_char(fecha, 'YYYY-MM-DD') AS f, texto, respuesta, borrador
-         FROM ml_preguntas WHERE item_id = $1 AND estado = 'ANSWERED' AND respuesta IS NOT NULL
-         ORDER BY fecha DESC LIMIT ${MAX_PARES}`, [it.item_id])
-      const L = [`PUBLICACIÓN: ${it.titulo}`]
-      if (it.ficha) L.push(`FICHA TÉCNICA: ${it.ficha}`)
-      L.push(`\nPREGUNTAS Y RESPUESTAS DEL VENDEDOR (de la más nueva a la más vieja, ${pares.length}):`)
-      for (const p of pares) {
-        const corrigio = p.borrador && p.borrador.trim() !== p.respuesta.trim()
-        L.push(`[${p.f}] P: ${p.texto.slice(0, 300)}\nR: ${p.respuesta.slice(0, 400)}` +
-          (corrigio ? `\n(la IA había propuesto: "${p.borrador.slice(0, 300)}"; el vendedor lo corrigió)` : ''))
-      }
-      const { resultado, uso, modelo } = await llamarClaude<{ datos: string; dudas: string | null }>({
-        sistema: SISTEMA, contenido: L.join('\n'), herramienta: HERRAMIENTA, maxTokens: 900,
-      })
-      await registrarUso(db, 'fichas', modelo, uso)
-      const datos = String(resultado.datos ?? '').trim().slice(0, 1500)
-      if (!datos) continue
-      await db.query(
-        `INSERT INTO ml_item_fichas (item_id, texto, dudas, n_preguntas, generada_at) VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (empresa_id, item_id) DO UPDATE SET texto = EXCLUDED.texto, dudas = EXCLUDED.dudas,
-           n_preguntas = EXCLUDED.n_preguntas, generada_at = NOW()`,
-        [it.item_id, datos, resultado.dudas?.trim() || null, total])
-      hechas++
-    } catch (e) {
-      console.error('[fichas IA]', it.item_id, e instanceof Error ? e.message : e)
+    const { rows: [{ total }] } = await db.query(
+      `SELECT COUNT(*)::int AS total FROM ml_preguntas WHERE item_id = $1 AND estado = 'ANSWERED' AND respuesta IS NOT NULL`,
+      [it.item_id])
+    const { rows: pares } = await db.query(
+      `SELECT to_char(fecha, 'YYYY-MM-DD') AS f, texto, respuesta, borrador
+       FROM ml_preguntas WHERE item_id = $1 AND estado = 'ANSWERED' AND respuesta IS NOT NULL
+       ORDER BY fecha DESC LIMIT ${MAX_PARES}`, [it.item_id])
+    const L = [`PUBLICACIÓN: ${it.titulo}`]
+    if (it.ficha) L.push(`FICHA TÉCNICA: ${it.ficha}`)
+    L.push(`\nPREGUNTAS Y RESPUESTAS DEL VENDEDOR (de la más nueva a la más vieja, ${pares.length}):`)
+    for (const p of pares) {
+      const corrigio = p.borrador && p.borrador.trim() !== p.respuesta.trim()
+      L.push(`[${p.f}] P: ${p.texto.slice(0, 300)}\nR: ${p.respuesta.slice(0, 400)}` +
+        (corrigio ? `\n(la IA había propuesto: "${p.borrador.slice(0, 300)}"; el vendedor lo corrigió)` : ''))
     }
+    totales[it.item_id] = total
+    pedidos.push({ id: it.item_id, pedido: { sistema: SISTEMA, contenido: L.join('\n'), herramienta: HERRAMIENTA, maxTokens: 900 } })
   }
-  return hechas
+  try {
+    const batchId = await enviarLote(pedidos)
+    await db.query(`INSERT INTO ia_lotes (batch_id, modulo, datos) VALUES ($1, 'fichas', $2)`, [batchId, JSON.stringify(totales)])
+  } catch (e) {
+    await db.query(`UPDATE ml_catalogo SET ficha_pedida_at = NULL WHERE item_id = ANY($1)`, [rows.map(r => r.item_id)])
+    throw e
+  }
+  return guardadas
 }

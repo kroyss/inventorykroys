@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
-import { Sugerencias, UsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
+import { Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
@@ -267,6 +267,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
       if (!r.ok) { setError(d.error ?? 'La IA no respondió'); return }
       setTexto(d.borrador.respuesta)
       setMeta({ confianza: d.borrador.confianza, falta: d.borrador.falta_dato, web: d.borrador.web })
+      avisarUsoIA()
     } finally { setPidiendo(null) }
   }
 

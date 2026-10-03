@@ -7,7 +7,7 @@
 //   - ML descarta textos con links externos o datos de contacto: se revisan antes;
 //   - las preguntas de publicaciones pausadas no salen en el panel de ML pero la API sí
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
-import { llamarClaude, type UsoIA } from '@/lib/ia'
+import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
@@ -356,20 +356,40 @@ const HERRAMIENTA = {
   },
 }
 
-/** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar). */
-export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador & { uso: UsoIA; modelo: string }> {
-  const { resultado: b, uso, modelo } = await llamarClaude<Borrador>({
-    sistema: SISTEMA + (web
-      ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
-      : ''),
-    contenido: bloqueContexto(c), herramienta: HERRAMIENTA, web,
-  })
-  return {
-    respuesta: String(b.respuesta ?? '').trim(),
-    confianza: ['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja',
-    falta_dato: b.falta_dato || null,
-    web, uso, modelo,
+// Pregunta SIMPLE = de las que se responden con stock, precio, políticas y respuestas rápidas
+// (disponible, precio, envío, ubicación, pago) y no tocan nada técnico del producto. Esas van a
+// Haiku (5× más barato); el resto, y las que Haiku no responde con confianza "alta", a Sonnet.
+// Envío GRATIS y "cuántas hay" van a Sonnet: en la prueba (30 preguntas reales, 2026-10-03) Haiku
+// dijo "sí" al envío gratis de una publicación que no lo tiene y esquivó el número de unidades.
+const SIMPLE = /disponib|\bhay\b|precio|cu[aá]nto (sale|cuesta|es)|env[ií]|ubicad|d[oó]nde (est|qued)|tienda f[ií]sica|retir|entrega|llega|tarda|zoom|mrw|tealca|domesa|liberty|\bpag|binance|paypal|zelle|bcv|divisa|efectivo|unidades/i
+const TECNICO = /compatib|sirve|funciona|conect|empare|incluye|viene con|\btrae|\bkit\b|cable|medida|\bmts?\b|metro|\bcm\b|\bmm\b|pulgada|volt|wat|bater|carg|modelo|original|instal|adapt|usb|bluetooth|color|negro|blanco|talla|tama[ñn]o|material|descuento|oferta|al mayor|garant|gratis|cu[aá]nt[ao]s/i
+
+export const esPreguntaSimple = (texto: string) =>
+  SIMPLE.test(texto) && !TECNICO.test(texto) && texto.trim().split(/\s+/).length <= 30
+
+/** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
+ *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
+export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string }> {
+  const sistema = SISTEMA + (web
+    ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
+    : '')
+  const contenido = bloqueContexto(c)
+  const llamadas: LlamadaIA[] = []
+  const pedir = async (modelo?: string) => {
+    const { resultado: b, uso, modelo: m } = await llamarClaude<Borrador>({ sistema, contenido, herramienta: HERRAMIENTA, web, modelo })
+    llamadas.push({ modelo: m, uso })
+    return {
+      respuesta: String(b.respuesta ?? '').trim(),
+      confianza: (['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja') as Borrador['confianza'],
+      falta_dato: b.falta_dato || null,
+      web, modelo: m,
+    }
   }
+  if (!web && esPreguntaSimple(c.pregunta.texto)) {
+    const b = await pedir(MODELO_SIMPLE).catch(() => null)
+    if (b && b.confianza === 'alta' && b.respuesta) return { ...b, llamadas }
+  }
+  return { ...(await pedir()), llamadas }
 }
 
 // ── Sugerencias (gratis, sin IA): respuestas ya dadas a preguntas parecidas ──────────────────

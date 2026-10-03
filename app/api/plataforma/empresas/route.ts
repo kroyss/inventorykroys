@@ -26,7 +26,7 @@ export async function GET() {
   if (error) return error
   try {
     const { rows } = await dbGlobal().query(
-      `SELECT e.id, e.nombre, e.country, e.modulos, e.is_active, e.created_at,
+      `SELECT e.id, e.nombre, e.country, e.modulos, e.is_active, e.created_at, e.ia_limite_mes,
               o.id AS organizacion_id, o.nombre AS organizacion,
               o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.fundador,
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
