@@ -41,26 +41,21 @@ export default function LoginForm({ marca }: { marca: Marca }) {
 
   const revisarMayus = (e: KeyboardEvent<HTMLInputElement>) => setMayus(e.getModifierState('CapsLock'))
   const campo = 'w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
+  // Automatizaciones primero: es con lo que arranca todo cliente; Inventario es opcional (2026-10-03).
   const productos = [
-    { t: 'Inventario',       d: 'Stock, ventas, compras, facturas y márgenes reales' },
-    { t: 'Automatizaciones', d: 'Preguntas con IA, mensajes, despachos, guías y calificaciones de todas tus cuentas' },
+    { t: 'Automatizaciones', d: 'Preguntas con IA, mensajes, despachos con manifiesto, reporte de guías, calificaciones y stock de todas tus cuentas' },
+    { t: 'Inventario',       d: 'Opcional: stock, ventas, compras y la ganancia real de cada venta' },
     { t: 'Radar',            d: 'Qué se vende en MercadoLibre y dónde está la oportunidad' },
   ]
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-white">
 
-      {/* Panel de marca (en el celular se reduce a una franja arriba) */}
-      <aside className="relative overflow-hidden bg-neutral-950 text-white px-6 py-8 lg:px-14 lg:py-12 flex flex-col">
+      {/* Panel de marca (solo en pantallas grandes; sin logo: el dueño lo pidió, 2026-10-03) */}
+      <aside className="relative overflow-hidden bg-neutral-950 text-white px-14 py-12 hidden lg:flex flex-col">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 w-[34rem] h-[34rem] rounded-full border border-lime-400/15" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 w-[24rem] h-[24rem] rounded-full border border-lime-400/20" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 w-[14rem] h-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
-
-        <div className="relative flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={marca.logo} alt="" className={`h-11 w-11 ${marca.logoRedondo ? 'rounded-xl' : ''}`} />
-          <span className="text-lg font-semibold tracking-tight">{marca.nombre}</span>
-        </div>
 
         <div className="relative hidden lg:flex flex-col flex-1 justify-center max-w-md">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
