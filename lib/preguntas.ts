@@ -12,9 +12,10 @@ import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
+import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
-interface PreguntaML {
+export interface PreguntaML {
   id: number; item_id: string; status: string; text: string; date_created: string
   from?: { id?: number }
   answer?: { text: string; status: string; date_created: string } | null
@@ -25,7 +26,7 @@ interface BusquedaML { total: number; questions: PreguntaML[] }
 // que cualquier otro parser (JS) no falle.
 const fechaML = (s?: string | null) => s ? s.replace(/(\.\d{6})\d+/, '$1') : null
 
-async function guardar(db: Pool, conexionId: number, q: PreguntaML) {
+export async function guardarPregunta(db: Pool, conexionId: number, q: PreguntaML) {
   await db.query(
     `INSERT INTO ml_preguntas (id, conexion_id, item_id, texto, estado, fecha, comprador_id,
                                respuesta, respuesta_estado, respuesta_fecha, sincronizada_at)
@@ -112,7 +113,7 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
     try {
       const { rows: [{ n: antes }] } = await db.query(`SELECT COUNT(*)::int AS n FROM ml_preguntas WHERE conexion_id = $1`, [c.id])
       const pendientes = await buscar(db, c.id, 'UNANSWERED', 20)
-      for (const q of pendientes) await guardar(db, c.id, q)
+      for (const q of pendientes) await guardarPregunta(db, c.id, q)
 
       const vivas = new Set(pendientes.map(q => q.id))
       const { rows: viejas } = await db.query(
@@ -120,7 +121,7 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       for (const v of viejas) {
         if (vivas.has(Number(v.id))) continue
         try {
-          await guardar(db, c.id, await mlFetch<PreguntaML>(db, c.id, `/questions/${v.id}?api_version=4`))
+          await guardarPregunta(db, c.id, await mlFetch<PreguntaML>(db, c.id, `/questions/${v.id}?api_version=4`))
         } catch (e) {
           // Borrada del todo en ML: se marca para que no siga como pendiente.
           if ((e as { status?: number }).status === 404) {
@@ -130,7 +131,7 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       }
 
       if (!c.ultima_sync) {
-        for (const q of await buscar(db, c.id, 'ANSWERED', 20)) await guardar(db, c.id, q)
+        for (const q of await buscar(db, c.id, 'ANSWERED', 20)) await guardarPregunta(db, c.id, q)
       }
       // Las preguntas ya quedaron al día: se marca antes de lo opcional (títulos).
       await db.query(`UPDATE ml_conexiones SET ultima_sync = NOW(), ultimo_error = NULL WHERE id = $1`, [c.id])
@@ -167,7 +168,7 @@ import { leerPlantillas, plantillaAplica, condicionPlantilla, type Plantilla } f
 // ── Contexto para la IA ─────────────────────────────────────────────────────
 interface ItemML {
   id: string; title: string; price: number; currency_id: string; available_quantity: number
-  condition: string; status: string; permalink: string
+  condition: string; status: string; permalink: string; category_id?: string | null
   attributes?: { name: string; value_name: string | null }[]
   shipping?: { free_shipping?: boolean }
   warranty?: string | null
@@ -186,6 +187,8 @@ export interface Contexto {
   notas: string[]
   mismoItem: { p: string; r: string }[]
   parecidas: { p: string; r: string }[]
+  ficha: { texto: string; dudas: string | null } | null     // ficha de conocimiento de la publicación
+  otras: OtraPublicacion[]                                   // otras publicaciones del vendedor
 }
 
 export async function armarContexto(db: Pool, preguntaId: number, country: string): Promise<Contexto & { conexionId: number }> {
@@ -198,7 +201,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Con `attributes=` explícito: el GET completo lo puede frenar el PolicyAgent de ML.
   try {
     item = await mlFetch<ItemML>(db, q.conexion_id, `/items/${q.item_id}?attributes=` +
-      'id,title,price,currency_id,available_quantity,condition,status,permalink,attributes,shipping,warranty')
+      'id,title,price,currency_id,available_quantity,condition,status,permalink,category_id,attributes,shipping,warranty')
   } catch { /* sin datos de ML: la IA trabaja con el resto */ }
   try {
     const d = await mlFetch<{ plain_text?: string }>(db, q.conexion_id, `/items/${q.item_id}/description`)
@@ -221,21 +224,25 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
   const { rows: notas } = await db.query(
     `SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [q.item_id])
-  // Memoria de la IA = las últimas MEMORIA_POR_CUENTA respuestas de CADA cuenta (decisión
-  // del dueño: la logística y las políticas cambian; lo viejo deja de servir de ejemplo).
-  // El historial completo se conserva en la base, solo no se usa para imitar.
-  const memoria = `(SELECT id FROM (
-       SELECT id, row_number() OVER (PARTITION BY conexion_id ORDER BY fecha DESC) AS n
-       FROM ml_preguntas WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL) m
-     WHERE m.n <= ${MEMORIA_POR_CUENTA})`
+  // Memoria de la IA = TODAS las respuestas del vendedor (decisión del dueño, 2026-10-03; antes
+  // eran las últimas 1.000 por cuenta). Parecidas = se escribe parecido (trigramas) O comparte
+  // al menos 2 palabras en español con la pregunta ("conectar/conecta", "copiloto"…), ordenadas
+  // por cuántas comparte; a igual parecido, la más reciente (la logística y las políticas cambian).
   const { rows: mismo } = await db.query(
-    `SELECT texto AS p, respuesta AS r FROM ml_preguntas
-     WHERE item_id = $1 AND id <> $2 AND id IN ${memoria}
-     ORDER BY similarity(texto, $3) DESC, fecha DESC LIMIT 6`, [q.item_id, q.id, q.texto])
+    `${PALABRAS_CTE}
+     SELECT p.texto AS p, p.respuesta AS r FROM ml_preguntas p, qw, ${COMPARTIDAS}
+     WHERE p.item_id = $1 AND p.id <> $2 AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
+     ORDER BY x.n DESC, similarity(p.texto, $3) DESC, p.fecha DESC
+     LIMIT 8`, [q.item_id, q.id, q.texto])
   const { rows: parecidas } = await db.query(
-    `SELECT texto AS p, respuesta AS r FROM ml_preguntas
-     WHERE item_id <> $1 AND texto % $2 AND id IN ${memoria}
-     ORDER BY similarity(texto, $2) DESC, fecha DESC LIMIT 8`, [q.item_id, q.texto])
+    `${PALABRAS_CTE.split('$3').join('$2')}
+     SELECT p.texto AS p, p.respuesta AS r FROM ml_preguntas p, qw, ${COMPARTIDAS}
+     WHERE p.item_id <> $1 AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
+       AND (p.texto % $2 OR x.n >= LEAST(2, cardinality(qw.w)))
+     ORDER BY x.n DESC, similarity(p.texto, $2) DESC, p.fecha DESC
+     LIMIT 10`, [q.item_id, q.texto])
+  const { rows: [ficha] } = await db.query(`SELECT texto, dudas FROM ml_item_fichas WHERE item_id = $1`, [q.item_id])
+  const otras = await otrasPublicaciones(db, q.item_id, item?.title ?? q.item_titulo ?? '', q.texto).catch(() => [])
 
   return {
     conexionId: q.conexion_id,
@@ -248,11 +255,17 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     plantillas: leerPlantillas(pl?.value),
     notas: notas.map(n => n.texto),
     mismoItem: mismo, parecidas,
+    ficha: ficha ?? null, otras,
   }
 }
 
+// Palabras (raíces en español, sin "de/la/para…") de la pregunta, y cuántas comparte cada
+// respuesta guardada: "¿se conecta con otro igual?" → {conect, otro, igual}.
+const PALABRAS_CTE = `WITH qw AS (SELECT tsvector_to_array(to_tsvector('spanish', $3)) AS w)`
+const COMPARTIDAS = `LATERAL (SELECT COUNT(*)::int AS n FROM unnest(tsvector_to_array(to_tsvector('spanish', p.texto))) t
+                              WHERE t = ANY(qw.w)) x`
+
 // ── Borrador con Claude ─────────────────────────────────────────────────────
-export const MEMORIA_POR_CUENTA = 1000
 
 export { MODELO_IA as MODELO_PREGUNTAS, iaConfigurada } from '@/lib/ia'
 
@@ -261,10 +274,13 @@ const SISTEMA = `Eres quien responde las preguntas de los compradores en las pub
 Cómo responder:
 - Español de Venezuela, cordial y breve (1 a 3 frases). Saluda corto ("¡Hola!") y cierra corto si el vendedor suele hacerlo.
 - Copia el tono, las frases y las políticas de las RESPUESTAS ANTERIORES DEL VENDEDOR: son su voz real. Adáptalas, no las inventes de cero.
-- Usa SOLO los datos que te doy: ficha y descripción de la publicación, stock real, políticas y notas. El stock de la publicación en MercadoLibre no es confiable: manda el STOCK REAL del sistema.
-- Si el stock real es 0, no digas que hay disponible.
+- Usa SOLO los datos que te doy: ficha y descripción de la publicación, FICHA DE CONOCIMIENTO, stock, políticas y notas.
+- Disponibilidad: si hay STOCK REAL del sistema, manda ese (si es 0, no digas que hay disponible). Si la publicación no está vinculada al sistema, guíate por la publicación: activa y con unidades = disponible (como responde siempre el vendedor); pausada o sin unidades = no lo afirmes.
+- Si la publicación no tiene lo que pide el comprador y en OTRAS PUBLICACIONES DEL VENDEDOR hay una que sí lo cumple (según su título o su ficha), recomiéndala como lo hace el vendedor: dile que esta no, que la otra sí, y pon el link de esa publicación tal cual. Si ninguna cumple con certeza, no recomiendes nada.
 - Nunca inventes medidas, compatibilidades, garantías, precios ni tiempos de envío. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
-- Prohibido: links, páginas web, correos, teléfonos, redes sociales, "escríbeme al…". MercadoLibre borra esas respuestas.
+- Prohibido: links (salvo el de otra publicación del vendedor, tal cual viene en OTRAS PUBLICACIONES), páginas web, correos, teléfonos, redes sociales, "escríbeme al…". MercadoLibre borra esas respuestas.
+- En Venezuela MercadoLibre no tiene carrito de compras: no lo menciones.
+- "falta_dato": una frase corta (máximo 25 palabras) para el vendedor.
 - No prometas descuentos ni cosas fuera de las políticas.
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
@@ -292,7 +308,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   if (c.producto) {
     L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)
   } else {
-    L.push('\nSTOCK REAL: esta publicación no está vinculada a un producto del sistema (no afirmes disponibilidad sin verla).')
+    L.push(`\nSTOCK REAL: esta publicación no está vinculada a un producto del sistema. En MercadoLibre: ${c.item ? `${c.item.status === 'active' ? 'activa' : c.item.status}, ${c.item.available_quantity} unidades` : 'no se pudo leer'}.`)
   }
   if (c.politicas.trim()) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${c.politicas.trim()}`)
   const precio = pml && pml.moneda === 'USD' ? pml.precio : null
@@ -303,6 +319,14 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
       aplican.map(p => `- [${p.titulo}] (${condicionPlantilla(p)}): ${p.texto}`).join('\n'))
   }
   if (c.notas.length) L.push(`\nDATOS QUE EL VENDEDOR ANOTÓ DE ESTA PUBLICACIÓN:\n- ${c.notas.join('\n- ')}`)
+  if (c.ficha) L.push(`\nFICHA DE CONOCIMIENTO (lo que el vendedor ya respondió de esta publicación, resumido):\n${c.ficha.texto}`)
+  if (c.otras.length) {
+    L.push('\nOTRAS PUBLICACIONES DEL VENDEDOR (activas y con stock; solo para recomendar si esta no cumple):')
+    for (const o of c.otras) {
+      L.push(`- ${o.titulo} · ${o.precio ?? '?'} ${o.moneda ?? ''} · ${o.disponible} disp. · link: ${o.permalink ?? '—'}` +
+        (o.ficha ? `\n  Ficha: ${o.ficha.slice(0, 400)}` : ''))
+    }
+  }
   const par = (xs: { p: string; r: string }[]) => xs.map(x => `P: ${x.p}\nR: ${x.r}`).join('\n\n')
   if (c.mismoItem.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR EN ESTA MISMA PUBLICACIÓN:\n${par(c.mismoItem)}`)
   if (c.parecidas.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR A PREGUNTAS PARECIDAS (otras publicaciones):\n${par(c.parecidas)}`)
@@ -345,18 +369,14 @@ export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador
 export interface SugerenciaPregunta { pregunta: string; respuesta: string; parecido: number; mismaPublicacion: boolean; titulo: string | null }
 
 /** Hasta 3 respuestas propias a preguntas parecidas (las de la misma publicación pesan más),
- *  de la misma memoria que usa la IA. Sin repetir respuestas. */
+ *  de TODAS las respondidas (la misma memoria que usa la IA). Sin repetir respuestas. */
 export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise<SugerenciaPregunta[]> {
   const { rows } = await db.query(
-    `WITH q AS (SELECT id, item_id, texto FROM ml_preguntas WHERE id = $1),
-          memoria AS (SELECT id FROM (
-            SELECT id, row_number() OVER (PARTITION BY conexion_id ORDER BY fecha DESC) AS n
-            FROM ml_preguntas WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL) m
-          WHERE m.n <= ${MEMORIA_POR_CUENTA})
+    `WITH q AS (SELECT id, item_id, texto FROM ml_preguntas WHERE id = $1)
      SELECT p.texto AS pregunta, p.respuesta, similarity(p.texto, q.texto)::float AS parecido,
             p.item_id = q.item_id AS "mismaPublicacion", p.item_titulo AS titulo
      FROM ml_preguntas p, q
-     WHERE p.id <> q.id AND p.id IN (SELECT id FROM memoria)
+     WHERE p.id <> q.id AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
        AND (p.texto % q.texto OR (p.item_id = q.item_id AND similarity(p.texto, q.texto) > 0.15))
      ORDER BY similarity(p.texto, q.texto) + CASE WHEN p.item_id = q.item_id THEN 0.15 ELSE 0 END DESC, p.fecha DESC
      LIMIT 30`, [preguntaId])

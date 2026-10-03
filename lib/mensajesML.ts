@@ -280,14 +280,20 @@ export async function sugerenciasMensaje(db: Pool, pack: string, limite = 3): Pr
     return { consulta, sugerencias: [] }
   }
   const { rows: pares } = await db.query(
-    `SELECT b.texto AS pregunta, r.texto AS respuesta, similarity(b.texto, $1)::float AS parecido
-     FROM ml_mensajes b
+    // Parecido = se escribe parecido (trigramas) o comparte al menos 2 palabras en español con lo
+    // que escribió el comprador ("llega/llegó", "guía"…); primero las que comparten más.
+    `WITH qw AS (SELECT tsvector_to_array(to_tsvector('spanish', $1)) AS w)
+     SELECT b.texto AS pregunta, r.texto AS respuesta, similarity(b.texto, $1)::float AS parecido
+     FROM ml_mensajes b CROSS JOIN qw
+     JOIN LATERAL (SELECT COUNT(*)::int AS n FROM unnest(tsvector_to_array(to_tsvector('spanish', b.texto))) t
+                   WHERE t = ANY(qw.w)) x ON TRUE
      JOIN LATERAL (
        SELECT texto FROM ml_mensajes r
        WHERE r.pack_id = b.pack_id AND r.propio AND r.fecha > b.fecha AND r.fecha < b.fecha + INTERVAL '3 days'
        ORDER BY r.fecha LIMIT 1) r ON TRUE
-     WHERE NOT b.propio AND b.pack_id <> $2 AND b.texto % $1 AND r.texto !~* $3
-     ORDER BY parecido DESC LIMIT 30`, [consulta, pack, AUTOMATICOS])
+     WHERE NOT b.propio AND b.pack_id <> $2 AND (b.texto % $1 OR x.n >= LEAST(2, cardinality(qw.w)))
+       AND r.texto !~* $3
+     ORDER BY x.n DESC, parecido DESC LIMIT 30`, [consulta, pack, AUTOMATICOS])
   const vistas = new Set<string>()
   const sugerencias: Sugerencia[] = []
   for (const x of pares) {

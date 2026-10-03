@@ -33,7 +33,7 @@ export async function umbralStock(db: Pool) {
 }
 
 /** Ids de las publicaciones de un estado (scan: sin el tope de 1.000 de la búsqueda normal). */
-async function idsDe(db: Pool, conexionId: number, sellerId: number, estado: 'active' | 'paused') {
+export async function idsDe(db: Pool, conexionId: number, sellerId: number, estado: 'active' | 'paused') {
   const ids: string[] = []
   let scroll: string | null = null
   for (let vuelta = 0; vuelta < 200; vuelta++) {

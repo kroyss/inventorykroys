@@ -1,11 +1,13 @@
 // Llamadas a Claude (Preguntas y Mensajes) y registro de lo que cuesta cada una.
 //
-// Precios por millón de tokens (USD). Haiku 4.5: $1 entrada / $5 salida; leer de la caché
-// cuesta 0,1× y escribirla 1,25× la entrada; cada búsqueda web, $0,01. Si se cambia el
-// modelo por env (PREGUNTAS_MODELO) y no está en la tabla, se calcula como Haiku.
+// Precios por millón de tokens (USD). Sonnet 5.5: $3 entrada / $15 salida; Haiku 4.5: $1 / $5;
+// leer de la caché cuesta 0,1× y escribirla 1,25× la entrada; cada búsqueda web, $0,01.
+// Modelo: Sonnet desde 2026-10-03 (prueba con 22 preguntas reales: Haiku inventó en 5 —puertos
+// que el producto no tiene, carrito de compras, disponibilidad de una pausada—; Sonnet en ninguna).
+// Se puede cambiar por env (PREGUNTAS_MODELO); si no está en la tabla, se calcula como Sonnet.
 import type { Pool } from 'pg'
 
-export const MODELO_IA = process.env.PREGUNTAS_MODELO ?? 'claude-haiku-4-5-20251001'
+export const MODELO_IA = process.env.PREGUNTAS_MODELO ?? 'claude-sonnet-5-5'
 export const iaConfigurada = () => !!process.env.ANTHROPIC_API_KEY
 
 const PRECIOS: Record<string, { entrada: number; salida: number }> = {
@@ -20,13 +22,13 @@ export interface UsoIA {
 }
 
 export function costoDe(modelo: string, u: UsoIA) {
-  const p = PRECIOS[modelo] ?? PRECIOS['claude-haiku-4-5-20251001']
+  const p = PRECIOS[modelo] ?? PRECIOS['claude-sonnet-5-5']
   const entrada = (u.input_tokens ?? 0) + 1.25 * (u.cache_creation_input_tokens ?? 0) + 0.1 * (u.cache_read_input_tokens ?? 0)
   return (entrada * p.entrada + (u.output_tokens ?? 0) * p.salida) / 1e6 + 0.01 * (u.server_tool_use?.web_search_requests ?? 0)
 }
 
 /** Guarda una llamada a la IA (no hace fallar nada si no se puede guardar). */
-export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes', modelo: string, u: UsoIA, usuarioId?: number | string | null) {
+export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 'fichas', modelo: string, u: UsoIA, usuarioId?: number | string | null) {
   try {
     await db.query(
       `INSERT INTO ia_uso (modulo, modelo, entrada, salida, busquedas, costo, usuario_id)
@@ -58,7 +60,8 @@ export async function llamarClaude<T>(o: {
       // Las instrucciones son siempre iguales: se cachean (más barato si hay varias seguidas).
       system: [{ type: 'text', text: o.sistema, cache_control: { type: 'ephemeral' } }],
       tools,
-      tool_choice: o.web ? { type: 'auto' } : { type: 'tool', name: o.herramienta.name },
+      // Sonnet 5.5 no acepta forzar la herramienta: va en auto (las instrucciones piden usarla siempre).
+      tool_choice: o.web || !MODELO_IA.includes('haiku') ? { type: 'auto' } : { type: 'tool', name: o.herramienta.name },
       messages: [{ role: 'user', content: o.contenido }],
     }),
     cache: 'no-store',

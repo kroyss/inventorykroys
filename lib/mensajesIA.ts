@@ -7,6 +7,7 @@ import type { Pool } from 'pg'
 import { llamarClaude, type UsoIA } from '@/lib/ia'
 import { itemsDeVenta, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
 import { leerNotas } from '@/lib/notasML'
+import { mlFetch } from '@/lib/ml'
 
 const ESTADO_VENTA: Record<string, string> = {
   BORRADOR: 'cargada en el sistema, pago todavía sin verificar',
@@ -23,6 +24,8 @@ Cómo responder:
 - Responde a lo ÚLTIMO que escribió el comprador, teniendo en cuenta toda la conversación, la nota de la venta y su estado.
 - Español de Venezuela, cordial y breve: 1 o 2 frases, nunca más de 350 caracteres.
 - Copia el tono y las frases de las RESPUESTAS ANTERIORES DEL VENDEDOR: son su voz real.
+- Para dudas del producto (cómo se usa, qué incluye, compatibilidad) usa su FICHA, DESCRIPCIÓN y FICHA DE CONOCIMIENTO.
+- En Venezuela MercadoLibre no tiene carrito de compras: no lo menciones.
 - Usa SOLO los datos que te doy. Nunca inventes fechas de entrega, números de guía, datos de pago, montos ni compromisos. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
 - Si hay GUÍA de envío, puedes darla. Si no la hay, no digas que ya se envió.
 - Si el comprador solo saluda o agradece, responde corto y amable.
@@ -46,8 +49,10 @@ const HERRAMIENTA = {
 
 export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null }
 
-export async function borradorMensaje(db: Pool, conexionId: number, sellerId: number, pack: string, country: string)
-  : Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
+// conInventario = false: la empresa trabaja "todo desde MercadoLibre" (sin ventas cargadas): el
+// estado sale de la venta en ML y NO se le dice a la IA que "no está cargada" (sería falso).
+export async function borradorMensaje(db: Pool, conexionId: number, sellerId: number, pack: string, country: string,
+  conInventario = true): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
   const [hilo, venta, notas, ejemplos] = await Promise.all([
     leerHilo(db, conexionId, pack, sellerId, false),
     itemsDeVenta(db, conexionId, pack).catch(() => null),
@@ -69,9 +74,27 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
       L.push(`- ${it.cantidad} × ${it.titulo}${s ? ` (stock real en el sistema: ${s.stock})` : ''}`)
     }
   }
+  // Producto: ficha técnica (catálogo), descripción (ML) y ficha de conocimiento (lo que el
+  // vendedor ya respondió). Para preguntas post-venta de uso, contenido o compatibilidad.
+  for (const it of (venta?.items ?? []).slice(0, 3)) {
+    const { rows: [cat] } = await db.query(`SELECT ficha FROM ml_catalogo WHERE item_id = $1`, [it.id])
+    const { rows: [fc] } = await db.query(`SELECT texto FROM ml_item_fichas WHERE item_id = $1`, [it.id])
+    const desc = await mlFetch<{ plain_text?: string }>(db, conexionId, `/items/${it.id}/description`)
+      .then(d => d.plain_text?.trim() || null).catch(() => null)
+    if (!cat?.ficha && !fc?.texto && !desc) continue
+    L.push(`\nPRODUCTO "${it.titulo}":`)
+    if (cat?.ficha) L.push(`Ficha: ${cat.ficha}`)
+    if (desc) L.push(`Descripción: ${desc.slice(0, 2500)}`)
+    if (fc?.texto) L.push(`Ficha de conocimiento (lo que el vendedor ya respondió de este producto):\n${fc.texto}`)
+  }
   if (venta?.comprador.nombre || venta?.comprador.nick) L.push(`COMPRADOR: ${[venta.comprador.nombre, venta.comprador.nick].filter(Boolean).join(' · ')}`)
   const { rows: [s] } = await db.query(`SELECT status, notes FROM sales WHERE ml_order_number = $1`, [pack])
-  L.push(s ? `ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada (el pago no se ha registrado).')
+  if (conInventario) {
+    L.push(s ? `ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada (el pago no se ha registrado).')
+  } else {
+    const { rows: [o] } = await db.query(`SELECT estado FROM ml_ordenes WHERE id::text = $1 OR pack_id::text = $1 LIMIT 1`, [pack])
+    if (o?.estado === 'cancelled') L.push('ESTADO DE LA VENTA: cancelada en MercadoLibre.')
+  }
   if (country === 'VE') {
     const { rows: [g] } = await db.query(
       `SELECT e.carrier, COALESCE(e.guia_final, e.guia) AS guia, j.status AS jornada, j.closed_at

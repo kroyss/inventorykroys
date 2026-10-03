@@ -3,6 +3,9 @@ import { conEmpresa, dbEmpresa, dbGlobal } from '@/lib/db'
 import { revisarStockPendiente } from '@/lib/alertasStock'
 import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
+import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
+import { generarFichasPendientes } from '@/lib/fichasIA'
+import { iaConfigurada } from '@/lib/ia'
 import { mlConfigurado } from '@/lib/ml'
 import type { Country } from '@/lib/types'
 
@@ -39,6 +42,20 @@ export async function GET(req: NextRequest) {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
       } catch (err) {
         console.error('[alertas stock]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Contexto de la IA (lib/catalogoML.ts, lib/fichasIA.ts): catálogo cada 6 h por cuenta, el
+    // historial completo de a pocas publicaciones y las fichas de conocimiento de a 2 por pasada.
+    for (const e of empresas) {
+      try {
+        await conEmpresa(e.id, e.country as Country, async db => {
+          const { rows: cuentas } = await db.query(`SELECT id FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
+          for (const c of cuentas) await actualizarCatalogo(db, c.id)
+          await importarHistorial(db)
+          if (iaConfigurada()) await generarFichasPendientes(db)
+        })
+      } catch (err) {
+        console.error('[contexto IA]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Limpieza de PDF viejos de Despachos: una vez al día (la primera pasada que lo logra marcar).
