@@ -9,7 +9,7 @@ import FormularioFundadores from '@/components/fundadores/FormularioFundadores'
 
 export const metadata = {
   title: 'Programa Fundadores',
-  description: '10 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis, configuración y adiestramiento sin costo.',
+  description: '15 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis, configuración y adiestramiento sin costo.',
 }
 
 // Lo que reciben los Fundadores además del mes gratis.
@@ -33,7 +33,7 @@ const INCLUYE = [
 ]
 
 // Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas
-// (5 + 5 = 10 pioneros) y el formulario. Lo de la base se lee en cada visita.
+// (5 + 10 = 15 pioneros; los cupos salen de fundadores_tandas) y el formulario. Lo de la base se lee en cada visita.
 // ?vista=previa: muestra el formulario aunque la inscripción esté cerrada, sin poder enviarlo
 // (para revisar cómo quedan las preguntas).
 export default async function FundadoresPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
@@ -46,6 +46,10 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
      FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
   const total = tandas.reduce((a, t) => a + t.cupos, 0)
   const tomados = tandas.reduce((a, t) => a + Math.min(t.tomados, t.cupos), 0)
+  // "en dos rondas de 5" si son iguales; "en dos rondas (5 y 10)" si no.
+  const cupos = tandas.map(t => t.cupos)
+  const rondas = `${tandas.length === 2 ? 'dos' : tandas.length} rondas`
+  const reparto = cupos.every(c => c === cupos[0]) ? `${rondas} de ${cupos[0]}` : `${rondas} (${cupos.join(' y ')})`
   const anio = new Date().getFullYear()
   const hoy = currentDate(TZ_FUNDADORES)
   const abiertaHoy = tandaInscribiendo(tandas, hoy)
@@ -66,11 +70,11 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               Programa Fundadores <span className="text-neutral-500">·</span> El Comerciante Digital
             </p>
             <h1 className="mt-3 text-4xl sm:text-5xl font-semibold leading-[1.1] tracking-tight">
-              Sé uno de los <span className="text-lime-400">10 primeros.</span>
+              Sé uno de los <span className="text-lime-400">{total} primeros.</span>
             </h1>
             <p className="mt-4 text-neutral-400 leading-relaxed">
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a
-              10 vendedores con movimiento real, en dos rondas de 5, con <b className="text-white">un mes gratis</b> para
+              {total} vendedores con movimiento real, en {reparto}, con <b className="text-white">un mes gratis</b> para
               usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos de inscripción</b> y la selección
               se anuncia al día siguiente. Después decides si te quedas.
             </p>
