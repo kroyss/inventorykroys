@@ -28,7 +28,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <main className="max-w-7xl mx-auto px-4 py-6">
         {children}
       </main>
-      <footer className="max-w-7xl mx-auto px-4 pt-2 pb-24 md:pb-6 text-center text-xs text-neutral-400">
+      <footer className="max-w-7xl mx-auto px-4 pt-2 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 text-center text-xs text-neutral-400">
         © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados
       </footer>
       <BottomNav role={role} country={country} modulos={modulos} />

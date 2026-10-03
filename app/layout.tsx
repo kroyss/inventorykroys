@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Providers from '@/components/Providers'
@@ -6,6 +6,10 @@ import { connection } from 'next/server'
 import { marca } from '@/lib/marca'
 
 const inter = Inter({ subsets: ['latin'] })
+
+// viewportFit 'cover': la página llega hasta el borde del iPhone y la barra inferior del celular
+// se corre sola por encima del gesto de inicio (env(safe-area-inset-bottom) en BottomNav).
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#ffffff' }
 
 // Metadatos según la marca de la instalación (lib/marca.ts). connection(): se resuelven
 // por request, no al compilar (la MARCA la fija cada contenedor en tiempo de ejecución).
