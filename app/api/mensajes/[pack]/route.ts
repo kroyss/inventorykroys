@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { OrigenRespuesta, registrarOrigen } from '@/lib/respuestasOrigen'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML } from '@/lib/ml'
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
 }
 
 const Body = z.object({ texto: z.string().trim().min(1, 'Escribe un mensaje').max(350), dejarSinLeer: z.boolean().optional() })
+  .merge(OrigenRespuesta)
 const MAX_MB = 15
 const EXT_OK = /\.(jpe?g|png|pdf|txt)$/i
 
@@ -53,10 +55,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
     let raw: unknown, archivos: File[] = []
     if ((req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
       const form = await req.formData()
-      raw = { texto: form.get('texto') ?? '' }
+      raw = { texto: form.get('texto') ?? '', fuente: form.get('fuente') ?? undefined, base: form.get('base') ?? undefined }
       archivos = form.getAll('archivo').filter((f): f is File => f instanceof File && f.size > 0)
     } else raw = await req.json()
-    const { texto, dejarSinLeer } = Body.parse(raw)
+    const { texto, dejarSinLeer, fuente, base } = Body.parse(raw)
     if (archivos.length > 5) return NextResponse.json({ error: 'Máximo 5 archivos por mensaje' }, { status: 400 })
     for (const f of archivos) {
       if (!EXT_OK.test(f.name)) return NextResponse.json({ error: `"${f.name}": solo fotos JPG/PNG, PDF o TXT` }, { status: 400 })
@@ -70,6 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
       const ids: string[] = []
       for (const f of archivos) ids.push(await subirAdjunto(s.db, c.conexion_id, f))
       const h = await responderHilo(s.db, c.conexion_id, pack, texto, dejarSinLeer, ids)
+      await registrarOrigen(s.db, { modulo: 'mensajes', ref: pack, fuente, base, texto, usuarioId: s.session.user.id })
       return NextResponse.json({ cuenta: c.nickname, ...h })
     } catch (e) {
       if (e instanceof ErrorML) return NextResponse.json({ error: e.message, detalle: e.datos }, { status: 502 })

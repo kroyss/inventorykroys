@@ -106,7 +106,7 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
   ANSWERED: { status: 'FINALIZADA', label: 'Respondida' },
   CLOSED_UNANSWERED: { status: 'INCONSISTENTE', label: 'Cerrada sin respuesta' },
   BANNED: { status: 'INCONSISTENTE', label: 'Bloqueada por ML' },
-  DELETED: { status: 'INACTIVO', label: 'Borrada' },
+  DELETED: { status: 'INACTIVO', label: 'Eliminada' },
   DISABLED: { status: 'INACTIVO', label: 'Deshabilitada' },
   UNDER_REVIEW: { status: 'PAGO_VERIFICADO', label: 'En revisión de ML' },
 }
@@ -242,6 +242,11 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
 }) {
   const confirm = useConfirm()
   const [texto, setTexto] = useState(p.borrador ?? '')
+  // De dónde salió el texto (se guarda al publicar, migración 062): IA, parecida, rápida o propia.
+  const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'propia'; base: string }>(
+    p.borrador ? { fuente: 'ia', base: p.borrador } : { fuente: 'propia', base: '' })
+  const usar = (t: string, fuente: 'ia' | 'parecida' | 'rapida') => { setTexto(t); setOrigen({ fuente, base: t }) }
+  const [eliminando, setEliminando] = useState(false)
   const [meta, setMeta] = useState({ confianza: p.borrador_confianza, falta: p.borrador_falta, web: p.borrador_web })
   const [pidiendo, setPidiendo] = useState<null | 'normal' | 'web'>(null)
   const [enviando, setEnviando] = useState(false)
@@ -265,7 +270,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'La IA no respondió'); return }
-      setTexto(d.borrador.respuesta)
+      usar(d.borrador.respuesta, 'ia')
       setMeta({ confianza: d.borrador.confianza, falta: d.borrador.falta_dato, web: d.borrador.web })
       avisarUsoIA()
     } finally { setPidiendo(null) }
@@ -281,7 +286,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
     setEnviando(true); setError(null)
     try {
       const r = await fetch(`/api/preguntas/${p.id}/responder`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, ...origen }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
@@ -289,6 +294,24 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         ? { tipo: 'ok', texto: `Respuesta publicada en ${p.cuenta}.` }
         : { tipo: 'error', texto: d.aviso ?? 'MercadoLibre no confirmó la publicación' })
     } finally { setEnviando(false) }
+  }
+
+  const eliminar = async () => {
+    const ok = await confirm({
+      title: 'Eliminar pregunta',
+      message: `Se eliminará de la publicación en MercadoLibre (cuenta ${p.cuenta}). No se puede deshacer.
+
+"${p.texto}"`,
+      confirmText: 'Eliminar', danger: true,
+    })
+    if (!ok) return
+    setEliminando(true); setError(null)
+    try {
+      const r = await fetch(`/api/preguntas/${p.id}`, { method: 'DELETE' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(d.error ?? 'No se pudo eliminar'); return }
+      onRespondida({ tipo: 'ok', texto: `Pregunta eliminada de ${p.cuenta}.` })
+    } finally { setEliminando(false) }
   }
 
   const guardarNota = async () => {
@@ -334,7 +357,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
       </div>
 
       <Sugerencias lista={sugerencias} etiqueta="Parecidas:"
-        onUsar={t => { setTexto(t); setMeta({ confianza: null, falta: null, web: false }) }} />
+        onUsar={t => { usar(t, 'parecida'); setMeta({ confianza: null, falta: null, web: false }) }} />
 
       {plantillas.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -343,7 +366,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
             const aplica = plantillaAplica(pl, precioUSD(p))
             const condicionada = pl.precio_desde != null || pl.precio_hasta != null
             return (
-              <button key={i} type="button" onClick={() => { setTexto(pl.texto); setMeta({ confianza: null, falta: null, web: false }) }}
+              <button key={i} type="button" onClick={() => { usar(pl.texto, 'rapida'); setMeta({ confianza: null, falta: null, web: false }) }}
                 title={`${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
                 className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   aplica && condicionada ? 'bg-lime-50 border-lime-300 text-lime-900 hover:bg-lime-100'
@@ -370,6 +393,14 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
           title="Un dato de esta publicación que la IA debe saber la próxima vez">
           Anotar dato del producto
         </button>
+        <button onClick={eliminar} disabled={eliminando} className="btn-ghost text-sm text-red-600 hover:text-red-700"
+          title="Para preguntas imprudentes u ofensivas: la quita de la publicación en MercadoLibre">
+          {eliminando ? 'Eliminando…' : 'Eliminar'}
+        </button>
+        <a href={`https://www.mercadolibre.com.ve/preguntas/vendedor`} target="_blank" rel="noreferrer" className="btn-ghost text-sm"
+          title="MercadoLibre ya no deja bloquear desde otras apps: se abre tu bandeja de preguntas en ML, ahí usa ⋮ → Bloquear comprador">
+          Bloquear en ML ↗
+        </a>
         <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm ml-auto">
           {enviando ? 'Publicando…' : 'Publicar respuesta'}
         </button>

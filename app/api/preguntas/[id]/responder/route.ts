@@ -4,8 +4,9 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { problemasDelTexto } from '@/lib/preguntas'
+import { OrigenRespuesta, registrarOrigen } from '@/lib/respuestasOrigen'
 
-const Body = z.object({ texto: z.string().min(1).max(2000) })
+const Body = z.object({ texto: z.string().min(1).max(2000) }).merge(OrigenRespuesta)
 
 interface PreguntaML { status: string; answer?: { text: string; status: string; date_created: string } | null }
 
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'Pregunta inválida' }, { status: 400 })
 
   try {
-    const { texto } = Body.parse(await req.json())
+    const { texto, fuente, base } = Body.parse(await req.json())
     const problemas = problemasDelTexto(texto)
     if (problemas.length) {
       return NextResponse.json({ error: 'MercadoLibre rechazaría esta respuesta', problemas }, { status: 422 })
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       [id, v.status, v.answer?.text ?? texto.trim(), v.answer?.status ?? null,
        v.answer?.date_created?.replace(/(\.\d{6})\d+/, '$1') ?? new Date().toISOString(), Number(s.session.user.id)])
     const publicada = v.status === 'ANSWERED' && v.answer?.status === 'ACTIVE'
+    await registrarOrigen(s.db, { modulo: 'preguntas', ref: id, fuente, base, texto, usuarioId: s.session.user.id })
     return NextResponse.json({
       publicada, estado: v.status, respuesta_estado: v.answer?.status ?? null,
       aviso: publicada ? null : `MercadoLibre la dejó en "${v.answer?.status ?? v.status}": revísala en MercadoLibre.`,

@@ -91,6 +91,8 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
   const [items, setItems] = useState<{ id: string; titulo: string; cantidad: number; link: string | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [texto, setTexto] = useState('')
+  // De dónde salió el texto (se guarda al enviar, migración 062).
+  const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'propia'; base: string }>({ fuente: 'propia', base: '' })
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [archivos, setArchivos] = useState<File[]>([])
@@ -113,7 +115,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       const r = await fetch(`/api/mensajes/${c.pack_id}/borrador`, { method: 'POST' })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'La IA no respondió'); return }
-      setTexto(d.borrador.respuesta)
+      setTexto(d.borrador.respuesta); setOrigen({ fuente: 'ia', base: d.borrador.respuesta })
       setMeta({ confianza: d.borrador.confianza, falta: d.borrador.falta_dato })
       avisarUsoIA()
     } finally { setPensando(false) }
@@ -158,15 +160,17 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       if (archivos.length) {
         const form = new FormData()
         form.append('texto', texto)
+        form.append('fuente', origen.fuente)
+        form.append('base', origen.base)
         archivos.forEach(f => form.append('archivo', f, f.name))
         init = { method: 'POST', body: form }
       } else {
-        init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) }
+        init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, ...origen }) }
       }
       const r = await fetch(`/api/mensajes/${c.pack_id}`, init)
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
-      setMensajes(d.mensajes); setTexto(''); setArchivos([]); setMeta(null); setSugerencias([]); onCambio()
+      setMensajes(d.mensajes); setTexto(''); setOrigen({ fuente: 'propia', base: '' }); setArchivos([]); setMeta(null); setSugerencias([]); onCambio()
       const ultimo = (d.mensajes as Mensaje[]).filter(m => m.propio).pop()
       if (ultimo?.moderacion && ultimo.moderacion !== 'clean') setError(`MercadoLibre moderó el mensaje (${ultimo.moderacion})`)
     } finally { setEnviando(false) }
@@ -239,7 +243,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
       </div>
       <footer className="border-t border-neutral-100 p-3 space-y-2">
         {ultimoEsComprador && !texto.trim() && (
-          <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setMeta(null) }} />
+          <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setOrigen({ fuente: 'parecida', base: t }); setMeta(null) }} />
         )}
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && texto.trim() && !problemas.length) enviar() }}
