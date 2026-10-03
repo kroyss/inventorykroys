@@ -66,8 +66,7 @@ export const PREGUNTAS: Pregunta[] = [
     ],
   },
   {
-    campo: 'compromiso', texto: '¿Te interesaría llevar también tu inventario en el sistema?',
-    ayuda: 'Tus ventas de MercadoLibre entran solas al conectar tu cuenta. El inventario es opcional.',
+    campo: 'compromiso', texto: '¿Te interesaría llevar tu inventario en el sistema?',
     opciones: [
       { valor: 'inicio', texto: 'Sí, desde el inicio', puntos: 0 },
       { valor: 'despues', texto: 'Más adelante, primero quiero probar las herramientas', puntos: 0 },
