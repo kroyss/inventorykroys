@@ -14,6 +14,31 @@ function navegadorId() {
   } catch { return undefined }
 }
 
+/** Anota un paso del embudo (vista / empezó / envió) con el origen de la visita. Sin esperar
+ *  respuesta: si falla, no afecta nada. La vista previa (?vista=previa) no se cuenta. */
+function medir(evento: 'vista' | 'empezo' | 'enviado') {
+  try {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('vista') === 'previa') return
+    const id = navegadorId()
+    if (!id) return
+    // El origen de la PRIMERA visita queda guardado: si vuelve más tarde por el link directo,
+    // sigue contando para el anuncio que lo trajo.
+    let o: { utm_source?: string; utm_campaign?: string; referrer?: string } = {}
+    const guardado = localStorage.getItem('ecd_origen')
+    if (guardado) o = JSON.parse(guardado)
+    else {
+      o = { utm_source: q.get('utm_source') ?? undefined, utm_campaign: q.get('utm_campaign') ?? undefined,
+            referrer: document.referrer || undefined }
+      localStorage.setItem('ecd_origen', JSON.stringify(o))
+    }
+    fetch('/api/fundadores', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ navegador_id: id, evento, ...o }),
+    }).catch(() => {})
+  } catch { /* sin localStorage: no se mide */ }
+}
+
 interface Props {
   abierta: boolean            // hoy cae en los días de inscripción de una tanda
   previa?: boolean            // /fundadores?vista=previa: se ve el formulario completo pero no se envía
@@ -40,6 +65,12 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
     if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [paso])
   useEffect(() => () => clearTimeout(avance.current), [])
+  useEffect(() => { medir('vista') }, [])
+  // "Empezó" = respondió la primera pregunta.
+  const empezo = useRef(false)
+  useEffect(() => {
+    if (!empezo.current && Object.keys(resp).length > 0) { empezo.current = true; medir('empezo') }
+  }, [resp])
 
   const ir = (n: number) => { clearTimeout(avance.current); setError(null); setPaso(Math.max(0, Math.min(PASOS - 1, n))) }
 
@@ -77,6 +108,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'No se pudo enviar. Intenta de nuevo.'); return }
+      medir('enviado')
       setHecho({ nombre: body.nombre.trim().split(' ')[0], telegram: body.telegram.trim().replace(/^@/, ''), repetida: !!d.repetida })
     } finally { setEnviando(false) }
   }

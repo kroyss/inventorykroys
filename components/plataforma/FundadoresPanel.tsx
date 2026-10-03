@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import VisitasFundadores from './VisitasFundadores'
 import { PREGUNTAS, PUNTO_NICK, type Pregunta } from '@/lib/fundadores'
 
 interface Tanda { numero: number; cupos: number; abierta: boolean; inscribe_desde: string | null; inscribe_hasta: string | null; tomados: number }
@@ -167,6 +168,8 @@ export default function FundadoresPanel() {
           </div>
         ))}
       </div>
+
+      <VisitasFundadores />
 
       <div className="flex flex-wrap gap-1.5">
         {(['calificado', 'aprobado', 'rechazado', 'descartado', 'todas', 'radar'] as const).map(f => (

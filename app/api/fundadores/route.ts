@@ -11,6 +11,7 @@ import {
 
 // Programa Fundadores (PÚBLICO, sin login; el proxy no protege /api).
 //   GET  → estado de las tandas (cupos y cuántos ya entraron), para la página.
+//   PATCH → visita (vista / empezó el formulario / envió), para medir el embudo (migración 061).
 //   POST → solicitud. Solo en los días de inscripción de una tanda (hora Caracas). La respuesta es SIEMPRE la misma para el vendedor (calificado o no):
 //          así nadie sabe qué respuesta lo dejó afuera ni prueba de nuevo con otra.
 
@@ -122,6 +123,57 @@ export async function POST(req: NextRequest) {
        puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null,
        s.mensaje, s.compromiso, s.herramientas])
     return NextResponse.json({ ok: true })
+  } catch (err) {
+    return apiError(err)
+  }
+}
+
+// ── Visitas (PATCH): el embudo de la página, sin IP ni cookies de terceros ──────────────────
+
+const Visita = z.object({
+  navegador_id: z.string().regex(/^[0-9a-f-]{36}$/i),
+  evento: z.enum(['vista', 'empezo', 'enviado']),
+  utm_source: z.string().max(60).optional(),
+  utm_campaign: z.string().max(60).optional(),
+  referrer: z.string().max(300).optional(),
+})
+const BOT = /bot|crawl|spider|preview|headless|externalhit|curl|python|wget/i
+// No se cuenta de nuevo la misma vista en 30 minutos (recargas) ni el mismo paso en 12 horas.
+const REPETIDA = { vista: '30 minutes', empezo: '12 hours', enviado: '12 hours' } as const
+
+/** De dónde llegó: el utm del anuncio; si no, el sitio que la mandó; si no, la app desde la que
+ *  abrió (Instagram y Facebook abren los links en su navegador y no dicen de dónde vienen). */
+function origenDe(v: z.infer<typeof Visita>, ua: string) {
+  const utm = v.utm_source?.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 30)
+  if (utm) return utm
+  let host = ''
+  try { host = v.referrer ? new URL(v.referrer).hostname.replace(/^www\./, '') : '' } catch { /* referrer raro */ }
+  if (/instagram/.test(host)) return 'instagram'
+  if (/facebook|fb\.|messenger/.test(host)) return 'facebook'
+  if (/whatsapp|wa\.me/.test(host)) return 'whatsapp'
+  if (/t\.me|telegram/.test(host)) return 'telegram'
+  if (/google/.test(host)) return 'google'
+  if (host && !host.endsWith('elcomerciantedigital.com')) return host.slice(0, 40)
+  if (/Instagram/.test(ua)) return 'instagram'
+  if (/FBAN|FBAV|FB_IAB/.test(ua)) return 'facebook'
+  if (/WhatsApp/i.test(ua)) return 'whatsapp'
+  return 'directo'
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const ua = req.headers.get('user-agent') ?? ''
+    const v = Visita.safeParse(await req.json().catch(() => null))
+    if (!v.success || BOT.test(ua)) return new NextResponse(null, { status: 204 })
+    const d = v.data
+    await dbGlobal().query(
+      `INSERT INTO fundadores_visitas (navegador_id, evento, origen, campana, movil)
+       SELECT $1, $2, $3, $4, $5
+       WHERE NOT EXISTS (SELECT 1 FROM fundadores_visitas
+                         WHERE navegador_id = $1 AND evento = $2 AND fecha > NOW() - $6::interval)`,
+      [d.navegador_id, d.evento, origenDe(d, ua), d.utm_campaign?.trim().slice(0, 40) || null,
+       /Android|iPhone|iPad|Mobile/i.test(ua), REPETIDA[d.evento]])
+    return new NextResponse(null, { status: 204 })
   } catch (err) {
     return apiError(err)
   }
