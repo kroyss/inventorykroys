@@ -66,14 +66,14 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'otro_sistema', texto: 'Sí, otro sistema o app', puntos: 0 },
     ],
   },
-  // Informativa (2026-10-03): para qué paga ya alguna herramienta de MercadoLibre = ya es cliente de
-  // algo parecido (para el precio de Fundador y saber contra quién se compite). "preguntas" ≈
-  // Automatizaciones; "analisis" ≈ público del Radar. Sin nombrar a la competencia.
+  // Para qué paga ya alguna herramienta de MercadoLibre (2026-10-03). Solo "preguntas o mensajes"
+  // suma 1 (desempate, decidido con el dueño): ya paga por algo que esto reemplaza = el que más
+  // probablemente se quede pagando. "analisis" ≈ público del Radar (0). Sin nombrar a la competencia.
   {
     campo: 'herramientas', texto: '¿Pagas alguna herramienta para MercadoLibre?', multiple: true,
     opciones: [
       { valor: 'no', texto: 'No, ninguna', puntos: 0, exclusiva: true },
-      { valor: 'preguntas', texto: 'Sí, para responder preguntas o mensajes', puntos: 0 },
+      { valor: 'preguntas', texto: 'Sí, para responder preguntas o mensajes', puntos: 1 },
       { valor: 'analisis', texto: 'Sí, para analizar ventas o competencia', puntos: 0 },
       { valor: 'otra', texto: 'Sí, para otra cosa', puntos: 0 },
     ],
