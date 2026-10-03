@@ -150,9 +150,8 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
           <fieldset key={pregunta.campo} className="mt-4">
             <legend className="text-lg font-semibold text-neutral-900 leading-snug">{pregunta.texto}</legend>
             {pregunta.multiple && !pregunta.ayuda ? (
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime-100 text-lime-900 ring-1 ring-inset ring-lime-300 px-3 py-1 text-sm font-semibold">
-                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" /></svg>
-                Puedes marcar varias
+              <p className="mt-1 text-sm text-neutral-500">
+                Marca <b className="font-semibold text-neutral-900">todas las que apliquen</b>.
               </p>
             ) : <p className="mt-1 text-sm text-neutral-400">
               {pregunta.ayuda ?? (paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.')}
