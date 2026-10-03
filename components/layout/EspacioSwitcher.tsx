@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { espacioDe } from '@/lib/espacios'
+import { espacioActual } from '@/lib/espacios'
 import { useAvisos, Numerito } from './Avisos'
 
 // Íconos de trazo (24x24), heredan el color del texto.
@@ -22,9 +22,9 @@ const NOMBRES = { inventario: 'Inventario', automatizaciones: 'Automatizaciones'
 
 // Selector de espacio junto al logo: muestra dónde estás y abre un menú con los demás.
 // Solo aparece si hay más de un espacio.
-export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automatizaciones: boolean; radarUrl: string | null }) {
+export default function EspacioSwitcher({ automatizaciones, inventario, radarUrl }: { automatizaciones: boolean; inventario: boolean; radarUrl: string | null }) {
   const pathname = usePathname()
-  const actual = espacioDe(pathname)
+  const actual = espacioActual(pathname, inventario ? ['inventario'] : [])
   const [abierto, setAbierto] = useState(false)
   const avisos = useAvisos()
   const urgentesAuto = avisos.preguntas + avisos.mensajes
@@ -40,10 +40,11 @@ export default function EspacioSwitcher({ automatizaciones, radarUrl }: { automa
     return () => { document.removeEventListener('mousedown', fuera); document.removeEventListener('keydown', esc) }
   }, [abierto])
 
-  if (!automatizaciones && !radarUrl) return null
+  // Sin otro espacio al que cambiar, no aparece (la empresa sin inventario solo tiene Automatizaciones).
+  if (!radarUrl && !(automatizaciones && inventario)) return null
 
   const opciones = [
-    { id: 'inventario' as const, href: '/dashboard', desc: 'Stock, ventas, compras y productos' },
+    ...(inventario ? [{ id: 'inventario' as const, href: '/dashboard', desc: 'Stock, ventas, compras y productos' }] : []),
     ...(automatizaciones ? [{ id: 'automatizaciones' as const, href: '/automatizaciones', desc: 'Despachos, Reportador y más' }] : []),
   ]
   const fila = 'flex items-center gap-3 px-2.5 py-2 rounded-md text-left transition-colors'

@@ -1,11 +1,16 @@
-// Módulos por empresa (empresas.modulos). El núcleo (Inicio, Ventas, Inventario, Compras,
-// Productos, Reportes, Ajustes, Usuarios) lo tienen todas; estos se prenden por empresa.
+// Módulos por empresa (empresas.modulos). Lo que no es módulo (Usuarios, Automatizaciones…) lo
+// tienen todas; estos se prenden por empresa.
 // Un módulo apagado no aparece en el menú, su página redirige y su API responde 403.
 //
 // Así se libera a los clientes de a poco: la empresa de la plataforma (SolucionesMC) tiene
 // todo y a cada cliente se le prende lo que corresponda en Plataforma → Empresas. Lo nuevo o
 // en pruebas entra como módulo propio (apagado para los clientes) y no como un "if" escondido.
 export const MODULOS = {
+  // El sistema de inventario entero (Inicio, Ventas, Inventario, Compras, Productos, Reportes,
+  // Ajustes). Apagado = la empresa trabaja "todo desde MercadoLibre" (decidido con el dueño,
+  // 2026-10-03): solo ve Automatizaciones y Despachos arma las etiquetas con las ventas que trae
+  // de ML en vez de las cargadas a mano. Las empresas de antes lo tienen prendido (migración 056).
+  inventario: 'Inventario (Inicio, Ventas, Inventario, Compras, Productos, Reportes, Ajustes). Apagado = todo desde MercadoLibre',
   despachos:  'Despachos (etiquetas Zoom/Tealca 4 por hoja y manifiesto)',
   reportador: 'Reportador (mensaje de guía al comprador)',
   facturas:   'Facturas',
@@ -22,6 +27,13 @@ export type Modulo = keyof typeof MODULOS
 
 // Página → módulo que la habilita (lo que no está aquí es del núcleo).
 export const MODULO_DE_RUTA: Record<string, Modulo> = {
+  '/dashboard':  'inventario',
+  '/ventas':     'inventario',
+  '/inventario': 'inventario',
+  '/compras':    'inventario',
+  '/productos':  'inventario',
+  '/reportes':   'inventario',
+  '/tasas':      'inventario',
   '/despachos': 'despachos',
   '/reportador': 'reportador',
   '/facturas':  'facturas',
@@ -43,6 +55,9 @@ export function rutaHabilitada(href: string, modulos: string[]) {
   const m = MODULO_DE_RUTA[href]
   return !m || modulos.includes(m)
 }
+
+/** ¿La empresa lleva inventario? Si no, las ventas salen de MercadoLibre (ver MODULOS.inventario). */
+export const llevaInventario = (user: { modulos?: string[] } | null | undefined) => tieneModulo(user, 'inventario')
 
 /** Facturas: solo Venezuela (factura fiscal en Bs) y con el módulo prendido. */
 export function facturasHabilitadas(user: { country?: string; modulos?: string[] }) {

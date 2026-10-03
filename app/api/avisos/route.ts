@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
-import { leerPlantillasCal, SQL_BANDEJA } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
 import { contarAlertas } from '@/lib/alertasStock'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
@@ -30,7 +30,7 @@ export async function GET() {
       {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
         const { rows: [c] } = await db.query(
-          `SELECT COUNT(*)::int AS n FROM (${SQL_BANDEJA}) b WHERE sugerencia <> 'esperar'`,
+          `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(!tieneModulo(u, 'inventario'))}) b WHERE sugerencia <> 'esperar'`,
           [leerPlantillasCal(pl?.value).noConcretada.dias])
         out.calificaciones = c.n
       }

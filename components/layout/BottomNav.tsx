@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
-import { espacioDe } from '@/lib/espacios'
+import { espacioActual } from '@/lib/espacios'
 
 interface NavItem { href: string; label: string; icon: string; roles: UserRole[]; countries: Country[] }
 
@@ -45,7 +45,7 @@ export default function BottomNav({ role, country, modulos }: { role: UserRole; 
   const visible = (items: NavItem[]) =>
     items.filter(i => i.roles.includes(role) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
 
-  const auto    = espacioDe(pathname) === 'automatizaciones'
+  const auto    = espacioActual(pathname, modulos) === 'automatizaciones'
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador')
   const primary = visible(auto ? PRIMARY_AUTO : PRIMARY)
   const more    = visible(auto ? MORE_AUTO : MORE).filter(i => i.href !== '/automatizaciones' || tieneAuto)

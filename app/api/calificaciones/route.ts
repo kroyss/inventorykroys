@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
-import { leerPlantillasCal, SQL_BANDEJA } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
+import { llevaInventario } from '@/lib/modulos'
 
 // GET /api/calificaciones?vista=listas|esperando
 //   listas    → sin calificar con sugerencia (concretada / no concretada)
@@ -14,6 +15,9 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
     const plantillas = leerPlantillasCal(pl?.value)
     const dias = plantillas.noConcretada.dias
+    // Sin inventario: "en el sistema" = despachada (etiqueta impresa), ver SQL_BANDEJA_ML.
+    const desdeML = !llevaInventario(s.session.user)
+    const SQL_BANDEJA = sqlBandeja(desdeML)
     const { rows } = await s.db.query(
       `SELECT * FROM (${SQL_BANDEJA}) b
        WHERE ${vista === 'esperando' ? `sugerencia = 'esperar'` : `sugerencia <> 'esperar'`}
@@ -25,7 +29,7 @@ export async function GET(req: NextRequest) {
        FROM (${SQL_BANDEJA}) b`, [dias])
     const { rows: cuentas } = await s.db.query(
       `SELECT nickname, ordenes_sync_at FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
-    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas })
+    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML })
   } catch (err) {
     return apiError(err)
   }

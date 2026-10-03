@@ -13,6 +13,12 @@ export function espacioDe(pathname: string): Espacio {
     : 'inventario'
 }
 
+/** El espacio en que se está: la empresa sin el módulo inventario vive siempre en
+ *  Automatizaciones (también en Usuarios, Aprendizaje…, que no son de ningún espacio). */
+export function espacioActual(pathname: string, modulos: string[]): Espacio {
+  return modulos.includes('inventario') ? espacioDe(pathname) : 'automatizaciones'
+}
+
 // Módulos que forman el espacio Automatizaciones (si la empresa no tiene ninguno, el
 // espacio no aparece).
 export const MODULOS_AUTOMATIZACIONES = ['despachos', 'reportador', 'preguntas'] as const

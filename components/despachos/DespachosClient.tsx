@@ -61,6 +61,12 @@ const ESTADO_UI: Record<Estado, { label: string; cls: string }> = {
   YA_IMPRESA:    { label: 'Ya impresa',       cls: 'bg-red-100 text-red-800' },
 }
 
+// Sin inventario las ventas salen de MercadoLibre: los mismos estados, dichos para ese caso.
+const ESTADO_UI_ML: Partial<Record<Estado, { label: string; cls: string }>> = {
+  SIN_VENTA: { label: 'Venta no encontrada', cls: 'bg-red-100 text-red-800' },
+  ESTADO:    { label: 'Venta cancelada',     cls: 'bg-red-100 text-red-800' },
+}
+
 const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
 })
@@ -94,7 +100,7 @@ const TANDA = 60  // PDFs por envío al servidor (MAX_PDFS_POR_SUBIDA)
 const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
 
 // ── Pantalla ────────────────────────────────────────────────────────────────
-export default function DespachosClient({ isAdmin, reportador }: { isAdmin: boolean; reportador: boolean }) {
+export default function DespachosClient({ isAdmin, reportador, desdeML = false }: { isAdmin: boolean; reportador: boolean; desdeML?: boolean }) {
   const confirm = useConfirm()
   const [data, setData]         = useState<Overview | null>(null)
   const [lotes, setLotes]       = useState<Record<number, LoteDetalle>>({})
@@ -265,7 +271,7 @@ export default function DespachosClient({ isAdmin, reportador }: { isAdmin: bool
       <Dropzone onFiles={f => subir(f, loteDestino)} busy={busy === 'subir'} agregaALote={loteDestino} />
 
       {pendientes.map(l => (
-        <LotePendiente key={l.id} lote={l} busy={busy}
+        <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML}
           onToggle={e => toggleIncluida(l.id, e)}
           onRevalidar={cargar}
           onAgregar={f => subir(f, l.id)}
@@ -408,8 +414,9 @@ function Dropzone({ onFiles, busy, compact, agregaALote }: {
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, onToggle, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, onToggle, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
+  desdeML: boolean
   busy: string | null
   onToggle: (e: Etiqueta) => void
   onRevalidar: () => void
@@ -433,7 +440,7 @@ function LotePendiente({ lote, busy, onToggle, onRevalidar, onAgregar, onGenerar
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onRevalidar} className="btn-secondary text-xs" title="Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)">↻ Revalidar</button>
+          <button onClick={onRevalidar} className="btn-secondary text-xs" title={desdeML ? 'Volver a buscar las ventas y las notas en MercadoLibre' : 'Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)'}>↻ Revalidar</button>
           <button onClick={onDescartar} className="btn-secondary text-xs">Descartar</button>
           <button onClick={onGenerar} disabled={generando || lote.imprimibles === 0} className="btn-primary text-sm">
             {generando ? 'Generando y verificando…' : `Generar PDF (${lote.imprimibles})`}
@@ -449,14 +456,14 @@ function LotePendiente({ lote, busy, onToggle, onRevalidar, onAgregar, onGenerar
               <th className="px-3 py-2 text-left">Venta</th>
               <th className="px-3 py-2 text-left">Guía</th>
               <th className="px-3 py-2 text-left">Remitente</th>
-              <th className="px-3 py-2 text-left">Productos (del sistema)</th>
+              <th className="px-3 py-2 text-left">{desdeML ? 'Productos (de MercadoLibre)' : 'Productos (del sistema)'}</th>
               <th className="px-3 py-2 text-left">Nota</th>
               <th className="px-3 py-2 text-left">Estado</th>
             </tr>
           </thead>
           <tbody>
             {lote.etiquetas.map(e => {
-              const ui = ESTADO_UI[e.estado]
+              const ui = (desdeML && ESTADO_UI_ML[e.estado]) || ESTADO_UI[e.estado]
               const nota = e.sale_notes || e.items.find(i => i.notes)?.notes || ''
               return (
                 <tr key={e.id} className={`border-t border-neutral-100 align-top ${!e.incluida ? 'opacity-50' : ''}`}>

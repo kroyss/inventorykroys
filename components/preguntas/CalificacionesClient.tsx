@@ -15,6 +15,8 @@ interface Plantillas {
 interface Datos {
   ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; esperando: number }
   plantillas: Plantillas; cuentas: { nickname: string; ordenes_sync_at: string | null }[]
+  /** Empresa sin inventario: "en el sistema" = despachada (etiqueta impresa en Despachos). */
+  desdeML?: boolean
 }
 type Tipo = 'concretada' | 'no_concretada'
 
@@ -112,7 +114,10 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
       {!datos ? <Cargando /> : vista === 'textos' ? <Textos plantillas={datos.plantillas} onGuardado={cargar} /> : (
         <>
           <p className="text-xs text-neutral-500">
-            {vista === 'listas'
+            {datos.desdeML ? (vista === 'listas'
+              ? <>Despachada (su etiqueta salió en Despachos) → <b>concretada</b>. Sin despachar después de {datos.plantillas.noConcretada.dias} días, o cancelada en MercadoLibre → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
+              : <>Ventas recientes que todavía no se despacharon: al imprimir su etiqueta pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no salieron, a no concretadas.</>)
+            : vista === 'listas'
               ? <>En el sistema (cargada o facturada) → <b>concretada</b>. Sin cargar después de {datos.plantillas.noConcretada.dias} días → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
               : <>Ventas recientes que todavía no están en el sistema: si se cargan, pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no aparecen, a no concretadas.</>}
             {sinc && <> · Ventas actualizadas {new Date(sinc).toLocaleString('es-VE')}</>}
@@ -170,7 +175,9 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       </td>
                       <td className="px-3 py-2 text-neutral-700 max-w-[28rem]"><span className="line-clamp-2">{o.productos}</span></td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        {o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={STATUS_LABELS[o.sistema_estado]} /> : <span className="text-xs text-amber-700">No cargada</span>}
+                        {o.sistema_estado === 'DESPACHADA' ? <span className="text-xs font-medium text-emerald-700">Despachada</span>
+                          : o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={STATUS_LABELS[o.sistema_estado]} />
+                          : <span className="text-xs text-amber-700">{datos.desdeML ? 'Sin despachar' : 'No cargada'}</span>}
                         {o.facturada && <div className="text-xs text-emerald-700 mt-0.5">Facturada</div>}
                       </td>
                       {vista === 'listas' && (

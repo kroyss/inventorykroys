@@ -5,7 +5,9 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import {
   armarLote, despachosForbidden, esGuiaDuplicada, etiquetasValidadas, filasDeVentas, guardarArchivo,
   IMPRIMIBLE, leerOriginal, MAX_POR_LOTE, respuestaServicio,
+  refrescarVentasML,
 } from '@/lib/despachos'
+import { llevaInventario } from '@/lib/modulos'
 
 /**
  * POST /api/despachos/lotes/[id]/generar — arma el PDF 4xA4 del lote.
@@ -24,6 +26,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (denied) return denied
 
   const userId = parseInt(session.user.id, 10)
+  // Sin inventario: las ventas son las de MercadoLibre; no hay venta del sistema que bloquear
+  // ni pasar a DESCARGADA. Todo lo demás (armado, jornada, manifiesto, Reportador) es igual.
+  const desdeML = !llevaInventario(session.user)
+  if (desdeML) await refrescarVentasML(db, parseInt(id, 10)).catch(() => {})
   const client = await db.connect()
   let outputPath: string | null = null
   try {
@@ -37,7 +43,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'El lote ya fue generado o descartado' }, { status: 400 })
     }
 
-    const aImprimir = (await etiquetasValidadas(db, lote.id))
+    const aImprimir = (await etiquetasValidadas(db, lote.id, desdeML))
       .filter(e => e.incluida && IMPRIMIBLE[e.estado])
     if (aImprimir.length === 0) {
       await client.query('ROLLBACK')
@@ -52,8 +58,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     // Bloquea las ventas y confirma que siguen imprimibles (nadie las reabrió entre la
     // revisión y este clic). Si algo cambió, se pide revalidar en vez de imprimir.
-    const saleIds = [...new Set(aImprimir.map(e => e.sale_id!))]
-    const { rows: ventasAhora } = await client.query(
+    const saleIds = desdeML ? [] : [...new Set(aImprimir.map(e => e.sale_id!))]
+    const { rows: ventasAhora } = desdeML ? { rows: [] as { id: number; status: string }[] } : await client.query(
       `SELECT id, status FROM sales WHERE id = ANY($1) FOR UPDATE`, [saleIds])
     const cambiadas = ventasAhora.filter(v => v.status !== 'PROCESADA' && v.status !== 'DESCARGADA')
     if (ventasAhora.length !== saleIds.length || cambiadas.length > 0) {

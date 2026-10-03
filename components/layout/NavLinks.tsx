@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
-import { espacioDe, type Espacio } from '@/lib/espacios'
+import { espacioActual, type Espacio } from '@/lib/espacios'
 import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
 
 const allLinks: { href: string; label: string; roles: UserRole[]; countries: Country[]; espacio?: Espacio }[] = [
@@ -37,7 +37,7 @@ export default function NavLinks({ role, country, modulos }: Props) {
   const avisos = useAvisos()
   const links = allLinks.filter(
     l => l.roles.includes(role) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
-      && (l.espacio ?? 'inventario') === espacioDe(pathname)
+      && (l.espacio ?? 'inventario') === espacioActual(pathname, modulos)
   )
 
   return (

@@ -13,6 +13,8 @@ import type { Pool } from 'pg'
 import type { Session } from 'next-auth'
 import { NextResponse } from 'next/server'
 import { tieneModulo } from '@/lib/modulos'
+import { traerOrden } from '@/lib/calificacionesML'
+import { leerNotas, unirNotas } from '@/lib/notasML'
 
 const ETIQUETAS_URL = process.env.ETIQUETAS_URL ?? 'http://inventory_etiquetas:8000'
 const UPLOAD_DIR    = process.env.UPLOAD_DIR ?? './uploads'
@@ -179,7 +181,7 @@ export type EstadoEtiqueta =
   | 'REIMPRESION'   // venta DESCARGADA: se imprime, avisando
   | 'ERROR_PDF'     // no se pudo abrir
   | 'NO_ETIQUETA'   // sin número de venta o sin guía (ZOOM / TEALCA)
-  | 'SIN_VENTA'     // la venta no está cargada en el sistema
+  | 'SIN_VENTA'     // la venta no está cargada en el sistema (o no está en ML, sin inventario)
   | 'ESTADO'        // venta en un estado que no se imprime (BORRADOR, etc.)
   | 'SIN_PRODUCTOS'
   | 'DUPLICADA'     // la misma guía dos veces en este lote
@@ -210,13 +212,83 @@ export interface EtiquetaValidada {
   customer_name: string | null
   sale_notes: string | null
   items: { product_name: string; quantity: number; notes: string | null }[]
+  /** Sin inventario: la venta de ML que se encontró (sale_id queda null). */
+  orden_ml?: string | null
   estado: EstadoEtiqueta
   detalle: string | null
 }
 
+// Número de venta de la etiqueta como BIGINT (NULL si no es un número): para cruzar con ml_ordenes.
+const VENTA_NUM = `CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END`
+
+// ── Empresas sin inventario: las ventas salen de MercadoLibre ───────────────────
+// Misma forma que las ventas del sistema (product_name, quantity, notes, customer_name,
+// sale_notes), así el armado, el manifiesto, las jornadas y el Reportador no cambian.
+// Producto = título tal cual en ML (+ variante); nota = las notas de la venta en ML (se
+// escriben allá, aquí no se editan).
+const SQL_DESDE_ML = `
+  SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
+         e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
+         e.incluida, e.impresa,
+         NULL::int AS sale_id, o.estado AS sale_status, o.comprador AS customer_name, o.notas AS sale_notes,
+         o.id::text AS orden_ml,
+         COALESCE((
+           SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                    'product_name', (d->>'titulo') || COALESCE(' (' || (d->>'variante') || ')', ''),
+                    'quantity', (d->>'cantidad')::int, 'notes', NULL))
+           FROM jsonb_array_elements(o.detalle) d
+         ), '[]'::json) AS items,
+         EXISTS (
+           SELECT 1 FROM despacho_etiquetas p
+           WHERE p.venta = e.venta AND p.impresa AND p.id <> e.id
+         ) AS venta_ya_impresa,
+         EXISTS (
+           SELECT 1 FROM despacho_etiquetas o2
+           WHERE o2.guia = e.guia AND o2.impresa AND o2.id <> e.id
+         ) AS ya_impresa,
+         (SELECT MIN(d.id) FROM despacho_etiquetas d
+           WHERE d.lote_id = e.lote_id AND d.guia = e.guia) AS primera_con_guia
+  FROM despacho_etiquetas e
+  LEFT JOIN LATERAL (
+    SELECT id, estado, comprador, notas, detalle FROM ml_ordenes
+    WHERE id = ${VENTA_NUM} OR pack_id = ${VENTA_NUM}
+    ORDER BY (id = ${VENTA_NUM}) DESC LIMIT 1
+  ) o ON TRUE
+  WHERE e.lote_id = $1
+  ORDER BY e.original_name, e.id`
+
+/** Antes de validar un lote sin inventario: trae de ML las ventas de las etiquetas que todavía
+ *  no llegaron con la sincronización (cada 30 min) y relee sus notas si tienen más de 2 min.
+ *  Nunca hace fallar la vista: lo que no se pudo traer queda como estaba. */
+export async function refrescarVentasML(db: Pool, loteId: number) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT e.venta, o.conexion_id, (o.notas_at IS NULL OR o.notas_at < NOW() - INTERVAL '2 minutes') AS releer
+     FROM despacho_etiquetas e
+     LEFT JOIN ml_ordenes o ON o.id = ${VENTA_NUM}
+     WHERE e.lote_id = $1 AND e.venta ~ '^[0-9]{1,18}$'`, [loteId])
+  const { rows: cuentas } = await db.query(`SELECT id FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
+  const pendientes = rows.filter(r => !r.conexion_id || r.releer) as { venta: string; conexion_id: number | null }[]
+  const uno = async (r: { venta: string; conexion_id: number | null }) => {
+    let conexion = r.conexion_id
+    if (!conexion) {
+      for (const c of cuentas) if (await traerOrden(db, c.id, r.venta)) { conexion = c.id; break }
+      if (!conexion) return
+    }
+    const { notas, error } = await leerNotas(db, conexion, r.venta)
+    if (!error) await db.query(
+      `UPDATE ml_ordenes SET notas = $2, notas_at = NOW() WHERE id = $1::bigint`, [r.venta, unirNotas(notas)])
+  }
+  // De a 6 a la vez (ML limita); cada una con su propio manejo de errores.
+  for (let i = 0; i < pendientes.length; i += 6) {
+    await Promise.all(pendientes.slice(i, i + 6).map(r => uno(r).catch(e => console.error('[despachos ML]', r.venta, e))))
+  }
+}
+
 // Etiquetas de un lote con su estado calculado contra las ventas ACTUALES
 // (por eso "Revalidar" es simplemente volver a pedir el lote).
-export async function etiquetasValidadas(db: Pool, loteId: number): Promise<EtiquetaValidada[]> {
+// desdeML: la empresa no lleva inventario → las ventas son las de MercadoLibre (ver SQL_DESDE_ML).
+export async function etiquetasValidadas(db: Pool, loteId: number, desdeML = false): Promise<EtiquetaValidada[]> {
+  if (desdeML) return validarDesdeML(db, loteId)
   const { rows } = await db.query(
     `SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
             e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
@@ -269,6 +341,36 @@ export async function etiquetasValidadas(db: Pool, loteId: number): Promise<Etiq
 
     const out = { ...r, estado, detalle }
     delete out.read_error; delete out.ya_impresa; delete out.primera_con_guia
+    return out as EtiquetaValidada
+  })
+}
+
+async function validarDesdeML(db: Pool, loteId: number): Promise<EtiquetaValidada[]> {
+  const { rows } = await db.query(SQL_DESDE_ML, [loteId])
+  return rows.map(r => {
+    let estado: EstadoEtiqueta = 'OK'
+    let detalle: string | null = null
+    if (r.read_error)                          { estado = 'ERROR_PDF';   detalle = r.read_error }
+    else if (!r.venta || !r.guia)              {
+      estado = 'NO_ETIQUETA'
+      detalle = !r.venta
+        ? (r.carrier === 'TEALCA'
+            ? 'Etiqueta TEALCA sin número de venta en el nombre del archivo (debe llamarse guide-2000….pdf)'
+            : 'No tiene número de venta')
+        : `No tiene guía ${r.carrier}`
+    }
+    else if (r.impresa)                        { estado = 'OK' }
+    else if (r.ya_impresa)                     { estado = 'YA_IMPRESA';  detalle = `La guía ${r.guia} ya se imprimió en otro lote` }
+    else if (r.primera_con_guia !== r.id)      { estado = 'DUPLICADA';   detalle = 'La misma guía está dos veces en este lote' }
+    else if (!r.orden_ml)                      { estado = 'SIN_VENTA';   detalle = `La venta ${r.venta} no está en las ventas de MercadoLibre de tus cuentas conectadas` }
+    else if (r.sale_status === 'cancelled')    { estado = 'ESTADO';      detalle = 'La venta está cancelada en MercadoLibre' }
+    else if (r.items.length === 0)             { estado = 'SIN_PRODUCTOS'; detalle = 'MercadoLibre no trajo los productos de la venta' }
+    else if (r.venta_ya_impresa)               { estado = 'REIMPRESION'; detalle = 'Esta venta ya salió en otro lote' }
+
+    if (estado === 'OK' && r.page_count > 1) detalle = `El PDF tiene ${r.page_count} páginas: se usa solo la primera`
+
+    const out = { ...r, estado, detalle }
+    delete out.read_error; delete out.ya_impresa; delete out.primera_con_guia; delete out.venta_ya_impresa
     return out as EtiquetaValidada
   })
 }

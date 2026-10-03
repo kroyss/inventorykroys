@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { UserRole, Country } from '@/lib/types'
+import { rutaHabilitada } from '@/lib/modulos'
 
 interface Command {
   label: string
@@ -32,7 +33,7 @@ export default function CommandPalette({ role, country, modulos }: { role: UserR
 
   useEffect(() => { if (open) { setQuery(''); setActive(0) } }, [open])
 
-  const go = (href: string) => () => { setOpen(false); router.push(href) }
+  const go = (href: string) => Object.assign(() => { setOpen(false); router.push(href) }, { href })
 
   const commands = useMemo<Command[]>(() => [
     { label: 'Ir a Inicio',       hint: 'Dashboard', action: go('/dashboard'),  roles: ['admin','user'], countries: ['VE','CO'] },
@@ -50,7 +51,8 @@ export default function CommandPalette({ role, country, modulos }: { role: UserR
     { label: 'Nuevo producto',    hint: 'Acción',    action: go('/productos?new=1'), roles: ['admin'],        countries: ['VE','CO'] },
   ].filter(c => c.roles.includes(role) && c.countries.includes(country)
       && !(c.label === 'Ir a Despachos' && !modulos.includes('despachos'))
-      && !(c.label === 'Ir a Facturas' && !modulos.includes('facturas'))), [role, country, modulos, router])
+      && !(c.label === 'Ir a Facturas' && !modulos.includes('facturas'))
+      && rutaHabilitada((c.action as { href?: string }).href?.split('?')[0] ?? '', modulos)), [role, country, modulos, router])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
