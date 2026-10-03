@@ -50,6 +50,8 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'mensajes_guias', texto: 'Mensajes de las ventas y enviar las guías', puntos: 2 },
       { valor: 'stock', texto: 'Llevar el stock y las ventas', puntos: 1 },
       { valor: 'que_vender', texto: 'Saber qué vender o qué traer', puntos: 0 },
+      // Precios (2026-10-03): 0 puntos; candidato a Inventario (calculadora de Productos) y Radar.
+      { valor: 'precios', texto: 'Decidir a qué precio vender', puntos: 0 },
     ],
   },
   // Las dos últimas son solo informativas (0 puntos, sin descarte): sirven para preparar la
