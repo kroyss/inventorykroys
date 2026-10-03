@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
     const desdeML = !llevaInventario(s.session.user)
     const SQL_BANDEJA = sqlBandeja(desdeML)
     const { rows } = await s.db.query(
-      `SELECT * FROM (${SQL_BANDEJA}) b
+      // en_espera: más nueva que los días de espera de la empresa (fecha del país de la empresa:
+      // la conexión tiene su TimeZone). Se muestra, pero no entra al lote.
+      `SELECT b.*, (b.fecha::date > CURRENT_DATE - ${plantillas.esperaDias}) AS en_espera FROM (${SQL_BANDEJA}) b
        WHERE ${vista === 'esperando' ? `sugerencia = 'esperar'` : `sugerencia <> 'esperar'`}
        ORDER BY fecha DESC LIMIT 1000`, [dias])
     const { rows: [n] } = await s.db.query(

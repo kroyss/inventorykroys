@@ -7,10 +7,12 @@ interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
   cal_comprador: string | null; cuenta: string; sistema_estado: string | null; facturada: boolean
   sugerencia: 'concretada' | 'no_concretada' | 'esperar'
+  en_espera: boolean            // más nueva que los días de espera: todavía no se califica
 }
 interface Plantillas {
   concretada: { rating: string; mensaje: string }
   noConcretada: { rating: string; motivo: string; mensaje: string; dias: number }
+  esperaDias: number
 }
 interface Datos {
   ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; esperando: number }
@@ -32,7 +34,7 @@ const MOTIVOS: Record<string, string> = {
 /** Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema. */
 export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) {
   const confirm = useConfirm()
-  const [vista, setVista] = useState<'listas' | 'esperando' | 'textos'>('listas')
+  const [vista, setVista] = useState<'listas' | 'esperando' | 'config'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [elegidas, setElegidas] = useState<Record<string, Tipo | null>>({})
   const [filtro, setFiltro] = useState<'todas' | Tipo>('todas')
@@ -47,8 +49,8 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setAviso(d.error ?? 'No se pudo cargar'); return }
     setDatos(d)
-    // Por defecto, cada una con su sugerencia marcada.
-    setElegidas(Object.fromEntries((d.ordenes as Orden[]).filter(o => o.sugerencia !== 'esperar').map(o => [o.id, o.sugerencia as Tipo])))
+    // Por defecto, cada una con su sugerencia marcada (salvo las que siguen en días de espera).
+    setElegidas(Object.fromEntries((d.ordenes as Orden[]).filter(o => o.sugerencia !== 'esperar' && !o.en_espera).map(o => [o.id, o.sugerencia as Tipo])))
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
 
@@ -64,7 +66,15 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   }
 
   const visibles = useMemo(() => (datos?.ordenes ?? []).filter(o => filtro === 'todas' || o.sugerencia === filtro), [datos, filtro])
-  const aCalificar = visibles.filter(o => elegidas[o.id])
+  const aCalificar = visibles.filter(o => elegidas[o.id] && !o.en_espera)
+  // Marcar / desmarcar del lote (casilla): al marcar vuelve la sugerencia de esa venta.
+  const marcables = visibles.filter(o => !o.en_espera)
+  const todas = marcables.length > 0 && marcables.every(o => elegidas[o.id])
+  const sugerida = (o: Orden): Tipo => (o.sugerencia === 'esperar' ? 'concretada' : o.sugerencia)
+  const marcar = (o: Orden, si: boolean) => setElegidas(x => ({ ...x, [o.id]: si ? sugerida(o) : null }))
+  const marcarTodas = (si: boolean) =>
+    setElegidas(x => ({ ...x, ...Object.fromEntries(marcables.map(o => [o.id, si ? (x[o.id] ?? sugerida(o)) : null])) }))
+  const enEspera = visibles.filter(o => o.en_espera).length
   const n = (t: Tipo) => aCalificar.filter(o => elegidas[o.id] === t).length
 
   const calificar = async () => {
@@ -108,10 +118,10 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
       <Tabs value={vista} onChange={setVista} items={[
         { value: 'listas', label: 'Por calificar', count: datos ? datos.contadores.concretadas + datos.contadores.no_concretadas : undefined },
         { value: 'esperando', label: 'Esperando', count: datos?.contadores.esperando },
-        ...(isAdmin ? [{ value: 'textos' as const, label: 'Textos' }] : []),
+        ...(isAdmin ? [{ value: 'config' as const, label: 'Configuración' }] : []),
       ]} />
 
-      {!datos ? <Cargando /> : vista === 'textos' ? <Textos plantillas={datos.plantillas} onGuardado={cargar} /> : (
+      {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} onGuardado={cargar} /> : (
         <>
           <p className="text-xs text-neutral-500">
             {datos.desdeML ? (vista === 'listas'
@@ -120,6 +130,9 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
             : vista === 'listas'
               ? <>En el sistema (cargada o facturada) → <b>concretada</b>. Sin cargar después de {datos.plantillas.noConcretada.dias} días → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
               : <>Ventas recientes que todavía no están en el sistema: si se cargan, pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no aparecen, a no concretadas.</>}
+            {vista === 'listas' && datos.plantillas.esperaDias > 0 && (
+              <> · Espera de <b>{datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}</b>: las más nuevas se ven, pero todavía no se califican{enEspera > 0 ? ` (${enEspera} en espera)` : ''}.</>
+            )}
             {sinc && <> · Ventas actualizadas {new Date(sinc).toLocaleString('es-VE')}</>}
           </p>
 
@@ -156,6 +169,12 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
               <table className="w-full text-sm [&_th]:whitespace-nowrap">
                 <thead className="bg-neutral-50 text-xs text-neutral-500">
                   <tr className="border-b border-neutral-100">
+                    {vista === 'listas' && (
+                      <th className="pl-3 py-2 w-8">
+                        <input type="checkbox" checked={todas} onChange={e => marcarTodas(e.target.checked)} disabled={marcables.length === 0}
+                          aria-label="Marcar o desmarcar todas" title="Marcar o desmarcar todas" className="w-4 h-4 accent-neutral-900" />
+                      </th>
+                    )}
                     <th className="px-3 py-2 text-left">Venta</th>
                     <th className="px-3 py-2 text-left">Comprador</th>
                     <th className="px-3 py-2 text-left">Productos</th>
@@ -165,7 +184,15 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                 </thead>
                 <tbody>
                   {visibles.map(o => (
-                    <tr key={o.id} className="border-b border-neutral-50 align-top">
+                    <tr key={o.id} className={`border-b border-neutral-50 align-top ${o.en_espera ? 'opacity-50' : vista === 'listas' && !elegidas[o.id] ? 'opacity-60' : ''}`}>
+                      {vista === 'listas' && (
+                        <td className="pl-3 py-2">
+                          <input type="checkbox" checked={!!elegidas[o.id] && !o.en_espera} disabled={o.en_espera}
+                            onChange={e => marcar(o, e.target.checked)} aria-label={`Calificar la venta ${o.id}`}
+                            title={o.en_espera ? `En días de espera (${datos.plantillas.esperaDias}): todavía no se califica` : undefined}
+                            className="w-4 h-4 mt-0.5 accent-neutral-900" />
+                        </td>
+                      )}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <div className="font-mono text-xs text-neutral-700">{o.id}</div>
                         <div className="text-xs text-neutral-400">{o.cuenta} · {new Date(o.fecha).toLocaleDateString('es-VE')}</div>
@@ -182,13 +209,13 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       </td>
                       {vista === 'listas' && (
                         <td className="px-3 py-2">
-                          <select value={elegidas[o.id] ?? ''} onChange={e => setElegidas(x => ({ ...x, [o.id]: (e.target.value || null) as Tipo | null }))}
+                          {o.en_espera ? <span className="text-xs text-neutral-500">En espera</span> : <select value={elegidas[o.id] ?? ''} onChange={e => setElegidas(x => ({ ...x, [o.id]: (e.target.value || null) as Tipo | null }))}
                             className={`border rounded-lg px-2 py-1 text-xs ${elegidas[o.id] === 'concretada' ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
                               : elegidas[o.id] === 'no_concretada' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-neutral-300'}`}>
                             <option value="concretada">Concretada · {RATING[datos.plantillas.concretada.rating]}</option>
                             <option value="no_concretada">No concretada · {RATING[datos.plantillas.noConcretada.rating]}</option>
                             <option value="">No calificar ahora</option>
-                          </select>
+                          </select>}
                         </td>
                       )}
                     </tr>
@@ -203,7 +230,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   )
 }
 
-function Textos({ plantillas, onGuardado }: { plantillas: Plantillas; onGuardado: () => void }) {
+function Configuracion({ plantillas, onGuardado }: { plantillas: Plantillas; onGuardado: () => void }) {
   const [p, setP] = useState(plantillas)
   const [msg, setMsg] = useState<string | null>(null)
   const guardar = async () => {
@@ -215,6 +242,19 @@ function Textos({ plantillas, onGuardado }: { plantillas: Plantillas; onGuardado
   const sel = 'border border-neutral-300 rounded-lg px-2 py-1.5 text-sm'
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <section className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-1">
+        <h2 className="font-semibold text-neutral-900">Días de espera para calificar</h2>
+        <label className="text-sm text-neutral-600 flex flex-wrap items-center gap-2">
+          <input type="number" min={0} max={60} value={p.esperaDias}
+            onChange={e => setP({ ...p, esperaDias: Math.max(0, Math.min(60, Math.round(Number(e.target.value) || 0))) })}
+            className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
+          días
+        </label>
+        <p className="text-xs text-neutral-500">
+          Las ventas más nuevas que esto se ven en la lista, pero no entran al lote. Ejemplo: con 2, el día 3 se califican solo
+          las ventas del día 1 hacia atrás. 0 = sin espera.
+        </p>
+      </section>
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-2">
         <h2 className="font-semibold text-neutral-900">Venta concretada</h2>
         <select value={p.concretada.rating} onChange={e => setP({ ...p, concretada: { ...p.concretada, rating: e.target.value } })} className={sel}>
@@ -243,7 +283,7 @@ function Textos({ plantillas, onGuardado }: { plantillas: Plantillas; onGuardado
       </section>
       <div className="lg:col-span-2 flex items-center justify-end gap-3">
         {msg && <span className="text-xs text-neutral-600">{msg}</span>}
-        <button onClick={guardar} className="btn-primary text-sm">Guardar textos</button>
+        <button onClick={guardar} className="btn-primary text-sm">Guardar configuración</button>
       </div>
     </div>
   )

@@ -26,8 +26,10 @@ export async function POST(req: NextRequest) {
 
     for (const o of ordenes) {
       const { rows: [fila] } = await s.db.query(
-        `SELECT conexion_id, cal_vendedor FROM ml_ordenes WHERE id = $1`, [o.id])
+        `SELECT conexion_id, cal_vendedor, fecha::date > CURRENT_DATE - $2::int AS en_espera FROM ml_ordenes WHERE id = $1`,
+        [o.id, p.esperaDias])
       if (!fila) { resultados.push({ id: o.id, ok: false, detalle: 'Venta no encontrada' }); continue }
+      if (fila.en_espera) { resultados.push({ id: o.id, ok: false, detalle: `Todavía en los ${p.esperaDias} días de espera` }); continue }
       if (fila.cal_vendedor) { resultados.push({ id: o.id, ok: true, detalle: 'Ya estaba calificada' }); continue }
       const cuerpo = o.tipo === 'concretada'
         ? { fulfilled: true, rating: p.concretada.rating, message: p.concretada.mensaje }

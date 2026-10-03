@@ -13,10 +13,14 @@ export const SYNC_MINUTOS = 30          // cada cuánto el cron refresca las ven
 export interface PlantillasCalificacion {
   concretada:   { rating: 'positive' | 'neutral' | 'negative'; mensaje: string }
   noConcretada: { rating: 'positive' | 'neutral' | 'negative'; motivo: string; mensaje: string; dias: number }
+  /** Días de espera antes de calificar: con 2, hoy (día 3) solo entran al lote las ventas del día 1
+   *  hacia atrás (las más nuevas se ven, pero no se pueden calificar todavía). 0 = sin espera. */
+  esperaDias: number
 }
 export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   concretada:   { rating: 'positive', mensaje: 'Excelente, persona seria y responsable, un placer !' },
   noConcretada: { rating: 'neutral', motivo: 'BUYER_NOT_ENOUGH_MONEY', mensaje: 'No tenemos su compra registrada', dias: 3 },
+  esperaDias: 0,
 }
 
 export function leerPlantillasCal(json: string | null | undefined): PlantillasCalificacion {
@@ -25,6 +29,7 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
     return {
       concretada: { ...PLANTILLAS_DEFAULT.concretada, ...(v?.concretada ?? {}) },
       noConcretada: { ...PLANTILLAS_DEFAULT.noConcretada, ...(v?.noConcretada ?? {}) },
+      esperaDias: Math.max(0, Math.min(60, Math.round(Number(v?.esperaDias) || 0))),
     }
   } catch { return PLANTILLAS_DEFAULT }
 }
