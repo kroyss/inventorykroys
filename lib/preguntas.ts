@@ -393,15 +393,26 @@ export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador
 }
 
 // ── Sugerencias (gratis, sin IA): respuestas ya dadas a preguntas parecidas ──────────────────
+
+// Palabras de PRESENTACIÓN (cómo se vende: por par, kit, combo…). Una respuesta que las nombra solo
+// vale para publicaciones que se venden igual (la palabra está en su título). "Mínimo 2 unidades"
+// (envío gratis) no es presentación: no se filtra.
+const PRESENTACION = /\b(par|pares|combo|kit|pack|juego|set|docena|\d+\s*x|x\s*\d+)\b/gi
+function presentacionAjena(respuesta: string, tituloActual: string | null) {
+  const palabras = respuesta.toLowerCase().match(PRESENTACION)
+  if (!palabras) return false
+  const titulo = (tituloActual ?? '').toLowerCase()
+  return palabras.some(w => !titulo.includes(w.replace(/\s+/g, ' ').trim()))
+}
 export interface SugerenciaPregunta { pregunta: string; respuesta: string; parecido: number; mismaPublicacion: boolean; titulo: string | null }
 
 /** Hasta 3 respuestas propias a preguntas parecidas (las de la misma publicación pesan más),
  *  de TODAS las respondidas (la misma memoria que usa la IA). Sin repetir respuestas. */
 export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise<SugerenciaPregunta[]> {
   const { rows } = await db.query(
-    `WITH q AS (SELECT id, item_id, texto FROM ml_preguntas WHERE id = $1)
+    `WITH q AS (SELECT id, item_id, texto, item_titulo FROM ml_preguntas WHERE id = $1)
      SELECT p.texto AS pregunta, p.respuesta, similarity(p.texto, q.texto)::float AS parecido,
-            p.item_id = q.item_id AS "mismaPublicacion", p.item_titulo AS titulo
+            p.item_id = q.item_id AS "mismaPublicacion", p.item_titulo AS titulo, q.item_titulo AS "tituloActual"
      FROM ml_preguntas p, q
      WHERE p.id <> q.id AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
        AND (p.texto % q.texto OR (p.item_id = q.item_id AND similarity(p.texto, q.texto) > 0.15))
@@ -410,9 +421,13 @@ export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise
   const vistas = new Set<string>()
   const out: SugerenciaPregunta[] = []
   for (const x of rows) {
+    // De OTRA publicación no sirve una respuesta sobre su presentación ("precio por el par", "kit de
+    // 5 ruedas") si esta publicación no se vende así: la pregunta se escribe igual, la respuesta no.
+    if (!x.mismaPublicacion && presentacionAjena(x.respuesta, x.tituloActual)) continue
     const clave = x.respuesta.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/g, ' ').trim()
     if (vistas.has(clave)) continue
     vistas.add(clave)
+    delete x.tituloActual
     out.push(x)
     if (out.length === 3) break
   }
