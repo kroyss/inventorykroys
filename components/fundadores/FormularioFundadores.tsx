@@ -149,9 +149,14 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
         {pregunta ? (
           <fieldset key={pregunta.campo} className="mt-4">
             <legend className="text-lg font-semibold text-neutral-900 leading-snug">{pregunta.texto}</legend>
-            <p className="mt-1 text-sm text-neutral-400">
-              {pregunta.ayuda ?? (pregunta.multiple ? 'Puedes marcar varias.' : paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.')}
-            </p>
+            {pregunta.multiple && !pregunta.ayuda ? (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime-100 text-lime-900 ring-1 ring-inset ring-lime-300 px-3 py-1 text-sm font-semibold">
+                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" /></svg>
+                Puedes marcar varias
+              </p>
+            ) : <p className="mt-1 text-sm text-neutral-400">
+              {pregunta.ayuda ?? (paso === 0 ? `Toma 2 minutos.${resultados ? ` La selección se anuncia el ${resultados}.` : ''}` : 'Elige una.')}
+            </p>}
             <div className="mt-5 space-y-2" role={pregunta.multiple ? 'group' : 'radiogroup'}>
               {pregunta.opciones.map(o => {
                 const on = !!resp[pregunta.campo]?.includes(o.valor)

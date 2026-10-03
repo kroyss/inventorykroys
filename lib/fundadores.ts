@@ -11,7 +11,7 @@ export interface Opcion { valor: string; texto: string; puntos: number; descarta
 // multiple: se marcan varias (se guardan separadas por coma y suman los puntos de cada una).
 // ayuda: explicación corta bajo la pregunta (en lugar de "Elige una.").
 export interface Pregunta {
-  campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario' | 'compromiso'
+  campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario' | 'herramientas' | 'compromiso'
   texto: string; ayuda?: string; opciones: Opcion[]; multiple?: boolean
 }
 
@@ -63,6 +63,16 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'ninguno', texto: 'No, lo llevo en Excel, en un cuaderno o no lo llevo', puntos: 0 },
       { valor: 'facturacion_oficial', texto: 'Sí, un sistema de facturación oficial', puntos: 0 },
       { valor: 'otro_sistema', texto: 'Sí, otro sistema o app', puntos: 0 },
+    ],
+  },
+  // Informativa (2026-10-03): si ya paga una app o a alguien, para el precio de Fundador y para
+  // saber contra quién se compite (Real Trends, Nubimetrics…) o qué trabajo se le ahorra.
+  {
+    campo: 'herramientas', texto: '¿Pagas alguna herramienta o servicio para vender?',
+    opciones: [
+      { valor: 'no', texto: 'No, ninguna', puntos: 0 },
+      { valor: 'app', texto: 'Sí, una app', puntos: 0 },
+      { valor: 'persona', texto: 'Sí, una persona que me ayuda', puntos: 0 },
     ],
   },
   {

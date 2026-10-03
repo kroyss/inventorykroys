@@ -9,7 +9,7 @@ interface Verif {
 }
 interface Solicitud {
   id: number; nombre: string; telegram: string; nick_ml: string | null; mensaje: string | null
-  ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; compromiso: string | null
+  ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; herramientas: string | null; compromiso: string | null
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'rechazado'; tanda: number | null
   sospechosa: string | null; ml_verificado: Verif | null; notas: string | null; created_at: string
 }
@@ -32,7 +32,7 @@ const FILTRO: Record<Filtro, string> = {
 
 // Respuestas en filas: etiqueta corta + una pastilla por opción (verde = suma puntos) + los puntos de la fila.
 const ETIQUETA: Record<Pregunta['campo'], string> = {
-  ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Usa sistema', compromiso: 'Inventario',
+  ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Usa sistema', herramientas: 'Paga por', compromiso: 'Inventario',
 }
 
 function Respuestas({ s }: { s: Solicitud }) {
