@@ -26,7 +26,7 @@ function hace(fecha: string | null) {
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
 export default function MensajesClient() {
-  const [vista, setVista] = useState<'sin_leer' | 'con_nota' | 'todas'>('sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas'>('sin_leer')
   const [lista, setLista] = useState<Conversacion[] | null>(null)
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
@@ -48,14 +48,13 @@ export default function MensajesClient() {
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null) }} items={[
         { value: 'sin_leer', label: 'Sin leer', count: cont?.conversaciones },
-        { value: 'con_nota', label: 'Con nota', count: cont?.con_nota },
         { value: 'todas', label: 'Recientes' },
       ]} />
       {!lista ? <Cargando /> : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
             {lista.length === 0 ? (
-              <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : vista === 'con_nota' ? 'Ninguna venta con nota.' : 'Todavía no hay conversaciones.'} />
+              <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : 'Todavía no hay conversaciones.'} />
             ) : lista.map(c => (
               <button key={c.pack_id} onClick={() => setAbierta(c)}
                 className={`w-full text-left px-4 py-3 space-y-1 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
@@ -329,7 +328,7 @@ function TextoConLinks({ texto: crudo }: { texto: string }) {
 interface NotaML { id: string; texto: string; fecha: string; fuente: 'orden' | 'pack' }
 
 /** Notas de la venta en MercadoLibre: se ven, se agregan, se cambian y se borran (el
- *  comprador no las ve). Las ventas con nota quedan en la pestaña "Con nota". */
+ *  comprador no las ve). */
 function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) {
   const [datos, setDatos] = useState<{ notas: NotaML[]; error: string | null } | null>(null)
   const [editando, setEditando] = useState<{ id: string | null; texto: string } | null>(null)
