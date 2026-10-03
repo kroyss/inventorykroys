@@ -160,7 +160,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-neutral-900">Cómo funciona</h2>
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
-              <li>En los días de postulación de cada ronda llenas el formulario (2 minutos).</li>
+              <li>Te postulas una sola vez, en los días de postulación (2 minutos). Si no quedas en la ronda 1, tu postulación sigue en pie para la ronda 2.</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
               <li>Al día siguiente del cierre de las postulaciones anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
