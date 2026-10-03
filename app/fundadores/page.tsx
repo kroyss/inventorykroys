@@ -73,7 +73,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               Sé uno de los <span className="text-lime-400">{total} primeros.</span>
             </h1>
             <p className="mt-4 text-neutral-400 leading-relaxed">
-              Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a
+              Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a{' '}
               {total} vendedores con movimiento real, en {reparto}, con <b className="text-white">un mes gratis</b> para
               usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos para postularse</b> y la selección
               se anuncia al día siguiente. Después decides si te quedas.
@@ -134,7 +134,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <a href="#solicitud" className="inline-flex items-center gap-2 bg-lime-400 text-neutral-950 px-5 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors">
-              {abiertaHoy ? 'Postúlate' : 'Ver la postulación'} <span aria-hidden="true">↓</span>
+              {abiertaHoy ? 'Postúlate' : 'Ver el formulario'} <span aria-hidden="true">↓</span>
             </a>
             <span className="text-xs text-neutral-500">{tomados} de {total} pioneros confirmados</span>
           </div>
@@ -160,7 +160,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-neutral-900">Cómo funciona</h2>
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
-              <li>En los días de postulación de la ronda envías tu postulación (2 minutos).</li>
+              <li>En los días de postulación de cada ronda llenas el formulario (2 minutos).</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
               <li>Al día siguiente anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
