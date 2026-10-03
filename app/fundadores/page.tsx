@@ -29,7 +29,7 @@ const INCLUYE = [
   { t: 'Guías y despachos', d: 'Imprimes todas las guías del día de una vez, cada una identificada con tus productos para no confundir paquetes, y sacas el manifiesto de envíos para ZOOM o Tealca.' },
   { t: 'Reporte de guías', d: 'Cada comprador recibe su número de guía sin que lo escribas a mano.' },
   { t: 'Calificaciones', d: 'Calificas a tus compradores en bloque, no venta por venta.' },
-  { t: 'Ventas e inventario', d: 'Tu stock y tus ventas al día, sin cuaderno ni Excel.' },
+  { t: 'Inventario (opcional)', d: 'Si quieres, también llevas tu stock y tus ventas al día, sin cuaderno ni Excel.' },
 ]
 
 // Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas

@@ -51,9 +51,12 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'que_vender', texto: 'Saber qué vender o qué traer', puntos: 0 },
     ],
   },
-  // Qué usa hoy (columna `inventario`): solo informativa, para preparar la configuración. Lo que
-  // pesa es el compromiso de abajo (decidido con el dueño, 2026-10-02): el que no usa nada y el que
-  // ya tiene sistema pueden sacar el máximo si se comprometen a llevar TODO aquí.
+  // Las dos últimas son solo informativas (0 puntos, sin descarte): sirven para preparar la
+  // configuración. Qué usa hoy va en la columna `inventario`; si quiere llevar inventario va en
+  // `compromiso` (decidido con el dueño, 2026-10-03): de entrada todos arrancan sin inventario
+  // (las ventas y las etiquetas salen directo de MercadoLibre) y el inventario se ofrece como
+  // paso siguiente; quien lo pida desde el inicio entra con el sistema completo. Querer
+  // inventario no hace mejor al vendedor: por eso no suma.
   {
     campo: 'inventario', texto: '¿Hoy usas algún sistema para llevar tu negocio?',
     opciones: [
@@ -63,13 +66,12 @@ export const PREGUNTAS: Pregunta[] = [
     ],
   },
   {
-    campo: 'compromiso', texto: '¿Llevarías tus ventas de MercadoLibre dentro del sistema?',
-    ayuda: 'Para que te ahorre tiempo de verdad, tus ventas de MercadoLibre tienen que estar dentro del sistema.',
+    campo: 'compromiso', texto: '¿Te interesaría llevar también tu inventario en el sistema?',
+    ayuda: 'Tus ventas de MercadoLibre entran solas al conectar tu cuenta. El inventario es opcional.',
     opciones: [
-      { valor: 'todo', texto: 'Sí, llevaría mis ventas en el sistema', puntos: 3 },
-      { valor: 'ademas', texto: 'Ya tengo otro sistema, pero igual cargaría mis ventas aquí', puntos: 3 },
-      { valor: 'partes', texto: 'Solo quiero usar algunas partes (preguntas, guías…)', puntos: 0 },
-      { valor: 'no', texto: 'Prefiero no cargar mis ventas', puntos: 0, descarta: true },
+      { valor: 'inicio', texto: 'Sí, desde el inicio', puntos: 0 },
+      { valor: 'despues', texto: 'Más adelante, primero quiero probar las herramientas', puntos: 0 },
+      { valor: 'no', texto: 'No, solo me interesan las herramientas', puntos: 0 },
     ],
   },
 ]

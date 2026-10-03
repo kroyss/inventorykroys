@@ -86,7 +86,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
         </h2>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           {hecho.repetida
-            ? <>Ya recibimos una solicitud de <b>@{hecho.telegram}</b> No hace falta enviarla de nuevo.</>
+            ? <>Ya recibimos una solicitud de <b>@{hecho.telegram}</b>. No hace falta enviarla de nuevo.</>
             : <>Recibimos tu solicitud. La selección se anuncia el <b>{resultados ?? 'día siguiente al cierre'}</b>: si quedas, te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
         </p>
         <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
