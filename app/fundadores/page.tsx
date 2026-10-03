@@ -76,7 +76,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a{' '}
               {total} vendedores con movimiento real, en {reparto}, con <b className="text-white">un mes gratis</b> para
               usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos para postularse</b> y la selección
-              se anuncia al día siguiente. Después decides si te quedas.
+              se anuncia al día siguiente del cierre. Después decides si te quedas.
             </p>
             {/* Beneficios: sin caja (las cajas son de las tandas), ícono + título + bajada */}
             <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Solo para Fundadores</p>
@@ -162,7 +162,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
               <li>En los días de postulación de cada ronda llenas el formulario (2 minutos).</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
-              <li>Al día siguiente anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
+              <li>Al día siguiente del cierre de las postulaciones anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
             </ol>
           </section>
