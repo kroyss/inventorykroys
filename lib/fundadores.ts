@@ -65,14 +65,15 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'otro_sistema', texto: 'Sí, otro sistema o app', puntos: 0 },
     ],
   },
-  // Informativa (2026-10-03): si ya paga una app o a alguien, para el precio de Fundador y para
-  // saber contra quién se compite (Real Trends, Nubimetrics…) o qué trabajo se le ahorra.
+  // Informativa (2026-10-03): si ya paga una app o una asistencia virtual para MercadoLibre = ya es
+  // cliente de algo parecido (para el precio de Fundador y saber contra quién se compite). Que tenga
+  // personal propio no interesa.
   {
-    campo: 'herramientas', texto: '¿Pagas alguna herramienta o servicio para vender?',
+    campo: 'herramientas', texto: '¿Pagas alguna app o asistente virtual para MercadoLibre?',
     opciones: [
       { valor: 'no', texto: 'No, ninguna', puntos: 0 },
-      { valor: 'app', texto: 'Sí, una app', puntos: 0 },
-      { valor: 'persona', texto: 'Sí, una persona que me ayuda', puntos: 0 },
+      { valor: 'app', texto: 'Sí, una app o sistema', puntos: 0 },
+      { valor: 'asistente', texto: 'Sí, un servicio de asistencia virtual', puntos: 0 },
     ],
   },
   {
