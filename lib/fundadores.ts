@@ -7,7 +7,8 @@
 // decírselo en pantalla: el mensaje es el mismo para todos, así nadie sabe qué respuesta lo
 // dejó afuera). El resto se ordena por puntaje y el dueño aprueba desde Plataforma.
 
-export interface Opcion { valor: string; texto: string; puntos: number; descarta?: boolean }
+// exclusiva: en una pregunta de varias, marcarla desmarca las demás (p. ej. "No, ninguna").
+export interface Opcion { valor: string; texto: string; puntos: number; descarta?: boolean; exclusiva?: boolean }
 // multiple: se marcan varias (se guardan separadas por coma y suman los puntos de cada una).
 // ayuda: explicación corta bajo la pregunta (en lugar de "Elige una.").
 export interface Pregunta {
@@ -65,15 +66,16 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'otro_sistema', texto: 'Sí, otro sistema o app', puntos: 0 },
     ],
   },
-  // Informativa (2026-10-03): si ya paga una app o una asistencia virtual para MercadoLibre = ya es
-  // cliente de algo parecido (para el precio de Fundador y saber contra quién se compite). Que tenga
-  // personal propio no interesa.
+  // Informativa (2026-10-03): para qué paga ya alguna herramienta de MercadoLibre = ya es cliente de
+  // algo parecido (para el precio de Fundador y saber contra quién se compite). "preguntas" ≈
+  // Automatizaciones; "analisis" ≈ público del Radar. Sin nombrar a la competencia.
   {
-    campo: 'herramientas', texto: '¿Pagas alguna app o asistente virtual para MercadoLibre?',
+    campo: 'herramientas', texto: '¿Pagas alguna herramienta para MercadoLibre?', multiple: true,
     opciones: [
-      { valor: 'no', texto: 'No, ninguna', puntos: 0 },
-      { valor: 'app', texto: 'Sí, una app o sistema', puntos: 0 },
-      { valor: 'asistente', texto: 'Sí, un servicio de asistencia virtual', puntos: 0 },
+      { valor: 'no', texto: 'No, ninguna', puntos: 0, exclusiva: true },
+      { valor: 'preguntas', texto: 'Sí, para responder preguntas o mensajes', puntos: 0 },
+      { valor: 'analisis', texto: 'Sí, para analizar ventas o competencia', puntos: 0 },
+      { valor: 'otra', texto: 'Sí, para otra cosa', puntos: 0 },
     ],
   },
   {

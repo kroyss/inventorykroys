@@ -55,7 +55,7 @@ const Solicitud = z.object({
   despacho: opciones('despacho'),
   dolor: opciones('dolor'),
   inventario: opcion('inventario'),
-  herramientas: opcion('herramientas'),
+  herramientas: opciones('herramientas'),
   compromiso: opcion('compromiso'),
   navegador_id: z.string().max(64).optional(),
   sitio: z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena

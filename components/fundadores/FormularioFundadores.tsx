@@ -46,7 +46,11 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
   function elegir(p: Pregunta, valor: string) {
     const ya = resp[p.campo] ?? []
     if (p.multiple) {
-      setResp(r => ({ ...r, [p.campo]: ya.includes(valor) ? ya.filter(v => v !== valor) : [...ya, valor] }))
+      // "No, ninguna" (exclusiva) no se combina con las demás: marcar una desmarca la otra.
+      const excl = new Set(p.opciones.filter(o => o.exclusiva).map(o => o.valor))
+      const nuevo = ya.includes(valor) ? ya.filter(v => v !== valor)
+        : excl.has(valor) ? [valor] : [...ya.filter(v => !excl.has(v)), valor]
+      setResp(r => ({ ...r, [p.campo]: nuevo }))
       return
     }
     setResp(r => ({ ...r, [p.campo]: [valor] }))
