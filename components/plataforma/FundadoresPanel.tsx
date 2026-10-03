@@ -144,12 +144,12 @@ export default function FundadoresPanel() {
               <span className={`text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'Abierta' : 'Cerrada'}</span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
-              Inscripción
-              <input type="date" aria-label="Inscripción desde" defaultValue={t.inscribe_desde ?? ''}
+              Postulaciones
+              <input type="date" aria-label="Postulaciones desde" defaultValue={t.inscribe_desde ?? ''}
                 onChange={e => tanda(t, { inscribe_desde: e.target.value || null })}
                 className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
               al
-              <input type="date" aria-label="Inscripción hasta" defaultValue={t.inscribe_hasta ?? ''}
+              <input type="date" aria-label="Postulaciones hasta" defaultValue={t.inscribe_hasta ?? ''}
                 onChange={e => tanda(t, { inscribe_hasta: e.target.value || null })}
                 className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
             </div>
@@ -263,7 +263,7 @@ export default function FundadoresPanel() {
         </div>
       )}
       <p className="text-xs text-neutral-400">
-        Aprobar asigna a la ronda en cuyos días se inscribió (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
+        Aprobar asigna a la ronda en cuyos días se postuló (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
       </p>
     </div>
   )

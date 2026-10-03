@@ -59,7 +59,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
     setError(null)
     const faltan = PREGUNTAS.findIndex(p => !resp[p.campo]?.length)
     if (faltan >= 0) { setPaso(faltan); setError('Falta responder esta pregunta'); return }
-    if (previa) { setError('Vista previa: la solicitud no se envía.'); return }
+    if (previa) { setError('Vista previa: la postulación no se envía.'); return }
     setEnviando(true)
     try {
       const body = {
@@ -82,12 +82,12 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       <section className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm self-start">
         <div className="w-11 h-11 rounded-full bg-lime-100 text-lime-700 grid place-items-center text-xl">✓</div>
         <h2 className="mt-4 text-xl font-semibold text-neutral-900">
-          {hecho.repetida ? 'Ya tenemos tu solicitud' : `¡Listo, ${hecho.nombre}!`}
+          {hecho.repetida ? 'Ya tenemos tu postulación' : `¡Listo, ${hecho.nombre}!`}
         </h2>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           {hecho.repetida
-            ? <>Ya recibimos una solicitud de <b>@{hecho.telegram}</b>. No hace falta enviarla de nuevo.</>
-            : <>Recibimos tu solicitud. La selección se anuncia el <b>{resultados ?? 'día siguiente al cierre'}</b>: si quedas, te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
+            ? <>Ya recibimos una postulación de <b>@{hecho.telegram}</b>. No hace falta enviarla de nuevo.</>
+            : <>Recibimos tu postulación. La selección se anuncia el <b>{resultados ?? 'día siguiente al cierre'}</b>: si quedas, te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
         </p>
         <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
           Si esta vez no se da, no te preocupes: se abrirán nuevas oportunidades para tu perfil.
@@ -99,10 +99,10 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
   if (!abierta && !previa) {
     return (
       <section id="solicitud" className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm self-start">
-        <h2 className="text-xl font-semibold text-neutral-900">Solicitud</h2>
+        <h2 className="text-xl font-semibold text-neutral-900">Postúlate</h2>
         {proxima ? <>
           <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
-            La inscripción es el <b className="text-neutral-900">{proxima}</b>. Esos días aparece aquí mismo el
+            Las postulaciones son el <b className="text-neutral-900">{proxima}</b>. Esos días aparece aquí mismo el
             formulario: toma 2 minutos.
           </p>
           <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
@@ -110,7 +110,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
           </p>
         </> : (
           <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
-            Las inscripciones de esta ronda están cerradas. Pronto abriremos nuevos cupos.
+            Las postulaciones de esta ronda están cerradas. Pronto abriremos nuevos cupos.
           </p>
         )}
       </section>
@@ -132,12 +132,12 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
       {previa && (
         <p className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs px-6 py-2">
-          Vista previa: puedes recorrer todas las preguntas, pero la solicitud no se envía.
+          Vista previa: puedes recorrer todas las preguntas, pero la postulación no se envía.
         </p>
       )}
       <div className="p-6 sm:p-8">
         <div className="flex items-center justify-between text-xs text-neutral-400">
-          <span className="font-semibold uppercase tracking-[0.15em] text-neutral-500">Solicitud</span>
+          <span className="font-semibold uppercase tracking-[0.15em] text-neutral-500">Postulación</span>
           <span className="num">Paso {paso + 1} de {PASOS}</span>
         </div>
 
@@ -228,7 +228,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
           ) : (
             <button type="submit" disabled={enviando}
               className="bg-lime-400 text-neutral-950 px-6 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors disabled:opacity-50">
-              {enviando ? 'Enviando…' : 'Enviar solicitud'}
+              {enviando ? 'Enviando…' : 'Enviar postulación'}
             </button>
           )}
         </div>

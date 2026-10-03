@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     if (!tandaInscribiendo(tandas, hoy)) {
       const prox = proximaInscripcion(tandas, hoy)
       return NextResponse.json({
-        error: prox ? `La inscripción es el ${diasInscripcion(prox)}.` : 'Las inscripciones están cerradas.',
+        error: prox ? `Las postulaciones son el ${diasInscripcion(prox)}.` : 'Las postulaciones están cerradas.',
       }, { status: 403 })
     }
 

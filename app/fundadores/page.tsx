@@ -75,7 +75,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
             <p className="mt-4 text-neutral-400 leading-relaxed">
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a
               {total} vendedores con movimiento real, en {reparto}, con <b className="text-white">un mes gratis</b> para
-              usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos de inscripción</b> y la selección
+              usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos para postularse</b> y la selección
               se anuncia al día siguiente. Después decides si te quedas.
             </p>
             {/* Beneficios: sin caja (las cajas son de las tandas), ícono + título + bajada */}
@@ -104,9 +104,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               const actual = t.numero === destacada
               const cerro = !!t.inscribe_desde && (t.inscribe_hasta ?? t.inscribe_desde) < hoy
               const estado = llena ? 'Completa'
-                : t.numero === abiertaHoy?.numero ? 'Inscripción abierta'
+                : t.numero === abiertaHoy?.numero ? 'Postulaciones abiertas'
                 : !t.abierta ? 'Cerrada'
-                : cerro ? 'Inscripción cerrada'
+                : cerro ? 'Postulaciones cerradas'
                 : 'Próxima'
               const dias = diasInscripcion(t)
               const res = diaResultados(t)
@@ -118,7 +118,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                   </div>
                   {dias && (
                     <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
-                      Inscripción: <span className="text-neutral-200">{dias}</span>
+                      Postulaciones: <span className="text-neutral-200">{dias}</span>
                       {res && <><br />Seleccionados: <span className="text-neutral-200">{fechaTanda(res)}</span></>}
                     </p>
                   )}
@@ -134,7 +134,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <a href="#solicitud" className="inline-flex items-center gap-2 bg-lime-400 text-neutral-950 px-5 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors">
-              {abiertaHoy ? 'Quiero mi cupo' : 'Ver la solicitud'} <span aria-hidden="true">↓</span>
+              {abiertaHoy ? 'Postúlate' : 'Ver la postulación'} <span aria-hidden="true">↓</span>
             </a>
             <span className="text-xs text-neutral-500">{tomados} de {total} pioneros confirmados</span>
           </div>
@@ -160,7 +160,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-neutral-900">Cómo funciona</h2>
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
-              <li>En los días de inscripción de la ronda llenas la solicitud (2 minutos).</li>
+              <li>En los días de postulación de la ronda envías tu postulación (2 minutos).</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
               <li>Al día siguiente anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
