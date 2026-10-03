@@ -259,6 +259,13 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   }
 }
 
+// Link corto de una publicación (MLV123 → https://articulo.mercadolibre.com.ve/MLV-123), como lo
+// escribe el vendedor: la IA lo copia tal cual (con el link largo llegó a mezclar dos).
+const linkCorto = (itemId: string) => {
+  const m = /^(M[A-Z]{2})(\d+)$/.exec(itemId)
+  return m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}` : '—'
+}
+
 // Palabras (raíces en español, sin "de/la/para…") de la pregunta, y cuántas comparte cada
 // respuesta guardada: "¿se conecta con otro igual?" → {conect, otro, igual}.
 const PALABRAS_CTE = `WITH qw AS (SELECT tsvector_to_array(to_tsvector('spanish', $3)) AS w)`
@@ -323,8 +330,8 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   if (c.otras.length) {
     L.push('\nOTRAS PUBLICACIONES DEL VENDEDOR (activas y con stock; solo para recomendar si esta no cumple):')
     for (const o of c.otras) {
-      L.push(`- ${o.titulo} · ${o.precio ?? '?'} ${o.moneda ?? ''} · ${o.disponible} disp. · link: ${o.permalink ?? '—'}` +
-        (o.ficha ? `\n  Ficha: ${o.ficha.slice(0, 400)}` : ''))
+      L.push(`- ${o.titulo} · ${o.precio ?? '?'} ${o.moneda ?? ''} · ${o.disponible} disp. · link: ${linkCorto(o.item_id)}` +
+        (o.ficha ? `\n  Ficha: ${o.ficha.slice(0, 250)}` : ''))
     }
   }
   const par = (xs: { p: string; r: string }[]) => xs.map(x => `P: ${x.p}\nR: ${x.r}`).join('\n\n')

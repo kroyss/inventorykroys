@@ -104,15 +104,20 @@ export interface OtraPublicacion { item_id: string; titulo: string; precio: numb
 
 /** Otras publicaciones del vendedor que podrían servirle al comprador: misma categoría o título
  *  parecido, activas y con stock. Para que la IA recomiende otro modelo si el de la pregunta no cumple. */
-export async function otrasPublicaciones(db: Pool, itemId: string, titulo: string, pregunta: string, limite = 6): Promise<OtraPublicacion[]> {
+export async function otrasPublicaciones(db: Pool, itemId: string, titulo: string, pregunta: string, limite = 12): Promise<OtraPublicacion[]> {
+  // Primero las que comparten palabras con la PREGUNTA ("¿venden el modelo pro?" → las "Pro"),
+  // después las de la misma categoría y las de título parecido. Hasta `limite` (una categoría
+  // puede tener muchas variantes del mismo producto: con 6 se quedaban afuera las que importaban).
   const { rows } = await db.query(
-    `WITH yo AS (SELECT category_id FROM ml_catalogo WHERE item_id = $1)
+    `WITH yo AS (SELECT category_id FROM ml_catalogo WHERE item_id = $1),
+          qw AS (SELECT tsvector_to_array(to_tsvector('spanish', $3)) AS w)
      SELECT c.item_id, c.titulo, c.precio::float AS precio, c.moneda, c.permalink, c.ficha, c.disponible
-     FROM ml_catalogo c
+     FROM ml_catalogo c CROSS JOIN qw
+     JOIN LATERAL (SELECT COUNT(*)::int AS n FROM unnest(tsvector_to_array(to_tsvector('spanish', c.titulo))) t
+                   WHERE t = ANY(qw.w)) x ON TRUE
      WHERE c.item_id <> $1 AND c.estado = 'active' AND c.disponible > 0
-       AND (c.category_id = (SELECT category_id FROM yo) OR similarity(c.titulo, $2) > 0.25 OR word_similarity($3, c.titulo) > 0.45)
-     ORDER BY (c.category_id = (SELECT category_id FROM yo)) DESC NULLS LAST,
-              GREATEST(similarity(c.titulo, $2), word_similarity($3, c.titulo)) DESC
+       AND (c.category_id = (SELECT category_id FROM yo) OR similarity(c.titulo, $2) > 0.25 OR x.n >= 2)
+     ORDER BY x.n DESC, (c.category_id = (SELECT category_id FROM yo)) DESC NULLS LAST, similarity(c.titulo, $2) DESC
      LIMIT $4`, [itemId, titulo, pregunta, limite])
   return rows
 }
