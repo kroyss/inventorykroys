@@ -104,7 +104,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
               <th className="px-4 py-2 text-left">Admins</th>
               <th className="px-4 py-2 text-right">Usuarios</th>
               <th className="px-4 py-2 text-left">Módulos</th>
-              <th className="px-4 py-2 text-right" title="Borradores con IA (Preguntas + Mensajes) por mes. Vacío = sin límite">IA/mes</th>
+              <th className="px-4 py-2 text-right" title="Créditos de IA por mes (1 por borrador; buscar en internet, hasta 4). Vacío = sin límite">IA/mes</th>
               <th className="px-4 py-2 text-left">Estado</th>
             </tr>
           </thead>
@@ -263,7 +263,7 @@ function LimiteIA({ valor, onGuardar }: { valor: number | null; onGuardar: (v: n
   return (
     <input value={v} onChange={ev => setV(ev.target.value.replace(/[^0-9]/g, ''))} onBlur={guardar}
       onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur() }}
-      inputMode="numeric" placeholder="sin límite" title="Borradores con IA por mes (vacío = sin límite)"
+      inputMode="numeric" placeholder="sin límite" title="Créditos de IA por mes (vacío = sin límite)"
       className="w-20 border border-neutral-200 rounded px-1.5 py-0.5 text-xs text-right num" />
   )
 }

@@ -67,7 +67,7 @@ const CABECERAS = () => ({
 export function cuerpoClaude(o: Pedido) {
   const modelo = o.modelo ?? MODELO_IA
   const tools: unknown[] = [o.herramienta]
-  if (o.web) tools.unshift({ type: 'web_search_20250305', name: 'web_search', max_uses: 3 })
+  if (o.web) tools.unshift({ type: 'web_search_20250305', name: 'web_search', max_uses: CREDITOS_WEB_MAX - 1 })
   return {
     model: modelo,
     max_tokens: o.maxTokens ?? 1024,
@@ -128,22 +128,32 @@ export async function leerLote(id: string): Promise<ResultadoLote[] | null> {
 
 // ── Límite de borradores por mes ──────────────────────────────────────────────────────────────
 
-/** Borradores de IA (Preguntas + Mensajes) usados este mes y el límite de la empresa (null = sin
- *  límite: el dueño de la plataforma). Cada "Proponer con IA" cuenta, se use o no la respuesta.
- *  Las fichas no cuentan: solo se arman donde ya se pidió IA (migración 063). */
+/** CRÉDITOS de IA del mes (2026-10-04). El cliente ve "N de 100 créditos" y cada botón dice lo
+ *  que cuesta ANTES de presionarlo:
+ *    · "Proponer con IA" (Preguntas o Mensajes) = 1 crédito, se use o no la respuesta;
+ *    · "Buscar en internet" = 1 + 1 por cada búsqueda que haga la IA (máx. 3) = hasta 4.
+ *  Un crédito ≈ $0,02-0,03 (una búsqueda cuesta $0,01 + las páginas que lee ≈ un borrador difícil).
+ *  usados = filas de ia_uso (un borrador por fila) + sus búsquedas. Límite null = sin límite (el
+ *  dueño de la plataforma). Las fichas no cuentan (apagadas, migración 063). */
+export const CREDITOS_WEB_MAX = 4
+
 export async function cupoIA(db: Pool, empresaId: number) {
   const { rows: [e] } = await dbGlobal().query(
     `SELECT CASE WHEN o.estado = 'propietario' THEN NULL ELSE e.ia_limite_mes END AS limite
      FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id WHERE e.id = $1`, [empresaId])
   const { rows: [u] } = await db.query(
-    `SELECT COUNT(*)::int AS usados FROM ia_uso
+    `SELECT (COUNT(*) + COALESCE(SUM(busquedas), 0))::int AS usados FROM ia_uso
      WHERE modulo IN ('preguntas', 'mensajes') AND fecha >= date_trunc('month', NOW())`)
   const limite: number | null = e?.limite ?? null
-  return { usados: u.usados as number, limite, agotado: limite !== null && u.usados >= limite }
+  const usados = u.usados as number
+  return { usados, limite, quedan: limite === null ? null : Math.max(0, limite - usados), agotado: limite !== null && usados >= limite }
 }
 
 export const mensajeCupoAgotado = (limite: number) =>
-  `Llegaste a los ${limite} borradores con IA de este mes. Las respuestas parecidas y las respuestas rápidas siguen funcionando; el cupo se renueva el día 1.`
+  `Usaste los ${limite} créditos de IA de este mes. Las respuestas parecidas y las respuestas rápidas siguen funcionando; los créditos se renuevan el día 1.`
+
+export const mensajeSinCreditosWeb = (quedan: number) =>
+  `Buscar en internet usa hasta ${CREDITOS_WEB_MAX} créditos y te ${quedan === 1 ? 'queda 1' : `quedan ${quedan}`}. Puedes usar «Proponer con IA» (1 crédito) o anotar el dato del producto.`
 
 /** Lo gastado en IA en el mes actual (por módulo), para mostrarlo en pantalla. */
 export async function usoDelMes(db: Pool) {

@@ -4,10 +4,15 @@ import { useEffect, useState } from 'react'
 /** Avisa a <UsoIA /> que se pidió un borrador (para que actualice el contador). */
 export const avisarUsoIA = () => window.dispatchEvent(new Event('uso-ia'))
 
-/** Borradores de IA usados este mes. El cliente ve "usados de su límite"; el dueño de la plataforma
+/** Lo que cuesta cada botón, en créditos (ver cupoIA en lib/ia.ts). */
+export const CREDITOS_TXT = '1 crédito'
+export const CREDITOS_WEB_TXT = 'hasta 4 créditos'
+const AYUDA_CREDITOS = 'Cada «Proponer con IA» usa 1 crédito, se use o no la respuesta. «Buscar en internet» usa 1 más 1 por cada búsqueda que haga (hasta 4). Las respuestas parecidas y las rápidas no gastan créditos. Se renuevan el día 1.'
+
+/** Créditos de IA usados este mes. El cliente ve "usados de su límite"; el dueño de la plataforma
  *  (sin límite) ve además lo que costaron. */
 export function UsoIA() {
-  const [uso, setUso] = useState<{ total?: number; borradores: number; limite: number | null } | null>(null)
+  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null } | null>(null)
   useEffect(() => {
     let vivo = true
     const cargar = () => fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
@@ -17,19 +22,19 @@ export function UsoIA() {
   }, [])
   if (!uso) return null
   if (uso.limite !== null) {
-    const quedan = Math.max(0, uso.limite - uso.borradores)
+    const quedan = Math.max(0, uso.limite - uso.creditos)
     return (
       <span className={`text-xs whitespace-nowrap ${quedan <= uso.limite * 0.1 ? 'text-amber-700' : 'text-neutral-500'}`}
-        title="Borradores con IA en Preguntas y Mensajes este mes. Las respuestas parecidas y las rápidas no cuentan. Se renueva el día 1.">
-        IA este mes: <b className="num">{uso.borradores}</b> de {uso.limite}
+        title={AYUDA_CREDITOS}>
+        Créditos IA: <b className="num">{uso.creditos}</b> de {uso.limite} · te quedan <b className="num">{quedan}</b>
       </span>
     )
   }
   const total = uso.total ?? 0
   return (
-    <span className="text-xs text-neutral-500 whitespace-nowrap" title="Costo de los borradores de la IA en Preguntas y Mensajes este mes (más las fichas, en segundo plano)">
+    <span className="text-xs text-neutral-500 whitespace-nowrap" title={`Costo de la IA este mes. ${AYUDA_CREDITOS}`}>
       IA este mes: <b className="text-neutral-800 num">${total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: total > 0 && total < 0.995 ? 4 : 2 })}</b>
-      {' '}· {uso.borradores} borrador{uso.borradores === 1 ? '' : 'es'}
+      {' '}· {uso.creditos} crédito{uso.creditos === 1 ? '' : 's'}
     </span>
   )
 }

@@ -5,7 +5,7 @@ import type { PreguntaPrevia } from '@/lib/preguntasComprador'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
+import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -276,6 +276,7 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
           <button type="button" onClick={proponer} disabled={pensando || !mensajes?.length} className="btn-secondary text-sm ml-auto mr-2"
             title="La IA lee la conversación, la nota y la venta, y propone una respuesta (no envía nada)">
             {pensando ? 'Pensando…' : texto ? 'Proponer otra' : 'Proponer con IA'}
+            {!pensando && <span className="ml-1.5 text-xs font-normal text-neutral-400">· {CREDITOS_TXT}</span>}
           </button>
           <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm"
             title={!texto.trim() && archivos.length ? 'Escribe un mensaje para acompañar el archivo' : undefined}>

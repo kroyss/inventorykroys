@@ -21,7 +21,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ pa
     const b = await borradorMensaje(s.db, c.conexion_id, Number(c.ml_user_id), pack, s.session.user.country,
       llevaInventario(s.session.user))
     await registrarUso(s.db, 'mensajes', [{ modelo: b.modelo, uso: b.uso }], s.session.user.id)
-    return NextResponse.json({ borrador: { respuesta: b.respuesta, confianza: b.confianza, falta_dato: b.falta_dato }, ejemplos: b.ejemplos, cupo: { usados: cupo.usados + 1, limite: cupo.limite } })
+    return NextResponse.json({ borrador: { respuesta: b.respuesta, confianza: b.confianza, falta_dato: b.falta_dato }, ejemplos: b.ejemplos, cupo: await cupoIA(s.db, s.session.user.empresaId) })
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('IA ')) {
       return NextResponse.json({ error: `La IA no respondió: ${err.message}` }, { status: 502 })

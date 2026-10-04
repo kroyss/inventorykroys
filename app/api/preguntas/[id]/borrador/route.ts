@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { armarContexto, iaConfigurada, pedirBorrador } from '@/lib/preguntas'
-import { cupoIA, mensajeCupoAgotado, registrarUso } from '@/lib/ia'
+import { CREDITOS_WEB_MAX, cupoIA, mensajeCupoAgotado, mensajeSinCreditosWeb, registrarUso } from '@/lib/ia'
 
 const Body = z.object({ web: z.boolean().optional() })
 
@@ -19,6 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { web } = Body.parse(await req.json().catch(() => ({})))
     const cupo = await cupoIA(s.db, s.session.user.empresaId)
     if (cupo.agotado) return NextResponse.json({ error: mensajeCupoAgotado(cupo.limite!), cupo }, { status: 429 })
+    if (web && cupo.quedan !== null && cupo.quedan < CREDITOS_WEB_MAX)
+      return NextResponse.json({ error: mensajeSinCreditosWeb(cupo.quedan), cupo }, { status: 429 })
     const ctx = await armarContexto(s.db, Number(id), s.session.user.country)
     const b = await pedirBorrador(ctx, !!web)
     await registrarUso(s.db, 'preguntas', b.llamadas, s.session.user.id)
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         vinculado: !!ctx.producto, stock: ctx.producto?.stock ?? null,
         ejemplos: ctx.mismoItem.length + ctx.parecidas.length, descripcion: !!ctx.descripcion,
       },
-      cupo: { usados: cupo.usados + 1, limite: cupo.limite },
+      cupo: await cupoIA(s.db, s.session.user.empresaId),   // ya con este borrador y sus búsquedas
     })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
-import { Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
+import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
@@ -391,11 +391,13 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
       <footer className="flex flex-wrap items-center gap-2">
         <button onClick={() => proponer(false)} disabled={!iaLista || !!pidiendo} className="btn-secondary text-sm">
           {pidiendo === 'normal' ? 'Pensando…' : texto ? 'Proponer otra' : 'Proponer con IA'}
+          {pidiendo !== 'normal' && <span className="ml-1.5 text-xs font-normal text-neutral-400">· {CREDITOS_TXT}</span>}
         </button>
         {meta.falta && (
           <button onClick={() => proponer(true)} disabled={!iaLista || !!pidiendo} className="btn-ghost text-sm"
             title="La IA busca datos técnicos del producto en internet">
             {pidiendo === 'web' ? 'Buscando…' : 'Buscar en internet'}
+            {pidiendo !== 'web' && <span className="ml-1.5 text-xs font-normal text-neutral-400">· {CREDITOS_WEB_TXT}</span>}
           </button>
         )}
         <button onClick={() => setNota(nota === null ? '' : null)} className="btn-ghost text-sm"

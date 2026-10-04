@@ -197,7 +197,9 @@ function DetalleMes({ datos }: { datos: Datos }) {
       ) : metas.map(e => {
         const filas = datos.detalle.filter(d => d.empresa_id === e.id)
         const costo = filas.reduce((a, d) => a + d.costo, 0)
-        const borradores = filas.filter(d => d.modulo !== 'fichas').reduce((a, d) => a + d.usos, 0)
+        const deBoton = filas.filter(d => d.modulo !== 'fichas')
+        const borradores = deBoton.reduce((a, d) => a + d.usos, 0)
+        const creditos = deBoton.reduce((a, d) => a + d.usos + d.busquedas, 0)   // igual que cupoIA
         const entrada = filas.reduce((a, d) => a + d.entrada, 0)
         const salida = filas.reduce((a, d) => a + d.salida, 0)
         const agrupar = (clave: (d: Detalle) => string) => {
@@ -221,14 +223,15 @@ function DetalleMes({ datos }: { datos: Datos }) {
               className="w-full px-4 py-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-left hover:bg-neutral-50 rounded-xl">
               <span className="font-semibold text-neutral-900">{e.nombre}</span>
               <span className="text-sm text-neutral-600">
-                Borradores: <b className="num">{borradores}</b>
+                Créditos: <b className="num">{creditos}</b>
                 {cupo != null ? (
                   <> de <span className="num">{cupo}</span>
-                    <span className={`ml-1 text-xs ${borradores >= cupo * 0.9 ? 'text-amber-700' : 'text-neutral-400'}`}>
-                      ({Math.round((borradores / Math.max(1, cupo)) * 100)}%)
+                    <span className={`ml-1 text-xs ${creditos >= cupo * 0.9 ? 'text-amber-700' : 'text-neutral-400'}`}>
+                      ({Math.round((creditos / Math.max(1, cupo)) * 100)}%)
                     </span>
                   </>
                 ) : <span className="text-xs text-neutral-400"> · sin límite</span>}
+                <span className="text-xs text-neutral-400"> · {borradores} borradores</span>
               </span>
               <span className="text-sm text-neutral-600">
                 Costo: <b className="num text-neutral-900">{usd(costo)}</b>
@@ -303,7 +306,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
         )
       })}
       <p className="text-xs text-neutral-400">
-        Borradores = cada vez que alguien presionó «Proponer con IA» (cuenta para el tope, se use o no la respuesta).
+        Créditos = lo que ve el cliente: 1 por cada «Proponer con IA» (se use o no la respuesta) + 1 por cada búsqueda en internet.
         Haiku = preguntas simples (~$0,004); Sonnet = difíciles (~$0,03); «lote» = fichas a mitad de precio.
         Al cierre = lo gastado hasta hoy llevado a todo el mes.
       </p>
