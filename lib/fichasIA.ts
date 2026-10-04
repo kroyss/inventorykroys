@@ -6,15 +6,20 @@
 // publicó manda (y queda en la ficha para no repetir el error). Las contradicciones (p. ej. el
 // mínimo para envío gratis dicho de dos formas) van aparte en "dudas", para revisarlas.
 //
-// Solo publicaciones ACTIVAS (a las pausadas no les llegan preguntas). Se rehace SOLO cuando la
-// publicación suma 3+ respuestas nuevas (sin respuestas nuevas no hay nada que cambie; rehacerlas
-// cada 30 días costaba ~$2/mes por las ~360 fichas sin aportar nada).
+// POR USO (migración 063, 2026-10-04): solo se arma para publicaciones ACTIVAS donde alguien pidió
+// un borrador a la IA en los últimos DIAS_USO días (ml_catalogo.ia_usada_at, lo marcan
+// armarContexto y borradorMensaje). Antes se armaba para toda publicación con 3+ respuestas:
+// en la cuenta del dueño fueron 515 fichas ($4,55) con 7 borradores pedidos -- el sistema gastaba
+// solo, sin que nadie usara la IA. Se rehace cada REHACER_CADA respuestas nuevas (antes 3: con
+// ~1.200 preguntas/mes eran 150-290 regeneraciones mensuales; con 10, unas 30).
 // La corre el cron de preguntas en segundo plano por la API de LOTES (mitad de precio; nadie
 // espera la respuesta): un lote abierto por empresa a la vez (tabla ia_lotes, migración 060).
 import type { Pool } from 'pg'
 import { enviarLote, inputDeHerramienta, leerLote, registrarUso } from '@/lib/ia'
 
 const MINIMO_RESPUESTAS = 3
+const REHACER_CADA = 10                    // respuestas nuevas para rehacer una ficha
+const DIAS_USO = 60                        // la IA se usó en esa publicación hace menos de esto
 const FICHAS_POR_LOTE = 50
 const MAX_PARES = 150                      // las más recientes (la ficha sale de ahí)
 
@@ -86,8 +91,9 @@ export async function generarFichasPendientes(db: Pool) {
                      WHERE q.item_id = c.item_id AND q.estado = 'ANSWERED' AND q.respuesta IS NOT NULL) r ON TRUE
        LEFT JOIN ml_item_fichas f ON f.item_id = c.item_id
        WHERE r.n >= ${MINIMO_RESPUESTAS} AND c.estado = 'active'
+         AND c.ia_usada_at > NOW() - INTERVAL '${DIAS_USO} days'
          AND (c.ficha_pedida_at IS NULL OR c.ficha_pedida_at < NOW() - INTERVAL '26 hours')
-         AND (f.item_id IS NULL OR r.n >= f.n_preguntas + 3)
+         AND (f.item_id IS NULL OR r.n >= f.n_preguntas + ${REHACER_CADA})
        ORDER BY (f.item_id IS NULL) DESC, r.n DESC
        LIMIT ${FICHAS_POR_LOTE} FOR UPDATE OF c SKIP LOCKED)
      RETURNING item_id, titulo, ficha`)

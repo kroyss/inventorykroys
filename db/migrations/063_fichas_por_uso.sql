@@ -1,0 +1,11 @@
+-- 063 · Fichas de conocimiento POR USO (2026-10-04).
+--
+-- Antes la ficha se armaba para TODA publicación activa con 3+ respuestas, se usara la IA o no:
+-- en la cuenta del dueño fueron 515 fichas ($4,55) con solo 7 borradores pedidos. Ahora la ficha
+-- se arma solo para publicaciones donde alguien pidió un borrador a la IA (ia_usada_at), y se
+-- rehace cada 10 respuestas nuevas (antes 3) mientras se siga usando la IA ahí (60 días).
+-- El primer borrador de una publicación sin ficha usa sus respuestas anteriores y las parecidas
+-- (como siempre); la ficha llega en el lote siguiente para los borradores que vengan.
+--
+-- ml_catalogo es por empresa (RLS ya puesta en 059): solo se agrega la columna. Idempotente.
+ALTER TABLE ml_catalogo ADD COLUMN IF NOT EXISTS ia_usada_at TIMESTAMPTZ;

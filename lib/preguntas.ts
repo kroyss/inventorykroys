@@ -242,6 +242,8 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
      ORDER BY x.n DESC, similarity(p.texto, $2) DESC, p.fecha DESC
      LIMIT 10`, [q.item_id, q.texto])
   const { rows: [ficha] } = await db.query(`SELECT texto, dudas FROM ml_item_fichas WHERE item_id = $1`, [q.item_id])
+  // Se pidió IA en esta publicación: desde ahora merece ficha (fichas POR USO, migración 063).
+  await db.query(`UPDATE ml_catalogo SET ia_usada_at = NOW() WHERE item_id = $1`, [q.item_id]).catch(() => {})
   const otras = await otrasPublicaciones(db, q.item_id, item?.title ?? q.item_titulo ?? '', q.texto).catch(() => [])
 
   return {
