@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -118,15 +118,24 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [datos, setDatos] = useState<Datos | null>(null)
+  // De qué pestaña son los `datos` que hay en pantalla. Al pasar de Historial a Sin responder,
+  // durante el viaje al servidor seguían los del Historial (ya respondidas) dibujados como
+  // tarjetas pendientes. Mientras no coincida, se muestra "Cargando".
+  const [datosDe, setDatosDe] = useState<string | null>(null)
+  const ultimoPedido = useRef(0)
   const [sincronizando, setSincronizando] = useState(false)
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
   const cargar = useCallback(async () => {
     const v = vista === 'respondidas' ? 'respondidas' : 'pendientes'
+    const n = ++ultimoPedido.current
     const r = await fetch(`/api/preguntas?vista=${v}&page=${page}&q=${encodeURIComponent(q)}`)
     const d = await r.json().catch(() => ({}))
+    // Una respuesta vieja (de la pestaña o página anterior) que llega tarde no pisa la actual.
+    if (n !== ultimoPedido.current) return
     if (!r.ok) { setAviso({ tipo: 'error', texto: d.error ?? 'No se pudo cargar' }); return }
     setDatos(d)
+    setDatosDe(v)
   }, [vista, page, q])
 
   useEffect(() => { cargar() }, [cargar])
@@ -197,7 +206,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
             <CuentasYPoliticas cuentas={datos.cuentas} mlListo={datos.configuracion.ml} onCambio={cargar} />
           </div>
         ) : <Cargando />
-      ) : !datos ? <Cargando /> : sinCuentas && datos.total === 0 ? (
+      ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
           <EmptyState message="Todavía no hay cuentas de MercadoLibre conectadas."
             cta={isAdmin
