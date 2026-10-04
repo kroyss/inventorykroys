@@ -27,7 +27,7 @@ export default function AprendizajeNav() {
     <Link href="/aprendizaje" title={completo ? 'Aprendizaje: completado' : n.total ? `Aprendizaje: ${n.hechos} de ${n.total} videos` : 'Aprendizaje: por dónde empezar'}
       className={`hidden md:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm transition-colors ${
         activo ? 'bg-neutral-900 text-white' : completo ? 'text-neutral-500 hover:bg-neutral-100' : 'bg-lime-50 text-lime-900 ring-1 ring-inset ring-lime-300 hover:bg-lime-100'}`}>
-      <span aria-hidden="true">🎓</span>
+      <span aria-hidden="true" className={completo ? 'grayscale opacity-60' : undefined}>🎓</span>
       {!completo && <>Aprendizaje {n.total > 0 && <span className="num text-xs opacity-80">{n.hechos}/{n.total}</span>}</>}
     </Link>
   )
