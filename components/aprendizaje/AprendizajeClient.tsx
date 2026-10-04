@@ -53,8 +53,8 @@ export default function AprendizajeClient() {
 
   if (!videos) return <PageHeader title="Aprendizaje" subtitle="Cargando…" />
   if (videos.length === 0) {
-    return <div><PageHeader title="Aprendizaje" subtitle="Videos cortos para sacarle todo el provecho al sistema" />
-      <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">Pronto habrá videos aquí.</p></div>
+    return <div className="space-y-5"><PageHeader title="Aprendizaje" subtitle="Por dónde empezar" />
+      <PrimerosPasos agendar={agendar} hayVideos={false} /></div>
   }
 
   const hechos = videos.filter(v => v.completado).length
@@ -261,5 +261,36 @@ function Reproductor({ video, onAvance }: {
         ))}
       </div>
     </div>
+  )
+}
+
+/** Los primeros pasos, en orden (lo primero que ve un cliente nuevo). Sin videos todavía, es la guía. */
+function PrimerosPasos({ agendar, hayVideos }: { agendar: string | null; hayVideos: boolean }) {
+  const pasos: { titulo: string; texto: string; link?: { href: string; label: string; externo?: boolean } }[] = [
+    { titulo: 'Aprende primero', texto: hayVideos
+        ? 'Mira los videos de esta página, en orden. Tus días de prueba no corren mientras no conectes tu cuenta.'
+        : 'Los videos cortos aparecerán en esta página. Mientras tanto, recorre Automatizaciones con calma: tus días de prueba no corren mientras no conectes tu cuenta.' },
+    { titulo: 'Conecta tu cuenta de MercadoLibre', texto: 'Con la cuenta PRINCIPAL abierta en este navegador. Desde ese día empiezan tus días de prueba.',
+      link: { href: '/conectar', label: 'Conectar ahora →' } },
+    { titulo: 'Escribe tus políticas', texto: 'Envíos, garantía, horarios y formas de pago: con eso la IA responde tus preguntas como tú.',
+      link: { href: '/preguntas', label: 'Ir a Preguntas →' } },
+    { titulo: 'Agenda tu configuración', texto: 'Te acompañamos 1 a 1 a dejar todo listo: Despachos, Reportador y Calificaciones.',
+      link: agendar ? { href: agendar, label: 'Agendar por Telegram →', externo: true } : undefined },
+  ]
+  return (
+    <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
+      {pasos.map((p, i) => (
+        <li key={p.titulo} className="flex gap-4 px-5 py-4">
+          <span className="shrink-0 w-7 h-7 rounded-full bg-lime-100 text-lime-900 text-sm font-semibold flex items-center justify-center num">{i + 1}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-neutral-900">{p.titulo}</p>
+            <p className="text-sm text-neutral-600">{p.texto}</p>
+            {p.link && (p.link.externo
+              ? <a href={p.link.href} target="_blank" rel="noreferrer" className="inline-block mt-1 text-sm font-medium text-lime-800 hover:underline">{p.link.label}</a>
+              : <a href={p.link.href} className="inline-block mt-1 text-sm font-medium text-lime-800 hover:underline">{p.link.label}</a>)}
+          </div>
+        </li>
+      ))}
+    </ol>
   )
 }
