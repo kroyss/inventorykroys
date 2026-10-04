@@ -133,17 +133,19 @@ export async function leerLote(id: string): Promise<ResultadoLote[] | null> {
  *    · "Proponer con IA" (Preguntas o Mensajes) = 1 crédito, se use o no la respuesta;
  *    · "Buscar en internet" = 1 + 1 por cada búsqueda que haga la IA (máx. 3) = hasta 4.
  *  Un crédito ≈ $0,02-0,03 (una búsqueda cuesta $0,01 + las páginas que lee ≈ un borrador difícil).
- *  usados = filas de ia_uso (un borrador por fila) + sus búsquedas. Límite null = sin límite (el
- *  dueño de la plataforma). Las fichas no cuentan (apagadas, migración 063). */
+ *  usados = filas de ia_uso (un borrador por fila) + sus búsquedas. Límite null = sin límite (desde
+ *  la migración 066 el dueño también tiene tope, por decisión propia). Las fichas no cuentan (apagadas, migración 063). */
 export const CREDITOS_WEB_MAX = 4
 
 export async function cupoIA(db: Pool, empresaId: number) {
   const { rows: [e] } = await dbGlobal().query(
-    `SELECT CASE WHEN o.estado = 'propietario' THEN NULL ELSE e.ia_limite_mes END AS limite
-     FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id WHERE e.id = $1`, [empresaId])
+    `SELECT ia_limite_mes AS limite, ia_creditos_desde AS desde FROM empresas WHERE id = $1`, [empresaId])
+  // Cuenta desde el día 1 del mes, o desde ia_creditos_desde si es más reciente (migración 066:
+  // el dueño arrancó sus créditos a mitad de mes, sin descontarse lo de antes).
   const { rows: [u] } = await db.query(
     `SELECT (COUNT(*) + COALESCE(SUM(busquedas), 0))::int AS usados FROM ia_uso
-     WHERE modulo IN ('preguntas', 'mensajes') AND fecha >= date_trunc('month', NOW())`)
+     WHERE modulo IN ('preguntas', 'mensajes')
+       AND fecha >= GREATEST(date_trunc('month', NOW()), COALESCE($1::timestamptz, '-infinity'))`, [e?.desde ?? null])
   const limite: number | null = e?.limite ?? null
   const usados = u.usados as number
   return { usados, limite, quedan: limite === null ? null : Math.max(0, limite - usados), agotado: limite !== null && usados >= limite }

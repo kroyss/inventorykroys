@@ -215,7 +215,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
         const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.usuario))
         const porDia = agrupar(d => d.dia).sort((a, b) => a[0].localeCompare(b[0]))
         const maxDia = Math.max(...porDia.map(([, g]) => g.costo), 0.0001)
-        const cupo = e.propietario ? null : e.limite
+        const cupo = e.limite
         const abierto = abierta === e.id
         return (
           <div key={e.id} className="bg-white rounded-xl border border-neutral-200 shadow-sm">

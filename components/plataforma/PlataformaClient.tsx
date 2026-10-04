@@ -134,9 +134,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                   </div>
                 </td>
                 <td className="px-4 py-2 text-right">
-                  {e.estado === 'propietario'
-                    ? <span className="text-xs text-neutral-400" title="El dueño de la plataforma no tiene límite">sin límite</span>
-                    : <LimiteIA key={`${e.id}-${e.ia_limite_mes}`} valor={e.ia_limite_mes} onGuardar={v => actualizar(e, { ia_limite_mes: v })} />}
+                  <LimiteIA key={`${e.id}-${e.ia_limite_mes}`} valor={e.ia_limite_mes} onGuardar={v => actualizar(e, { ia_limite_mes: v })} />
                 </td>
                 <td className="px-4 py-2">
                   <button disabled={e.id === empresaActual}
