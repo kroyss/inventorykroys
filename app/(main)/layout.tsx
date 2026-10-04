@@ -6,6 +6,7 @@ import BottomNav from '@/components/layout/BottomNav'
 import CommandPalette from '@/components/layout/CommandPalette'
 import { ES_STAGING } from '@/lib/entorno'
 import { AvisosProvider } from '@/components/layout/Avisos'
+import AvisoCuenta from '@/components/layout/AvisoCuenta'
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -25,6 +26,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         </div>
       )}
       <Navbar />
+      <AvisoCuenta organizacionId={session.user.organizacionId} esAdmin={role === 'admin'} />
       <main className="max-w-7xl mx-auto px-4 py-6">
         {children}
       </main>
