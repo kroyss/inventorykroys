@@ -233,7 +233,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
      SELECT p.texto AS p, p.respuesta AS r FROM ml_preguntas p, qw, ${COMPARTIDAS}
      WHERE p.item_id = $1 AND p.id <> $2 AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
      ORDER BY x.n DESC, similarity(p.texto, $3) DESC, p.fecha DESC
-     LIMIT 8`, [q.item_id, q.id, q.texto])
+     LIMIT 12`, [q.item_id, q.id, q.texto])   // 12 (antes 8): sin fichas nuevas, más memoria de la misma publicación
   const { rows: parecidas } = await db.query(
     `${PALABRAS_CTE.split('$3').join('$2')}
      SELECT p.texto AS p, p.respuesta AS r FROM ml_preguntas p, qw, ${COMPARTIDAS}

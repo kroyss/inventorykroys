@@ -81,6 +81,13 @@ export async function generarFichasPendientes(db: Pool) {
     await db.query(`UPDATE ia_lotes SET estado = 'terminado', terminado_at = NOW() WHERE id = $1`, [abierto.id])
   }
 
+  // APAGADAS por defecto (decisión del dueño, 2026-10-04): no se arman fichas nuevas. El borrador
+  // ya recibe, buscadas por la BASE (sin IA, sin tokens), las respuestas anteriores más parecidas
+  // de la misma publicación y de otras; la ficha solo las resumía, y costaba más que los
+  // borradores mismos. Las fichas que ya existen se siguen usando. Un lote ya enviado se recoge
+  // igual arriba (ya se pagó). Para volver a encenderlas: FICHAS_IA=1 en el .env.
+  if (process.env.FICHAS_IA !== '1') return guardadas
+
   // Reserva atómica: publicaciones del catálogo con suficientes respuestas y ficha vieja o sin ficha.
   // Un lote puede tardar hasta 24 h: la reserva vence a las 26 h por si el lote se perdió.
   const { rows } = await db.query(
