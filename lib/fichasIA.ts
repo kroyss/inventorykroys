@@ -78,8 +78,9 @@ export async function generarFichasPendientes(db: Pool) {
           [r.custom_id, datos, f.dudas?.trim() || null, totales[r.custom_id] ?? 0])
         guardadas++
       } catch (e) {
-        // Queda libre para el próximo lote.
-        await db.query(`UPDATE ml_catalogo SET ficha_pedida_at = NULL WHERE item_id = $1`, [r.custom_id])
+        // NO se libera la reserva (bug 2026-10-04): las fichas que llegaban cortadas por max_tokens
+        // fallaban, se liberaban y entraban de nuevo en el lote siguiente, cada 2 minutos, pagándose
+        // cada vez (111 de 556 = $1,93 tirados). Con la reserva puesta, se reintenta a las 26 h.
         console.error('[fichas IA]', r.custom_id, e instanceof Error ? e.message : e)
       }
     }
