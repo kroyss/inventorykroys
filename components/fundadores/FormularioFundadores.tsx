@@ -128,6 +128,11 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
         <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
           Si esta vez no se da, no te preocupes: se abrirán nuevas oportunidades para tu perfil.
         </p>
+        <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noopener noreferrer"
+          className="mt-4 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900 hover:bg-sky-100">
+          <span aria-hidden="true">✈️</span>
+          <span>Mientras tanto, únete a nuestra <b>Comunidad de Vendedores</b> en Telegram: <span className="underline underline-offset-2">t.me/comerciantedigitalve</span></span>
+        </a>
       </section>
     )
   }
@@ -240,6 +245,11 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                     autoCapitalize="none" spellCheck={false} className={campo} />
                 </div>
               </div>
+              <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noopener noreferrer"
+                className="-mt-1 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 hover:bg-sky-100">
+                <span aria-hidden="true">✈️</span>
+                <span>¿Aún no estás en nuestra <b>Comunidad de Vendedores</b>? Únete en Telegram: <span className="underline underline-offset-2">t.me/comerciantedigitalve</span></span>
+              </a>
               <p className="-mt-2 text-xs text-neutral-400">Con el nick solo vemos tu reputación pública: no accedemos a tu cuenta.</p>
               <div>
                 <label htmlFor="mensaje" className="flex items-baseline justify-between gap-2 text-sm font-medium text-neutral-700 mb-1">
