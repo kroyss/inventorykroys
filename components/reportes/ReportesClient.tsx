@@ -33,7 +33,8 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 
 // analisisStock: módulo. Sin él no están Stock (reposición/declive/remate, calibrado a importaciones)
 // ni Conteos (conteos físicos).
-export default function ReportesClient({ analisisStock }: { analisisStock: boolean }) {
+// importaciones: módulo. Sin él no se ofrece el filtro Local/Importación (solo hay compras locales).
+export default function ReportesClient({ analisisStock, importaciones }: { analisisStock: boolean; importaciones: boolean }) {
   const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', 'ventas')
   const tab = !analisisStock && (tabGuardada === 'stock' || tabGuardada === 'conteos') ? 'ventas' : tabGuardada
   const stateTabs = analisisStock ? STATE_TABS : STATE_TABS.filter(t => t.key !== 'stock' && t.key !== 'conteos')
@@ -158,7 +159,7 @@ export default function ReportesClient({ analisisStock }: { analisisStock: boole
         <SalesReport data={data} search={search} setSearch={setSearch} statusF={ventaStatus} setStatusF={setVentaStatus} />
       )}
       {!loading && data && tab === 'compras'    && data.purchases   && (
-        <PurchasesReport data={data} search={search} setSearch={setSearch} tipo={compraTipo} setTipo={setCompraTipo} />
+        <PurchasesReport data={data} search={search} setSearch={setSearch} tipo={importaciones ? compraTipo : ''} setTipo={setCompraTipo} importaciones={importaciones} />
       )}
       {!loading && data && tab === 'inventario' && data.items       && (
         <InventoryReport data={data} search={search} setSearch={setSearch} />
@@ -168,7 +169,7 @@ export default function ReportesClient({ analisisStock }: { analisisStock: boole
       )}
       {!loading && data && tab === 'top'      && Array.isArray(data) && <TopProductsReport rows={data} />}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
-        <InTransitReport rows={data} tipo={transTipo} setTipo={setTransTipo} />
+        <InTransitReport rows={data} tipo={importaciones ? transTipo : ''} setTipo={setTransTipo} importaciones={importaciones} />
       )}
       {!loading && data && tab === 'conteos'  && data.items && (
         <CountsReport data={data} search={search} setSearch={setSearch} />
@@ -233,7 +234,7 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
 }
 
 // ───── compras ─────
-function PurchasesReport({ data, search, setSearch, tipo, setTipo }: any) {
+function PurchasesReport({ data, search, setSearch, tipo, setTipo, importaciones }: any) {
   const rows = useMemo(() => {
     let r = data.purchases as any[]
     if (tipo) r = r.filter(o => o.order_type === tipo)
@@ -262,11 +263,11 @@ function PurchasesReport({ data, search, setSearch, tipo, setTipo }: any) {
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <SearchBar value={search} onChange={setSearch} placeholder="Buscar orden o proveedor…" />
-        <select value={tipo} onChange={e => setTipo(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm">
+        {importaciones && <select value={tipo} onChange={e => setTipo(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm">
           <option value="">Local + Importación</option>
           <option value="local">Solo local</option>
           <option value="import">Solo importación</option>
-        </select>
+        </select>}
       </div>
       <DataTable columns={cols} rows={rows} exportName="compras" emptyText="Sin compras en el período" />
     </div>
@@ -823,7 +824,7 @@ function TopProductsReport({ rows }: { rows: any[] }) {
 }
 
 // ───── in transit ─────
-function InTransitReport({ rows, tipo, setTipo }: any) {
+function InTransitReport({ rows, tipo, setTipo, importaciones }: any) {
   const filtered = tipo ? (rows as any[]).filter(o => o.tipo === tipo) : rows
   const exportFlat = () => {
     const flat: Record<string, unknown>[] = []
@@ -839,11 +840,11 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <div className="flex items-center gap-3">
-          <select value={tipo} onChange={e => setTipo(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm">
+          {importaciones && <select value={tipo} onChange={e => setTipo(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm">
             <option value="">Local + Importación</option>
             <option value="local">Solo local</option>
             <option value="import">Solo importación</option>
-          </select>
+          </select>}
           <span className="text-xs text-neutral-500">
             {filtered.length} orden{filtered.length === 1 ? '' : 'es'} · <span className="text-amber-600 font-semibold">{totalPend}</span> und pendientes
           </span>
@@ -876,7 +877,7 @@ function InTransitReport({ rows, tipo, setTipo }: any) {
                     <tr className="bg-neutral-50/70 border-t border-neutral-200">
                       <td colSpan={3} className="px-3 py-1.5">
                         <span className="font-mono font-semibold text-neutral-800">{o.order_number}</span>
-                        <span className="text-neutral-400 text-xs"> · {o.tipo}</span>
+                        {importaciones && <span className="text-neutral-400 text-xs"> · {o.tipo}</span>}
                         {o.supplier_name && <span className="text-neutral-500 text-xs"> · {o.supplier_name}</span>}
                         <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-200 text-neutral-700">{o.status}</span>
                       </td>
