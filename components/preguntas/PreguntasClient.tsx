@@ -478,12 +478,13 @@ function CuentasYPoliticas({ cuentas, mlListo, onCambio }: { cuentas: Cuenta[]; 
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold text-neutral-900">Cuentas de MercadoLibre</h2>
           {mlListo
-            ? <a href="/api/ml/conectar" className="btn-primary text-sm">Conectar cuenta</a>
+            ? <a href="/conectar" className="btn-primary text-sm">Conectar cuenta</a>
             : <span className="text-xs text-amber-700">Falta configurar la app de ML</span>}
         </div>
         <p className="text-xs text-neutral-500">
           Te lleva a MercadoLibre para autorizar. Entra con la cuenta PRINCIPAL del vendedor (un colaborador no puede autorizar).
         </p>
+        {mlListo && <LinkConectar />}
         {cuentas.length === 0 ? <p className="text-sm text-neutral-400">Ninguna conectada todavía. Si estás en prueba, tus días gratis empiezan cuando conectes la primera.</p> : (
           <ul className="divide-y divide-neutral-100">
             {cuentas.map(c => (
@@ -581,5 +582,27 @@ function Plantillas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuard
         <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
       </div>
     </section>
+  )
+}
+
+/** Link corto para conectar desde otra PC (app/conectar): se copia y se abre allá. */
+function LinkConectar() {
+  const [copiado, setCopiado] = useState(false)
+  const [url, setUrl] = useState('/conectar')
+  useEffect(() => { setUrl(`${window.location.origin}/conectar`) }, [])
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(url); setCopiado(true); setTimeout(() => setCopiado(false), 2000) } catch { /* sin portapapeles */ }
+  }
+  return (
+    <div className="rounded-lg bg-neutral-50 border border-neutral-200 p-2.5 space-y-1.5">
+      <p className="text-xs text-neutral-600">
+        <b>¿La cuenta de MercadoLibre está abierta en otra PC?</b> Copia este link y ábrelo allá: entra al sistema con tu
+        usuario y conecta la cuenta de ML que esté abierta en ESE navegador.
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 min-w-0 truncate text-xs bg-white border border-neutral-200 rounded px-2 py-1">{url}</code>
+        <button type="button" onClick={copiar} className="btn-secondary text-xs px-2 py-1 whitespace-nowrap">{copiado ? '✓ Copiado' : 'Copiar'}</button>
+      </div>
+    </div>
   )
 }

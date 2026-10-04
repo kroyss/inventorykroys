@@ -29,7 +29,14 @@ export default function LoginForm({ marca }: { marca: Marca }) {
     })
 
     if (result?.ok) {
-      router.push('/')
+      // Vuelve a donde iba (p. ej. el link /conectar abierto sin sesión); solo rutas propias.
+      const destino = new URLSearchParams(window.location.search).get('callbackUrl') ?? '/'
+      let ruta = '/'
+      try {
+        const u = new URL(destino, window.location.origin)
+        if (u.origin === window.location.origin) ruta = u.pathname + u.search
+      } catch { /* destino inválido: inicio */ }
+      router.push(ruta)
       router.refresh()
     } else {
       setError(result?.error === CUENTA_VENCIDA
