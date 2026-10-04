@@ -228,7 +228,8 @@ export default function FundadoresPanel() {
                   <div className="pt-1"><Respuestas s={s} /></div>
                   <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">
                     {s.nick_ml ? <>
-                      <span>Nick ML: <b className="text-neutral-700">{s.nick_ml}</b> <span className="text-lime-700">+{PUNTO_NICK}</span></span>
+                      <span>Nick ML: <a href={`https://www.mercadolibre.com.ve/perfil/vendedor/${encodeURIComponent(s.nick_ml)}`} target="_blank" rel="noreferrer"
+                        title="Ver su perfil en MercadoLibre (reputación y calificaciones)" className="font-bold text-neutral-700 underline underline-offset-2 hover:text-neutral-900">{s.nick_ml} ↗</a> <span className="text-lime-700">+{PUNTO_NICK}</span></span>
                       {v ? (v.encontrado
                         ? <span className="text-emerald-700">✓ {v.nickname} · {v.ventas_total != null ? `${v.ventas_total.toLocaleString('de-DE')} ventas en total` : 'sin dato de ventas'}
                             {v.ventas_periodo != null ? ` · ${v.ventas_periodo} en ${v.periodo === '60 days' ? '60 días' : v.periodo}` : ''}
