@@ -21,7 +21,7 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
   if (o.prueba_dias != null && quedan >= o.prueba_dias) {
     return (
       <div className="bg-lime-50 border-b border-lime-200 text-lime-900 text-center text-sm py-2 px-4">
-        Tus <b>{o.prueba_dias} días gratis</b> empiezan cuando conectes tu primera cuenta de MercadoLibre
+        Tus <b>días gratis</b> empiezan cuando conectes tu primera cuenta de MercadoLibre
         {quedan - o.prueba_dias <= 3 ? <> (si no, empiezan solos {quedan - o.prueba_dias === 0 ? 'hoy' : `en ${quedan - o.prueba_dias} día${quedan - o.prueba_dias === 1 ? '' : 's'}`})</> : null}.{' '}
         {esAdmin && <Link href="/conectar" className="underline font-semibold whitespace-nowrap">Conectar ahora →</Link>}
       </div>
