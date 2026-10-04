@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { canjearCodigo, cifrar, usuarioML } from '@/lib/ml'
+import { dbGlobal } from '@/lib/db'
 
 // Paso 2 del OAuth: ML vuelve con ?code&state. Se canjea el código por los tokens y se
 // guarda la cuenta en la empresa de la sesión (cifrados). Siempre termina en /preguntas.
@@ -49,6 +50,13 @@ export async function GET(req: NextRequest) {
       // La fila existe pero es de OTRA empresa (RLS no deja actualizarla).
       return volver({ ml_error: `La cuenta ${u.nickname} ya está conectada en otra empresa` })
     }
+    // Primera cuenta conectada: arrancan los días de prueba (migración 067). LEAST: nunca pasa
+    // del tope que se fijó al crear la cuenta; prueba_dias = NULL para no volver a hacerlo.
+    await dbGlobal().query(
+      `UPDATE organizaciones o SET prueba_dias = NULL,
+         prueba_hasta = LEAST(o.prueba_hasta, (NOW() AT TIME ZONE 'America/Caracas')::date + o.prueba_dias)
+       FROM empresas e WHERE e.id = $1 AND o.id = e.organizacion_id AND o.prueba_dias IS NOT NULL AND o.estado = 'prueba'`,
+      [s.session.user.empresaId]).catch(e => console.error('[ML callback] prueba', e instanceof Error ? e.message : e))
     return volver({ conectada: u.nickname })
   } catch (e) {
     console.error('[ML callback]', e instanceof Error ? e.message : e)

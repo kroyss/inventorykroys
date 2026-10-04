@@ -6,6 +6,10 @@ export type EstadoCuenta = 'propietario' | 'prueba' | 'activo' | 'vencido'
 /** Días de prueba gratis según el tipo de alta. */
 export const DIAS_PRUEBA = { fundador: 30, normal: 15 } as const
 
+/** La prueba arranca al conectar la primera cuenta de ML (migración 067), pero a más tardar
+ *  estos días después de creada la cuenta. */
+export const DIAS_ESPERA_CONEXION = 7
+
 /** Condición SQL (alias `o` = organizaciones): ¿sus usuarios pueden entrar hoy? Una prueba con la
  *  fecha ya pasada (hora Caracas) cuenta como vencida. */
 export const SQL_CUENTA_HABILITADA = `(o.estado IN ('propietario', 'activo')

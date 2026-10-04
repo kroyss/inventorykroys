@@ -29,6 +29,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       `UPDATE organizaciones SET
          estado       = COALESCE($2, estado),
          prueba_hasta = CASE WHEN $4 THEN $3::date ELSE prueba_hasta END,
+         -- una fecha cambiada a mano (o salir de prueba) manda: ya no se recalcula al conectar ML (mig. 067)
+         prueba_dias  = CASE WHEN ($4 AND $3::date IS DISTINCT FROM prueba_hasta) OR $2 IN ('activo', 'vencido') THEN NULL ELSE prueba_dias END,
          fundador     = COALESCE($5, fundador)
        WHERE id = $1`,
       [id, b.estado ?? null, b.prueba_hasta ?? null, b.prueba_hasta !== undefined, b.fundador ?? null])

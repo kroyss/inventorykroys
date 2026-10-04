@@ -20,6 +20,7 @@ interface Empresa {
   admins: string | null
   estado: EstadoCuenta
   prueba_hasta: string | null
+  prueba_dias: number | null
   fundador: boolean
   ia_limite_mes: number | null
 }
@@ -201,8 +202,8 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
         </label>
         <label className="text-xs text-neutral-600">Cuenta
           <select className={input} value={f.alta} onChange={e => setF({ ...f, alta: e.target.value as typeof f.alta })}>
-            <option value="fundador">⭐ Fundador: {DIAS_PRUEBA.fundador} días gratis</option>
-            <option value="prueba">Prueba: {DIAS_PRUEBA.normal} días gratis</option>
+            <option value="fundador">⭐ Fundador: {DIAS_PRUEBA.fundador} días gratis desde que conecte ML</option>
+            <option value="prueba">Prueba: {DIAS_PRUEBA.normal} días gratis desde que conecte ML</option>
             <option value="activo">Activo (ya paga)</option>
           </select>
         </label>
@@ -272,16 +273,20 @@ function Cuenta({ e, hoy, onGuardada, onError }: {
   const [editando, setEditando] = useState(false)
   const [f, setF] = useState({ estado: e.estado, prueba_hasta: e.prueba_hasta ?? '', fundador: e.fundador })
   const ef = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
-  const dias = e.prueba_hasta && ef === 'prueba'
+  const esperando = ef === 'prueba' && e.prueba_dias != null      // aún no conecta ML (migración 067)
+  const dias = e.prueba_hasta && ef === 'prueba' && !esperando
     ? Math.round((Date.parse(`${e.prueba_hasta}T12:00:00Z`) - Date.parse(`${hoy}T12:00:00Z`)) / 86_400_000) : null
 
   const pastilla = (
     <span className="inline-flex flex-wrap items-center gap-1">
       <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${COLOR_ESTADO[ef]}`}>
         {ETIQUETA_ESTADO[ef]}
-        {ef === 'prueba' && e.prueba_hasta ? ` · hasta ${ddmm(e.prueba_hasta)}` : ''}
+        {esperando ? ` · ${e.prueba_dias} días al conectar ML` : ef === 'prueba' && e.prueba_hasta ? ` · hasta ${ddmm(e.prueba_hasta)}` : ''}
         {ef === 'vencido' && e.estado === 'prueba' && e.prueba_hasta ? ` · el ${ddmm(e.prueba_hasta)}` : ''}
       </span>
+      {esperando && e.prueba_hasta && <span className="text-[11px] text-neutral-500 whitespace-nowrap"
+        title={`Si no conecta su cuenta de MercadoLibre, los días corren igual: vence a más tardar el ${ddmm(e.prueba_hasta)}`}>
+        tope {ddmm(e.prueba_hasta)}</span>}
       {e.fundador && <span className="text-xs text-amber-700 whitespace-nowrap" title="Programa Fundadores: precio especial">⭐ Fundador</span>}
       {dias != null && dias <= 5 && <span className="text-[11px] text-amber-700 whitespace-nowrap">quedan {dias} día{dias === 1 ? '' : 's'}</span>}
     </span>

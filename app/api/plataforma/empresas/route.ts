@@ -9,7 +9,7 @@ import { esDuenoPlataforma } from '@/lib/empresa'
 import { MODULOS } from '@/lib/modulos'
 import { forbidden, unauthorized } from '@/lib/session'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
-import { DIAS_PRUEBA } from '@/lib/cuenta'
+import { DIAS_ESPERA_CONEXION, DIAS_PRUEBA } from '@/lib/cuenta'
 import { currentDate } from '@/lib/tz'
 
 // Plataforma: alta y listado de empresas clientes. Solo el dueño de la plataforma.
@@ -28,7 +28,7 @@ export async function GET() {
     const { rows } = await dbGlobal().query(
       `SELECT e.id, e.nombre, e.country, e.modulos, e.is_active, e.created_at, e.ia_limite_mes,
               o.id AS organizacion_id, o.nombre AS organizacion,
-              o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.fundador,
+              o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.prueba_dias, o.fundador,
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
               (SELECT string_agg(u.username, ', ' ORDER BY u.username)
                  FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
@@ -79,12 +79,14 @@ export async function POST(req: NextRequest) {
     if (dupU) { await client.query('ROLLBACK'); return NextResponse.json({ error: `El usuario "${body.admin.username}" ya existe. Elige otro.` }, { status: 400 }) }
 
     // Cuenta: Fundador = 30 días gratis + marca permanente; Prueba = 15 días; Activo = ya paga.
+    // Los días arrancan al conectar la primera cuenta de ML (api/ml/callback, migración 067); hasta
+    // entonces prueba_hasta es el TOPE: hoy + DIAS_ESPERA_CONEXION + días de prueba.
     const dias = body.alta === 'fundador' ? DIAS_PRUEBA.fundador : body.alta === 'prueba' ? DIAS_PRUEBA.normal : null
     const { rows: [org] } = await client.query(
-      `INSERT INTO organizaciones (nombre, estado, prueba_hasta, fundador)
-       VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $3::int END, $4)
+      `INSERT INTO organizaciones (nombre, estado, prueba_hasta, prueba_dias, fundador)
+       VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $5::int + $3::int END, $3, $4)
        RETURNING id`,
-      [body.nombre, dias ? 'prueba' : 'activo', dias, body.alta === 'fundador'])
+      [body.nombre, dias ? 'prueba' : 'activo', dias, body.alta === 'fundador', DIAS_ESPERA_CONEXION])
     const { rows: [emp] } = await client.query(
       `INSERT INTO empresas (organizacion_id, nombre, country, modulos) VALUES ($1, $2, $3, $4) RETURNING id`,
       [org.id, body.nombre, body.country, body.modulos])

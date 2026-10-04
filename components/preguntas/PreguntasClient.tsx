@@ -484,7 +484,7 @@ function CuentasYPoliticas({ cuentas, mlListo, onCambio }: { cuentas: Cuenta[]; 
         <p className="text-xs text-neutral-500">
           Te lleva a MercadoLibre para autorizar. Entra con la cuenta PRINCIPAL del vendedor (un colaborador no puede autorizar).
         </p>
-        {cuentas.length === 0 ? <p className="text-sm text-neutral-400">Ninguna conectada todavía.</p> : (
+        {cuentas.length === 0 ? <p className="text-sm text-neutral-400">Ninguna conectada todavía. Si estás en prueba, tus días gratis empiezan cuando conectes la primera.</p> : (
           <ul className="divide-y divide-neutral-100">
             {cuentas.map(c => (
               <li key={c.id} className="py-2.5 flex items-center gap-3 text-sm">
