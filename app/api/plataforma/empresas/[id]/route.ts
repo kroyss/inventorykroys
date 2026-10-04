@@ -35,6 +35,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.is_active === false && Number(id) === session.user.empresaId) {
       return NextResponse.json({ error: 'No puedes desactivar la empresa en la que estás' }, { status: 400 })
     }
+    // Renombrar: la organización con una sola empresa y el mismo nombre se renombra también.
+    if (body.nombre) {
+      await dbGlobal().query(
+        `UPDATE organizaciones o SET nombre = $2 FROM empresas e
+         WHERE e.id = $1 AND o.id = e.organizacion_id AND o.nombre = e.nombre AND o.estado <> 'propietario'
+           AND (SELECT COUNT(*) FROM empresas x WHERE x.organizacion_id = o.id) = 1`, [id, body.nombre])
+    }
     const { rowCount } = await dbGlobal().query(
       `UPDATE empresas SET
          nombre    = COALESCE($2, nombre),
@@ -49,6 +56,49 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message ?? err.message }, { status: 400 })
     if ((err as { code?: string }).code === '23505') return NextResponse.json({ error: 'Ya existe una empresa con ese nombre' }, { status: 400 })
+    return apiError(err)
+  }
+}
+
+/** GET /api/plataforma/empresas/[id] — lo que se perdería al eliminarla (filas por tabla). */
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.empresaId) return unauthorized()
+  if (!esDuenoPlataforma(session.user)) return forbidden()
+  try {
+    const { rows: [r] } = await dbGlobal().query(`SELECT plataforma_eliminar_empresa($1, false) AS r`, [id])
+    return NextResponse.json(r.r)
+  } catch (err) {
+    const msg = (err as { message?: string }).message ?? ''
+    if (/no encontrada|plataforma/.test(msg)) return NextResponse.json({ error: msg }, { status: 400 })
+    return apiError(err)
+  }
+}
+
+/**
+ * DELETE /api/plataforma/empresas/[id] { confirmar: nombre } — borra la empresa con TODOS sus datos
+ * (migración 068). Solo desactivada, nunca de la plataforma, y escribiendo su nombre exacto.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.empresaId) return unauthorized()
+  if (!esDuenoPlataforma(session.user)) return forbidden()
+  try {
+    const { confirmar } = z.object({ confirmar: z.string() }).parse(await req.json())
+    const { rows: [e] } = await dbGlobal().query(`SELECT nombre FROM empresas WHERE id = $1`, [id])
+    if (!e) return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 })
+    if (confirmar.trim() !== e.nombre) return NextResponse.json({ error: 'El nombre no coincide: no se eliminó nada' }, { status: 400 })
+    const { rows: [r] } = await dbGlobal().query(`SELECT plataforma_eliminar_empresa($1, true) AS r`, [id])
+    console.log('[plataforma] empresa eliminada', id, e.nombre, 'por', session.user.id, JSON.stringify(r.r))
+    return NextResponse.json(r.r)
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: 'Falta confirmar el nombre' }, { status: 400 })
+    const msg = (err as { message?: string }).message ?? ''
+    if (/Primero desactiva|no encontrada|plataforma|No se pudo borrar/.test(msg)) return NextResponse.json({ error: msg }, { status: 400 })
     return apiError(err)
   }
 }

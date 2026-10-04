@@ -38,14 +38,14 @@ export default function CuentasPanel() {
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
-  const actualizar = async (c: Cuenta, cambios: { email?: string; productos?: string[] }) => {
+  const actualizar = async (c: Cuenta, cambios: { email?: string; productos?: string[]; full_name?: string; is_active?: boolean; password?: string }, msg?: string) => {
     setError(null); setAviso(null)
     const r = await fetch(`/api/plataforma/cuentas/${c.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
     })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'Error'); return }
-    setAviso(`${c.username}: guardado`)
+    setAviso(msg ?? `${c.username}: guardado`)
     cargar()
   }
 
@@ -53,6 +53,30 @@ export default function CuentasPanel() {
     const email = window.prompt(`Correo de ${c.username} (vacío = sin correo)`, c.email ?? '')
     if (email === null) return
     actualizar(c, { email: email.trim() })
+  }
+
+  const cambiarNombre = (c: Cuenta) => {
+    const full_name = window.prompt(`Nombre completo de ${c.username}`, c.full_name ?? '')?.trim()
+    if (full_name && full_name !== c.full_name) actualizar(c, { full_name })
+  }
+
+  const nuevaClave = (c: Cuenta) => {
+    const password = claveInicial()
+    if (!window.confirm(`¿Darle a ${c.username} una clave nueva? Se cierran sus sesiones abiertas y tendrá que entrar con la nueva.`)) return
+    actualizar(c, { password }, `${c.username}: clave nueva ${password} (pásasela por Telegram privado; se muestra solo esta vez).`)
+  }
+
+  const eliminar = async (c: Cuenta) => {
+    if (!window.confirm(`¿Eliminar la cuenta ${c.username}? No se puede deshacer.` +
+      (c.empresas.length ? `
+
+También sale de: ${c.empresas.map(e => e.nombre).join(', ')}.` : ''))) return
+    setError(null); setAviso(null)
+    const r = await fetch(`/api/plataforma/cuentas/${c.id}`, { method: 'DELETE' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { setError(d.error ?? 'No se pudo eliminar'); return }
+    setAviso(`${c.username}: eliminada`)
+    cargar()
   }
 
   const alternar = (c: Cuenta, p: string) =>
@@ -82,13 +106,19 @@ export default function CuentasPanel() {
               <th className="px-4 py-2 text-left">Correo (recuperar clave)</th>
               <th className="px-4 py-2 text-left">Productos</th>
               <th className="px-4 py-2 text-left">Empresas de inventario</th>
+              <th className="px-4 py-2 text-left">Estado</th>
+              <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody>
             {visibles.map(c => (
               <tr key={c.id} className={`border-t border-neutral-100 align-top ${!c.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-4 py-2 font-mono">{c.username}</td>
-                <td className="px-4 py-2">{c.full_name ?? '—'}</td>
+                <td className="px-4 py-2">
+                  <button onClick={() => cambiarNombre(c)} className="hover:underline text-left" title="Cambiar el nombre">
+                    {c.full_name ?? <span className="text-neutral-400">agregar…</span>} <span className="text-neutral-400 text-xs">✏️</span>
+                  </button>
+                </td>
                 <td className="px-4 py-2">
                   <button onClick={() => cambiarCorreo(c)} className="hover:underline text-left" title="Cambiar correo">
                     {c.email ?? <span className="text-neutral-400">agregar…</span>}
@@ -109,6 +139,17 @@ export default function CuentasPanel() {
                 <td className="px-4 py-2 text-xs text-neutral-600">
                   {c.empresas.length ? c.empresas.map(e => `${e.nombre} (${e.role})`).join(', ') : '—'}
                 </td>
+                <td className="px-4 py-2">
+                  <button onClick={() => actualizar(c, { is_active: !c.is_active })}
+                    title={c.is_active ? 'Desactivar: ya no puede entrar (sus datos quedan)' : 'Activar'}
+                    className={`px-2 py-0.5 rounded-full text-xs ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-600'}`}>
+                    {c.is_active ? 'Activa' : 'Desactivada'}
+                  </button>
+                </td>
+                <td className="px-4 py-2 text-right whitespace-nowrap">
+                  <button onClick={() => nuevaClave(c)} className="text-xs text-neutral-600 hover:underline mr-3">Clave nueva</button>
+                  <button onClick={() => eliminar(c)} className="text-xs text-red-600 hover:underline">Eliminar</button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -116,6 +157,7 @@ export default function CuentasPanel() {
       </div>
       <p className="text-xs text-neutral-500">
         Cada persona entra con su <b>usuario</b> a todos los productos que tenga marcados. El correo solo sirve para recuperar la clave.
+        Desactivar la saca de todo (sus datos quedan). Eliminar solo se puede si no registró movimientos; si no, desactívala.
         El acceso a empresas de inventario (y su rol) se maneja en Usuarios de cada empresa.
       </p>
     </div>

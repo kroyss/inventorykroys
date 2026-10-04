@@ -42,6 +42,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [aviso, setAviso]       = useState<string | null>(null)
   const [vista, setVista]       = useState<'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('empresas')
   const [hoy, setHoy]           = useState('')
+  const [borrar, setBorrar]     = useState<Empresa | null>(null)
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/plataforma/empresas')
@@ -51,7 +52,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
-  const actualizar = async (e: Empresa, cambios: Partial<Pick<Empresa, 'modulos' | 'is_active' | 'ia_limite_mes'>>) => {
+  const actualizar = async (e: Empresa, cambios: Partial<Pick<Empresa, 'nombre' | 'modulos' | 'is_active' | 'ia_limite_mes'>>) => {
     setError(null); setAviso(null)
     const r = await fetch(`/api/plataforma/empresas/${e.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
@@ -60,6 +61,11 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     if (!r.ok) { setError(d.error ?? 'Error'); return }
     setAviso(`${e.nombre}: cambios guardados. Sus usuarios los ven en su próximo clic.`)
     cargar()
+  }
+
+  const renombrar = (e: Empresa) => {
+    const nombre = window.prompt(`Nuevo nombre para "${e.nombre}"`, e.nombre)?.trim()
+    if (nombre && nombre !== e.nombre) actualizar(e, { nombre })
   }
 
   const alternarModulo = (e: Empresa, m: string) =>
@@ -89,6 +95,11 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
 
+      {borrar && (
+        <EliminarEmpresa e={borrar} onCancelar={() => setBorrar(null)}
+          onEliminada={msg => { setBorrar(null); setAviso(msg); cargar() }} />
+      )}
+
       {nueva && (
         <NuevaEmpresa modulos={modulos}
           onCancelar={() => setNueva(false)}
@@ -107,13 +118,14 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
               <th className="px-4 py-2 text-left">Módulos</th>
               <th className="px-4 py-2 text-right" title="Créditos de IA por mes (1 por borrador; buscar en internet, hasta 4). Vacío = sin límite">IA/mes</th>
               <th className="px-4 py-2 text-left">Estado</th>
+              <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody>
             {empresas.map(e => (
               <tr key={e.id} className={`border-t border-neutral-100 align-top ${!e.is_active ? 'opacity-50' : ''}`}>
                 <td className="px-4 py-2">
-                  <div className="font-medium">{e.nombre}</div>
+                  <button onClick={() => renombrar(e)} title="Cambiar el nombre" className="font-medium text-left hover:underline">{e.nombre} <span className="text-neutral-400 text-xs">✏️</span></button>
                   {e.organizacion !== e.nombre && <div className="text-xs text-neutral-400">{e.organizacion}</div>}
                 </td>
                 <td className="px-4 py-2"><Cuenta e={e} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} /></td>
@@ -145,6 +157,12 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                     {e.is_active ? 'Activa' : 'Desactivada'}
                   </button>
                 </td>
+                <td className="px-4 py-2 text-right">
+                  {e.estado !== 'propietario' && (
+                    <button onClick={() => { setError(null); setAviso(null); setBorrar(e) }} title="Eliminar la empresa con todos sus datos"
+                      className="text-xs text-red-600 hover:underline">Eliminar</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -152,7 +170,8 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       </div>
       <p className="text-xs text-neutral-500">
         Inicio, Ventas, Inventario, Compras, Productos, Reportes, Ajustes y Usuarios los tienen todas las empresas.
-        Tocar un módulo lo prende o lo apaga. Desactivar una empresa saca a sus usuarios; sus datos se conservan.
+        Tocar el nombre lo cambia; tocar un módulo lo prende o lo apaga. Desactivar una empresa saca a sus usuarios; sus datos se conservan.
+        Eliminar la borra con TODOS sus datos (primero hay que desactivarla).
         Cuenta: una prueba vence sola al pasar su fecha (sus usuarios ya no entran, los datos quedan); tócala para cambiarla.
       </p>
       </>}
@@ -339,5 +358,69 @@ function Cuenta({ e, hoy, onGuardada, onError }: {
         <button onClick={() => setEditando(false)} className="btn-secondary text-xs px-2 py-1">Cancelar</button>
       </div>
     </div>
+  )
+}
+
+/** Eliminar una empresa: muestra lo que se pierde y pide escribir su nombre (api DELETE, migración 068). */
+function EliminarEmpresa({ e, onCancelar, onEliminada }: {
+  e: Empresa; onCancelar: () => void; onEliminada: (msg: string) => void
+}) {
+  const [filas, setFilas] = useState<Record<string, number> | null>(null)
+  const [texto, setTexto] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [borrando, setBorrando] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/plataforma/empresas/${e.id}`).then(r => r.json()).then(d => d.error ? setError(d.error) : setFilas(d.filas ?? {}))
+      .catch(() => setError('No se pudo revisar la empresa'))
+  }, [e.id])
+
+  const NOMBRES: Record<string, string> = {
+    sales: 'ventas', products: 'productos', purchase_orders: 'compras', import_orders: 'importaciones',
+    inventory_movements: 'movimientos de inventario', ml_conexiones: 'cuentas de MercadoLibre conectadas',
+    ml_preguntas: 'preguntas', ml_mensajes: 'mensajes', despacho_lotes: 'despachos', reportador_ordenes: 'órdenes reportadas',
+    invoices: 'facturas', finance_movements: 'movimientos de finanzas', ia_uso: 'usos de IA (salen de Interno)',
+  }
+  const importantes = filas ? Object.entries(NOMBRES).filter(([t]) => filas[t]).map(([t, n]) => `${filas[t].toLocaleString('de-DE')} ${n}`) : []
+
+  const eliminar = async () => {
+    setBorrando(true); setError(null)
+    const r = await fetch(`/api/plataforma/empresas/${e.id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmar: texto }),
+    })
+    const d = await r.json().catch(() => ({}))
+    setBorrando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo eliminar'); return }
+    onEliminada(`"${e.nombre}" eliminada con todos sus datos.` +
+      (d.usuarios_borrados ? ` Se borraron ${d.usuarios_borrados} usuario(s).` : '') +
+      (d.usuarios_desactivados ? ` ${d.usuarios_desactivados} usuario(s) quedaron desactivados (tenían registros globales).` : ''))
+  }
+
+  return (
+    <section className="bg-white rounded-xl border-2 border-red-200 shadow-sm p-4 space-y-3">
+      <h2 className="text-sm font-semibold text-red-800">Eliminar “{e.nombre}”</h2>
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
+      {e.is_active ? (
+        <p className="text-sm text-neutral-700">Primero <b>desactívala</b> (columna Estado): sus usuarios dejan de entrar. Si solo quieres que no entre más, con eso basta y sus datos se conservan.</p>
+      ) : !filas ? <p className="text-sm text-neutral-400">Revisando sus datos…</p> : (
+        <>
+          <p className="text-sm text-neutral-700">
+            Se borra <b>para siempre</b> la empresa con todo lo suyo
+            {importantes.length ? <>: {importantes.join(' · ')}</> : ' (no tiene ventas, productos ni cuentas de ML)'}.
+            También sus usuarios que no entren a otra empresa. <b>No se puede deshacer.</b>
+          </p>
+          <label className="text-xs text-neutral-600 block">Para confirmar escribe el nombre exacto: <b>{e.nombre}</b>
+            <input className={input} value={texto} onChange={ev => setTexto(ev.target.value)} autoComplete="off" />
+          </label>
+        </>
+      )}
+      <div className="flex gap-2">
+        {!e.is_active && filas && (
+          <button onClick={eliminar} disabled={borrando || texto.trim() !== e.nombre}
+            className="px-3 py-1.5 rounded text-sm bg-red-600 text-white disabled:opacity-40">{borrando ? 'Eliminando…' : 'Eliminar para siempre'}</button>
+        )}
+        <button onClick={onCancelar} className="btn-secondary text-sm">Cancelar</button>
+      </div>
+    </section>
   )
 }
