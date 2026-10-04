@@ -17,6 +17,11 @@
 import type { Pool } from 'pg'
 import { enviarLote, inputDeHerramienta, leerLote, registrarUso } from '@/lib/ia'
 
+/** Fichas encendidas (FICHAS_IA=1). Apagadas (default desde 2026-10-04) NO se arman NI se leen:
+ *  el dueño quiere la IA igual que los clientes, y las fichas viejas se irían quedando
+ *  desactualizadas. Quedan guardadas en ml_item_fichas por si se reactivan. */
+export const fichasActivas = () => process.env.FICHAS_IA === '1'
+
 const MINIMO_RESPUESTAS = 3
 const REHACER_CADA = 10                    // respuestas nuevas para rehacer una ficha
 const DIAS_USO = 60                        // la IA se usó en esa publicación hace menos de esto
@@ -86,7 +91,7 @@ export async function generarFichasPendientes(db: Pool) {
   // de la misma publicación y de otras; la ficha solo las resumía, y costaba más que los
   // borradores mismos. Las fichas que ya existen se siguen usando. Un lote ya enviado se recoge
   // igual arriba (ya se pagó). Para volver a encenderlas: FICHAS_IA=1 en el .env.
-  if (process.env.FICHAS_IA !== '1') return guardadas
+  if (!fichasActivas()) return guardadas
 
   // Reserva atómica: publicaciones del catálogo con suficientes respuestas y ficha vieja o sin ficha.
   // Un lote puede tardar hasta 24 h: la reserva vence a las 26 h por si el lote se perdió.

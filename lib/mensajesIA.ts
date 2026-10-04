@@ -8,6 +8,7 @@ import { llamarClaude, type UsoIA } from '@/lib/ia'
 import { itemsDeVenta, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
 import { leerNotas } from '@/lib/notasML'
 import { mlFetch } from '@/lib/ml'
+import { fichasActivas } from '@/lib/fichasIA'
 
 const ESTADO_VENTA: Record<string, string> = {
   BORRADOR: 'cargada en el sistema, pago todavía sin verificar',
@@ -79,7 +80,9 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   // vendedor ya respondió). Para preguntas post-venta de uso, contenido o compatibilidad.
   for (const it of (venta?.items ?? []).slice(0, 3)) {
     const { rows: [cat] } = await db.query(`SELECT ficha FROM ml_catalogo WHERE item_id = $1`, [it.id])
-    const { rows: [fc] } = await db.query(`SELECT texto FROM ml_item_fichas WHERE item_id = $1`, [it.id])
+    const { rows: [fc] } = fichasActivas()
+      ? await db.query(`SELECT texto FROM ml_item_fichas WHERE item_id = $1`, [it.id])
+      : { rows: [] }
     // Fichas POR USO (migración 063): se pidió IA sobre este producto.
     await db.query(`UPDATE ml_catalogo SET ia_usada_at = NOW() WHERE item_id = $1`, [it.id]).catch(() => {})
     const desc = await mlFetch<{ plain_text?: string }>(db, conexionId, `/items/${it.id}/description`)

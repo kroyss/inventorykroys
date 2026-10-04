@@ -13,6 +13,7 @@ import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
+import { fichasActivas } from '@/lib/fichasIA'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 export interface PreguntaML {
@@ -241,7 +242,10 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
        AND (p.texto % $2 OR x.n >= LEAST(2, cardinality(qw.w)))
      ORDER BY x.n DESC, similarity(p.texto, $2) DESC, p.fecha DESC
      LIMIT 10`, [q.item_id, q.texto])
-  const { rows: [ficha] } = await db.query(`SELECT texto, dudas FROM ml_item_fichas WHERE item_id = $1`, [q.item_id])
+  // Fichas apagadas (default): no se leen, la IA trabaja igual para el dueño y los clientes.
+  const { rows: [ficha] } = fichasActivas()
+    ? await db.query(`SELECT texto, dudas FROM ml_item_fichas WHERE item_id = $1`, [q.item_id])
+    : { rows: [] }
   // Se pidió IA en esta publicación: desde ahora merece ficha (fichas POR USO, migración 063).
   await db.query(`UPDATE ml_catalogo SET ia_usada_at = NOW() WHERE item_id = $1`, [q.item_id]).catch(() => {})
   const otras = await otrasPublicaciones(db, q.item_id, item?.title ?? q.item_titulo ?? '', q.texto).catch(() => [])
