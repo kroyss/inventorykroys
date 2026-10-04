@@ -397,10 +397,6 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
           title="Para preguntas imprudentes u ofensivas: la quita de la publicación en MercadoLibre">
           {eliminando ? 'Eliminando…' : 'Eliminar'}
         </button>
-        <a href={`https://www.mercadolibre.com.ve/preguntas/vendedor`} target="_blank" rel="noreferrer" className="btn-ghost text-sm"
-          title="MercadoLibre ya no deja bloquear desde otras apps: se abre tu bandeja de preguntas en ML, ahí usa ⋮ → Bloquear comprador">
-          Bloquear en ML ↗
-        </a>
         <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm ml-auto">
           {enviando ? 'Publicando…' : 'Publicar respuesta'}
         </button>
