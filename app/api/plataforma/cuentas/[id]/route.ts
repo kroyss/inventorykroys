@@ -28,6 +28,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.is_active === false && Number(id) === Number(session!.user.id)) {
       return NextResponse.json({ error: 'No puedes desactivar tu propia cuenta' }, { status: 400 })
     }
+    if (body.password !== undefined && Number(id) === Number(session!.user.id)) {
+      return NextResponse.json({ error: 'Tu propia clave cámbiala en Usuarios → Cambiar contraseña (la eliges tú). Desde aquí te dejaría afuera con una clave generada.' }, { status: 400 })
+    }
     const corta = body.is_active === false || body.password !== undefined
     const { rowCount } = await dbGlobal().query(
       `UPDATE users SET
