@@ -14,6 +14,26 @@ interface UsuarioML {
   }
 }
 
+// Id del vendedor a partir del nick. La búsqueda de la API (/sites/MLV/search?nickname=) ya no está
+// abierta a las apps (403 desde oct-2026, aun con la cuenta propia): se lee el perfil PÚBLICO
+// (mercadolibre.com.ve/perfil/vendedor/<nick>), que trae el id, y se confirma con /users/<id> que
+// el nick coincida.
+async function idDeNick(db: Parameters<typeof mlFetch>[0], conexionId: number, nick: string) {
+  const r = await fetch(`https://www.mercadolibre.com.ve/perfil/vendedor/${encodeURIComponent(nick.trim())}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36', 'Accept-Language': 'es' },
+    cache: 'no-store',
+  })
+  if (!r.ok) return null
+  const html = await r.text()
+  const ids = [...new Set([...html.matchAll(/"(?:seller_id|sellerId|user_id|userId)"\s*:\s*"?(\d{5,12})/g)].map(m => m[1]))].slice(0, 3)
+  const buscado = nick.trim().toUpperCase()
+  for (const id of ids) {
+    const u = await mlFetch<{ nickname?: string }>(db, conexionId, `/users/${id}`).catch(() => null)
+    if (u?.nickname?.toUpperCase() === buscado) return id
+  }
+  return null
+}
+
 // POST /api/plataforma/fundadores/[id]/verificar → busca el nick en MercadoLibre (datos
 // PÚBLICOS: reputación y ventas) con una cuenta conectada del dueño, y lo guarda en la solicitud.
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -31,16 +51,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     let resultado: Record<string, unknown>
     try {
-      const busq = await mlFetch<{ seller?: { id: number } }>(db, c.id, `/sites/MLV/search?nickname=${encodeURIComponent(s.nick_ml)}&limit=1`)
-      if (!busq.seller?.id) {
-        resultado = { encontrado: false, motivo: 'No hay un vendedor con ese nick y publicaciones activas en MercadoLibre Venezuela' }
+      const sellerId = await idDeNick(db, c.id, s.nick_ml)
+      if (!sellerId) {
+        resultado = { encontrado: false, motivo: 'No encontramos ese nick en MercadoLibre Venezuela (revisa cómo lo escribió)' }
       } else {
-        const u = await mlFetch<UsuarioML>(db, c.id, `/users/${busq.seller.id}`)
+        const u = await mlFetch<UsuarioML>(db, c.id, `/users/${sellerId}`)
         const r = u.seller_reputation ?? {}
         resultado = {
           encontrado: true, id: u.id, nickname: u.nickname, desde: u.registration_date ?? null,
           nivel: r.level_id ?? null, lider: r.power_seller_status ?? null,
-          ventas_total: r.transactions?.completed ?? null, canceladas: r.transactions?.canceled ?? null,
+          ventas_total: r.transactions?.completed ?? r.transactions?.total ?? null, canceladas: r.transactions?.canceled ?? null,
           ventas_periodo: r.metrics?.sales?.completed ?? null, periodo: r.metrics?.sales?.period ?? null,
         }
       }
