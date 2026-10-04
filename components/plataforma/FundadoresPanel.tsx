@@ -7,6 +7,7 @@ interface Tanda { numero: number; cupos: number; abierta: boolean; inscribe_desd
 interface Verif {
   encontrado: boolean; motivo?: string; nickname?: string; nivel?: string | null; lider?: string | null
   ventas_total?: number | null; ventas_periodo?: number | null; periodo?: string | null; desde?: string | null
+  anios?: number | null; ventas_texto?: string | null
 }
 interface Solicitud {
   id: number; nombre: string; telegram: string; nick_ml: string | null; mensaje: string | null
@@ -105,10 +106,12 @@ export default function FundadoresPanel() {
       await cargar()
     } finally { setOcupado(null) }
   }
-  const verificar = async (s: Solicitud) => {
+  const verificar = async (s: Solicitud, nick?: string) => {
     setError(null); setOcupado(s.id)
     try {
-      const r = await fetch(`/api/plataforma/fundadores/${s.id}/verificar`, { method: 'POST' })
+      const r = await fetch(`/api/plataforma/fundadores/${s.id}/verificar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(nick ? { nick } : {}),
+      })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) setError(d.error ?? 'No se pudo verificar')
       await cargar()
@@ -231,13 +234,26 @@ export default function FundadoresPanel() {
                       <span>Nick ML: <a href={`https://www.mercadolibre.com.ve/perfil/vendedor/${encodeURIComponent(s.nick_ml)}`} target="_blank" rel="noreferrer"
                         title="Ver su perfil en MercadoLibre (reputación y calificaciones)" className="font-bold text-neutral-700 underline underline-offset-2 hover:text-neutral-900">{s.nick_ml} ↗</a> <span className="text-lime-700">+{PUNTO_NICK}</span></span>
                       {v ? (v.encontrado
-                        ? <span className="text-emerald-700">✓ {v.nickname} · {v.ventas_total != null ? `${v.ventas_total.toLocaleString('de-DE')} ventas en total` : 'sin dato de ventas'}
+                        ? <span className="text-emerald-700">✓ {v.nickname} · {v.ventas_total != null ? `${v.ventas_total.toLocaleString('de-DE')} ventas en total` : v.ventas_texto ?? 'perfil encontrado'}
+                            {v.anios ? ` · ${v.anios} años vendiendo` : ''}
                             {v.ventas_periodo != null ? ` · ${v.ventas_periodo} en ${v.periodo === '60 days' ? '60 días' : v.periodo}` : ''}
                             {v.nivel ? ` · reputación ${v.nivel.replace(/^\d_/, '')}` : ''}{v.lider ? ` · MercadoLíder ${v.lider}` : ''}</span>
                         : <span className="text-amber-700">✗ {v.motivo}</span>) : null}
                       <button onClick={() => verificar(s)} disabled={ocupado === s.id} className="underline underline-offset-2 hover:text-neutral-800">
                         {v ? 'verificar de nuevo' : 'Verificar en ML'}
                       </button>
+                      {v && !v.encontrado && (
+                        // Suelen escribir el nombre de la tienda: se corrige con el nick real o el enlace de su perfil.
+                        <form className="flex items-center gap-1" onSubmit={e => {
+                          e.preventDefault()
+                          const n = String(new FormData(e.currentTarget).get('nick') ?? '').trim()
+                          if (n) verificar(s, n)
+                        }}>
+                          <input name="nick" placeholder="Nick correcto o enlace del perfil" maxLength={200}
+                            className="border border-neutral-300 rounded px-2 py-0.5 text-xs w-56" />
+                          <button type="submit" disabled={ocupado === s.id} className="btn-secondary text-xs py-0.5">Corregir</button>
+                        </form>
+                      )}
                     </> : <span className="text-neutral-400">Sin nick de ML</span>}
                   </div>
                   {s.mensaje && (
