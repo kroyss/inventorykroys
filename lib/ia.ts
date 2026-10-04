@@ -129,7 +129,8 @@ export async function leerLote(id: string): Promise<ResultadoLote[] | null> {
 // ── Límite de borradores por mes ──────────────────────────────────────────────────────────────
 
 /** Borradores de IA (Preguntas + Mensajes) usados este mes y el límite de la empresa (null = sin
- *  límite: el dueño de la plataforma). Las fichas no cuentan: corren solas, en segundo plano. */
+ *  límite: el dueño de la plataforma). Cada "Proponer con IA" cuenta, se use o no la respuesta.
+ *  Las fichas no cuentan: solo se arman donde ya se pidió IA (migración 063). */
 export async function cupoIA(db: Pool, empresaId: number) {
   const { rows: [e] } = await dbGlobal().query(
     `SELECT CASE WHEN o.estado = 'propietario' THEN NULL ELSE e.ia_limite_mes END AS limite
