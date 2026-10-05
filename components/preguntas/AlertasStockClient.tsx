@@ -31,6 +31,7 @@ export default function AlertasStockClient() {
   const [buscar, setBuscar] = useState('')
   const [revisando, setRevisando] = useState(false)
   const [umbral, setUmbral] = useState('')
+  const [guardandoUmbral, setGuardandoUmbral] = useState(false)
   const [vez, setVez] = useState(0)
   // Reponer desde aquí (admin): nuevo stock por fila (clave item:variante); solo las marcadas se envían.
   const confirm = useConfirm()
@@ -60,8 +61,13 @@ export default function AlertasStockClient() {
   const guardarUmbral = async () => {
     const n = parseInt(umbral, 10)
     if (!(n >= 1 && n <= 100)) return
-    await fetch('/api/alertas-stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ umbral: n }) })
-    setVez(x => x + 1)
+    setGuardandoUmbral(true)
+    try {
+      await fetch('/api/alertas-stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ umbral: n }) })
+      // Se ve al instante (la lista se recarga detrás).
+      setDatos(d => d && { ...d, umbral: n })
+      setVez(x => x + 1)
+    } finally { setGuardandoUmbral(false) }
   }
 
   const escribir = (f: Fila, v: string) => {
@@ -119,7 +125,7 @@ export default function AlertasStockClient() {
               className="w-16 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-neutral-800 num" />
             unidades
             {datos && umbral !== String(datos.umbral) && (
-              <button onClick={guardarUmbral} className="btn-secondary text-xs px-2.5 py-1">Guardar</button>
+              <button onClick={guardarUmbral} disabled={guardandoUmbral} className="btn-secondary text-xs px-2.5 py-1">{guardandoUmbral ? 'Guardando…' : 'Guardar'}</button>
             )}
           </label>
         )}

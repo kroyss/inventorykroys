@@ -14,11 +14,11 @@ export const UMBRAL_DEFAULT = 3            // "por agotarse" = menos de esto (po
 export const MINUTOS_ENTRE_REVISIONES = 120   // cada 2 h por cuenta: cuida las llamadas a ML al crecer
 export const DIAS_VENDIDAS = 30
 
-/** Condición SQL sobre ml_stock_alertas `a`: se vendió en los últimos DIAS_VENDIDAS días. */
-export const SQL_VENDIDA = `EXISTS (
-  SELECT 1 FROM ml_ordenes o
-  WHERE o.fecha > NOW() - INTERVAL '${DIAS_VENDIDAS} days'
-    AND (CASE WHEN a.variante_id = 0 THEN a.item_id ELSE a.item_id || ':' || a.variante_id END) = ANY(o.items))`
+/** Condición SQL sobre ml_stock_alertas `a`: se vendió en los últimos DIAS_VENDIDAS días.
+ *  Con IN (subconsulta) Postgres arma UNA vez la lista de lo vendido y la consulta como hash; con
+ *  EXISTS … = ANY(o.items) recorría todas las ventas por cada fila (3 s por conteo, ~12 ms así). */
+export const SQL_VENDIDA = `(CASE WHEN a.variante_id = 0 THEN a.item_id ELSE a.item_id || ':' || a.variante_id END) IN (
+  SELECT unnest(o.items) FROM ml_ordenes o WHERE o.fecha > NOW() - INTERVAL '${DIAS_VENDIDAS} days')`
 const POR_MULTIGET = 20                    // máximo de ML en /items?ids=
 
 interface ItemML {
