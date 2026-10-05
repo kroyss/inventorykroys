@@ -4,7 +4,7 @@ import { int } from '@/components/ui'
 import { parseBonusPhases, DEFAULT_BONUS_METAS, DEFAULT_BONUS_MONTOS } from '@/lib/bonus'
 
 /**
- * Bonos por ventas del mes — metas y montos editables (3 fases).
+ * Bonos por ventas del mes — metas y montos editables (4 fases).
  * Se guardan en app_settings del país de la sesión (`bono_meta_N` / `bono_monto_N`)
  * y los lee el pipeline del dashboard vía /api/dashboard/my-bonus.
  */
@@ -59,7 +59,7 @@ export default function BonusSettings() {
       <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1.5 items-center">
         <div />
         <div className="text-[11px] text-neutral-500">Meta de ventas $</div>
-        <div className="text-[11px] text-neutral-500">Bono $</div>
+        <div className="text-[11px] text-neutral-500">Bono</div>
         {metas.map((m, i) => (
           <div key={i} className="contents">
             <span className="text-[11px] text-neutral-500 whitespace-nowrap pr-1">Fase {i + 1}</span>
@@ -75,7 +75,7 @@ export default function BonusSettings() {
 
       <div className="flex items-center justify-between gap-2 mt-3">
         <span className="text-[11px] text-neutral-500">
-          Máximo por mes: <b>${int(totalM)}</b>
+          Máximo por mes: <b>{int(totalM)}</b>
         </span>
         <button onClick={save} disabled={busy}
           className="text-xs px-3 py-1.5 rounded-lg border-2 border-neutral-900/40 font-semibold text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-colors disabled:opacity-60 whitespace-nowrap">

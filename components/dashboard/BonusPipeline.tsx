@@ -56,9 +56,9 @@ export default function BonusPipeline({ detalle = false }: { detalle?: boolean }
         <span className="font-semibold text-neutral-900">Bono del mes</span>
         <span className="text-neutral-500">
           Vendido <b className="text-neutral-900 num">${usd(salesAmount)}</b>
-          {ganado > 0 && <> · ganado <b className="text-emerald-600 num">${ganado}</b></>}
+          {ganado > 0 && <> · bono ganado <b className="text-emerald-600 num">{ganado}</b></>}
           {proximo
-            ? <> · faltan <b className="text-neutral-900 num">${usd(proximo.end - salesAmount)}</b> para +${proximo.bonus}</>
+            ? <> · faltan <b className="text-neutral-900 num">${usd(proximo.end - salesAmount)}</b> para el bono de {proximo.bonus}</>
             : <> · ¡todas las metas cumplidas!</>}
         </span>
       </div>}
@@ -101,7 +101,7 @@ export default function BonusPipeline({ detalle = false }: { detalle?: boolean }
                     : 'bg-neutral-200 text-neutral-500'
                 }`}
               >
-                ${p.bonus}
+                {p.bonus}
               </div>
             </span>
           )

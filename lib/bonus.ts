@@ -1,4 +1,4 @@
-// Bonos por ventas del mes — 3 fases acumulativas.
+// Bonos por ventas del mes — 4 fases acumulativas (la 4ª desde 2026-10-05: el equipo llegó al tope).
 //
 // El vendedor cobra el bono de cada fase que alcanza: si el mes cierra en $16.000
 // con la config default cobró $100 + $200 = $300. Las metas y los montos son
@@ -16,12 +16,12 @@ export interface BonusPhase {
   bonus: number
 }
 
-export const BONUS_PHASES = 3
-export const DEFAULT_BONUS_METAS  = [10000, 15000, 20000]
-export const DEFAULT_BONUS_MONTOS = [100, 200, 300]
+export const BONUS_PHASES = 4
+export const DEFAULT_BONUS_METAS  = [10000, 15000, 20000, 25000]
+export const DEFAULT_BONUS_MONTOS = [100, 200, 300, 400]
 
 /**
- * Arma las 3 fases desde un objeto de settings (`{ bono_meta_1: '12000', … }`).
+ * Arma las 4 fases desde un objeto de settings (`{ bono_meta_1: '12000', … }`).
  * Si las metas no son crecientes o falta algún valor, cae al default completo:
  * una escalera mal formada rompería el cálculo de progreso.
  */
@@ -35,8 +35,15 @@ export function parseBonusPhases(
     return Number.isFinite(n) && n > 0 ? n : fallback
   }
 
-  const metas  = DEFAULT_BONUS_METAS.map((d, i)  => num(`bono_meta_${i + 1}`,  d))
-  const montos = DEFAULT_BONUS_MONTOS.map((d, i) => num(`bono_monto_${i + 1}`, d))
+  // Una fase sin configurar (p. ej. la 4ª en una empresa que tenía 3) sigue la escalera: meta =
+  // anterior + el último salto, bono = anterior + 100. Así no rompe una configuración propia.
+  const metas: number[] = []
+  const montos: number[] = []
+  DEFAULT_BONUS_METAS.forEach((d, i) => {
+    const salto = i >= 2 ? metas[i - 1] - metas[i - 2] : 0
+    metas.push(num(`bono_meta_${i + 1}`, i >= 2 && salto > 0 ? metas[i - 1] + salto : d))
+    montos.push(num(`bono_monto_${i + 1}`, i >= 1 ? montos[i - 1] + 100 : DEFAULT_BONUS_MONTOS[i]))
+  })
 
   const creciente = metas.every((m, i) => i === 0 || m > metas[i - 1])
   const finales = creciente ? metas : DEFAULT_BONUS_METAS
