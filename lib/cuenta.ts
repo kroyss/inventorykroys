@@ -19,6 +19,11 @@ export const SQL_CUENTA_HABILITADA = `(o.estado IN ('propietario', 'activo')
  *  sin notar nada). Pasado eso, el cron deja de sincronizarla; al reactivarla se retoma sola. */
 export const DIAS_SINCRONIZA_VENCIDA = 30
 
+/** Empresa inactiva = ningún usuario suyo usó el sistema en estos días: el cron la sincroniza cada
+ *  MINUTOS_INACTIVA minutos en vez de cada minuto. Vuelve sola a cada minuto cuando alguien entra. */
+export const DIAS_INACTIVA = 7
+export const MINUTOS_INACTIVA = 30
+
 /** Condición SQL (alias `o`): ¿el cron sigue trayendo sus datos de MercadoLibre? Habilitada, o prueba
  *  vencida hace menos de DIAS_SINCRONIZA_VENCIDA días. "Vencido" puesto a mano corta el mismo día. */
 export const SQL_CUENTA_SINCRONIZA = `(${SQL_CUENTA_HABILITADA}
