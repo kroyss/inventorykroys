@@ -1,3 +1,4 @@
+import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import { after, NextRequest, NextResponse } from 'next/server'
 import { conEmpresa, dbEmpresa, dbGlobal } from '@/lib/db'
 import { revisarStockPendiente } from '@/lib/alertasStock'
@@ -25,7 +26,10 @@ export async function GET(req: NextRequest) {
   if (!mlConfigurado()) return NextResponse.json({ omitido: 'ML sin configurar' })
 
   const { rows: empresas } = await dbGlobal().query(
-    `SELECT id, country, 'alertas_stock' = ANY(modulos) AS stock FROM empresas WHERE is_active AND 'preguntas' = ANY(modulos) ORDER BY id`)
+    // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
+    `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock
+     FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
+     WHERE e.is_active AND 'preguntas' = ANY(e.modulos) AND ${SQL_CUENTA_SINCRONIZA} ORDER BY e.id`)
   const resultado: Record<number, unknown> = {}
   for (const e of empresas) {
     try {

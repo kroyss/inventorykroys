@@ -15,6 +15,15 @@ export const DIAS_ESPERA_CONEXION = 7
 export const SQL_CUENTA_HABILITADA = `(o.estado IN ('propietario', 'activo')
   OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date)))`
 
+/** Días que se siguen trayendo los datos de MercadoLibre de una prueba vencida (margen para que pague
+ *  sin notar nada). Pasado eso, el cron deja de sincronizarla; al reactivarla se retoma sola. */
+export const DIAS_SINCRONIZA_VENCIDA = 30
+
+/** Condición SQL (alias `o`): ¿el cron sigue trayendo sus datos de MercadoLibre? Habilitada, o prueba
+ *  vencida hace menos de DIAS_SINCRONIZA_VENCIDA días. "Vencido" puesto a mano corta el mismo día. */
+export const SQL_CUENTA_SINCRONIZA = `(${SQL_CUENTA_HABILITADA}
+  OR (o.estado = 'prueba' AND o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date - ${DIAS_SINCRONIZA_VENCIDA}))`
+
 /** El estado que vale hoy: una prueba vencida se muestra como "vencido". */
 export function estadoEfectivo(estado: EstadoCuenta, pruebaHasta: string | null, hoy: string): EstadoCuenta {
   return estado === 'prueba' && pruebaHasta != null && pruebaHasta < hoy ? 'vencido' : estado
