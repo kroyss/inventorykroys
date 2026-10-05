@@ -71,6 +71,11 @@ export default function CuentasMLClient() {
                       <p className="text-xs text-neutral-500 truncate">
                         {c.ultimo_error ?? (c.ultima_sync ? `Actualizada ${hace(c.ultima_sync)}` : 'Sin actualizar todavía')}
                       </p>
+                      {c.estado !== 'activa' && (
+                        <p className="text-xs text-amber-700">
+                          Para reconectarla, entra a mercadolibre.com.ve <b>con {c.nickname}</b> en este navegador (cierra la otra cuenta si está abierta) y toca Reconectar.
+                        </p>
+                      )}
                     </div>
                     {datos.esAdmin && (c.estado === 'activa'
                       ? <button onClick={() => desconectar(c)} className="btn-ghost text-xs text-red-600">Desconectar</button>
