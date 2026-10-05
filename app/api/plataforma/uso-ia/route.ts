@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { dbGlobal } from '@/lib/db'
+import { dbEmpresa, dbGlobal } from '@/lib/db'
+import { cupoIA } from '@/lib/ia'
+import type { Country } from '@/lib/types'
 import { soloDueno } from '@/lib/plataforma'
 import { currentDate, currentYearMonth } from '@/lib/tz'
 
@@ -32,9 +34,14 @@ export async function GET() {
                 entrada::float AS entrada, salida::float AS salida, busquedas::float AS busquedas, costo::float AS costo
          FROM plataforma_uso_ia_detalle($1::date) ORDER BY dia`, [`${mesActual}-01`]).catch(() => ({ rows: [] })),
       dbGlobal().query(
-        `SELECT e.id, e.nombre, o.estado = 'propietario' AS propietario, e.ia_limite_mes AS limite
+        `SELECT e.id, e.nombre, e.country, o.estado = 'propietario' AS propietario, e.ia_limite_mes AS limite
          FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id ORDER BY e.id`),
     ])
+    // Créditos usados: los mismos que ve el cliente (cupoIA cuenta desde ia_creditos_desde si es más
+    // reciente que el día 1; el detalle por día no puede saberlo).
+    await Promise.all(empresas.map(async e => {
+      e.creditos = await cupoIA(dbEmpresa(e.id, e.country as Country), e.id).then(c => c.usados).catch(() => null)
+    }))
     const hoy = currentDate()
     const diasMes = new Date(Date.UTC(y, m, 0)).getUTCDate()
     return NextResponse.json({ meses, filas: rows, detalle, empresas, hoy, diasMes, diaHoy: Number(hoy.slice(8, 10)) })

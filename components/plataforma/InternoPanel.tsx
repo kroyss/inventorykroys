@@ -12,7 +12,7 @@ interface Detalle {
   empresa_id: number; dia: string; modulo: string; modelo: string; usuario: string
   usos: number; entrada: number; salida: number; busquedas: number; costo: number
 }
-interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null }
+interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null; creditos?: number | null }
 interface Datos { meses: string[]; filas: Fila[]; detalle: Detalle[]; empresas: EmpresaMeta[]; diasMes: number; diaHoy: number }
 
 const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Fichas (segundo plano)' }
@@ -199,7 +199,8 @@ function DetalleMes({ datos }: { datos: Datos }) {
         const costo = filas.reduce((a, d) => a + d.costo, 0)
         const deBoton = filas.filter(d => d.modulo !== 'fichas')
         const borradores = deBoton.reduce((a, d) => a + d.usos, 0)
-        const creditos = deBoton.reduce((a, d) => a + d.usos + d.busquedas, 0)   // igual que cupoIA
+        // Los que ve el cliente (cupoIA en la API); si no llegaron, desde el detalle del mes.
+        const creditos = e.creditos ?? deBoton.reduce((a, d) => a + d.usos + d.busquedas, 0)
         const entrada = filas.reduce((a, d) => a + d.entrada, 0)
         const salida = filas.reduce((a, d) => a + d.salida, 0)
         const agrupar = (clave: (d: Detalle) => string) => {
