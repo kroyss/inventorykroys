@@ -7,14 +7,14 @@ import { usePathname } from 'next/navigation'
  *  los primeros pasos. Completo, queda solo el ícono en gris. */
 export default function AprendizajeNav() {
   const pathname = usePathname()
-  const [n, setN] = useState<{ hechos: number; total: number } | null>(null)
+  const [n, setN] = useState<{ hechos: number; total: number; exento: boolean } | null>(null)
   useEffect(() => {
     let vivo = true
     fetch('/api/aprendizaje', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (!vivo || !d) return
-        setN({ hechos: d.videos.filter((v: { completado: boolean }) => v.completado).length, total: d.videos.length })
+        setN({ hechos: d.videos.filter((v: { completado: boolean }) => v.completado).length, total: d.videos.length, exento: !!d.exento })
       })
       .catch(() => {})
     return () => { vivo = false }
@@ -22,7 +22,8 @@ export default function AprendizajeNav() {
 
   if (!n) return null
   const activo = pathname.startsWith('/aprendizaje')
-  const completo = n.total > 0 && n.hechos >= n.total
+  // Exento (organización de la plataforma): siempre como completado.
+  const completo = n.exento || (n.total > 0 && n.hechos >= n.total)
   return (
     <Link href="/aprendizaje" title={completo ? 'Aprendizaje: completado' : n.total ? `Aprendizaje: ${n.hechos} de ${n.total} videos` : 'Aprendizaje: por dónde empezar'}
       className={`hidden md:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm transition-colors ${

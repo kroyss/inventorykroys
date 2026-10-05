@@ -37,8 +37,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <footer className="max-w-7xl mx-auto px-4 pt-2 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 text-center text-xs text-neutral-400">
         © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados
       </footer>
-      {/* El primer video de Aprendizaje se abre solo hasta completarlo (no al dueño de la plataforma). */}
-      {!esDuenoPlataforma(session.user) && <BienvenidaVideo />}
+      {/* El primer video de Aprendizaje se abre solo hasta completarlo (no a la organización de la plataforma: lo decide la API). */}
+      <BienvenidaVideo />
       <BottomNav role={role} country={country} modulos={modulos} />
       <CommandPalette role={role} country={country} modulos={modulos} />
     </div>

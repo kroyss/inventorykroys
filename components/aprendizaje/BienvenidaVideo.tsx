@@ -21,7 +21,7 @@ export default function BienvenidaVideo() {
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         const primero: Video | undefined = d?.videos?.[0]
-        if (vivo && primero && !primero.completado) setVideo(primero)
+        if (vivo && primero && !primero.completado && !d.exento) setVideo(primero)
       })
       .catch(() => {})
     return () => { vivo = false }
