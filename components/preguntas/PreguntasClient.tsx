@@ -227,7 +227,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
           ) : vista === 'pendientes' ? (
             <div className="space-y-3">
               {datos.preguntas.map(p => (
-                <TarjetaPendiente key={p.id} p={p} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
+                <TarjetaPendiente key={p.id} p={p} esAdmin={isAdmin} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
                   onRespondida={msg => { setAviso(msg); cargar() }} />
               ))}
             </div>
@@ -246,8 +246,8 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
 }
 
 // ── Pregunta sin responder ─────────────────────────────────────────────────
-function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
-  p: Pregunta; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
+function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
+  p: Pregunta; esAdmin: boolean; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
 }) {
   const confirm = useConfirm()
   const [texto, setTexto] = useState(p.borrador ?? '')
@@ -269,7 +269,8 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
   }, [p.id])
   const problemas = texto.trim() ? problemasDelTexto(texto) : []
   const avisosTexto = texto.trim() ? revisarTexto(texto).avisos : []
-  const pausada = p.item_estado && p.item_estado !== 'active'
+  const [estadoItem, setEstadoItem] = useState(p.item_estado)
+  const pausada = !!estadoItem && estadoItem !== 'active'
 
   const proponer = async (web: boolean) => {
     setPidiendo(web ? 'web' : 'normal'); setError(null)
@@ -298,6 +299,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, ...origen }),
       })
       const d = await r.json().catch(() => ({}))
+      if (d.codigo === 'item_inactivo') setEstadoItem('paused')
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
       onRespondida(d.publicada
         ? { tipo: 'ok', texto: `Respuesta publicada en ${p.cuenta}.` }
@@ -339,7 +341,7 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
         <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{p.cuenta}</span>
         <Producto p={p} umbral={umbralDe(plantillas)} />
-        {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {p.item_estado === 'paused' ? 'pausada' : p.item_estado} · no sale en el panel de ML</span>}
+        {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {estadoItem === 'paused' ? 'pausada' : estadoItem} · no se puede responder</span>}
         <span className="ml-auto whitespace-nowrap" title={new Date(p.fecha).toLocaleString('es-VE')}>{hace(p.fecha)}</span>
         {p.comprador_id && (
           <PreguntasPrevias n={p.previas} cargar={() =>
@@ -363,6 +365,10 @@ function TarjetaPendiente({ p, iaLista, plantillas, onRespondida }: {
         {problemas.length > 0 && <p className="text-xs text-red-600">MercadoLibre la rechazaría: {problemas.join(' · ')}</p>}
         {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
+        {pausada && (
+          <Reponer id={p.id} esAdmin={esAdmin} hayTexto={!!texto.trim() && problemas.length === 0}
+            onRepuesta={(estado, publicar) => { setEstadoItem(estado); setError(null); if (publicar && estado === 'active') enviar() }} />
+        )}
       </div>
 
       <Sugerencias lista={sugerencias} etiqueta="Parecidas:"
@@ -544,5 +550,71 @@ function Plantillas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuard
         <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
       </div>
     </section>
+  )
+}
+
+/** Publicación pausada (sin stock): MercadoLibre no deja responder. Reponer la cantidad desde aquí
+ *  (admin) y, si ya hay respuesta escrita, publicarla en el mismo paso. */
+function Reponer({ id, esAdmin, hayTexto, onRepuesta }: {
+  id: string; esAdmin: boolean; hayTexto: boolean; onRepuesta: (estado: string, publicar: boolean) => void
+}) {
+  const [info, setInfo] = useState<{ disponible: number; variantes: { id: string; nombre: string; disponible: number }[] } | null>(null)
+  const [cantidad, setCantidad] = useState('')
+  const [variante, setVariante] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!esAdmin) return
+    let vivo = true
+    fetch(`/api/preguntas/${id}/reponer`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setInfo(d) }).catch(() => {})
+    return () => { vivo = false }
+  }, [id, esAdmin])
+
+  const reponer = async (publicar: boolean) => {
+    const n = parseInt(cantidad, 10)
+    if (!(n >= 1)) return
+    setEnviando(true); setError(null)
+    try {
+      const r = await fetch(`/api/preguntas/${id}/reponer`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidad: n, variante_id: variante || null }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(d.error ?? 'No se pudo reponer'); return }
+      if (d.estado !== 'active') { setError('Se cargó el stock, pero MercadoLibre todavía la muestra pausada. Actívala en MercadoLibre y vuelve a publicar.'); return }
+      onRepuesta(d.estado, publicar)
+    } finally { setEnviando(false) }
+  }
+
+  const conVariantes = (info?.variantes.length ?? 0) > 0
+  return (
+    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2 text-sm">
+      <p className="text-amber-900">
+        <b>MercadoLibre no deja responder:</b> la publicación está pausada, casi siempre porque se quedó sin stock.
+        {esAdmin ? ' Si tienes unidades, repónlas aquí y se reactiva. Si no, elimina la pregunta.' : ' Pídele a un administrador que reponga el stock, o elimina la pregunta.'}
+      </p>
+      {esAdmin && (
+        <div className="flex flex-wrap items-center gap-2">
+          {conVariantes && (
+            <select value={variante} onChange={e => setVariante(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+              <option value="">Elige la variante…</option>
+              {info!.variantes.map(v => <option key={v.id} value={v.id}>{v.nombre} ({v.disponible} u.)</option>)}
+            </select>
+          )}
+          <input inputMode="numeric" value={cantidad} onChange={e => setCantidad(e.target.value.replace(/\D/g, '').slice(0, 5))}
+            placeholder="Unidades" className="w-24 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm text-right num bg-white" />
+          <button onClick={() => reponer(false)} disabled={enviando || !cantidad || (conVariantes && !variante)} className="btn-secondary text-sm">
+            {enviando ? 'Reponiendo…' : 'Reponer stock'}
+          </button>
+          {hayTexto && (
+            <button onClick={() => reponer(true)} disabled={enviando || !cantidad || (conVariantes && !variante)} className="btn-primary text-sm">
+              Reponer y publicar respuesta
+            </button>
+          )}
+        </div>
+      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
   )
 }

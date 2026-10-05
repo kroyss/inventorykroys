@@ -32,6 +32,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     try {
       await mlFetch(s.db, q.conexion_id, '/answers', { method: 'POST', body: { question_id: Number(id), text: texto.trim() } })
     } catch (e) {
+      // Publicación pausada (casi siempre por quedarse sin stock): ML no deja responder hasta reactivarla.
+      if (e instanceof ErrorML && /must be active/i.test(e.message)) {
+        await s.db.query(`UPDATE ml_preguntas SET item_estado = 'paused' WHERE item_id = (SELECT item_id FROM ml_preguntas WHERE id = $1)`, [id])
+        return NextResponse.json({ codigo: 'item_inactivo',
+          error: 'La publicación está pausada (sin stock): MercadoLibre no deja responder hasta que vuelva a tener stock. Repón el stock aquí abajo o elimina la pregunta.' }, { status: 409 })
+      }
       if (e instanceof ErrorML) {
         return NextResponse.json({ error: `MercadoLibre no aceptó la respuesta (${e.message})` }, { status: 502 })
       }
