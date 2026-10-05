@@ -16,6 +16,7 @@ export default function AprendizajePanel() {
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [vez, setVez] = useState(0)
+  const [editando, setEditando] = useState<{ id: number; titulo: string; descripcion: string; url: string } | null>(null)
   const recargar = () => setVez(n => n + 1)
 
   useEffect(() => {
@@ -77,10 +78,31 @@ export default function AprendizajePanel() {
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-neutral-900">Videos <span className="text-neutral-400 font-normal text-sm">({activos} visibles · en este orden se ven)</span></h2>
         {datos.videos.length === 0 ? (
-          <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-6 text-center">Todavía no hay videos. Mientras no haya, “Aprendizaje” no aparece en el menú.</p>
+          <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-6 text-center">Todavía no hay videos. Mientras no haya, “Aprendizaje” muestra los primeros pasos.</p>
         ) : (
           <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
-            {datos.videos.map((v, i) => (
+            {datos.videos.map((v, i) => editando?.id === v.id ? (
+              <li key={v.id} className="px-4 py-3 space-y-2 bg-neutral-50/60">
+                <p className="text-xs font-medium text-neutral-500">Editar video {i + 1}</p>
+                <input className={input} placeholder="Título" maxLength={120} value={editando.titulo}
+                  onChange={e => setEditando({ ...editando, titulo: e.target.value })} />
+                <textarea className={input} rows={2} placeholder="Descripción (opcional)" maxLength={500} value={editando.descripcion}
+                  onChange={e => setEditando({ ...editando, descripcion: e.target.value })} />
+                <input className={input} placeholder="Link de YouTube" value={editando.url}
+                  onChange={e => setEditando({ ...editando, url: e.target.value })} />
+                <p className="text-xs text-neutral-500">Si cambias el video, quien ya lo había completado lo mantiene visto; a los demás se les reinicia el avance de ese video.</p>
+                <div className="flex gap-2">
+                  <button disabled={editando.titulo.trim().length < 2 || !editando.url.trim()}
+                    onClick={async () => {
+                      const cambio: Record<string, unknown> = { titulo: editando.titulo, descripcion: editando.descripcion.trim() || null }
+                      if (editando.url.trim() !== `https://youtu.be/${v.youtube_id}`) cambio.url = editando.url
+                      if (await pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', cambio, `Video "${editando.titulo.trim()}" guardado.`)) setEditando(null)
+                    }}
+                    className="btn-primary text-sm disabled:opacity-40">Guardar</button>
+                  <button onClick={() => setEditando(null)} className="btn-secondary text-sm">Cancelar</button>
+                </div>
+              </li>
+            ) : (
               <li key={v.id} className={`px-4 py-3 flex flex-wrap items-center gap-3 ${v.activo ? '' : 'opacity-50'}`}>
                 <span className="w-6 text-center text-sm text-neutral-400 num">{i + 1}</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -95,6 +117,8 @@ export default function AprendizajePanel() {
                     className="btn-ghost px-2 py-1 disabled:opacity-30" title="Subir">↑</button>
                   <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { mover: 'abajo' })} disabled={i === datos.videos.length - 1}
                     className="btn-ghost px-2 py-1 disabled:opacity-30" title="Bajar">↓</button>
+                  <button onClick={() => setEditando({ id: v.id, titulo: v.titulo, descripcion: v.descripcion ?? '', url: `https://youtu.be/${v.youtube_id}` })}
+                    className="btn-ghost px-2 py-1 text-xs">Editar</button>
                   <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { activo: !v.activo })}
                     className="btn-ghost px-2 py-1 text-xs">{v.activo ? 'Ocultar' : 'Mostrar'}</button>
                   <button onClick={() => borrar(v)} className="btn-ghost px-2 py-1 text-xs text-red-600">Borrar</button>

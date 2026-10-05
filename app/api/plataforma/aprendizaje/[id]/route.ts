@@ -41,6 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       youtube = idDeYoutube(b.url)
       if (!youtube) return NextResponse.json({ error: 'No reconozco ese link de YouTube' }, { status: 400 })
     }
+    const { rows: [antes] } = await db.query(`SELECT youtube_id FROM aprendizaje_videos WHERE id = $1`, [id])
     await db.query(
       `UPDATE aprendizaje_videos SET
          titulo = COALESCE($2, titulo),
@@ -49,6 +50,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
          activo = COALESCE($6, activo)
        WHERE id = $1`,
       [id, b.titulo ?? null, b.descripcion !== undefined, b.descripcion ?? null, youtube, b.activo ?? null])
+    // Video reemplazado: quien ya lo completó lo conserva; al resto se le reinicia el avance (los
+    // segundos vistos y la duración eran del video anterior).
+    if (youtube && youtube !== antes?.youtube_id) {
+      await db.query(`DELETE FROM aprendizaje_progreso WHERE video_id = $1 AND completado_at IS NULL`, [id])
+    }
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
