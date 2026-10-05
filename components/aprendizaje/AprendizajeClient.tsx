@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui'
 
-interface Video {
+export interface Video {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string
   visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
 }
@@ -35,6 +35,7 @@ const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto
 export default function AprendizajeClient() {
   const [videos, setVideos] = useState<Video[] | null>(null)
   const [agendar, setAgendar] = useState<string | null>(null)
+  const [conectar, setConectar] = useState(false)   // empresa sin cuenta de ML y el usuario es admin
   const [actual, setActual] = useState<number | null>(null)
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function AprendizajeClient() {
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (!vivo || !d) return
-        setVideos(d.videos); setAgendar(d.agendar)
+        setVideos(d.videos); setAgendar(d.agendar); setConectar(!!d.sinCuentas && !!d.esAdmin)
         // Abre en el primer video sin terminar.
         setActual(a => a ?? (d.videos.find((v: Video) => !v.completado) ?? d.videos[0])?.id ?? null)
       })
@@ -73,6 +74,17 @@ export default function AprendizajeClient() {
   return (
     <div className="space-y-5">
       <PageHeader title="Aprendizaje" subtitle="Videos cortos para sacarle todo el provecho al sistema, en orden" />
+
+      {/* Empujón a conectar (nunca bloquea: los videos se pueden seguir viendo sin conectar). */}
+      {conectar && hechos >= 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-lime-50 border border-lime-300 rounded-xl px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold text-neutral-900">¿Listo? Conecta tu cuenta de MercadoLibre</p>
+            <p className="text-sm text-neutral-600">Desde ese día empiezan tus días gratis. Puedes seguir viendo los videos igual.</p>
+          </div>
+          <a href="/conectar" className="btn-primary text-sm">Conectar ahora</a>
+        </div>
+      )}
 
       {/* Progreso total */}
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4">
@@ -150,7 +162,7 @@ export default function AprendizajeClient() {
  *  cuenta igual), sigue desde donde quedó y guarda cada 5 s, al pausar y al cerrar/recargar la página. */
 const VELOCIDADES = [1, 1.25, 1.5, 2]
 
-function Reproductor({ video, onAvance }: {
+export function Reproductor({ video, onAvance }: {
   video: Video; onAvance: (id: number, visto: number, duracion: number, completado: boolean) => void
 }) {
   const caja = useRef<HTMLDivElement>(null)

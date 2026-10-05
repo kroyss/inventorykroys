@@ -7,6 +7,8 @@ import GuiasTealca from '@/components/despachos/GuiasTealca'
 import ReportadorPanel from '@/components/despachos/ReportadorPanel'
 import ReportadorApi from '@/components/despachos/ReportadorApi'
 import ReportadorVistas from '@/components/despachos/ReportadorVistas'
+import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
+import { sinCuentasML } from '@/lib/preguntasSesion'
 
 export const metadata = { title: 'Reportador' }
 
@@ -18,6 +20,12 @@ export default async function ReportadorPage({ searchParams }: { searchParams: P
   if (!tieneModulo(session?.user, 'reportador') || !tieneModulo(session?.user, 'despachos')) redirect('/automatizaciones')
   if (session!.user.country !== 'VE') redirect('/automatizaciones')
   const isAdmin = session!.user.role === 'admin'
+  if (await sinCuentasML(session!)) {
+    return <SinCuentaML esAdmin={isAdmin} titulo="Reportador" gancho="Le escribe a cada comprador su número de guía, sin copiar y pegar."
+      beneficios={['Toma las guías de tus despachos y le manda a cada comprador su mensaje en MercadoLibre.',
+        'Tus propias plantillas de mensaje, por cuenta.',
+        'Corre en segundo plano: puedes cerrar la pantalla, y queda el historial de lo enviado.']} />
+  }
   const sp = await searchParams
   const jornada = /^\d+$/.test(sp.jornada ?? '') ? Number(sp.jornada) : null
   return (

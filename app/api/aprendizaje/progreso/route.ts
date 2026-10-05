@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
       `INSERT INTO aprendizaje_progreso (user_id, video_id, visto_seg, duracion_seg, posicion_seg, completado_at)
        SELECT $1::int, v.id, $3::int, $4::int, $6::int, CASE WHEN $3::int >= $4::int * $5::numeric THEN NOW() END
        FROM aprendizaje_videos v WHERE v.id = $2::int AND v.activo
+         -- en orden: no cuenta si hay un video ANTERIOR sin completar
+         AND NOT EXISTS (SELECT 1 FROM aprendizaje_videos a
+                         LEFT JOIN aprendizaje_progreso pa ON pa.video_id = a.id AND pa.user_id = $1::int
+                         WHERE a.activo AND (a.orden, a.id) < (v.orden, v.id) AND pa.completado_at IS NULL)
        ON CONFLICT (user_id, video_id) DO UPDATE SET
          visto_seg     = GREATEST(aprendizaje_progreso.visto_seg, EXCLUDED.visto_seg),
          duracion_seg  = EXCLUDED.duracion_seg,
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
          updated_at    = NOW()
        RETURNING completado_at IS NOT NULL AS completado`,
       [Number(session.user.id), b.video_id, visto, b.duracion_seg, PORCENTAJE_COMPLETO, Math.min(b.posicion_seg, b.duracion_seg)])
-    if (!r) return NextResponse.json({ error: 'Video no encontrado' }, { status: 404 })
+    if (!r) return NextResponse.json({ error: 'Video no encontrado o todavía bloqueado (primero termina el anterior)' }, { status: 404 })
     return NextResponse.json({ completado: r.completado })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })

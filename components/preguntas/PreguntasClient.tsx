@@ -208,9 +208,9 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
         ) : <Cargando />
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
-          <EmptyState message="Todavía no hay cuentas de MercadoLibre conectadas."
+          <EmptyState message="Aquí llegan las preguntas de todas tus cuentas de MercadoLibre, y la IA te propone cada respuesta para que solo la revises y publiques. Conecta tu cuenta para empezar: nunca se publica nada sin que tú lo revises."
             cta={isAdmin
-              ? <button onClick={() => setVista('cuentas')} className="btn-primary text-sm">Conectar una cuenta</button>
+              ? <a href="/conectar" className="btn-primary text-sm">Conectar ahora</a>
               : <span className="text-xs text-neutral-400">Pídele a un administrador que conecte las cuentas.</span>} />
         </div>
       ) : (

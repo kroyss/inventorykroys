@@ -7,6 +7,8 @@ import CommandPalette from '@/components/layout/CommandPalette'
 import { ES_STAGING } from '@/lib/entorno'
 import { AvisosProvider } from '@/components/layout/Avisos'
 import AvisoCuenta from '@/components/layout/AvisoCuenta'
+import BienvenidaVideo from '@/components/aprendizaje/BienvenidaVideo'
+import { esDuenoPlataforma } from '@/lib/empresa'
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -33,6 +35,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <footer className="max-w-7xl mx-auto px-4 pt-2 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 text-center text-xs text-neutral-400">
         © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados
       </footer>
+      {/* El primer video de Aprendizaje se abre solo hasta completarlo (no al dueño de la plataforma). */}
+      {!esDuenoPlataforma(session.user) && <BienvenidaVideo />}
       <BottomNav role={role} country={country} modulos={modulos} />
       <CommandPalette role={role} country={country} modulos={modulos} />
     </div>

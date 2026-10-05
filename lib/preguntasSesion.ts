@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSessionDb } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
+import type { Session } from 'next-auth'
+import { dbDeSesion } from '@/lib/session'
 
 /** Sesión + conexión de la empresa para las rutas de Preguntas (módulo `preguntas`). */
 export async function sesionPreguntas(soloAdmin = false) {
@@ -23,4 +25,11 @@ export async function sesionStock(soloAdmin = false) {
     return { error: NextResponse.json({ error: 'Tu empresa no tiene el módulo Stock' }, { status: 403 }) } as const
   }
   return s
+}
+
+/** La empresa de la sesión todavía no conectó ninguna cuenta de MercadoLibre (las pantallas de
+ *  Automatizaciones muestran entonces components/automatizaciones/SinCuentaML). */
+export async function sinCuentasML(session: Session) {
+  const { rowCount } = await dbDeSesion(session).query(`SELECT 1 FROM ml_conexiones WHERE estado = 'activa' LIMIT 1`)
+  return rowCount === 0
 }
