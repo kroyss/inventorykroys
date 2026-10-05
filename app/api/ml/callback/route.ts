@@ -5,9 +5,9 @@ import { canjearCodigo, cifrar, usuarioML } from '@/lib/ml'
 import { dbGlobal } from '@/lib/db'
 
 // Paso 2 del OAuth: ML vuelve con ?code&state. Se canjea el código por los tokens y se
-// guarda la cuenta en la empresa de la sesión (cifrados). Siempre termina en /preguntas.
+// guarda la cuenta en la empresa de la sesión (cifrados). Siempre termina en /cuentas-ml.
 export async function GET(req: NextRequest) {
-  const base = new URL('/preguntas', process.env.NEXTAUTH_URL ?? req.url)
+  const base = new URL('/cuentas-ml', process.env.NEXTAUTH_URL ?? req.url)
   const volver = (params: Record<string, string>) => {
     const u = new URL(base)
     for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v)

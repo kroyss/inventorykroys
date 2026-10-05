@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
-import { LinkConectar } from '@/components/preguntas/PreguntasClient'
+import { LinkConectar } from '@/components/preguntas/CuentasMLClient'
 
 // Pantalla de una herramienta de Automatizaciones mientras la empresa no conectó ninguna cuenta de
 // MercadoLibre: en vez de una bandeja vacía (o un botón bloqueado), qué gana con esa herramienta y

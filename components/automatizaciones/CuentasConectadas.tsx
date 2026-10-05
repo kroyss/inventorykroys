@@ -6,7 +6,7 @@ export interface CuentaML { nickname: string; estado: string; con_error: boolean
 
 // Botón del encabezado de Automatizaciones (mismo estilo que los botones secundarios y el menú de la
 // cuenta): cuántas cuentas de MercadoLibre hay y, al tocarlo, cuáles + conectar otra. Manejarlas
-// (desconectar, reconectar, link para otra PC) sigue en Preguntas → Cuentas y políticas.
+// (desconectar, reconectar, link para otra PC) está en su pantalla, /cuentas-ml.
 export default function CuentasConectadas({ cuentas, esAdmin }: { cuentas: CuentaML[]; esAdmin: boolean }) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -61,7 +61,7 @@ export default function CuentasConectadas({ cuentas, esAdmin }: { cuentas: Cuent
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="w-4 h-4 text-neutral-500"><path d="M12 5v14M5 12h14" /></svg>
                 Conectar otra cuenta
               </a>
-              <Link href="/preguntas?vista=cuentas" role="menuitem" onClick={() => setAbierto(false)} className={`${fila} text-neutral-700 hover:bg-neutral-50`}>
+              <Link href="/cuentas-ml" role="menuitem" onClick={() => setAbierto(false)} className={`${fila} text-neutral-700 hover:bg-neutral-50`}>
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-neutral-500">
                   <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>

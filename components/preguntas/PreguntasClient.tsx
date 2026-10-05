@@ -112,7 +112,7 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
 }
 
 export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
-  // ?vista=cuentas (desde el aviso de "primer paso" de Automatizaciones) abre Cuentas y políticas.
+  // ?vista=cuentas abre Políticas y respuestas rápidas (las cuentas de ML están en /cuentas-ml).
   const pedida = useSearchParams().get('vista')
   const [vista, setVista] = useState<Vista>(isAdmin && pedida === 'cuentas' ? 'cuentas' : 'pendientes')
   const [page, setPage] = useState(1)
@@ -196,14 +196,14 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       <Tabs value={vista} onChange={v => { setVista(v); setPage(1) }} items={[
         { value: 'pendientes', label: 'Sin responder', count: cont?.pendientes },
         { value: 'respondidas', label: 'Historial', count: cont?.respondidas },
-        ...(isAdmin ? [{ value: 'cuentas' as const, label: 'Cuentas y políticas' }] : []),
+        ...(isAdmin ? [{ value: 'cuentas' as const, label: 'Políticas y respuestas rápidas' }] : []),
       ]} />
 
       {vista === 'cuentas' ? (
         datos ? (
           <div className="space-y-4">
             <Plantillas iniciales={datos.plantillas} onGuardado={cargar} />
-            <CuentasYPoliticas cuentas={datos.cuentas} mlListo={datos.configuracion.ml} onCambio={cargar} />
+            <CuentasYPoliticas />
           </div>
         ) : <Cargando />
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (
@@ -448,8 +448,8 @@ function FilaHistorial({ p }: { p: Pregunta }) {
 }
 
 // ── Cuentas conectadas + políticas para la IA ──────────────────────────────
-function CuentasYPoliticas({ cuentas, mlListo, onCambio }: { cuentas: Cuenta[]; mlListo: boolean; onCambio: () => void }) {
-  const confirm = useConfirm()
+// Las cuentas de ML viven en su pantalla (/cuentas-ml); aquí quedan las políticas para la IA.
+function CuentasYPoliticas() {
   const [politicas, setPoliticas] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [ok, setOk] = useState(false)
@@ -466,46 +466,8 @@ function CuentasYPoliticas({ cuentas, mlListo, onCambio }: { cuentas: Cuenta[]; 
     setGuardando(false); setOk(r.ok)
   }
 
-  const desconectar = async (c: Cuenta) => {
-    if (!await confirm({ title: `Desconectar ${c.nickname}`, message: 'Se dejan de traer sus preguntas y no se podrá responder desde aquí. Lo ya guardado se conserva.', confirmText: 'Desconectar', danger: true })) return
-    await fetch(`/api/ml/conexiones/${c.id}`, { method: 'DELETE' })
-    onCambio()
-  }
-
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-neutral-900">Cuentas de MercadoLibre</h2>
-          {mlListo
-            ? <a href="/conectar" className="btn-primary text-sm">Conectar cuenta</a>
-            : <span className="text-xs text-amber-700">Falta configurar la app de ML</span>}
-        </div>
-        <p className="text-xs text-neutral-500">
-          Te lleva a MercadoLibre para autorizar. Entra con la cuenta PRINCIPAL del vendedor (un colaborador no puede autorizar).
-        </p>
-        {mlListo && <LinkConectar />}
-        {cuentas.length === 0 ? <p className="text-sm text-neutral-400">Ninguna conectada todavía. Si estás en prueba, tus días gratis empiezan cuando conectes la primera.</p> : (
-          <ul className="divide-y divide-neutral-100">
-            {cuentas.map(c => (
-              <li key={c.id} className="py-2.5 flex items-center gap-3 text-sm">
-                <StatusBadge status={c.estado === 'activa' ? (c.ultimo_error ? 'PARCIAL' : 'OK') : 'INCONSISTENTE'}
-                  label={c.estado === 'activa' ? (c.ultimo_error ? 'Con error' : 'Conectada') : 'Desconectada'} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900">{c.nickname}</p>
-                  <p className="text-xs text-neutral-500 truncate">
-                    {c.ultimo_error ?? (c.ultima_sync ? `Actualizada ${hace(c.ultima_sync)}` : 'Sin actualizar todavía')}
-                  </p>
-                </div>
-                {c.estado === 'activa'
-                  ? <button onClick={() => desconectar(c)} className="btn-ghost text-xs text-red-600">Desconectar</button>
-                  : mlListo && <a href="/api/ml/conectar" className="btn-secondary text-xs px-2.5 py-1">Reconectar</a>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
+    <div className="grid gap-4">
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
         <h2 className="font-semibold text-neutral-900">Políticas para la IA</h2>
         <p className="text-xs text-neutral-500">
@@ -582,27 +544,5 @@ function Plantillas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuard
         <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
       </div>
     </section>
-  )
-}
-
-/** Link corto para conectar desde otra PC (app/conectar): se copia y se abre allá. */
-export function LinkConectar() {
-  const [copiado, setCopiado] = useState(false)
-  const [url, setUrl] = useState('/conectar')
-  useEffect(() => { setUrl(`${window.location.origin}/conectar`) }, [])
-  const copiar = async () => {
-    try { await navigator.clipboard.writeText(url); setCopiado(true); setTimeout(() => setCopiado(false), 2000) } catch { /* sin portapapeles */ }
-  }
-  return (
-    <div className="rounded-lg bg-neutral-50 border border-neutral-200 p-2.5 space-y-1.5">
-      <p className="text-xs text-neutral-600">
-        <b>¿La cuenta de MercadoLibre está abierta en otra PC?</b> Copia este link y ábrelo allá: entra al sistema con tu
-        usuario y conecta la cuenta de ML que esté abierta en ESE navegador.
-      </p>
-      <div className="flex items-center gap-2">
-        <code className="flex-1 min-w-0 truncate text-xs bg-white border border-neutral-200 rounded px-2 py-1">{url}</code>
-        <button type="button" onClick={copiar} className="btn-secondary text-xs px-2 py-1 whitespace-nowrap">{copiado ? '✓ Copiado' : 'Copiar'}</button>
-      </div>
-    </div>
   )
 }

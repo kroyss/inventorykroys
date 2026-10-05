@@ -161,7 +161,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
 
           {visibles.length === 0 ? (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
-              <EmptyState message={datos.cuentas.length === 0 ? 'No hay cuentas de MercadoLibre conectadas (Preguntas → Cuentas y políticas).'
+              <EmptyState message={datos.cuentas.length === 0 ? 'No hay cuentas de MercadoLibre conectadas (Automatizaciones → Cuentas de MercadoLibre).'
                 : vista === 'listas' ? 'No hay ventas por calificar. Si recién conectaste las cuentas, dale "Actualizar ventas".' : 'Nada esperando.'} />
             </div>
           ) : (

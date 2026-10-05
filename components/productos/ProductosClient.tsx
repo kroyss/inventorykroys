@@ -979,7 +979,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 {form.ml_codes.length === 0 && (
                   <p className="text-xs text-neutral-500">
                     Aquí va el código de la publicación (MLV…) en cada una de tus cuentas. Aparecen al conectar tus cuentas
-                    de MercadoLibre (Automatizaciones → Preguntas → Cuentas y políticas) o al escribirlas en Ajustes → Tu negocio.
+                    de MercadoLibre (Automatizaciones → Cuentas de MercadoLibre) o al escribirlas en Ajustes → Tu negocio.
                   </p>
                 )}
                 <div className="grid grid-cols-2 gap-2">
