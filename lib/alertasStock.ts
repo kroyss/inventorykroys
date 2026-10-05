@@ -1,7 +1,8 @@
 // Alertas de stock (migración 052): lo que queda publicado en MercadoLibre, por publicación y por
 // variante. Lee TODAS las publicaciones activas (y las pausadas por falta de stock: ML las pausa
 // solo al llegar a 0) de cada cuenta conectada; no depende de los códigos ML de los productos.
-// Solo lee de MercadoLibre. Lo corre el cron de preguntas, cada 2 horas por cuenta.
+// La revisión solo lee de MercadoLibre (cron de preguntas, cada 2 h por cuenta). Cambiar la cantidad la
+// hace el admin a mano desde Stock (api/alertas-stock/actualizar).
 //
 // Filtro (decisión del dueño, 2026-10-02): solo cuenta lo que se VENDIÓ en los últimos 30 días
 // (la variante, o la publicación si no tiene variantes), según las ventas que ya se traen de ML
