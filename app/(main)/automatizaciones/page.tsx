@@ -1,9 +1,9 @@
-import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { tieneModulo } from '@/lib/modulos'
 import { dbDeSesion } from '@/lib/session'
 import { PageHeader } from '@/components/ui'
+import CuentasConectadas, { type CuentaML } from '@/components/automatizaciones/CuentasConectadas'
 import InicioAutomatizaciones, { type Herramienta } from '@/components/automatizaciones/InicioAutomatizaciones'
 
 export const metadata = { title: 'Automatizaciones' }
@@ -21,9 +21,9 @@ export default async function AutomatizacionesPage() {
   const stock = ml && tieneModulo(u, 'alertas_stock')
 
   // Primer paso de una empresa nueva: sin cuentas de MercadoLibre conectadas casi nada funciona.
-  const cuentas: string[] = ml ? (await dbDeSesion(session!).query(
-    `SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)).rows.map(r => r.nickname) : []
-  const sinCuentas = ml && cuentas.length === 0
+  const cuentas: CuentaML[] = ml ? (await dbDeSesion(session!).query(
+    `SELECT nickname, estado, ultimo_error IS NOT NULL AS con_error FROM ml_conexiones ORDER BY nickname`)).rows : []
+  const sinCuentas = ml && !cuentas.some(c => c.estado === 'activa')
 
   const grupos: { titulo: string; texto: string; items: Herramienta[] }[] = [
     {
@@ -59,15 +59,7 @@ export default async function AutomatizacionesPage() {
   return (
     <div>
       <PageHeader title="Automatizaciones" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones"
-        actions={ml && cuentas.length > 0 ? (
-          // Las cuentas conectadas, siempre a la vista; agregar otra o manejarlas está en Preguntas → Cuentas y políticas.
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-neutral-500" title="Cuentas de MercadoLibre conectadas">
-              {cuentas.length === 1 ? 'Cuenta' : 'Cuentas'}: <b className="text-neutral-800">{cuentas.join(', ')}</b>
-            </span>
-            {u.role === 'admin' && <Link href="/preguntas?vista=cuentas" className="btn-secondary text-sm whitespace-nowrap">+ Conectar otra cuenta</Link>}
-          </div>
-        ) : undefined} />
+        actions={ml && !sinCuentas ? <CuentasConectadas cuentas={cuentas} esAdmin={u.role === 'admin'} /> : undefined} />
       <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={u.role === 'admin'} />
     </div>
   )

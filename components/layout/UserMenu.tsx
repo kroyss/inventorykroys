@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useEffect, useRef, useState } from 'react'
+import { espacioDe } from '@/lib/espacios'
 
 interface Props {
   nombre: string
@@ -31,7 +32,8 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
 
   const iniciales = nombre.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
   const links = [
-    ajustes    && { href: '/tasas',      label: 'Ajustes' },
+    // Ajustes es del inventario (tasa, exceso, categorías): en Automatizaciones cada herramienta tiene los suyos adentro.
+    ajustes && espacioDe(pathname) === 'inventario' && { href: '/tasas', label: 'Ajustes' },
     usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },
   ].filter(Boolean) as { href: string; label: string }[]
