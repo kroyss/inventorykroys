@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { PageHeader, Tabs } from '@/components/ui'
+import { PageHeader, Tabs, Cargando } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface Fila {
@@ -27,6 +27,7 @@ const hace = (s: string | null) => {
 export default function AlertasStockClient() {
   const [vista, setVista] = useState<Vista>('agotadas')
   const [datos, setDatos] = useState<Datos | null>(null)
+  const [datosDe, setDatosDe] = useState<Vista | null>(null)   // de qué pestaña son los datos cargados
   const [buscar, setBuscar] = useState('')
   const [revisando, setRevisando] = useState(false)
   const [umbral, setUmbral] = useState('')
@@ -44,7 +45,7 @@ export default function AlertasStockClient() {
     let vivo = true
     fetch(`/api/alertas-stock?vista=${vista}`, { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))
-      .then((d: Datos | null) => { if (vivo && d) { setDatos(d); setUmbral(u => u || String(d.umbral)) } })
+      .then((d: Datos | null) => { if (vivo && d) { setDatos(d); setDatosDe(vista); setUmbral(u => u || String(d.umbral)) } })
       .catch(() => {})
     return () => { vivo = false }
   }, [vista, vez])
@@ -143,7 +144,8 @@ export default function AlertasStockClient() {
         </div>
       )}
 
-      {!datos ? <p className="text-sm text-neutral-400">Cargando…</p> : filas.length === 0 ? (
+      {/* Al cambiar de pestaña no se muestra la lista anterior mientras llega la nueva. */}
+      {!datos || datosDe !== vista ? <Cargando /> : filas.length === 0 ? (
         <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">
           {vista === 'agotadas' ? 'Nada de lo vendido en 30 días está agotado. 👌' : 'Nada de lo vendido en 30 días está por agotarse.'}
         </p>
