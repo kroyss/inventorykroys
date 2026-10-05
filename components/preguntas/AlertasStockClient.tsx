@@ -116,9 +116,11 @@ export default function AlertasStockClient() {
           <label className="flex items-center gap-1.5">
             Por agotarse = menos de
             <input type="number" min={1} max={100} value={umbral} onChange={e => setUmbral(e.target.value)}
-              className="w-14 border border-neutral-300 rounded px-1.5 py-0.5 text-neutral-800" />
+              className="w-16 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-neutral-800 num" />
             unidades
-            {datos && umbral !== String(datos.umbral) && <button onClick={guardarUmbral} className="underline underline-offset-2 text-sky-700">guardar</button>}
+            {datos && umbral !== String(datos.umbral) && (
+              <button onClick={guardarUmbral} className="btn-secondary text-xs px-2.5 py-1">Guardar</button>
+            )}
           </label>
         )}
       </div>
