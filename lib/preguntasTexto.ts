@@ -50,7 +50,12 @@ export function revisarTexto(t: string, tipo: 'pregunta' | 'mensaje' = 'pregunta
   if (urls.some(u => !ES_ML.test(u))) avisos.push('Tiene un link que no es de MercadoLibre: puede que ML no lo deje publicar')
   if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(s)) bloqueantes.push('Tiene un correo')
   if (tipo === 'pregunta' && /(\+?\d[\d\s().-]{8,}\d)/.test(sinUrls.replace(/\b\d{1,3}([.,]\d{3})+([.,]\d+)?\b/g, ''))) bloqueantes.push('Parece tener un número de teléfono')
-  if (/\b(whats\s*app|wasap|instagram|insta|facebook|telegram|tiktok)\b|(^|\s)@\w{3,}/i.test(sinUrls)) bloqueantes.push('Menciona redes sociales o un usuario de contacto')
+  // Redes sociales: en preguntas (públicas) se bloquea; en la mensajería postventa de MLV sí pasan
+  // (p. ej. "al whatsapp 0414…"), así que solo se avisa (decisión del dueño, 2026-10-05).
+  if (/\b(whats\s*app|wasap|instagram|insta|facebook|telegram|tiktok)\b|(^|\s)@\w{3,}/i.test(sinUrls)) {
+    if (tipo === 'mensaje') avisos.push('Menciona una red social: MercadoLibre a veces modera estos mensajes')
+    else bloqueantes.push('Menciona redes sociales o un usuario de contacto')
+  }
   return { bloqueantes, avisos }
 }
 
