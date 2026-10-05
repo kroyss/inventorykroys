@@ -586,7 +586,7 @@ function Plantillas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuard
 }
 
 /** Link corto para conectar desde otra PC (app/conectar): se copia y se abre allá. */
-function LinkConectar() {
+export function LinkConectar() {
   const [copiado, setCopiado] = useState(false)
   const [url, setUrl] = useState('/conectar')
   useEffect(() => { setUrl(`${window.location.origin}/conectar`) }, [])

@@ -17,8 +17,8 @@ export default async function DespachosPage() {
   }
   const isAdmin = session!.user.role === 'admin'
   const desdeML = !llevaInventario(session!.user)
-  // Sin inventario las etiquetas salen con el producto de MercadoLibre: sin cuenta conectada no hay de dónde.
-  if (desdeML && tieneModulo(session!.user, 'preguntas') && await sinCuentasML(session!)) {
+  // Como todas las Automatizaciones: hasta conectar una cuenta de ML se explica qué gana y se ofrece conectar.
+  if (tieneModulo(session!.user, 'preguntas') && await sinCuentasML(session!)) {
     return <SinCuentaML esAdmin={isAdmin} titulo="Despachos" gancho="Imprime las etiquetas de todas tus cuentas, 4 por hoja, con el producto escrito."
       beneficios={['Subes los PDF de Mercado Envíos y salen 4 etiquetas por hoja, con el producto y la nota de la venta.',
         'Guías Tealca, cierre de jornada y manifiesto para la transportista.',
