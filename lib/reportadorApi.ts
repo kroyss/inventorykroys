@@ -15,6 +15,7 @@ import { buscarOrden, mensajesDeOrden, type MensajeML } from '@/lib/ventasML'
 import { cuentaDe, leerConfig, paraTealca, problemasConfig, rellenar, RESERVA_HORAS, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { remitenteConfigurado } from '@/lib/despachos'
 import { ES_STAGING } from '@/lib/entorno'
+import { esDemo } from '@/lib/demo'
 
 // MercadoLibre manda solo, A NOMBRE DEL VENDEDOR, "Gracias por tu compra. El número de guía
 // para tu envío es: …" cuando el comprador llena el formulario. Tiene la misma guía pero NO es
@@ -66,6 +67,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   const problemas = problemasConfig(config)
   if (problemas.length) throw new Error(`Configuración del Reportador incompleta: ${problemas.join(' · ')}`)
   const remitenteDefault = await remitenteConfigurado(db)
+  const demo = !simular && await esDemo(db)
 
   const baseSql = `
     SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente
@@ -111,6 +113,15 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
     if (!cuenta) {
       await soltar()
       procesados.push({ ...base, resultado: 'ERROR', detalle: 'El remitente no coincide con ninguna cuenta del Reportador', mensaje: null })
+      continue
+    }
+    // Modo demostración (lib/demo.ts): queda como enviado, sin escribirle a nadie en MercadoLibre.
+    if (demo) {
+      let mensaje = rellenar(config.plantillas[Math.floor(Math.random() * config.plantillas.length)], config.bloque, cuenta.pagina, base.guia)
+      if (base.carrier === 'TEALCA') mensaje = paraTealca(mensaje)
+      await cerrar('ENVIADO', 'demostración: no se envió a MercadoLibre', mensaje)
+      procesados.push({ ...base, resultado: 'ENVIADO', detalle: `Desde ${cuenta.nombre}`, mensaje })
+      await pausa(600)
       continue
     }
     try {

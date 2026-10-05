@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { leerPlantillasCal } from '@/lib/calificacionesML'
+import { esDemo } from '@/lib/demo'
 
 const Body = z.object({
   ordenes: z.array(z.object({
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
     const p = leerPlantillasCal(pl?.value)
     const resultados: { id: string; ok: boolean; detalle?: string }[] = []
+    const demo = await esDemo(s.db)   // lib/demo.ts: se registra sin llamar a MercadoLibre
 
     for (const o of ordenes) {
       const { rows: [fila] } = await s.db.query(
@@ -34,6 +36,12 @@ export async function POST(req: NextRequest) {
       const cuerpo = o.tipo === 'concretada'
         ? { fulfilled: true, rating: p.concretada.rating, message: p.concretada.mensaje }
         : { fulfilled: false, rating: p.noConcretada.rating, reason: p.noConcretada.motivo, message: p.noConcretada.mensaje }
+      if (demo) {
+        await s.db.query(`UPDATE ml_ordenes SET cal_vendedor = $2, cal_concretada = $3, actualizada_at = NOW() WHERE id = $1`,
+          [o.id, cuerpo.rating, cuerpo.fulfilled])
+        resultados.push({ id: o.id, ok: true })
+        continue
+      }
       try {
         await mlFetch(s.db, fila.conexion_id, `/orders/${o.id}/feedback`, { method: 'POST', body: cuerpo })
         const v = await mlFetch<{ sale: { rating?: string; fulfilled?: boolean } | null }>(
