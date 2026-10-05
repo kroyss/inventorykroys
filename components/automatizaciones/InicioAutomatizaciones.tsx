@@ -53,7 +53,7 @@ export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esA
                 {!esAdmin && ' Lo hace un administrador de tu empresa.'}
               </p>
             </div>
-            {esAdmin && <Link href="/preguntas?vista=cuentas" className="btn-primary text-sm whitespace-nowrap">Conectar cuentas</Link>}
+            {esAdmin && <a href="/conectar" className="btn-primary text-sm whitespace-nowrap">Conectar ahora</a>}
           </div>
         ) : todas.length === 0 ? null : pendientes.length === 0 ? (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4 flex items-center gap-3">
