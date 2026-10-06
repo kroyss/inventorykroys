@@ -32,6 +32,20 @@ const INCLUYE = [
   { t: 'Inventario (opcional)', d: 'Si quieres, también llevas tu stock y tus ventas al día, sin cuaderno ni Excel.' },
 ]
 
+// Seleccionados de cada ronda, como se anunciaron en el grupo de Telegram (el @ es el que cada uno
+// usa en Telegram, que no siempre coincide con el del formulario). Se muestran desde el día de resultados.
+// Los seleccionados escriben ellos a la cuenta oficial (no se les escribe en frío: Telegram lo limita).
+const TELEGRAM_OFICIAL = 'elcomerciantedigital'
+const SELECCIONADOS: Record<number, { telegram: string; nombre: string }[]> = {
+  1: [
+    { telegram: 'repuestoschevypartes', nombre: 'Cristhian' },
+    { telegram: 'Ruben', nombre: 'Rubenpico' },
+    { telegram: 'Luisha21', nombre: 'Luisarnal' },
+    { telegram: 'Businessbqto', nombre: 'Miguel' },
+    { telegram: 'bacutone', nombre: 'Gerardo' },
+  ],
+}
+
 // Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas
 // (5 + 10 = 15 pioneros; los cupos salen de fundadores_tandas) y el formulario. Lo de la base se lee en cada visita.
 // ?vista=previa: muestra el formulario aunque la inscripción esté cerrada, sin poder enviarlo
@@ -55,6 +69,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
   const abiertaHoy = tandaInscribiendo(tandas, hoy)
   const proxima = proximaInscripcion(tandas, hoy)
   const destacada = (abiertaHoy ?? proxima)?.numero      // la que inscribe hoy o, si no, la próxima en abrir
+  // La última ronda con resultados ya anunciados y lista de seleccionados.
+  const anunciada = [...tandas].reverse().find(t => SELECCIONADOS[t.numero] && (diaResultados(t) ?? '9999') <= hoy)
+  const siguiente = anunciada && tandas.find(t => t.numero === anunciada.numero + 1)
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -141,6 +158,54 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
         </div>
       </section>
 
+      {/* Seleccionados de la última ronda anunciada: qué tienen que hacer y qué pasa con el resto */}
+      {anunciada && (
+        <section className="bg-lime-50 border-b border-lime-200">
+          <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 grid gap-6 lg:grid-cols-[1fr_1.15fr] items-start">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-800">Resultados · Ronda {anunciada.numero}</p>
+              <h2 className="mt-2 text-2xl font-semibold text-neutral-900">🎉 ¡Ya están los seleccionados!</h2>
+              <p className="mt-2 text-sm text-neutral-600">Gracias a todos los que se postularon. La respuesta fue increíble.</p>
+              <ul className="mt-4 space-y-1.5">
+                {SELECCIONADOS[anunciada.numero].map(x => (
+                  <li key={x.telegram} className="flex items-center gap-2 text-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-lime-600 shrink-0" />
+                    <span className="font-semibold text-neutral-900">@{x.telegram}</span>
+                    <span className="text-neutral-500">({x.nombre})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-xl bg-white border border-lime-300 p-4">
+                <p className="text-sm font-semibold text-neutral-900">👉 ¿Quedaste seleccionado?</p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Escríbenos por privado a{' '}
+                  <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer" className="font-semibold text-lime-800 underline underline-offset-2">@{TELEGRAM_OFICIAL}</a>{' '}
+                  para darte tu acceso.
+                </p>
+                <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 bg-neutral-950 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-neutral-800 transition-colors">
+                  Escribir por Telegram <span aria-hidden="true">→</span>
+                </a>
+              </div>
+              {siguiente && (
+                <div className="rounded-xl bg-white border border-neutral-200 p-4 text-sm text-neutral-600 space-y-2">
+                  <p>
+                    <b className="text-neutral-900">¿Te postulaste y no quedaste esta vez?</b> Tu postulación <b className="text-neutral-900">sigue participando en la Ronda {siguiente.numero}</b>:
+                    no tienes que volver a postularte. La Ronda {siguiente.numero} tiene <b className="text-neutral-900">{siguiente.cupos} cupos</b>
+                    {diaResultados(siguiente) && <> y se anuncia el <b className="text-neutral-900">{fechaTanda(diaResultados(siguiente)!)}</b></>}.
+                  </p>
+                  {diasInscripcion(siguiente) && (
+                    <p><b className="text-neutral-900">¿Aún no te postulas?</b> Hazlo el <b className="text-neutral-900">{diasInscripcion(siguiente)}</b> en el formulario de abajo 🚀</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       <main className="max-w-5xl mx-auto px-5 sm:px-8 py-12 grid gap-10 lg:grid-cols-[1fr_1.15fr]">
         <div className="space-y-8">
           <section>
@@ -162,7 +227,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
               <li>Te postulas una sola vez, en los días de postulación (2 minutos). Si no quedas en la ronda 1, tu postulación sigue en pie para la ronda 2.</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
-              <li>Al día siguiente del cierre de las postulaciones anunciamos la selección. Si quedas, te escribimos por Telegram, configuramos el sistema contigo y te enseñamos a usarlo.</li>
+              <li>Al día siguiente del cierre de las postulaciones anunciamos la selección aquí y en nuestro grupo de Telegram. Si quedas, nos escribes a @elcomerciantedigital, configuramos el sistema contigo y te enseñamos a usarlo.</li>
               <li>Un mes gratis. Después decides si te quedas.</li>
             </ol>
           </section>
