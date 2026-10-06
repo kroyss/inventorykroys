@@ -14,6 +14,7 @@ import { sincronizarMensajes } from '@/lib/mensajesML'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
+import { esDemo } from '@/lib/demo'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 export interface PreguntaML {
@@ -107,6 +108,8 @@ export interface ResultadoSync { cuenta: string; nuevas?: number; error?: string
  *     aprenda del tono y las políticas del vendedor.
  */
 export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
+  // Demostración: sus datos son los sembrados (lib/demoDatos.ts); no hay nada que traer.
+  if (await esDemo(db)) return []
   const { rows: cuentas } = await db.query(
     `SELECT id, nickname, ultima_sync FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
   const res: ResultadoSync[] = []

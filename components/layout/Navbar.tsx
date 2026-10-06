@@ -8,6 +8,8 @@ import EspacioSwitcher from './EspacioSwitcher'
 import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
+import { esDemo } from '@/lib/demo'
+import { dbDeSesion } from '@/lib/session'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
@@ -22,6 +24,8 @@ export default async function Navbar() {
     ? await dbGlobal().query(`SELECT productos FROM users WHERE id = $1`, [session.user.id])
     : { rows: [] as { productos: string[] }[] }
   const conRadar = !!cuenta?.productos?.includes('radar')
+  // Empresa de demostración: el menú de la cuenta lleva a /demo (restaurar cada sección).
+  const demo = session?.user.empresaId ? await esDemo(dbDeSesion(session)).catch(() => false) : false
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
@@ -39,7 +43,7 @@ export default async function Navbar() {
           )}
           {session?.user && (
             <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
-              ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'} plataforma={esDuenoPlataforma(session.user)} />
+              ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'} plataforma={esDuenoPlataforma(session.user)} demo={demo} />
           )}
         </div>
 

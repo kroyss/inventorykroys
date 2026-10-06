@@ -198,7 +198,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
 }) {
   const [f, setF] = useState({
     nombre: '', country: 'VE' as 'VE' | 'CO', modulos: ['despachos', 'reportador', 'preguntas', 'alertas_stock'],   // un Fundador: Automatizaciones, sin Inventario
-    alta: 'fundador' as 'fundador' | 'prueba' | 'activo',
+    alta: 'fundador' as 'fundador' | 'prueba' | 'activo' | 'demo',
     username: '', full_name: '', password: claveInicial(),
   })
   const [guardando, setGuardando] = useState(false)
@@ -238,7 +238,9 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
             <option value="fundador">⭐ Fundador: {DIAS_PRUEBA.fundador} días gratis desde que conecte ML</option>
             <option value="prueba">Prueba: {DIAS_PRUEBA.normal} días gratis desde que conecte ML</option>
             <option value="activo">Activo (ya paga)</option>
+            <option value="demo">🎬 Demo para videos: datos ficticios, nada sale a MercadoLibre</option>
           </select>
+          {f.alta === 'demo' && <span className="block mt-1 text-[11px] text-neutral-500">Se crea con 2 cuentas de ML ficticias y todo pendiente (Automatizaciones). Se restaura desde el menú de la cuenta → Demo.</span>}
         </label>
         <label className="text-xs text-neutral-600">Administrador: nombre completo
           <input className={input} value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} />

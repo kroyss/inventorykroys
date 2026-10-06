@@ -5,7 +5,7 @@
 // mark_as_read=false NO la marca como leída (así ML sigue avisando en su app); se marca
 // al responder o con el botón "Marcar como leída".
 import type { Pool } from 'pg'
-import { mlFetch, ErrorML, ML_API, tokenVigente } from '@/lib/ml'
+import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
 
 interface MensajeApi {
@@ -219,7 +219,9 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
     form.append('file', archivo, archivo.name)
     return fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${await tokenVigente(db, conexionId, forzar)}` }, body: form, cache: 'no-store' })
   }
-  let r = await enviar(false)
+  // Demostración: el archivo no sale de aquí (el mensaje se "manda" sin el adjunto).
+  let r: Response
+  try { r = await enviar(false) } catch (e) { if (e instanceof CuentaDemo) return `demo-${archivo.name}`; throw e }
   if (r.status === 401) r = await enviar(true)
   const d = await r.json().catch(() => null) as { id?: string; message?: string } | null
   if (!r.ok || !d?.id) throw new ErrorML(r.status, d, `MercadoLibre no aceptó "${archivo.name}"${d?.message ? `: ${d.message}` : ` (${r.status})`}`)

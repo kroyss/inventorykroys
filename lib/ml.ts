@@ -15,6 +15,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import type { Pool } from 'pg'
 import type { Country } from '@/lib/types'
+import { TOKEN_DEMO } from '@/lib/demo'
 
 export const ML_API = 'https://api.mercadolibre.com'
 const AUTH_HOST: Record<Country, string> = {
@@ -86,11 +87,14 @@ export const canjearCodigo = (code: string) =>
 const MARGEN_MS = 5 * 60 * 1000
 
 export class CuentaDesconectada extends Error {}
+/** Cuenta de demostración (lib/demo.ts): no tiene token; mlFetch la responde con lib/demoML.ts. */
+export class CuentaDemo extends Error {}
 
 export async function tokenVigente(db: Pool, conexionId: number, forzar = false): Promise<string> {
   const { rows: [c] } = await db.query(
     `SELECT access_token_enc, expira_en, estado FROM ml_conexiones WHERE id = $1`, [conexionId])
   if (!c) throw new Error('Conexión no encontrada')
+  if (c.access_token_enc === TOKEN_DEMO) throw new CuentaDemo('Cuenta de demostración: no se conecta a MercadoLibre')
   if (c.estado !== 'activa') throw new CuentaDesconectada('La cuenta está desconectada: vuelve a conectarla')
   if (!forzar && new Date(c.expira_en).getTime() - Date.now() > MARGEN_MS) return descifrar(c.access_token_enc)
 
@@ -142,7 +146,14 @@ const espera = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 /** GET/POST a la API con el token de la conexión. Reintenta 429/5xx y renueva ante 401. */
 export async function mlFetch<T = unknown>(db: Pool, conexionId: number, ruta: string, init?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<T> {
-  let token = await tokenVigente(db, conexionId)
+  let token: string
+  try {
+    token = await tokenVigente(db, conexionId)
+  } catch (e) {
+    // Cuenta de demostración: responde el MercadoLibre simulado, nunca el real.
+    if (e instanceof CuentaDemo) return (await import('@/lib/demoML')).mlDemo<T>(db, conexionId, ruta, init)
+    throw e
+  }
   let renovado = false
   for (let intento = 0; ; intento++) {
     const r = await fetch(`${ML_API}${ruta}`, {

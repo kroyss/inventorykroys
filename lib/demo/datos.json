@@ -1,0 +1,1830 @@
+{
+ "tienda": "Tecnova Store",
+ "cuentas": [
+  {
+   "nickname": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "pagina": "mercadolibre.com.ve/pagina/tecnovastore"
+  },
+  {
+   "nickname": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "pagina": "mercadolibre.com.ve/pagina/tecnovaoutlet"
+  }
+ ],
+ "catalogo": [
+  {
+   "id": "MLV900100101",
+   "titulo": "Audífonos Bluetooth 5.3 Inalámbricos TWS con Estuche de Carga",
+   "precio": 14.99,
+   "icono": "🎧",
+   "color": "#ede9fe",
+   "ficha": "Bluetooth 5.3. Batería: 6 h de música por carga y 24 h con el estuche. Carga por USB-C (cable incluido, sin cargador de pared). Resistentes al sudor IPX4. Controles táctiles. Micrófono para llamadas. Compatibles con Android y iPhone.",
+   "descripcion": "Audífonos inalámbricos TWS con estuche de carga. Se conectan solos al abrir el estuche. Incluye: audífonos, estuche, cable USB-C y almohadillas de 3 tamaños. Garantía de 30 días por defectos de fábrica."
+  },
+  {
+   "id": "MLV900100102",
+   "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+   "precio": 9.5,
+   "icono": "🔌",
+   "color": "#e0f2fe",
+   "ficha": "Potencia 20 W, Power Delivery 3.0. Entrada 100-240 V (sirve en cualquier voltaje). Incluye cable USB-C a USB-C de 1 m. Para iPhone 8 en adelante se necesita cable USB-C a Lightning (se vende aparte). Carga un iPhone 13 al 50% en 30 minutos.",
+   "descripcion": "Cargador de pared de 20 W con puerto USB-C y cable incluido. Protección contra sobrecarga y cortocircuito. Garantía de 30 días."
+  },
+  {
+   "id": "MLV900100103",
+   "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+   "precio": 5.99,
+   "icono": "🔋",
+   "color": "#fef3c7",
+   "variantes": {
+    "2001": "Color: Negro",
+    "2002": "Color: Blanco"
+   },
+   "ficha": "Largo 1 m. Nylon trenzado, puntas reforzadas. Carga rápida con cargador de 20 W (PD). Transfiere datos. Compatible con iPhone 5 al iPhone 14 y iPads con conector Lightning. No sirve para iPhone 15 (usa USB-C).",
+   "descripcion": "Cable trenzado resistente, carga rápida. Colores: negro y blanco (elige la variante al comprar)."
+  },
+  {
+   "id": "MLV900100104",
+   "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+   "precio": 18.9,
+   "icono": "⚡",
+   "color": "#dcfce7",
+   "ficha": "Capacidad 10000 mAh (carga un celular normal unas 2 veces). Salidas: 2 USB-A y 1 USB-C, carga rápida 22.5 W. Entrada USB-C. Pantalla con el porcentaje. Peso 210 g. Se puede llevar en el avión (menos de 100 Wh).",
+   "descripcion": "Batería portátil con pantalla digital y carga rápida. Incluye cable USB a USB-C. Garantía de 30 días."
+  },
+  {
+   "id": "MLV900100105",
+   "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+   "precio": 6.5,
+   "icono": "🚗",
+   "color": "#fee2e2",
+   "ficha": "Se engancha a la rejilla del aire acondicionado. Imán de neodimio, gira 360°. Incluye 2 placas metálicas adhesivas para pegar al celular o al forro. Sirve para celulares de hasta 7 pulgadas.",
+   "descripcion": "Soporte magnético firme, no se cae en huecos. Incluye placas metálicas."
+  },
+  {
+   "id": "MLV900100106",
+   "titulo": "Mouse Inalámbrico Recargable Silencioso 2.4G y Bluetooth",
+   "precio": 8.99,
+   "icono": "🖱️",
+   "color": "#f1f5f9",
+   "ficha": "Doble modo: receptor USB 2.4G y Bluetooth. Batería recargable por USB-C, dura unas 3 semanas. Clic silencioso. 3 niveles de DPI (800/1200/1600). Compatible con Windows, Mac, Android y tablets.",
+   "descripcion": "Mouse recargable sin pilas, clic silencioso. Incluye receptor USB (guardado debajo del mouse) y cable de carga."
+  },
+  {
+   "id": "MLV900100107",
+   "titulo": "Teclado Inalámbrico Bluetooth Multidispositivo en Español",
+   "precio": 21.0,
+   "icono": "⌨️",
+   "color": "#e0e7ff",
+   "ficha": "Bluetooth, se conecta a 3 equipos y cambia con una tecla. Distribución en español con la Ñ. Funciona con 2 pilas AAA (incluidas), duran unos 6 meses. Compatible con Windows, Mac, iPad, Android y Smart TV.",
+   "descripcion": "Teclado compacto en español, ideal para tablet y laptop."
+  },
+  {
+   "id": "MLV900100108",
+   "titulo": "Smartwatch Reloj Inteligente Deportivo Resistente al Agua",
+   "precio": 29.9,
+   "icono": "⌚",
+   "color": "#fae8ff",
+   "ficha": "Pantalla 1.83\". Mide pasos, frecuencia cardíaca, sueño y oxígeno. Notificaciones de WhatsApp y llamadas. Resistente al agua IP67 (lluvia y lavarse las manos; no para nadar). Batería 5 a 7 días. App en español para Android e iPhone. Correa de silicona negra.",
+   "descripcion": "Reloj inteligente con app en español. Incluye cargador magnético."
+  },
+  {
+   "id": "MLV900100109",
+   "titulo": "Lámpara LED de Escritorio Recargable Táctil 3 Tonos de Luz",
+   "precio": 12.75,
+   "icono": "💡",
+   "color": "#fef9c3",
+   "ficha": "Recargable por USB (cable incluido), batería de 4 a 8 horas según el brillo. 3 tonos de luz (fría, neutra y cálida) y 5 niveles de brillo, táctil. Brazo flexible. Funciona también conectada.",
+   "descripcion": "Lámpara LED que no calienta, ideal para estudiar. Funciona sin luz eléctrica (recargable)."
+  },
+  {
+   "id": "MLV900100110",
+   "titulo": "Hub USB-C 6 en 1 HDMI 4K USB 3.0 Lector SD para Laptop",
+   "precio": 24.5,
+   "icono": "🖥️",
+   "color": "#ccfbf1",
+   "ficha": "Puertos: HDMI 4K 30 Hz, 2 USB 3.0, lector SD y microSD, USB-C de carga 100 W (pasa la carga de la laptop). Compatible con MacBook, laptops con USB-C que soporten video (DisplayPort Alt Mode) y iPad Pro.",
+   "descripcion": "Adaptador multipuerto de aluminio para laptops con USB-C."
+  },
+  {
+   "id": "MLV900100111",
+   "titulo": "Memoria USB 64GB 3.0 Metálica Alta Velocidad",
+   "precio": 7.9,
+   "icono": "💾",
+   "color": "#e2e8f0",
+   "ficha": "Capacidad 64 GB (unos 58 GB útiles, como toda memoria). USB 3.0, lectura hasta 100 MB/s. Cuerpo metálico con argolla. Compatible con USB 2.0.",
+   "descripcion": "Pendrive metálico resistente. Garantía de 30 días."
+  },
+  {
+   "id": "MLV900100112",
+   "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+   "precio": 19.99,
+   "icono": "🔊",
+   "color": "#ffedd5",
+   "ficha": "Potencia 10 W. Bluetooth 5.0, alcance 10 m. Batería 8 horas. Resistente al agua IPX6 (lluvia y salpicaduras). Entrada para memoria microSD y radio FM. Se pueden unir 2 cornetas iguales (TWS).",
+   "descripcion": "Corneta portátil con buen bajo y luz LED. Incluye cable de carga."
+  },
+  {
+   "id": "MLV900100113",
+   "titulo": "Protector de Pantalla Vidrio Templado 9D para Samsung",
+   "precio": 3.5,
+   "icono": "📱",
+   "color": "#f5f5f4",
+   "variantes": {
+    "3001": "Modelo: Galaxy A15",
+    "3002": "Modelo: Galaxy A25",
+    "3003": "Modelo: Galaxy A35"
+   },
+   "ficha": "Vidrio templado 9H, cubre toda la pantalla (borde negro). Compatible con el lector de huella de la pantalla en A25 y A35. Incluye paño y sticker para el polvo.",
+   "descripcion": "Protector de vidrio templado de borde a borde. Elige el modelo de tu celular en la variante."
+  },
+  {
+   "id": "MLV900100114",
+   "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+   "precio": 16.8,
+   "icono": "🤳",
+   "color": "#fce7f3",
+   "ficha": "Aro de 26 cm, 3 tonos de luz y 10 niveles de brillo. Trípode extensible de 60 cm a 2 m. Conexión USB (sirve con cargador de celular, laptop o power bank). Control en el cable.",
+   "descripcion": "Ideal para videos, clases en línea y maquillaje. Incluye soporte de celular."
+  }
+ ],
+ "compradores": [
+  "DAYANA PEREZ",
+  "ADRIANA SUAREZ",
+  "RICARDO COLMENARES",
+  "RAFAEL PARRA",
+  "LISBETH DIAZ",
+  "FABIOLA SALAZAR",
+  "FABIOLA ESCALONA",
+  "WILMER LEAL",
+  "SAMUEL CHACON",
+  "LUIS GONZALEZ",
+  "CARLOS DIAZ",
+  "GABRIELA PEREZ",
+  "BARBARA MARQUEZ",
+  "YULIMAR ARAUJO",
+  "MILAGROS ROJAS",
+  "CAROLINA MENDOZA",
+  "DANIELA HERNANDEZ",
+  "DAYANA RAMIREZ",
+  "CAROLINA RAMIREZ",
+  "MIGUEL MONTILLA",
+  "ISABEL MEDINA",
+  "MARIA MENDOZA",
+  "MANUEL GONZALEZ",
+  "YOSELIN GUERRERO",
+  "JOSE HERNANDEZ",
+  "MARIANA GONZALEZ",
+  "EDUARDO BRICEÑO",
+  "JORGE HERNANDEZ",
+  "ORLANDO DIAZ",
+  "LUIS COLMENARES",
+  "DAYANA MENDOZA",
+  "JUAN QUINTERO",
+  "PAOLA SALAZAR",
+  "CAROLINA LEAL",
+  "PEDRO GONZALEZ",
+  "LUIS GUERRERO",
+  "DAYANA BLANCO",
+  "MARYORI ZAMBRANO",
+  "MIGUEL RODRIGUEZ",
+  "MILAGROS ESCALONA",
+  "ALBERTO PARRA",
+  "ORLANDO QUINTERO",
+  "GABRIELA COLMENARES",
+  "ARMANDO BLANCO",
+  "KARINA ARAUJO",
+  "LUIS SUAREZ",
+  "RICARDO BRICEÑO",
+  "VALENTINA ARAUJO",
+  "LISBETH OCHOA",
+  "LUIS RAMIREZ",
+  "GABRIELA MEDINA",
+  "PEDRO BRICEÑO",
+  "ISABEL DIAZ",
+  "OSCAR SUAREZ",
+  "ANDREA LEAL",
+  "WILMER OCHOA",
+  "JOSE PEREZ",
+  "JOSE MONTILLA",
+  "HECTOR OCHOA",
+  "GENESIS ARAUJO",
+  "VALENTINA PARRA",
+  "CAROLINA PEÑA",
+  "ALEJANDRO GONZALEZ",
+  "NORELYS OCHOA",
+  "GUSTAVO ARAUJO",
+  "JOSE GUERRERO",
+  "YOSELIN HERNANDEZ",
+  "ANA PARRA",
+  "ROSANGEL MENDOZA",
+  "YULIMAR GONZALEZ",
+  "NATHALY GONZALEZ",
+  "OSCAR PEÑA",
+  "JOSE ZAMBRANO",
+  "ARMANDO GUERRERO",
+  "MIGUEL CASTILLO",
+  "DAYANA DIAZ",
+  "LISBETH PARRA",
+  "DAYANA ARAUJO",
+  "GUSTAVO VILLEGAS",
+  "YULIMAR SALAZAR",
+  "ISABEL ROJAS",
+  "MARIA OCHOA",
+  "MARYORI SUAREZ",
+  "SAMUEL GUERRERO",
+  "JOSE TORRES",
+  "HECTOR PEREZ",
+  "GENESIS VILLEGAS",
+  "GUSTAVO BLANCO",
+  "NORELYS PEREZ",
+  "MANUEL MORENO",
+  "RICARDO PEÑA",
+  "OSCAR GUERRERO",
+  "JESUS BRICEÑO",
+  "CARLOS ZAMBRANO",
+  "YULIMAR RAMIREZ",
+  "LISBETH MEDINA",
+  "YOSELIN SALAZAR",
+  "PEDRO ESCALONA",
+  "ENRIQUE HERNANDEZ",
+  "YELITZA MENDOZA",
+  "ANTONIO OCHOA",
+  "LUIS VILLEGAS",
+  "MILAGROS MENDOZA",
+  "MARIANA SUAREZ",
+  "WILMER MONTILLA",
+  "GUSTAVO COLMENARES",
+  "RONALD GONZALEZ",
+  "FABIOLA ZAMBRANO",
+  "ANDREA MORENO",
+  "ADRIANA MONTILLA",
+  "JOSE LEAL",
+  "VALENTINA MONTILLA",
+  "ANA PEÑA",
+  "MARIANA BRICEÑO",
+  "CAROLINA GUERRERO",
+  "ISABEL SALAZAR",
+  "ISABEL ZAMBRANO",
+  "JOSE VILLEGAS",
+  "ORLANDO HERNANDEZ",
+  "MILAGROS ZAMBRANO"
+ ],
+ "envios": [
+  {
+   "venta": "2000099991000001",
+   "carrier": "ZOOM",
+   "guia": "1711920037",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "DAYANA PEREZ",
+   "ci": "27239502",
+   "telefono": "04145734023",
+   "ciudad": "BARQUISIMETO",
+   "estado": "LARA",
+   "codigo": "BRM",
+   "oficina": "3101 - Barquisimeto",
+   "direccion": "CALLE SUCRE, CASA NRO. 12",
+   "peso": 0.48,
+   "horas": 36,
+   "nota": null,
+   "total": 21.0,
+   "items": [
+    {
+     "item_id": "MLV900100107",
+     "variante_id": 0,
+     "titulo": "Teclado Inalámbrico Bluetooth Multidispositivo en Español",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000002",
+   "carrier": "ZOOM",
+   "guia": "1711920074",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "ADRIANA SUAREZ",
+   "ci": "24132666",
+   "telefono": "04263707021",
+   "ciudad": "MERIDA",
+   "estado": "MERIDA",
+   "codigo": "MRD",
+   "oficina": "5101 - Merida",
+   "direccion": "AV. UNIVERSIDAD, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 0.78,
+   "horas": 11,
+   "nota": null,
+   "total": 9.5,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000003",
+   "carrier": "TEALCA",
+   "guia": "691001",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "RICARDO COLMENARES",
+   "ci": "19707748",
+   "telefono": "04148180632",
+   "ciudad": "MATURIN",
+   "estado": "MONAGAS",
+   "codigo": "MUN",
+   "oficina": "6301 - Maturin",
+   "direccion": "AV. LIBERTADOR, CASA NRO. 12",
+   "peso": 0.15,
+   "horas": 9,
+   "nota": null,
+   "total": 48.8,
+   "items": [
+    {
+     "item_id": "MLV900100108",
+     "variante_id": 0,
+     "titulo": "Smartwatch Reloj Inteligente Deportivo Resistente al Agua",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000004",
+   "carrier": "ZOOM",
+   "guia": "1711920111",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "RAFAEL PARRA",
+   "ci": "24658024",
+   "telefono": "04121730730",
+   "ciudad": "CUMANA",
+   "estado": "SUCRE",
+   "codigo": "CUM",
+   "oficina": "6201 - Cumana",
+   "direccion": "CALLE PRINCIPAL, LOCAL 4, C.C. PLAZA",
+   "peso": 0.88,
+   "horas": 14,
+   "nota": null,
+   "total": 3.5,
+   "items": [
+    {
+     "item_id": "MLV900100113",
+     "variante_id": 3001,
+     "titulo": "Protector de Pantalla Vidrio Templado 9D para Samsung",
+     "variante": "Modelo: Galaxy A15",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000005",
+   "carrier": "ZOOM",
+   "guia": "1711920148",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "LISBETH DIAZ",
+   "ci": "17518657",
+   "telefono": "04121133049",
+   "ciudad": "LOS TEQUES",
+   "estado": "MIRANDA",
+   "codigo": "LTQ",
+   "oficina": "1301 - Los Teques",
+   "direccion": "CALLE MIRANDA, LOCAL 4, C.C. PLAZA",
+   "peso": 0.45,
+   "horas": 4,
+   "nota": "Envolver para regalo",
+   "total": 39.98,
+   "items": [
+    {
+     "item_id": "MLV900100112",
+     "variante_id": 0,
+     "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000006",
+   "carrier": "TEALCA",
+   "guia": "691002",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "FABIOLA SALAZAR",
+   "ci": "26237121",
+   "telefono": "04169522409",
+   "ciudad": "MATURIN",
+   "estado": "MONAGAS",
+   "codigo": "MUN",
+   "oficina": "6301 - Maturin",
+   "direccion": "AV. FUERZAS ARMADAS, EDIF. CENTRO, PISO 1",
+   "peso": 0.61,
+   "horas": 25,
+   "nota": null,
+   "total": 18.9,
+   "items": [
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000007",
+   "carrier": "ZOOM",
+   "guia": "1711920185",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "FABIOLA ESCALONA",
+   "ci": "12665438",
+   "telefono": "04161431676",
+   "ciudad": "CUMANA",
+   "estado": "SUCRE",
+   "codigo": "CUM",
+   "oficina": "6201 - Cumana",
+   "direccion": "CALLE PRINCIPAL, EDIF. LOS SAMANES, PISO 3, APTO 3-B",
+   "peso": 1.27,
+   "horas": 16,
+   "nota": null,
+   "total": 50.87,
+   "items": [
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2001,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Negro",
+     "cantidad": 2
+    },
+    {
+     "item_id": "MLV900100112",
+     "variante_id": 0,
+     "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000008",
+   "carrier": "ZOOM",
+   "guia": "1711920222",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "WILMER LEAL",
+   "ci": "16977635",
+   "telefono": "04126575355",
+   "ciudad": "MERIDA",
+   "estado": "MERIDA",
+   "codigo": "MRD",
+   "oficina": "5101 - Merida",
+   "direccion": "AV. INTERCOMUNAL, CASA NRO. 12",
+   "peso": 0.97,
+   "horas": 26,
+   "nota": null,
+   "total": 26.49,
+   "items": [
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100112",
+     "variante_id": 0,
+     "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000009",
+   "carrier": "ZOOM",
+   "guia": "1711920259",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "SAMUEL CHACON",
+   "ci": "27891083",
+   "telefono": "04163963353",
+   "ciudad": "VALENCIA",
+   "estado": "CARABOBO",
+   "codigo": "VLN",
+   "oficina": "2101 - Valencia",
+   "direccion": "AV. INTERCOMUNAL, QUINTA MARIA ELENA",
+   "peso": 0.29,
+   "horas": 25,
+   "nota": null,
+   "total": 46.7,
+   "items": [
+    {
+     "item_id": "MLV900100108",
+     "variante_id": 0,
+     "titulo": "Smartwatch Reloj Inteligente Deportivo Resistente al Agua",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000010",
+   "carrier": "TEALCA",
+   "guia": "691003",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "LUIS GONZALEZ",
+   "ci": "15510587",
+   "telefono": "04262828247",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "AV. UNIVERSIDAD, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 0.78,
+   "horas": 33,
+   "nota": null,
+   "total": 16.8,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000011",
+   "carrier": "ZOOM",
+   "guia": "1711920296",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "CARLOS DIAZ",
+   "ci": "29759196",
+   "telefono": "04123635221",
+   "ciudad": "MATURIN",
+   "estado": "MONAGAS",
+   "codigo": "MUN",
+   "oficina": "6301 - Maturin",
+   "direccion": "AV. INTERCOMUNAL, EDIF. CENTRO, PISO 1",
+   "peso": 0.71,
+   "horas": 20,
+   "nota": null,
+   "total": 55.69,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100112",
+     "variante_id": 0,
+     "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000012",
+   "carrier": "ZOOM",
+   "guia": "1711920333",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "GABRIELA PEREZ",
+   "ci": "29737969",
+   "telefono": "04126414535",
+   "ciudad": "MARACAIBO",
+   "estado": "ZULIA",
+   "codigo": "MAR",
+   "oficina": "4102 - Maracaibo",
+   "direccion": "AV. BOLIVAR, LOCAL 4, C.C. PLAZA",
+   "peso": 0.27,
+   "horas": 16,
+   "nota": "Confirmar dirección por mensaje",
+   "total": 6.5,
+   "items": [
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000013",
+   "carrier": "TEALCA",
+   "guia": "691004",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "BARBARA MARQUEZ",
+   "ci": "14356175",
+   "telefono": "04246611756",
+   "ciudad": "PUERTO ORDAZ",
+   "estado": "BOLIVAR",
+   "codigo": "PZO",
+   "oficina": "7101 - Puerto Ordaz",
+   "direccion": "CALLE PAEZ, LOCAL 4, C.C. PLAZA",
+   "peso": 0.58,
+   "horas": 27,
+   "nota": null,
+   "total": 8.99,
+   "items": [
+    {
+     "item_id": "MLV900100106",
+     "variante_id": 0,
+     "titulo": "Mouse Inalámbrico Recargable Silencioso 2.4G y Bluetooth",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000014",
+   "carrier": "ZOOM",
+   "guia": "1711920370",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "YULIMAR ARAUJO",
+   "ci": "12671361",
+   "telefono": "04167469468",
+   "ciudad": "CUMANA",
+   "estado": "SUCRE",
+   "codigo": "CUM",
+   "oficina": "6201 - Cumana",
+   "direccion": "AV. LAS AMERICAS, CASA NRO. 12",
+   "peso": 0.18,
+   "horas": 31,
+   "nota": null,
+   "total": 13.5,
+   "items": [
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100113",
+     "variante_id": 3003,
+     "titulo": "Protector de Pantalla Vidrio Templado 9D para Samsung",
+     "variante": "Modelo: Galaxy A35",
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000015",
+   "carrier": "ZOOM",
+   "guia": "1711920407",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "MILAGROS ROJAS",
+   "ci": "30253094",
+   "telefono": "04126210703",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "CALLE SUCRE, QUINTA MARIA ELENA",
+   "peso": 1.21,
+   "horas": 31,
+   "nota": null,
+   "total": 16.8,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000016",
+   "carrier": "ZOOM",
+   "guia": "1711920444",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "CAROLINA MENDOZA",
+   "ci": "16643350",
+   "telefono": "04145511736",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "AV. FUERZAS ARMADAS, EDIF. LOS SAMANES, PISO 3, APTO 3-B",
+   "peso": 0.57,
+   "horas": 20,
+   "nota": null,
+   "total": 19.0,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000017",
+   "carrier": "TEALCA",
+   "guia": "691005",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "DANIELA HERNANDEZ",
+   "ci": "28107255",
+   "telefono": "04141129125",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "CALLE PRINCIPAL, LOCAL 4, C.C. PLAZA",
+   "peso": 0.47,
+   "horas": 6,
+   "nota": null,
+   "total": 16.8,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000018",
+   "carrier": "ZOOM",
+   "guia": "1711920481",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "DAYANA RAMIREZ",
+   "ci": "20268965",
+   "telefono": "04126629739",
+   "ciudad": "MATURIN",
+   "estado": "MONAGAS",
+   "codigo": "MUN",
+   "oficina": "6301 - Maturin",
+   "direccion": "CALLE PRINCIPAL, CASA NRO. 12",
+   "peso": 0.63,
+   "horas": 32,
+   "nota": null,
+   "total": 5.99,
+   "items": [
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2001,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Negro",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000019",
+   "carrier": "ZOOM",
+   "guia": "1711920518",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "CAROLINA RAMIREZ",
+   "ci": "13899057",
+   "telefono": "04241021942",
+   "ciudad": "BARQUISIMETO",
+   "estado": "LARA",
+   "codigo": "BRM",
+   "oficina": "3101 - Barquisimeto",
+   "direccion": "AV. FUERZAS ARMADAS, CASA NRO. 12",
+   "peso": 1.36,
+   "horas": 34,
+   "nota": "Color negro por favor",
+   "total": 16.8,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000020",
+   "carrier": "TEALCA",
+   "guia": "691006",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "MIGUEL MONTILLA",
+   "ci": "24561078",
+   "telefono": "04124849007",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "AV. LAS AMERICAS, URB. LA FLORESTA, CASA 8",
+   "peso": 0.97,
+   "horas": 18,
+   "nota": null,
+   "total": 8.99,
+   "items": [
+    {
+     "item_id": "MLV900100106",
+     "variante_id": 0,
+     "titulo": "Mouse Inalámbrico Recargable Silencioso 2.4G y Bluetooth",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000021",
+   "carrier": "ZOOM",
+   "guia": "1711920555",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "ISABEL MEDINA",
+   "ci": "27640364",
+   "telefono": "04265307434",
+   "ciudad": "BARQUISIMETO",
+   "estado": "LARA",
+   "codigo": "BRM",
+   "oficina": "3101 - Barquisimeto",
+   "direccion": "AV. INTERCOMUNAL, EDIF. CENTRO, PISO 1",
+   "peso": 1.26,
+   "horas": 24,
+   "nota": null,
+   "total": 6.5,
+   "items": [
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000022",
+   "carrier": "ZOOM",
+   "guia": "1711920592",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "MARIA MENDOZA",
+   "ci": "12618867",
+   "telefono": "04261287763",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "AV. BOLIVAR, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 0.9,
+   "horas": 35,
+   "nota": null,
+   "total": 36.4,
+   "items": [
+    {
+     "item_id": "MLV900100108",
+     "variante_id": 0,
+     "titulo": "Smartwatch Reloj Inteligente Deportivo Resistente al Agua",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000023",
+   "carrier": "ZOOM",
+   "guia": "1711920629",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "MANUEL GONZALEZ",
+   "ci": "28128093",
+   "telefono": "04243314369",
+   "ciudad": "BARINAS",
+   "estado": "BARINAS",
+   "codigo": "BNS",
+   "oficina": "5301 - Barinas",
+   "direccion": "AV. LIBERTADOR, QUINTA MARIA ELENA",
+   "peso": 0.43,
+   "horas": 29,
+   "nota": null,
+   "total": 18.9,
+   "items": [
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000024",
+   "carrier": "TEALCA",
+   "guia": "691007",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "YOSELIN GUERRERO",
+   "ci": "22557356",
+   "telefono": "04146963778",
+   "ciudad": "MATURIN",
+   "estado": "MONAGAS",
+   "codigo": "MUN",
+   "oficina": "6301 - Maturin",
+   "direccion": "AV. LAS AMERICAS, EDIF. CENTRO, PISO 1",
+   "peso": 1.26,
+   "horas": 19,
+   "nota": null,
+   "total": 14.99,
+   "items": [
+    {
+     "item_id": "MLV900100101",
+     "variante_id": 0,
+     "titulo": "Audífonos Bluetooth 5.3 Inalámbricos TWS con Estuche de Carga",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000025",
+   "carrier": "ZOOM",
+   "guia": "1711920666",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "JOSE HERNANDEZ",
+   "ci": "24720969",
+   "telefono": "04243473658",
+   "ciudad": "PUERTO ORDAZ",
+   "estado": "BOLIVAR",
+   "codigo": "PZO",
+   "oficina": "7101 - Puerto Ordaz",
+   "direccion": "AV. LAS AMERICAS, CASA NRO. 12",
+   "peso": 0.27,
+   "horas": 16,
+   "nota": null,
+   "total": 37.8,
+   "items": [
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000026",
+   "carrier": "ZOOM",
+   "guia": "1711920703",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "MARIANA GONZALEZ",
+   "ci": "27519523",
+   "telefono": "04248685631",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "AV. INTERCOMUNAL, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 0.34,
+   "horas": 27,
+   "nota": null,
+   "total": 5.99,
+   "items": [
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2002,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Blanco",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000027",
+   "carrier": "TEALCA",
+   "guia": "691008",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "EDUARDO BRICEÑO",
+   "ci": "28773772",
+   "telefono": "04266026632",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "CALLE 5 CON CARRERA 8, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 1.4,
+   "horas": 2,
+   "nota": null,
+   "total": 21.0,
+   "items": [
+    {
+     "item_id": "MLV900100107",
+     "variante_id": 0,
+     "titulo": "Teclado Inalámbrico Bluetooth Multidispositivo en Español",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000028",
+   "carrier": "ZOOM",
+   "guia": "1711920740",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "JORGE HERNANDEZ",
+   "ci": "16197914",
+   "telefono": "04149275706",
+   "ciudad": "ACARIGUA",
+   "estado": "PORTUGUESA",
+   "codigo": "ACA",
+   "oficina": "3401 - Acarigua",
+   "direccion": "CALLE URDANETA, URB. LA FLORESTA, CASA 8",
+   "peso": 0.81,
+   "horas": 12,
+   "nota": "Retira en oficina, no a domicilio",
+   "total": 63.39,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 3
+    },
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2001,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Negro",
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100113",
+     "variante_id": 3003,
+     "titulo": "Protector de Pantalla Vidrio Templado 9D para Samsung",
+     "variante": "Modelo: Galaxy A35",
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000029",
+   "carrier": "ZOOM",
+   "guia": "1711920777",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "ORLANDO DIAZ",
+   "ci": "25275461",
+   "telefono": "04248733418",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "AV. BOLIVAR, EDIF. CENTRO, PISO 1",
+   "peso": 0.74,
+   "horas": 17,
+   "nota": null,
+   "total": 14.99,
+   "items": [
+    {
+     "item_id": "MLV900100101",
+     "variante_id": 0,
+     "titulo": "Audífonos Bluetooth 5.3 Inalámbricos TWS con Estuche de Carga",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000030",
+   "carrier": "ZOOM",
+   "guia": "1711920814",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "LUIS COLMENARES",
+   "ci": "14717598",
+   "telefono": "04144954014",
+   "ciudad": "CUMANA",
+   "estado": "SUCRE",
+   "codigo": "CUM",
+   "oficina": "6201 - Cumana",
+   "direccion": "CALLE PRINCIPAL, LOCAL 4, C.C. PLAZA",
+   "peso": 0.36,
+   "horas": 39,
+   "nota": null,
+   "total": 9.5,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000031",
+   "carrier": "TEALCA",
+   "guia": "691009",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "DAYANA MENDOZA",
+   "ci": "14642902",
+   "telefono": "04163095856",
+   "ciudad": "CARACAS",
+   "estado": "DISTRITO CAPITAL",
+   "codigo": "CCS",
+   "oficina": "1101 - Caracas Chacao",
+   "direccion": "AV. BOLIVAR, EDIF. CENTRO, PISO 1",
+   "peso": 0.33,
+   "horas": 8,
+   "nota": null,
+   "total": 17.4,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100111",
+     "variante_id": 0,
+     "titulo": "Memoria USB 64GB 3.0 Metálica Alta Velocidad",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000032",
+   "carrier": "ZOOM",
+   "guia": "1711920851",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "JUAN QUINTERO",
+   "ci": "16744575",
+   "telefono": "04128262219",
+   "ciudad": "PUNTO FIJO",
+   "estado": "FALCON",
+   "codigo": "PFJ",
+   "oficina": "3301 - Punto Fijo",
+   "direccion": "AV. INTERCOMUNAL, CASA NRO. 12",
+   "peso": 1.27,
+   "horas": 37,
+   "nota": null,
+   "total": 24.5,
+   "items": [
+    {
+     "item_id": "MLV900100110",
+     "variante_id": 0,
+     "titulo": "Hub USB-C 6 en 1 HDMI 4K USB 3.0 Lector SD para Laptop",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000033",
+   "carrier": "ZOOM",
+   "guia": "1711920888",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "PAOLA SALAZAR",
+   "ci": "29577851",
+   "telefono": "04263015162",
+   "ciudad": "BARINAS",
+   "estado": "BARINAS",
+   "codigo": "BNS",
+   "oficina": "5301 - Barinas",
+   "direccion": "AV. INTERCOMUNAL, EDIF. CENTRO, PISO 1",
+   "peso": 0.68,
+   "horas": 5,
+   "nota": "Envolver para regalo",
+   "total": 17.98,
+   "items": [
+    {
+     "item_id": "MLV900100106",
+     "variante_id": 0,
+     "titulo": "Mouse Inalámbrico Recargable Silencioso 2.4G y Bluetooth",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000034",
+   "carrier": "TEALCA",
+   "guia": "691010",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "CAROLINA LEAL",
+   "ci": "18721420",
+   "telefono": "04163009422",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "AV. INTERCOMUNAL, CONJ. RES. LAS ACACIAS, CASA 27",
+   "peso": 1.34,
+   "horas": 2,
+   "nota": null,
+   "total": 16.8,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000035",
+   "carrier": "ZOOM",
+   "guia": "1711920925",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "PEDRO GONZALEZ",
+   "ci": "13623853",
+   "telefono": "04268975703",
+   "ciudad": "PUERTO ORDAZ",
+   "estado": "BOLIVAR",
+   "codigo": "PZO",
+   "oficina": "7101 - Puerto Ordaz",
+   "direccion": "CALLE PRINCIPAL, CONJ. RES. LAS ACACIAS, CASA 27",
+   "peso": 1.03,
+   "horas": 36,
+   "nota": null,
+   "total": 3.5,
+   "items": [
+    {
+     "item_id": "MLV900100113",
+     "variante_id": 3003,
+     "titulo": "Protector de Pantalla Vidrio Templado 9D para Samsung",
+     "variante": "Modelo: Galaxy A35",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000036",
+   "carrier": "ZOOM",
+   "guia": "1711920962",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "LUIS GUERRERO",
+   "ci": "19296777",
+   "telefono": "04121977915",
+   "ciudad": "MATURIN",
+   "estado": "MONAGAS",
+   "codigo": "MUN",
+   "oficina": "6301 - Maturin",
+   "direccion": "CALLE 5 CON CARRERA 8, EDIF. LOS SAMANES, PISO 3, APTO 3-B",
+   "peso": 0.93,
+   "horas": 32,
+   "nota": "Envolver para regalo",
+   "total": 105.5,
+   "items": [
+    {
+     "item_id": "MLV900100110",
+     "variante_id": 0,
+     "titulo": "Hub USB-C 6 en 1 HDMI 4K USB 3.0 Lector SD para Laptop",
+     "variante": null,
+     "cantidad": 3
+    },
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100109",
+     "variante_id": 0,
+     "titulo": "Lámpara LED de Escritorio Recargable Táctil 3 Tonos de Luz",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000037",
+   "carrier": "ZOOM",
+   "guia": "1711920999",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "DAYANA BLANCO",
+   "ci": "28133258",
+   "telefono": "04246531963",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "CALLE PRINCIPAL, URB. LA FLORESTA, CASA 8",
+   "peso": 0.84,
+   "horas": 37,
+   "nota": null,
+   "total": 21.99,
+   "items": [
+    {
+     "item_id": "MLV900100105",
+     "variante_id": 0,
+     "titulo": "Soporte Magnético de Celular para Carro Rejilla de Aire",
+     "variante": null,
+     "cantidad": 2
+    },
+    {
+     "item_id": "MLV900100106",
+     "variante_id": 0,
+     "titulo": "Mouse Inalámbrico Recargable Silencioso 2.4G y Bluetooth",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000038",
+   "carrier": "TEALCA",
+   "guia": "691011",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "MARYORI ZAMBRANO",
+   "ci": "28804817",
+   "telefono": "04126680031",
+   "ciudad": "BARINAS",
+   "estado": "BARINAS",
+   "codigo": "BNS",
+   "oficina": "5301 - Barinas",
+   "direccion": "AV. FUERZAS ARMADAS, LOCAL 4, C.C. PLAZA",
+   "peso": 0.86,
+   "horas": 40,
+   "nota": null,
+   "total": 18.74,
+   "items": [
+    {
+     "item_id": "MLV900100109",
+     "variante_id": 0,
+     "titulo": "Lámpara LED de Escritorio Recargable Táctil 3 Tonos de Luz",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2001,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Negro",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000039",
+   "carrier": "ZOOM",
+   "guia": "1711921036",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "MIGUEL RODRIGUEZ",
+   "ci": "20722372",
+   "telefono": "04124602781",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "AV. INTERCOMUNAL, CONJ. RES. LAS ACACIAS, CASA 27",
+   "peso": 0.91,
+   "horas": 39,
+   "nota": null,
+   "total": 5.99,
+   "items": [
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2001,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Negro",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000040",
+   "carrier": "ZOOM",
+   "guia": "1711921073",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "MILAGROS ESCALONA",
+   "ci": "24167541",
+   "telefono": "04249115180",
+   "ciudad": "BARQUISIMETO",
+   "estado": "LARA",
+   "codigo": "BRM",
+   "oficina": "3101 - Barquisimeto",
+   "direccion": "AV. INTERCOMUNAL, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 0.59,
+   "horas": 39,
+   "nota": null,
+   "total": 19.0,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000041",
+   "carrier": "TEALCA",
+   "guia": "691012",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "ALBERTO PARRA",
+   "ci": "25229706",
+   "telefono": "04124265549",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "AV. BOLIVAR, RES. EL PARQUE, TORRE A, APTO 5-2",
+   "peso": 0.38,
+   "horas": 25,
+   "nota": null,
+   "total": 26.99,
+   "items": [
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2002,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Blanco",
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100107",
+     "variante_id": 0,
+     "titulo": "Teclado Inalámbrico Bluetooth Multidispositivo en Español",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000042",
+   "carrier": "ZOOM",
+   "guia": "1711921110",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "ORLANDO QUINTERO",
+   "ci": "21406015",
+   "telefono": "04243827556",
+   "ciudad": "CARACAS",
+   "estado": "DISTRITO CAPITAL",
+   "codigo": "CCS",
+   "oficina": "1101 - Caracas Chacao",
+   "direccion": "AV. LIBERTADOR, EDIF. CENTRO, PISO 1",
+   "peso": 0.74,
+   "horas": 10,
+   "nota": null,
+   "total": 18.9,
+   "items": [
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000043",
+   "carrier": "ZOOM",
+   "guia": "1711921147",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "GABRIELA COLMENARES",
+   "ci": "24529093",
+   "telefono": "04169823610",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "AV. UNIVERSIDAD, EDIF. LOS SAMANES, PISO 3, APTO 3-B",
+   "peso": 1.09,
+   "horas": 9,
+   "nota": null,
+   "total": 15.8,
+   "items": [
+    {
+     "item_id": "MLV900100111",
+     "variante_id": 0,
+     "titulo": "Memoria USB 64GB 3.0 Metálica Alta Velocidad",
+     "variante": null,
+     "cantidad": 2
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000044",
+   "carrier": "ZOOM",
+   "guia": "1711921184",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "ARMANDO BLANCO",
+   "ci": "19462475",
+   "telefono": "04264239088",
+   "ciudad": "LECHERIA",
+   "estado": "ANZOATEGUI",
+   "codigo": "LCH",
+   "oficina": "6105 - Lecheria",
+   "direccion": "AV. UNIVERSIDAD, CONJ. RES. LAS ACACIAS, CASA 27",
+   "peso": 0.38,
+   "horas": 29,
+   "nota": null,
+   "total": 25.98,
+   "items": [
+    {
+     "item_id": "MLV900100112",
+     "variante_id": 0,
+     "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2002,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Blanco",
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000045",
+   "carrier": "TEALCA",
+   "guia": "691013",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "KARINA ARAUJO",
+   "ci": "27280075",
+   "telefono": "04241578313",
+   "ciudad": "CARACAS",
+   "estado": "DISTRITO CAPITAL",
+   "codigo": "CCS",
+   "oficina": "1101 - Caracas Chacao",
+   "direccion": "CALLE PAEZ, CASA NRO. 12",
+   "peso": 1.21,
+   "horas": 13,
+   "nota": null,
+   "total": 36.79,
+   "items": [
+    {
+     "item_id": "MLV900100114",
+     "variante_id": 0,
+     "titulo": "Aro de Luz LED 26cm con Trípode de 2m y Soporte de Celular",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100112",
+     "variante_id": 0,
+     "titulo": "Corneta Bluetooth Portátil Resistente al Agua 10W",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000046",
+   "carrier": "ZOOM",
+   "guia": "1711921221",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "LUIS SUAREZ",
+   "ci": "28569524",
+   "telefono": "04121140899",
+   "ciudad": "PUNTO FIJO",
+   "estado": "FALCON",
+   "codigo": "PFJ",
+   "oficina": "3301 - Punto Fijo",
+   "direccion": "CALLE URDANETA, CONJ. RES. LAS ACACIAS, CASA 27",
+   "peso": 1.0,
+   "horas": 23,
+   "nota": null,
+   "total": 65.89,
+   "items": [
+    {
+     "item_id": "MLV900100101",
+     "variante_id": 0,
+     "titulo": "Audífonos Bluetooth 5.3 Inalámbricos TWS con Estuche de Carga",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100107",
+     "variante_id": 0,
+     "titulo": "Teclado Inalámbrico Bluetooth Multidispositivo en Español",
+     "variante": null,
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100108",
+     "variante_id": 0,
+     "titulo": "Smartwatch Reloj Inteligente Deportivo Resistente al Agua",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000047",
+   "carrier": "ZOOM",
+   "guia": "1711921258",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "RICARDO BRICEÑO",
+   "ci": "27863809",
+   "telefono": "04262706972",
+   "ciudad": "MERIDA",
+   "estado": "MERIDA",
+   "codigo": "MRD",
+   "oficina": "5101 - Merida",
+   "direccion": "AV. INTERCOMUNAL, CONJ. RES. LAS ACACIAS, CASA 27",
+   "peso": 0.72,
+   "horas": 28,
+   "nota": "Confirmar dirección por mensaje",
+   "total": 9.5,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000048",
+   "carrier": "TEALCA",
+   "guia": "691014",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "VALENTINA ARAUJO",
+   "ci": "19650431",
+   "telefono": "04145386798",
+   "ciudad": "MARACAY",
+   "estado": "ARAGUA",
+   "codigo": "MCY",
+   "oficina": "2201 - Maracay",
+   "direccion": "CALLE MIRANDA, EDIF. CENTRO, PISO 1",
+   "peso": 0.83,
+   "horas": 8,
+   "nota": null,
+   "total": 13.89,
+   "items": [
+    {
+     "item_id": "MLV900100103",
+     "variante_id": 2001,
+     "titulo": "Cable USB-C a Lightning Trenzado 1m Carga Rápida para iPhone",
+     "variante": "Color: Negro",
+     "cantidad": 1
+    },
+    {
+     "item_id": "MLV900100111",
+     "variante_id": 0,
+     "titulo": "Memoria USB 64GB 3.0 Metálica Alta Velocidad",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000049",
+   "carrier": "ZOOM",
+   "guia": "1711921295",
+   "cuenta": "TECNOVA_OUTLET",
+   "remitente": "TECNOVA OUTLET",
+   "comprador": "LISBETH OCHOA",
+   "ci": "30702379",
+   "telefono": "04144489013",
+   "ciudad": "ACARIGUA",
+   "estado": "PORTUGUESA",
+   "codigo": "ACA",
+   "oficina": "3401 - Acarigua",
+   "direccion": "AV. FUERZAS ARMADAS, CASA NRO. 12",
+   "peso": 0.34,
+   "horas": 29,
+   "nota": null,
+   "total": 18.9,
+   "items": [
+    {
+     "item_id": "MLV900100104",
+     "variante_id": 0,
+     "titulo": "Power Bank 10000mAh Carga Rápida 22.5W Doble USB y USB-C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  },
+  {
+   "venta": "2000099991000050",
+   "carrier": "ZOOM",
+   "guia": "1711921332",
+   "cuenta": "TECNOVA_STORE",
+   "remitente": "TECNOVA STORE",
+   "comprador": "LUIS RAMIREZ",
+   "ci": "21391184",
+   "telefono": "04243406117",
+   "ciudad": "LOS TEQUES",
+   "estado": "MIRANDA",
+   "codigo": "LTQ",
+   "oficina": "1301 - Los Teques",
+   "direccion": "AV. UNIVERSIDAD, EDIF. CENTRO, PISO 1",
+   "peso": 1.33,
+   "horas": 34,
+   "nota": null,
+   "total": 9.5,
+   "items": [
+    {
+     "item_id": "MLV900100102",
+     "variante_id": 0,
+     "titulo": "Cargador Rápido 20W USB-C Power Delivery con Cable Tipo C",
+     "variante": null,
+     "cantidad": 1
+    }
+   ]
+  }
+ ]
+}

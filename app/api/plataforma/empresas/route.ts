@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { apiError } from '@/lib/apiError'
-import { dbGlobal } from '@/lib/db'
+import { conEmpresa, dbGlobal } from '@/lib/db'
+import { restaurarDemo, SECCIONES_DEMO } from '@/lib/demoDatos'
 import { esDuenoPlataforma } from '@/lib/empresa'
 import { MODULOS } from '@/lib/modulos'
 import { forbidden, unauthorized } from '@/lib/session'
@@ -46,7 +47,7 @@ const CreateSchema = z.object({
   nombre:   z.string().trim().min(2, 'Falta el nombre de la empresa').max(80),
   country:  z.enum(['VE', 'CO']),
   modulos:  z.array(z.enum(modulosValidos)).max(20),
-  alta:     z.enum(['fundador', 'prueba', 'activo']).default('fundador'),   // lib/cuenta.ts
+  alta:     z.enum(['fundador', 'prueba', 'activo', 'demo']).default('fundador'),   // lib/cuenta.ts · demo: lib/demo.ts
   admin: z.object({
     username:  z.string().trim().toLowerCase().regex(USERNAME_RE, 'Usuario: 3 a 30 caracteres, solo letras, números, punto, guion o guion bajo'),
     full_name: z.string().trim().min(2, 'Falta el nombre del administrador').max(100),
@@ -87,9 +88,12 @@ export async function POST(req: NextRequest) {
        VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $5::int + $3::int END, $3, $4)
        RETURNING id`,
       [body.nombre, dias ? 'prueba' : 'activo', dias, body.alta === 'fundador', DIAS_ESPERA_CONEXION])
+    // Demo: créditos de IA sin límite (se repiten tomas) y los módulos de Automatizaciones de un Fundador.
+    const demo = body.alta === 'demo'
+    if (demo && body.country !== 'VE') { await client.query('ROLLBACK'); return NextResponse.json({ error: 'La demo es de Venezuela (Despachos y Reportador son solo VE)' }, { status: 400 }) }
     const { rows: [emp] } = await client.query(
-      `INSERT INTO empresas (organizacion_id, nombre, country, modulos) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [org.id, body.nombre, body.country, body.modulos])
+      `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, CASE WHEN $5 THEN NULL ELSE 100 END) RETURNING id`,
+      [org.id, body.nombre, body.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : body.modulos, demo])
     const { rows: [user] } = await client.query(
       `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active)
        VALUES ($1, $2, $3, 'admin', $4, TRUE) RETURNING id`,
@@ -138,6 +142,8 @@ export async function POST(req: NextRequest) {
     }
 
     await client.query('COMMIT')
+    // Demo: se siembra todo (cuentas de ML ficticias, ventas, preguntas, mensajes…) con su propia conexión.
+    if (demo) await conEmpresa(emp.id, body.country, db => restaurarDemo(db, SECCIONES_DEMO.map(x => x.id)))
     return NextResponse.json({ id: emp.id, categorias: categorias.length, ajustes: ajustes.length }, { status: 201 })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})

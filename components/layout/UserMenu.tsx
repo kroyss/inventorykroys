@@ -12,11 +12,12 @@ interface Props {
   ajustes: boolean
   usuarios: boolean
   plataforma: boolean
+  demo?: boolean
 }
 
 // Menú de la cuenta (arriba a la derecha): lo que se toca poco (Ajustes, Usuarios,
 // Plataforma) y Cerrar sesión, para que la barra quede solo con el trabajo del día.
-export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma }: Props) {
+export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo }: Props) {
   const pathname = usePathname()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -36,6 +37,7 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
     ajustes && espacioDe(pathname) === 'inventario' && { href: '/tasas', label: 'Ajustes' },
     usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },
+    demo       && { href: '/demo',       label: 'Demo · restaurar' },
   ].filter(Boolean) as { href: string; label: string }[]
   const fila = 'block px-3 py-2 rounded-md text-sm transition-colors'
 

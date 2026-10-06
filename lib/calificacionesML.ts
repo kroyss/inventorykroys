@@ -6,6 +6,7 @@
 // Mientras tanto (recién vendida, o en borrador) → esperar. Los textos son editables.
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
+import { esDemo } from '@/lib/demo'
 
 export const DIAS_VENTANA = 90          // ventas que se traen de ML
 export const SYNC_MINUTOS = 30          // cada cuánto el cron refresca las ventas
@@ -92,6 +93,7 @@ export async function traerOrden(db: Pool, conexionId: number, id: string) {
 
 /** Trae las ventas de los últimos DIAS_VENTANA días de una cuenta (más nuevas primero). */
 export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = false) {
+  if (await esDemo(db)) return 0     // demostración: las ventas son las sembradas
   const { rows: [c] } = await db.query(
     `SELECT ml_user_id, ordenes_sync_at FROM ml_conexiones WHERE id = $1`, [conexionId])
   if (!forzar && c.ordenes_sync_at && Date.now() - new Date(c.ordenes_sync_at).getTime() < SYNC_MINUTOS * 60_000) return 0
