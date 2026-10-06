@@ -9,6 +9,7 @@
 // para Calificaciones (ml_ordenes.items). Lo que no se vende hace rato ya "murió" hasta reponerlo.
 import type { Pool } from 'pg'
 import { mlFetch } from '@/lib/ml'
+import { esDemo } from '@/lib/demo'
 
 export const UMBRAL_DEFAULT = 3            // "por agotarse" = menos de esto (por empresa en Ajustes del módulo)
 export const MINUTOS_ENTRE_REVISIONES = 120   // cada 2 h por cuenta: cuida las llamadas a ML al crecer
@@ -54,6 +55,8 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
   const { rows: [c] } = await db.query(`SELECT ml_user_id FROM ml_conexiones WHERE id = $1`, [conexionId])
   if (!c) return { publicaciones: 0 }
   await db.query(`UPDATE ml_conexiones SET stock_alertas_at = NOW() WHERE id = $1`, [conexionId])
+  // Modo demostración (lib/demo.ts): no se relee ML, para no pisar ni borrar el stock sembrado.
+  if (await esDemo(db)) return { publicaciones: 0 }
   const umbral = await umbralStock(db)
   const inicio = new Date()
   const seller = Number(c.ml_user_id)

@@ -31,6 +31,7 @@ DELETE FROM inventory_movements WHERE reference LIKE '%20000999900001%';
 DELETE FROM sales WHERE ml_order_number LIKE '20000999900001%';
 DELETE FROM inventory WHERE product_id IN (SELECT id FROM products WHERE code LIKE 'DEMO-%');
 DELETE FROM products WHERE code LIKE 'DEMO-%';
+DELETE FROM ml_stock_alertas WHERE item_id LIKE 'MLV99990001%' OR item_id LIKE 'MLV99990002%';
 DELETE FROM ml_ordenes WHERE id BETWEEN 2000099990000101 AND 2000099990000105;
 
 -- Config

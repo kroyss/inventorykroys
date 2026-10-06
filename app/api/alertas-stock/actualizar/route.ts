@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
 import { ErrorML, mlFetch } from '@/lib/ml'
 import { umbralStock } from '@/lib/alertasStock'
+import { esDemo } from '@/lib/demo'
 
 const Body = z.object({
   cambios: z.array(z.object({
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
   try {
     const { cambios } = Body.parse(await req.json())
     const umbral = await umbralStock(s.db)
+    const demo = await esDemo(s.db)   // lib/demo.ts: se registra sin llamar a MercadoLibre
     const resultado: { item_id: string; variante_id: string; ok: boolean; error?: string }[] = []
     for (const c of cambios) {
       // La fila confirma que la publicación es de esta empresa (RLS) y de qué cuenta.
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
       if (!a) { resultado.push({ ...c, ok: false, error: 'No está en tu lista de Stock' }); continue }
       try {
         const ruta = c.variante_id === '0' ? `/items/${c.item_id}` : `/items/${c.item_id}/variations/${c.variante_id}`
-        await mlFetch(s.db, a.conexion_id, ruta, { method: 'PUT', body: { available_quantity: c.cantidad } })
+        if (!demo) await mlFetch(s.db, a.conexion_id, ruta, { method: 'PUT', body: { available_quantity: c.cantidad } })
         await s.db.query(
           `UPDATE ml_stock_alertas SET disponible = $3,
              agotada_desde = CASE WHEN $3 <= 0 THEN COALESCE(agotada_desde, NOW()) END,
