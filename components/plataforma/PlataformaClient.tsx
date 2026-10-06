@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import CuentasPanel from './CuentasPanel'
 import FundadoresPanel from './FundadoresPanel'
 import InternoPanel from './InternoPanel'
@@ -27,6 +28,13 @@ interface Empresa {
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
 
+// Encender Inventario cambia cómo trabaja Despachos: deja de armar con las ventas de MercadoLibre
+// y exige cada venta cargada en Ventas. Regla (2026-10-06): todos arrancan sin Inventario y se
+// enciende en la sesión de configuración, después de la serie de videos de Automatizaciones.
+const AVISO_INVENTARIO = 'Al encender Inventario, Despachos deja de usar las ventas de MercadoLibre: cada venta debe '
+  + 'estar cargada en Ventas (con sus productos) para poder imprimir su etiqueta. Hazlo en la sesión de configuración, '
+  + 'con el cliente ya listo para cargar productos y ventas.'
+
 // Clave inicial legible (sin 0/O/1/l): el cliente la cambia al entrar.
 function claveInicial() {
   const abc = 'abcdefghjkmnpqrstuvwxyz23456789'
@@ -43,6 +51,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [vista, setVista]       = useState<'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('empresas')
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
+  const confirm = useConfirm()
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/plataforma/empresas')
@@ -68,8 +77,13 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     if (nombre && nombre !== e.nombre) actualizar(e, { nombre })
   }
 
-  const alternarModulo = (e: Empresa, m: string) =>
-    actualizar(e, { modulos: e.modulos.includes(m) ? e.modulos.filter(x => x !== m) : [...e.modulos, m] })
+  const alternarModulo = async (e: Empresa, m: string) => {
+    const enciende = !e.modulos.includes(m)
+    if (m === 'inventario' && enciende && !await confirm({
+      title: `Encender Inventario en ${e.nombre}`, message: AVISO_INVENTARIO, confirmText: 'Encender Inventario',
+    })) return
+    actualizar(e, { modulos: enciende ? [...e.modulos, m] : e.modulos.filter(x => x !== m) })
+  }
 
   return (
     <div className="space-y-4">
@@ -183,7 +197,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
   modulos: Record<string, string>; onCancelar: () => void; onCreada: (msg: string) => void
 }) {
   const [f, setF] = useState({
-    nombre: '', country: 'VE' as 'VE' | 'CO', modulos: ['despachos', 'reportador'],
+    nombre: '', country: 'VE' as 'VE' | 'CO', modulos: ['despachos', 'reportador', 'preguntas', 'alertas_stock'],   // un Fundador: Automatizaciones, sin Inventario
     alta: 'fundador' as 'fundador' | 'prueba' | 'activo',
     username: '', full_name: '', password: claveInicial(),
   })
@@ -250,6 +264,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
               </label>
             ))}
           </div>
+          {f.modulos.includes('inventario') && <p className="mt-1.5 text-amber-700">⚠ {AVISO_INVENTARIO}</p>}
         </div>
       </div>
       <div className="flex justify-end gap-2">
