@@ -121,7 +121,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       let mensaje = rellenar(config.plantillas[Math.floor(Math.random() * config.plantillas.length)], config.bloque, cuenta.pagina, base.guia)
       if (base.carrier === 'TEALCA') mensaje = paraTealca(mensaje)
       await cerrar('ENVIADO', 'demostración: no se envió a MercadoLibre', mensaje)
-      procesados.push({ ...base, resultado: 'ENVIADO', detalle: `Desde ${cuenta.nombre}`, mensaje })
+      procesados.push({ ...base, resultado: simular ? 'SIMULADO' : 'ENVIADO', detalle: `Desde ${cuenta.nombre}`, mensaje })
       await pausa(600)
       continue
     }

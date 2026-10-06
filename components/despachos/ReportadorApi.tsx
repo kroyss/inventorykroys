@@ -37,6 +37,7 @@ export default function ReportadorApi() {
   const [estado, setEstado] = useState<Estado | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pidiendo, setPidiendo] = useState(false)
+  const [verDetalle, setVerDetalle] = useState(false)
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/despachos/reportador/api', { cache: 'no-store' })
@@ -62,7 +63,7 @@ export default function ReportadorApi() {
       })
       if (!ok) return
     }
-    setPidiendo(true); setError(null)
+    setPidiendo(true); setError(null); setVerDetalle(false)
     try {
       const r = await fetch('/api/despachos/reportador/api', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ simular }),
@@ -122,7 +123,7 @@ export default function ReportadorApi() {
       <p className="text-xs text-neutral-500">
         Cuentas conectadas a la API: {conectadas.length ? <b className="text-neutral-800">{conectadas.join(', ')}</b> : 'ninguna'}
         {' · '}las ventas de otras cuentas quedan para el programa de escritorio (abajo, de respaldo).{' '}
-        <Link href="/preguntas" className="underline underline-offset-2 hover:text-neutral-800">Conectar cuentas</Link>
+        <Link href="/cuentas-ml" className="underline underline-offset-2 hover:text-neutral-800">Conectar cuentas</Link>
       </p>
 
       {estado.soloSimula && (
@@ -161,11 +162,17 @@ export default function ReportadorApi() {
           )}
 
           {hechos.length > 0 && <>
-            <p className="text-sm text-neutral-700">
-              {(['ENVIADO', 'SIMULADO', 'YA_ENVIADO', 'SIN_CONEXION', 'SIN_CHAT', 'RECHAZADO', 'ERROR'] as const)
-                .filter(r => cuenta(r) > 0).map(r => `${ETIQUETA[r].t}: ${cuenta(r)}`).join(' · ')}
-            </p>
-            <div className="max-h-96 overflow-y-auto divide-y divide-neutral-100 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-700">
+              <span>
+                {(['ENVIADO', 'SIMULADO', 'YA_ENVIADO', 'SIN_CONEXION', 'SIN_CHAT', 'RECHAZADO', 'ERROR'] as const)
+                  .filter(r => cuenta(r) > 0).map(r => `${ETIQUETA[r].t}: ${cuenta(r)}`).join(' · ')}
+              </span>
+              <button onClick={() => setVerDetalle(v => !v)}
+                className="text-xs text-neutral-500 underline underline-offset-2 hover:text-neutral-800">
+                {verDetalle ? 'Ocultar detalle' : 'Ver detalle'}
+              </button>
+            </div>
+            {verDetalle && <div className="max-h-96 overflow-y-auto divide-y divide-neutral-100 text-sm">
               {hechos.map((h, i) => (
                 <div key={i} className="py-2">
                   <div className="flex flex-wrap items-center gap-x-3 text-xs">
@@ -178,7 +185,7 @@ export default function ReportadorApi() {
                   {h.mensaje && <p className="text-xs text-neutral-600 mt-1 whitespace-pre-line bg-neutral-50 rounded px-2 py-1">{h.mensaje}</p>}
                 </div>
               ))}
-            </div>
+            </div>}
           </>}
         </div>
       )}
