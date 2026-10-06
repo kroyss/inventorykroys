@@ -67,7 +67,8 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   const problemas = problemasConfig(config)
   if (problemas.length) throw new Error(`Configuración del Reportador incompleta: ${problemas.join(' · ')}`)
   const remitenteDefault = await remitenteConfigurado(db)
-  const demo = !simular && await esDemo(db)
+  // En demostración ni la vista previa consulta MercadoLibre (las ventas sembradas no existen allá).
+  const demo = await esDemo(db)
 
   const baseSql = `
     SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente
