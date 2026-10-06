@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML, mlFetch } from '@/lib/ml'
+import { registrarUso } from '@/lib/usoAcciones'
 
 // Publicación pausada por falta de stock: MercadoLibre no deja responder sus preguntas ("Item must be
 // active"). Desde la misma pregunta (admin): GET → stock actual y variantes · POST { cantidad, variante_id? }
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await d.s.db.query(
       `UPDATE ml_stock_alertas SET disponible = $3, agotada_desde = NULL WHERE item_id = $1 AND variante_id = $2::bigint`,
       [d.q.item_id, variante_id ?? '0', cantidad])
+    await registrarUso(d.s.db, 'stock', 1)
     return NextResponse.json({ estado: it.status })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: 'Cantidad inválida (de 1 a 99.999)' }, { status: 400 })

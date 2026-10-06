@@ -5,6 +5,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { leerPlantillasCal } from '@/lib/calificacionesML'
 import { esDemo } from '@/lib/demo'
+import { registrarUso } from '@/lib/usoAcciones'
 
 const Body = z.object({
   ordenes: z.array(z.object({
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
         resultados.push({ id: o.id, ok: false, detalle: msg })
       }
     }
+    await registrarUso(s.db, 'calificacion', resultados.filter(r => r.ok && r.detalle !== 'Ya estaba calificada').length)
     return NextResponse.json({ resultados })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

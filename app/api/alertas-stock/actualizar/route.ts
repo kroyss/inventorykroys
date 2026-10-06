@@ -5,6 +5,7 @@ import { sesionStock } from '@/lib/preguntasSesion'
 import { ErrorML, mlFetch } from '@/lib/ml'
 import { umbralStock } from '@/lib/alertasStock'
 import { esDemo } from '@/lib/demo'
+import { registrarUso } from '@/lib/usoAcciones'
 
 const Body = z.object({
   cambios: z.array(z.object({
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
         })
       }
     }
+    await registrarUso(s.db, 'stock', resultado.filter(r => r.ok).length)
     return NextResponse.json({ resultado })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: 'Cantidades inválidas (de 0 a 99.999, máximo 50 a la vez)' }, { status: 400 })

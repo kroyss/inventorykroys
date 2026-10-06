@@ -8,6 +8,20 @@ interface Alumno {
   id: number; full_name: string | null; username: string; empresas: string; ultima: string | null
   completados: number; completados_inv: number; inventario: boolean
 }
+interface Uso {
+  id: number; nombre: string; estado: string; fundador: boolean; prueba_dias: number | null; prueba_hasta: string | null
+  cuentas: string | null; conectada_at: string | null; ultima_actividad: string | null
+  preguntas: number; preguntas_7d: number; mensajes: number; mensajes_7d: number; etiquetas: number; etiquetas_7d: number
+  reportadas: number; reportadas_7d: number; calificadas: number; calificadas_7d: number; stock: number; stock_7d: number
+}
+// Columnas de uso: [campo total, campo de los últimos 7 días, título]
+const USOS: [keyof Uso, keyof Uso, string][] = [
+  ['preguntas', 'preguntas_7d', 'Preguntas'], ['mensajes', 'mensajes_7d', 'Mensajes'], ['etiquetas', 'etiquetas_7d', 'Etiquetas'],
+  ['reportadas', 'reportadas_7d', 'Reportadas'], ['calificadas', 'calificadas_7d', 'Calificadas'], ['stock', 'stock_7d', 'Stock'],
+]
+const fechaHora = (f: string) => new Date(f).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
+
 const SERIES: Record<Serie, { nombre: string; quien: string }> = {
   automatizaciones: { nombre: 'Automatizaciones', quien: 'todas las empresas' },
   inventario:       { nombre: 'Inventario', quien: 'solo empresas con el módulo Inventario' },
@@ -19,7 +33,7 @@ const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-
 /** Plataforma → Aprendizaje: videos (YouTube "No listado"), su orden, el link de "agendar" y el avance de cada cliente. */
 export default function AprendizajePanel() {
   const confirm = useConfirm()
-  const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null } | null>(null)
+  const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null; uso: Uso[] } | null>(null)
   const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '', serie: 'automatizaciones' as Serie, duracion: '' })
   const [agendar, setAgendar] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -205,6 +219,72 @@ export default function AprendizajePanel() {
                         </td>
                       )}
                       <td className="px-4 py-2 text-xs text-neutral-500">{a.ultima ? new Date(a.ultima).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h2 className="text-base font-semibold text-neutral-900">Uso de cada cliente</h2>
+          <p className="text-sm text-neutral-500">
+            Lo que hicieron <b>desde el sistema</b>: preguntas respondidas, mensajes enviados, etiquetas impresas, guías reportadas,
+            ventas calificadas y stock cambiado en MercadoLibre. El número chico es lo de los últimos 7 días.
+          </p>
+        </div>
+        {datos.uso.length === 0 ? (
+          <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-6 text-center">Todavía no hay empresas clientes.</p>
+        ) : (
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-neutral-50 text-xs text-neutral-500">
+                <tr>
+                  <th className="px-4 py-2 text-left">Empresa</th>
+                  <th className="px-4 py-2 text-left">MercadoLibre</th>
+                  {USOS.map(([k, , t]) => <th key={k} className="px-3 py-2 text-right">{t}</th>)}
+                  <th className="px-4 py-2 text-left">Última actividad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {datos.uso.map(u => {
+                  const esperando = u.prueba_dias != null
+                  return (
+                    <tr key={u.id} className="border-t border-neutral-100 align-top">
+                      <td className="px-4 py-2">
+                        <div className="font-medium">{u.nombre}</div>
+                        <div className="text-xs text-neutral-400">{u.fundador ? 'Fundador' : u.estado === 'prueba' ? 'Prueba' : u.estado}</div>
+                      </td>
+                      <td className="px-4 py-2 min-w-[11rem]">
+                        {u.cuentas ? (
+                          <>
+                            <div className="text-emerald-700 font-medium">✓ {u.cuentas}</div>
+                            <div className="text-xs text-neutral-500">
+                              desde {u.conectada_at ? fechaHora(u.conectada_at) : '—'}
+                              {u.estado === 'prueba' && u.prueba_hasta && <> · prueba hasta {ddmm(u.prueba_hasta)}</>}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-amber-700 font-medium">Sin conectar</div>
+                            {esperando && u.prueba_hasta && <div className="text-xs text-neutral-500">sus días corren solos desde el {ddmm(
+                              new Date(new Date(`${u.prueba_hasta}T12:00:00Z`).getTime() - u.prueba_dias! * 86400000).toISOString().slice(0, 10))}</div>}
+                          </>
+                        )}
+                      </td>
+                      {USOS.map(([k, k7]) => {
+                        const total = u[k] as number, semana = u[k7] as number
+                        return (
+                          <td key={k} className="px-3 py-2 text-right num">
+                            <span className={total ? 'text-neutral-900 font-medium' : 'text-neutral-300'}>{total}</span>
+                            {semana > 0 && <div className="text-[11px] text-lime-700">+{semana} en 7 d</div>}
+                          </td>
+                        )
+                      })}
+                      <td className="px-4 py-2 text-xs text-neutral-500">{u.ultima_actividad ? fechaHora(u.ultima_actividad) : '—'}</td>
                     </tr>
                   )
                 })}

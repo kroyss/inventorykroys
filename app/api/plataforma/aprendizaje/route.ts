@@ -7,7 +7,8 @@ import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { idDeYoutube, linkAgendar, segundosDe, SQL_ORDEN_SERIE } from '@/lib/aprendizaje'
 
 // Plataforma → Aprendizaje (solo el dueño).
-//   GET  → videos (todos), link de "agendar" y el avance de cada usuario de las empresas clientes
+//   GET  → videos (todos), link de "agendar", el avance de cada usuario de las empresas clientes y el uso
+//          de cada empresa (conexión a ML y cuánto usó cada herramienta)
 //   POST { titulo, descripcion?, url, serie, duracion? } → agrega un video al final de su serie
 //   PUT  { agendar } → link al que lleva "Agenda tu configuración" (Telegram)
 export async function GET() {
@@ -15,7 +16,7 @@ export async function GET() {
   if (error) return error
   try {
     const db = dbGlobal()
-    const [{ rows: videos }, { rows: alumnos }, agendar] = await Promise.all([
+    const [{ rows: videos }, { rows: alumnos }, agendar, { rows: uso }] = await Promise.all([
       db.query(`SELECT v.id, v.orden, v.titulo, v.descripcion, v.youtube_id, v.activo, v.serie, v.duracion_seg
                 FROM aprendizaje_videos v ORDER BY ${SQL_ORDEN_SERIE}, v.orden, v.id`),
       db.query(
@@ -33,8 +34,19 @@ export async function GET() {
          WHERE u.is_active
          GROUP BY u.id ORDER BY MAX(p.updated_at) DESC NULLS LAST, u.full_name`, [ORGANIZACION_PLATAFORMA]),
       linkAgendar(),
+      // Uso de cada empresa cliente (migración 073): si conectó ML y cuánto usa cada herramienta.
+      db.query(
+        `SELECT e.id, e.nombre, o.estado, o.fundador, o.prueba_dias, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta,
+                u.cuentas, u.conectada_at, u.preguntas, u.preguntas_7d, u.mensajes, u.mensajes_7d,
+                u.etiquetas, u.etiquetas_7d, u.reportadas, u.reportadas_7d, u.calificadas, u.calificadas_7d,
+                u.stock, u.stock_7d, u.ultima_actividad
+         FROM plataforma_uso_clientes() u
+         JOIN empresas e ON e.id = u.empresa_id
+         JOIN organizaciones o ON o.id = e.organizacion_id
+         WHERE e.organizacion_id <> $1 AND e.is_active
+         ORDER BY u.conectada_at IS NULL, u.ultima_actividad DESC NULLS LAST, e.nombre`, [ORGANIZACION_PLATAFORMA]),
     ])
-    return NextResponse.json({ videos, alumnos, agendar })
+    return NextResponse.json({ videos, alumnos, agendar, uso })
   } catch (err) {
     return apiError(err)
   }
