@@ -37,7 +37,7 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
     if (quedan >= total - 1) {
       return (
         <div className="bg-lime-50 border-b border-lime-200 text-lime-900 text-center text-sm py-2 px-4">
-          ✓ ¡Listo! {o.fundador ? <>Tus <b>{total} días gratis de Fundador</b></> : <>Tu <b>prueba gratis</b></>} ya empezaron: van hasta el <b>{ddmm(o.hasta)}</b>.
+          ✓ ¡Listo! {o.fundador ? <>Tus <b>{total} días gratis de Fundador</b> ya empezaron</> : <>Tu <b>prueba gratis</b> ya empezó</>}: va hasta el <b>{ddmm(o.hasta)}</b>.
         </div>
       )
     }
