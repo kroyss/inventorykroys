@@ -25,6 +25,11 @@ DELETE FROM despacho_etiquetas WHERE venta LIKE '20000999900001%';
 DELETE FROM despacho_lotes WHERE id IN (SELECT id FROM demo_lotes);
 DELETE FROM despacho_jornadas WHERE id IN (SELECT id FROM demo_jornadas);
 
+-- Corridas del Reportador por API que solo procesaron ventas de demostración.
+DELETE FROM reportador_corridas
+WHERE estado <> 'corriendo' AND jsonb_array_length(procesados) > 0
+  AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(procesados) p WHERE p->>'venta' NOT LIKE '20000999900001%');
+
 -- Ventas
 DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE ml_order_number LIKE '20000999900001%');
 DELETE FROM inventory_movements WHERE reference LIKE '%20000999900001%';
