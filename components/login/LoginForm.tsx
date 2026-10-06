@@ -29,6 +29,9 @@ export default function LoginForm({ marca }: { marca: Marca }) {
     })
 
     if (result?.ok) {
+      // Cada inicio de sesión vuelve a ofrecer el video de bienvenida (BienvenidaVideo): el
+      // "Verlo después" de antes vivía en la pestaña y pasaba a otro usuario o a otro ingreso.
+      try { sessionStorage.removeItem('bienvenida_pospuesta') } catch { /* sin storage */ }
       // Vuelve a donde iba (p. ej. el link /conectar abierto sin sesión); solo rutas propias.
       const destino = new URLSearchParams(window.location.search).get('callbackUrl') ?? '/'
       let ruta = '/'

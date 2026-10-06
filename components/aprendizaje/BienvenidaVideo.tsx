@@ -4,8 +4,8 @@ import { usePathname } from 'next/navigation'
 import { Reproductor, type Video } from './AprendizajeClient'
 
 // Al entrar, mientras el usuario no haya completado el PRIMER video de Aprendizaje, se le abre en una
-// ventana. "Verlo después" la cierra por esta sesión del navegador (sessionStorage): vuelve a salir la
-// próxima vez que abra el sistema, hasta que lo complete (80%, el mismo avance que en Aprendizaje).
+// ventana. "Verlo después" la cierra mientras dure este ingreso (sessionStorage, que el login borra):
+// vuelve a salir al iniciar sesión o abrir el navegador, hasta que lo complete (80%, como en Aprendizaje).
 const POSPUESTO = 'bienvenida_pospuesta'
 
 export default function BienvenidaVideo() {
