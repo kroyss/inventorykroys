@@ -2,8 +2,17 @@
 import { useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
-interface Video { id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string; activo: boolean }
-interface Alumno { id: number; full_name: string | null; username: string; empresas: string; completados: number; ultima: string | null }
+type Serie = 'automatizaciones' | 'inventario'
+interface Video { id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string; activo: boolean; serie: Serie; duracion_seg: number | null }
+interface Alumno {
+  id: number; full_name: string | null; username: string; empresas: string; ultima: string | null
+  completados: number; completados_inv: number; inventario: boolean
+}
+const SERIES: Record<Serie, { nombre: string; quien: string }> = {
+  automatizaciones: { nombre: 'Automatizaciones', quien: 'todas las empresas' },
+  inventario:       { nombre: 'Inventario', quien: 'solo empresas con el módulo Inventario' },
+}
+const reloj = (seg: number | null) => seg ? `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}` : ''
 
 const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white'
 
@@ -11,12 +20,12 @@ const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-
 export default function AprendizajePanel() {
   const confirm = useConfirm()
   const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null } | null>(null)
-  const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '' })
+  const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '', serie: 'automatizaciones' as Serie, duracion: '' })
   const [agendar, setAgendar] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [vez, setVez] = useState(0)
-  const [editando, setEditando] = useState<{ id: number; titulo: string; descripcion: string; url: string } | null>(null)
+  const [editando, setEditando] = useState<{ id: number; titulo: string; descripcion: string; url: string; serie: Serie; duracion: string } | null>(null)
   const recargar = () => setVez(n => n + 1)
 
   useEffect(() => {
@@ -42,7 +51,7 @@ export default function AprendizajePanel() {
     return true
   }
   const agregar = async () => {
-    if (await pedir('/api/plataforma/aprendizaje', 'POST', nuevo, `Video "${nuevo.titulo}" agregado al final.`)) setNuevo({ url: '', titulo: '', descripcion: '' })
+    if (await pedir('/api/plataforma/aprendizaje', 'POST', nuevo, `Video "${nuevo.titulo}" agregado al final de ${SERIES[nuevo.serie].nombre}.`)) setNuevo({ url: '', titulo: '', descripcion: '', serie: nuevo.serie, duracion: '' })
   }
   const borrar = async (v: Video) => {
     if (!await confirm({ title: 'Borrar video', message: `Se borra "${v.titulo}" y el avance de todos en ese video.`, confirmText: 'Borrar' })) return
@@ -51,6 +60,9 @@ export default function AprendizajePanel() {
 
   if (!datos) return error ? <p className="text-sm text-red-600">{error}</p> : <p className="text-sm text-neutral-400">Cargando…</p>
   const activos = datos.videos.filter(v => v.activo).length
+  const activosAuto = datos.videos.filter(v => v.activo && v.serie === 'automatizaciones').length
+  const activosInv = datos.videos.filter(v => v.activo && v.serie === 'inventario').length
+  const deSerie = (v: Video) => datos.videos.filter(x => x.serie === v.serie)
 
   return (
     <div className="space-y-6">
@@ -69,6 +81,11 @@ export default function AprendizajePanel() {
           <input className={input} placeholder="Título (ej. Conectar MercadoLibre)" value={nuevo.titulo} maxLength={120} onChange={e => setNuevo({ ...nuevo, titulo: e.target.value })} />
           <textarea className={`${input} sm:col-span-2 resize-none`} rows={2} maxLength={500} placeholder="Descripción corta (opcional)"
             value={nuevo.descripcion} onChange={e => setNuevo({ ...nuevo, descripcion: e.target.value })} />
+          <select className={input} value={nuevo.serie} onChange={e => setNuevo({ ...nuevo, serie: e.target.value as Serie })}>
+            {(Object.keys(SERIES) as Serie[]).map(k => <option key={k} value={k}>{SERIES[k].nombre} ({SERIES[k].quien})</option>)}
+          </select>
+          <input className={input} placeholder="Duración (ej. 6:12); vacía: se toma al reproducirlo" value={nuevo.duracion}
+            onChange={e => setNuevo({ ...nuevo, duracion: e.target.value })} />
         </div>
         <div className="flex justify-end">
           <button onClick={agregar} disabled={!nuevo.url.trim() || !nuevo.titulo.trim()} className="btn-primary text-sm disabled:opacity-40">+ Agregar video</button>
@@ -76,25 +93,41 @@ export default function AprendizajePanel() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-base font-semibold text-neutral-900">Videos <span className="text-neutral-400 font-normal text-sm">({activos} visibles · en este orden se ven)</span></h2>
+        <h2 className="text-base font-semibold text-neutral-900">Videos <span className="text-neutral-400 font-normal text-sm">({activos} visibles · en este orden se ven, cada serie con su propio orden)</span></h2>
         {datos.videos.length === 0 ? (
           <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-6 text-center">Todavía no hay videos. Mientras no haya, “Aprendizaje” muestra los primeros pasos.</p>
         ) : (
           <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
-            {datos.videos.map((v, i) => editando?.id === v.id ? (
+            {datos.videos.map((v, i) => {
+              const serie = deSerie(v), k = serie.indexOf(v)
+              const cabecera = (i === 0 || datos.videos[i - 1].serie !== v.serie) && (
+                <li key={`s-${v.serie}`} className="px-4 py-2 bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {SERIES[v.serie].nombre} <span className="normal-case font-normal tracking-normal text-neutral-400">· la ven {SERIES[v.serie].quien}
+                  {' · '}{reloj(serie.filter(x => x.activo).reduce((t, x) => t + (x.duracion_seg ?? 0), 0)) || '—'} en total</span>
+                </li>
+              )
+              return [cabecera, editando?.id === v.id ? (
               <li key={v.id} className="px-4 py-3 space-y-2 bg-neutral-50/60">
-                <p className="text-xs font-medium text-neutral-500">Editar video {i + 1}</p>
+                <p className="text-xs font-medium text-neutral-500">Editar video {k + 1} de {SERIES[v.serie].nombre}</p>
                 <input className={input} placeholder="Título" maxLength={120} value={editando.titulo}
                   onChange={e => setEditando({ ...editando, titulo: e.target.value })} />
                 <textarea className={input} rows={2} placeholder="Descripción (opcional)" maxLength={500} value={editando.descripcion}
                   onChange={e => setEditando({ ...editando, descripcion: e.target.value })} />
                 <input className={input} placeholder="Link de YouTube" value={editando.url}
                   onChange={e => setEditando({ ...editando, url: e.target.value })} />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <select className={input} value={editando.serie} onChange={e => setEditando({ ...editando, serie: e.target.value as Serie })}>
+                    {(Object.keys(SERIES) as Serie[]).map(x => <option key={x} value={x}>{SERIES[x].nombre} ({SERIES[x].quien})</option>)}
+                  </select>
+                  <input className={input} placeholder="Duración (ej. 6:12)" value={editando.duracion}
+                    onChange={e => setEditando({ ...editando, duracion: e.target.value })} />
+                </div>
                 <p className="text-xs text-neutral-500">Si cambias el video, quien ya lo había completado lo mantiene visto; a los demás se les reinicia el avance de ese video.</p>
                 <div className="flex gap-2">
                   <button disabled={editando.titulo.trim().length < 2 || !editando.url.trim()}
                     onClick={async () => {
-                      const cambio: Record<string, unknown> = { titulo: editando.titulo, descripcion: editando.descripcion.trim() || null }
+                      const cambio: Record<string, unknown> = { titulo: editando.titulo, descripcion: editando.descripcion.trim() || null,
+                        serie: editando.serie, duracion: editando.duracion }
                       if (editando.url.trim() !== `https://youtu.be/${v.youtube_id}`) cambio.url = editando.url
                       if (await pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', cambio, `Video "${editando.titulo.trim()}" guardado.`)) setEditando(null)
                     }}
@@ -104,27 +137,29 @@ export default function AprendizajePanel() {
               </li>
             ) : (
               <li key={v.id} className={`px-4 py-3 flex flex-wrap items-center gap-3 ${v.activo ? '' : 'opacity-50'}`}>
-                <span className="w-6 text-center text-sm text-neutral-400 num">{i + 1}</span>
+                <span className="w-6 text-center text-sm text-neutral-400 num">{k + 1}</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`https://i.ytimg.com/vi/${v.youtube_id}/mqdefault.jpg`} alt="" className="w-24 aspect-video rounded object-cover bg-neutral-100" />
                 <div className="flex-1 min-w-[12rem]">
-                  <p className="text-sm font-medium text-neutral-900">{v.titulo}</p>
+                  <p className="text-sm font-medium text-neutral-900">{v.titulo}
+                    {v.duracion_seg ? <span className="ml-2 text-xs font-normal text-neutral-400 num">{reloj(v.duracion_seg)}</span>
+                      : <span className="ml-2 text-xs font-normal text-amber-600">sin duración</span>}</p>
                   {v.descripcion && <p className="text-xs text-neutral-500 line-clamp-1">{v.descripcion}</p>}
                   <a href={`https://youtu.be/${v.youtube_id}`} target="_blank" rel="noreferrer" className="text-xs text-sky-700 hover:underline">youtu.be/{v.youtube_id}</a>
                 </div>
                 <div className="flex items-center gap-1 text-sm">
-                  <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { mover: 'arriba' })} disabled={i === 0}
+                  <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { mover: 'arriba' })} disabled={k === 0}
                     className="btn-ghost px-2 py-1 disabled:opacity-30" title="Subir">↑</button>
-                  <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { mover: 'abajo' })} disabled={i === datos.videos.length - 1}
+                  <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { mover: 'abajo' })} disabled={k === serie.length - 1}
                     className="btn-ghost px-2 py-1 disabled:opacity-30" title="Bajar">↓</button>
-                  <button onClick={() => setEditando({ id: v.id, titulo: v.titulo, descripcion: v.descripcion ?? '', url: `https://youtu.be/${v.youtube_id}` })}
+                  <button onClick={() => setEditando({ id: v.id, titulo: v.titulo, descripcion: v.descripcion ?? '', url: `https://youtu.be/${v.youtube_id}`, serie: v.serie, duracion: reloj(v.duracion_seg) })}
                     className="btn-ghost px-2 py-1 text-xs">Editar</button>
                   <button onClick={() => pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', { activo: !v.activo })}
                     className="btn-ghost px-2 py-1 text-xs">{v.activo ? 'Ocultar' : 'Mostrar'}</button>
                   <button onClick={() => borrar(v)} className="btn-ghost px-2 py-1 text-xs text-red-600">Borrar</button>
                 </div>
               </li>
-            ))}
+            )]})}
           </ol>
         )}
       </section>
@@ -147,11 +182,12 @@ export default function AprendizajePanel() {
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr><th className="px-4 py-2 text-left">Usuario</th><th className="px-4 py-2 text-left">Empresa</th>
-                  <th className="px-4 py-2 text-left">Avance</th><th className="px-4 py-2 text-left">Último video</th></tr>
+                  <th className="px-4 py-2 text-left">Automatizaciones</th>
+                  {activosInv > 0 && <th className="px-4 py-2 text-left">Inventario</th>}<th className="px-4 py-2 text-left">Último video</th></tr>
               </thead>
               <tbody>
                 {datos.alumnos.map(a => {
-                  const p = activos ? Math.min(100, Math.round(a.completados / activos * 100)) : 0
+                  const p = activosAuto ? Math.min(100, Math.round(a.completados / activosAuto * 100)) : 0
                   return (
                     <tr key={a.id} className="border-t border-neutral-100">
                       <td className="px-4 py-2"><div className="font-medium">{a.full_name ?? a.username}</div><div className="text-xs text-neutral-400 font-mono">{a.username}</div></td>
@@ -159,10 +195,15 @@ export default function AprendizajePanel() {
                       <td className="px-4 py-2 min-w-[10rem]">
                         <div className="flex items-center gap-2">
                           <div className="h-1.5 flex-1 rounded-full bg-neutral-100 overflow-hidden"><div className={`h-full ${p === 100 ? 'bg-lime-500' : 'bg-sky-400'}`} style={{ width: `${p}%` }} /></div>
-                          <span className="text-xs num text-neutral-600">{a.completados}/{activos}</span>
+                          <span className="text-xs num text-neutral-600">{a.completados}/{activosAuto}</span>
                           {p === 100 && <span className="text-xs text-lime-700 font-medium">✓ listo</span>}
                         </div>
                       </td>
+                      {activosInv > 0 && (
+                        <td className="px-4 py-2 text-xs num text-neutral-600">
+                          {a.inventario ? `${a.completados_inv}/${activosInv}` : <span className="text-neutral-400">no lo lleva</span>}
+                        </td>
+                      )}
                       <td className="px-4 py-2 text-xs text-neutral-500">{a.ultima ? new Date(a.ultima).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                     </tr>
                   )

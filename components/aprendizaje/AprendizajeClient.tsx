@@ -4,8 +4,16 @@ import { PageHeader } from '@/components/ui'
 
 export interface Video {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string
+  serie: 'automatizaciones' | 'inventario'; duracion_video: number | null
   visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
 }
+
+const NOMBRE_SERIE: Record<Video['serie'], string> = { automatizaciones: 'Automatizaciones', inventario: 'Inventario' }
+/** Duración a mostrar: la cargada en Plataforma o, si falta, la que reportó el reproductor. */
+const duracionDe = (v: Video) => v.duracion_video ?? (v.duracion_seg > 0 ? v.duracion_seg : null)
+const reloj = (seg: number) => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
+const minutos = (seg: number) => seg < 3600 ? `${Math.max(1, Math.round(seg / 60))} min`
+  : `${Math.floor(seg / 3600)} h ${Math.round(seg % 3600 / 60)} min`
 
 // API de YouTube (iframe), lo mínimo que se usa.
 interface YTPlayer { getCurrentTime(): number; getDuration(): number; getPlayerState(): number; setPlaybackRate(r: number): void; destroy(): void }
@@ -36,6 +44,7 @@ export default function AprendizajeClient() {
   const [videos, setVideos] = useState<Video[] | null>(null)
   const [agendar, setAgendar] = useState<string | null>(null)
   const [conectar, setConectar] = useState(false)   // empresa sin cuenta de ML y el usuario es admin
+  const [inventario, setInventario] = useState(true) // la empresa lleva inventario (si no, se le ofrece al terminar)
   const [actual, setActual] = useState<number | null>(null)
 
   useEffect(() => {
@@ -45,6 +54,7 @@ export default function AprendizajeClient() {
       .then(d => {
         if (!vivo || !d) return
         setVideos(d.videos); setAgendar(d.agendar); setConectar(!!d.sinCuentas && !!d.esAdmin)
+        setInventario(!!d.inventario || !!d.exento)
         // Abre en el primer video sin terminar.
         setActual(a => a ?? (d.videos.find((v: Video) => !v.completado) ?? d.videos[0])?.id ?? null)
       })
@@ -60,11 +70,16 @@ export default function AprendizajeClient() {
 
   const hechos = videos.filter(v => v.completado).length
   const total = videos.length
-  const primeroPendiente = videos.findIndex(v => !v.completado)
-  const habilitado = (i: number) => primeroPendiente === -1 || i <= primeroPendiente
+  // En orden DENTRO de cada serie: se habilita si todos los anteriores de su serie están completos.
+  const habilitado = (i: number) => videos.slice(0, i).every(x => x.serie !== videos[i].serie || x.completado)
   const v = videos.find(x => x.id === actual) ?? videos[0]
   const idx = videos.indexOf(v)
   const siguiente = videos[idx + 1]
+  const series = [...new Set(videos.map(x => x.serie))]
+  const numero = (x: Video) => videos.filter(y => y.serie === x.serie).indexOf(x) + 1
+  const restante = videos.filter(x => !x.completado).reduce((t, x) => t + (duracionDe(x) ?? 0), 0)
+  const autoHecha = videos.filter(x => x.serie === 'automatizaciones').every(x => x.completado)
+  const durV = duracionDe(v)
 
   // Avance que reporta el reproductor (se refleja al instante en la lista).
   const avance = (id: number, visto: number, duracion: number, completado: boolean) =>
@@ -90,7 +105,10 @@ export default function AprendizajeClient() {
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-5 py-4">
         <div className="flex items-baseline justify-between text-sm">
           <span className="font-medium text-neutral-800">Tu avance</span>
-          <span className="text-neutral-500"><b className="text-neutral-900 num">{hechos}</b> de {total} videos · {Math.round(hechos / total * 100)}%</span>
+          <span className="text-neutral-500">
+            <b className="text-neutral-900 num">{hechos}</b> de {total} videos · {Math.round(hechos / total * 100)}%
+            {restante > 0 && <> · te quedan <b className="text-neutral-900 num">{minutos(restante)}</b></>}
+          </span>
         </div>
         <div className="mt-2 h-2 rounded-full bg-neutral-100 overflow-hidden">
           <div className="h-full bg-lime-500 transition-[width] duration-500" style={{ width: `${hechos / total * 100}%` }} />
@@ -104,6 +122,20 @@ export default function AprendizajeClient() {
             {agendar && <a href={agendar} target="_blank" rel="noreferrer" className="btn-primary text-sm">Agendar mi configuración</a>}
           </div>
         )}
+        {/* Inventario es OPCIONAL: las automatizaciones trabajan solas con MercadoLibre. Al terminar
+            esa serie, a quien no lo tiene se le ofrece (lo activa el dueño de la plataforma). */}
+        {autoHecha && !inventario && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-neutral-200 rounded-lg px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-neutral-900">Siguiente paso (opcional): Inventario</p>
+              <p className="text-sm text-neutral-600">
+                Si además quieres llevar tu stock, compras, costos y ganancias en el sistema, escríbenos y te lo activamos
+                con sus videos. No es obligatorio: todo lo que ya aprendiste funciona sin él.
+              </p>
+            </div>
+            {agendar && <a href={agendar} target="_blank" rel="noreferrer" className="btn-secondary text-sm">Quiero Inventario</a>}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -111,7 +143,11 @@ export default function AprendizajeClient() {
         <section className="space-y-3 min-w-0">
           <Reproductor key={v.id} video={v} onAvance={avance} />
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">{idx + 1}. {v.titulo}</h2>
+            <h2 className="text-lg font-semibold text-neutral-900">
+              {series.length > 1 && <span className="text-neutral-400 font-normal">{NOMBRE_SERIE[v.serie]} · </span>}
+              {numero(v)}. {v.titulo}
+              {durV && <span className="ml-2 text-sm font-normal text-neutral-400 num">{reloj(durV)}</span>}
+            </h2>
             {v.descripcion && <p className="text-sm text-neutral-600 mt-1 whitespace-pre-line">{v.descripcion}</p>}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -127,12 +163,19 @@ export default function AprendizajeClient() {
         </section>
 
         {/* Lista */}
-        <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 self-start">
+        <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 self-start overflow-hidden">
           {videos.map((x, i) => {
             const libre = habilitado(i)
             const activo = x.id === v.id
+            const dur = duracionDe(x)
+            const titulo = series.length > 1 && (i === 0 || videos[i - 1].serie !== x.serie)
             return (
               <li key={x.id}>
+                {titulo && (
+                  <p className="px-4 pt-3 pb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-50">
+                    {NOMBRE_SERIE[x.serie]}
+                  </p>
+                )}
                 <button disabled={!libre} onClick={() => setActual(x.id)}
                   title={libre ? undefined : 'Primero termina el video anterior'}
                   className={`w-full text-left px-4 py-3 flex items-center gap-3 ${activo ? 'bg-lime-50/70' : libre ? 'hover:bg-neutral-50' : 'opacity-50 cursor-not-allowed'}`}>
@@ -140,11 +183,14 @@ export default function AprendizajeClient() {
                     x.completado ? 'bg-lime-500 text-white' : activo ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
                     {x.completado
                       ? <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M20 6 9 17l-5-5" /></svg>
-                      : libre ? i + 1
+                      : libre ? numero(x)
                       : <svg aria-label="Bloqueado" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-neutral-400"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-neutral-900 truncate">{x.titulo}</span>
+                    <span className="flex items-baseline gap-2">
+                      <span className="text-sm font-medium text-neutral-900 truncate">{x.titulo}</span>
+                      {dur && <span className="ml-auto shrink-0 text-xs text-neutral-400 num">{reloj(dur)}</span>}
+                    </span>
                     {!x.completado && x.visto_seg > 0 && (
                       <span className="mt-1 block h-1 rounded-full bg-neutral-100 overflow-hidden">
                         <span className="block h-full bg-lime-400" style={{ width: `${pct(x)}%` }} />
