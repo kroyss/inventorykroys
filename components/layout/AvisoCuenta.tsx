@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { dbGlobal } from '@/lib/db'
+import { DIAS_PRUEBA } from '@/lib/cuenta'
 
 // Aviso arriba de todas las pantallas sobre la cuenta de la organización (lib/cuenta.ts):
 //  - prueba esperando conexión (migración 067): "tus días empiezan al conectar ML" (el número solo a
 //    los Fundadores; a una prueba normal no, así los videos sirven para todos);
-//  - prueba corriendo: desde AVISAR_DESDE días antes del vencimiento, cuántos quedan.
+//  - prueba corriendo: el primer día, "¡tus días empezaron!"; después una línea discreta con lo que
+//    queda (así el cliente sabe que ya corren); desde AVISAR_DESDE días antes, el aviso de vencimiento.
 // Cuando haya suscripciones pagas con fecha, el mismo aviso sirve para "tu suscripción vence".
 const AVISAR_DESDE = 7
 
@@ -28,7 +30,23 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
       </div>
     )
   }
-  if (quedan > AVISAR_DESDE || quedan < 0) return null
+  if (quedan < 0) return null
+  if (quedan > AVISAR_DESDE) {
+    const total = o.fundador ? DIAS_PRUEBA.fundador : DIAS_PRUEBA.normal
+    // Recién empezados (hoy o ayer): confirmación en verde.
+    if (quedan >= total - 1) {
+      return (
+        <div className="bg-lime-50 border-b border-lime-200 text-lime-900 text-center text-sm py-2 px-4">
+          ✓ ¡Listo! {o.fundador ? <>Tus <b>{total} días gratis de Fundador</b></> : <>Tu <b>prueba gratis</b></>} ya empezaron: van hasta el <b>{ddmm(o.hasta)}</b>.
+        </div>
+      )
+    }
+    return (
+      <div className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 text-center text-xs py-1.5 px-4">
+        {o.fundador ? 'Prueba gratis de Fundador' : 'Prueba gratis'}: quedan <b className="num">{quedan} días</b> (hasta el {ddmm(o.hasta)}).
+      </div>
+    )
+  }
   const cuando = quedan === 0 ? <b>vence HOY</b> : quedan === 1 ? <b>vence mañana</b> : <>vence en <b>{quedan} días</b> (el {ddmm(o.hasta)})</>
   return (
     <div className={`border-b text-center text-sm py-2 px-4 ${quedan <= 2 ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
