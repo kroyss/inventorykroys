@@ -13,8 +13,18 @@ export async function GET() {
     const [{ rows: solicitudes }, { rows: tandas }] = await Promise.all([
       db.query(
         `SELECT id, nombre, telegram, nick_ml, mensaje, ventas_mes, cuentas, despacho, dolor, inventario, herramientas, compromiso, puntaje, estado,
-                tanda, sospechosa, ml_verificado, notas, created_at, revisada_at
-         FROM fundadores_solicitudes WHERE ronda = $1
+                tanda, sospechosa, ml_verificado, notas, created_at, revisada_at,
+                COALESCE((SELECT json_agg(f.id ORDER BY f.id) FROM fundadores_fotos f WHERE f.solicitud_id = s.id), '[]') AS fotos,
+                -- Lo investigado de la misma persona en rondas anteriores (mismo Telegram o nick).
+                COALESCE((SELECT json_agg(json_build_object('ronda', p.ronda, 'estado', p.estado, 'notas', p.notas,
+                            'fecha', to_char(p.created_at, 'DD/MM/YYYY'),
+                            'fotos', COALESCE((SELECT json_agg(f.id ORDER BY f.id) FROM fundadores_fotos f WHERE f.solicitud_id = p.id), '[]'))
+                          ORDER BY p.created_at DESC)
+                   FROM fundadores_solicitudes p
+                   WHERE p.id <> s.id AND (lower(p.telegram) = lower(s.telegram)
+                         OR (s.nick_ml IS NOT NULL AND lower(p.nick_ml) = lower(s.nick_ml)))
+                     AND (p.notas IS NOT NULL OR EXISTS (SELECT 1 FROM fundadores_fotos f WHERE f.solicitud_id = p.id))), '[]') AS previas
+         FROM fundadores_solicitudes s WHERE ronda = $1
          ORDER BY CASE estado WHEN 'calificado' THEN 0 WHEN 'aprobado' THEN 1 WHEN 'rechazado' THEN 2 ELSE 3 END,
                   puntaje DESC, created_at`, [RONDA_ACTUAL]),
       db.query(

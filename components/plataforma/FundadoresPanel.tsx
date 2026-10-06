@@ -14,6 +14,7 @@ interface Solicitud {
   ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; herramientas: string | null; compromiso: string | null
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'rechazado'; tanda: number | null
   sospechosa: string | null; ml_verificado: Verif | null; notas: string | null; created_at: string
+  fotos: number[]; previas: { ronda: number; estado: string; notas: string | null; fecha: string; fotos: number[] }[]
 }
 type Filtro = 'calificado' | 'aprobado' | 'rechazado' | 'descartado' | 'todas' | 'radar'
 
@@ -88,6 +89,22 @@ export default function FundadoresPanel() {
     fetch('/api/plataforma/fundadores').then(r => r.json()).then(d => { if (vivo) setDatos(d) }).catch(() => {})
     return () => { vivo = false }
   }, [])
+
+  // Fotos de la nota interna (migración 071): capturas del perfil de ML, reputación, etc.
+  const subirFoto = async (s: Solicitud, f: File) => {
+    setOcupado(s.id); setError(null)
+    const fd = new FormData(); fd.append('foto', f)
+    const r = await fetch(`/api/plataforma/fundadores/${s.id}/fotos`, { method: 'POST', body: fd })
+    const d = await r.json().catch(() => ({}))
+    setOcupado(null)
+    if (!r.ok) { setError(d.error ?? 'No se pudo guardar la foto'); return }
+    cargar()
+  }
+  const borrarFoto = async (id: number) => {
+    if (!window.confirm('¿Borrar esta foto de la nota?')) return
+    await fetch(`/api/plataforma/fundadores/fotos/${id}`, { method: 'DELETE' })
+    cargar()
+  }
 
   const accion = async (s: Solicitud, body: { accion: string; notas?: string }) => {
     setError(null); setOcupado(s.id)
@@ -260,9 +277,26 @@ export default function FundadoresPanel() {
                     <p className="text-sm text-neutral-700 bg-neutral-50 border-l-2 border-lime-500 rounded-r px-3 py-1.5 whitespace-pre-line">“{s.mensaje}”</p>
                   )}
                   {s.sospechosa && <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">⚠ Ojo: {s.sospechosa}</p>}
-                  <input defaultValue={s.notas ?? ''} placeholder="Nota interna…" maxLength={1000}
+                  <input defaultValue={s.notas ?? ''} placeholder="Nota interna… (pega una captura con Ctrl+V)" maxLength={1000}
                     onBlur={e => { if ((e.target.value || null) !== s.notas) accion(s, { accion: 'nota', notas: e.target.value }) }}
+                    onPaste={e => {
+                      const img = [...e.clipboardData.files].find(f => f.type.startsWith('image/'))
+                      if (img) { e.preventDefault(); subirFoto(s, img) }
+                    }}
                     className="w-full text-xs border border-transparent hover:border-neutral-200 focus:border-neutral-300 rounded px-2 py-1 text-neutral-600" />
+                  <FotosNota fotos={s.fotos} onSubir={f => subirFoto(s, f)} onBorrar={borrarFoto} ocupado={ocupado === s.id} />
+                  {s.previas.length > 0 && (
+                    <div className="rounded border border-amber-200 bg-amber-50/60 px-2 py-1.5 space-y-1">
+                      <p className="text-[11px] font-medium text-amber-900">Ya lo investigaste en rondas anteriores</p>
+                      {s.previas.map((p, i) => (
+                        <div key={i} className="text-xs text-neutral-700">
+                          <span className="text-neutral-500">Ronda {p.ronda} · {p.fecha} · {ESTADO[p.estado as Solicitud['estado']]?.t ?? p.estado}</span>
+                          {p.notas && <span> — {p.notas}</span>}
+                          {p.fotos.length > 0 && <FotosNota fotos={p.fotos} />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-start gap-2 shrink-0">
                   {s.estado !== 'aprobado' && (
@@ -285,6 +319,36 @@ export default function FundadoresPanel() {
       <p className="text-xs text-neutral-400">
         Aprobar asigna a la ronda en cuyos días se postuló (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
       </p>
+    </div>
+  )
+}
+
+/** Miniaturas de las fotos de una nota (clic = abrir grande). Con `onSubir`, botón para agregar. */
+function FotosNota({ fotos, onSubir, onBorrar, ocupado }: {
+  fotos: number[]; onSubir?: (f: File) => void; onBorrar?: (id: number) => void; ocupado?: boolean
+}) {
+  if (!fotos.length && !onSubir) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {fotos.map(id => (
+        <span key={id} className="relative group">
+          <a href={`/api/plataforma/fundadores/fotos/${id}`} target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/plataforma/fundadores/fotos/${id}`} alt="Foto de la nota" className="h-14 w-20 object-cover rounded border border-neutral-200" />
+          </a>
+          {onBorrar && (
+            <button onClick={() => onBorrar(id)} title="Borrar foto"
+              className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-4 h-4 items-center justify-center rounded-full bg-neutral-800 text-white text-[10px]">×</button>
+          )}
+        </span>
+      ))}
+      {onSubir && (
+        <label className={`text-[11px] text-neutral-500 hover:text-neutral-800 cursor-pointer px-1.5 py-0.5 rounded border border-dashed border-neutral-300 ${ocupado ? 'opacity-50' : ''}`}>
+          {ocupado ? 'Subiendo…' : '+ Foto'}
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={ocupado}
+            onChange={e => { const f = e.target.files?.[0]; if (f) onSubir(f); e.target.value = '' }} />
+        </label>
+      )}
     </div>
   )
 }
