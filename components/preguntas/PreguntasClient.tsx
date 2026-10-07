@@ -286,13 +286,10 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
     } finally { setPidiendo(null) }
   }
 
+  // Sin confirmación (07-10-2026, pedido del dueño): el texto ya está a la vista y revisado en la
+  // tarjeta; "Publicar respuesta" publica directo para responder más rápido.
   const enviar = async () => {
-    const ok = await confirm({
-      title: 'Publicar respuesta',
-      message: `Se publicará en MercadoLibre (cuenta ${p.cuenta}) y la verá cualquier comprador:\n\n"${texto.trim()}"`,
-      confirmText: 'Publicar',
-    })
-    if (!ok) return
+    if (enviando) return
     setEnviando(true); setError(null)
     try {
       const r = await fetch(`/api/preguntas/${p.id}/responder`, {
