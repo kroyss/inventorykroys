@@ -28,11 +28,14 @@ TEXT_FONT = "helv"
 TEXT_SIZE = 9
 TEXT_MARGIN_LEFT_PT = 10
 TEXT_MARGIN_BOTTOM_PT = 55
-TEXT_MAX_CHARS = 55
+TEXT_MAX_CHARS = 70  # antes 55; lo que no cabe en el ancho lo resuelve ajustar_lineas
 NOTE_LINE_OFFSET_PT = 12
 NOTE_TEXT_SIZE_DELTA = 1
 PRODUCT_LINE_STEP_PT = 11
 MAX_PRODUCT_LINES = 4
+# Texto del producto/nota en ZOOM: si no cabe en el ancho de la etiqueta, se achica hasta
+# TEXT_SIZE_MIN y, si aun no cabe, se corta con "...". Solo texto: no toca los códigos.
+TEXT_SIZE_MIN = 6.5
 # Solo aparece con más de 4 productos en una venta (máx. real observado: 4). Texto,
 # no toca los códigos.
 OVERFLOW_HINT = "(ver sistema)"
@@ -132,7 +135,23 @@ def clip_text(s, max_chars=TEXT_MAX_CHARS):
     s = re.sub(r"\s+", " ", str(s)).strip()
     if len(s) <= max_chars:
         return s
-    return s[:max_chars - 1].rstrip() + "…"
+    return s[:max_chars - 3].rstrip() + "..."  # "…" no existe en la fuente helv (salía "·")
+
+
+def ajustar_lineas(lineas, ancho, fs=TEXT_SIZE, fs_min=TEXT_SIZE_MIN):
+    """Mismo tamaño para todas las líneas: el mayor que hace caber la más larga (mínimo
+    fs_min); la que aun así no cabe se corta con "...". Devuelve (lineas, tamaño)."""
+    largo = lambda t, f: fitz.get_text_length(t, fontname=TEXT_FONT, fontsize=f)
+    while fs > fs_min and any(largo(l, fs) > ancho for l in lineas):
+        fs -= 0.5
+    salida = []
+    for l in lineas:
+        if largo(l, fs) > ancho:
+            while len(l) > 1 and largo(l.rstrip(" .…") + "...", fs) > ancho:
+                l = l[:-1]
+            l = l.rstrip(" .…") + "..."
+        salida.append(l)
+    return salida, fs
 
 
 # ===== API del servicio =====
@@ -208,27 +227,30 @@ def armar_pdf(etiquetas, sales_map, ventas=None):
 
             x = dest.x0 + TEXT_MARGIN_LEFT_PT
             y = dest.y1 - TEXT_MARGIN_BOTTOM_PT
+            ancho = dest.width - 2 * TEXT_MARGIN_LEFT_PT
 
             lineas = list(lineas_producto)
             if len(lineas) > MAX_PRODUCT_LINES:
                 ocultos = len(lineas) - (MAX_PRODUCT_LINES - 1)
                 lineas = lineas[:MAX_PRODUCT_LINES - 1]
                 lineas.append(f"... y {ocultos} producto(s) mas {OVERFLOW_HINT}")
+            lineas, fs = ajustar_lineas(lineas, ancho)
 
             for k, linea in enumerate(lineas):
                 out_page.insert_text(
                     (x, y + k * PRODUCT_LINE_STEP_PT),
                     linea,
-                    fontsize=TEXT_SIZE,
+                    fontsize=fs,
                     fontname=TEXT_FONT,
                 )
 
             if linea_nota:
                 y_nota = y + (len(lineas) - 1) * PRODUCT_LINE_STEP_PT + NOTE_LINE_OFFSET_PT
+                [nota_aj], fs_nota = ajustar_lineas([linea_nota], ancho, TEXT_SIZE - NOTE_TEXT_SIZE_DELTA)
                 out_page.insert_text(
                     (x, y_nota),
-                    linea_nota,
-                    fontsize=max(4, TEXT_SIZE - NOTE_TEXT_SIZE_DELTA),
+                    nota_aj,
+                    fontsize=max(4, fs_nota),
                     fontname=TEXT_FONT,
                 )
 
