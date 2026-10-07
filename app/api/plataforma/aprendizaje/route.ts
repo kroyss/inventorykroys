@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
-import { soloDueno } from '@/lib/plataforma'
+import { EN_LINEA_MINUTOS, soloDueno } from '@/lib/plataforma'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { idDeYoutube, linkAgendar, segundosDe, SQL_ORDEN_SERIE } from '@/lib/aprendizaje'
 
@@ -16,7 +16,7 @@ export async function GET() {
   if (error) return error
   try {
     const db = dbGlobal()
-    const [{ rows: videos }, { rows: alumnos }, agendar, { rows: uso }] = await Promise.all([
+    const [{ rows: videos }, { rows: alumnos }, agendar, { rows: uso }, { rows: enLinea }] = await Promise.all([
       db.query(`SELECT v.id, v.orden, v.titulo, v.descripcion, v.youtube_id, v.activo, v.serie, v.duracion_seg
                 FROM aprendizaje_videos v ORDER BY ${SQL_ORDEN_SERIE}, v.orden, v.id`),
       db.query(
@@ -27,6 +27,7 @@ export async function GET() {
                 bool_or('inventario' = ANY(e.modulos)) AS inventario,
                 MAX(p.updated_at) AS ultima,
                 GREATEST(u.ultima_actividad, u.last_login) AS ingreso,
+                COALESCE(u.ultima_actividad > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS}), FALSE) AS en_linea,
                 -- Video empezado y sin terminar (el último que tocó): "viendo el 1º, 57%".
                 (SELECT json_build_object('serie', w.serie, 'pct', LEAST(99, ROUND(100.0 * q.visto_seg / NULLIF(q.duracion_seg, 0))),
                           'numero', (SELECT COUNT(*) FROM aprendizaje_videos z WHERE z.activo AND z.serie = w.serie AND z.orden <= w.orden))
@@ -48,14 +49,24 @@ export async function GET() {
                 u.etiquetas, u.etiquetas_7d, u.reportadas, u.reportadas_7d, u.calificadas, u.calificadas_7d,
                 u.stock, u.stock_7d, u.ultima_actividad,
                 (SELECT MAX(GREATEST(x.ultima_actividad, x.last_login)) FROM usuario_empresas ue JOIN users x ON x.id = ue.user_id
-                 WHERE ue.empresa_id = e.id) AS ingreso
+                 WHERE ue.empresa_id = e.id) AS ingreso,
+                EXISTS (SELECT 1 FROM usuario_empresas ue JOIN users x ON x.id = ue.user_id
+                        WHERE ue.empresa_id = e.id AND x.ultima_actividad > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS})) AS en_linea
          FROM plataforma_uso_clientes() u
          JOIN empresas e ON e.id = u.empresa_id
          JOIN organizaciones o ON o.id = e.organizacion_id
          WHERE e.organizacion_id <> $1 AND e.is_active
          ORDER BY u.conectada_at IS NULL, u.ultima_actividad DESC NULLS LAST, e.nombre`, [ORGANIZACION_PLATAFORMA]),
+      // En línea ahora: cualquier usuario (también los de la plataforma) que usó el sistema hace poco.
+      db.query(
+        `SELECT u.id, COALESCE(u.full_name, u.username) AS nombre, u.username, u.ultima_actividad,
+                (SELECT string_agg(e.nombre, ', ' ORDER BY e.nombre) FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
+                 WHERE ue.user_id = u.id) AS empresas
+         FROM users u
+         WHERE u.is_active AND u.ultima_actividad > NOW() - make_interval(mins => $1)
+         ORDER BY u.ultima_actividad DESC`, [EN_LINEA_MINUTOS]),
     ])
-    return NextResponse.json({ videos, alumnos, agendar, uso })
+    return NextResponse.json({ videos, alumnos, agendar, uso, enLinea, enLineaMinutos: EN_LINEA_MINUTOS })
   } catch (err) {
     return apiError(err)
   }

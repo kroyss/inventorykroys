@@ -7,11 +7,15 @@ interface Video { id: number; orden: number; titulo: string; descripcion: string
 interface Alumno {
   id: number; full_name: string | null; username: string; empresas: string; ultima: string | null
   completados: number; completados_inv: number; inventario: boolean
-  ingreso: string | null; viendo: { serie: Serie; numero: number; pct: number | null } | null
+  ingreso: string | null; en_linea: boolean; viendo: { serie: Serie; numero: number; pct: number | null } | null
 }
+interface EnLinea { id: number; nombre: string; username: string; ultima_actividad: string; empresas: string | null }
+const PUNTO_VERDE = <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 align-middle" title="En línea ahora" />
+const haceMin = (f: string) => { const m = Math.max(0, Math.round((Date.now() - new Date(f).getTime()) / 60000)); return m === 0 ? 'ahora' : `hace ${m} min` }
+
 interface Uso {
   id: number; nombre: string; estado: string; fundador: boolean; prueba_dias: number | null; prueba_hasta: string | null
-  cuentas: string | null; conectada_at: string | null; ultima_actividad: string | null; ingreso: string | null
+  cuentas: string | null; conectada_at: string | null; ultima_actividad: string | null; ingreso: string | null; en_linea: boolean
   preguntas: number; preguntas_7d: number; mensajes: number; mensajes_7d: number; etiquetas: number; etiquetas_7d: number
   reportadas: number; reportadas_7d: number; calificadas: number; calificadas_7d: number; stock: number; stock_7d: number
 }
@@ -34,7 +38,7 @@ const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-
 /** Plataforma → Aprendizaje: videos (YouTube "No listado"), su orden, el link de "agendar" y el avance de cada cliente. */
 export default function AprendizajePanel() {
   const confirm = useConfirm()
-  const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null; uso: Uso[] } | null>(null)
+  const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null; uso: Uso[]; enLinea: EnLinea[]; enLineaMinutos: number } | null>(null)
   const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '', serie: 'automatizaciones' as Serie, duracion: '' })
   const [agendar, setAgendar] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -188,6 +192,24 @@ export default function AprendizajePanel() {
         </div>
       </section>
 
+      <section className={`rounded-xl border p-4 ${datos.enLinea.length ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
+        <h2 className="text-sm font-semibold text-neutral-900">
+          {datos.enLinea.length ? <>{PUNTO_VERDE}En línea ahora ({datos.enLinea.length})</> : 'En línea ahora'}
+        </h2>
+        {datos.enLinea.length ? (
+          <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            {datos.enLinea.map(u => (
+              <li key={u.id}>
+                <b className="text-neutral-900">{u.nombre}</b>
+                <span className="text-neutral-500"> · {u.empresas ?? u.username} · {haceMin(u.ultima_actividad)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1 text-sm text-neutral-500">Nadie usando el sistema en los últimos {datos.enLineaMinutos} minutos: buen momento para actualizar.</p>
+        )}
+      </section>
+
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-neutral-900">Avance de los clientes</h2>
         {datos.alumnos.length === 0 ? (
@@ -206,7 +228,7 @@ export default function AprendizajePanel() {
                   const p = activosAuto ? Math.min(100, Math.round(a.completados / activosAuto * 100)) : 0
                   return (
                     <tr key={a.id} className="border-t border-neutral-100">
-                      <td className="px-4 py-2"><div className="font-medium">{a.full_name ?? a.username}</div><div className="text-xs text-neutral-400 font-mono">{a.username}</div></td>
+                      <td className="px-4 py-2"><div className="font-medium">{a.en_linea && PUNTO_VERDE}{a.full_name ?? a.username}</div><div className="text-xs text-neutral-400 font-mono">{a.username}</div></td>
                       <td className="px-4 py-2 text-neutral-600">{a.empresas}</td>
                       <td className="px-4 py-2 min-w-[10rem]">
                         <div className="flex items-center gap-2">
@@ -226,7 +248,7 @@ export default function AprendizajePanel() {
                         </td>
                       )}
                       <td className="px-4 py-2 text-xs text-neutral-500">{a.ultima ? new Date(a.ultima).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                      <td className="px-4 py-2 text-xs text-neutral-500">{a.ingreso ? new Date(a.ingreso).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca'}</td>
+                      <td className="px-4 py-2 text-xs text-neutral-500">{a.en_linea ? <span className="text-emerald-700 font-medium">{PUNTO_VERDE}en línea</span> : a.ingreso ? new Date(a.ingreso).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca'}</td>
                     </tr>
                   )
                 })}
@@ -293,7 +315,7 @@ export default function AprendizajePanel() {
                           </td>
                         )
                       })}
-                      <td className="px-4 py-2 text-xs text-neutral-500">{u.ingreso ? fechaHora(u.ingreso) : 'nunca'}</td>
+                      <td className="px-4 py-2 text-xs text-neutral-500">{u.en_linea ? <span className="text-emerald-700 font-medium">{PUNTO_VERDE}en línea</span> : u.ingreso ? fechaHora(u.ingreso) : 'nunca'}</td>
                       <td className="px-4 py-2 text-xs text-neutral-500">{u.ultima_actividad ? fechaHora(u.ultima_actividad) : 'todavía no'}</td>
                     </tr>
                   )

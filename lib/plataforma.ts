@@ -10,3 +10,7 @@ export async function soloDueno() {
   if (!esDuenoPlataforma(session.user)) return { error: forbidden() }
   return { session }
 }
+
+/** "En línea ahora" en Plataforma: usó el sistema en estos minutos (users.ultima_actividad se marca como
+ *  máximo cada 2 minutos, lib/auth.ts). Con la página abierta los avisos la mantienen al día. */
+export const EN_LINEA_MINUTOS = 5

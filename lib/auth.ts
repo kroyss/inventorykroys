@@ -111,11 +111,12 @@ export const authOptions: NextAuthOptions = {
       if (!u || !u.is_active || u.sv !== (token.sv ?? 0)) {
         throw new Error('Sesión cerrada: el usuario fue desactivado o cambió su contraseña')
       }
-      // Última actividad (migración 069), como máximo una vez por hora: la usa el cron de ML para
-      // saber qué empresas están en uso.
+      // Última actividad (migración 069), como máximo cada 2 minutos (antes cada hora): la usa el cron
+      // de ML para saber qué empresas están en uso, y Plataforma para mostrar quién está "en línea ahora"
+      // (lib/plataforma: EN_LINEA_MINUTOS) y no actualizar producción mientras alguien trabaja.
       await dbGlobal().query(
         `UPDATE users SET ultima_actividad = NOW()
-         WHERE id = $1 AND (ultima_actividad IS NULL OR ultima_actividad < NOW() - INTERVAL '1 hour')`, [token.sub]).catch(() => {})
+         WHERE id = $1 AND (ultima_actividad IS NULL OR ultima_actividad < NOW() - INTERVAL '2 minutes')`, [token.sub]).catch(() => {})
 
       // Cambio de empresa en caliente, vía useSession().update({ empresaId }) — o
       // update({ country }), el selector VE/CO de siempre.
