@@ -77,12 +77,16 @@ const imagen = (p: ProductoDemo) => 'data:image/svg+xml,' + encodeURIComponent(
 export const SECCIONES_DEMO = [
   { id: 'despachos', titulo: 'Despachos', texto: '50 ventas sin despachar. Sube las 50 etiquetas PDF (carpeta "Demo videos/Despachos"), genera la hoja 4 por página y los manifiestos.' },
   { id: 'reportador', titulo: 'Reportador', texto: '24 guías de la jornada de ayer, cerrada, esperando que se le avise a cada comprador.' },
-  { id: 'preguntas', titulo: 'Preguntas', texto: '15 preguntas sin responder (una de una publicación pausada sin stock) y el historial que usa la IA.' },
-  { id: 'mensajes', titulo: 'Mensajes', texto: '10 conversaciones sin leer (guía, factura, cambio de color, reclamo…) y respuestas anteriores para sugerir.' },
+  { id: 'preguntas', titulo: 'Preguntas', texto: 'Hasta 15 preguntas sin responder (una de una publicación pausada sin stock) y el historial que usa la IA.' },
+  { id: 'mensajes', titulo: 'Mensajes', texto: 'Hasta 10 conversaciones sin leer (guía, factura, cambio de color, reclamo…) y respuestas anteriores para sugerir.' },
   { id: 'calificaciones', titulo: 'Calificaciones', texto: 'Ventas sin calificar: despachadas (positiva), sin despachar o canceladas (neutral) y recientes (esperar).' },
   { id: 'stock', titulo: 'Stock', texto: '6 publicaciones agotadas y 5 por agotarse, por variante, para reponer en un clic.' },
 ] as const
 export type SeccionDemo = typeof SECCIONES_DEMO[number]['id']
+
+/** Cuántas preguntas sin responder y conversaciones sin leer se siembran (para videos más cortos). */
+export const MAX_DEMO = { preguntas: 15, mensajes: 10 } as const
+export interface OpcionesDemo { preguntas?: number; mensajes?: number }
 
 const RANGO: Record<string, string> = {
   despachos: '20000999910', reportador: '20000999920', calificaciones: '20000999930', mensajes: '20000999940', stock: '20000999950',
@@ -92,11 +96,11 @@ const enRango = (sec: string) => `id BETWEEN ${RANGO[sec]}00001 AND ${RANGO[sec]
 type Cuentas = Record<string, number>   // nickname → conexion_id
 
 /** Restaura las secciones pedidas (y la base: cuentas, catálogo y ajustes). Todo o nada. */
-export async function restaurarDemo(db: Pool, secciones: readonly SeccionDemo[]) {
+export async function restaurarDemo(db: Pool, secciones: readonly SeccionDemo[], op: OpcionesDemo = {}) {
   await db.query('BEGIN')
   try {
     const cx = await base(db)
-    for (const s of secciones) await SEMBRAR[s](db, cx)
+    for (const s of secciones) await SEMBRAR[s](db, cx, op)
     await db.query('COMMIT')
   } catch (e) {
     await db.query('ROLLBACK').catch(() => {})
@@ -370,7 +374,7 @@ const HISTORIAL: [string | null, string, string][] = [
   [null, '¿Hay disponible?', '¡Hola! Sí, tenemos disponible. Puedes ofertar y lo despachamos hoy mismo. Saludos, Tecnova Store.'],
   [null, '¿Despachan hoy?', '¡Hola! Sí, si el pago entra antes de las 2 pm sale hoy mismo. Saludos, Tecnova Store.'],
 ]
-async function preguntas(db: Pool, cx: Cuentas) {
+async function preguntas(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   await db.query(`DELETE FROM ml_preguntas`)
   await db.query(`DELETE FROM respuestas_origen WHERE modulo = 'preguntas'`)
   const cuentaItem = (id: string) => cx[D.cuentas[D.catalogo.findIndex(p => p.id === id) % 3 === 2 ? 1 : 0].nickname]
@@ -392,7 +396,7 @@ async function preguntas(db: Pool, cx: Cuentas) {
     const comprador = k === 1 ? compradorDemo(D.compradores[3]).id : k === 14 ? compradorDemo(D.compradores[8]).id : 991_000_000 + k
     await fila(99_100_000_000 + ++n, it, pregunta, 60 * 24 * (3 + Math.floor(r() * 50)) + Math.floor(r() * 600), comprador, respuesta)
   }
-  for (const [itemId, pregunta, minutos, comprador] of PENDIENTES) {
+  for (const [itemId, pregunta, minutos, comprador] of PENDIENTES.slice(0, op.preguntas ?? PENDIENTES.length)) {
     await fila(99_100_000_000 + ++n, itemId, pregunta, minutos,
       comprador !== null ? compradorDemo(D.compradores[comprador]).id : 992_000_000 + n, null)
   }
@@ -436,14 +440,14 @@ const RESPONDIDAS: [string, string, string][] = [
   ['MLV900100107', '¿Me puede enviar la factura?', 'Hola. Claro, pásanos el RIF y la razón social por aquí y te la enviamos en PDF.'],
   ['MLV900100113', 'Quiero cambiar el modelo del protector', 'Hola. Sin problema, dinos el modelo correcto y lo cambiamos antes de despachar.'],
 ]
-async function mensajes(db: Pool, cx: Cuentas) {
+async function mensajes(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   await borrarJornadas(db, 'mensajes')
   await db.query(`DELETE FROM ml_mensajes`)
   await db.query(`DELETE FROM ml_conversaciones`)
   await db.query(`DELETE FROM respuestas_origen WHERE modulo = 'mensajes'`)
   await db.query(`DELETE FROM ml_ordenes WHERE ${enRango('mensajes')}`)
   const conversaciones: (Conversacion & { venta: string; comprador: string; cuenta: number })[] = []
-  SIN_LEER.forEach((c, i) => conversaciones.push({ ...c, venta: `${RANGO.mensajes}${String(i + 1).padStart(5, '0')}`, comprador: D.compradores[96 + i], cuenta: cx[cuentaDe(cx, i).nickname] }))
+  SIN_LEER.slice(0, op.mensajes ?? SIN_LEER.length).forEach((c, i) => conversaciones.push({ ...c, venta: `${RANGO.mensajes}${String(i + 1).padStart(5, '0')}`, comprador: D.compradores[96 + i], cuenta: cx[cuentaDe(cx, i).nickname] }))
   const r = azar(7)
   RESPONDIDAS.forEach(([it, p, resp], i) => {
     const horas = 24 * (4 + Math.floor(r() * 40))
@@ -480,6 +484,6 @@ async function mensajes(db: Pool, cx: Cuentas) {
   }
 }
 
-const SEMBRAR: Record<SeccionDemo, (db: Pool, cx: Cuentas) => Promise<void>> = {
+const SEMBRAR: Record<SeccionDemo, (db: Pool, cx: Cuentas, op: OpcionesDemo) => Promise<void>> = {
   despachos, reportador, preguntas, mensajes, calificaciones, stock,
 }

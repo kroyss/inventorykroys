@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { esDemo } from '@/lib/demo'
-import { restaurarDemo, SECCIONES_DEMO, type SeccionDemo } from '@/lib/demoDatos'
+import { MAX_DEMO, restaurarDemo, SECCIONES_DEMO, type SeccionDemo } from '@/lib/demoDatos'
 import { SQL_BANDEJA_ML } from '@/lib/calificacionesML'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { forbidden, getSessionDb, unauthorized } from '@/lib/session'
@@ -31,22 +31,27 @@ export async function GET() {
          (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS mensajes,
          (SELECT COUNT(*) FROM (${SQL_BANDEJA_ML}) b WHERE b.sugerencia <> 'esperar')::int AS calificaciones,
          (SELECT COUNT(*) FROM ml_stock_alertas WHERE disponible < 3 AND actualizado_at > NOW() - INTERVAL '1 day')::int AS stock`, [3])
-    return NextResponse.json({ secciones: SECCIONES_DEMO.map(x => ({ ...x, pendientes: n[x.id] as number })), esAdmin: s.session.user.role === 'admin' })
+    return NextResponse.json({ secciones: SECCIONES_DEMO.map(x => ({ ...x, pendientes: n[x.id] as number })), esAdmin: s.session.user.role === 'admin', max: MAX_DEMO })
   } catch (err) {
     return apiError(err)
   }
 }
 
 const ids = SECCIONES_DEMO.map(x => x.id) as [SeccionDemo, ...SeccionDemo[]]
-const Body = z.object({ secciones: z.array(z.enum(ids)).min(1) })
+const Body = z.object({
+  secciones: z.array(z.enum(ids)).min(1),
+  // Cuántas preguntas / conversaciones sin leer (por defecto, todas).
+  preguntas: z.number().int().min(1).max(MAX_DEMO.preguntas).optional(),
+  mensajes: z.number().int().min(1).max(MAX_DEMO.mensajes).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const s = await sesionDemo(true)
   if ('error' in s) return s.error
   try {
-    const { secciones } = Body.parse(await req.json())
+    const { secciones, preguntas, mensajes } = Body.parse(await req.json())
     // En el orden de SECCIONES_DEMO: Despachos primero (borra lo hecho en vivo en Despachos).
-    await restaurarDemo(s.db, ids.filter(x => secciones.includes(x)))
+    await restaurarDemo(s.db, ids.filter(x => secciones.includes(x)), { preguntas, mensajes })
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })
