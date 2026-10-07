@@ -6,7 +6,7 @@ import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } fr
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
-import { DESCRIPCION_FALTA, VARIABLES_MENSAJE, llenarMensaje, primerNombre, type MensajeRapido } from '@/lib/mensajesRapidos'
+import type { MensajeRapido } from '@/lib/mensajesRapidos'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -99,7 +99,6 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
   const [texto, setTexto] = useState('')
   // De dónde salió el texto (se guarda al enviar, migración 062).
   const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'propia'; base: string }>({ fuente: 'propia', base: '' })
-  const [envio, setEnvio] = useState<{ guia: string | null; transportista: string | null } | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [archivos, setArchivos] = useState<File[]>([])
@@ -153,19 +152,11 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
     if (d.items) setItems(d.items)
     if (d.comprador) setComprador(d.comprador)
     if (Array.isArray(d.preguntas)) setPrevias(d.preguntas)
-    if ('envio' in d) setEnvio(d.envio)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
   useEffect(() => { fin.current?.scrollIntoView({ block: 'end' }) }, [mensajes])
 
-  // Datos de ESTA venta para las respuestas rápidas.
-  const datosVenta = {
-    comprador: primerNombre(comprador?.nombre ?? c.comprador_nombre, comprador?.nick ?? c.comprador_nick),
-    producto: items?.length ? items.map(it => it.titulo).join(' y ') : c.productos,
-    tienda: c.cuenta,
-    guia: envio?.guia, transportista: envio?.transportista,
-  }
   const problemas = texto.trim() ? problemasDelTexto(texto, 'mensaje') : []
   const avisosTexto = texto.trim() ? revisarTexto(texto, 'mensaje').avisos : []
   const enviar = async () => {
@@ -263,17 +254,13 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
         {rapidas.length > 0 && mensajes && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-neutral-400 mr-1">Respuestas rápidas:</span>
-            {rapidas.map((rp, i) => {
-              const { texto: lleno, faltan } = llenarMensaje(rp.texto, datosVenta)
-              return (
-                <button key={i} type="button" disabled={faltan.length > 0}
-                  onClick={() => { const t = lleno.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
-                  title={faltan.length ? `Esta venta no tiene ${faltan.map(f => DESCRIPCION_FALTA[f]).join(' ni ')}` : lleno}
-                  className="text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed">
-                  {rp.titulo}
-                </button>
-              )
-            })}
+            {rapidas.map((rp, i) => (
+              <button key={i} type="button" title={rp.texto}
+                onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
+                className="text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
+                {rp.titulo}
+              </button>
+            ))}
           </div>
         )}
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
@@ -325,26 +312,11 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
   const cambiar = (i: number, c: Partial<MensajeRapido>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
-  // Largo con datos típicos (nombre, producto y guía de largo normal): ML corta en 350.
-  const largo = (t: string) => llenarMensaje(t, { comprador: 'Mariana', producto: 'x'.repeat(40), tienda: 'x'.repeat(15), guia: '1234567890', transportista: 'TEALCA' }).texto.length
-  // Variables con un clic: se insertan donde está el cursor del texto que se está escribiendo.
-  const cajas = useRef<(HTMLTextAreaElement | null)[]>([])
-  const insertar = (i: number, v: string) => {
-    const el = cajas.current[i]
-    const t = lista[i].texto
-    const desde = el?.selectionStart ?? t.length, hasta = el?.selectionEnd ?? t.length
-    const antes = t.slice(0, desde), despues = t.slice(hasta)
-    const sep = antes && !/\s$/.test(antes) ? ' ' : ''
-    cambiar(i, { texto: antes + sep + v + despues })
-    requestAnimationFrame(() => { if (el) { el.focus(); const p = desde + sep.length + v.length; el.setSelectionRange(p, p) } })
-  }
 
   const guardar = async () => {
     const limpias = lista.map(p => ({ titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
     const malas = limpias.filter(p => problemasDelTexto(p.texto, 'mensaje').length)
     if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto, 'mensaje').join(', ')}` }); return }
-    const largas = limpias.filter(p => largo(p.texto) > 350)
-    if (largas.length) { setMsg({ ok: false, t: `"${largas[0].titulo}" pasa de 350 caracteres con los datos de la venta: acórtala` }); return }
     setGuardando(true)
     const r = await fetch('/api/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -360,15 +332,10 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
       <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-neutral-900">Respuestas rápidas de mensajes</h2>
-          <p className="text-xs text-neutral-500">Salen como botones en cada conversación: un clic pone el texto con los datos de esa venta y lo puedes retocar antes de enviar.</p>
+          <p className="text-xs text-neutral-500">Salen como botones en cada conversación: un clic pone el texto y lo puedes retocar antes de enviar.</p>
         </div>
         <button onClick={() => setLista(l => [...l, { titulo: '', texto: '' }])} className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
       </div>
-      <p className="text-xs text-neutral-600 bg-neutral-50 rounded-lg px-3 py-2">
-        Variables que se llenan solas con los datos de cada venta (debajo de cada texto, un clic las pone donde está el cursor):{' '}
-        {VARIABLES_MENSAJE.map((x, i) => <span key={x.v}>{i > 0 && ' · '}<code className="text-neutral-900">{x.v}</code> {x.que}</span>)}.
-        {' '}Si la venta no tiene el dato (por ejemplo, todavía no hay guía), el botón sale apagado.
-      </p>
       {lista.length === 0 && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 space-y-2">
           <p>Todavía no tienes respuestas rápidas. ¿Empiezas con estos ejemplos? Los puedes cambiar antes de guardar.</p>
@@ -378,7 +345,7 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
       )}
       <div className="space-y-3">
         {lista.map((p, i) => {
-          const n = largo(p.texto)
+          const n = p.texto.length
           return (
             <div key={i} className="border border-neutral-200 rounded-lg p-3 space-y-2">
               <div className="flex items-center gap-2">
@@ -386,21 +353,10 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
                   className="flex-1 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
                 <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
               </div>
-              <textarea ref={el => { cajas.current[i] = el }} value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={500}
-                placeholder="Texto del mensaje (ej. ¡Hola {comprador}! Tu pedido ya salió por {transportista}, guía {guia})"
+              <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={350}
+                placeholder="Texto del mensaje (ej. ¡Hola! Gracias por tu compra, ya estamos preparando tu pedido)"
                 className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-neutral-400">Poner:</span>
-                {VARIABLES_MENSAJE.map(x => (
-                  <button key={x.v} type="button" onMouseDown={e => e.preventDefault()} onClick={() => insertar(i, x.v)} title={x.que}
-                    className="text-[11px] font-mono rounded-full px-2 py-0.5 bg-lime-50 text-lime-800 ring-1 ring-inset ring-lime-200 hover:bg-lime-100">
-                    {x.v}
-                  </button>
-                ))}
-                <span className={`ml-auto text-[11px] ${n > 350 ? 'text-red-600' : 'text-neutral-400'}`}>
-                  ~{n}/350 con los datos de una venta{n > 350 ? ': muy largo, MercadoLibre lo cortaría' : ''}
-                </span>
-              </div>
+              <p className="text-[11px] text-neutral-400 text-right">{n}/350</p>
             </div>
           )
         })}

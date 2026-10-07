@@ -34,13 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
     if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
     // Lo que este comprador preguntó antes (de lo ya sincronizado en Preguntas).
     const preguntas = venta?.comprador.id ? await preguntasDeComprador(s.db, venta.comprador.id).catch(() => []) : []
-    // Guía impresa de esta venta (Despachos): para {guia} y {transportista} de las respuestas rápidas.
-    const { rows: [envio] } = await s.db.query(
-      `SELECT e.carrier, COALESCE(e.guia_final, e.guia) AS guia
-       FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
-       WHERE e.venta = $1 AND e.impresa AND l.status = 'GENERADO' ORDER BY e.id DESC LIMIT 1`, [pack])
-    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas,
-      envio: envio ? { guia: envio.guia as string | null, transportista: envio.carrier as string | null } : null })
+    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas })
   } catch (err) {
     return apiError(err)
   }

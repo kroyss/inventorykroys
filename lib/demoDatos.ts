@@ -145,7 +145,7 @@ async function base(db: Pool): Promise<Cuentas> {
     ['despacho_remitente', D.cuentas[0].remitente],
     ['preguntas_politicas', POLITICAS],
     ['preguntas_plantillas', JSON.stringify(PLANTILLAS)],
-    ['mensajes_plantillas', JSON.stringify(MENSAJES_SUGERIDOS)],
+    ['mensajes_plantillas', JSON.stringify(MENSAJES_SUGERIDOS(D.cuentas[0].nickname))],
     // Reportador sin cuentas escritas a mano: cada envío sale desde la cuenta de su venta (como un Fundador).
     ['reportador_cuentas', '[]'],
     ['reportador_plantillas', JSON.stringify([

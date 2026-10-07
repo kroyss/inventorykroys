@@ -27,9 +27,10 @@ export async function GET(req: NextRequest) {
        FROM ml_conversaciones`)
     // Respuestas rápidas (botones en cada conversación); `sugeridas` = ejemplos para el editor.
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
+    const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
     return NextResponse.json({
       conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: s.session.user.role === 'admin',
-      sugeridas: MENSAJES_SUGERIDOS,
+      sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
     })
   } catch (err) {
     return apiError(err)
