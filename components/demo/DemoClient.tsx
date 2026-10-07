@@ -13,7 +13,9 @@ const RUTA: Record<string, string> = {
 // Cuenta de demostración: lo pendiente de cada sección y un botón para dejarla como al principio
 // (para repetir una toma). Cada sección se restaura sola; "Restaurar todo" deja la cuenta entera.
 export default function DemoClient() {
-  const [datos, setDatos] = useState<{ secciones: Seccion[]; esAdmin: boolean } | null>(null)
+  const [datos, setDatos] = useState<{ secciones: Seccion[]; esAdmin: boolean; max: Record<string, number> } | null>(null)
+  // Cuántas preguntas / conversaciones sin leer deja cada restauración (vacío = todas).
+  const [cantidad, setCantidad] = useState<Record<string, number | null>>({ preguntas: null, mensajes: null })
   const [trabajando, setTrabajando] = useState<string | null>(null)
   const [listo, setListo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +28,9 @@ export default function DemoClient() {
   async function restaurar(ids: string[], clave: string) {
     setTrabajando(clave); setListo(null); setError(null)
     try {
-      const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secciones: ids }) })
+      const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        secciones: ids, preguntas: cantidad.preguntas ?? undefined, mensajes: cantidad.mensajes ?? undefined,
+      }) })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error ?? 'No se pudo restaurar')
       await cargar()
@@ -61,6 +65,17 @@ export default function DemoClient() {
                 </span>
               </div>
               <p className="mt-1 text-sm text-neutral-500 flex-1">{s.texto}</p>
+              {datos.esAdmin && datos.max[s.id] && (
+                <label className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
+                  Al restaurar, dejar
+                  <select value={cantidad[s.id] ?? datos.max[s.id]}
+                    onChange={e => setCantidad(c => ({ ...c, [s.id]: Number(e.target.value) }))}
+                    className="border border-neutral-300 rounded-lg px-2 py-1 text-sm num">
+                    {Array.from({ length: datos.max[s.id] }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  {s.id === 'preguntas' ? 'preguntas' : 'conversaciones sin leer'}
+                </label>
+              )}
               <div className="mt-3 flex items-center gap-2">
                 {datos.esAdmin && (
                   <button onClick={() => restaurar([s.id], s.id)} disabled={!!trabajando}
