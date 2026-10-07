@@ -9,7 +9,7 @@ import FormularioFundadores from '@/components/fundadores/FormularioFundadores'
 
 export const metadata = {
   title: 'Programa Fundadores',
-  description: '15 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis, configuración y adiestramiento sin costo.',
+  description: '20 cupos para vendedores de MercadoLibre Venezuela con movimiento real: un mes gratis, configuración y adiestramiento sin costo.',
 }
 
 // Lo que reciben los Fundadores además del mes gratis.
@@ -33,21 +33,22 @@ const INCLUYE = [
 ]
 
 // Seleccionados de cada ronda, como se anunciaron en el grupo de Telegram (el @ es el que cada uno
-// usa en Telegram, que no siempre coincide con el del formulario). Se muestran desde el día de resultados.
+// usa en Telegram, que no siempre coincide con el del formulario). Se muestran desde el día de resultados,
+// solo con el @ (07-10-2026: sin nombres, a pedido del dueño).
 // Los seleccionados escriben ellos a la cuenta oficial (no se les escribe en frío: Telegram lo limita).
 const TELEGRAM_OFICIAL = 'elcomerciantedigital'
-const SELECCIONADOS: Record<number, { telegram: string; nombre: string }[]> = {
+const SELECCIONADOS: Record<number, { telegram: string }[]> = {
   1: [
-    { telegram: 'repuestoschevypartes', nombre: 'Cristhian' },
-    { telegram: 'Ruben', nombre: 'Rubenpico' },
-    { telegram: 'Luisha21', nombre: 'Luisarnal' },
-    { telegram: 'Businessbqto', nombre: 'Miguel' },
-    { telegram: 'bacutone', nombre: 'Gerardo' },
+    { telegram: 'repuestoschevypartes' },
+    { telegram: 'Ruben' },
+    { telegram: 'Luisha21' },
+    { telegram: 'Businessbqto' },
+    { telegram: 'bacutone' },
   ],
 }
 
 // Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas
-// (5 + 10 = 15 pioneros; los cupos salen de fundadores_tandas) y el formulario. Lo de la base se lee en cada visita.
+// (5 + 15 = 20 pioneros desde el 07-10-2026; los cupos salen de fundadores_tandas) y el formulario. Lo de la base se lee en cada visita.
 // ?vista=previa: muestra el formulario aunque la inscripción esté cerrada, sin poder enviarlo
 // (para revisar cómo quedan las preguntas).
 export default async function FundadoresPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
@@ -171,7 +172,6 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                   <li key={x.telegram} className="flex items-center gap-2 text-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-lime-600 shrink-0" />
                     <span className="font-semibold text-neutral-900">@{x.telegram}</span>
-                    <span className="text-neutral-500">({x.nombre})</span>
                   </li>
                 ))}
               </ul>

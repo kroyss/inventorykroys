@@ -1,6 +1,6 @@
 // Programa Fundadores: preguntas, puntaje y descarte (página pública /fundadores).
 //
-// Decidido con el dueño (2026-10-01; 2026-10-03 pasó a 5 + 10 = 15): 15 pioneros en 2 tandas (5 y 10), 1 mes gratis, atención personalizada 1 a 1 y
+// Decidido con el dueño (2026-10-01; 2026-10-03 pasó a 5 + 10 = 15; 2026-10-07 a 5 + 15 = 20): 15 pioneros en 2 tandas (5 y 10), 1 mes gratis, atención personalizada 1 a 1 y
 // configuración + adiestramiento gratis. Cada tanda tiene días fijos de inscripción (4-5 y 11-12 de octubre): solo
 // esos días se acepta el formulario y la selección se avisa al día siguiente del cierre (6 y 13).
 // Requisito: movimiento real. Menos de 30 ventas al mes = descartado en la ronda (sin
