@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
+import { leerMensajesRapidos, MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
 
 // GET /api/mensajes?vista=sin_leer|con_nota|todas → conversaciones post-venta de las cuentas de
 // la empresa (las sin leer primero) con el estado de la venta en el sistema y sus notas de ML.
@@ -24,7 +25,12 @@ export async function GET(req: NextRequest) {
       `SELECT COUNT(*) FILTER (WHERE sin_leer > 0)::int AS conversaciones, COALESCE(SUM(sin_leer), 0)::int AS mensajes,
               COUNT(*) FILTER (WHERE notas IS NOT NULL)::int AS con_nota
        FROM ml_conversaciones`)
-    return NextResponse.json({ conversaciones: rows, sin_leer: n })
+    // Respuestas rápidas (botones en cada conversación); `sugeridas` = ejemplos para el editor.
+    const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
+    return NextResponse.json({
+      conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: s.session.user.role === 'admin',
+      sugeridas: MENSAJES_SUGERIDOS(s.session.user.empresaNombre ?? 'nuestra tienda'),
+    })
   } catch (err) {
     return apiError(err)
   }

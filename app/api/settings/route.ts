@@ -20,6 +20,7 @@ const ALLOWED = new Set([
   'despacho_remitente',                              // remitente del manifiesto (vacío = nombre de la empresa)
   'preguntas_politicas',                             // Preguntas ML: políticas que usa la IA (texto libre)
   'preguntas_plantillas',                            // Preguntas ML: respuestas rápidas (JSON)
+  'mensajes_plantillas',                             // Mensajes ML: respuestas rápidas post-venta (JSON)
   'calificaciones_plantillas',                       // Calificaciones ML: textos concretada / no concretada (JSON)
   'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten', // CO
   'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)

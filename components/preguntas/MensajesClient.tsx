@@ -6,6 +6,7 @@ import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } fr
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
+import { DESCRIPCION_FALTA, VARIABLES_MENSAJE, llenarMensaje, primerNombre, type MensajeRapido } from '@/lib/mensajesRapidos'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -26,17 +27,19 @@ function hace(fecha: string | null) {
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
 export default function MensajesClient() {
-  const [vista, setVista] = useState<'sin_leer' | 'todas'>('sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'rapidas'>('sin_leer')
+  const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [lista, setLista] = useState<Conversacion[] | null>(null)
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    const r = await fetch(`/api/mensajes?vista=${vista}`)
+    const r = await fetch(`/api/mensajes?vista=${vista === 'rapidas' ? 'sin_leer' : vista}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setLista(d.conversaciones); setCont(d.sin_leer)
+    setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
@@ -49,8 +52,11 @@ export default function MensajesClient() {
       <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null) }} items={[
         { value: 'sin_leer', label: 'Sin leer', count: cont?.conversaciones },
         { value: 'todas', label: 'Recientes' },
+        ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
       ]} />
-      {!lista ? <Cargando /> : (
+      {vista === 'rapidas' ? (
+        <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
+      ) : !lista ? <Cargando /> : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
             {lista.length === 0 ? (
@@ -77,7 +83,7 @@ export default function MensajesClient() {
             ))}
           </div>
           {abierta
-            ? <Hilo key={abierta.pack_id} c={abierta} onCambio={cargar} />
+            ? <Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={cargar} />
             : <div className="hidden lg:block bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">Elige una conversación</div>}
         </div>
       )}
@@ -85,14 +91,15 @@ export default function MensajesClient() {
   )
 }
 
-function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
+function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; cantidad: number; link: string | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [texto, setTexto] = useState('')
   // De dónde salió el texto (se guarda al enviar, migración 062).
-  const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'propia'; base: string }>({ fuente: 'propia', base: '' })
+  const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'propia'; base: string }>({ fuente: 'propia', base: '' })
+  const [envio, setEnvio] = useState<{ guia: string | null; transportista: string | null } | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [archivos, setArchivos] = useState<File[]>([])
@@ -146,11 +153,18 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
     if (d.items) setItems(d.items)
     if (d.comprador) setComprador(d.comprador)
     if (Array.isArray(d.preguntas)) setPrevias(d.preguntas)
+    if ('envio' in d) setEnvio(d.envio)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
   useEffect(() => { fin.current?.scrollIntoView({ block: 'end' }) }, [mensajes])
 
+  // Datos de ESTA venta para las respuestas rápidas.
+  const datosVenta = {
+    comprador: primerNombre(comprador?.nombre ?? c.comprador_nombre, comprador?.nick ?? c.comprador_nick),
+    producto: items?.length ? items.map(it => it.titulo).join(' y ') : c.productos,
+    guia: envio?.guia, transportista: envio?.transportista,
+  }
   const problemas = texto.trim() ? problemasDelTexto(texto, 'mensaje') : []
   const avisosTexto = texto.trim() ? revisarTexto(texto, 'mensaje').avisos : []
   const enviar = async () => {
@@ -245,6 +259,22 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
         {ultimoEsComprador && !texto.trim() && (
           <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setOrigen({ fuente: 'parecida', base: t }); setMeta(null) }} />
         )}
+        {rapidas.length > 0 && mensajes && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-neutral-400 mr-1">Respuestas rápidas:</span>
+            {rapidas.map((rp, i) => {
+              const { texto: lleno, faltan } = llenarMensaje(rp.texto, datosVenta)
+              return (
+                <button key={i} type="button" disabled={faltan.length > 0}
+                  onClick={() => { const t = lleno.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
+                  title={faltan.length ? `Esta venta no tiene ${faltan.map(f => DESCRIPCION_FALTA[f]).join(' ni ')}` : lleno}
+                  className="text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed">
+                  {rp.titulo}
+                </button>
+              )
+            })}
+          </div>
+        )}
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && texto.trim() && !problemas.length) enviar() }}
           onPaste={pegar}
@@ -284,6 +314,80 @@ function Hilo({ c, onCambio }: { c: Conversacion; onCambio: () => void }) {
           </button>
         </div>
       </footer>
+    </section>
+  )
+}
+
+// ── Respuestas rápidas (editor, solo admin) ───────────────────────────────
+function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: MensajeRapido[]; sugeridas: MensajeRapido[]; onGuardado: () => void }) {
+  const [lista, setLista] = useState<MensajeRapido[]>(iniciales)
+  const [guardando, setGuardando] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+  const cambiar = (i: number, c: Partial<MensajeRapido>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
+  // Largo con datos típicos (nombre, producto y guía de largo normal): ML corta en 350.
+  const largo = (t: string) => llenarMensaje(t, { comprador: 'Mariana', producto: 'x'.repeat(40), guia: '1234567890', transportista: 'TEALCA' }).texto.length
+
+  const guardar = async () => {
+    const limpias = lista.map(p => ({ titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
+    const malas = limpias.filter(p => problemasDelTexto(p.texto, 'mensaje').length)
+    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto, 'mensaje').join(', ')}` }); return }
+    const largas = limpias.filter(p => largo(p.texto) > 350)
+    if (largas.length) { setMsg({ ok: false, t: `"${largas[0].titulo}" pasa de 350 caracteres con los datos de la venta: acórtala` }); return }
+    setGuardando(true)
+    const r = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mensajes_plantillas: JSON.stringify(limpias) }),
+    })
+    setGuardando(false)
+    if (!r.ok) { setMsg({ ok: false, t: 'No se pudo guardar' }); return }
+    setLista(limpias); setMsg({ ok: true, t: 'Guardadas' }); onGuardado()
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-neutral-900">Respuestas rápidas de mensajes</h2>
+          <p className="text-xs text-neutral-500">Salen como botones en cada conversación: un clic pone el texto con los datos de esa venta y lo puedes retocar antes de enviar.</p>
+        </div>
+        <button onClick={() => setLista(l => [...l, { titulo: '', texto: '' }])} className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
+      </div>
+      <p className="text-xs text-neutral-600 bg-neutral-50 rounded-lg px-3 py-2">
+        Variables que se llenan solas:{' '}
+        {VARIABLES_MENSAJE.map((x, i) => <span key={x.v}>{i > 0 && ' · '}<code className="text-neutral-900">{x.v}</code> {x.que}</span>)}.
+        {' '}Si la venta no tiene el dato (por ejemplo, todavía no hay guía), el botón sale apagado.
+      </p>
+      {lista.length === 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 space-y-2">
+          <p>Todavía no tienes respuestas rápidas. ¿Empiezas con estos ejemplos? Los puedes cambiar antes de guardar.</p>
+          <ul className="text-xs text-blue-800 list-disc pl-5 space-y-0.5">{sugeridas.map(x => <li key={x.titulo}><b>{x.titulo}:</b> {x.texto}</li>)}</ul>
+          <button onClick={() => setLista(sugeridas)} className="btn-primary text-xs px-3 py-1">Usar estos ejemplos</button>
+        </div>
+      )}
+      <div className="space-y-3">
+        {lista.map((p, i) => {
+          const n = largo(p.texto)
+          return (
+            <div key={i} className="border border-neutral-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto del botón (ej. Ya salió)" maxLength={40}
+                  className="flex-1 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
+                <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
+              </div>
+              <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={500}
+                placeholder="Texto del mensaje (ej. ¡Hola {comprador}! Tu pedido ya salió por {transportista}, guía {guia})"
+                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
+              <p className={`text-[11px] ${n > 350 ? 'text-red-600' : 'text-neutral-400'}`}>
+                ~{n}/350 con los datos de una venta{n > 350 ? ': muy largo, MercadoLibre lo cortaría' : ''}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        {msg && <span className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.t}</span>}
+        <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
+      </div>
     </section>
   )
 }

@@ -11,6 +11,7 @@
 //   stock          2000099995000001…  ventas de los últimos 30 días de lo agotado / por agotarse
 //   preguntas      preguntas sin responder + historial respondido (memoria de la IA y sugerencias)
 // Las fechas son relativas al momento de restaurar: siempre se ve "de hoy".
+import { MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
 import type { Pool } from 'pg'
 import datos from '@/lib/demo/datos.json'
 import { TOKEN_DEMO } from '@/lib/demo'
@@ -144,6 +145,7 @@ async function base(db: Pool): Promise<Cuentas> {
     ['despacho_remitente', D.cuentas[0].remitente],
     ['preguntas_politicas', POLITICAS],
     ['preguntas_plantillas', JSON.stringify(PLANTILLAS)],
+    ['mensajes_plantillas', JSON.stringify(MENSAJES_SUGERIDOS(D.tienda))],
     // Reportador sin cuentas escritas a mano: cada envío sale desde la cuenta de su venta (como un Fundador).
     ['reportador_cuentas', '[]'],
     ['reportador_plantillas', JSON.stringify([
