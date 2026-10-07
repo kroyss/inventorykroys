@@ -51,7 +51,7 @@ export async function GET() {
       // Sin cuentas configuradas, cada envío sale desde la cuenta de su venta (estas son las conectadas).
       porVenta: cuentaPorVenta(config), conectadas: conectadas.map(c => c.nickname as string),
       // Mensajes listos para quien todavía no tiene: los revisa y los guarda antes del primer reporte.
-      sugeridas: plantillasSugeridas(session.user.empresaNombre ?? 'nuestra tienda'),
+      sugeridas: plantillasSugeridas(session.user.empresaNombre ?? 'nuestra tienda', conectadas[0]?.nickname),
     })
   } catch (err) {
     return apiError(err)

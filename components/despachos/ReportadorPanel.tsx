@@ -412,10 +412,8 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
         <p className="text-xs text-neutral-500 mb-2">
           Se elige una al azar por comprador. <code>{'{guia}'}</code> se cambia por la guía y <code>{'{transportista}'}</code> por
           ZOOM o TEALCA según el envío (no escribas el transportista a mano: un mensaje que dice TEALCA también le llegaría así a los
-          de ZOOM). Estas dos variables no se pueden borrar, solo cambiar de lugar.{' '}
-          <code>{'{pagina}'}</code> (opcional) se cambia por {config.cuentas.length
-            ? 'la página de la cuenta'
-            : <>la página oficial de la cuenta de la venta ({paginaML(conectadas[0] ?? 'tutienda')})</>}.
+          de ZOOM). Estas dos variables no se pueden borrar, solo cambiar de lugar.
+          {config.cuentas.length > 0 && <> <code>{'{pagina}'}</code> se cambia por la página de la cuenta.</>}
           {' '}MercadoLibre corta en {limite} caracteres sin avisar.
         </p>
         <div className="space-y-2">
@@ -464,7 +462,8 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
       <div>
         <h3 className="text-xs font-semibold text-neutral-600 mb-1">Texto final (se agrega a todas las plantillas)</h3>
         <p className="text-xs text-neutral-500 mb-1">
-          Opcional. Por ejemplo: «¡Gracias por comprar en MI TIENDA! Síguenos en nuestra cuenta oficial: {'{pagina}'}» (empieza con un espacio).
+          Opcional. Por ejemplo: «¡Gracias por comprar en MI TIENDA! Síguenos en nuestra cuenta oficial:
+          {' '}{paginaML(conectadas[0] ?? 'tutienda')}» (empieza con un espacio; el link lo puedes cambiar).
         </p>
         <textarea className={input} rows={5} value={config.bloque} onChange={e => onChange({ ...config, bloque: e.target.value })} />
         <p className="text-xs text-neutral-500 mt-1">

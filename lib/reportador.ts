@@ -147,12 +147,14 @@ export const SQL_CUENTA_VENTA = `(
   ORDER BY (o.id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)) DESC LIMIT 1)`
 
 /** Mensajes listos para quien todavía no configuró los suyos (se revisan antes de usarlos). */
-export const plantillasSugeridas = (tienda: string): Pick<ConfigReportador, 'plantillas' | 'bloque'> => ({
+// El texto final lleva la página de la cuenta ESCRITA (no {pagina}): el cliente ve el link real y lo cambia
+// si su página tiene otra dirección. {pagina} sigue funcionando para quien ya lo usa.
+export const plantillasSugeridas = (tienda: string, nickname?: string | null): Pick<ConfigReportador, 'plantillas' | 'bloque'> => ({
   plantillas: [
     '¡Hola! Tu pedido ya va en camino. Tu número de guía {transportista} es {guia}.',
     'Buen día, tu paquete fue entregado a {transportista} con la guía {guia}. Cualquier duda, aquí estamos para ayudarte.',
   ],
-  bloque: ` ¡Gracias por comprar en ${tienda}! Síguenos en nuestra cuenta oficial: {pagina}`,
+  bloque: ` ¡Gracias por comprar en ${tienda}!` + (nickname ? ` Síguenos en nuestra cuenta oficial: ${paginaML(nickname)}` : ''),
 })
 
 /** Avisos que NO impiden guardar: un transportista escrito a mano dice lo mismo en ZOOM y en TEALCA. */
