@@ -88,12 +88,13 @@ export async function POST(req: NextRequest) {
        VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $5::int + $3::int END, $3, $4)
        RETURNING id`,
       [body.nombre, dias ? 'prueba' : 'activo', dias, body.alta === 'fundador', DIAS_ESPERA_CONEXION])
-    // Demo: créditos de IA sin límite (se repiten tomas) y los módulos de Automatizaciones de un Fundador.
+    // Demo: los módulos de Automatizaciones de un Fundador y sus mismos 100 créditos de IA (en los videos
+    // se ve "Créditos IA: N de 100", como lo ve un cliente; si hace falta se sube en la base).
     const demo = body.alta === 'demo'
     if (demo && body.country !== 'VE') { await client.query('ROLLBACK'); return NextResponse.json({ error: 'La demo es de Venezuela (Despachos y Reportador son solo VE)' }, { status: 400 }) }
     const { rows: [emp] } = await client.query(
-      `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, CASE WHEN $5 THEN NULL ELSE 100 END) RETURNING id`,
-      [org.id, body.nombre, body.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : body.modulos, demo])
+      `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, 100) RETURNING id`,
+      [org.id, body.nombre, body.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : body.modulos])
     const { rows: [user] } = await client.query(
       `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active)
        VALUES ($1, $2, $3, 'admin', $4, TRUE) RETURNING id`,

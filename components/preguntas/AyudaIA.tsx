@@ -30,7 +30,15 @@ export function UsoIA() {
       </span>
     )
   }
-  const total = uso.total ?? 0
+  // Sin límite y sin costo (el costo solo llega al dueño de la plataforma): solo los créditos usados.
+  if (uso.total === undefined) {
+    return (
+      <span className="text-xs text-neutral-500 whitespace-nowrap" title={AYUDA_CREDITOS}>
+        Créditos IA usados este mes: <b className="text-neutral-800 num">{uso.creditos}</b>
+      </span>
+    )
+  }
+  const total = uso.total
   return (
     <span className="text-xs text-neutral-500 whitespace-nowrap" title={`Costo de la IA este mes. ${AYUDA_CREDITOS}`}>
       IA este mes: <b className="text-neutral-800 num">${total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: total > 0 && total < 0.995 ? 4 : 2 })}</b>
