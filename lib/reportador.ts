@@ -113,11 +113,54 @@ export function rellenar(plantilla: string, bloque: string, pagina: string, guia
   return (plantilla + bloque).split('{pagina}').join(pagina).split('{guia}').join(guia)
 }
 
+/** {transportista} → ZOOM; en los envíos Tealca paraTealca() lo pasa a TEALCA. Así el programa de
+ *  escritorio (que solo conoce {guia}, {pagina} y el cambio ZOOM→TEALCA) recibe plantillas que ya
+ *  entiende, y las plantillas viejas con "ZOOM" escrito siguen funcionando igual. */
+export const conTransportista = (t: string) => t.split('{transportista}').join('ZOOM')
+
+/** El mensaje que recibe el comprador de un envío. */
+export function mensajeEnvio(plantilla: string, bloque: string, pagina: string, guia: string, carrier: string) {
+  const m = rellenar(conTransportista(plantilla), conTransportista(bloque), pagina, guia)
+  return carrier === 'TEALCA' ? paraTealca(m) : m
+}
+
+/** Sin cuentas escritas a mano = la cuenta de cada envío sale de su VENTA (la cuenta de ML conectada
+ *  que la tiene). Las cuentas con remitente quedan para quien ya las tenía configuradas (programa de
+ *  escritorio, cuentas sin conectar a la API). */
+export const cuentaPorVenta = (c: ConfigReportador) => c.cuentas.length === 0
+
+/** SQL (alias `e` = despacho_etiquetas): la cuenta de ML (nickname) de la venta de la etiqueta, según
+ *  las ventas sincronizadas de las cuentas conectadas. NULL si no se encuentra. */
+export const SQL_CUENTA_VENTA = `(
+  SELECT x.nickname FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id
+  WHERE o.id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)
+     OR o.pack_id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)
+  ORDER BY (o.id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)) DESC LIMIT 1)`
+
+/** Mensajes listos para quien todavía no configuró los suyos (se revisan antes de usarlos). */
+export const plantillasSugeridas = (tienda: string): Pick<ConfigReportador, 'plantillas' | 'bloque'> => ({
+  plantillas: [
+    '¡Hola! Tu pedido ya va en camino. Tu número de guía {transportista} es {guia}.',
+    'Buen día, tu paquete fue entregado a {transportista} con la guía {guia}. Cualquier duda, aquí estamos para ayudarte.',
+  ],
+  bloque: ` ¡Gracias por comprar en ${tienda}!`,
+})
+
+/** Avisos que NO impiden guardar: un transportista escrito a mano dice lo mismo en ZOOM y en TEALCA. */
+export function avisosConfig(c: Pick<ConfigReportador, 'plantillas' | 'bloque'>): string[] {
+  const a: string[] = []
+  c.plantillas.forEach((t, i) => {
+    if (/tealca/i.test(t)) a.push(`La plantilla ${i + 1} dice TEALCA: los compradores de ZOOM también leerían TEALCA. Usa {transportista} y el sistema pone el correcto.`)
+  })
+  if (/tealca/i.test(c.bloque)) a.push('El texto final dice TEALCA: también lo leerían los compradores de ZOOM. Usa {transportista}.')
+  return a
+}
+
 /** Problemas de la config (vacío = OK). Mismo criterio que validar_plantillas() del
  *  script: el peor caso (página más larga + guía de 12 dígitos) no pasa de 350. */
 export function problemasConfig(c: ConfigReportador): string[] {
   const p: string[] = []
-  if (c.cuentas.length === 0) p.push('Falta al menos una cuenta de MercadoLibre')
+  // Sin cuentas: cada envío sale desde la cuenta de su venta (cuentaPorVenta), no hace falta configurarlas.
   if (c.plantillas.length === 0) p.push('Falta al menos una plantilla de mensaje')
   c.plantillas.forEach((t, i) => {
     if (!t.includes('{guia}')) p.push(`La plantilla ${i + 1} no tiene {guia}`)
@@ -127,8 +170,8 @@ export function problemasConfig(c: ConfigReportador): string[] {
   const paginaLarga = c.cuentas.reduce((a, x) => (x.pagina.length > a.length ? x.pagina : a), '')
   c.plantillas.forEach((t, i) => {
     // El peor caso incluye la versión Tealca (TEALCA tiene 2 letras más que ZOOM).
-    const armado = rellenar(t, c.bloque, paginaLarga, '9'.repeat(12))
-    const largo = Math.max(armado.length, paraTealca(armado).length)
+    const largo = Math.max(mensajeEnvio(t, c.bloque, paginaLarga, '9'.repeat(12), 'ZOOM').length,
+                           mensajeEnvio(t, c.bloque, paginaLarga, '9'.repeat(12), 'TEALCA').length)
     if (largo > LIMITE_CARACTERES) {
       p.push(`La plantilla ${i + 1} llega a ${largo} caracteres (máximo ${LIMITE_CARACTERES}): MercadoLibre la cortaría`)
     }

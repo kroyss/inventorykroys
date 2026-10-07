@@ -144,12 +144,13 @@ async function base(db: Pool): Promise<Cuentas> {
     ['despacho_remitente', D.cuentas[0].remitente],
     ['preguntas_politicas', POLITICAS],
     ['preguntas_plantillas', JSON.stringify(PLANTILLAS)],
-    ['reportador_cuentas', JSON.stringify(D.cuentas.map(c => ({ nombre: c.nickname, filtro: c.remitente, pagina: c.pagina })))],
+    // Reportador sin cuentas escritas a mano: cada envío sale desde la cuenta de su venta (como un Fundador).
+    ['reportador_cuentas', '[]'],
     ['reportador_plantillas', JSON.stringify([
-      '¡Hola! Tu pedido ya va en camino 🚚 Tu número de guía es {guia}. ¡Gracias por tu compra!',
-      'Buen día, tu paquete fue entregado al transportista con la guía {guia}. Cualquier duda, aquí estamos.',
+      '¡Hola! Tu pedido ya va en camino. Tu número de guía {transportista} es {guia}.',
+      'Buen día, tu paquete fue entregado a {transportista} con la guía {guia}. Cualquier duda, aquí estamos para ayudarte.',
     ])],
-    ['reportador_bloque', ' Más productos en {pagina}'],
+    ['reportador_bloque', ` ¡Gracias por comprar en ${D.tienda}!`],
   ]
   for (const [k, v] of ajustes) {
     await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [k, v])

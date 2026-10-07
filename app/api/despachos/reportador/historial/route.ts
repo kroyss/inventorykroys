@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { reportadorForbidden, remitenteConfigurado } from '@/lib/despachos'
-import { cuentaDe, leerConfig } from '@/lib/reportador'
+import { cuentaDe, cuentaPorVenta, leerConfig, SQL_CUENTA_VENTA } from '@/lib/reportador'
 
 const COLUMNAS = `
   e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, e.destinatario,
   e.reimpresion, e.reporte_estado, e.reporte_detalle, e.reporte_intentos, e.reportado_at,
-  e.reporte_mensaje, j.id AS jornada_id, j.closed_at`
+  e.reporte_mensaje, j.id AS jornada_id, j.closed_at, ${SQL_CUENTA_VENTA} AS cuenta_venta`
 const DESDE = `
   FROM despacho_etiquetas e
   JOIN despacho_lotes l    ON l.id = e.lote_id
@@ -53,7 +53,10 @@ export async function GET(req: NextRequest) {
         : { rows: [] }
 
     const [config, remitenteDefault] = await Promise.all([leerConfig(db), remitenteConfigurado(db)])
-    const envios = rows.map(r => ({ ...r, cuenta: cuentaDe(r.remitente, config.cuentas, remitenteDefault)?.nombre ?? null }))
+    const porVenta = cuentaPorVenta(config)
+    const envios = rows.map(({ cuenta_venta, ...r }) => ({
+      ...r, cuenta: (porVenta ? cuenta_venta : cuentaDe(r.remitente, config.cuentas, remitenteDefault)?.nombre) ?? null,
+    }))
     return NextResponse.json({ meses, mes, envios })
   } catch (err) {
     return apiError(err)

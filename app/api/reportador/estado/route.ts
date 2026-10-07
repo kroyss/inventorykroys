@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { autenticarEquipo, cuentaDe, leerConfig, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
+import { autenticarEquipo, cuentaDe, cuentaPorVenta, leerConfig, SQL_CUENTA_VENTA, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { remitenteConfigurado } from '@/lib/despachos'
 
 /** GET /api/reportador/estado — pendientes por cuenta (para mostrar antes de reportar) */
@@ -13,17 +13,18 @@ export async function GET(req: NextRequest) {
     const remitenteDefault = await remitenteConfigurado(db)
 
     const { rows } = await db.query(
-      `SELECT e.remitente, e.reporte_estado
+      `SELECT e.remitente, ${SQL_CUENTA_VENTA} AS cuenta_venta, e.reporte_estado
        FROM despacho_etiquetas e
        JOIN despacho_lotes l     ON l.id = e.lote_id
        JOIN despacho_jornadas j  ON j.id = l.jornada_id
        WHERE ${SQL_REPORTABLE} AND ${SQL_PENDIENTE}`)
 
+    const porVenta = cuentaPorVenta(config)
     const pendientes: Record<string, number> = Object.fromEntries(config.cuentas.map(c => [c.nombre, 0]))
     let sinCuenta = 0, reintentos = 0
     for (const r of rows) {
-      const c = cuentaDe(r.remitente, config.cuentas, remitenteDefault)
-      if (c) pendientes[c.nombre]++
+      const nombre = porVenta ? r.cuenta_venta as string | null : cuentaDe(r.remitente, config.cuentas, remitenteDefault)?.nombre
+      if (nombre) pendientes[nombre] = (pendientes[nombre] ?? 0) + 1
       else sinCuenta++
       if (r.reporte_estado) reintentos++
     }

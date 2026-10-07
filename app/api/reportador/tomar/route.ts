@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { remitenteConfigurado } from '@/lib/despachos'
 import {
-  autenticarEquipo, leerConfig, RESERVA_HORAS, SQL_PENDIENTE, SQL_REPORTABLE,
+  autenticarEquipo, cuentaPorVenta, leerConfig, RESERVA_HORAS, SQL_CUENTA_VENTA, SQL_PENDIENTE, SQL_REPORTABLE,
 } from '@/lib/reportador'
 
 const Schema = z.object({ cuenta: z.string().min(1) })
@@ -20,8 +20,17 @@ export async function POST(req: NextRequest) {
     const { db, equipo } = auth
     const { cuenta: nombre } = Schema.parse(await req.json())
 
-    const cuenta = (await leerConfig(db)).cuentas.find(c => c.nombre === nombre)
+    const config = await leerConfig(db)
+    // Sin cuentas configuradas, la cuenta es una conectada a ML y sus envíos son los de SUS ventas.
+    const porVenta = cuentaPorVenta(config)
+    const cuenta = porVenta
+      ? ((await db.query(`SELECT 1 FROM ml_conexiones WHERE nickname = $1 AND estado = 'activa'`, [nombre])).rows.length
+          ? { nombre, filtro: '', pagina: '' } : undefined)
+      : config.cuentas.find(c => c.nombre === nombre)
     if (!cuenta) return NextResponse.json({ error: `La cuenta ${nombre} no está configurada` }, { status: 400 })
+    const deLaCuenta = porVenta
+      ? `${SQL_CUENTA_VENTA} = $3 AND $2::text IS NOT NULL`
+      : `starts_with(UPPER(COALESCE(NULLIF(TRIM(e.remitente), ''), $2)), UPPER(TRIM($3)))`
 
     const { rows } = await db.query(
       `UPDATE despacho_etiquetas t
@@ -32,7 +41,7 @@ export async function POST(req: NextRequest) {
          JOIN despacho_lotes l    ON l.id = e.lote_id
          JOIN despacho_jornadas j ON j.id = l.jornada_id
          WHERE ${SQL_REPORTABLE} AND ${SQL_PENDIENTE}
-           AND starts_with(UPPER(COALESCE(NULLIF(TRIM(e.remitente), ''), $2)), UPPER(TRIM($3)))
+           AND ${deLaCuenta}
            AND (e.reporte_tomado_at IS NULL
                 OR e.reporte_tomado_por = $1
                 OR e.reporte_tomado_at < NOW() - make_interval(hours => $4))
@@ -42,7 +51,7 @@ export async function POST(req: NextRequest) {
        RETURNING t.id AS etiqueta_id, t.venta AS order_id, COALESCE(t.guia_final, t.guia) AS guia, t.carrier,
                  t.reporte_estado AS estado_previo,
                  s.closed_at, s.generated_at, s.original_name`,
-      [equipo.id, await remitenteConfigurado(db), cuenta.filtro, RESERVA_HORAS])
+      [equipo.id, await remitenteConfigurado(db), porVenta ? cuenta.nombre : cuenta.filtro, RESERVA_HORAS])
 
     // Orden de la jornada: lo más viejo primero, como la cola del CSV.
     rows.sort((a, b) =>

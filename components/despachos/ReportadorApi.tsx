@@ -82,6 +82,8 @@ export default function ReportadorApi() {
 
   if (!estado) return error ? <p className="text-sm text-red-600">{error}</p> : null
   const conectadas = estado.conexiones.filter(c => c.estado === 'activa').map(c => c.nickname)
+  // Todavía sin mensajes: se revisan abajo (Mensaje al comprador) antes del primer reporte.
+  const sinMensajes = estado.problemas.some(p => p.startsWith('Falta al menos una plantilla'))
   const c = estado.corrida
   const hechos = c?.procesados ?? []
   const cuenta = (r: Procesado['resultado']) => hechos.filter(h => h.resultado === r).length
@@ -100,7 +102,7 @@ export default function ReportadorApi() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => correr(true)} disabled={ocupado || estado.total === 0} className="btn-secondary text-sm">
+          <button onClick={() => correr(true)} disabled={ocupado || estado.total === 0 || sinMensajes} className="btn-secondary text-sm">
             {corriendo && c?.simular ? 'Revisando…' : 'Vista previa'}
           </button>
           {!estado.soloSimula && (
@@ -131,7 +133,12 @@ export default function ReportadorApi() {
           En esta copia de pruebas solo hay vista previa: los despachos son una copia de producción y los compradores son reales, así que no se envía nada.
         </p>
       )}
-      {estado.problemas.length > 0 && (
+      {sinMensajes ? (
+        <p className="text-xs bg-sky-50 border border-sky-200 text-sky-800 rounded-lg px-3 py-2">
+          Antes de reportar, revisa el mensaje que recibirá tu comprador: está más abajo, en <b>Mensaje al comprador</b>
+          (te dejamos uno listo para que lo uses o lo cambies).
+        </p>
+      ) : estado.problemas.length > 0 && (
         <p className="text-xs text-red-600">Configuración de mensajes incompleta: {estado.problemas.join(' · ')}</p>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}

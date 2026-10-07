@@ -15,7 +15,10 @@ interface Equipo {
   version: string | null; codigo: string | null; codigo_expira: string | null
   en_linea: boolean; auto_reportar: boolean; actividad: string | null; orden: Orden | null
 }
-interface Estado { equipos: Equipo[]; config: Config; pendientes: number; problemas: string[]; limite: number }
+interface Estado {
+  equipos: Equipo[]; config: Config; pendientes: number; problemas: string[]; avisos: string[]; limite: number
+  porVenta: boolean; conectadas: string[]; sugeridas: Pick<Config, 'plantillas' | 'bloque'>
+}
 
 const activa = (o: Orden | null) => !!o && (o.estado === 'PENDIENTE' || o.estado === 'EN_CURSO')
 
@@ -27,9 +30,32 @@ const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
 const paraTealca = (t: string) =>
   t.replace(/zoom/gi, m => (m === m.toUpperCase() ? 'TEALCA' : m[0] === m[0].toUpperCase() ? 'Tealca' : 'tealca'))
 
-// Igual que lib/reportador.ts rellenar(): peor caso = página más larga + guía de 12 dígitos.
+// Igual que lib/reportador.ts rellenar() y mensajeEnvio(): {transportista} → ZOOM, y en Tealca ZOOM → TEALCA.
 const rellenar = (t: string, bloque: string, pagina: string, guia: string) =>
   (t + bloque).split('{pagina}').join(pagina).split('{guia}').join(guia)
+const conTransportista = (t: string) => t.split('{transportista}').join('ZOOM')
+const mensajeEnvio = (t: string, bloque: string, pagina: string, guia: string, carrier: 'ZOOM' | 'TEALCA') => {
+  const m = rellenar(conTransportista(t), conTransportista(bloque), pagina, guia)
+  return carrier === 'TEALCA' ? paraTealca(m) : m
+}
+// Guías de ejemplo para la vista previa.
+const GUIA_ZOOM = '1711920037', GUIA_TEALCA = '41234567'
+
+/** Cómo le llega el mensaje al comprador, por ZOOM y por TEALCA. */
+function VistaPrevia({ plantilla, bloque, pagina }: { plantilla: string; bloque: string; pagina: string }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {(['ZOOM', 'TEALCA'] as const).map(c => (
+        <div key={c}>
+          <p className="text-[11px] font-medium text-neutral-500 mb-0.5">Envío por {c}</p>
+          <pre className="text-xs bg-white border border-neutral-200 rounded p-2 whitespace-pre-wrap font-sans">
+            {mensajeEnvio(plantilla, bloque, pagina, c === 'ZOOM' ? GUIA_ZOOM : GUIA_TEALCA, c)}
+          </pre>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 /** Mensajes y cuentas del Reportador + programa de escritorio (respaldo de la API). */
 export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
@@ -95,11 +121,11 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
     cargar()
   }
 
-  const guardar = async () => {
-    if (!editando) return
+  const guardar = async (config: Config | null = editando) => {
+    if (!config) return
     setGuardando(true); setError(null)
     const r = await fetch('/api/despachos/reportador', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editando),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config),
     })
     setGuardando(false)
     if (!r.ok) { setError((await r.json().catch(() => ({}))).error ?? 'Error'); return }
@@ -108,7 +134,9 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
   }
 
   if (!estado) return null
-  const { equipos, config, pendientes, problemas, limite } = estado
+  const { equipos, config, pendientes, problemas, avisos, limite, porVenta, conectadas, sugeridas } = estado
+  // Todavía sin mensajes: se le proponen unos listos para que los revise antes del primer reporte.
+  const sinMensajes = config.plantillas.length === 0
   const vinculados = equipos.filter(e => e.vinculado_at)
   const codigos    = equipos.filter(e => !e.vinculado_at && e.codigo)
 
@@ -120,24 +148,62 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold text-neutral-800">Mensajes y cuentas</h2>
+            <h2 className="text-sm font-semibold text-neutral-800">Mensaje al comprador</h2>
             <p className="text-xs text-neutral-500">
-              {config.plantillas.length} plantilla(s) que se eligen al azar · cuentas: {config.cuentas.map(c => c.nombre).join(', ') || 'ninguna'}.
-              {' '}Las usan el reporte por API y el programa de escritorio.
+              {config.plantillas.length} plantilla(s) que se eligen al azar ·{' '}
+              {porVenta
+                ? <>cada mensaje sale desde la cuenta de MercadoLibre de su venta{conectadas.length ? ` (${conectadas.join(', ')})` : ''}.</>
+                : <>cuentas: {config.cuentas.map(c => c.nombre).join(', ')}.</>}
+              {' '}Lo usan el reporte por API y el programa de escritorio.
             </p>
           </div>
-          {isAdmin && !editando && (
-            <button onClick={() => setEditando(structuredClone(config))} className="btn-secondary text-xs">Editar mensajes y cuentas</button>
+          {isAdmin && !editando && !sinMensajes && (
+            <button onClick={() => setEditando(structuredClone(config))} className="btn-secondary text-xs">Editar mensajes</button>
           )}
         </div>
-        {problemas.length > 0 && !editando && (
+        {sinMensajes && !editando && (
+          <div className="mx-4 mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-sky-900">Antes de tu primer reporte: revisa el mensaje que recibirá tu comprador</p>
+              <p className="text-xs text-sky-800 mt-0.5">
+                Te dejamos estos mensajes listos. Se elige uno al azar para cada comprador y el sistema pone su guía y el transportista
+                (ZOOM o TEALCA) solo. Puedes usarlos así o cambiarlos.
+              </p>
+            </div>
+            <ul className="text-xs text-neutral-700 space-y-1 list-disc pl-5">
+              {sugeridas.plantillas.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+            <div>
+              <p className="text-xs font-medium text-sky-900 mb-1">Así le llega a tu comprador:</p>
+              <VistaPrevia plantilla={sugeridas.plantillas[0]} bloque={sugeridas.bloque} pagina="" />
+            </div>
+            {isAdmin ? (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => guardar({ ...config, ...sugeridas })} disabled={guardando} className="btn-primary text-sm">
+                  {guardando ? 'Guardando…' : 'Usar estos mensajes'}
+                </button>
+                <button onClick={() => setEditando({ ...structuredClone(config), ...structuredClone(sugeridas) })} className="btn-secondary text-sm">
+                  Cambiarlos
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-sky-800">Pídele al administrador de tu empresa que los revise y los guarde.</p>
+            )}
+          </div>
+        )}
+        {avisos.length > 0 && !editando && (
+          <div className="mx-4 mb-3 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
+            {avisos.map((a, i) => <p key={i}>{a}</p>)}
+          </div>
+        )}
+        {problemas.length > 0 && !editando && !sinMensajes && (
           <div className="mx-4 mb-3 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
             Configuración incompleta: {problemas.join(' · ')}
           </div>
         )}
         {editando && (
-          <EditorConfig config={editando} limite={limite} onChange={setEditando}
-            onGuardar={guardar} onCancelar={() => { setEditando(null); setError(null) }} guardando={guardando} />
+          <EditorConfig config={editando} limite={limite} onChange={setEditando} conectadas={conectadas}
+            onGuardar={() => guardar()} onCancelar={() => { setEditando(null); setError(null) }} guardando={guardando} />
         )}
       </section>
 
@@ -257,8 +323,8 @@ function FilaEquipo({ e, isAdmin, pendientes, configOk, onReportar, onDetener, o
   )
 }
 
-function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardando }: {
-  config: Config; limite: number; onChange: (c: Config) => void
+function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCancelar, guardando }: {
+  config: Config; limite: number; conectadas: string[]; onChange: (c: Config) => void
   onGuardar: () => void; onCancelar: () => void; guardando: boolean
 }) {
   const setCuenta = (i: number, k: keyof Cuenta, v: string) =>
@@ -268,13 +334,7 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
   const paginaLarga = config.cuentas.reduce((a, c) => (c.pagina.length > a.length ? c.pagina : a), '')
   const input = 'border border-neutral-300 rounded px-2 py-1 text-sm w-full'
 
-  return (
-    <div className="border-t border-neutral-100 px-4 py-4 space-y-4 bg-neutral-50/50">
-      <div>
-        <h3 className="text-xs font-semibold text-neutral-600 mb-1">Cuentas de MercadoLibre</h3>
-        <p className="text-xs text-neutral-500 mb-2">
-          Cada envío va a la cuenta cuyo <b>remitente</b> (en la etiqueta) empieza con el texto indicado.
-        </p>
+  const cuentasEditor = (
         <div className="space-y-2">
           {config.cuentas.map((c, i) => (
             <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_2fr_auto] gap-2 items-center">
@@ -290,21 +350,53 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
               className="text-xs text-neutral-600 underline">+ Agregar cuenta</button>
           )}
         </div>
-      </div>
+  )
+
+  return (
+    <div className="border-t border-neutral-100 px-4 py-4 space-y-4 bg-neutral-50/50">
+      {config.cuentas.length > 0 ? (
+        <div>
+          <h3 className="text-xs font-semibold text-neutral-600 mb-1">Cuentas por remitente</h3>
+          <p className="text-xs text-neutral-500 mb-2">
+            Cada envío va a la cuenta cuyo <b>remitente</b> (en la etiqueta) empieza con el texto indicado. Si quitas todas, cada envío
+            sale desde la cuenta de MercadoLibre de su venta{conectadas.length ? ` (${conectadas.join(', ')})` : ''}.
+          </p>
+          {cuentasEditor}
+        </div>
+      ) : (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-neutral-500">
+            Cuentas: cada envío sale desde la cuenta de MercadoLibre de su venta{conectadas.length ? ` (${conectadas.join(', ')})` : ''}. <u>Avanzado</u>
+          </summary>
+          <p className="text-neutral-500 my-2">
+            Solo si usas el programa de escritorio con cuentas que <b>no</b> están conectadas al sistema: la cuenta se reconoce por el
+            comienzo del remitente de la etiqueta. Si no es tu caso, déjalo vacío.
+          </p>
+          {cuentasEditor}
+        </details>
+      )}
 
       <div>
         <h3 className="text-xs font-semibold text-neutral-600 mb-1">Plantillas del mensaje</h3>
-        <p className="text-[11px] text-neutral-500 mb-1">Para los envíos Tealca se usa el mismo mensaje cambiando la palabra ZOOM por TEALCA.</p>
         <p className="text-xs text-neutral-500 mb-2">
-          Se elige una al azar por comprador. <code>{'{guia}'}</code> se reemplaza por la guía y <code>{'{pagina}'}</code> por la página de la cuenta.
-          MercadoLibre corta en {limite} caracteres sin avisar.
+          Se elige una al azar por comprador. <code>{'{guia}'}</code> se cambia por la guía y <code>{'{transportista}'}</code> por
+          ZOOM o TEALCA según el envío (no escribas el transportista a mano: un mensaje que dice TEALCA también le llegaría así a los
+          de ZOOM).{config.cuentas.length > 0 && <> <code>{'{pagina}'}</code> se cambia por la página de la cuenta.</>}
+          {' '}MercadoLibre corta en {limite} caracteres sin avisar.
         </p>
         <div className="space-y-2">
           {config.plantillas.map((p, i) => {
-            const armado = rellenar(p, config.bloque, paginaLarga, '9'.repeat(12))
-            const largo = Math.max(armado.length, paraTealca(armado).length)
+            const largo = Math.max(mensajeEnvio(p, config.bloque, paginaLarga, '9'.repeat(12), 'ZOOM').length,
+                                   mensajeEnvio(p, config.bloque, paginaLarga, '9'.repeat(12), 'TEALCA').length)
             return (
-              <div key={i} className="flex gap-2 items-start">
+              <div key={i}>
+              {/tealca/i.test(p) && (
+                <p className="text-[11px] text-amber-700 mb-0.5">
+                  Dice TEALCA: los compradores de ZOOM también leerían TEALCA. Cámbialo por {'{transportista}'}.
+                </p>
+              )}
+              {!p.includes('{guia}') && <p className="text-[11px] text-red-700 mb-0.5">Le falta {'{guia}'}: el comprador no recibiría su guía.</p>}
+              <div className="flex gap-2 items-start">
                 <textarea className={`${input} min-h-[2.5rem]`} rows={1} value={p} onChange={e => setPlantilla(i, e.target.value)} />
                 <span className={`text-xs whitespace-nowrap pt-1 ${largo > limite ? 'text-red-700 font-semibold' : 'text-neutral-500'}`}>
                   {largo}/{limite}
@@ -312,10 +404,11 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
                 <button onClick={() => onChange({ ...config, plantillas: config.plantillas.filter((_, j) => j !== i) })}
                   className="text-xs text-neutral-400 hover:text-red-600 pt-1">Quitar</button>
               </div>
+              </div>
             )
           })}
           {config.plantillas.length < 10 && (
-            <button onClick={() => onChange({ ...config, plantillas: [...config.plantillas, 'Buen día, su pedido fue despachado. Guía ZOOM: {guia}'] })}
+            <button onClick={() => onChange({ ...config, plantillas: [...config.plantillas, 'Buen día, su pedido fue despachado. Guía {transportista}: {guia}'] })}
               className="text-xs text-neutral-600 underline">+ Agregar plantilla</button>
           )}
         </div>
@@ -323,6 +416,7 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
 
       <div>
         <h3 className="text-xs font-semibold text-neutral-600 mb-1">Texto final (se agrega a todas las plantillas)</h3>
+        <p className="text-xs text-neutral-500 mb-1">Opcional. Por ejemplo, el nombre de tu tienda: «Gracias por comprar en MI TIENDA.» (empieza con un espacio).</p>
         <textarea className={input} rows={5} value={config.bloque} onChange={e => onChange({ ...config, bloque: e.target.value })} />
         <p className="text-xs text-neutral-500 mt-1">
           Ojo: MercadoLibre rechaza links de Facebook (incluso acortados). t.me y youtube.com sí pasan.
@@ -331,10 +425,8 @@ function EditorConfig({ config, limite, onChange, onGuardar, onCancelar, guardan
 
       {config.plantillas[0] && (
         <div>
-          <h3 className="text-xs font-semibold text-neutral-600 mb-1">Vista previa</h3>
-          <pre className="text-xs bg-white border border-neutral-200 rounded p-2 whitespace-pre-wrap font-sans">
-            {rellenar(config.plantillas[0], config.bloque, config.cuentas[0]?.pagina ?? '', '1701822939')}
-          </pre>
+          <h3 className="text-xs font-semibold text-neutral-600 mb-1">Vista previa (plantilla 1)</h3>
+          <VistaPrevia plantilla={config.plantillas[0]} bloque={config.bloque} pagina={config.cuentas[0]?.pagina ?? ''} />
         </div>
       )}
 

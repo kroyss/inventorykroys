@@ -4,7 +4,8 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { reportadorForbidden } from '@/lib/despachos'
 import {
-  EN_LINEA_SEGUNDOS, leerConfig, LIMITE_CARACTERES, problemasConfig, SQL_PENDIENTE, SQL_REPORTABLE,
+  avisosConfig, cuentaPorVenta, EN_LINEA_SEGUNDOS, leerConfig, LIMITE_CARACTERES, plantillasSugeridas, problemasConfig,
+  SQL_PENDIENTE, SQL_REPORTABLE,
 } from '@/lib/reportador'
 
 /** GET /api/despachos/reportador — equipos vinculados (en línea, qué hacen, última orden),
@@ -44,7 +45,14 @@ export async function GET() {
          JOIN despacho_jornadas j ON j.id = l.jornada_id
          WHERE ${SQL_REPORTABLE} AND ${SQL_PENDIENTE}`),
     ])
-    return NextResponse.json({ equipos, config, pendientes, problemas: problemasConfig(config), limite: LIMITE_CARACTERES })
+    const { rows: conectadas } = await db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
+    return NextResponse.json({
+      equipos, config, pendientes, problemas: problemasConfig(config), avisos: avisosConfig(config), limite: LIMITE_CARACTERES,
+      // Sin cuentas configuradas, cada envío sale desde la cuenta de su venta (estas son las conectadas).
+      porVenta: cuentaPorVenta(config), conectadas: conectadas.map(c => c.nickname as string),
+      // Mensajes listos para quien todavía no tiene: los revisa y los guarda antes del primer reporte.
+      sugeridas: plantillasSugeridas(session.user.empresaNombre ?? 'nuestra tienda'),
+    })
   } catch (err) {
     return apiError(err)
   }
@@ -55,7 +63,7 @@ const Schema = z.object({
     nombre: z.string().trim().min(1).max(40),
     filtro: z.string().trim().min(2).max(40),
     pagina: z.string().trim().max(200),
-  })).min(1).max(5),
+  })).max(5),   // vacío = la cuenta de cada envío sale de su venta (lib/reportador.ts cuentaPorVenta)
   plantillas: z.array(z.string().trim().min(1).max(LIMITE_CARACTERES)).min(1).max(10),
   bloque: z.string().max(LIMITE_CARACTERES),
 })

@@ -12,7 +12,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, CuentaDesconectada } from '@/lib/ml'
 import { buscarOrden, mensajesDeOrden, type MensajeML } from '@/lib/ventasML'
-import { cuentaDe, leerConfig, paraTealca, problemasConfig, rellenar, RESERVA_HORAS, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
+import { cuentaDe, cuentaPorVenta, leerConfig, mensajeEnvio, problemasConfig, RESERVA_HORAS, SQL_CUENTA_VENTA, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { remitenteConfigurado } from '@/lib/despachos'
 import { ES_STAGING } from '@/lib/entorno'
 import { esDemo } from '@/lib/demo'
@@ -41,18 +41,20 @@ export async function pendientesApi(db: Pool) {
   const config = await leerConfig(db)
   const remitenteDefault = await remitenteConfigurado(db)
   const { rows } = await db.query(
-    `SELECT e.remitente, (e.reporte_tomado_por IS NOT NULL
+    `SELECT e.remitente, ${SQL_CUENTA_VENTA} AS cuenta_venta, (e.reporte_tomado_por IS NOT NULL
                           AND e.reporte_tomado_at > NOW() - make_interval(hours => $1)) AS en_equipo
      FROM despacho_etiquetas e
      JOIN despacho_lotes l ON l.id = e.lote_id
      JOIN despacho_jornadas j ON j.id = l.jornada_id
      WHERE ${SQL_REPORTABLE} AND ${SQL_PENDIENTE}`, [RESERVA_HORAS])
-  const porCuenta: Record<string, number> = Object.fromEntries(config.cuentas.map(c => [c.nombre, 0]))
+  // Por cuenta: la de la venta (sin cuentas configuradas) o la del remitente (configuración vieja).
+  const porVenta = cuentaPorVenta(config)
+  const porCuenta: Record<string, number> = porVenta ? {} : Object.fromEntries(config.cuentas.map(c => [c.nombre, 0]))
   let enEquipo = 0
   for (const r of rows) {
     if (r.en_equipo) { enEquipo++; continue }
-    const c = cuentaDe(r.remitente, config.cuentas, remitenteDefault)
-    porCuenta[c?.nombre ?? 'Sin cuenta'] = (porCuenta[c?.nombre ?? 'Sin cuenta'] ?? 0) + 1
+    const nombre = (porVenta ? r.cuenta_venta : cuentaDe(r.remitente, config.cuentas, remitenteDefault)?.nombre) ?? 'Sin cuenta'
+    porCuenta[nombre] = (porCuenta[nombre] ?? 0) + 1
   }
   return { porCuenta, enEquipo, total: rows.length - enEquipo, problemas: problemasConfig(config) }
 }
@@ -71,7 +73,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   const demo = await esDemo(db)
 
   const baseSql = `
-    SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente
+    SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, ${SQL_CUENTA_VENTA} AS cuenta_venta
     FROM despacho_etiquetas e
     JOIN despacho_lotes l ON l.id = e.lote_id
     JOIN despacho_jornadas j ON j.id = l.jornada_id
@@ -88,13 +90,17 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         `UPDATE despacho_etiquetas t SET reporte_tomado_por = NULL, reporte_tomado_at = NOW()
          FROM (${baseSql} FOR UPDATE OF e SKIP LOCKED) s
          WHERE t.id = s.id
-         RETURNING t.id, s.venta, s.guia, s.carrier, s.remitente`,
+         RETURNING t.id, s.venta, s.guia, s.carrier, s.remitente, s.cuenta_venta`,
         [opciones.limite, RESERVA_HORAS, excluir])
 
   const procesados: EnvioProcesado[] = []
+  const porVenta = cuentaPorVenta(config)
+  const elegirPlantilla = () => config.plantillas[Math.floor(Math.random() * config.plantillas.length)]
   for (const e of rows) {
-    const cuenta = cuentaDe(e.remitente, config.cuentas, remitenteDefault)
-    const base = { venta: String(e.venta), guia: String(e.guia), carrier: String(e.carrier), cuenta: cuenta?.nombre ?? null }
+    // Sin cuentas configuradas, la cuenta es la de la venta (la confirma buscarOrden al enviar).
+    const cuenta = porVenta ? null : cuentaDe(e.remitente, config.cuentas, remitenteDefault)
+    const base = { venta: String(e.venta), guia: String(e.guia), carrier: String(e.carrier),
+                   cuenta: cuenta?.nombre ?? (e.cuenta_venta as string | null) ?? null }
     const cerrar = async (estado: 'ENVIADO' | 'SIN_CHAT' | 'RECHAZADO' | 'ERROR', detalle: string | null, texto: string | null = null) => {
       if (simular) return
       const final = estado === 'ENVIADO' || estado === 'SIN_CHAT'
@@ -111,17 +117,16 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       if (!simular) await db.query(`UPDATE despacho_etiquetas SET reporte_tomado_at = NULL WHERE id = $1`, [e.id])
     }
 
-    if (!cuenta) {
+    if (!porVenta && !cuenta) {
       await soltar()
       procesados.push({ ...base, resultado: 'ERROR', detalle: 'El remitente no coincide con ninguna cuenta del Reportador', mensaje: null })
       continue
     }
     // Modo demostración (lib/demo.ts): queda como enviado, sin escribirle a nadie en MercadoLibre.
     if (demo) {
-      let mensaje = rellenar(config.plantillas[Math.floor(Math.random() * config.plantillas.length)], config.bloque, cuenta.pagina, base.guia)
-      if (base.carrier === 'TEALCA') mensaje = paraTealca(mensaje)
+      const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, cuenta?.pagina ?? '', base.guia, base.carrier)
       await cerrar('ENVIADO', 'demostración: no se envió a MercadoLibre', mensaje)
-      procesados.push({ ...base, resultado: simular ? 'SIMULADO' : 'ENVIADO', detalle: `Desde ${cuenta.nombre}`, mensaje })
+      procesados.push({ ...base, resultado: simular ? 'SIMULADO' : 'ENVIADO', detalle: `Desde ${base.cuenta ?? 'la cuenta de la venta'}`, mensaje })
       await pausa(600)
       continue
     }
@@ -132,8 +137,8 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         procesados.push({ ...base, resultado: 'SIN_CONEXION', detalle: 'La cuenta de esta venta no está conectada a la API', mensaje: null })
         continue
       }
-      let mensaje = rellenar(config.plantillas[Math.floor(Math.random() * config.plantillas.length)], config.bloque, cuenta.pagina, base.guia)
-      if (base.carrier === 'TEALCA') mensaje = paraTealca(mensaje)
+      base.cuenta ??= orden.cuenta
+      const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, cuenta?.pagina ?? '', base.guia, base.carrier)
 
       const antes = await mensajesDeOrden(db, orden.conexionId, orden.orden)
       const previo = antes.find(m => esReporteNuestro(m, base.guia))
