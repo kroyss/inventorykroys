@@ -163,6 +163,7 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
   const datosVenta = {
     comprador: primerNombre(comprador?.nombre ?? c.comprador_nombre, comprador?.nick ?? c.comprador_nick),
     producto: items?.length ? items.map(it => it.titulo).join(' y ') : c.productos,
+    tienda: c.cuenta,
     guia: envio?.guia, transportista: envio?.transportista,
   }
   const problemas = texto.trim() ? problemasDelTexto(texto, 'mensaje') : []
@@ -325,7 +326,18 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
   const cambiar = (i: number, c: Partial<MensajeRapido>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
   // Largo con datos típicos (nombre, producto y guía de largo normal): ML corta en 350.
-  const largo = (t: string) => llenarMensaje(t, { comprador: 'Mariana', producto: 'x'.repeat(40), guia: '1234567890', transportista: 'TEALCA' }).texto.length
+  const largo = (t: string) => llenarMensaje(t, { comprador: 'Mariana', producto: 'x'.repeat(40), tienda: 'x'.repeat(15), guia: '1234567890', transportista: 'TEALCA' }).texto.length
+  // Variables con un clic: se insertan donde está el cursor del texto que se está escribiendo.
+  const cajas = useRef<(HTMLTextAreaElement | null)[]>([])
+  const insertar = (i: number, v: string) => {
+    const el = cajas.current[i]
+    const t = lista[i].texto
+    const desde = el?.selectionStart ?? t.length, hasta = el?.selectionEnd ?? t.length
+    const antes = t.slice(0, desde), despues = t.slice(hasta)
+    const sep = antes && !/\s$/.test(antes) ? ' ' : ''
+    cambiar(i, { texto: antes + sep + v + despues })
+    requestAnimationFrame(() => { if (el) { el.focus(); const p = desde + sep.length + v.length; el.setSelectionRange(p, p) } })
+  }
 
   const guardar = async () => {
     const limpias = lista.map(p => ({ titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
@@ -353,7 +365,7 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
         <button onClick={() => setLista(l => [...l, { titulo: '', texto: '' }])} className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
       </div>
       <p className="text-xs text-neutral-600 bg-neutral-50 rounded-lg px-3 py-2">
-        Variables que se llenan solas:{' '}
+        Variables que se llenan solas con los datos de cada venta (debajo de cada texto, un clic las pone donde está el cursor):{' '}
         {VARIABLES_MENSAJE.map((x, i) => <span key={x.v}>{i > 0 && ' · '}<code className="text-neutral-900">{x.v}</code> {x.que}</span>)}.
         {' '}Si la venta no tiene el dato (por ejemplo, todavía no hay guía), el botón sale apagado.
       </p>
@@ -374,12 +386,21 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
                   className="flex-1 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
                 <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
               </div>
-              <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={500}
+              <textarea ref={el => { cajas.current[i] = el }} value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={500}
                 placeholder="Texto del mensaje (ej. ¡Hola {comprador}! Tu pedido ya salió por {transportista}, guía {guia})"
                 className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
-              <p className={`text-[11px] ${n > 350 ? 'text-red-600' : 'text-neutral-400'}`}>
-                ~{n}/350 con los datos de una venta{n > 350 ? ': muy largo, MercadoLibre lo cortaría' : ''}
-              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-neutral-400">Poner:</span>
+                {VARIABLES_MENSAJE.map(x => (
+                  <button key={x.v} type="button" onMouseDown={e => e.preventDefault()} onClick={() => insertar(i, x.v)} title={x.que}
+                    className="text-[11px] font-mono rounded-full px-2 py-0.5 bg-lime-50 text-lime-800 ring-1 ring-inset ring-lime-200 hover:bg-lime-100">
+                    {x.v}
+                  </button>
+                ))}
+                <span className={`ml-auto text-[11px] ${n > 350 ? 'text-red-600' : 'text-neutral-400'}`}>
+                  ~{n}/350 con los datos de una venta{n > 350 ? ': muy largo, MercadoLibre lo cortaría' : ''}
+                </span>
+              </div>
             </div>
           )
         })}

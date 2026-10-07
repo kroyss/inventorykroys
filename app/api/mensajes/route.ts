@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     return NextResponse.json({
       conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: s.session.user.role === 'admin',
-      sugeridas: MENSAJES_SUGERIDOS(s.session.user.empresaNombre ?? 'nuestra tienda'),
+      sugeridas: MENSAJES_SUGERIDOS,
     })
   } catch (err) {
     return apiError(err)
