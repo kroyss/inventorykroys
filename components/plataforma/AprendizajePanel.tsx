@@ -7,10 +7,11 @@ interface Video { id: number; orden: number; titulo: string; descripcion: string
 interface Alumno {
   id: number; full_name: string | null; username: string; empresas: string; ultima: string | null
   completados: number; completados_inv: number; inventario: boolean
+  ingreso: string | null; viendo: { serie: Serie; numero: number; pct: number | null } | null
 }
 interface Uso {
   id: number; nombre: string; estado: string; fundador: boolean; prueba_dias: number | null; prueba_hasta: string | null
-  cuentas: string | null; conectada_at: string | null; ultima_actividad: string | null
+  cuentas: string | null; conectada_at: string | null; ultima_actividad: string | null; ingreso: string | null
   preguntas: number; preguntas_7d: number; mensajes: number; mensajes_7d: number; etiquetas: number; etiquetas_7d: number
   reportadas: number; reportadas_7d: number; calificadas: number; calificadas_7d: number; stock: number; stock_7d: number
 }
@@ -197,7 +198,8 @@ export default function AprendizajePanel() {
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr><th className="px-4 py-2 text-left">Usuario</th><th className="px-4 py-2 text-left">Empresa</th>
                   <th className="px-4 py-2 text-left">Automatizaciones</th>
-                  {activosInv > 0 && <th className="px-4 py-2 text-left">Inventario</th>}<th className="px-4 py-2 text-left">Último video</th></tr>
+                  {activosInv > 0 && <th className="px-4 py-2 text-left">Inventario</th>}<th className="px-4 py-2 text-left">Último video</th>
+                  <th className="px-4 py-2 text-left">Último ingreso</th></tr>
               </thead>
               <tbody>
                 {datos.alumnos.map(a => {
@@ -212,6 +214,11 @@ export default function AprendizajePanel() {
                           <span className="text-xs num text-neutral-600">{a.completados}/{activosAuto}</span>
                           {p === 100 && <span className="text-xs text-lime-700 font-medium">✓ listo</span>}
                         </div>
+                        {a.viendo && (
+                          <div className="mt-0.5 text-[11px] text-sky-700">
+                            viendo el {a.viendo.numero}º{a.viendo.serie === 'inventario' ? ' de Inventario' : ''}{a.viendo.pct != null ? ` (${a.viendo.pct}%)` : ''}
+                          </div>
+                        )}
                       </td>
                       {activosInv > 0 && (
                         <td className="px-4 py-2 text-xs num text-neutral-600">
@@ -219,6 +226,7 @@ export default function AprendizajePanel() {
                         </td>
                       )}
                       <td className="px-4 py-2 text-xs text-neutral-500">{a.ultima ? new Date(a.ultima).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td className="px-4 py-2 text-xs text-neutral-500">{a.ingreso ? new Date(a.ingreso).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca'}</td>
                     </tr>
                   )
                 })}
@@ -246,7 +254,8 @@ export default function AprendizajePanel() {
                   <th className="px-4 py-2 text-left">Empresa</th>
                   <th className="px-4 py-2 text-left">MercadoLibre</th>
                   {USOS.map(([k, , t]) => <th key={k} className="px-3 py-2 text-right">{t}</th>)}
-                  <th className="px-4 py-2 text-left">Última actividad</th>
+                  <th className="px-4 py-2 text-left">Último ingreso</th>
+                  <th className="px-4 py-2 text-left" title="Última vez que respondió, mandó, imprimió, reportó, calificó o cambió stock">Último uso de herramientas</th>
                 </tr>
               </thead>
               <tbody>
@@ -284,7 +293,8 @@ export default function AprendizajePanel() {
                           </td>
                         )
                       })}
-                      <td className="px-4 py-2 text-xs text-neutral-500">{u.ultima_actividad ? fechaHora(u.ultima_actividad) : '—'}</td>
+                      <td className="px-4 py-2 text-xs text-neutral-500">{u.ingreso ? fechaHora(u.ingreso) : 'nunca'}</td>
+                      <td className="px-4 py-2 text-xs text-neutral-500">{u.ultima_actividad ? fechaHora(u.ultima_actividad) : 'todavía no'}</td>
                     </tr>
                   )
                 })}

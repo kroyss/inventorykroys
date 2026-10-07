@@ -25,7 +25,14 @@ export async function GET() {
                 COUNT(p.completado_at) FILTER (WHERE v.activo AND v.serie = 'automatizaciones')::int AS completados,
                 COUNT(p.completado_at) FILTER (WHERE v.activo AND v.serie = 'inventario')::int AS completados_inv,
                 bool_or('inventario' = ANY(e.modulos)) AS inventario,
-                MAX(p.updated_at) AS ultima
+                MAX(p.updated_at) AS ultima,
+                GREATEST(u.ultima_actividad, u.last_login) AS ingreso,
+                -- Video empezado y sin terminar (el último que tocó): "viendo el 1º, 57%".
+                (SELECT json_build_object('serie', w.serie, 'pct', LEAST(99, ROUND(100.0 * q.visto_seg / NULLIF(q.duracion_seg, 0))),
+                          'numero', (SELECT COUNT(*) FROM aprendizaje_videos z WHERE z.activo AND z.serie = w.serie AND z.orden <= w.orden))
+                 FROM aprendizaje_progreso q JOIN aprendizaje_videos w ON w.id = q.video_id
+                 WHERE q.user_id = u.id AND w.activo AND q.completado_at IS NULL AND q.visto_seg > 0
+                 ORDER BY q.updated_at DESC LIMIT 1) AS viendo
          FROM users u
          JOIN usuario_empresas ue ON ue.user_id = u.id
          JOIN empresas e ON e.id = ue.empresa_id AND e.organizacion_id <> $1
@@ -39,7 +46,9 @@ export async function GET() {
         `SELECT e.id, e.nombre, o.estado, o.fundador, o.prueba_dias, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta,
                 u.cuentas, u.conectada_at, u.preguntas, u.preguntas_7d, u.mensajes, u.mensajes_7d,
                 u.etiquetas, u.etiquetas_7d, u.reportadas, u.reportadas_7d, u.calificadas, u.calificadas_7d,
-                u.stock, u.stock_7d, u.ultima_actividad
+                u.stock, u.stock_7d, u.ultima_actividad,
+                (SELECT MAX(GREATEST(x.ultima_actividad, x.last_login)) FROM usuario_empresas ue JOIN users x ON x.id = ue.user_id
+                 WHERE ue.empresa_id = e.id) AS ingreso
          FROM plataforma_uso_clientes() u
          JOIN empresas e ON e.id = u.empresa_id
          JOIN organizaciones o ON o.id = e.organizacion_id
