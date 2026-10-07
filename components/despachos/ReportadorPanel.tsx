@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface Cuenta { nombre: string; filtro: string; pagina: string }
@@ -38,6 +38,10 @@ const mensajeEnvio = (t: string, bloque: string, pagina: string, guia: string, c
   const m = rellenar(conTransportista(t), conTransportista(bloque), pagina, guia)
   return carrier === 'TEALCA' ? paraTealca(m) : m
 }
+// Igual que lib/reportador.ts paginaML(): página oficial de la cuenta (sin cuentas escritas a mano).
+const paginaML = (nick: string) => `https://www.mercadolibre.com.ve/pagina/${nick.toLowerCase()}`
+// Variables que el sistema necesita en cada plantilla: no se pueden borrar, solo mover.
+const VARIABLES = ['{guia}', '{transportista}'] as const
 // Guías de ejemplo para la vista previa.
 const GUIA_ZOOM = '1711920037', GUIA_TEALCA = '41234567'
 
@@ -175,7 +179,7 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
             </ul>
             <div>
               <p className="text-xs font-medium text-sky-900 mb-1">Así le llega a tu comprador:</p>
-              <VistaPrevia plantilla={sugeridas.plantillas[0]} bloque={sugeridas.bloque} pagina="" />
+              <VistaPrevia plantilla={sugeridas.plantillas[0]} bloque={sugeridas.bloque} pagina={paginaML(conectadas[0] ?? 'tutienda')} />
             </div>
             {isAdmin ? (
               <div className="flex flex-wrap gap-2">
@@ -329,9 +333,36 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
 }) {
   const setCuenta = (i: number, k: keyof Cuenta, v: string) =>
     onChange({ ...config, cuentas: config.cuentas.map((c, j) => (j === i ? { ...c, [k]: v } : c)) })
-  const setPlantilla = (i: number, v: string) =>
+  const [aviso, setAviso] = useState<{ i: number; texto: string } | null>(null)
+  const areas = useRef<(HTMLTextAreaElement | null)[]>([])
+  // {guia} y {transportista} no se pueden borrar (el comprador se quedaría sin guía o con el transportista
+  // equivocado): si un cambio los quita, no se aplica.
+  const setPlantilla = (i: number, v: string) => {
+    const borrada = VARIABLES.find(x => config.plantillas[i].includes(x) && !v.includes(x))
+    if (borrada) {
+      setAviso({ i, texto: `${borrada} no se puede borrar: el sistema lo necesita. Para cambiarlo de lugar, pon el cursor donde lo quieres y toca «Mover ${borrada} aquí».` })
+      return
+    }
+    setAviso(a => (a?.i === i ? null : a))
     onChange({ ...config, plantillas: config.plantillas.map((p, j) => (j === i ? v : p)) })
-  const paginaLarga = config.cuentas.reduce((a, c) => (c.pagina.length > a.length ? c.pagina : a), '')
+  }
+  // Mueve (o agrega) la variable a donde está el cursor, sin que llegue a faltar en ningún momento.
+  const moverAqui = (i: number, variable: string) => {
+    const t = config.plantillas[i]
+    const el = areas.current[i]
+    let pos = el ? el.selectionStart : t.length
+    // Cursor dentro de la variable misma: cuenta como al inicio de ella.
+    for (let k = t.indexOf(variable); k >= 0; k = t.indexOf(variable, k + 1)) if (pos > k && pos < k + variable.length) pos = k
+    const sin = t.split(variable).join('')
+    const antes = t.slice(0, pos).split(variable).join('')
+    const nuevo = (antes + variable + sin.slice(antes.length)).replace(/ {2,}/g, ' ')
+    setAviso(null)
+    onChange({ ...config, plantillas: config.plantillas.map((p, j) => (j === i ? nuevo : p)) })
+  }
+  const paginaEjemplo = config.cuentas.length ? config.cuentas[0].pagina : paginaML(conectadas[0] ?? 'tutienda')
+  const paginaLarga = config.cuentas.length
+    ? config.cuentas.reduce((a, c) => (c.pagina.length > a.length ? c.pagina : a), '')
+    : paginaML('x'.repeat(24))
   const input = 'border border-neutral-300 rounded px-2 py-1 text-sm w-full'
 
   const cuentasEditor = (
@@ -381,7 +412,10 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
         <p className="text-xs text-neutral-500 mb-2">
           Se elige una al azar por comprador. <code>{'{guia}'}</code> se cambia por la guía y <code>{'{transportista}'}</code> por
           ZOOM o TEALCA según el envío (no escribas el transportista a mano: un mensaje que dice TEALCA también le llegaría así a los
-          de ZOOM).{config.cuentas.length > 0 && <> <code>{'{pagina}'}</code> se cambia por la página de la cuenta.</>}
+          de ZOOM). Estas dos variables no se pueden borrar, solo cambiar de lugar.{' '}
+          <code>{'{pagina}'}</code> (opcional) se cambia por {config.cuentas.length
+            ? 'la página de la cuenta'
+            : <>la página oficial de la cuenta de la venta ({paginaML(conectadas[0] ?? 'tutienda')})</>}.
           {' '}MercadoLibre corta en {limite} caracteres sin avisar.
         </p>
         <div className="space-y-2">
@@ -396,14 +430,27 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
                 </p>
               )}
               {!p.includes('{guia}') && <p className="text-[11px] text-red-700 mb-0.5">Le falta {'{guia}'}: el comprador no recibiría su guía.</p>}
+              {!p.includes('{transportista}') && !/zoom/i.test(p) && (
+                <p className="text-[11px] text-red-700 mb-0.5">Le falta {'{transportista}'}: el comprador no sabría si es ZOOM o TEALCA.</p>
+              )}
               <div className="flex gap-2 items-start">
-                <textarea className={`${input} min-h-[2.5rem]`} rows={1} value={p} onChange={e => setPlantilla(i, e.target.value)} />
+                <textarea ref={el => { areas.current[i] = el }} className={`${input} min-h-[2.5rem]`} rows={2} value={p}
+                  onChange={e => setPlantilla(i, e.target.value)} onDrop={e => e.preventDefault()} />
                 <span className={`text-xs whitespace-nowrap pt-1 ${largo > limite ? 'text-red-700 font-semibold' : 'text-neutral-500'}`}>
                   {largo}/{limite}
                 </span>
                 <button onClick={() => onChange({ ...config, plantillas: config.plantillas.filter((_, j) => j !== i) })}
                   className="text-xs text-neutral-400 hover:text-red-600 pt-1">Quitar</button>
               </div>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {VARIABLES.map(x => (
+                  <button key={x} type="button" onMouseDown={e => e.preventDefault()} onClick={() => moverAqui(i, x)}
+                    className="text-[11px] px-2 py-0.5 rounded-full border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100">
+                    {p.includes(x) ? `Mover ${x} aquí` : `Poner ${x} aquí`}
+                  </button>
+                ))}
+              </div>
+              {aviso?.i === i && <p className="text-[11px] text-amber-700 mt-1">{aviso.texto}</p>}
               </div>
             )
           })}
@@ -416,7 +463,9 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
 
       <div>
         <h3 className="text-xs font-semibold text-neutral-600 mb-1">Texto final (se agrega a todas las plantillas)</h3>
-        <p className="text-xs text-neutral-500 mb-1">Opcional. Por ejemplo, el nombre de tu tienda: «Gracias por comprar en MI TIENDA.» (empieza con un espacio).</p>
+        <p className="text-xs text-neutral-500 mb-1">
+          Opcional. Por ejemplo: «¡Gracias por comprar en MI TIENDA! Síguenos en nuestra cuenta oficial: {'{pagina}'}» (empieza con un espacio).
+        </p>
         <textarea className={input} rows={5} value={config.bloque} onChange={e => onChange({ ...config, bloque: e.target.value })} />
         <p className="text-xs text-neutral-500 mt-1">
           Ojo: MercadoLibre rechaza links de Facebook (incluso acortados). t.me y youtube.com sí pasan.
@@ -426,7 +475,7 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
       {config.plantillas[0] && (
         <div>
           <h3 className="text-xs font-semibold text-neutral-600 mb-1">Vista previa (plantilla 1)</h3>
-          <VistaPrevia plantilla={config.plantillas[0]} bloque={config.bloque} pagina={config.cuentas[0]?.pagina ?? ''} />
+          <VistaPrevia plantilla={config.plantillas[0]} bloque={config.bloque} pagina={paginaEjemplo} />
         </div>
       )}
 

@@ -150,7 +150,7 @@ async function base(db: Pool): Promise<Cuentas> {
       '¡Hola! Tu pedido ya va en camino. Tu número de guía {transportista} es {guia}.',
       'Buen día, tu paquete fue entregado a {transportista} con la guía {guia}. Cualquier duda, aquí estamos para ayudarte.',
     ])],
-    ['reportador_bloque', ` ¡Gracias por comprar en ${D.tienda}!`],
+    ['reportador_bloque', ` ¡Gracias por comprar en ${D.tienda}! Síguenos en nuestra cuenta oficial: {pagina}`],
   ]
   for (const [k, v] of ajustes) {
     await db.query(`INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [k, v])

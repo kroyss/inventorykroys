@@ -52,6 +52,10 @@ async function main() {
     ok(tealca.length > 0 && tealca.every(x => x.mensaje!.includes('TEALCA') && !/zoom/i.test(x.mensaje!)), `${tealca.length} TEALCA dicen TEALCA`)
     const zoom = r.procesados.filter(x => x.carrier === 'ZOOM')
     ok(zoom.every(x => x.mensaje!.includes('ZOOM') && !/tealca/i.test(x.mensaje!)), `${zoom.length} ZOOM dicen ZOOM`)
+    ok(r.procesados.every(x => x.mensaje!.includes(`mercadolibre.com.ve/pagina/${x.cuenta!.toLowerCase()}`)), 'cada mensaje lleva la página de la cuenta de su venta')
+    const { problemasConfig } = await import('@/lib/reportador')
+    ok(problemasConfig({ cuentas: [], plantillas: ['Tu guía es {guia}'], bloque: '' }).some(x => x.includes('{transportista}')), 'sin transportista no se puede guardar')
+    ok(problemasConfig(cfg1).length === 0, 'las plantillas de empresa 1 (con ZOOM) siguen válidas')
     console.log('    ej. ZOOM  :', zoom[0].cuenta, '→', zoom[0].mensaje)
     console.log('    ej. TEALCA:', tealca[0].cuenta, '→', tealca[0].mensaje)
   } finally {

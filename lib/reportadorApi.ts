@@ -12,7 +12,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, CuentaDesconectada } from '@/lib/ml'
 import { buscarOrden, mensajesDeOrden, type MensajeML } from '@/lib/ventasML'
-import { cuentaDe, cuentaPorVenta, leerConfig, mensajeEnvio, problemasConfig, RESERVA_HORAS, SQL_CUENTA_VENTA, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
+import { cuentaDe, cuentaPorVenta, leerConfig, mensajeEnvio, paginaML, problemasConfig, RESERVA_HORAS, SQL_CUENTA_VENTA, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { remitenteConfigurado } from '@/lib/despachos'
 import { ES_STAGING } from '@/lib/entorno'
 import { esDemo } from '@/lib/demo'
@@ -96,6 +96,8 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   const procesados: EnvioProcesado[] = []
   const porVenta = cuentaPorVenta(config)
   const elegirPlantilla = () => config.plantillas[Math.floor(Math.random() * config.plantillas.length)]
+  // {pagina}: la de la cuenta configurada o, sin cuentas escritas, la página oficial de la cuenta de la venta.
+  const paginaDe = (c: { pagina: string } | null, nick: string | null) => c?.pagina ?? (nick ? paginaML(nick) : '')
   for (const e of rows) {
     // Sin cuentas configuradas, la cuenta es la de la venta (la confirma buscarOrden al enviar).
     const cuenta = porVenta ? null : cuentaDe(e.remitente, config.cuentas, remitenteDefault)
@@ -124,7 +126,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
     }
     // Modo demostración (lib/demo.ts): queda como enviado, sin escribirle a nadie en MercadoLibre.
     if (demo) {
-      const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, cuenta?.pagina ?? '', base.guia, base.carrier)
+      const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, paginaDe(cuenta, base.cuenta), base.guia, base.carrier)
       await cerrar('ENVIADO', 'demostración: no se envió a MercadoLibre', mensaje)
       procesados.push({ ...base, resultado: simular ? 'SIMULADO' : 'ENVIADO', detalle: `Desde ${base.cuenta ?? 'la cuenta de la venta'}`, mensaje })
       await pausa(600)
@@ -138,7 +140,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         continue
       }
       base.cuenta ??= orden.cuenta
-      const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, cuenta?.pagina ?? '', base.guia, base.carrier)
+      const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, paginaDe(cuenta, porVenta ? orden.cuenta : null), base.guia, base.carrier)
 
       const antes = await mensajesDeOrden(db, orden.conexionId, orden.orden)
       const previo = antes.find(m => esReporteNuestro(m, base.guia))

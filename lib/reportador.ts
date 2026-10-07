@@ -124,6 +124,15 @@ export function mensajeEnvio(plantilla: string, bloque: string, pagina: string, 
   return carrier === 'TEALCA' ? paraTealca(m) : m
 }
 
+/** Página oficial de una cuenta de MercadoLibre Venezuela (la de su nickname, en minúsculas). Es el
+ *  {pagina} de los mensajes cuando la cuenta sale de la venta (sin cuentas escritas a mano). */
+export const paginaML = (nickname: string) => `https://www.mercadolibre.com.ve/pagina/${nickname.toLowerCase()}`
+// Peor caso para medir el largo del mensaje (nicknames de ML de hasta ~20 letras).
+const PAGINA_LARGA = paginaML('x'.repeat(24))
+
+/** ¿La plantilla tiene transportista? {transportista}, o "ZOOM" escrito (las viejas: se cambia en Tealca). */
+export const tieneTransportista = (t: string) => t.includes('{transportista}') || /zoom/i.test(t)
+
 /** Sin cuentas escritas a mano = la cuenta de cada envío sale de su VENTA (la cuenta de ML conectada
  *  que la tiene). Las cuentas con remitente quedan para quien ya las tenía configuradas (programa de
  *  escritorio, cuentas sin conectar a la API). */
@@ -143,7 +152,7 @@ export const plantillasSugeridas = (tienda: string): Pick<ConfigReportador, 'pla
     '¡Hola! Tu pedido ya va en camino. Tu número de guía {transportista} es {guia}.',
     'Buen día, tu paquete fue entregado a {transportista} con la guía {guia}. Cualquier duda, aquí estamos para ayudarte.',
   ],
-  bloque: ` ¡Gracias por comprar en ${tienda}!`,
+  bloque: ` ¡Gracias por comprar en ${tienda}! Síguenos en nuestra cuenta oficial: {pagina}`,
 })
 
 /** Avisos que NO impiden guardar: un transportista escrito a mano dice lo mismo en ZOOM y en TEALCA. */
@@ -164,10 +173,11 @@ export function problemasConfig(c: ConfigReportador): string[] {
   if (c.plantillas.length === 0) p.push('Falta al menos una plantilla de mensaje')
   c.plantillas.forEach((t, i) => {
     if (!t.includes('{guia}')) p.push(`La plantilla ${i + 1} no tiene {guia}`)
+    if (!tieneTransportista(t)) p.push(`La plantilla ${i + 1} no tiene {transportista}`)
   })
   const filtros = c.cuentas.map(x => x.filtro.trim().toUpperCase())
   if (new Set(filtros).size !== filtros.length) p.push('Dos cuentas tienen el mismo comienzo de remitente')
-  const paginaLarga = c.cuentas.reduce((a, x) => (x.pagina.length > a.length ? x.pagina : a), '')
+  const paginaLarga = cuentaPorVenta(c) ? PAGINA_LARGA : c.cuentas.reduce((a, x) => (x.pagina.length > a.length ? x.pagina : a), '')
   c.plantillas.forEach((t, i) => {
     // El peor caso incluye la versión Tealca (TEALCA tiene 2 letras más que ZOOM).
     const largo = Math.max(mensajeEnvio(t, c.bloque, paginaLarga, '9'.repeat(12), 'ZOOM').length,
