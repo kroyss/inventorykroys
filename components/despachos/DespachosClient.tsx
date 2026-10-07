@@ -107,6 +107,9 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
   const [busy, setBusy]         = useState<string | null>(null)
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
+  // Manifiestos de la jornada recién cerrada: si el navegador bloquea la 2ª descarga automática,
+  // quedan a un clic en el aviso.
+  const [recienCerrada, setRecienCerrada] = useState<{ id: number; transportistas: string[] } | null>(null)
   const [fallas, setFallas]     = useState<Falla[]>([])
 
   const cargar = useCallback(() => fetch('/api/despachos').then(async res => {
@@ -204,7 +207,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
       message: `Se genera el manifiesto (uno por transportista: Zoom / Tealca) con los ${data?.jornada?.total_envios ?? 0} envíos de la jornada y se cierra.`,
       confirmText: 'Generar manifiesto',
     })) return
-    setBusy('cerrar'); setError(null); setAviso(null)
+    setBusy('cerrar'); setError(null); setAviso(null); setRecienCerrada(null)
     const res = await fetch('/api/despachos/jornadas/cerrar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ forzar }),
     })
@@ -218,8 +221,10 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     }
     if (!res.ok) { setError(body.error ?? 'Error'); cargar(); return }
     // Un manifiesto por transportista (van a lugares distintos): se bajan uno tras otro.
-    ;(body.manifiestos ?? ['ZOOM']).forEach((t, k) => setTimeout(
+    const transportistas = body.manifiestos ?? ['ZOOM']
+    transportistas.forEach((t, k) => setTimeout(
       () => descargar(`/api/despachos/jornadas/${body.jornada_id}/manifiesto?transportista=${t}`), k * 600))
+    if (transportistas.length > 1 && body.jornada_id) setRecienCerrada({ id: body.jornada_id, transportistas })
     setAviso((body.reportando ?? 0) > 0
       ? 'Jornada cerrada. El Reportador empieza solo a escribirle a los compradores: sigue el avance abajo, en Reportador.'
       : 'Jornada cerrada. Sus envíos ya están en la cola del Reportador: toca "▶ Reportar" abajo, en Reportador.')
@@ -267,6 +272,16 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
         </div>
       )}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
+      {recienCerrada && (
+        <div className="bg-sky-50 border border-sky-200 text-sky-900 px-4 py-2.5 rounded text-sm flex flex-wrap items-center gap-2">
+          <span className="mr-auto">Se generaron {recienCerrada.transportistas.length} manifiestos. Si tu navegador bajó solo uno, toca el que falta
+            (o permite las «descargas automáticas» de esta página cuando el navegador lo pregunte):</span>
+          {recienCerrada.transportistas.map(t => (
+            <button key={t} onClick={() => descargar(`/api/despachos/jornadas/${recienCerrada.id}/manifiesto?transportista=${t}`)}
+              className="btn-secondary text-xs">↓ Manifiesto {t === 'TEALCA' ? 'Tealca' : 'Zoom'}</button>
+          ))}
+        </div>
+      )}
 
       <Dropzone onFiles={f => subir(f, loteDestino)} busy={busy === 'subir'} agregaALote={loteDestino} />
 
@@ -322,6 +337,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
       {data.cerradas.length > 0 && (
         <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
           <h2 className="px-4 py-3 border-b border-neutral-100 text-sm font-semibold text-neutral-800">Jornadas cerradas</h2>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr><th className="px-4 py-2 text-left">Cierre</th><th className="px-4 py-2 text-right">Envíos</th>
@@ -334,6 +350,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       )}
     </div>
@@ -369,7 +386,8 @@ function FilaJornada({ j, onCsv }: { j: Overview['cerradas'][number]; onCsv: () 
         )}
       </td>
       <td className="px-4 py-2 text-neutral-500">{j.closed_by ?? '—'}</td>
-      <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+      <td className="px-4 py-2">
+        <div className="flex flex-wrap justify-end gap-2">
         <Link href={`/reportador?vista=historial&jornada=${j.id}`} className="btn-secondary text-xs">Ver reporte</Link>
         {j.tiene_manifiesto && (
           <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto`)} className="btn-secondary text-xs">
@@ -379,6 +397,7 @@ function FilaJornada({ j, onCsv }: { j: Overview['cerradas'][number]; onCsv: () 
         {j.tiene_manifiesto_tealca && (
           <button onClick={() => descargar(`/api/despachos/jornadas/${j.id}/manifiesto?transportista=TEALCA`)} className="btn-secondary text-xs">↓ Manifiesto Tealca</button>
         )}
+        </div>
       </td>
     </tr>
   )
