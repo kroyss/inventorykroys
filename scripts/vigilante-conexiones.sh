@@ -20,6 +20,7 @@ pegadas=$(docker exec inventory_db psql -U postgres -d inventory -tAc \
   "SELECT COUNT(*) FROM pg_stat_activity WHERE usename = 'inventory_app' AND state = 'idle'
      AND NOW() - state_change > INTERVAL '5 minutes'" 2>/dev/null | tr -d ' ')
 ahora=$(date '+%Y-%m-%d %H:%M:%S')
+echo "$ahora pegadas=$pegadas" > /tmp/vigilante-conexiones.latido   # para comprobar que el cron lo corre
 
 if [ -z "$pegadas" ]; then
   echo "$ahora no se pudo consultar la base" >> "$LOG"
