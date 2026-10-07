@@ -8,8 +8,7 @@ import EspacioSwitcher from './EspacioSwitcher'
 import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
-import { esDemo } from '@/lib/demo'
-import { dbDeSesion } from '@/lib/session'
+import { esDemoEmpresa } from '@/lib/demo'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
@@ -25,7 +24,7 @@ export default async function Navbar() {
     : { rows: [] as { productos: string[] }[] }
   const conRadar = !!cuenta?.productos?.includes('radar')
   // Empresa de demostración: el menú de la cuenta lleva a /demo (restaurar cada sección).
-  const demo = session?.user.empresaId ? await esDemo(dbDeSesion(session)).catch(() => false) : false
+  const demo = session?.user.empresaId ? await esDemoEmpresa(session.user.empresaId, session.user.country) : false
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">

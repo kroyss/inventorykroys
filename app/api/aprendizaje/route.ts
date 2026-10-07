@@ -6,8 +6,8 @@ import { linkAgendar, videosDeUsuario } from '@/lib/aprendizaje'
 import { llevaInventario, tieneModulo } from '@/lib/modulos'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
-import { esDemo } from '@/lib/demo'
-import { dbDeSesion, unauthorized } from '@/lib/session'
+import { esDemoEmpresa } from '@/lib/demo'
+import { unauthorized } from '@/lib/session'
 
 // GET /api/aprendizaje → videos activos con el avance del usuario y el link de "agendar".
 export async function GET() {
@@ -20,7 +20,7 @@ export async function GET() {
     // completado (libro gris, sin ventana de bienvenida) aunque su avance real no lo esté.
     const exento = session.user.organizacionId === ORGANIZACION_PLATAFORMA
     // Demostración: sin ventana de bienvenida (se graba la cuenta desde el primer login).
-    const demo = session.user.empresaId ? await esDemo(dbDeSesion(session)).catch(() => false) : false
+    const demo = session.user.empresaId ? await esDemoEmpresa(session.user.empresaId, session.user.country) : false
     // inventario: si la empresa lo lleva (si no, al terminar se le ofrece activarlo).
     return NextResponse.json({ videos, agendar, sinCuentas, esAdmin: session.user.role === 'admin', exento, demo,
       inventario: llevaInventario(session.user) },

@@ -8,7 +8,7 @@ import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
 import { mlConfigurado } from '@/lib/ml'
-import { esDemo } from '@/lib/demo'
+import { esDemoEmpresa } from '@/lib/demo'
 import type { Country } from '@/lib/types'
 
 // Cron de preguntas (crontab del VPS, cada minuto, con CRON_SECRET):
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
         if (u?.reciente) { resultado[e.id] = { omitida: 'inactiva' }; continue }
       }
       // Demostración: datos sembrados, nada que traer ni revisar (lib/demo.ts).
-      if (await esDemo(dbEmpresa(e.id, e.country as Country))) { resultado[e.id] = { omitida: 'demo' }; continue }
+      if (await esDemoEmpresa(e.id, e.country as Country)) { resultado[e.id] = { omitida: 'demo' }; continue }
       sincronizadas.push(e)
       resultado[e.id] = await sincronizarEmpresa(dbEmpresa(e.id, e.country as Country))
     } catch (err) {
