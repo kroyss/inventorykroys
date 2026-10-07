@@ -341,6 +341,11 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
 }
 
 // ── Jornada cerrada + resumen del reporte (el detalle vive en Reportador → Historial) ──
+// Botón "CSV viejo" (Reportador .exe con CSV): oculto desde el 07-10-2026, ya no se usa (está la API y el
+// programa conectado). La lógica sigue (bajarCsv y /api/despachos/jornadas/[id]/bot-csv): para volver a
+// mostrarlo, poner esto en true.
+const MOSTRAR_CSV_VIEJO = false
+
 function FilaJornada({ j, onCsv }: { j: Overview['cerradas'][number]; onCsv: () => void }) {
   const partes = [
     j.enviados     ? <span key="e" className="text-green-700">✓ {j.enviados} enviado(s)</span> : null,
@@ -359,7 +364,7 @@ function FilaJornada({ j, onCsv }: { j: Overview['cerradas'][number]; onCsv: () 
         {partes.length
           ? <span className="space-x-2">{partes}</span>
           : <span className="text-neutral-400">{j.reimpresiones ? 'Solo reimpresiones: nada que reportar' : '—'}</span>}
-        {j.a_reportar > 0 && (
+        {MOSTRAR_CSV_VIEJO && j.a_reportar > 0 && (
           <button onClick={onCsv} className="ml-2 text-neutral-400 underline" title="Solo para usar el Reportador viejo (.exe con CSV)">CSV viejo</button>
         )}
       </td>
