@@ -83,6 +83,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
   // Plazo de activación y lista de espera: solo se avisan desde la Ronda 2 y hasta que se confirma la lista.
   const conPlazo = !!anunciada && anunciada.numero >= 2 && hoy <= FECHA_LISTA_ESPERA
   const siguiente = anunciada && tandas.find(t => t.numero === anunciada.numero + 1)
+  // Con otra ronda ya abierta, los resultados de la anterior pierden protagonismo (ya se contactó a los
+  // seleccionados): bajan a una franja compacta al pie y el formulario queda primero.
+  const resultadosViejos = !!anunciada && !!abiertaHoy && anunciada.numero < abiertaHoy.numero
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -178,7 +181,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
       </section>
 
       {/* Seleccionados de la última ronda anunciada: qué tienen que hacer y qué pasa con el resto */}
-      {anunciada && (
+      {anunciada && !resultadosViejos && (
         <section className="bg-lime-50 border-b border-lime-200">
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 grid gap-6 lg:grid-cols-[1fr_1.15fr] items-start">
             <div>
@@ -243,7 +246,8 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
       )}
 
       <main className="max-w-5xl mx-auto px-5 sm:px-8 py-12 grid gap-10 lg:grid-cols-[1fr_1.15fr]">
-        <div className="space-y-8">
+        {/* En celular (97% de las visitas) el formulario va antes de "Qué vas a probar". */}
+        <div className="space-y-8 order-last lg:order-none">
           <section>
             <h2 className="text-lg font-semibold text-neutral-900">Qué vas a probar</h2>
             <ul className="mt-4 space-y-4">
@@ -276,6 +280,21 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           proxima={proxima ? diasInscripcion(proxima) : null}
           resultados={abiertaHoy ? fechaTanda(diaResultados(abiertaHoy)) : null} />
       </main>
+
+      {anunciada && resultadosViejos && (
+        <section className="border-t border-neutral-200 bg-white">
+          <div className="max-w-5xl mx-auto px-5 sm:px-8 py-6 text-sm text-neutral-600">
+            <p>
+              <b className="text-neutral-900">Seleccionados de la Ronda {anunciada.numero}:</b>{' '}
+              {seleccionados(anunciada.numero).join(' · ')}. ¡Gracias a todos los que se postularon!
+            </p>
+            <p className="mt-1">
+              ¿Te postulaste en la Ronda {anunciada.numero} y no quedaste? <b className="text-neutral-900">Sigues participando en esta ronda</b>:
+              no tienes que volver a postularte.
+            </p>
+          </div>
+        </section>
+      )}
 
       <footer className="border-t border-neutral-200 py-6 text-center text-xs text-neutral-400">
         © {anio} El Comerciante Digital · Todos los derechos reservados
