@@ -134,7 +134,8 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           </div>
 
           {/* Tandas */}
-          <div className="mt-10 grid gap-3 sm:grid-cols-2 max-w-2xl">
+          {/* En escritorio ocupan todo el ancho, igual que el bloque del formulario de abajo (alineados a la derecha). */}
+          <div className="mt-10 grid gap-3 sm:grid-cols-2 max-w-2xl lg:max-w-none lg:grid-cols-[1fr_1.15fr] lg:gap-10">
             {tandas.map(t => {
               const llena = t.tomados >= t.cupos
               const actual = t.numero === destacada
