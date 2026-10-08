@@ -151,8 +151,11 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                   </div>
                   {dias && (
                     <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
-                      Postulaciones: <span className="text-neutral-200">{dias}</span>
-                      {res && <><br />Seleccionados: <span className="text-neutral-200">{fechaTanda(res)}</span></>}
+                      {t.numero === abiertaHoy?.numero
+                        // Abierta hoy: lo que importa es hasta cuándo (2026-10-08, Ronda 2 abierta desde el jueves 8).
+                        ? <>Postulaciones abiertas hasta el <span className="text-neutral-200">{fechaTanda(t.inscribe_hasta ?? t.inscribe_desde)}</span></>
+                        : <>Postulaciones: <span className="text-neutral-200">{dias}</span></>}
+                      {res && <><br />Resultados: <span className="text-neutral-200">{fechaTanda(res)}</span></>}
                     </p>
                   )}
                   <div className="mt-3 flex gap-1.5" aria-label={`${t.tomados} de ${t.cupos} cupos tomados`}>
