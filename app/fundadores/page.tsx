@@ -96,7 +96,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 w-[14rem] h-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
 
         <div className="relative max-w-5xl mx-auto px-5 sm:px-8 pt-10 sm:pt-14 pb-14 sm:pb-20">
-          <div className="max-w-2xl">
+          {/* En escritorio, dos columnas con las mismas proporciones que las rondas y el formulario de abajo. */}
+          <div className="max-w-2xl lg:max-w-none lg:grid lg:grid-cols-[1fr_1.15fr] lg:gap-10 lg:items-end">
+           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">
               Programa Fundadores <span className="text-neutral-500">·</span> El Comerciante Digital
             </p>
@@ -109,7 +111,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos para postularse</b> y la selección
               se anuncia al día siguiente del cierre. Después decides si te quedas.
             </p>
-            <p className="mt-3 text-neutral-400 leading-relaxed">
+           </div>
+           <div>
+            <p className="mt-3 lg:mt-0 text-neutral-400 leading-relaxed">
               Además, <b className="text-white">{CUPOS_ESPERA} postulantes quedan en lista de espera</b> y se publican aquí junto con
               los seleccionados. Si algún seleccionado no inicia su activación antes del {fechaTanda(FECHA_LIMITE_ACTIVACION)}, el{' '}
               {fechaTanda(FECHA_LISTA_ESPERA)} entra el siguiente de la lista.
@@ -131,6 +135,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                 </li>
               ))}
             </ul>
+           </div>
           </div>
 
           {/* Tandas */}
