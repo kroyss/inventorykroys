@@ -43,7 +43,9 @@ export default function NavLinks({ role, country, modulos }: Props) {
   return (
     // En mobile la navegación vive en la barra inferior (BottomNav); acá se
     // ocultan los links para que la barra superior no se desborde.
-    <div className="hidden md:flex items-center gap-0.5 flex-1">
+    // En pantallas medianas (tablet, laptop chica) los links pueden no caber: se desplazan DENTRO de la
+    // barra (min-w-0 + overflow) en vez de ensanchar toda la página, y se compactan hasta xl.
+    <div className="hidden md:flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
       {links.map(l => {
         const active =
@@ -53,7 +55,7 @@ export default function NavLinks({ role, country, modulos }: Props) {
           <Link
             key={l.href}
             href={l.href}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 xl:px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               active
                 ? 'bg-neutral-900 text-white'
                 : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'

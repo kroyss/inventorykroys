@@ -28,13 +28,13 @@ export default async function Navbar() {
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2 xl:gap-4">
 
         <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} radarUrl={conRadar ? radarUrl() : null} />
 
         <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
 
-        <div className="flex items-center gap-3 shrink-0 ml-auto">
+        <div className="flex items-center gap-2 xl:gap-3 shrink-0 ml-auto">
           <AprendizajeNav />
           {session?.user.empresaId && (
             <CountrySwitcher actual={session.user.empresaId}
