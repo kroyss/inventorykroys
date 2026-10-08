@@ -233,8 +233,8 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
           <div className="mt-4">
             <h3 className="text-lg font-semibold text-neutral-900">¿Dónde te escribimos?</h3>
             <p className="mt-1 text-sm text-neutral-400">
-              Tu usuario de Telegram <b className="font-medium text-neutral-600">o</b> de Instagram (con uno basta), bien escrito: los
-              seleccionados se anuncian con ese usuario en esta página y en nuestra Comunidad de Vendedores de Telegram.
+              Toda la atención y la Comunidad de Vendedores están en <b className="font-medium text-neutral-600">Telegram</b>. Si no
+              lo usas, déjanos tu Instagram y te escribimos por ahí. Los seleccionados se anuncian con ese usuario en esta página.
             </p>
             <div className="mt-5 space-y-4">
               <div>
@@ -243,7 +243,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="telegram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Telegram</label>
+                  <label htmlFor="telegram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Telegram <span className="font-normal text-lime-700">(recomendado)</span></label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400" aria-hidden="true">@</span>
                     <input id="telegram" value={contacto.telegram} onChange={set('telegram')} maxLength={80} placeholder="tuusuario"
@@ -251,7 +251,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="instagram" className="block text-sm font-medium text-neutral-700 mb-1">o Usuario de Instagram</label>
+                  <label htmlFor="instagram" className="block text-sm font-medium text-neutral-700 mb-1">¿No usas Telegram? Tu Instagram</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400" aria-hidden="true">@</span>
                     <input id="instagram" value={contacto.instagram} onChange={set('instagram')} maxLength={120} placeholder="tuusuario"

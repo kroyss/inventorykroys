@@ -212,7 +212,7 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                 <p className="mt-1 text-sm text-neutral-600">
                   Escríbenos por privado a{' '}
                   <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer" className="font-semibold text-lime-800 underline underline-offset-2">@{TELEGRAM_OFICIAL}</a>{' '}
-                  para darte tu acceso.
+                  para darte tu acceso. Si te postulaste con Instagram, te escribimos por ahí.
                 </p>
                 {conPlazo && (
                   <p className="mt-2 text-sm text-neutral-600">
