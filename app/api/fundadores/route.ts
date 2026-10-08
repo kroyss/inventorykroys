@@ -5,7 +5,7 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  diasInscripcion, evaluar, fechaTanda, FECHA_LIMITE_ACTIVACION, INSTAGRAM_RE, MENSAJE_MAX, normalizarInstagram, normalizarTelegram,
+  DOLOR_OTRO_MAX, diasInscripcion, evaluar, fechaTanda, saltaAContacto, FECHA_LIMITE_ACTIVACION, INSTAGRAM_RE, MENSAJE_MAX, normalizarInstagram, normalizarTelegram,
   PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo, TELEGRAM_RE, TZ_FUNDADORES, type Tanda,
 } from '@/lib/fundadores'
 
@@ -56,17 +56,21 @@ const Solicitud = z.object({
   mensaje: z.string().trim().max(MENSAJE_MAX, `El mensaje tiene un máximo de ${MENSAJE_MAX} caracteres`).optional()
     .transform(v => v || null),
   tipo: opcion('tipo'),
-  ventas_mes: opcion('ventas_mes'),
-  cuentas: opcion('cuentas'),
-  despacho: opciones('despacho'),
-  dolor: opciones('dolor'),
-  activacion: opcion('activacion'),
-  inventario: opcion('inventario'),
-  herramientas: opciones('herramientas'),
-  compromiso: opcion('compromiso'),
+  // Opcionales en el esquema: quien marca "hago marketing" no las responde (salta al contacto). Para los
+  // demás se exigen abajo (refine).
+  ventas_mes: opcion('ventas_mes').optional(),
+  cuentas: opcion('cuentas').optional(),
+  despacho: opciones('despacho').optional(),
+  dolor: opciones('dolor').optional(),
+  dolor_otro: z.string().trim().max(DOLOR_OTRO_MAX).optional().transform(v => v || null),
+  activacion: opcion('activacion').optional(),
+  inventario: opcion('inventario').optional(),
+  herramientas: opciones('herramientas').optional(),
+  compromiso: opcion('compromiso').optional(),
   navegador_id: z.string().max(64).optional(),
   sitio: z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena
 }).refine(s => s.telegram || s.instagram, { message: 'Escribe tu usuario de Telegram o de Instagram (al menos uno)' })
+  .refine(s => saltaAContacto(s) || PREGUNTAS.every(p => s[p.campo]), { message: 'Responde todas las preguntas' })
 
 function ipDe(req: NextRequest) {
   return req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
@@ -118,17 +122,17 @@ export async function POST(req: NextRequest) {
       ? otras.map(o => `${o.mismo_nav ? 'mismo navegador' : 'misma conexión'} que @${o.telegram}${o.estado === 'descartado' ? ' (descartada)' : ''}`).join(' · ')
       : null
 
-    const { puntaje, estado } = evaluar(s, s.nick_ml)
+    const { puntaje, estado } = evaluar(s as Parameters<typeof evaluar>[0], s.nick_ml)
     await db.query(
       `INSERT INTO fundadores_solicitudes
          (ronda, nombre, telegram, nick_ml, ventas_mes, cuentas, despacho, dolor, inventario,
           puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje, compromiso, herramientas,
-          tipo, activacion, instagram, acepta_plazo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,TRUE)
+          tipo, activacion, instagram, acepta_plazo, dolor_otro)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,TRUE,$22)
        ON CONFLICT DO NOTHING`,
-      [RONDA_ACTUAL, s.nombre, s.telegram, s.nick_ml, s.ventas_mes, s.cuentas, s.despacho, s.dolor, s.inventario,
+      [RONDA_ACTUAL, s.nombre, s.telegram, s.nick_ml, s.ventas_mes ?? '', s.cuentas ?? '', s.despacho ?? '', s.dolor ?? '', s.inventario ?? '',
        puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null,
-       s.mensaje, s.compromiso, s.herramientas, s.tipo, s.activacion, s.instagram])
+       s.mensaje, s.compromiso ?? null, s.herramientas ?? null, s.tipo, s.activacion ?? null, s.instagram, s.dolor_otro])
     return NextResponse.json({ ok: true })
   } catch (err) {
     return apiError(err)

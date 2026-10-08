@@ -10,7 +10,7 @@ interface Verif {
   anios?: number | null; ventas_texto?: string | null
 }
 interface Solicitud {
-  id: number; nombre: string; telegram: string | null; instagram: string | null; tipo: string | null; activacion: string | null
+  id: number; nombre: string; telegram: string | null; instagram: string | null; tipo: string | null; activacion: string | null; dolor_otro: string | null
   nick_ml: string | null; mensaje: string | null
   ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; herramientas: string | null; compromiso: string | null
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'espera' | 'rechazado'; tanda: number | null
@@ -43,7 +43,7 @@ const ETIQUETA: Record<Pregunta['campo'], string> = {
 function Respuestas({ s }: { s: Solicitud }) {
   return (
     <dl className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 text-sm">
-      {PREGUNTAS.filter(p => s[p.campo] != null).map(p => {
+      {PREGUNTAS.filter(p => s[p.campo]).map(p => {
         const elegidas = s[p.campo]!.split(',').map(v => p.opciones.find(o => o.valor === v) ?? { valor: v, texto: v, puntos: 0 })
         const pts = elegidas.reduce((a, o) => a + o.puntos, 0)
         return (
@@ -251,6 +251,7 @@ export default function FundadoresPanel() {
                     <span className="text-xs text-neutral-400">{fecha(s.created_at)}</span>
                   </div>
                   <div className="pt-1"><Respuestas s={s} /></div>
+                  {s.dolor_otro && <p className="text-xs text-neutral-600">Le quita tiempo (escrito): “{s.dolor_otro}”</p>}
                   <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">
                     {s.nick_ml ? <>
                       <span>Nick ML: <a href={`https://www.mercadolibre.com.ve/perfil/vendedor/${encodeURIComponent(s.nick_ml)}`} target="_blank" rel="noreferrer"

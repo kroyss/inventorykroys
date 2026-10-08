@@ -106,6 +106,11 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos para postularse</b> y la selección
               se anuncia al día siguiente del cierre. Después decides si te quedas.
             </p>
+            <p className="mt-3 text-neutral-400 leading-relaxed">
+              Además, <b className="text-white">{CUPOS_ESPERA} postulantes quedan en lista de espera</b> y se publican aquí junto con
+              los seleccionados. Si algún seleccionado no inicia su activación antes del {fechaTanda(FECHA_LIMITE_ACTIVACION)}, el{' '}
+              {fechaTanda(FECHA_LISTA_ESPERA)} entra el siguiente de la lista.
+            </p>
             {/* Beneficios: sin caja (las cajas son de las tandas), ícono + título + bajada */}
             <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">Solo para Fundadores</p>
             <ul className="mt-3 grid gap-4 sm:grid-cols-3 sm:gap-6">

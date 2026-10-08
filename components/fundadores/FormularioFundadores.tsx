@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { CUPOS_ESPERA, FECHA_LIMITE_ACTIVACION, fechaTanda, MENSAJE_MAX, PREGUNTAS, type Pregunta } from '@/lib/fundadores'
+import {
+  CUPOS_ESPERA, DOLOR_OTRO_MAX, FECHA_LIMITE_ACTIVACION, fechaTanda, MENSAJE_MAX, PREGUNTAS, saltaAContacto, type Pregunta,
+} from '@/lib/fundadores'
 
 type Campo = Pregunta['campo']
 
@@ -54,6 +56,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
   const [contacto, setContacto] = useState({ nombre: '', telegram: '', instagram: '', nick_ml: '', mensaje: '' })
   const [acepta, setAcepta] = useState(false)
+  const [dolorOtro, setDolorOtro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hecho, setHecho] = useState<{ nombre: string; contacto: string; repetida: boolean } | null>(null)
@@ -87,13 +90,15 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
     }
     setResp(r => ({ ...r, [p.campo]: [valor] }))
     clearTimeout(avance.current)
-    avance.current = setTimeout(() => setPaso(n => Math.min(PASOS - 1, n + 1)), 220)
+    // "Hago marketing, sin cuenta": directo al contacto (no tiene ventas que contar).
+    const marketing = saltaAContacto({ [p.campo]: valor })
+    avance.current = setTimeout(() => setPaso(n => marketing ? PASOS - 1 : Math.min(PASOS - 1, n + 1)), 220)
   }
 
   async function enviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
-    const faltan = PREGUNTAS.findIndex(p => !resp[p.campo]?.length)
+    const faltan = saltaAContacto(resp) ? -1 : PREGUNTAS.findIndex(p => !resp[p.campo]?.length)
     if (faltan >= 0) { setPaso(faltan); setError('Falta responder esta pregunta'); return }
     if (!contacto.telegram.trim() && !contacto.instagram.trim()) { setError('Escribe tu usuario de Telegram o de Instagram (al menos uno)'); return }
     if (!acepta) { setError(`Marca que inicias tu activación antes del ${fechaTanda(FECHA_LIMITE_ACTIVACION)}`); return }
@@ -103,9 +108,11 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       const body = {
         ...contacto,
         acepta_plazo: acepta,
+        dolor_otro: dolorOtro,
         sitio: String(new FormData(e.currentTarget).get('sitio') ?? ''),
         navegador_id: navegadorId(),
-        ...Object.fromEntries(PREGUNTAS.map(p => [p.campo, p.multiple ? resp[p.campo] : resp[p.campo]?.[0]])),
+        ...Object.fromEntries(PREGUNTAS.filter(p => !saltaAContacto(resp) || p.campo === 'tipo')
+          .map(p => [p.campo, p.multiple ? resp[p.campo] : resp[p.campo]?.[0]])),
       }
       const r = await fetch('/api/fundadores', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -223,13 +230,17 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                 )
               })}
             </div>
+            {pregunta.campo === 'dolor' && (
+              <input value={dolorOtro} onChange={e => setDolorOtro(e.target.value)} maxLength={DOLOR_OTRO_MAX}
+                placeholder="¿Otra cosa? Escríbela aquí (opcional)" className={`${campo} mt-3`} />
+            )}
           </fieldset>
         ) : (
           <div className="mt-4">
             <h3 className="text-lg font-semibold text-neutral-900">¿Dónde te escribimos?</h3>
             <p className="mt-1 text-sm text-neutral-400">
-              Telegram o Instagram: al menos uno, bien escrito. Los seleccionados se anuncian con ese usuario en esta página y en
-              nuestra Comunidad de Vendedores de Telegram.
+              Tu usuario de Telegram <b className="font-medium text-neutral-600">o</b> de Instagram (con uno basta), bien escrito: los
+              seleccionados se anuncian con ese usuario en esta página y en nuestra Comunidad de Vendedores de Telegram.
             </p>
             <div className="mt-5 space-y-4">
               <div>
@@ -246,7 +257,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="instagram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Instagram</label>
+                  <label htmlFor="instagram" className="block text-sm font-medium text-neutral-700 mb-1">o Usuario de Instagram</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400" aria-hidden="true">@</span>
                     <input id="instagram" value={contacto.instagram} onChange={set('instagram')} maxLength={120} placeholder="tuusuario"
@@ -266,7 +277,6 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                 <span aria-hidden="true">✈️</span>
                 <span>¿Aún no estás en nuestra <b>Comunidad de Vendedores</b>? Únete en Telegram: <span className="underline underline-offset-2">t.me/comerciantedigitalve</span></span>
               </a>
-              <p className="-mt-2 text-xs text-neutral-400">Con el nick solo vemos tu reputación pública: no accedemos a tu cuenta.</p>
               <div>
                 <label htmlFor="mensaje" className="flex items-baseline justify-between gap-2 text-sm font-medium text-neutral-700 mb-1">
                   ¿Algo más que quieras contarnos? <span className="text-xs font-normal text-neutral-400 whitespace-nowrap">opcional</span>
@@ -293,7 +303,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
         <div className="mt-6 flex items-center justify-between gap-3">
           {paso > 0
-            ? <button type="button" onClick={() => ir(paso - 1)} className="text-sm text-neutral-500 hover:text-neutral-900 px-1 py-2">← Atrás</button>
+            ? <button type="button" onClick={() => ir(!pregunta && saltaAContacto(resp) ? 0 : paso - 1)} className="text-sm text-neutral-500 hover:text-neutral-900 px-1 py-2">← Atrás</button>
             : <span />}
           {pregunta ? (
             (pregunta.multiple || listo) && (

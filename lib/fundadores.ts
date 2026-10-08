@@ -126,7 +126,18 @@ export const PUNTAJE_MAXIMO = PREGUNTAS.reduce((a, p) => a + maximoDe(p), 0) + P
 
 export type Respuestas = Record<Pregunta['campo'], string>
 
+/** "Hago marketing, sin cuenta": salta directo al contacto (no tiene ventas que contar) y queda descartado. */
+export const SALTA_A_CONTACTO = { campo: 'tipo', valor: 'marketing' } as const
+export const saltaAContacto = (r: Partial<Record<Pregunta['campo'], string | string[] | undefined>>) => {
+  const v = r[SALTA_A_CONTACTO.campo]
+  return Array.isArray(v) ? v.includes(SALTA_A_CONTACTO.valor) : v === SALTA_A_CONTACTO.valor
+}
+
+/** Texto libre opcional junto a "¿Qué te quita más tiempo hoy?". */
+export const DOLOR_OTRO_MAX = 200
+
 export function evaluar(r: Respuestas, nick: string | null) {
+  if (saltaAContacto(r)) return { puntaje: 0, estado: 'descartado' as const }
   let puntaje = nick ? PUNTO_NICK : 0
   let descartada = false
   for (const p of PREGUNTAS) {

@@ -12,7 +12,7 @@ export async function GET() {
     const db = dbGlobal()
     const [{ rows: solicitudes }, { rows: tandas }] = await Promise.all([
       db.query(
-        `SELECT id, nombre, telegram, instagram, tipo, activacion, nick_ml, mensaje, ventas_mes, cuentas, despacho, dolor, inventario, herramientas, compromiso, puntaje, estado,
+        `SELECT id, nombre, telegram, instagram, tipo, activacion, dolor_otro, nick_ml, mensaje, ventas_mes, cuentas, despacho, dolor, inventario, herramientas, compromiso, puntaje, estado,
                 tanda, sospechosa, ml_verificado, notas, created_at, revisada_at,
                 COALESCE((SELECT json_agg(f.id ORDER BY f.id) FROM fundadores_fotos f WHERE f.solicitud_id = s.id), '[]') AS fotos,
                 -- Lo investigado de la misma persona en rondas anteriores (mismo Telegram o nick).

@@ -10,6 +10,9 @@ ALTER TABLE fundadores_solicitudes ADD COLUMN IF NOT EXISTS tipo         text;
 ALTER TABLE fundadores_solicitudes ADD COLUMN IF NOT EXISTS activacion   text;
 ALTER TABLE fundadores_solicitudes ADD COLUMN IF NOT EXISTS instagram    text;
 ALTER TABLE fundadores_solicitudes ADD COLUMN IF NOT EXISTS acepta_plazo boolean;
+-- dolor_otro: "¿Qué te quita más tiempo hoy?" escrito por él (opcional). Quien marca "hago marketing" salta
+-- directo al contacto: sus respuestas de venta quedan vacías ('').
+ALTER TABLE fundadores_solicitudes ADD COLUMN IF NOT EXISTS dolor_otro   text;
 ALTER TABLE fundadores_solicitudes ALTER COLUMN telegram DROP NOT NULL;
 
 ALTER TABLE fundadores_solicitudes DROP CONSTRAINT IF EXISTS fundadores_estado_check;
