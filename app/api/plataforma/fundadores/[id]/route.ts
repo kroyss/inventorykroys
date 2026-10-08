@@ -8,11 +8,12 @@ import { RONDA_ACTUAL } from '@/lib/fundadores'
 const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('aprobar'), tanda: z.number().int().optional() }),
   z.object({ accion: z.literal('rechazar') }),
+  z.object({ accion: z.literal('espera') }),                 // lista de espera (Ronda 2: se confirma el lunes 19)
   z.object({ accion: z.literal('reconsiderar') }),           // volver a "calificado" (incluso un descartado)
   z.object({ accion: z.literal('nota'), notas: z.string().max(1000) }),
 ])
 
-// PUT /api/plataforma/fundadores/[id] → aprobar (a una tanda con cupo), rechazar, reconsiderar o anotar.
+// PUT /api/plataforma/fundadores/[id] → aprobar (a una tanda con cupo), rechazar, lista de espera, reconsiderar o anotar.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error } = await soloDueno()
   if (error) return error
@@ -25,10 +26,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       await db.query(`UPDATE fundadores_solicitudes SET notas = NULLIF(TRIM($2), '') WHERE id = $1`, [id, b.notas])
       return NextResponse.json({ ok: true })
     }
-    if (b.accion === 'rechazar' || b.accion === 'reconsiderar') {
+    if (b.accion === 'rechazar' || b.accion === 'reconsiderar' || b.accion === 'espera') {
       await db.query(
         `UPDATE fundadores_solicitudes SET estado = $2, tanda = NULL, revisada_at = NOW() WHERE id = $1`,
-        [id, b.accion === 'rechazar' ? 'rechazado' : 'calificado'])
+        [id, b.accion === 'rechazar' ? 'rechazado' : b.accion === 'espera' ? 'espera' : 'calificado'])
       return NextResponse.json({ ok: true })
     }
     // Aprobar: a la tanda indicada, o a aquella en cuyos días se inscribió (hora Caracas); si esa ya

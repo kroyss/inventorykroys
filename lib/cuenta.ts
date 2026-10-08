@@ -7,8 +7,8 @@ export type EstadoCuenta = 'propietario' | 'prueba' | 'activo' | 'vencido'
 export const DIAS_PRUEBA = { fundador: 30, normal: 15 } as const
 
 /** La prueba arranca al conectar la primera cuenta de ML (migración 067), pero a más tardar
- *  estos días después de creada la cuenta. */
-export const DIAS_ESPERA_CONEXION = 7
+ *  estos días después de creada la cuenta (2026-10-08: 7 → 5, Fundadores Ronda 2: creada el 13 → arranca el 18). */
+export const DIAS_ESPERA_CONEXION = 5
 
 /** Condición SQL (alias `o` = organizaciones): ¿sus usuarios pueden entrar hoy? Una prueba con la
  *  fecha ya pasada (hora Caracas) cuenta como vencida. */

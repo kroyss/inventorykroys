@@ -5,8 +5,8 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  diasInscripcion, evaluar, MENSAJE_MAX, normalizarTelegram, PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo,
-  TELEGRAM_RE, TZ_FUNDADORES, type Tanda,
+  diasInscripcion, evaluar, fechaTanda, FECHA_LIMITE_ACTIVACION, INSTAGRAM_RE, MENSAJE_MAX, normalizarInstagram, normalizarTelegram,
+  PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo, TELEGRAM_RE, TZ_FUNDADORES, type Tanda,
 } from '@/lib/fundadores'
 
 // Programa Fundadores (PÚBLICO, sin login; el proxy no protege /api).
@@ -46,21 +46,27 @@ const opciones = (campo: string) => {
 
 const Solicitud = z.object({
   nombre: z.string().trim().min(2, 'Escribe tu nombre').max(80),
-  telegram: z.string().max(80).transform(normalizarTelegram)
-    .refine(t => TELEGRAM_RE.test(t), 'Revisa tu usuario de Telegram (5 a 32 letras, números o _)'),
+  // Telegram o Instagram: al menos uno (2026-10-08). Vacío = no lo dio.
+  telegram: z.string().max(80).optional().transform(v => (v ? normalizarTelegram(v) : '') || null)
+    .refine(t => t === null || TELEGRAM_RE.test(t), 'Revisa tu usuario de Telegram: empieza con una letra y tiene de 5 a 32 letras, números o _'),
+  instagram: z.string().max(120).optional().transform(v => (v ? normalizarInstagram(v) : '') || null)
+    .refine(t => t === null || INSTAGRAM_RE.test(t), 'Revisa tu usuario de Instagram: letras, números, punto o _ (no un número de teléfono)'),
+  acepta_plazo: z.literal(true, { message: `Marca que inicias tu activación antes del ${fechaTanda(FECHA_LIMITE_ACTIVACION)}` }),
   nick_ml: z.string().trim().max(40).optional().transform(v => v?.replace(/^@/, '').trim() || null),
   mensaje: z.string().trim().max(MENSAJE_MAX, `El mensaje tiene un máximo de ${MENSAJE_MAX} caracteres`).optional()
     .transform(v => v || null),
+  tipo: opcion('tipo'),
   ventas_mes: opcion('ventas_mes'),
   cuentas: opcion('cuentas'),
   despacho: opciones('despacho'),
   dolor: opciones('dolor'),
+  activacion: opcion('activacion'),
   inventario: opcion('inventario'),
   herramientas: opciones('herramientas'),
   compromiso: opcion('compromiso'),
   navegador_id: z.string().max(64).optional(),
   sitio: z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena
-})
+}).refine(s => s.telegram || s.instagram, { message: 'Escribe tu usuario de Telegram o de Instagram (al menos uno)' })
 
 function ipDe(req: NextRequest) {
   return req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
@@ -88,9 +94,9 @@ export async function POST(req: NextRequest) {
     const ip = ipDe(req)
     const ipHash = ip ? createHash('sha256').update(`${ip}|${process.env.NEXTAUTH_SECRET ?? ''}`).digest('hex').slice(0, 32) : null
 
-    // Una solicitud por ronda por usuario de Telegram.
+    // Una solicitud por ronda por usuario de Telegram o de Instagram.
     const { rows: [ya] } = await db.query(
-      `SELECT id FROM fundadores_solicitudes WHERE ronda = $1 AND telegram = $2`, [RONDA_ACTUAL, s.telegram])
+      `SELECT id FROM fundadores_solicitudes WHERE ronda = $1 AND (telegram = $2 OR instagram = $3)`, [RONDA_ACTUAL, s.telegram, s.instagram])
     if (ya) return NextResponse.json({ ok: true, repetida: true })
 
     // Freno a los que insisten: más de 5 solicitudes desde la misma conexión en un día no se guardan.
@@ -104,10 +110,10 @@ export async function POST(req: NextRequest) {
     // No se bloquea: en Venezuela mucha gente comparte la IP de CANTV o de los datos móviles.
     // Queda marcada para mirarla antes de aprobar.
     const { rows: otras } = await db.query(
-      `SELECT telegram, estado, navegador_id = $3 AS mismo_nav
+      `SELECT COALESCE(telegram, instagram) AS telegram, estado, navegador_id = $3 AS mismo_nav
        FROM fundadores_solicitudes
-       WHERE ronda = $1 AND telegram <> $4 AND ((navegador_id IS NOT NULL AND navegador_id = $3) OR (ip_hash IS NOT NULL AND ip_hash = $2))
-       ORDER BY created_at LIMIT 3`, [RONDA_ACTUAL, ipHash, s.navegador_id ?? null, s.telegram])
+       WHERE ronda = $1 AND telegram IS DISTINCT FROM $4 AND instagram IS DISTINCT FROM $5 AND ((navegador_id IS NOT NULL AND navegador_id = $3) OR (ip_hash IS NOT NULL AND ip_hash = $2))
+       ORDER BY created_at LIMIT 3`, [RONDA_ACTUAL, ipHash, s.navegador_id ?? null, s.telegram, s.instagram])
     const sospechosa = otras.length
       ? otras.map(o => `${o.mismo_nav ? 'mismo navegador' : 'misma conexión'} que @${o.telegram}${o.estado === 'descartado' ? ' (descartada)' : ''}`).join(' · ')
       : null
@@ -116,12 +122,13 @@ export async function POST(req: NextRequest) {
     await db.query(
       `INSERT INTO fundadores_solicitudes
          (ronda, nombre, telegram, nick_ml, ventas_mes, cuentas, despacho, dolor, inventario,
-          puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje, compromiso, herramientas)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-       ON CONFLICT (ronda, telegram) DO NOTHING`,
+          puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje, compromiso, herramientas,
+          tipo, activacion, instagram, acepta_plazo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,TRUE)
+       ON CONFLICT DO NOTHING`,
       [RONDA_ACTUAL, s.nombre, s.telegram, s.nick_ml, s.ventas_mes, s.cuentas, s.despacho, s.dolor, s.inventario,
        puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null,
-       s.mensaje, s.compromiso, s.herramientas])
+       s.mensaje, s.compromiso, s.herramientas, s.tipo, s.activacion, s.instagram])
     return NextResponse.json({ ok: true })
   } catch (err) {
     return apiError(err)

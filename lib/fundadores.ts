@@ -12,11 +12,29 @@ export interface Opcion { valor: string; texto: string; puntos: number; descarta
 // multiple: se marcan varias (se guardan separadas por coma y suman los puntos de cada una).
 // ayuda: explicación corta bajo la pregunta (en lugar de "Elige una.").
 export interface Pregunta {
-  campo: 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'inventario' | 'herramientas' | 'compromiso'
+  campo: 'tipo' | 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'activacion' | 'inventario' | 'herramientas' | 'compromiso'
   texto: string; ayuda?: string; opciones: Opcion[]; multiple?: boolean
 }
 
+// Ronda 2 (2026-10-08, decidido con el dueño): 15 Fundadores + 5 en lista de espera. Los seleccionados
+// tienen hasta FECHA_LIMITE_ACTIVACION para iniciar su activación (conectar su cuenta); quien no lo
+// haga deja el cupo a la lista de espera, que se confirma FECHA_LISTA_ESPERA con los cupos libres.
+// En la lista de espera entran también los no seleccionados de la Ronda 1 (estado 'espera').
+export const FECHA_INICIO_ACTIVACION = '2026-10-13'
+export const FECHA_LIMITE_ACTIVACION = '2026-10-18'
+export const FECHA_LISTA_ESPERA = '2026-10-19'
+export const CUPOS_ESPERA = 5
+
 export const PREGUNTAS: Pregunta[] = [
+  // Filtra a quien no vende (marketing sin cuenta): puede llenar el formulario, pero queda descartado.
+  {
+    campo: 'tipo', texto: '¿Vendes en MercadoLibre o haces marketing?',
+    opciones: [
+      { valor: 'vendedor', texto: 'Vendo con mi cuenta', puntos: 1 },
+      { valor: 'gestor', texto: 'Manejo cuentas de otros', puntos: 1 },
+      { valor: 'marketing', texto: 'No tengo cuenta, hago marketing', puntos: 0, descarta: true },
+    ],
+  },
   {
     campo: 'ventas_mes', texto: '¿Cuántas ventas haces al mes en MercadoLibre?',
     opciones: [
@@ -52,6 +70,16 @@ export const PREGUNTAS: Pregunta[] = [
       { valor: 'que_vender', texto: 'Saber qué vender o qué traer', puntos: 0 },
       // Precios (2026-10-03): 0 puntos; candidato a Inventario (calculadora de Productos) y Radar.
       { valor: 'precios', texto: 'Decidir a qué precio vender', puntos: 0 },
+    ],
+  },
+  // Compromiso: cuánto tardaría en arrancar si queda (la Ronda 1 mostró que el freno es empezar).
+  {
+    campo: 'activacion', texto: 'Si quedas seleccionado, ¿cuándo iniciarías tu activación?',
+    ayuda: `Desde el ${fechaTanda(FECHA_INICIO_ACTIVACION)}. Hay plazo hasta el ${fechaTanda(FECHA_LIMITE_ACTIVACION)}.`,
+    opciones: [
+      { valor: 'mismo_dia', texto: 'El mismo día', puntos: 2 },
+      { valor: '1-3', texto: 'En 1 a 3 días', puntos: 1 },
+      { valor: 'no_se', texto: 'No sé todavía', puntos: 0 },
     ],
   },
   // Las dos últimas son solo informativas (0 puntos, sin descarte): sirven para preparar la
@@ -122,7 +150,19 @@ export const textoOpcion = (campo: Pregunta['campo'], valor: string) => {
 export function normalizarTelegram(t: string) {
   return t.trim().replace(/^https?:\/\/(www\.)?t\.me\//i, '').replace(/^@+/, '').trim().toLowerCase()
 }
-export const TELEGRAM_RE = /^[a-z0-9_]{5,32}$/
+// Telegram: empieza con letra (así un número de teléfono no pasa).
+export const TELEGRAM_RE = /^[a-z][a-z0-9_]{4,31}$/
+
+/** "@Pedro.Ventas " → "pedro.ventas" (también acepta el link instagram.com/…). */
+export function normalizarInstagram(t: string) {
+  return t.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/[/?].*$/, '').replace(/^@+/, '').trim().toLowerCase()
+}
+// Instagram: letras, números, punto y _, hasta 30, con al menos una letra (un teléfono no pasa).
+export const INSTAGRAM_RE = /^(?=.*[a-z])[a-z0-9._]{1,30}$/
+
+/** El @ con el que se anuncia a alguien: Telegram si lo dio, si no Instagram. */
+export const contactoDe = (s: { telegram: string | null; instagram?: string | null }) =>
+  s.telegram ? `@${s.telegram}` : s.instagram ? `@${s.instagram} (Instagram)` : '—'
 
 /** Mensaje libre opcional del formulario (corto: no es una carta, es "algo más que quieras contarnos"). */
 export const MENSAJE_MAX = 280

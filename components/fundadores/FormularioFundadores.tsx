@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { MENSAJE_MAX, PREGUNTAS, type Pregunta } from '@/lib/fundadores'
+import { CUPOS_ESPERA, FECHA_LIMITE_ACTIVACION, fechaTanda, MENSAJE_MAX, PREGUNTAS, type Pregunta } from '@/lib/fundadores'
 
 type Campo = Pregunta['campo']
 
@@ -52,10 +52,11 @@ const PASOS = PREGUNTAS.length + 1
 export default function FormularioFundadores({ abierta, previa = false, proxima, resultados }: Props) {
   const [paso, setPaso] = useState(0)
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
-  const [contacto, setContacto] = useState({ nombre: '', telegram: '', nick_ml: '', mensaje: '' })
+  const [contacto, setContacto] = useState({ nombre: '', telegram: '', instagram: '', nick_ml: '', mensaje: '' })
+  const [acepta, setAcepta] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [hecho, setHecho] = useState<{ nombre: string; telegram: string; repetida: boolean } | null>(null)
+  const [hecho, setHecho] = useState<{ nombre: string; contacto: string; repetida: boolean } | null>(null)
   const caja = useRef<HTMLFormElement>(null)
   const avance = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -94,11 +95,14 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
     setError(null)
     const faltan = PREGUNTAS.findIndex(p => !resp[p.campo]?.length)
     if (faltan >= 0) { setPaso(faltan); setError('Falta responder esta pregunta'); return }
+    if (!contacto.telegram.trim() && !contacto.instagram.trim()) { setError('Escribe tu usuario de Telegram o de Instagram (al menos uno)'); return }
+    if (!acepta) { setError(`Marca que inicias tu activación antes del ${fechaTanda(FECHA_LIMITE_ACTIVACION)}`); return }
     if (previa) { setError('Vista previa: la postulación no se envía.'); return }
     setEnviando(true)
     try {
       const body = {
         ...contacto,
+        acepta_plazo: acepta,
         sitio: String(new FormData(e.currentTarget).get('sitio') ?? ''),
         navegador_id: navegadorId(),
         ...Object.fromEntries(PREGUNTAS.map(p => [p.campo, p.multiple ? resp[p.campo] : resp[p.campo]?.[0]])),
@@ -109,7 +113,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'No se pudo enviar. Intenta de nuevo.'); return }
       medir('enviado')
-      setHecho({ nombre: body.nombre.trim().split(' ')[0], telegram: body.telegram.trim().replace(/^@/, ''), repetida: !!d.repetida })
+      setHecho({ nombre: body.nombre.trim().split(' ')[0], contacto: (body.telegram || body.instagram).trim().replace(/^@/, ''), repetida: !!d.repetida })
     } finally { setEnviando(false) }
   }
 
@@ -122,8 +126,9 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
         </h2>
         <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
           {hecho.repetida
-            ? <>Ya recibimos una postulación de <b>@{hecho.telegram}</b>. No hace falta enviarla de nuevo.</>
-            : <>Recibimos tu postulación. La selección se anuncia el <b>{resultados ?? 'día siguiente al cierre'}</b>: si quedas, te escribimos por Telegram a <b>@{hecho.telegram}</b>.</>}
+            ? <>Ya recibimos una postulación de <b>@{hecho.contacto}</b>. No hace falta enviarla de nuevo.</>
+            : <>Recibimos tu postulación. Los seleccionados y la lista de espera se anuncian el <b>{resultados ?? 'día siguiente al cierre'}</b> en
+              esta página y en nuestra Comunidad de Vendedores de Telegram, con tu usuario <b>@{hecho.contacto}</b>.</>}
         </p>
         <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
           Si esta vez no se da, no te preocupes: se abrirán nuevas oportunidades para tu perfil.
@@ -147,7 +152,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
             formulario: toma 2 minutos.
           </p>
           <p className="mt-3 text-sm text-neutral-500 leading-relaxed">
-            Ten a mano tu usuario de Telegram y, si quieres, tu nick de MercadoLibre.
+            Ten a mano tu usuario de Telegram o de Instagram y, si quieres, tu nick de MercadoLibre.
           </p>
         </> : (
           <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
@@ -222,7 +227,10 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
         ) : (
           <div className="mt-4">
             <h3 className="text-lg font-semibold text-neutral-900">¿Dónde te escribimos?</h3>
-            <p className="mt-1 text-sm text-neutral-400">Si quedas seleccionado, te contactamos por Telegram.</p>
+            <p className="mt-1 text-sm text-neutral-400">
+              Telegram o Instagram: al menos uno, bien escrito. Los seleccionados se anuncian con ese usuario en esta página y en
+              nuestra Comunidad de Vendedores de Telegram.
+            </p>
             <div className="mt-5 space-y-4">
               <div>
                 <label htmlFor="nombre" className="block text-sm font-medium text-neutral-700 mb-1">Tu nombre</label>
@@ -233,7 +241,15 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                   <label htmlFor="telegram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Telegram</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400" aria-hidden="true">@</span>
-                    <input id="telegram" value={contacto.telegram} onChange={set('telegram')} required maxLength={80} placeholder="tuusuario"
+                    <input id="telegram" value={contacto.telegram} onChange={set('telegram')} maxLength={80} placeholder="tuusuario"
+                      autoCapitalize="none" spellCheck={false} className={`${campo} pl-7`} />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="instagram" className="block text-sm font-medium text-neutral-700 mb-1">Usuario de Instagram</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-400" aria-hidden="true">@</span>
+                    <input id="instagram" value={contacto.instagram} onChange={set('instagram')} maxLength={120} placeholder="tuusuario"
                       autoCapitalize="none" spellCheck={false} className={`${campo} pl-7`} />
                   </div>
                 </div>
@@ -262,6 +278,13 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                   {contacto.mensaje.length}/{MENSAJE_MAX}
                 </p>
               </div>
+              <label className="flex items-start gap-3 rounded-lg border border-lime-300 bg-lime-50 px-3 py-2.5 text-sm text-neutral-800 cursor-pointer">
+                <input type="checkbox" checked={acepta} onChange={e => setAcepta(e.target.checked)} className="mt-0.5 w-4 h-4 accent-lime-600 shrink-0" />
+                <span>
+                  Si quedo seleccionado, <b>inicio mi activación antes del {fechaTanda(FECHA_LIMITE_ACTIVACION)}</b>. Si no, mi cupo pasa
+                  a la lista de espera ({CUPOS_ESPERA} cupos).
+                </span>
+              </label>
             </div>
           </div>
         )}

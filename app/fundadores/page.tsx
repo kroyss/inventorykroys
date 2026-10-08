@@ -2,8 +2,8 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  RONDA_ACTUAL, TZ_FUNDADORES, diaResultados, diasInscripcion, fechaTanda, proximaInscripcion, tandaInscribiendo,
-  type Tanda,
+  CUPOS_ESPERA, FECHA_LIMITE_ACTIVACION, FECHA_LISTA_ESPERA, RONDA_ACTUAL, TZ_FUNDADORES, contactoDe, diaResultados, diasInscripcion,
+  fechaTanda, proximaInscripcion, tandaInscribiendo, type Tanda,
 } from '@/lib/fundadores'
 import FormularioFundadores from '@/components/fundadores/FormularioFundadores'
 
@@ -32,8 +32,9 @@ const INCLUYE = [
   { t: 'Inventario (opcional)', d: 'Si quieres, también llevas tu stock y tus ventas al día, sin cuaderno ni Excel.' },
 ]
 
-// Seleccionados de cada ronda, como se anunciaron en el grupo de Telegram (el @ es el que cada uno
-// usa en Telegram, que no siempre coincide con el del formulario). Se muestran desde el día de resultados,
+// Seleccionados de la Ronda 1, como se anunciaron en el grupo de Telegram (el @ es el que cada uno
+// usa en Telegram, que no siempre coincide con el del formulario). Desde la Ronda 2 salen de la base
+// (aprobados de la tanda + lista de espera, con su Telegram o Instagram). Se muestran desde el día de resultados,
 // solo con el @ (07-10-2026: sin nombres, a pedido del dueño).
 // Los seleccionados escriben ellos a la cuenta oficial (no se les escribe en frío: Telegram lo limita).
 const TELEGRAM_OFICIAL = 'elcomerciantedigital'
@@ -59,6 +60,13 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               to_char(t.inscribe_hasta, 'YYYY-MM-DD') AS inscribe_hasta,
             (SELECT COUNT(*)::int FROM fundadores_solicitudes s WHERE s.tanda = t.numero AND s.estado = 'aprobado') AS tomados
      FROM fundadores_tandas t WHERE t.ronda = $1 ORDER BY t.numero`, [RONDA_ACTUAL])
+  // Aprobados por tanda y lista de espera (desde la Ronda 2 el anuncio sale de aquí).
+  const { rows: elegidos } = await dbGlobal().query<{ tanda: number | null; estado: string; telegram: string | null; instagram: string | null }>(
+    `SELECT tanda, estado, telegram, instagram FROM fundadores_solicitudes
+     WHERE ronda = $1 AND estado IN ('aprobado', 'espera') ORDER BY revisada_at NULLS LAST, id`, [RONDA_ACTUAL])
+  const seleccionados = (n: number) => SELECCIONADOS[n]?.map(x => `@${x.telegram}`)
+    ?? elegidos.filter(e => e.estado === 'aprobado' && e.tanda === n).map(contactoDe)
+  const espera = elegidos.filter(e => e.estado === 'espera').map(contactoDe)
   const total = tandas.reduce((a, t) => a + t.cupos, 0)
   const tomados = tandas.reduce((a, t) => a + Math.min(t.tomados, t.cupos), 0)
   // "en dos rondas de 5" si son iguales; "en dos rondas (5 y 10)" si no.
@@ -71,7 +79,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
   const proxima = proximaInscripcion(tandas, hoy)
   const destacada = (abiertaHoy ?? proxima)?.numero      // la que inscribe hoy o, si no, la próxima en abrir
   // La última ronda con resultados ya anunciados y lista de seleccionados.
-  const anunciada = [...tandas].reverse().find(t => SELECCIONADOS[t.numero] && (diaResultados(t) ?? '9999') <= hoy)
+  const anunciada = [...tandas].reverse().find(t => seleccionados(t.numero).length > 0 && (diaResultados(t) ?? '9999') <= hoy)
+  // Plazo de activación y lista de espera: solo se avisan desde la Ronda 2 y hasta que se confirma la lista.
+  const conPlazo = !!anunciada && anunciada.numero >= 2 && hoy <= FECHA_LISTA_ESPERA
   const siguiente = anunciada && tandas.find(t => t.numero === anunciada.numero + 1)
 
   return (
@@ -168,13 +178,25 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
               <h2 className="mt-2 text-2xl font-semibold text-neutral-900">🎉 ¡Ya están los seleccionados!</h2>
               <p className="mt-2 text-sm text-neutral-600">Gracias a todos los que se postularon. La respuesta fue increíble.</p>
               <ul className="mt-4 space-y-1.5">
-                {SELECCIONADOS[anunciada.numero].map(x => (
-                  <li key={x.telegram} className="flex items-center gap-2 text-sm">
+                {seleccionados(anunciada.numero).map(x => (
+                  <li key={x} className="flex items-center gap-2 text-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-lime-600 shrink-0" />
-                    <span className="font-semibold text-neutral-900">@{x.telegram}</span>
+                    <span className="font-semibold text-neutral-900">{x}</span>
                   </li>
                 ))}
               </ul>
+              {conPlazo && espera.length > 0 && <>
+                <p className="mt-5 text-sm font-semibold text-neutral-900">Lista de espera</p>
+                <p className="text-xs text-neutral-500">Se confirma el {fechaTanda(FECHA_LISTA_ESPERA)} con los cupos que queden libres.</p>
+                <ul className="mt-2 space-y-1.5">
+                  {espera.map(x => (
+                    <li key={x} className="flex items-center gap-2 text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span className="font-medium text-neutral-700">{x}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>}
             </div>
             <div className="space-y-3">
               <div className="rounded-xl bg-white border border-lime-300 p-4">
@@ -184,6 +206,12 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                   <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer" className="font-semibold text-lime-800 underline underline-offset-2">@{TELEGRAM_OFICIAL}</a>{' '}
                   para darte tu acceso.
                 </p>
+                {conPlazo && (
+                  <p className="mt-2 text-sm text-neutral-600">
+                    Tienes <b className="text-neutral-900">hasta el {fechaTanda(FECHA_LIMITE_ACTIVACION)}</b> para iniciar tu activación
+                    (conectar tu cuenta de MercadoLibre). Si no, tu cupo pasa a la lista de espera.
+                  </p>
+                )}
                 <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer"
                   className="mt-3 inline-flex items-center gap-2 bg-neutral-950 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-neutral-800 transition-colors">
                   Escribir por Telegram <span aria-hidden="true">→</span>
@@ -227,8 +255,9 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
             <ol className="mt-3 space-y-2 text-sm text-neutral-600 list-decimal pl-4">
               <li>Te postulas una sola vez, en los días de postulación (2 minutos). Si no quedas en la ronda 1, tu postulación sigue en pie para la ronda 2.</li>
               <li>Revisamos los perfiles: buscamos vendedores con movimiento real, para que el sistema te sirva de verdad.</li>
-              <li>Al día siguiente del cierre de las postulaciones anunciamos la selección aquí y en nuestro grupo de Telegram. Si quedas, nos escribes a @elcomerciantedigital, configuramos el sistema contigo y te enseñamos a usarlo.</li>
-              <li>Un mes gratis. Después decides si te quedas.</li>
+              <li>Al día siguiente del cierre de las postulaciones anunciamos aquí y en nuestra Comunidad de Vendedores de Telegram a los seleccionados y a {CUPOS_ESPERA} en lista de espera. Si quedas, nos escribes a @elcomerciantedigital, configuramos el sistema contigo y te enseñamos a usarlo.</li>
+              <li>Tienes hasta el {fechaTanda(FECHA_LIMITE_ACTIVACION)} para iniciar tu activación (conectar tu cuenta de MercadoLibre). Si no, el cupo pasa a la lista de espera, que se confirma el {fechaTanda(FECHA_LISTA_ESPERA)}.</li>
+              <li>Un mes gratis desde que conectas tu cuenta (o desde el {fechaTanda(FECHA_LIMITE_ACTIVACION)} si no lo has hecho). Después decides si te quedas.</li>
             </ol>
           </section>
         </div>

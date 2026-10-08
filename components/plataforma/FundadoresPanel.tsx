@@ -10,13 +10,14 @@ interface Verif {
   anios?: number | null; ventas_texto?: string | null
 }
 interface Solicitud {
-  id: number; nombre: string; telegram: string; nick_ml: string | null; mensaje: string | null
+  id: number; nombre: string; telegram: string | null; instagram: string | null; tipo: string | null; activacion: string | null
+  nick_ml: string | null; mensaje: string | null
   ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; herramientas: string | null; compromiso: string | null
-  puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'rechazado'; tanda: number | null
+  puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'espera' | 'rechazado'; tanda: number | null
   sospechosa: string | null; ml_verificado: Verif | null; notas: string | null; created_at: string
   fotos: number[]; previas: { ronda: number; estado: string; notas: string | null; fecha: string; fotos: number[] }[]
 }
-type Filtro = 'calificado' | 'aprobado' | 'rechazado' | 'descartado' | 'todas' | 'radar'
+type Filtro = 'calificado' | 'aprobado' | 'espera' | 'rechazado' | 'descartado' | 'todas' | 'radar'
 
 // Marcó "Saber qué vender o qué traer": no suma para Fundadores, pero es público para el Radar
 // (también si quedó descartado o rechazado).
@@ -25,17 +26,18 @@ const quiereRadar = (s: Solicitud) => s.dolor.split(',').includes('que_vender')
 const ESTADO: Record<Solicitud['estado'], { t: string; c: string }> = {
   calificado: { t: 'Por revisar', c: 'bg-sky-50 text-sky-800 ring-sky-200' },
   aprobado:   { t: 'Aprobado', c: 'bg-lime-50 text-lime-800 ring-lime-300' },
+  espera:     { t: 'Lista de espera', c: 'bg-amber-50 text-amber-800 ring-amber-200' },
   rechazado:  { t: 'Rechazado', c: 'bg-neutral-100 text-neutral-600 ring-neutral-200' },
   descartado: { t: 'Descartado', c: 'bg-neutral-100 text-neutral-500 ring-neutral-200' },
 }
 
 const FILTRO: Record<Filtro, string> = {
-  calificado: 'Por revisar', aprobado: 'Aprobados', rechazado: 'Rechazados', descartado: 'Descartados', todas: 'Todas', radar: '📡 Interés Radar',
+  calificado: 'Por revisar', aprobado: 'Aprobados', espera: 'Lista de espera', rechazado: 'Rechazados', descartado: 'Descartados', todas: 'Todas', radar: '📡 Interés Radar',
 }
 
 // Respuestas en filas: etiqueta corta + una pastilla por opción (verde = suma puntos) + los puntos de la fila.
 const ETIQUETA: Record<Pregunta['campo'], string> = {
-  ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Usa sistema', herramientas: 'Paga por', compromiso: 'Inventario',
+  tipo: 'Es', activacion: 'Activaría', ventas_mes: 'Ventas al mes', cuentas: 'Cuentas ML', despacho: 'Despacha por', dolor: 'Le quita tiempo', inventario: 'Usa sistema', herramientas: 'Paga por', compromiso: 'Inventario',
 }
 
 function Respuestas({ s }: { s: Solicitud }) {
@@ -71,7 +73,7 @@ export default function FundadoresPanel() {
   const [filtro, setFiltro] = useState<Filtro>('calificado')
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<number | null>(null)
-  const [aviso, setAviso] = useState<{ texto: string; telegram?: string } | null>(null)
+  const [aviso, setAviso] = useState<{ texto: string; telegram?: string | null } | null>(null)
   useEffect(() => {
     if (!aviso) return
     const t = setTimeout(() => setAviso(null), 8000)
@@ -115,7 +117,9 @@ export default function FundadoresPanel() {
       const d = await r.json().catch(() => ({}))
       if (!r.ok) setError(d.error ?? 'No se pudo')
       else if ('accion' in body && body.accion === 'aprobar')
-        setAviso({ texto: `${s.nombre} aprobado en la ronda ${d.tanda}. Pasó a “Aprobados”: escríbele por Telegram.`, telegram: s.telegram })
+        setAviso({ texto: `${s.nombre} aprobado en la ronda ${d.tanda}. Pasó a “Aprobados”.`, telegram: s.telegram })
+      else if ('accion' in body && body.accion === 'espera')
+        setAviso({ texto: `${s.nombre} quedó en la lista de espera.` })
       else if ('accion' in body && body.accion === 'rechazar')
         setAviso({ texto: `${s.nombre} ${s.estado === 'aprobado' ? 'salió de su ronda y quedó' : 'quedó'} en “Rechazados”. No se le avisa nada.` })
       else if ('accion' in body && body.accion === 'reconsiderar')
@@ -192,7 +196,7 @@ export default function FundadoresPanel() {
       <VisitasFundadores />
 
       <div className="flex flex-wrap gap-1.5">
-        {(['calificado', 'aprobado', 'rechazado', 'descartado', 'todas', 'radar'] as const).map(f => (
+        {(['calificado', 'aprobado', 'espera', 'rechazado', 'descartado', 'todas', 'radar'] as const).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
             className={`px-3 py-1 text-xs font-medium rounded-full border ${filtro === f ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'}`}>
             {FILTRO[f]} ({cuenta(f)})
@@ -235,7 +239,8 @@ export default function FundadoresPanel() {
                 <div className="flex-1 min-w-[16rem] space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-neutral-900">{s.nombre}</span>
-                    <a href={`https://t.me/${s.telegram}`} target="_blank" rel="noreferrer" className="text-sm text-sky-700 hover:underline">@{s.telegram}</a>
+                    {s.telegram && <a href={`https://t.me/${s.telegram}`} target="_blank" rel="noreferrer" className="text-sm text-sky-700 hover:underline">@{s.telegram}</a>}
+                    {s.instagram && <a href={`https://instagram.com/${s.instagram}`} target="_blank" rel="noreferrer" className="text-sm text-pink-700 hover:underline">IG @{s.instagram}</a>}
                     <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ${ESTADO[s.estado].c}`}>
                       {ESTADO[s.estado].t}{s.estado === 'aprobado' && s.tanda ? ` · ronda ${s.tanda}` : ''}
                     </span>
@@ -301,6 +306,12 @@ export default function FundadoresPanel() {
                 <div className="flex items-start gap-2 shrink-0">
                   {s.estado !== 'aprobado' && (
                     <button onClick={() => accion(s, { accion: 'aprobar' })} disabled={ocupado === s.id} className="btn-primary text-xs">Aprobar</button>
+                  )}
+                  {(s.estado === 'calificado' || s.estado === 'rechazado') && (
+                    <button onClick={() => accion(s, { accion: 'espera' })} disabled={ocupado === s.id} className="btn-secondary text-xs">Lista de espera</button>
+                  )}
+                  {s.estado === 'espera' && (
+                    <button onClick={() => accion(s, { accion: 'reconsiderar' })} disabled={ocupado === s.id} className="btn-ghost text-xs">Sacar de espera</button>
                   )}
                   {(s.estado === 'calificado' || s.estado === 'aprobado') && (
                     <button onClick={() => accion(s, { accion: 'rechazar' })} disabled={ocupado === s.id} className="btn-secondary text-xs">
