@@ -244,6 +244,10 @@ export default function FundadoresPanel() {
                     <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ${ESTADO[s.estado].c}`}>
                       {ESTADO[s.estado].t}{s.estado === 'aprobado' && s.tanda ? ` · ronda ${s.tanda}` : ''}
                     </span>
+                    {!s.tipo && s.estado !== 'descartado' && (
+                      <span title="Se postuló antes de las preguntas nuevas: se le cuentan puntos neutrales en «¿Vendes o haces marketing?» y «¿Cuándo iniciarías?»"
+                        className="text-[11px] rounded-full px-2 py-0.5 bg-neutral-100 text-neutral-600 ring-1 ring-inset ring-neutral-200">Ronda 1 · puntos neutrales</span>
+                    )}
                     {quiereRadar(s) && (
                       <span title="Marcó “Saber qué vender o qué traer”: posible cliente del Radar"
                         className="text-[11px] rounded-full px-2 py-0.5 bg-violet-50 text-violet-800 ring-1 ring-inset ring-violet-200">📡 Interés Radar</span>

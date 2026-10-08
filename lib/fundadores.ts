@@ -14,6 +14,7 @@ export interface Opcion { valor: string; texto: string; puntos: number; descarta
 export interface Pregunta {
   campo: 'tipo' | 'ventas_mes' | 'cuentas' | 'despacho' | 'dolor' | 'activacion' | 'inventario' | 'herramientas' | 'compromiso'
   texto: string; ayuda?: string; opciones: Opcion[]; multiple?: boolean
+  tope?: number      // máximo que suma la pregunta (varias opciones: marcar todo no infla el puntaje)
 }
 
 // Ronda 2 (2026-10-08, decidido con el dueño): 15 Fundadores + 5 en lista de espera. Los seleccionados
@@ -62,7 +63,7 @@ export const PREGUNTAS: Pregunta[] = [
     ],
   },
   {
-    campo: 'dolor', texto: '¿Qué te quita más tiempo hoy?', multiple: true,
+    campo: 'dolor', texto: '¿Qué te quita más tiempo hoy?', multiple: true, tope: 3,
     opciones: [
       { valor: 'preguntas', texto: 'Responder preguntas', puntos: 2 },
       { valor: 'mensajes_guias', texto: 'Mensajes de las ventas y enviar las guías', puntos: 2 },
@@ -77,7 +78,7 @@ export const PREGUNTAS: Pregunta[] = [
     campo: 'activacion', texto: 'Si quedas seleccionado, ¿cuándo iniciarías tu activación?',
     ayuda: `Desde el ${fechaTanda(FECHA_INICIO_ACTIVACION)}. Hay plazo hasta el ${fechaTanda(FECHA_LIMITE_ACTIVACION)}.`,
     opciones: [
-      { valor: 'mismo_dia', texto: 'El mismo día', puntos: 2 },
+      { valor: 'mismo_dia', texto: 'El mismo día', puntos: 3 },
       { valor: '1-3', texto: 'En 1 a 3 días', puntos: 1 },
       { valor: 'no_se', texto: 'No sé todavía', puntos: 0 },
     ],
@@ -120,8 +121,14 @@ export const PREGUNTAS: Pregunta[] = [
 
 /** El nick de MercadoLibre es opcional: si lo da, suma 1 (permite verificar su reputación). */
 export const PUNTO_NICK = 1
-const maximoDe = (p: Pregunta) =>
-  p.multiple ? p.opciones.reduce((a, o) => a + o.puntos, 0) : Math.max(...p.opciones.map(o => o.puntos))
+const maximoDe = (p: Pregunta) => Math.min(p.tope ?? Infinity,
+  p.multiple ? p.opciones.reduce((a, o) => a + o.puntos, 0) : Math.max(...p.opciones.map(o => o.puntos)))
+
+/** Equidad entre rondas (2026-10-08, pedido del dueño): las postulaciones de la Ronda 1 no tienen las
+ *  preguntas `tipo` ni `activacion` (se agregaron en la Ronda 2). Para que nadie gane ni pierda por
+ *  eso, se les cuentan puntos neutrales: vendedor (pasó el filtro de ventas) y el medio de la escala de
+ *  activación (2: entre "1 a 3 días" = 1 y "el mismo día" = 3). Sus respuestas quedan en blanco. */
+export const NEUTRAL_SIN_RESPUESTA: Partial<Record<Pregunta['campo'], number>> = { tipo: 1, activacion: 2 }
 export const PUNTAJE_MAXIMO = PREGUNTAS.reduce((a, p) => a + maximoDe(p), 0) + PUNTO_NICK
 
 export type Respuestas = Record<Pregunta['campo'], string>
@@ -138,13 +145,16 @@ export function evaluar(r: Respuestas, nick: string | null) {
   let puntaje = nick ? PUNTO_NICK : 0
   let descartada = false
   for (const p of PREGUNTAS) {
+    if (!r[p.campo] && NEUTRAL_SIN_RESPUESTA[p.campo] != null) { puntaje += NEUTRAL_SIN_RESPUESTA[p.campo]!; continue }
     const valores = p.multiple ? (r[p.campo] ?? '').split(',') : [r[p.campo]]
+    let suma = 0
     for (const v of valores) {
       const o = p.opciones.find(x => x.valor === v)
       if (!o) throw new Error(`Respuesta inválida en "${p.texto}"`)
-      puntaje += o.puntos
+      suma += o.puntos
       if (o.descarta) descartada = true
     }
+    puntaje += Math.min(suma, p.tope ?? Infinity)
   }
   return { puntaje, estado: descartada ? 'descartado' as const : 'calificado' as const }
 }
