@@ -10,7 +10,7 @@ interface Verif {
   anios?: number | null; ventas_texto?: string | null
 }
 interface Solicitud {
-  id: number; nombre: string; telegram: string | null; instagram: string | null; tipo: string | null; activacion: string | null; dolor_otro: string | null
+  id: number; nombre: string; telegram: string | null; instagram: string | null; tipo: string | null; activacion: string | null
   nick_ml: string | null; mensaje: string | null
   ventas_mes: string; cuentas: string; despacho: string; dolor: string; inventario: string; herramientas: string | null; compromiso: string | null
   puntaje: number; estado: 'descartado' | 'calificado' | 'aprobado' | 'espera' | 'rechazado'; tanda: number | null
@@ -251,7 +251,6 @@ export default function FundadoresPanel() {
                     <span className="text-xs text-neutral-400">{fecha(s.created_at)}</span>
                   </div>
                   <div className="pt-1"><Respuestas s={s} /></div>
-                  {s.dolor_otro && <p className="text-xs text-neutral-600">Le quita tiempo (escrito): “{s.dolor_otro}”</p>}
                   <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">
                     {s.nick_ml ? <>
                       <span>Nick ML: <a href={`https://www.mercadolibre.com.ve/perfil/vendedor/${encodeURIComponent(s.nick_ml)}`} target="_blank" rel="noreferrer"

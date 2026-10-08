@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  CUPOS_ESPERA, DOLOR_OTRO_MAX, FECHA_LIMITE_ACTIVACION, fechaTanda, MENSAJE_MAX, PREGUNTAS, saltaAContacto, type Pregunta,
+  CUPOS_ESPERA, FECHA_LIMITE_ACTIVACION, fechaTanda, MENSAJE_MAX, PREGUNTAS, saltaAContacto, type Pregunta,
 } from '@/lib/fundadores'
 
 type Campo = Pregunta['campo']
@@ -56,7 +56,6 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
   const [contacto, setContacto] = useState({ nombre: '', telegram: '', instagram: '', nick_ml: '', mensaje: '' })
   const [acepta, setAcepta] = useState(false)
-  const [dolorOtro, setDolorOtro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hecho, setHecho] = useState<{ nombre: string; contacto: string; repetida: boolean } | null>(null)
@@ -108,7 +107,6 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       const body = {
         ...contacto,
         acepta_plazo: acepta,
-        dolor_otro: dolorOtro,
         sitio: String(new FormData(e.currentTarget).get('sitio') ?? ''),
         navegador_id: navegadorId(),
         ...Object.fromEntries(PREGUNTAS.filter(p => !saltaAContacto(resp) || p.campo === 'tipo')
@@ -230,10 +228,6 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
                 )
               })}
             </div>
-            {pregunta.campo === 'dolor' && (
-              <input value={dolorOtro} onChange={e => setDolorOtro(e.target.value)} maxLength={DOLOR_OTRO_MAX}
-                placeholder="¿Otra cosa? Escríbela aquí (opcional)" className={`${campo} mt-3`} />
-            )}
           </fieldset>
         ) : (
           <div className="mt-4">

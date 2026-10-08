@@ -133,9 +133,6 @@ export const saltaAContacto = (r: Partial<Record<Pregunta['campo'], string | str
   return Array.isArray(v) ? v.includes(SALTA_A_CONTACTO.valor) : v === SALTA_A_CONTACTO.valor
 }
 
-/** Texto libre opcional junto a "¿Qué te quita más tiempo hoy?". */
-export const DOLOR_OTRO_MAX = 200
-
 export function evaluar(r: Respuestas, nick: string | null) {
   if (saltaAContacto(r)) return { puntaje: 0, estado: 'descartado' as const }
   let puntaje = nick ? PUNTO_NICK : 0

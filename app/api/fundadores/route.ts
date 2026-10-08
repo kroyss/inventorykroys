@@ -5,7 +5,7 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  DOLOR_OTRO_MAX, diasInscripcion, evaluar, fechaTanda, saltaAContacto, FECHA_LIMITE_ACTIVACION, INSTAGRAM_RE, MENSAJE_MAX, normalizarInstagram, normalizarTelegram,
+  diasInscripcion, evaluar, fechaTanda, saltaAContacto, FECHA_LIMITE_ACTIVACION, INSTAGRAM_RE, MENSAJE_MAX, normalizarInstagram, normalizarTelegram,
   PREGUNTAS, proximaInscripcion, RONDA_ACTUAL, tandaInscribiendo, TELEGRAM_RE, TZ_FUNDADORES, type Tanda,
 } from '@/lib/fundadores'
 
@@ -62,7 +62,6 @@ const Solicitud = z.object({
   cuentas: opcion('cuentas').optional(),
   despacho: opciones('despacho').optional(),
   dolor: opciones('dolor').optional(),
-  dolor_otro: z.string().trim().max(DOLOR_OTRO_MAX).optional().transform(v => v || null),
   activacion: opcion('activacion').optional(),
   inventario: opcion('inventario').optional(),
   herramientas: opciones('herramientas').optional(),
@@ -127,12 +126,12 @@ export async function POST(req: NextRequest) {
       `INSERT INTO fundadores_solicitudes
          (ronda, nombre, telegram, nick_ml, ventas_mes, cuentas, despacho, dolor, inventario,
           puntaje, estado, sospechosa, ip_hash, navegador_id, user_agent, mensaje, compromiso, herramientas,
-          tipo, activacion, instagram, acepta_plazo, dolor_otro)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,TRUE,$22)
+          tipo, activacion, instagram, acepta_plazo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,TRUE)
        ON CONFLICT DO NOTHING`,
       [RONDA_ACTUAL, s.nombre, s.telegram, s.nick_ml, s.ventas_mes ?? '', s.cuentas ?? '', s.despacho ?? '', s.dolor ?? '', s.inventario ?? '',
        puntaje, estado, sospechosa, ipHash, s.navegador_id ?? null, req.headers.get('user-agent')?.slice(0, 300) ?? null,
-       s.mensaje, s.compromiso ?? null, s.herramientas ?? null, s.tipo, s.activacion ?? null, s.instagram, s.dolor_otro])
+       s.mensaje, s.compromiso ?? null, s.herramientas ?? null, s.tipo, s.activacion ?? null, s.instagram])
     return NextResponse.json({ ok: true })
   } catch (err) {
     return apiError(err)
