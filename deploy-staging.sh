@@ -17,7 +17,9 @@ docker compose -f docker-compose.staging.yml up -d --build
 
 echo "→ limpiando imágenes viejas"
 docker image prune -f >/dev/null
-docker builder prune -af --max-used-space 5GB >/dev/null
+# --max-used-space NO sirve en este server (Docker con containerd: el 07-10 dejó 47 GB). Se borra la
+# caché que no se usó en 24 h: la del último build queda y el próximo compila rápido igual.
+docker builder prune -af --filter until=24h >/dev/null
 
 echo "✓ Staging OK en la rama $RAMA ($(git rev-parse --short HEAD))"
 docker compose -f docker-compose.staging.yml ps

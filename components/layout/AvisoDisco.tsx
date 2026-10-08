@@ -3,7 +3,8 @@ import { statfs } from 'fs/promises'
 // Alerta de disco del VPS para el dueño de la plataforma (el 2026-10-05 se llenó al 100% con caché de
 // Docker; un disco lleno puede dejar a la base sin poder guardar). El / del contenedor está en el mismo
 // disco del server, así que su espacio libre es el del server. La limpieza diaria es
-// scripts/limpieza-docker.sh (crontab 5:00).
+// scripts/limpieza-docker.sh (crontab 5:00). El comando del aviso borra TODA la caché de compilación
+// (--max-used-space no sirve con el containerd del server); el próximo deploy tarda unos minutos más.
 const AVISAR_DESDE = 80
 
 export default async function AvisoDisco() {
@@ -15,7 +16,7 @@ export default async function AvisoDisco() {
   return (
     <div className="bg-red-600 text-white text-center text-sm py-2 px-4">
       <b>Disco del servidor al {usado}%</b> (quedan {libreGb} GB). Libera espacio:{' '}
-      <code className="bg-red-700 px-1.5 py-0.5 rounded text-xs">docker builder prune -af --max-used-space 5GB</code>
+      <code className="bg-red-700 px-1.5 py-0.5 rounded text-xs">docker builder prune -af</code>
       {' '}· solo lo ves tú
     </div>
   )
