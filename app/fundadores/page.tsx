@@ -96,24 +96,21 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 w-[14rem] h-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
 
         <div className="relative max-w-5xl mx-auto px-5 sm:px-8 pt-10 sm:pt-14 pb-14 sm:pb-20">
-          {/* En escritorio, dos columnas con las mismas proporciones que las rondas y el formulario de abajo. */}
-          <div className="max-w-2xl lg:max-w-none lg:grid lg:grid-cols-[1fr_1.15fr] lg:gap-10 lg:items-end">
-           <div>
+          {/* En escritorio el texto ocupa todo el ancho (alineado con las rondas y el formulario), un poco más grande. */}
+          <div className="max-w-2xl lg:max-w-none">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">
               Programa Fundadores <span className="text-neutral-500">·</span> El Comerciante Digital
             </p>
             <h1 className="mt-3 text-4xl sm:text-5xl font-semibold leading-[1.1] tracking-tight">
               Sé uno de los <span className="text-lime-400">{total} primeros.</span>
             </h1>
-            <p className="mt-4 text-neutral-400 leading-relaxed">
+            <p className="mt-4 text-neutral-400 leading-relaxed lg:text-lg">
               Abrimos el sistema con el que manejamos nuestras propias cuentas de MercadoLibre a{' '}
               {total} vendedores con movimiento real, en {reparto}, con <b className="text-white">un mes gratis</b> para
               usarlo de verdad. Cada ronda tiene <b className="text-white">días fijos para postularse</b> y la selección
               se anuncia al día siguiente del cierre. Después decides si te quedas.
             </p>
-           </div>
-           <div>
-            <p className="mt-3 lg:mt-0 text-neutral-400 leading-relaxed">
+            <p className="mt-3 text-neutral-400 leading-relaxed lg:text-lg">
               Además, <b className="text-white">{CUPOS_ESPERA} postulantes quedan en lista de espera</b> y se publican aquí junto con
               los seleccionados. Si algún seleccionado no inicia su activación antes del {fechaTanda(FECHA_LIMITE_ACTIVACION)}, el{' '}
               {fechaTanda(FECHA_LISTA_ESPERA)} entra el siguiente de la lista.
@@ -135,7 +132,6 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                 </li>
               ))}
             </ul>
-           </div>
           </div>
 
           {/* Tandas */}
