@@ -675,11 +675,11 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
                 <Th k="categoria" label="Categoría" align="right" />
                 <Th k="stock_actual" label="Stock" align="right" />
                 <Th k="en_transito" label="En camino" align="right" />
+                <Th k="sugerido_comprar" label="Sugerido" align="right" />
                 <Th k="venta_mensual" label="V. mens" align="right" />
                 <Th k="cobertura" label="Cobertura" align="right" />
                 <Th k="cobertura_total" label="Cob+tránsito" align="right" />
                 <Th k="ganancia_mensual" label="Gan/mes" align="right" />
-                <Th k="sugerido_comprar" label="Sugerido" align="right" />
               </tr>
             </thead>
             <tbody>
@@ -713,12 +713,14 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
                       {p.categoria
                         ? <span className="px-2 py-0.5 rounded text-xs whitespace-nowrap"
                             style={{ backgroundColor: (p.categoria_color || '#999') + '22', color: p.categoria_color || '#666' }}>
-                            {p.categoria}{p.categoria_pct != null ? ` ${p.categoria_pct}%` : ''}
+                            {/* el nombre ya trae el % (p.ej. "ALTO 80%"): no repetirlo */}
+                            {p.categoria}{p.categoria_pct != null && !String(p.categoria).includes('%') ? ` ${p.categoria_pct}%` : ''}
                           </span>
                         : <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="px-3 py-2 text-right">{p.stock_actual}</td>
                     <td className={`px-3 py-2 text-right ${p.en_transito > 0 ? 'text-sky-600 font-medium' : 'text-neutral-300'}`}>{p.en_transito || '—'}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{p.sugerido_comprar}</td>
                     {/* Demanda con la que se calculan cobertura y sugerido. Cuando
                         difiere del promedio por calendario es porque el producto
                         estuvo agotado: se marca para que el número no sorprenda. */}
@@ -731,7 +733,6 @@ function StockAnalysisReport({ data, sub, setSub, onReload }: any) {
                     <td className="px-3 py-2 text-right">{p.cobertura} m</td>
                     <td className="px-3 py-2 text-right font-medium">{p.cobertura_total} m</td>
                     <td className="px-3 py-2 text-right text-green-600">${money(p.ganancia_mensual)}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{p.sugerido_comprar}</td>
                   </tr>
                 )
               })}
