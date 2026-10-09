@@ -6,6 +6,8 @@ import { digitsOnly } from '@/lib/inputGuards'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 import { orderLenLabel, mlOrderError } from '@/lib/orderNumber'
+import { PagoVenta } from '@/components/pagosme/PagoME'
+import type { PagoME } from '@/lib/pagosMEComun'
 
 interface FormItem {
   product_id: number
@@ -108,6 +110,23 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     }, 500)
     return () => { vivo = false; clearTimeout(t) }
   }, [numeroCompleto, orderNumber])
+  // Pagos MercadoEnvíos (módulo pagos_me): el pago que trajo el vigilante para este número.
+  // Sin el módulo la API responde 403 y no se muestra nada.
+  const [pagoME, setPagoME] = useState<{ numero: string; pago: PagoME | null } | null>(null)
+  useEffect(() => {
+    if (!numeroCompleto || country !== 'VE') return
+    const numero = orderNumber.trim()
+    let vivo = true
+    const t = setTimeout(() => {
+      fetch(`/api/pagos-me?venta=${encodeURIComponent(numero)}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((p: PagoME | null) => { if (vivo) setPagoME({ numero, pago: p }) })
+        .catch(() => {})
+    }, 500)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [numeroCompleto, orderNumber, country])
+  const pagoActual = numeroCompleto && pagoME?.numero === orderNumber.trim() ? pagoME.pago : null
+
   // Solo vale lo encontrado para el número que está escrito ahora.
   const mlActual = numeroCompleto && ml?.numero === orderNumber.trim() ? ml : null
   const mlVenta = mlActual?.venta ?? null
@@ -221,6 +240,13 @@ export default function VentasForm({ editing, products, country, onClose, onSave
       ? await fetch(`/api/sales/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       : await fetch('/api/sales',                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json().catch(() => ({}))
+    if (res.ok && pagoActual) {
+      // Pago verificado → la venta pasa a Pago verificado; y la guía entra al lote de Despachos.
+      await fetch('/api/pagos-me/vincular', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venta: orderNumber.trim() }),
+      }).catch(() => {})
+    }
     setBusy(false)
     if (!res.ok) {
       setError(data.error ?? 'Error')
@@ -332,6 +358,8 @@ export default function VentasForm({ editing, products, country, onClose, onSave
               )}
             </div>
           </div>
+
+          {pagoActual && <PagoVenta p={pagoActual} />}
 
           {/* Lo que compró en MercadoLibre */}
           {mlVenta && mlVenta.items.length > 0 && (() => {

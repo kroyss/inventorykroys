@@ -21,6 +21,9 @@ export const MODULOS = {
   descuento_ml:   'Descuento ML: descuento global sobre el exceso, tope por MercadoEnvíos y Márgenes < $5 (VE)',
   importaciones:  'Importaciones: compras al exterior (pagos 50/100, fotos, aduana, contenedores)',
   analisis_stock: 'Análisis de stock y conteos: reposición, declive, remate y conteos físicos (Reportes)',
+  // Solo la empresa de la plataforma (migración 076): el vigilante trae pagos y guías del portal de
+  // MercadoEnvíos; se verifican por lote y Despachos no imprime guías con el pago sin verificar.
+  pagos_me:       'Pagos MercadoEnvíos: traer pagos y guías del portal, verificarlos por lote (uso interno)',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -42,6 +45,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
   '/alertas-stock': 'alertas_stock',
+  '/pagos-me':       'pagos_me',
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
 }

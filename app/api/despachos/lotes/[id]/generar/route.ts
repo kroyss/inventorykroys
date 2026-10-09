@@ -7,7 +7,7 @@ import {
   IMPRIMIBLE, leerOriginal, MAX_POR_LOTE, respuestaServicio,
   refrescarVentasML,
 } from '@/lib/despachos'
-import { llevaInventario } from '@/lib/modulos'
+import { llevaInventario, tieneModulo } from '@/lib/modulos'
 
 /**
  * POST /api/despachos/lotes/[id]/generar — arma el PDF 4xA4 del lote.
@@ -43,7 +43,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'El lote ya fue generado o descartado' }, { status: 400 })
     }
 
-    const aImprimir = (await etiquetasValidadas(db, lote.id, desdeML))
+    const aImprimir = (await etiquetasValidadas(db, lote.id, desdeML, tieneModulo(session.user, 'pagos_me')))
       .filter(e => e.incluida && IMPRIMIBLE[e.estado])
     if (aImprimir.length === 0) {
       await client.query('ROLLBACK')

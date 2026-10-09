@@ -7,7 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 // ── Tipos de la API ─────────────────────────────────────────────────────────
 type Estado =
   | 'OK' | 'REIMPRESION' | 'ERROR_PDF' | 'NO_ETIQUETA' | 'SIN_VENTA'
-  | 'ESTADO' | 'SIN_PRODUCTOS' | 'DUPLICADA' | 'YA_IMPRESA'
+  | 'ESTADO' | 'SIN_PRODUCTOS' | 'DUPLICADA' | 'YA_IMPRESA' | 'PAGO'
 
 interface Etiqueta {
   id: number
@@ -21,6 +21,8 @@ interface Etiqueta {
   sale_status: string | null
   sale_notes: string | null
   items: { product_name: string; quantity: number; notes: string | null }[]
+  // Pagos MercadoEnvíos (solo la empresa de la plataforma): pago traído del portal
+  pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
   estado: Estado
   detalle: string | null
 }
@@ -47,7 +49,7 @@ interface Falla { etiqueta_id: number; original_name: string; venta: string | nu
 
 const IMPRIMIBLE: Record<Estado, boolean> = {
   OK: true, REIMPRESION: true, ERROR_PDF: false, NO_ETIQUETA: false, SIN_VENTA: false,
-  ESTADO: false, SIN_PRODUCTOS: false, DUPLICADA: false, YA_IMPRESA: false,
+  ESTADO: false, SIN_PRODUCTOS: false, DUPLICADA: false, YA_IMPRESA: false, PAGO: false,
 }
 const ESTADO_UI: Record<Estado, { label: string; cls: string }> = {
   OK:            { label: 'Lista',            cls: 'bg-green-100 text-green-800' },
@@ -59,6 +61,7 @@ const ESTADO_UI: Record<Estado, { label: string; cls: string }> = {
   SIN_PRODUCTOS: { label: 'Sin productos',    cls: 'bg-red-100 text-red-800' },
   DUPLICADA:     { label: 'Duplicada',        cls: 'bg-red-100 text-red-800' },
   YA_IMPRESA:    { label: 'Ya impresa',       cls: 'bg-red-100 text-red-800' },
+  PAGO:          { label: 'Pago sin verificar', cls: 'bg-amber-100 text-amber-800' },
 }
 
 // Sin inventario las ventas salen de MercadoLibre: los mismos estados, dichos para ese caso.
@@ -175,10 +178,10 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     pegarRef.current = (files: File[]) => { if (!busy) subir(files, loteDestino) }
   })
 
-  const toggleIncluida = async (loteId: number, e: Etiqueta) => {
+  const patchEtiqueta = async (loteId: number, e: Etiqueta, body: { incluida?: boolean; forzar_pago?: boolean }) => {
     await fetch(`/api/despachos/lotes/${loteId}/etiquetas/${e.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ incluida: !e.incluida }),
+      body: JSON.stringify(body),
     })
     const d = await fetch(`/api/despachos/lotes/${loteId}`).then(r => r.json())
     setLotes(prev => ({ ...prev, [loteId]: d }))
@@ -287,7 +290,8 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
 
       {pendientes.map(l => (
         <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML}
-          onToggle={e => toggleIncluida(l.id, e)}
+          onToggle={e => patchEtiqueta(l.id, e, { incluida: !e.incluida })}
+          onForzarPago={(e, v) => patchEtiqueta(l.id, e, { forzar_pago: v })}
           onRevalidar={cargar}
           onAgregar={f => subir(f, l.id)}
           onGenerar={() => generar(l)}
@@ -438,11 +442,12 @@ function Dropzone({ onFiles, busy, compact, agregaALote }: {
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, onToggle, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, onToggle, onForzarPago, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
   busy: string | null
   onToggle: (e: Etiqueta) => void
+  onForzarPago: (e: Etiqueta, forzar: boolean) => void
   onRevalidar: () => void
   onAgregar: (f: File[]) => void
   onGenerar: () => void
@@ -509,6 +514,19 @@ function LotePendiente({ lote, busy, desdeML, onToggle, onRevalidar, onAgregar, 
                   <td className="px-3 py-2 text-xs">
                     <span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span>
                     {e.detalle && <div className="text-neutral-500 mt-0.5">{e.detalle}</div>}
+                    {/* Pagos ME: despachar con el pago sin verificar queda registrado (quién). */}
+                    {e.estado === 'PAGO' && (
+                      <button onClick={() => onForzarPago(e, true)} className="mt-1 block text-amber-800 underline hover:text-amber-950">
+                        Despachar igual
+                      </button>
+                    )}
+                    {e.pago?.forzado_por && (
+                      <div className="mt-0.5 text-amber-700">
+                        Pago sin verificar: despacha {e.pago.forzado_por}{' '}
+                        <button onClick={() => onForzarPago(e, false)} className="underline">deshacer</button>
+                      </div>
+                    )}
+                    {e.pago?.verificacion === 'valido' && <div className="mt-0.5 text-green-700">✓ Pago verificado</div>}
                   </td>
                 </tr>
               )

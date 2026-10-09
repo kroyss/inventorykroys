@@ -19,6 +19,7 @@ const allLinks: { href: string; label: string; roles: UserRole[]; countries: Cou
   // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/pagos-me',         label: 'Pagos ME',   roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/despachos',        label: 'Despachos',  roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/reportador',       label: 'Reportador', roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/preguntas',        label: 'Preguntas',  roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },

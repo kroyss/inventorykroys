@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Vigilante Pagos ME</title>
+  <style>
+    body { font: 13px system-ui, sans-serif; margin: 14px; min-width: 340px; color: #222; }
+    h1 { font-size: 15px; margin: 0 0 10px; }
+    label { display: block; margin-top: 10px; font-weight: 600; }
+    input, select { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 3px; font: inherit; }
+    small { color: #777; font-weight: 400; }
+    button { margin-top: 12px; padding: 7px 12px; font: inherit; cursor: pointer; }
+    #estado { margin-top: 12px; padding: 8px; background: #f5f5f5; border-radius: 6px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Vigilante Pagos MercadoEnvíos</h1>
+  <label>Perfil <small>(nombre de la cuenta de este Chrome: PIKEKE o SOLUCION-MC)</small>
+    <input id="perfil" placeholder="PIKEKE">
+  </label>
+  <label>Sistema
+    <select id="servidor">
+      <option value="https://app.elcomerciantedigital.com">Producción (app.elcomerciantedigital.com)</option>
+      <option value="https://staging.elcomerciantedigital.com">Staging (pruebas)</option>
+    </select>
+  </label>
+  <label>Clave del vigilante <small>(Pagos ME → Generar clave)</small>
+    <input id="clave" placeholder="me_…" autocomplete="off">
+  </label>
+  <label>Usuario:clave de staging <small>(solo para pruebas en staging)</small>
+    <input id="basica" placeholder="usuario:clave" autocomplete="off">
+  </label>
+  <button id="guardar">Guardar</button>
+  <button id="probar">Probar conexión</button>
+  <div id="estado">…</div>
+  <script src="opciones.js"></script>
+</body>
+</html>

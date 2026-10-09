@@ -191,11 +191,12 @@ export type EstadoEtiqueta =
   | 'SIN_PRODUCTOS'
   | 'DUPLICADA'     // la misma guía dos veces en este lote
   | 'YA_IMPRESA'    // la guía ya salió en un lote generado
+  | 'PAGO'          // Pagos MercadoEnvíos (módulo pagos_me): el pago de la venta no está verificado
 
 export const IMPRIMIBLE: Record<EstadoEtiqueta, boolean> = {
   OK: true, REIMPRESION: true,
   ERROR_PDF: false, NO_ETIQUETA: false, SIN_VENTA: false, ESTADO: false,
-  SIN_PRODUCTOS: false, DUPLICADA: false, YA_IMPRESA: false,
+  SIN_PRODUCTOS: false, DUPLICADA: false, YA_IMPRESA: false, PAGO: false,
 }
 
 export interface EtiquetaValidada {
@@ -219,6 +220,8 @@ export interface EtiquetaValidada {
   items: { product_name: string; quantity: number; notes: string | null }[]
   /** Sin inventario: la venta de ML que se encontró (sale_id queda null). */
   orden_ml?: string | null
+  /** Pagos MercadoEnvíos: el pago de la venta traído del portal (null = no hay o módulo apagado). */
+  pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
   estado: EstadoEtiqueta
   detalle: string | null
 }
@@ -292,8 +295,37 @@ export async function refrescarVentasML(db: Pool, loteId: number) {
 // Etiquetas de un lote con su estado calculado contra las ventas ACTUALES
 // (por eso "Revalidar" es simplemente volver a pedir el lote).
 // desdeML: la empresa no lleva inventario → las ventas son las de MercadoLibre (ver SQL_DESDE_ML).
-export async function etiquetasValidadas(db: Pool, loteId: number, desdeML = false): Promise<EtiquetaValidada[]> {
-  if (desdeML) return validarDesdeML(db, loteId)
+export async function etiquetasValidadas(db: Pool, loteId: number, desdeML = false, pagosME = false): Promise<EtiquetaValidada[]> {
+  const etiquetas = desdeML ? await validarDesdeML(db, loteId) : await validarConInventario(db, loteId)
+  return pagosME ? conPagosME(db, loteId, etiquetas) : etiquetas
+}
+
+/**
+ * Pagos MercadoEnvíos (módulo pagos_me, solo la empresa de la plataforma): una guía cuya venta tiene
+ * pago traído del portal y SIN verificar no se imprime (estado PAGO), salvo "Despachar igual".
+ * Sin pago traído (venta local, cobro a destino manejado aparte…) no cambia nada.
+ */
+async function conPagosME(db: Pool, loteId: number, etiquetas: EtiquetaValidada[]) {
+  const { rows } = await db.query(
+    `SELECT e.id, p.verificacion, u.username AS forzado_por
+     FROM despacho_etiquetas e
+     JOIN me_pagos p ON p.venta = e.venta
+     LEFT JOIN users u ON u.id = e.pago_forzado_por
+     WHERE e.lote_id = $1`, [loteId])
+  const pagos = new Map(rows.map(r => [r.id as number, r]))
+  return etiquetas.map(e => {
+    const p = pagos.get(e.id)
+    if (!p) return { ...e, pago: null }
+    const pago = { verificacion: p.verificacion, forzado_por: p.forzado_por ?? null }
+    if (IMPRIMIBLE[e.estado] && !e.impresa && p.verificacion !== 'valido' && !p.forzado_por) {
+      return { ...e, pago, estado: 'PAGO' as const,
+        detalle: p.verificacion === 'invalido' ? 'El pago se marcó INVÁLIDO en Pagos ME' : 'El pago no está verificado en Pagos ME' }
+    }
+    return { ...e, pago }
+  })
+}
+
+async function validarConInventario(db: Pool, loteId: number): Promise<EtiquetaValidada[]> {
   const { rows } = await db.query(
     `SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
             e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
