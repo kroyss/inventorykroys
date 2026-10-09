@@ -17,6 +17,7 @@ import unicodedata
 
 import fitz  # PyMuPDF
 
+import datos_factura
 import tealca
 
 # ===== Constantes: idénticas a etiquetas_ml.py =====
@@ -161,15 +162,21 @@ def leer_etiqueta(pdf_bytes, nombre=None):
     with fitz.open(stream=pdf_bytes, filetype="pdf") as src:
         sp = src[0]
         if tealca.es_tealca(sp):
-            return tealca.leer(sp, src.page_count, nombre)
-        return {
-            "carrier": "ZOOM",
-            "paginas": src.page_count,
-            "venta": extract_sale_number(sp),
-            "guia": extract_guia(sp),
-            "remitente": extract_remitente(sp),
-            "destinatario": extract_destinatario(sp),
-        }
+            d = tealca.leer(sp, src.page_count, nombre)
+            fac = datos_factura.tealca(sp)
+        else:
+            d = {
+                "carrier": "ZOOM",
+                "paginas": src.page_count,
+                "venta": extract_sale_number(sp),
+                "guia": extract_guia(sp),
+                "remitente": extract_remitente(sp),
+                "destinatario": extract_destinatario(sp),
+            }
+            fac = datos_factura.zoom(sp.get_text("text") or "")
+        # Datos del comprador para facturar (None = revisar a mano).
+        d.update({f"fac_{k}": v for k, v in fac.items()})
+        return d
 
 
 def armar_sales_map(filas):

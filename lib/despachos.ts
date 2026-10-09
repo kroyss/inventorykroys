@@ -105,6 +105,11 @@ export interface EtiquetaLeida {
   destinatario?: string | null
   remitente_limpio?: string
   destinatario_limpio?: string
+  // Datos del comprador para facturar (null = revisar a mano)
+  fac_documento?: string | null
+  fac_telefono?: string | null
+  fac_ciudad?: string | null
+  fac_direccion?: string | null
   error: string | null
 }
 

@@ -78,11 +78,13 @@ export async function POST(req: NextRequest) {
         await client.query(
           `INSERT INTO despacho_etiquetas
              (lote_id, original_name, file_path, sha256, page_count, venta, guia,
-              remitente, remitente_limpio, destinatario, read_error, carrier)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+              remitente, remitente_limpio, destinatario, read_error, carrier,
+              fac_documento, fac_telefono, fac_ciudad, fac_direccion)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [loteId, datos[i].name, paths[i], sha256(datos[i].data), e.paginas ?? null, e.venta ?? null,
            e.guia ?? null, e.remitente ?? null, e.remitente_limpio ?? null, e.destinatario_limpio ?? null, e.error,
-           e.carrier ?? 'ZOOM'],
+           e.carrier ?? 'ZOOM', e.fac_documento ?? null, e.fac_telefono ?? null, e.fac_ciudad ?? null,
+           e.fac_direccion ?? null],
         )
       }
       await client.query('COMMIT')

@@ -42,6 +42,11 @@ interface Draft {
   lines: Line[]
 }
 
+interface DatosGuia {
+  carrier: 'ZOOM' | 'TEALCA'
+  documento: string | null; telefono: string | null; ciudad: string | null; direccion: string | null
+}
+const dirCompleta = (g: DatosGuia) => [g.direccion, g.ciudad].filter(Boolean).join(', ')
 interface DraftResp { data: Partial<Draft>; updated_at: string; updated_by: string | null }
 
 const saleLines = (sale?: Sale): Line[] => {
@@ -90,6 +95,8 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
   const [isSpecial, setIsSpecial] = useState(replaces?.is_special ?? false)
   const [retPct, setRetPct]   = useState(replaces?.retention_percent || 75)
   const [search, setSearch]   = useState('')
+  // Datos del comprador leídos de su guía ZOOM/TEALCA en Despachos (precargan cédula, teléfono y ciudad).
+  const [guia, setGuia] = useState<DatosGuia | null>(null)
 
   // IVA
   const [withIva, setWithIva] = useState(replaces ? replaces.with_iva : true)
@@ -156,6 +163,16 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
         setDraftInfo({ updated_at: draft.updated_at, updated_by: draft.updated_by })
       }
       setHydrated(true)
+      // Sin borrador: cédula, teléfono y ciudad salen de la guía (si la venta ya tiene una subida).
+      if (draftSaleId && !draft?.data) {
+        fetch(`/api/invoices/datos-guia/${draftSaleId}`).then(r => r.ok ? r.json() : null).then((g: DatosGuia | null) => {
+          if (!g) return
+          setGuia(g)
+          if (g.documento) setDoc(g.documento)
+          if (g.telefono) setPhone(g.telefono)
+          if (g.ciudad) setAddress(g.ciudad)
+        }).catch(() => {})
+      }
     }).catch(() => setError('No se pudo cargar la configuración de facturación'))
     fetch('/api/invoices/customers').then(r => r.json()).then(rows => {
       if (Array.isArray(rows)) setCustomers(rows)
@@ -412,6 +429,27 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                       } else setSearch(text)
                     }}
                   />
+                )}
+                {guia && (
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 space-y-1">
+                    <p>
+                      📦 Cédula, teléfono y ciudad tomados de la guía {guia.carrier === 'TEALCA' ? 'TEALCA' : 'ZOOM'}: revísalos antes de emitir.
+                      {(['documento', 'telefono', 'ciudad'] as const).some(k => !guia[k]) && (
+                        <b className="text-amber-700">
+                          {' '}Revisar: {[!guia.documento && 'cédula', !guia.telefono && 'teléfono', !guia.ciudad && 'ciudad'].filter(Boolean).join(', ')} (no se pudo leer).
+                        </b>
+                      )}
+                    </p>
+                    {guia.direccion && (
+                      <p className="text-sky-800">
+                        Dirección de la guía: {guia.direccion}
+                        {address !== dirCompleta(guia) && (
+                          <button type="button" onClick={() => setAddress(dirCompleta(guia))}
+                            className="ml-2 underline hover:text-sky-950">Usar dirección completa</button>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
