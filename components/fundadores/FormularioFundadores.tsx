@@ -151,7 +151,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   if (!abierta && !previa) {
     return (
-      <section id="solicitud" className={`scroll-mt-6 ${marco} p-6 sm:p-8 self-start`}>
+      <section className={`${marco} p-6 sm:p-8 self-start`}>
         <h2 className="text-xl font-semibold text-neutral-900">Postúlate</h2>
         {proxima ? <>
           <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
@@ -176,8 +176,8 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
   const set = (k: keyof typeof contacto) => (e: { target: { value: string } }) => setContacto(c => ({ ...c, [k]: e.target.value }))
 
   return (
-    <form ref={caja} id="solicitud" onSubmit={enviar}
-      className={`scroll-mt-6 ${marco} self-start overflow-hidden`}>
+    <form ref={caja} onSubmit={enviar}
+      className={`${marco} self-start overflow-hidden`}>
       {/* Progreso */}
       <div className="h-1.5 bg-neutral-100" aria-hidden="true">
         <div className="h-full bg-lime-400 transition-[width] duration-300" style={{ width: `${((paso + 1) / PASOS) * 100}%` }} />

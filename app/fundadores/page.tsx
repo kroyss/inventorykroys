@@ -89,6 +89,8 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
 
   return (
     <div className="min-h-screen bg-neutral-50">
+      {/* El botón "Postúlate" baja suave hasta el formulario. */}
+      <style>{'html { scroll-behavior: smooth; }'}</style>
       {/* Portada */}
       <section className="relative overflow-hidden bg-neutral-950 text-white">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 w-[34rem] h-[34rem] rounded-full border border-lime-400/15" />
@@ -284,7 +286,8 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
         </div>
 
         {/* El título señala el formulario (había quien no lo encontraba): elegido el 2026-10-09. */}
-        <div className="self-start">
+        {/* El ancla del botón "Postúlate" cae en el título, no a mitad de la tarjeta. */}
+        <div id="solicitud" className="self-start scroll-mt-4">
           <h2 className="mb-3 text-lg font-semibold text-neutral-900">Postúlate en 2 minutos <span className="text-lime-600">↓</span></h2>
           <FormularioFundadores
             abierta={!!abiertaHoy}
