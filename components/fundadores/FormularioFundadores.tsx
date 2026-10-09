@@ -176,11 +176,6 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
   return (
     <form ref={caja} id="solicitud" onSubmit={enviar}
       className="scroll-mt-6 rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white shadow-sm self-start overflow-hidden shadow-xl shadow-lime-900/10">
-      {/* Cabecera oscura: que se vea de lejos que aquí es donde uno se postula (había quien no lo encontraba) */}
-      <div className="bg-neutral-950 px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-white">📝 Postúlate aquí</span>
-        <span className="text-xs text-lime-400 font-medium">Toma 2 minutos</span>
-      </div>
       {/* Progreso */}
       <div className="h-1.5 bg-neutral-100" aria-hidden="true">
         <div className="h-full bg-lime-400 transition-[width] duration-300" style={{ width: `${((paso + 1) / PASOS) * 100}%` }} />
@@ -193,7 +188,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       )}
       <div className="p-6 sm:p-8">
         <div className="flex items-center justify-between text-xs text-neutral-400">
-          <span className="font-semibold uppercase tracking-[0.15em] text-neutral-500">Postulación</span>
+          <span className="font-semibold uppercase tracking-[0.15em] text-lime-700">Postúlate aquí</span>
           <span className="num">Paso {paso + 1} de {PASOS}</span>
         </div>
 
