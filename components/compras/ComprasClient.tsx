@@ -536,7 +536,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
   }
 
   const filteredProducts = products.filter(p =>
-    !!productSearch.trim() && matchTokens(productSearch, p.code, p.name)
+    // Los ya agregados no vuelven a salir en la búsqueda (solo hacen ruido).
+    !!productSearch.trim() && !formItems.some(i => i.product_id === p.id) && matchTokens(productSearch, p.code, p.name)
   ).slice(0, 10)
 
   const formTotal = formItems.reduce((s, i) => s + i.quantity * i.unit_cost_usd, 0)

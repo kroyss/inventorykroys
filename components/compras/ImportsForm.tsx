@@ -72,7 +72,8 @@ export default function ImportsForm({ editing, suppliers, carriers = [], onClose
   useEffect(() => { loadProducts() }, [loadProducts])
   useRefetchOnFocus(loadProducts)
 
-  const filtered = products.filter(p => matchTokens(search, p.name, p.code)).slice(0, 20)
+  // Los ya agregados no vuelven a salir en la búsqueda (solo hacen ruido).
+  const filtered = products.filter(p => !items.some(i => i.product_id === p.id) && matchTokens(search, p.name, p.code)).slice(0, 20)
 
   const addItem = (p: ProductRow) => {
     if (items.some(i => i.product_id === p.id)) return

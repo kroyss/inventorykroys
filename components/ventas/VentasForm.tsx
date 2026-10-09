@@ -126,7 +126,8 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     }
   }, [isLocal, editing, orderNumber])
 
-  const filtered = products.filter(p => matchTokens(search, p.name, p.code)).slice(0, 20)
+  // Los ya agregados no vuelven a salir en la búsqueda (solo hacen ruido).
+  const filtered = products.filter(p => !items.some(i => i.product_id === p.product_id) && matchTokens(search, p.name, p.code)).slice(0, 20)
 
   // Stock disponible en vivo por producto (para avisar de falta de stock al tipear
   // la cantidad, en vez de recién al procesar la venta).
