@@ -88,9 +88,17 @@ export default function CuentasMLClient() {
 
           <aside className="space-y-3">
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-2 text-sm text-neutral-600">
-              <p className="font-semibold text-neutral-900">Cómo conectar</p>
-              <p>Abre <b>mercadolibre.com.ve</b> en este navegador con la cuenta <b>PRINCIPAL</b> (un colaborador no puede autorizar) y toca <b>Conectar cuenta</b>.</p>
-              <p>Para otra cuenta: cierra sesión en MercadoLibre, entra con la otra y vuelve a conectar.</p>
+              <p className="font-semibold text-neutral-900">Cómo conectar (2 minutos)</p>
+              {/* Paso a paso con lo que muestra MercadoLibre: ahí se trababan los Fundadores (2026-10-09). */}
+              <ol className="list-decimal pl-4 space-y-1.5">
+                <li>En este mismo navegador, entra a <b>mercadolibre.com.ve</b> con tu cuenta <b>PRINCIPAL</b> (la de colaborador no puede autorizar).</li>
+                <li>Vuelve aquí y toca <b>Conectar cuenta</b>.</li>
+                <li>MercadoLibre puede pedirte <b>validar tu identidad</b> (foto de tu cara o un código). Es su seguridad normal: hazlo y sigue.</li>
+                <li>Verás la pantalla de <b>permisos</b> de El Comerciante Digital (preguntas, mensajes, ventas y envíos). Toca <b>Permitir</b>.</li>
+                <li>Vuelves solo al sistema y tu cuenta aparece en la lista. ¡Listo!</li>
+              </ol>
+              <p>Para otra cuenta: cierra sesión en MercadoLibre, entra con la otra y repite.</p>
+              <p className="text-xs text-neutral-500">Nunca vemos tu clave: MercadoLibre solo nos da los permisos que tú autorizas, y puedes quitarlos cuando quieras.</p>
               <p className="text-xs text-neutral-500">El sistema nunca publica nada sin que tú lo revises. Puedes desconectar una cuenta cuando quieras.</p>
             </div>
             {datos.esAdmin && datos.mlListo && <LinkConectar />}
