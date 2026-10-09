@@ -59,8 +59,24 @@ export default function InternoPanel() {
     return { promedioMes: conUso.length ? costo / conUso.length : 0, porBorrador: borradores ? costo / borradores : 0 }
   }
 
+  // Los 3 números del mes: cuánto va, cuánto cuesta cada borrador y quién consume más.
+  const gastoMes = mesActual ? totalMes(mesActual) : 0
+  const borradoresMes = mesActual ? empresas.reduce((a, e) => a + (e.porMes[mesActual]?.borradores ?? 0), 0) : 0
+  const top = mesActual ? [...empresas].sort((a, b) => (b.porMes[mesActual]?.costo ?? 0) - (a.porMes[mesActual]?.costo ?? 0))[0] : undefined
+  const cierre = datos && datos.diaHoy ? (gastoMes / datos.diaHoy) * datos.diasMes : gastoMes
+
   return (
     <div className="space-y-8">
+      {datos && empresas.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Numero titulo="Gasto de IA este mes" valor={usd(gastoMes)} detalle={`al ritmo actual cierra en ${usd(cierre)}`} />
+          <Numero titulo="Costo por borrador" valor={borradoresMes ? `$${(gastoMes / borradoresMes).toLocaleString('de-DE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}` : '—'}
+            detalle={`${borradoresMes} borradores este mes`} />
+          <Numero titulo="Más consume" valor={top && top.porMes[mesActual!]?.costo ? top.nombre : '—'}
+            detalle={top && top.porMes[mesActual!]?.costo ? usd(top.porMes[mesActual!].costo) : 'nadie usó la IA este mes'} />
+        </div>
+      )}
+
       <section className="space-y-3">
         <div>
           <h2 className="text-base font-semibold text-neutral-900">Consumo de IA por empresa</h2>
@@ -130,42 +146,50 @@ export default function InternoPanel() {
 
       {datos && <DetalleMes datos={datos} />}
 
+      {/* Referencia: no cambia día a día, queda plegada */}
+      <details className="group">
+        <summary className="cursor-pointer text-sm font-medium text-neutral-600 hover:text-neutral-900 select-none">
+          Referencia: lo que solo ves tú y lo que se activa por cliente
+        </summary>
+        <div className="mt-4 space-y-8">
       <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-neutral-900">Solo para ti</h2>
-          <p className="text-sm text-neutral-500">
-            Lo de la plataforma que ningún cliente ve, nunca. La lista vive en <code className="text-xs">lib/funcionesInternas.ts</code>.
-          </p>
+            <div>
+              <h2 className="text-base font-semibold text-neutral-900">Solo para ti</h2>
+              <p className="text-sm text-neutral-500">
+                Lo de la plataforma que ningún cliente ve, nunca. La lista vive en <code className="text-xs">lib/funcionesInternas.ts</code>.
+              </p>
+            </div>
+            <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
+              {FUNCIONES_INTERNAS.map(f => (
+                <li key={f.nombre} className="px-4 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="font-medium text-neutral-900">{f.nombre}</span>
+                  <span className="text-xs text-neutral-400">{f.donde} · desde {f.desde.split('-').reverse().join('/')}</span>
+                  <span className="basis-full text-sm text-neutral-600">{f.motivo}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+    
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-base font-semibold text-neutral-900">Lo que se activa por cliente</h2>
+              <p className="text-sm text-neutral-500">
+                Tu empresa tiene todo; a cada cliente se le prende lo que corresponda en <b>Empresas</b> (casillas de módulos).
+                Lo nuevo o en pruebas entra apagado para los clientes. El núcleo (Ventas, Inventario, Compras, Productos,
+                Reportes, Ajustes, Usuarios) lo tienen todos.
+              </p>
+            </div>
+            <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 text-sm">
+              {Object.entries(MODULOS).map(([clave, texto]) => (
+                <li key={clave} className="px-4 py-2.5 flex items-baseline gap-3">
+                  <code className="text-xs text-neutral-400 w-24 shrink-0">{clave}</code>
+                  <span className="text-neutral-700">{texto}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
-        <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
-          {FUNCIONES_INTERNAS.map(f => (
-            <li key={f.nombre} className="px-4 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-medium text-neutral-900">{f.nombre}</span>
-              <span className="text-xs text-neutral-400">{f.donde} · desde {f.desde.split('-').reverse().join('/')}</span>
-              <span className="basis-full text-sm text-neutral-600">{f.motivo}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-neutral-900">Lo que se activa por cliente</h2>
-          <p className="text-sm text-neutral-500">
-            Tu empresa tiene todo; a cada cliente se le prende lo que corresponda en <b>Empresas</b> (casillas de módulos).
-            Lo nuevo o en pruebas entra apagado para los clientes. El núcleo (Ventas, Inventario, Compras, Productos,
-            Reportes, Ajustes, Usuarios) lo tienen todos.
-          </p>
-        </div>
-        <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 text-sm">
-          {Object.entries(MODULOS).map(([clave, texto]) => (
-            <li key={clave} className="px-4 py-2.5 flex items-baseline gap-3">
-              <code className="text-xs text-neutral-400 w-24 shrink-0">{clave}</code>
-              <span className="text-neutral-700">{texto}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      </details>
     </div>
   )
 }
@@ -312,5 +336,15 @@ function DetalleMes({ datos }: { datos: Datos }) {
         Al cierre = lo gastado hasta hoy llevado a todo el mes.
       </p>
     </section>
+  )
+}
+
+function Numero({ titulo, valor, detalle }: { titulo: string; valor: string; detalle: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3 min-w-0">
+      <div className="text-xs text-neutral-500">{titulo}</div>
+      <div className="text-xl font-semibold text-neutral-900 num truncate">{valor}</div>
+      <div className="text-xs text-neutral-400 truncate">{detalle}</div>
+    </div>
   )
 }

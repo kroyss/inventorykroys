@@ -40,6 +40,8 @@ export default function AprendizajePanel() {
   const confirm = useConfirm()
   const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null; uso: Uso[]; enLinea: EnLinea[]; enLineaMinutos: number } | null>(null)
   const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '', serie: 'automatizaciones' as Serie, duracion: '' })
+  const [sub, setSub] = useState<'clientes' | 'videos'>('clientes')
+  const [agregando, setAgregando] = useState(false)
   const [agendar, setAgendar] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -70,7 +72,7 @@ export default function AprendizajePanel() {
     return true
   }
   const agregar = async () => {
-    if (await pedir('/api/plataforma/aprendizaje', 'POST', nuevo, `Video "${nuevo.titulo}" agregado al final de ${SERIES[nuevo.serie].nombre}.`)) setNuevo({ url: '', titulo: '', descripcion: '', serie: nuevo.serie, duracion: '' })
+    if (await pedir('/api/plataforma/aprendizaje', 'POST', nuevo, `Video "${nuevo.titulo}" agregado al final de ${SERIES[nuevo.serie].nombre}.`)) { setNuevo({ url: '', titulo: '', descripcion: '', serie: nuevo.serie, duracion: '' }); setAgregando(false) }
   }
   const borrar = async (v: Video) => {
     if (!await confirm({ title: 'Borrar video', message: `Se borra "${v.titulo}" y el avance de todos en ese video.`, confirmText: 'Borrar' })) return
@@ -81,13 +83,26 @@ export default function AprendizajePanel() {
   const activos = datos.videos.filter(v => v.activo).length
   const activosAuto = datos.videos.filter(v => v.activo && v.serie === 'automatizaciones').length
   const activosInv = datos.videos.filter(v => v.activo && v.serie === 'inventario').length
+  // Dos trabajos distintos: vigilar a los clientes (lo de todos los días) y armar el curso.
   const deSerie = (v: Video) => datos.videos.filter(x => x.serie === v.serie)
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-1.5">
+        {([['clientes', 'Clientes'], ['videos', `Curso (${activos} videos)`]] as const).map(([k, t]) => (
+          <button key={k} onClick={() => setSub(k)}
+            className={`px-3 py-1 rounded-full text-sm border ${sub === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
+        ))}
+      </div>
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-lime-50 border border-lime-300 text-lime-900 px-4 py-2 rounded text-sm">✓ {aviso}</div>}
 
+      {sub === 'videos' && <>
+      {!agregando ? (
+        <div className="flex justify-end">
+          <button onClick={() => setAgregando(true)} className="btn-primary text-sm">+ Agregar video</button>
+        </div>
+      ) : (
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
         <div>
           <h2 className="text-base font-semibold text-neutral-900">Agregar video</h2>
@@ -107,9 +122,11 @@ export default function AprendizajePanel() {
             onChange={e => setNuevo({ ...nuevo, duracion: e.target.value })} />
         </div>
         <div className="flex justify-end">
+          <button onClick={() => setAgregando(false)} className="btn-secondary text-sm mr-2">Cancelar</button>
           <button onClick={agregar} disabled={!nuevo.url.trim() || !nuevo.titulo.trim()} className="btn-primary text-sm disabled:opacity-40">+ Agregar video</button>
         </div>
       </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-neutral-900">Videos <span className="text-neutral-400 font-normal text-sm">({activos} visibles · en este orden se ven, cada serie con su propio orden)</span></h2>
@@ -192,6 +209,9 @@ export default function AprendizajePanel() {
         </div>
       </section>
 
+      </>}
+
+      {sub === 'clientes' && <>
       <section className={`rounded-xl border p-4 ${datos.enLinea.length ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
         <h2 className="text-sm font-semibold text-neutral-900">
           {datos.enLinea.length ? <>{PUNTO_VERDE}En línea ahora ({datos.enLinea.length})</> : 'En línea ahora'}
@@ -325,6 +345,7 @@ export default function AprendizajePanel() {
           </div>
         )}
       </section>
+      </>}
     </div>
   )
 }

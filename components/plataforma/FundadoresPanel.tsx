@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import VisitasFundadores from './VisitasFundadores'
-import { PREGUNTAS, PUNTO_NICK, type Pregunta } from '@/lib/fundadores'
+import { CUPOS_ESPERA, PREGUNTAS, PUNTO_NICK, type Pregunta } from '@/lib/fundadores'
 
 interface Tanda { numero: number; cupos: number; abierta: boolean; inscribe_desde: string | null; inscribe_hasta: string | null; tomados: number }
 interface Verif {
@@ -74,6 +74,9 @@ export default function FundadoresPanel() {
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<number | null>(null)
   const [aviso, setAviso] = useState<{ texto: string; telegram?: string | null } | null>(null)
+  // Fila desplegada (respuestas, verificación ML, nota y fotos): la lista se lee de un vistazo.
+  const [abiertas, setAbiertas] = useState<Set<number>>(new Set())
+  const alternar = (id: number) => setAbiertas(a => { const n = new Set(a); if (n.has(id)) n.delete(id); else n.add(id); return n })
   useEffect(() => {
     if (!aviso) return
     const t = setTimeout(() => setAviso(null), 8000)
@@ -155,43 +158,61 @@ export default function FundadoresPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-neutral-500">Página pública:</span>
-        <a href="/fundadores" target="_blank" rel="noreferrer" className="font-mono text-neutral-800 underline underline-offset-2">{enlace}</a>
-        <button onClick={() => navigator.clipboard?.writeText(enlace)} className="btn-ghost text-xs px-2 py-1">Copiar</button>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {datos.tandas.map(t => (
-          <div key={t.numero} className={`rounded-xl border p-4 bg-white ${t.abierta ? 'border-lime-400' : 'border-neutral-200'}`}>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-neutral-900">Ronda {t.numero}</span>
-              <span className={`text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'Abierta' : 'Cerrada'}</span>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
-              Postulaciones
-              <input type="date" aria-label="Postulaciones desde" defaultValue={t.inscribe_desde ?? ''}
-                onChange={e => tanda(t, { inscribe_desde: e.target.value || null })}
-                className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
-              al
-              <input type="date" aria-label="Postulaciones hasta" defaultValue={t.inscribe_hasta ?? ''}
-                onChange={e => tanda(t, { inscribe_hasta: e.target.value || null })}
-                className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
-            </div>
-            <div className="mt-2 flex gap-1">
-              {Array.from({ length: t.cupos }, (_, i) => (
-                <span key={i} className={`h-2 flex-1 rounded-full ${i < t.tomados ? 'bg-lime-500' : 'bg-neutral-200'}`} />
-              ))}
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-neutral-500">
-              <span>{t.tomados} de {t.cupos} cupos</span>
-              <button onClick={() => tanda(t, { abierta: !t.abierta })} className="underline underline-offset-2 hover:text-neutral-800">
-                {t.abierta ? 'Cerrar' : 'Abrir'}
-              </button>
-            </div>
+      {/* Estado de la ronda abierta (o la última) en una línea */}
+      {(() => {
+        const t = datos.tandas.find(x => x.abierta) ?? datos.tandas[datos.tandas.length - 1]
+        const dd = (f: string | null) => f ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : '—'
+        return (
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            {t && <span className="font-semibold text-neutral-900">Ronda {t.numero} <span className={`ml-1 text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'abierta' : 'cerrada'}</span></span>}
+            {t && <span><b className="num">{t.tomados}</b><span className="text-neutral-400">/{t.cupos}</span> aprobados</span>}
+            <span><b className="num">{cuenta('espera')}</b><span className="text-neutral-400">/{CUPOS_ESPERA}</span> en espera</span>
+            <span className={cuenta('calificado') ? 'text-sky-800' : ''}><b className="num">{cuenta('calificado')}</b> por revisar</span>
+            {t && <span className="text-neutral-500">postulaciones {dd(t.inscribe_desde)} al {dd(t.inscribe_hasta)}</span>}
+            <span className="ml-auto flex items-center gap-2 text-xs">
+              <a href="/fundadores" target="_blank" rel="noreferrer" className="text-neutral-600 underline underline-offset-2">Ver página ↗</a>
+              <button onClick={() => navigator.clipboard?.writeText(enlace)} className="btn-ghost text-xs px-2 py-1">Copiar enlace</button>
+            </span>
           </div>
-        ))}
-      </div>
+        )
+      })()}
+
+      <details className="group">
+        <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-800 select-none">Configurar rondas (fechas, abrir o cerrar)</summary>
+        <div className="mt-2">
+      <div className="grid gap-3 sm:grid-cols-2">
+          {datos.tandas.map(t => (
+            <div key={t.numero} className={`rounded-xl border p-4 bg-white ${t.abierta ? 'border-lime-400' : 'border-neutral-200'}`}>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-neutral-900">Ronda {t.numero}</span>
+                <span className={`text-xs font-medium ${t.abierta ? 'text-lime-700' : 'text-neutral-400'}`}>{t.abierta ? 'Abierta' : 'Cerrada'}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+                Postulaciones
+                <input type="date" aria-label="Postulaciones desde" defaultValue={t.inscribe_desde ?? ''}
+                  onChange={e => tanda(t, { inscribe_desde: e.target.value || null })}
+                  className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
+                al
+                <input type="date" aria-label="Postulaciones hasta" defaultValue={t.inscribe_hasta ?? ''}
+                  onChange={e => tanda(t, { inscribe_hasta: e.target.value || null })}
+                  className="border border-neutral-200 rounded px-1.5 py-0.5 text-neutral-700" />
+              </div>
+              <div className="mt-2 flex gap-1">
+                {Array.from({ length: t.cupos }, (_, i) => (
+                  <span key={i} className={`h-2 flex-1 rounded-full ${i < t.tomados ? 'bg-lime-500' : 'bg-neutral-200'}`} />
+                ))}
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs text-neutral-500">
+                <span>{t.tomados} de {t.cupos} cupos</span>
+                <button onClick={() => tanda(t, { abierta: !t.abierta })} className="underline underline-offset-2 hover:text-neutral-800">
+                  {t.abierta ? 'Cerrar' : 'Abrir'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        </div>
+      </details>
 
       <VisitasFundadores />
 
@@ -217,12 +238,12 @@ export default function FundadoresPanel() {
         </div>
       )}
 
-      <p className="text-xs text-neutral-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+      {abiertas.size > 0 && <p className="text-xs text-neutral-500 flex flex-wrap items-center gap-x-3 gap-y-1">
         Las pastillas son lo que marcó:
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-lime-50 ring-1 ring-inset ring-lime-300" />suma puntos</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-white ring-1 ring-inset ring-neutral-300" />marcada, no suma</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-50 ring-1 ring-inset ring-red-200" />descarta (&lt; 30 ventas)</span>
-      </p>
+      </p>}
 
       {lista.length === 0 ? (
         <p className="text-sm text-neutral-400 py-6 text-center">No hay solicitudes en esta vista.</p>
@@ -231,11 +252,13 @@ export default function FundadoresPanel() {
           {lista.map(s => {
             const v = s.ml_verificado
             return (
-              <div key={s.id} className="bg-white rounded-xl border border-neutral-200 p-4 flex flex-wrap gap-x-6 gap-y-3">
-                <div className="w-16 shrink-0 text-center">
-                  <div className="text-2xl font-semibold text-neutral-900 num">{s.puntaje}</div>
-                  <div className="text-[11px] text-neutral-400">de {datos.maximo}</div>
-                </div>
+              <div key={s.id} className="bg-white rounded-xl border border-neutral-200 px-4 py-3 flex flex-wrap gap-x-5 gap-y-2">
+                <button onClick={() => alternar(s.id)} className="w-14 shrink-0 text-left" title="Ver respuestas">
+                  <div className="text-xl font-semibold text-neutral-900 num leading-none">{s.puntaje}<span className="text-[11px] text-neutral-400 font-normal">/{datos.maximo}</span></div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+                    <div className="h-full bg-lime-500" style={{ width: `${Math.min(100, Math.round(100 * s.puntaje / Math.max(1, datos.maximo)))}%` }} />
+                  </div>
+                </button>
                 <div className="flex-1 min-w-[16rem] space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-neutral-900">{s.nombre}</span>
@@ -254,6 +277,20 @@ export default function FundadoresPanel() {
                     )}
                     <span className="text-xs text-neutral-400">{fecha(s.created_at)}</span>
                   </div>
+                  {/* Lo esencial en una línea: ventas declaradas y verificación de ML */}
+                  <button onClick={() => alternar(s.id)} className="w-full text-left text-xs text-neutral-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span>{PREGUNTAS.find(p => p.campo === 'ventas_mes')?.opciones.find(o => o.valor === s.ventas_mes)?.texto ?? (s.ventas_mes || '—')}</span>
+                    {s.nick_ml
+                      ? (v ? (v.encontrado
+                          ? <span className="text-emerald-700">✓ ML {v.nickname}{v.ventas_total != null ? ` · ${v.ventas_total.toLocaleString('de-DE')} ventas` : ''}</span>
+                          : <span className="text-amber-700">✗ ML: {v.motivo}</span>)
+                        : <span>ML {s.nick_ml} (sin verificar)</span>)
+                      : <span className="text-neutral-400">sin nick de ML</span>}
+                    {s.notas && <span className="text-neutral-400">📝 nota</span>}
+                    {s.sospechosa && <span className="text-amber-700">⚠ revisar</span>}
+                    <span className="ml-auto text-sky-700">{abiertas.has(s.id) ? 'Ocultar ▲' : 'Ver respuestas ▼'}</span>
+                  </button>
+                  {abiertas.has(s.id) && <>
                   <div className="pt-1"><Respuestas s={s} /></div>
                   <div className="text-xs text-neutral-500 flex flex-wrap items-center gap-2">
                     {s.nick_ml ? <>
@@ -306,6 +343,7 @@ export default function FundadoresPanel() {
                       ))}
                     </div>
                   )}
+                  </>}
                 </div>
                 <div className="flex items-start gap-2 shrink-0">
                   {s.estado !== 'aprobado' && (
@@ -332,7 +370,7 @@ export default function FundadoresPanel() {
         </div>
       )}
       <p className="text-xs text-neutral-400">
-        Aprobar asigna a la ronda en cuyos días se postuló (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
+        Toca el puntaje o la línea gris para ver sus respuestas. Aprobar asigna a la ronda en cuyos días se postuló (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
       </p>
     </div>
   )

@@ -19,7 +19,7 @@ const ddmm = (d: string | null) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '
 
 export default function VisitasFundadores() {
   const [datos, setDatos] = useState<Datos | null>(null)
-  const [abierto, setAbierto] = useState(true)
+  const [abierto, setAbierto] = useState(false)   // plegado: el detalle se abre si hace falta
   useEffect(() => {
     let vivo = true
     const cargar = () => fetch('/api/plataforma/fundadores/visitas').then(r => (r.ok ? r.json() : null))
@@ -35,7 +35,14 @@ export default function VisitasFundadores() {
     <section className="rounded-xl border border-neutral-200 bg-white">
       <button onClick={() => setAbierto(v => !v)} className="w-full flex items-center justify-between px-4 py-3 text-left">
         <span className="font-semibold text-neutral-900">Visitas a la página</span>
-        <span className="text-xs text-neutral-500">{total} persona{total === 1 ? '' : 's'} desde que se mide · {abierto ? 'ocultar' : 'ver'}</span>
+        <span className="text-xs text-neutral-500 text-right">
+          {/* Plegado: el embudo de la última ronda en una línea */}
+          {(() => {
+            const t = datos.porTanda[datos.porTanda.length - 1]
+            return t ? <>Ronda {t.numero}: <b className="text-neutral-700">{t.personas}</b> entraron → <b className="text-neutral-700">{t.empezaron}</b> empezaron → <b className="text-lime-700">{t.postulaciones}</b> se postularon · </> : null
+          })()}
+          {total} desde que se mide · {abierto ? 'ocultar' : 'ver detalle'}
+        </span>
       </button>
       {abierto && (
         <div className="border-t border-neutral-100 p-4 space-y-4 text-sm">
