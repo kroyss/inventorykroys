@@ -52,11 +52,8 @@ const SELECCIONADOS: Record<number, { telegram: string }[]> = {
 // (5 + 15 = 20 pioneros desde el 07-10-2026; los cupos salen de fundadores_tandas) y el formulario. Lo de la base se lee en cada visita.
 // ?vista=previa: muestra el formulario aunque la inscripción esté cerrada, sin poder enviarlo
 // (para revisar cómo quedan las preguntas).
-export default async function FundadoresPage({ searchParams }: { searchParams: Promise<{ vista?: string; estilo?: string }> }) {
-  const sp = await searchParams
-  const previa = sp.vista === 'previa'
-  // PRUEBA de diseño del formulario (?estilo=a|b|c): se borra al elegir.
-  const estilo = sp.estilo === 'a' || sp.estilo === 'b' || sp.estilo === 'c' ? sp.estilo : undefined
+export default async function FundadoresPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
+  const previa = (await searchParams).vista === 'previa'
   await connection()
   const { rows: tandas } = await dbGlobal().query<Tanda>(
     `SELECT t.numero, t.cupos, t.abierta, to_char(t.inscribe_desde, 'YYYY-MM-DD') AS inscribe_desde,
@@ -286,29 +283,15 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           </section>
         </div>
 
-        {(() => {
-          const form = (
-            <FormularioFundadores
-              abierta={!!abiertaHoy}
-              previa={previa && !abiertaHoy}
-              proxima={proxima ? diasInscripcion(proxima) : null}
-              resultados={abiertaHoy ? fechaTanda(diaResultados(abiertaHoy)) : null}
-              estilo={estilo} />
-          )
-          if (estilo === 'b') return (
-            <div className="self-start order-first lg:order-none rounded-3xl bg-neutral-950 p-3 sm:p-4">
-              <p className="px-2 pb-3 pt-1 text-sm font-semibold text-white">Postúlate aquí <span className="font-normal text-lime-400">· toma 2 minutos</span></p>
-              {form}
-            </div>
-          )
-          if (estilo === 'c') return (
-            <div className="self-start order-first lg:order-none">
-              <h2 className="mb-3 text-lg font-semibold text-neutral-900">Postúlate en 2 minutos <span className="text-lime-600">↓</span></h2>
-              {form}
-            </div>
-          )
-          return form
-        })()}
+        {/* El título señala el formulario (había quien no lo encontraba): elegido el 2026-10-09. */}
+        <div className="self-start">
+          <h2 className="mb-3 text-lg font-semibold text-neutral-900">Postúlate en 2 minutos <span className="text-lime-600">↓</span></h2>
+          <FormularioFundadores
+            abierta={!!abiertaHoy}
+            previa={previa && !abiertaHoy}
+            proxima={proxima ? diasInscripcion(proxima) : null}
+            resultados={abiertaHoy ? fechaTanda(diaResultados(abiertaHoy)) : null} />
+        </div>
       </main>
 
       {anunciada && resultadosViejos && (
