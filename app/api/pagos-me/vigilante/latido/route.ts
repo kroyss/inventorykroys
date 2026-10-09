@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       `SELECT id FROM me_pedidos
        WHERE pedido_at > NOW() - make_interval(mins => $1) AND NOT (resultados ? $2)
        ORDER BY id DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN, a.perfil])
-    return NextResponse.json({ pedido: p?.id ?? null })
+    return NextResponse.json({ pedido: p ? Number(p.id) : null })
   } catch (err) {
     return apiError(err)
   }
