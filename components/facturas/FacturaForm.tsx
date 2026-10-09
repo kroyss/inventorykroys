@@ -499,7 +499,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                   <div>
                     <label className="text-xs text-neutral-500">RIF / Cédula <span className="text-red-500">*</span></label>
                     <input value={doc} onChange={e => setDoc(e.target.value)} onBlur={onDocBlur}
-                      placeholder="Solo números, p. ej. 12345678" className={inputCls} />
+                      placeholder="Ej.: V-12345678, J-40282128-0 o 12345678" className={inputCls} />
                   </div>
                   <div>
                     <label className="text-xs text-neutral-500">Teléfono <span className="text-red-500">*</span></label>
