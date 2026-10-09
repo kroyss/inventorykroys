@@ -46,12 +46,16 @@ interface Props {
   previa?: boolean            // /fundadores?vista=previa: se ve el formulario completo pero no se envía
   proxima: string | null      // "domingo 11 y lunes 12 de octubre" (próxima inscripción)
   resultados: string | null   // "martes 6 de octubre" (cuándo se anuncia la selección)
+  estilo?: 'a' | 'b' | 'c'    // PRUEBA de diseño (?estilo=a|b|c) para elegir cómo resaltar el formulario
 }
 
 // Un paso por pregunta (las de una opción avanzan solas al elegir) y un último paso de contacto.
 const PASOS = PREGUNTAS.length + 1
 
-export default function FormularioFundadores({ abierta, previa = false, proxima, resultados }: Props) {
+export default function FormularioFundadores({ abierta, previa = false, proxima, resultados, estilo }: Props) {
+  const marco = estilo === 'b' ? 'rounded-2xl bg-white shadow-2xl'
+    : estilo ? 'rounded-2xl border border-neutral-200 bg-white shadow-lg'
+    : 'rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white'
   const [paso, setPaso] = useState(0)
   const [resp, setResp] = useState<Partial<Record<Campo, string[]>>>({})
   const [contacto, setContacto] = useState({ nombre: '', telegram: '', instagram: '', nick_ml: '', mensaje: '' })
@@ -124,7 +128,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   if (hecho) {
     return (
-      <section className="rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white p-6 sm:p-8 shadow-sm self-start">
+      <section className={`${marco} p-6 sm:p-8 self-start`}>
         <div className="w-11 h-11 rounded-full bg-lime-100 text-lime-700 grid place-items-center text-xl">✓</div>
         <h2 className="mt-4 text-xl font-semibold text-neutral-900">
           {hecho.repetida ? 'Ya tenemos tu postulación' : `¡Listo, ${hecho.nombre}!`}
@@ -149,7 +153,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   if (!abierta && !previa) {
     return (
-      <section id="solicitud" className="scroll-mt-6 rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white p-6 sm:p-8 shadow-sm self-start">
+      <section id="solicitud" className={`scroll-mt-6 ${marco} p-6 sm:p-8 self-start`}>
         <h2 className="text-xl font-semibold text-neutral-900">Postúlate</h2>
         {proxima ? <>
           <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
@@ -175,7 +179,13 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   return (
     <form ref={caja} id="solicitud" onSubmit={enviar}
-      className="scroll-mt-6 rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white shadow-sm self-start overflow-hidden shadow-xl shadow-lime-900/10">
+      className={`scroll-mt-6 ${marco} self-start overflow-hidden ${estilo ? '' : 'shadow-xl shadow-lime-900/10'}`}>
+      {estilo === 'a' && (
+        <div className="bg-lime-400 px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-neutral-950">Postúlate aquí</span>
+          <span className="text-xs font-medium text-neutral-800">Toma 2 minutos</span>
+        </div>
+      )}
       {/* Progreso */}
       <div className="h-1.5 bg-neutral-100" aria-hidden="true">
         <div className="h-full bg-lime-400 transition-[width] duration-300" style={{ width: `${((paso + 1) / PASOS) * 100}%` }} />
@@ -188,7 +198,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
       )}
       <div className="p-6 sm:p-8">
         <div className="flex items-center justify-between text-xs text-neutral-400">
-          <span className="font-semibold uppercase tracking-[0.15em] text-lime-700">Postúlate aquí</span>
+          <span className={`font-semibold uppercase tracking-[0.15em] ${estilo ? 'text-neutral-500' : 'text-lime-700'}`}>{estilo ? 'Postulación' : 'Postúlate aquí'}</span>
           <span className="num">Paso {paso + 1} de {PASOS}</span>
         </div>
 
