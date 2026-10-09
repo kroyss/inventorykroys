@@ -177,6 +177,13 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
             <a href="#solicitud" className="inline-flex items-center gap-2 bg-lime-400 text-neutral-950 px-5 py-3 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors">
               {abiertaHoy ? 'Postúlate' : 'Ver el formulario'} <span aria-hidden="true">↓</span>
             </a>
+            <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-2 border border-lime-400/60 text-lime-400 px-5 py-3 rounded-lg text-sm font-semibold hover:bg-lime-400/10 hover:border-lime-400 transition-colors">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+              Únete a la Comunidad de Vendedores
+            </a>
             <span className="text-xs text-neutral-500">{tomados} de {total} pioneros confirmados</span>
           </div>
         </div>
