@@ -237,3 +237,8 @@ export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 
     </>
   )
 }
+
+/** Vista previa de la hoja (sin barra ni impresión): "Revisar" antes de emitir. */
+export function FacturaVista({ invoice }: { invoice: PrintableInvoice }) {
+  return <Sheet inv={invoice} offX={0} offY={0} copyOffX={0} copyOffY={0} />
+}

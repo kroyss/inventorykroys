@@ -8,6 +8,8 @@ import {
 import { Combobox } from '@/components/ui/Combobox'
 import NumberInput from '@/components/ui/NumberInput'
 import { DateField } from '@/components/ui/DateField'
+import { FacturaVista } from './FacturaPrint'
+import { useImprimirFactura } from './ImprimirAqui'
 
 interface Line {
   product_id: number | null
@@ -114,6 +116,9 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
   })
 
   const [voidReason, setVoidReason] = useState('')
+  // Revisar antes de emitir: el número correlativo se gasta recién en "Emitir e imprimir".
+  const [revisando, setRevisando] = useState(false)
+  const { imprimir, marco } = useImprimirFactura()
   const saleId = replaces ? replaces.sale_id : sale?.id ?? null
 
   // Borrador autoguardado (solo al facturar una venta; no al reemitir)
@@ -307,6 +312,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
     pendingRef.current = null   // el servidor ya borró el borrador al emitir
     setSaved(data)
     onSaved(data)
+    imprimir(data.id)           // en esta misma pestaña
   }
 
   const custOptions = useMemo(
@@ -316,12 +322,13 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
 
   return (
     <div className="fixed inset-0 z-[60]">
+      {marco}
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
         <div className="px-5 py-4 border-b flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-semibold text-lg">
-              {replaces ? `Reimprimir en hoja nueva (anula #${replaces.invoice_number})` : 'Facturar venta'}
+              {replaces ? `Anular y corregir (anula #${replaces.invoice_number})` : 'Facturar venta'}
             </h2>
             {(sale || replaces?.sale_order_number) && (
               <div className="text-xs text-neutral-500 font-mono">
@@ -353,14 +360,40 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
               <div className="text-sm text-neutral-500">{saved.customer_name} · Bs {bs(saved.total_bs)}</div>
               {replaces && <div className="text-xs text-red-600 mt-1">La #{replaces.invoice_number} quedó ANULADA.</div>}
             </div>
-            <a href={`/factura/${saved.id}?print=1`} target="_blank" rel="noreferrer" className="btn-primary">
-              Imprimir factura #{saved.invoice_number}
-            </a>
-            <button onClick={onClose} className="btn-secondary text-sm">Cerrar</button>
+            <p className="text-xs text-neutral-500 max-w-sm">
+              Se abrió el diálogo de impresión. Si no salió, tócalo otra vez.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button onClick={() => imprimir(saved.id)} className="btn-secondary text-sm">Imprimir de nuevo (mismo N°)</button>
+              <button onClick={onClose} className="btn-primary text-sm">Listo</button>
+            </div>
+            <p className="text-[11px] text-neutral-400 max-w-sm">
+              ¿Salió con un error? En Facturas abre la #{saved.invoice_number} y toca “Anular y corregir”.
+            </p>
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            {revisando && (
+              <div className="flex-1 overflow-auto px-5 py-4 space-y-3 bg-neutral-100">
+                {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
+                <p className="text-sm text-neutral-700">
+                  Así va a salir la factura <b>#{number}</b>. Si algo está mal, toca <b>← Corregir</b>: todavía no se usó el número.
+                </p>
+                <div className="w-fit mx-auto bg-white shadow" style={{ zoom: 0.72 }}>
+                  <FacturaVista invoice={{
+                    invoice_number: number, invoice_date: date, customer_name: name.trim(),
+                    customer_doc: normalizeDoc(doc) || null, customer_address: address.trim() || null,
+                    customer_phone: phone.trim() || null, iva_rate: calc.iva_rate,
+                    base_bs: calc.base, iva_bs: calc.iva, total_bs: calc.total,
+                    items: calc.lines.map((l, i) => ({
+                      description: lines[i]?.description.trim() ?? '', quantity: l.quantity,
+                      unit_price_bs: l.unit_price_bs, total_bs: l.total_bs,
+                    })),
+                  }} />
+                </div>
+              </div>
+            )}
+            <div className={`flex-1 overflow-y-auto px-5 py-4 space-y-5 ${revisando ? 'hidden' : ''}`}>
               {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
 
               {replaces && (
@@ -588,14 +621,26 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
 
             <div className="p-4 border-t flex items-center justify-between gap-2 shrink-0 bg-neutral-50">
               <span className="text-xs text-neutral-500">
-                {problems.length > 0 ? `Falta: ${problems.join(', ')}` : `Se emitirá la factura #${number}`}
+                {problems.length > 0 ? `Falta: ${problems.join(', ')}`
+                  : revisando ? `Revisa la hoja: el #${number} se usa al emitir` : `Será la factura #${number}`}
               </span>
               <div className="flex gap-2">
-                <button onClick={onClose} className="btn-secondary text-sm">Cancelar</button>
-                <button onClick={submit} disabled={busy || problems.length > 0}
-                  className={replaces ? 'btn-danger text-sm' : 'btn-primary text-sm'}>
-                  {busy ? 'Emitiendo…' : replaces ? 'Anular y emitir nueva' : 'Emitir factura'}
-                </button>
+                {revisando ? (
+                  <>
+                    <button onClick={() => setRevisando(false)} disabled={busy} className="btn-secondary text-sm">← Corregir</button>
+                    <button onClick={submit} disabled={busy || problems.length > 0}
+                      className={replaces ? 'btn-danger text-sm' : 'btn-primary text-sm'}>
+                      {busy ? 'Emitiendo…' : replaces ? 'Anular, emitir e imprimir' : 'Emitir e imprimir'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={onClose} className="btn-secondary text-sm">Cancelar</button>
+                    <button onClick={() => { setError(null); setRevisando(true) }} disabled={problems.length > 0} className="btn-primary text-sm">
+                      Revisar →
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </>

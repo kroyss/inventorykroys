@@ -5,6 +5,7 @@ import { bs, fmtDate, type Invoice } from '@/lib/invoices'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import FacturaForm from './FacturaForm'
+import { useImprimirFactura } from './ImprimirAqui'
 import { PageHeader, chipCls } from '@/components/ui'
 import { DateField } from '@/components/ui/DateField'
 
@@ -187,6 +188,7 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
   onOpen: (id: number) => void
 }) {
   const confirm = useConfirm()
+  const { imprimir, marco } = useImprimirFactura()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [control, setControl] = useState(inv.control_number ?? '')
@@ -414,7 +416,7 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
               <p className="text-xs text-red-800">
                 Anular sin reemplazo: usalo si la factura no debía emitirse (venta equivocada, datos del cliente mal).
-                Si solo se dañó la hoja, usá “Reimprimir en hoja nueva”.
+                Si te equivocaste o se dañó la hoja, usa “Anular y corregir”.
               </p>
               <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="Motivo de la anulación"
                 className="w-full border border-neutral-300 rounded px-3 py-1.5 text-sm" />
@@ -427,14 +429,19 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
         </div>
 
         <div className="p-4 border-t flex flex-wrap gap-2 shrink-0 bg-neutral-50">
-          <a href={`/factura/${inv.id}${voided ? '' : '?print=1'}`} target="_blank" rel="noreferrer"
-            className={voided ? 'btn-secondary text-sm' : 'btn-primary text-sm'}>
-            {voided ? 'Ver hoja' : inv.print_count > 0 ? 'Reimprimir (mismo N°)' : 'Imprimir'}
-          </a>
+          {marco}
+          {voided ? (
+            <a href={`/factura/${inv.id}`} target="_blank" rel="noreferrer" className="btn-secondary text-sm">Ver hoja</a>
+          ) : (
+            <button onClick={() => imprimir(inv.id)} className="btn-primary text-sm">
+              {inv.print_count > 0 ? 'Reimprimir (mismo N°)' : 'Imprimir'}
+            </button>
+          )}
           {!voided && (
             <>
-              <button onClick={onReemit} className="btn-warning text-sm" title="La hoja preimpresa se dañó: anula esta y emite otra con el siguiente número">
-                Reimprimir en hoja nueva
+              <button onClick={onReemit} className="btn-warning text-sm"
+                title="Salió con un error o se dañó la hoja: anula esta (queda registrada) y emite otra con el siguiente número, con los datos cargados para corregir">
+                ¿Error? Anular y corregir
               </button>
               {!voiding && <button onClick={() => setVoiding(true)} className="btn-secondary text-sm">Anular</button>}
             </>
