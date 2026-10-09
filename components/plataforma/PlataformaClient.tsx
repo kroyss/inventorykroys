@@ -6,6 +6,7 @@ import CuentasPanel from './CuentasPanel'
 import FundadoresPanel from './FundadoresPanel'
 import InternoPanel from './InternoPanel'
 import AprendizajePanel from './AprendizajePanel'
+import ResumenPanel from './ResumenPanel'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 
 interface Empresa {
@@ -24,6 +25,19 @@ interface Empresa {
   prueba_dias: number | null
   fundador: boolean
   ia_limite_mes: number | null
+}
+
+type Filtro = 'todas' | 'prueba' | 'activo' | 'vencido' | 'desactivadas'
+const FILTROS: { k: Filtro; t: string; ok: (e: Empresa, hoy: string) => boolean }[] = [
+  { k: 'todas',        t: 'Todas',        ok: () => true },
+  { k: 'prueba',       t: 'En prueba',    ok: (e, h) => e.is_active && estadoEfectivo(e.estado, e.prueba_hasta, h) === 'prueba' },
+  { k: 'activo',       t: 'Activas',      ok: (e, h) => e.is_active && ['activo', 'propietario'].includes(estadoEfectivo(e.estado, e.prueba_hasta, h)) },
+  { k: 'vencido',      t: 'Vencidas',     ok: (e, h) => e.is_active && estadoEfectivo(e.estado, e.prueba_hasta, h) === 'vencido' },
+  { k: 'desactivadas', t: 'Desactivadas', ok: e => !e.is_active },
+]
+const TONO_ESTADO: Record<EstadoCuenta, string> = {
+  propietario: 'bg-neutral-100 text-neutral-700', activo: 'bg-green-100 text-green-800',
+  prueba: 'bg-amber-100 text-amber-800', vencido: 'bg-red-100 text-red-800',
 }
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
@@ -48,9 +62,12 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [nueva, setNueva]       = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
-  const [vista, setVista]       = useState<'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('empresas')
+  const [vista, setVista]       = useState<'resumen' | 'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('resumen')
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
+  const [abierta, setAbierta]   = useState<number | null>(null)
+  const [filtro, setFiltro]     = useState<Filtro>('todas')
+  const [buscar, setBuscar]     = useState('')
   const confirm = useConfirm()
 
   const cargar = useCallback(async () => {
@@ -85,6 +102,19 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     actualizar(e, { modulos: enciende ? [...e.modulos, m] : e.modulos.filter(x => x !== m) })
   }
 
+  const sel = empresas.find(e => e.id === abierta) ?? null
+  // Escape cierra el panel
+  useEffect(() => {
+    if (abierta == null) return
+    const k = (ev: KeyboardEvent) => { if (ev.key === 'Escape') setAbierta(null) }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [abierta])
+  const q = buscar.trim().toLowerCase()
+  const fil = FILTROS.find(f => f.k === filtro)!
+  const visibles = empresas.filter(e => fil.ok(e, hoy)
+    && (!q || e.nombre.toLowerCase().includes(q) || (e.admins ?? '').toLowerCase().includes(q) || e.organizacion.toLowerCase().includes(q)))
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -96,15 +126,15 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       />
 
       <div className="flex gap-1 border-b border-neutral-200">
-        {(['empresas', 'cuentas', 'fundadores', 'aprendizaje', 'interno'] as const).map(v => (
+        {(['resumen', 'empresas', 'cuentas', 'fundadores', 'aprendizaje', 'interno'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)}
             className={`px-3 py-1.5 text-sm -mb-px border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
-            {v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : v === 'aprendizaje' ? 'Aprendizaje' : 'Interno'}
+            {v === 'resumen' ? 'Resumen' : v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : v === 'aprendizaje' ? 'Aprendizaje' : 'Interno'}
           </button>
         ))}
       </div>
 
-      {vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'interno' ? <InternoPanel /> : vista === 'aprendizaje' ? <AprendizajePanel /> : <>
+      {vista === 'resumen' ? <ResumenPanel onIr={setVista} /> : vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'interno' ? <InternoPanel /> : vista === 'aprendizaje' ? <AprendizajePanel /> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
@@ -120,74 +150,139 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
           onCreada={msg => { setNueva(false); setAviso(msg); cargar() }} />
       )}
 
+      {/* Lista corta: lo que se mira seguido. El detalle (módulos, IA, acciones) va en el panel lateral. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          {FILTROS.map(f => (
+            <button key={f.k} onClick={() => setFiltro(f.k)}
+              className={`px-3 py-1 rounded-full text-xs border ${filtro === f.k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>
+              {f.t} <span className="opacity-60">{empresas.filter(e => f.ok(e, hoy)).length}</span>
+            </button>
+          ))}
+        </div>
+        <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Buscar empresa o admin…"
+          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-64" />
+      </div>
+
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>
               <th className="px-4 py-2 text-left">Empresa</th>
               <th className="px-4 py-2 text-left">Cuenta</th>
-              <th className="px-4 py-2 text-left">País</th>
-              <th className="px-4 py-2 text-left">Admins</th>
-              <th className="px-4 py-2 text-right">Usuarios</th>
-              <th className="px-4 py-2 text-left">Módulos</th>
-              <th className="px-4 py-2 text-right" title="Créditos de IA por mes (1 por borrador; buscar en internet, hasta 4). Vacío = sin límite">IA/mes</th>
+              <th className="px-4 py-2 text-left hidden md:table-cell">Admins</th>
+              <th className="px-4 py-2 text-right hidden sm:table-cell">Módulos</th>
               <th className="px-4 py-2 text-left">Estado</th>
-              <th className="px-4 py-2" />
+              <th className="px-2 py-2 w-6" />
             </tr>
           </thead>
           <tbody>
-            {empresas.map(e => (
-              <tr key={e.id} className={`border-t border-neutral-100 align-top ${!e.is_active ? 'opacity-50' : ''}`}>
-                <td className="px-4 py-2">
-                  <button onClick={() => renombrar(e)} title="Cambiar el nombre" className="font-medium text-left hover:underline">{e.nombre} <span className="text-neutral-400 text-xs">✏️</span></button>
-                  {e.organizacion !== e.nombre && <div className="text-xs text-neutral-400">{e.organizacion}</div>}
-                </td>
-                <td className="px-4 py-2"><Cuenta e={e} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} /></td>
-                <td className="px-4 py-2">{e.country}</td>
-                <td className="px-4 py-2 font-mono text-xs">{e.admins ?? '—'}</td>
-                <td className="px-4 py-2 text-right">{e.usuarios}</td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(modulos).map(([m, desc]) => (
-                      <button key={m} onClick={() => alternarModulo(e, m)} title={desc}
-                        className={`px-2 py-0.5 rounded-full text-xs border ${
-                          e.modulos.includes(m)
-                            ? 'bg-green-100 border-green-200 text-green-800'
-                            : 'bg-white border-neutral-200 text-neutral-400'
-                        }`}>
-                        {e.modulos.includes(m) ? '✓ ' : ''}{m}
-                      </button>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <LimiteIA key={`${e.id}-${e.ia_limite_mes}`} valor={e.ia_limite_mes} onGuardar={v => actualizar(e, { ia_limite_mes: v })} />
-                </td>
-                <td className="px-4 py-2">
-                  <button disabled={e.id === empresaActual}
-                    onClick={() => actualizar(e, { is_active: !e.is_active })}
-                    title={e.id === empresaActual ? 'Es la empresa en la que estás' : undefined}
-                    className={`px-2 py-0.5 rounded-full text-xs ${e.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-600'} disabled:cursor-not-allowed`}>
-                    {e.is_active ? 'Activa' : 'Desactivada'}
-                  </button>
-                </td>
-                <td className="px-4 py-2 text-right">
-                  {e.estado !== 'propietario' && (
-                    <button onClick={() => { setError(null); setAviso(null); setBorrar(e) }} title="Eliminar la empresa con todos sus datos"
-                      className="text-xs text-red-600 hover:underline">Eliminar</button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {visibles.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-400">Ninguna empresa con ese filtro.</td></tr>
+            )}
+            {visibles.map(e => {
+              const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
+              return (
+                <tr key={e.id} onClick={() => { setError(null); setAviso(null); setAbierta(e.id) }}
+                  className={`border-t border-neutral-100 cursor-pointer hover:bg-neutral-50 ${abierta === e.id ? 'bg-lime-50/60' : ''} ${!e.is_active ? 'opacity-50' : ''}`}>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-neutral-900">{e.nombre}</div>
+                    <div className="text-xs text-neutral-400">
+                      {e.country}{e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}{e.fundador ? ' · Fundador' : ''}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${TONO_ESTADO[est]}`}>{ETIQUETA_ESTADO[est]}</span>
+                    {est === 'prueba' && e.prueba_hasta && (
+                      <div className="text-xs text-neutral-400 mt-0.5">hasta {e.prueba_hasta.slice(8, 10)}/{e.prueba_hasta.slice(5, 7)}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-xs hidden md:table-cell">{e.admins ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-neutral-500 hidden sm:table-cell">{e.modulos.length}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`text-xs ${e.is_active ? 'text-green-700' : 'text-neutral-500'}`}>{e.is_active ? 'Activa' : 'Desactivada'}</span>
+                  </td>
+                  <td className="px-2 py-2.5 text-neutral-300">›</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-neutral-500">
-        Inicio, Ventas, Inventario, Compras, Productos, Reportes, Ajustes y Usuarios los tienen todas las empresas.
-        Tocar el nombre lo cambia; tocar un módulo lo prende o lo apaga. Desactivar una empresa saca a sus usuarios; sus datos se conservan.
-        Eliminar la borra con TODOS sus datos (primero hay que desactivarla).
-        Cuenta: una prueba vence sola al pasar su fecha (sus usuarios ya no entran, los datos quedan); tócala para cambiarla.
-      </p>
+
+      {/* Panel lateral con todo el detalle de la empresa */}
+      {sel && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/20" onClick={() => setAbierta(null)} />
+          <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col">
+            <div className="px-5 py-4 border-b flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <button onClick={() => renombrar(sel)} title="Cambiar el nombre" className="font-semibold text-lg text-left hover:underline">
+                  {sel.nombre} <span className="text-neutral-400 text-xs">✏️</span>
+                </button>
+                <div className="text-xs text-neutral-500">
+                  {sel.country} · {sel.organizacion} · {sel.usuarios} usuario{sel.usuarios === 1 ? '' : 's'}
+                </div>
+                {sel.admins && <div className="text-xs text-neutral-500 font-mono mt-0.5">Admin: {sel.admins}</div>}
+              </div>
+              <button onClick={() => setAbierta(null)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 text-sm">
+              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
+              {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-3 py-2 rounded text-sm">{aviso}</div>}
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Cuenta</h3>
+                <Cuenta e={sel} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} />
+              </section>
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Módulos</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(modulos).map(([m, desc]) => (
+                    <button key={m} onClick={() => alternarModulo(sel, m)} title={desc}
+                      className={`px-2 py-0.5 rounded-full text-xs border ${
+                        sel.modulos.includes(m) ? 'bg-green-100 border-green-200 text-green-800' : 'bg-white border-neutral-200 text-neutral-400'
+                      }`}>
+                      {sel.modulos.includes(m) ? '✓ ' : ''}{m}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-neutral-400 mt-1.5">Tocar un módulo lo prende o lo apaga (pasa el mouse encima para ver qué es).</p>
+              </section>
+
+              <section className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Créditos de IA por mes</h3>
+                  <p className="text-xs text-neutral-400">1 por borrador (buscar en internet, hasta 4). Vacío = sin límite.</p>
+                </div>
+                <LimiteIA key={`${sel.id}-${sel.ia_limite_mes}`} valor={sel.ia_limite_mes} onGuardar={v => actualizar(sel, { ia_limite_mes: v })} />
+              </section>
+
+              {/* Acciones delicadas: al fondo y separadas */}
+              <section className="border-t border-neutral-100 pt-4 space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Acciones</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button disabled={sel.id === empresaActual}
+                    onClick={() => actualizar(sel, { is_active: !sel.is_active })}
+                    title={sel.id === empresaActual ? 'Es la empresa en la que estás' : undefined}
+                    className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                    {sel.is_active ? 'Desactivar (saca a sus usuarios)' : 'Activar'}
+                  </button>
+                  {sel.estado !== 'propietario' && (
+                    <button onClick={() => { setError(null); setAviso(null); setBorrar(sel); setAbierta(null) }}
+                      className="btn-secondary text-xs text-red-600">Eliminar con todos sus datos…</button>
+                  )}
+                </div>
+                <p className="text-xs text-neutral-400">
+                  Desactivar saca a sus usuarios; los datos se conservan. Eliminar la borra con TODOS sus datos (primero hay que desactivarla).
+                </p>
+              </section>
+            </div>
+          </aside>
+        </div>
+      )}
       </>}
     </div>
   )
