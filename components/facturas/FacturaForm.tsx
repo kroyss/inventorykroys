@@ -221,9 +221,13 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
 
   const problems = [
     ...(!name.trim() ? ['nombre del cliente'] : []),
+    ...(!normalizeDoc(doc) ? ['cédula o RIF'] : []),
+    ...(!phone.trim() ? ['teléfono'] : []),
+    ...(!address.trim() ? ['dirección'] : []),
     ...(lines.length === 0 ? ['al menos una línea'] : []),
     ...(lines.length > MAX_INVOICE_LINES ? [`máximo ${MAX_INVOICE_LINES} líneas (la hoja no admite más)`] : []),
     ...(lines.some(l => !l.description.trim() || !(l.quantity > 0)) ? ['descripción y cantidad en cada línea'] : []),
+    ...(lines.some(l => !(l.unit_price_usd > 0)) ? ['monto (precio) en cada línea'] : []),
     ...(!(rate > 0) ? ['tasa BCV'] : []),
     ...(!(number > 0) ? ['número de factura'] : []),
     ...(replaces && !voidReason.trim() ? ['motivo de la anulación'] : []),
@@ -493,16 +497,16 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                     )}
                   </div>
                   <div>
-                    <label className="text-xs text-neutral-500">RIF / Cédula</label>
+                    <label className="text-xs text-neutral-500">RIF / Cédula <span className="text-red-500">*</span></label>
                     <input value={doc} onChange={e => setDoc(e.target.value)} onBlur={onDocBlur}
-                      placeholder="Vacío = consumidor final" className={inputCls} />
+                      placeholder="Solo números, p. ej. 12345678" className={inputCls} />
                   </div>
                   <div>
-                    <label className="text-xs text-neutral-500">Teléfono</label>
+                    <label className="text-xs text-neutral-500">Teléfono <span className="text-red-500">*</span></label>
                     <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-xs text-neutral-500">Dirección</label>
+                    <label className="text-xs text-neutral-500">Dirección <span className="text-red-500">*</span></label>
                     <input value={address} onChange={e => setAddress(e.target.value)} className={inputCls} />
                   </div>
                 </div>

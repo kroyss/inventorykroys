@@ -56,9 +56,10 @@ const CreateSchema = z.object({
   exchange_rate:  z.number().positive(),
   customer: z.object({
     name:              z.string().trim().min(1, 'El nombre del cliente es obligatorio'),
-    doc:               z.string().max(20).optional(),
-    address:           z.string().optional(),
-    phone:             z.string().max(40).optional(),
+    // Obligatorios desde 2026-10-09 (pedido del dueño): la factura sale completa.
+    doc:               z.string().trim().min(1, 'La cédula o RIF es obligatoria').max(20),
+    address:           z.string().trim().min(1, 'La dirección es obligatoria'),
+    phone:             z.string().trim().min(1, 'El teléfono es obligatorio').max(40),
     is_special:        z.boolean().default(false),
     retention_percent: z.number().min(0).max(100).default(75),
   }),
@@ -68,7 +69,7 @@ const CreateSchema = z.object({
     product_id:     z.number().int().positive().nullable(),
     description:    z.string().trim().min(1, 'Cada línea necesita descripción'),
     quantity:       z.number().positive(),
-    unit_price_usd: z.number().nonnegative(),
+    unit_price_usd: z.number().positive('Cada línea necesita su monto'),
   })).min(1).max(MAX_INVOICE_LINES, `La hoja admite máximo ${MAX_INVOICE_LINES} líneas`),
   notes:       z.string().optional(),
   // Reimpresión en hoja nueva: anula esta factura y la reemplaza por la nueva.

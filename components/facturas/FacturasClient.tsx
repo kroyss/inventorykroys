@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { UserRole } from '@/lib/types'
+import type { Sale, UserRole } from '@/lib/types'
 import { bs, fmtDate, type Invoice } from '@/lib/invoices'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
@@ -27,6 +27,9 @@ export default function FacturasClient(_: { userRole: UserRole }) {
   const [search, setSearch]     = useState('')
   const [selected, setSelected] = useState<Invoice | null>(null)
   const [reemit, setReemit]     = useState<Invoice | null>(null)
+  // Facturas a medio llenar (autoguardadas): por si se fue la luz o se cerró la ventana.
+  const [borradores, setBorradores] = useState<{ sale_id: number; ml_order_number: string; cliente: string | null; updated_at: string; updated_by: string | null }[]>([])
+  const [retomar, setRetomar] = useState<Sale | null>(null)
   const [showConfig, setShowConfig] = useState(false)
   // Cambia cada vez que llega una versión nueva del detalle → remonta el panel con los datos frescos
   const [detailVersion, setDetailVersion] = useState(0)
@@ -43,9 +46,13 @@ export default function FacturasClient(_: { userRole: UserRole }) {
     if (filter === 'EMITIDA' || filter === 'ANULADA') qs.set('status', filter)
     if (filter === 'RET_PENDIENTE') qs.set('retention', 'PENDIENTE')
     if (search) qs.set('search', search)
-    const data = await fetch(`/api/invoices?${qs}`).then(r => r.json()).catch(() => [])
+    const [data, drafts] = await Promise.all([
+      fetch(`/api/invoices?${qs}`).then(r => r.json()).catch(() => []),
+      fetch('/api/invoices/drafts').then(r => r.json()).catch(() => []),
+    ])
     if (my !== reqId.current) return
     setRows(Array.isArray(data) ? data : [])
+    setBorradores(Array.isArray(drafts) ? drafts : [])
     setLoading(false)
   }, [filter, search])
   useEffect(() => { load() }, [load])
@@ -102,6 +109,30 @@ export default function FacturasClient(_: { userRole: UserRole }) {
         <div className="mb-3 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2">
           {pendingRet.length} {pendingRet.length === 1 ? 'factura espera' : 'facturas esperan'} comprobante de retención ·
           Bs {bs(pendingRet.reduce((a, r) => a + r.retention_bs, 0))} retenidos sin respaldo todavía.
+        </div>
+      )}
+
+      {borradores.length > 0 && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <p className="font-medium text-amber-900">
+            {borradores.length === 1 ? '1 factura quedó a medio llenar' : `${borradores.length} facturas quedaron a medio llenar`}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {borradores.map(b => (
+              <li key={b.sale_id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-mono text-xs">{b.ml_order_number}</span>
+                <span>{b.cliente ?? '—'}</span>
+                <span className="text-xs text-amber-800/70">
+                  guardado {new Date(b.updated_at).toLocaleString('es-VE', { timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  {b.updated_by ? ` · ${b.updated_by}` : ''}
+                </span>
+                <button onClick={async () => {
+                  const s = await fetch(`/api/sales/${b.sale_id}`).then(r => (r.ok ? r.json() : null)).catch(() => null)
+                  if (s) setRetomar(s)
+                }} className="ml-auto underline text-amber-900 hover:text-amber-950">Continuar</button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -170,6 +201,14 @@ export default function FacturasClient(_: { userRole: UserRole }) {
           replaces={reemit}
           onClose={() => setReemit(null)}
           onSaved={inv => { load(); openDetail(inv.id) }}
+        />
+      )}
+
+      {retomar && (
+        <FacturaForm
+          sale={retomar}
+          onClose={() => { setRetomar(null); load() }}
+          onSaved={() => load()}
         />
       )}
 
