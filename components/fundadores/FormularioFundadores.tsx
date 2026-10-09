@@ -124,7 +124,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   if (hecho) {
     return (
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm self-start">
+      <section className="rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white p-6 sm:p-8 shadow-sm self-start">
         <div className="w-11 h-11 rounded-full bg-lime-100 text-lime-700 grid place-items-center text-xl">✓</div>
         <h2 className="mt-4 text-xl font-semibold text-neutral-900">
           {hecho.repetida ? 'Ya tenemos tu postulación' : `¡Listo, ${hecho.nombre}!`}
@@ -149,7 +149,7 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   if (!abierta && !previa) {
     return (
-      <section id="solicitud" className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm self-start">
+      <section id="solicitud" className="scroll-mt-6 rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white p-6 sm:p-8 shadow-sm self-start">
         <h2 className="text-xl font-semibold text-neutral-900">Postúlate</h2>
         {proxima ? <>
           <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
@@ -175,9 +175,14 @@ export default function FormularioFundadores({ abierta, previa = false, proxima,
 
   return (
     <form ref={caja} id="solicitud" onSubmit={enviar}
-      className="scroll-mt-6 rounded-2xl border border-neutral-200 bg-white shadow-sm self-start overflow-hidden">
+      className="scroll-mt-6 rounded-2xl border-2 border-lime-400 ring-4 ring-lime-400/20 bg-white shadow-sm self-start overflow-hidden shadow-xl shadow-lime-900/10">
+      {/* Cabecera oscura: que se vea de lejos que aquí es donde uno se postula (había quien no lo encontraba) */}
+      <div className="bg-neutral-950 px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-white">📝 Postúlate aquí</span>
+        <span className="text-xs text-lime-400 font-medium">Toma 2 minutos</span>
+      </div>
       {/* Progreso */}
-      <div className="h-1 bg-neutral-100" aria-hidden="true">
+      <div className="h-1.5 bg-neutral-100" aria-hidden="true">
         <div className="h-full bg-lime-400 transition-[width] duration-300" style={{ width: `${((paso + 1) / PASOS) * 100}%` }} />
       </div>
 
