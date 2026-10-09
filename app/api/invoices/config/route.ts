@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// PUT /api/invoices/config (admin) → número inicial, IVA y corrimiento de impresión
+// PUT /api/invoices/config (admin y usuario) → número inicial, IVA y corrimiento de impresión
 // (toda la hoja + ajuste extra solo para la copia).
 const PutSchema = z.object({
   start_number: z.number().int().positive().optional(),
@@ -48,7 +48,7 @@ const KEY: Record<keyof z.infer<typeof PutSchema>, string> = {
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (!facturasHabilitadas(session.user) || session.user.role !== 'admin') return forbidden()
+  if (!facturasHabilitadas(session.user)) return forbidden()   // admin y usuario (2026-10-09)
 
   try {
     const body = PutSchema.parse(await req.json())

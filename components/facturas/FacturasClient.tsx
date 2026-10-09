@@ -18,8 +18,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 const RET_LABEL: Record<string, string> = { PENDIENTE: 'Retención pendiente', RECIBIDA: 'Retención recibida' }
 
-export default function FacturasClient({ userRole }: { userRole: UserRole }) {
-  const isAdmin = userRole === 'admin'
+export default function FacturasClient(_: { userRole: UserRole }) {
   const [rows, setRows]         = useState<Invoice[]>([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState<Filter>('all')
@@ -80,9 +79,8 @@ export default function FacturasClient({ userRole }: { userRole: UserRole }) {
     <div>
       <PageHeader title="Facturas" subtitle="Facturas fiscales emitidas desde las ventas" actions={<>
         <a href="/factura/prueba" target="_blank" rel="noreferrer" className="btn-secondary text-sm whitespace-nowrap">Hoja de prueba</a>
-        {isAdmin && (
-          <button onClick={() => setShowConfig(true)} className="btn-secondary text-sm whitespace-nowrap">Configuración</button>
-        )}
+        {/* Configuración: también los usuarios, por si hay que corregir el número o el corrimiento al imprimir. */}
+        <button onClick={() => setShowConfig(true)} className="btn-secondary text-sm whitespace-nowrap">Configuración</button>
       </>} />
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
