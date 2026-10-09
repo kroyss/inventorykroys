@@ -10,6 +10,7 @@ import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
 const allLinks: { href: string; label: string; roles: UserRole[]; countries: Country[]; espacio?: Espacio }[] = [
   { href: '/dashboard',  label: 'Inicio',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/ventas',     label: 'Ventas',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
+  { href: '/pagos-me',   label: 'Pagos ME',  roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
   { href: '/facturas',   label: 'Facturas',  roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
   { href: '/inventario', label: 'Inventario',roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
   { href: '/compras',    label: 'Compras',   roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
@@ -19,7 +20,6 @@ const allLinks: { href: string; label: string; roles: UserRole[]; countries: Cou
   // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/pagos-me',         label: 'Pagos ME',   roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/despachos',        label: 'Despachos',  roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/reportador',       label: 'Reportador', roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/preguntas',        label: 'Preguntas',  roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
