@@ -120,7 +120,7 @@ export function Tabs<T extends string>({ items, value, onChange, className = '' 
   items: TabItem<T>[]; value: T; onChange: (v: T) => void; className?: string
 }) {
   return (
-    <div className={`flex items-end gap-1 border-b border-neutral-200 overflow-x-auto overflow-y-hidden [scrollbar-width:none] ${className}`} role="tablist">
+    <div className={`flex items-end sm:gap-1 border-b border-neutral-200 overflow-x-auto overflow-y-hidden [scrollbar-width:none] ${className}`} role="tablist">
       {items.map((t, i) => {
         const on = t.value === value
         const sep = i > 0 && t.group && t.group !== items[i - 1].group
@@ -128,11 +128,11 @@ export function Tabs<T extends string>({ items, value, onChange, className = '' 
           <div key={t.value} className="flex items-end">
             {sep && <span className="self-center h-5 w-px bg-neutral-200 mx-2" aria-hidden="true" />}
             <button type="button" role="tab" aria-selected={on} onClick={() => onChange(t.value)}
-              className={`relative px-3 pb-2.5 pt-1.5 text-sm whitespace-nowrap transition-colors ${
+              className={`relative px-2 sm:px-3 pb-2.5 pt-1.5 text-sm whitespace-nowrap transition-colors ${
                 on ? 'font-semibold text-neutral-900' : 'font-medium text-neutral-500 hover:text-neutral-800'}`}>
               {t.label}
               {t.count !== undefined && (
-                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full num ${on ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
+                <span className={`ml-1 sm:ml-1.5 text-xs px-1.5 py-0.5 rounded-full num ${on ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
                   {t.count}
                 </span>
               )}

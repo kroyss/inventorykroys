@@ -41,7 +41,12 @@ export default function EspacioSwitcher({ automatizaciones, inventario, radarUrl
   }, [abierto])
 
   // Sin otro espacio al que cambiar, no aparece (la empresa sin inventario solo tiene Automatizaciones).
-  if (!radarUrl && !(automatizaciones && inventario)) return null
+  // En el celular la barra no lleva el menú (va abajo): sin selector, al menos se ve dónde estás.
+  if (!radarUrl && !(automatizaciones && inventario)) return (
+    <div className="md:hidden flex items-center gap-2 pl-1 text-sm font-semibold text-neutral-800 min-w-0">
+      <Icono de={actual} /><span className="truncate">{NOMBRES[actual]}</span>
+    </div>
+  )
 
   const opciones = [
     ...(inventario ? [{ id: 'inventario' as const, href: '/dashboard', desc: 'Stock, ventas, compras y productos' }] : []),
