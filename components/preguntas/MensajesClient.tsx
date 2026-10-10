@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
-import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
+import { PageHeader, Tabs, EmptyState, Cargando } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -10,7 +10,7 @@ import type { MensajeRapido } from '@/lib/mensajesRapidos'
 
 interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
-  ultimo_at: string | null; productos: string | null; cuenta: string; venta_estado: string | null; notas: string | null
+  ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null
   comprador_nick: string | null; comprador_nombre: string | null
 }
 interface Adjunto { archivo: string; nombre: string; tipo: string | null }
@@ -190,9 +190,12 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
           <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{c.cuenta}</span>
           <Comprador nick={comprador?.nick ?? c.comprador_nick} nombre={comprador?.nombre ?? c.comprador_nombre} grande />
           <span className="font-mono">{c.pack_id}</span>
-          {c.venta_estado
-            ? <StatusBadge status={c.venta_estado} label={STATUS_LABELS[c.venta_estado]} />
-            : <span className="text-amber-700">No está cargada en el sistema</span>}
+          {/* Informativo (sin protagonismo): si su guía ya salió en Despachos. Pudo despacharse sin registrarlo aquí. */}
+          {c.cancelada
+            ? <span className="text-neutral-400">· cancelada en ML</span>
+            : c.con_despachos && (c.despachada_at
+              ? <span className="text-neutral-500" title="Su guía salió impresa en Despachos">· despachada {new Date(c.despachada_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
+              : <span className="text-neutral-400" title="No hay guía impresa en Despachos para esta venta (pudo despacharse sin registrarla aquí)">· sin despachar en sistema</span>)}
           {c.sin_leer > 0 && (
             <button onClick={() => leer(true)} className="ml-auto btn-ghost text-xs px-2 py-1">Marcar como leída</button>
           )}
