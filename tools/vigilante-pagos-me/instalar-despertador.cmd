@@ -1,15 +1,23 @@
 @echo off
-rem Registra el despertador para que arranque escondido cada vez que se inicia sesion en Windows
-rem y lo arranca ya. Doble clic (no hace falta administrador). Para quitarlo:
-rem   schtasks /delete /tn "Despertador Pagos ME" /f
-schtasks /create /tn "Despertador Pagos ME" /sc onlogon /rl limited /f /tr "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"%~dp0despertador.ps1\""
+rem Deja el despertador arrancando escondido cada vez que se inicia sesion en Windows (acceso directo
+rem en la carpeta Inicio del usuario: no necesita administrador) y lo arranca ya. Doble clic.
+rem Para quitarlo: borrar "Despertador Pagos ME" de shell:startup (Win+R).
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$s = (New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Startup') + '\Despertador Pagos ME.lnk');" ^
+  "$s.TargetPath = 'powershell.exe';" ^
+  "$s.Arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"%~dp0despertador.ps1\"';" ^
+  "$s.WorkingDirectory = '%~dp0';" ^
+  "$s.WindowStyle = 7;" ^
+  "$s.Save()"
 if errorlevel 1 (
   echo.
-  echo No se pudo registrar. Prueba con clic derecho ^> Ejecutar como administrador.
+  echo No se pudo crear el acceso directo de inicio.
   pause
   exit /b 1
 )
-schtasks /run /tn "Despertador Pagos ME"
+rem Si ya habia uno corriendo (otra instalacion), se cierra para no quedar dos.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -like '*despertador.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+start "" powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0despertador.ps1"
 echo.
 echo Listo: el despertador quedo corriendo y arranca solo al iniciar Windows.
 echo Revisa en el sistema (Pagos ME) que diga "PC en espera".

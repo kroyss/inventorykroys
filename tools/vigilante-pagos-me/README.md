@@ -35,9 +35,9 @@ MercadoEnvíos iniciada, esa ventana queda abierta para iniciarla ahí.
    - `perfiles`: el nombre que se puso en la extensión (`perfil`) y la carpeta de Chrome de ese perfil
      (`carpeta`: en esa ventana, `chrome://version` → "Ruta del perfil", lo último: `Profile 1`, `Profile 2`…).
    - `chrome`: vacío (se busca solo) o la ruta de `chrome.exe`.
-3. Doble clic en `instalar-despertador.cmd`. Queda corriendo y arranca solo al iniciar Windows.
+3. Doble clic en `instalar-despertador.cmd` (sin administrador). Queda corriendo y arranca solo al iniciar Windows (acceso directo en `shell:startup`).
 4. Cerrar las ventanas de Chrome. En el sistema, **Pagos ME** debe decir **"PC en espera"**.
-5. Registro: `despertador.log` en la misma carpeta. Quitar: `schtasks /delete /tn "Despertador Pagos ME" /f`.
+5. Registro: `despertador.log` en la misma carpeta. Quitar: borrar "Despertador Pagos ME" de `shell:startup`.
 
 Necesita que Windows entre solo (sin clave) para arrancar después de un apagado.
 
