@@ -76,8 +76,8 @@ async function completarItems(db: Pool, conexionId: number) {
   for (const { item_id } of rows) {
     try {
       const it = await mlFetch<{ id: string; title: string; permalink: string; status: string
-                                 price: number | null; original_price: number | null; currency_id: string | null; thumbnail?: string | null }>(
-        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status,price,original_price,currency_id,thumbnail`)
+                                 price: number | null; original_price: number | null; currency_id: string | null; thumbnail?: string | null; variations?: unknown[] }>(
+        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status,price,original_price,currency_id,thumbnail,variations`)
       // El precio con la promoción vigente: /sale_price es la fuente nueva de ML; si no
       // responde (permiso / sitio), queda el price del ítem.
       let precio = it.price, original = it.original_price, moneda = it.currency_id
@@ -89,10 +89,10 @@ async function completarItems(db: Pool, conexionId: number) {
       await db.query(
         `UPDATE ml_preguntas SET item_titulo = $2, item_permalink = $3, item_estado = $4,
                 item_precio = $5, item_precio_original = $6, item_moneda = $7,
-                item_imagen = COALESCE($8, item_imagen), item_actualizado_at = NOW()
+                item_imagen = COALESCE($8, item_imagen), item_variantes = $9, item_actualizado_at = NOW()
          WHERE item_id = $1`,
         [item_id, it.title, it.permalink, it.status, precio, original && original > (precio ?? 0) ? original : null, moneda,
-         it.thumbnail ? it.thumbnail.replace(/^http:/, 'https:') : null])
+         it.thumbnail ? it.thumbnail.replace(/^http:/, 'https:') : null, it.variations?.length ?? 0])
     } catch {
       if (++fallas >= 3) break          // si ML bloquea a todas, no insistir en esta pasada
     }

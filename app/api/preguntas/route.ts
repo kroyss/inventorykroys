@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     let filtroTexto = ''
     if (q) { params.push(`%${q}%`); filtroTexto = ` AND (p.texto ILIKE $1 OR p.item_titulo ILIKE $1 OR p.respuesta ILIKE $1 OR p.item_id ILIKE $1)` }
     const { rows } = await s.db.query(
-      `SELECT p.id::text, p.item_id, p.item_titulo, p.item_permalink, p.item_estado, p.item_imagen, p.texto, p.estado,
+      `SELECT p.id::text, p.item_id, p.item_titulo, p.item_permalink, p.item_estado, p.item_imagen, p.item_variantes, p.texto, p.estado,
               p.item_precio::float, p.item_precio_original::float, p.item_moneda,
               p.fecha, p.respuesta, p.respuesta_estado, p.respuesta_fecha, p.comprador_id::text,
               (SELECT COUNT(*)::int FROM ml_preguntas q WHERE q.comprador_id = p.comprador_id AND q.id <> p.id) AS previas,

@@ -4,3 +4,7 @@
 -- Idempotente. Primero staging, después producción.
 
 ALTER TABLE ml_preguntas ADD COLUMN IF NOT EXISTS item_imagen text;
+
+-- Cuántas variantes tiene la publicación (0 = ninguna): muestra "Ver variantes" junto al título; el
+-- detalle (combinación y stock de cada una) se lee de ML al abrirlo.
+ALTER TABLE ml_preguntas ADD COLUMN IF NOT EXISTS item_variantes integer;

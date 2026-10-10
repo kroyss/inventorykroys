@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 interface Pregunta {
-  id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null
+  id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null
   texto: string; estado: string; fecha: string
   respuesta: string | null; respuesta_estado: string | null; respuesta_fecha: string | null
   borrador: string | null; borrador_confianza: 'alta' | 'media' | 'baja' | null; borrador_falta: string | null
@@ -77,9 +77,64 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
           {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
         </span>
       )}
+      {!!p.item_variantes && <VerVariantes item={p.item_id} n={p.item_variantes} />}
       <span className="hidden sm:inline font-mono text-neutral-400">{p.item_id}</span>
     </span>
   )
+}
+
+/** "Ver variantes" (como en ML): ventana con cada combinación y su stock, leído de ML al abrirla. */
+function VerVariantes({ item, n }: { item: string; n: number }) {
+  const [abierta, setAbierta] = useState(false)
+  const [datos, setDatos] = useState<{ atributos: string[]; filas: { valores: string[]; stock: number }[] } | { error: string } | null>(null)
+  const abrir = async () => {
+    setAbierta(true); setDatos(null)
+    const r = await fetch(`/api/preguntas/variantes?item=${item}`)
+    const d = await r.json().catch(() => ({ error: 'No se pudo leer' }))
+    setDatos(r.ok ? d : { error: d.error ?? 'No se pudo leer' })
+  }
+  useEffect(() => {
+    if (!abierta) return
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierta(false) }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [abierta])
+  return <>
+    <button type="button" onClick={abrir} className="text-sky-700 hover:underline underline-offset-2 font-medium">Ver variantes ({n})</button>
+    {abierta && (
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setAbierta(false)} role="dialog" aria-label="Stock por variante">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-100">
+            <h3 className="text-base font-semibold text-neutral-900">Stock por variante</h3>
+            <button onClick={() => setAbierta(false)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none" aria-label="Cerrar">✕</button>
+          </div>
+          <div className="overflow-y-auto">
+            {!datos ? <p className="px-5 py-6 text-sm text-neutral-400">Leyendo de MercadoLibre…</p>
+              : 'error' in datos ? <p className="px-5 py-6 text-sm text-red-600">{datos.error}</p>
+              : datos.filas.length === 0 ? <p className="px-5 py-6 text-sm text-neutral-500">Esta publicación ya no tiene variantes.</p>
+              : (
+                <table className="w-full text-sm">
+                  <thead className="bg-neutral-50 text-xs text-neutral-500 sticky top-0">
+                    <tr>
+                      {datos.atributos.map(a => <th key={a} className="px-5 py-2 text-left font-medium">{a}</th>)}
+                      <th className="px-5 py-2 text-right font-medium">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {datos.filas.map((f, i) => (
+                      <tr key={i} className="border-t border-neutral-100">
+                        {f.valores.map((v, j) => <td key={j} className="px-5 py-2.5 text-neutral-800">{v}</td>)}
+                        <td className={`px-5 py-2.5 text-right num ${f.stock > 0 ? 'text-neutral-800' : 'text-red-600'}`}>{f.stock} u.</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+          </div>
+        </div>
+      </div>
+    )}
+  </>
 }
 /** Precio en MercadoLibre ahora (con la promoción; el anterior, tachado). */
 function Precio({ p, umbral }: { p: Pregunta; umbral: number | null }) {
