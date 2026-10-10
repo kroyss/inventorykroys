@@ -47,5 +47,7 @@ Necesita que Windows entre solo (sin clave) para arrancar después de un apagado
   prender la PC, un acceso directo en la carpeta de Inicio:
   `chrome.exe --profile-directory="Profile 1"` (y otro con el perfil de la otra cuenta).
 - En **Pagos ME** se ve si cada perfil está conectado y el resultado del último "Traer".
-- Si dice que **no tiene la sesión iniciada**: entrar al portal en ese perfil e iniciar sesión.
-  MercadoEnvíos cierra la sesión cada cierto tiempo.
+- **Sesión vencida** (MercadoEnvíos la cierra a diario): desde la 1.2.0 el vigilante entra solo con
+  "Ingresar con mi cuenta de Mercado Libre" (pasa directo si ese Chrome tiene la sesión de ML; nunca
+  escribe claves). Solo si ML pide clave o código, Pagos ME avisa "no tiene la sesión iniciada" y la
+  ventana queda abierta para hacerlo a mano.

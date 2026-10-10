@@ -83,9 +83,17 @@ async function procesar(cfg, pedido) {
       await esperarCarga(tabId)
     }
 
-    const [{ result: leido }] = await chrome.scripting.executeScript({
+    let [{ result: leido }] = await chrome.scripting.executeScript({
       target: { tabId }, world: 'MAIN', func: leerOrdenes, args: [DIAS],
     })
+    // Sesión vencida (MercadoEnvíos la cierra a diario): se entra solo con "Ingresar con mi cuenta
+    // de Mercado Libre", que pasa directo si este Chrome tiene la sesión de ML. Nunca escribe claves:
+    // si ML pide clave o código, queda como sin sesión y la ventana abierta para hacerlo a mano.
+    if (leido?.error === 'sin_sesion' && await reingresar(tabId)) {
+      [{ result: leido }] = await chrome.scripting.executeScript({
+        target: { tabId }, world: 'MAIN', func: leerOrdenes, args: [DIAS],
+      })
+    }
     if (!leido?.ok) throw new Error(leido?.error || 'No se pudo leer el portal')
     vistas = leido.ordenes.length
 
@@ -133,6 +141,36 @@ const anotarMarca = async (tabId, url) => {
 }
 chrome.tabs.onCreated.addListener(t => anotarMarca(t.id, t.pendingUrl || t.url))
 chrome.tabs.onUpdated.addListener((id, info, t) => anotarMarca(id, info.url || t.pendingUrl || t.url))
+
+/** Entra de nuevo al portal con la cuenta de ML de este perfil. true = volvió al portal con sesión. */
+async function reingresar(tabId) {
+  await anotar('Sesión de MercadoEnvíos vencida: entrando con la cuenta de Mercado Libre…')
+  await chrome.tabs.update(tabId, { url: `${PORTAL}/ingresar` })
+  await esperarCarga(tabId)
+  const [{ result: tocado }] = await chrome.scripting.executeScript({
+    target: { tabId }, world: 'MAIN',
+    func: () => {
+      const a = document.querySelector('a.mercadolibre-btn')
+        || [...document.querySelectorAll('a,button')].find(e => /cuenta de\s*mercado\s*libre/i.test(e.textContent || ''))
+      if (!a) return false
+      a.click()
+      return true
+    },
+  })
+  if (!tocado) return false
+  // Pasa por ML y vuelve al portal (a /comprador/dashboard). Hasta 40 s.
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 1000))
+    const t = await chrome.tabs.get(tabId).catch(() => null)
+    if (!t) return false
+    const u = t.url || ''
+    if (u.startsWith(PORTAL) && !/\/ingresar/.test(u) && t.status === 'complete') {
+      await new Promise(r => setTimeout(r, 1500))
+      return true
+    }
+  }
+  return false   // ML pidió clave o código: queda para hacerlo a mano
+}
 
 async function tabsDelDespertador() {
   const tabs = await chrome.tabs.query({})
