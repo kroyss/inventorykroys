@@ -6,13 +6,15 @@
 # Cada minuto le pregunta SOLO al sistema si alguien toco "Traer pagos y guias". Si hay pedido, abre
 # Chrome en el portal con cada perfil que todavia no lo hizo; la extension trabaja y cierra su ventana
 # sola. Chrome queda cerrado el resto del tiempo.
-# Configuracion: despertador.json (misma carpeta). Registro: despertador.log (misma carpeta).
+# Configuracion y registro: %APPDATA%\VigilantePagosME (los deja el instalador y no se borran al
+# actualizar); si no existe, despertador.json/.log junto a este archivo (instalacion a mano).
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
-$dir = $PSScriptRoot
+$dir = Join-Path $env:APPDATA 'VigilantePagosME'
+if (-not (Test-Path (Join-Path $dir 'despertador.json'))) { $dir = $PSScriptRoot }
 $log = Join-Path $dir 'despertador.log'
 function Anotar($texto) {
   $linea = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $texto"
