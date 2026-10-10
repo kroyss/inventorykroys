@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DatosDeItem, DatosProductos } from './DatosProducto'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -8,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 interface Pregunta {
-  id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null
+  id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null; datos_guardados?: number
   texto: string; estado: string; fecha: string
   respuesta: string | null; respuesta_estado: string | null; respuesta_fecha: string | null
   borrador: string | null; borrador_confianza: 'alta' | 'media' | 'baja' | null; borrador_falta: string | null
@@ -264,7 +265,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       <Tabs value={vista} onChange={v => { setVista(v); setPage(1) }} items={[
         { value: 'pendientes', label: 'Sin responder', count: cont?.pendientes },
         { value: 'respondidas', label: 'Historial', count: cont?.respondidas },
-        ...(isAdmin ? [{ value: 'cuentas' as const, label: 'Políticas y respuestas rápidas' }] : []),
+        ...(isAdmin ? [{ value: 'cuentas' as const, label: 'Configuración' }] : []),
       ]} />
 
       {vista === 'cuentas' ? (
@@ -272,6 +273,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
           <div className="space-y-4">
             <Plantillas iniciales={datos.plantillas} onGuardado={cargar} />
             <CuentasYPoliticas />
+            <DatosProductos />
           </div>
         ) : <Cargando />
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (
@@ -329,6 +331,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [nota, setNota] = useState<string | null>(null)
+  const [notasNuevas, setNotasNuevas] = useState(0)   // avisa a DatosDeItem que se anotó uno
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([])
   useEffect(() => {
     let vivo = true
@@ -395,7 +398,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
     const r = await fetch('/api/preguntas/notas', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: p.item_id, texto: nota }),
     })
-    if (r.ok) { setNota(null) } else { setError('No se pudo guardar el dato') }
+    if (r.ok) { setNota(null); setNotasNuevas(v => v + 1) } else { setError('No se pudo guardar el dato') }
   }
 
   const tonoConfianza = meta.confianza === 'alta' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
@@ -480,6 +483,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
           title="Un dato de esta publicación que la IA debe saber la próxima vez">
           Anotar dato del producto
         </button>
+        <DatosDeItem itemId={p.item_id} n={p.datos_guardados ?? 0} version={notasNuevas} />
         <button onClick={eliminar} disabled={eliminando} className="btn-ghost text-sm text-red-600 hover:text-red-700"
           title="Para preguntas imprudentes u ofensivas: la quita de la publicación en MercadoLibre">
           {eliminando ? 'Eliminando…' : 'Eliminar'}

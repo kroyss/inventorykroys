@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
               p.item_precio::float, p.item_precio_original::float, p.item_moneda,
               p.fecha, p.respuesta, p.respuesta_estado, p.respuesta_fecha, p.comprador_id::text,
               (SELECT COUNT(*)::int FROM ml_preguntas q WHERE q.comprador_id = p.comprador_id AND q.id <> p.id) AS previas,
+              (SELECT COUNT(*)::int FROM ml_item_notas n WHERE n.item_id = p.item_id) AS datos_guardados,
               p.borrador, p.borrador_confianza, p.borrador_falta, p.borrador_web, p.borrador_at,
               c.nickname AS cuenta, u.full_name AS respondida_por,
               pr.code AS producto_code, pr.name AS producto_nombre, pr.stock AS producto_stock,
