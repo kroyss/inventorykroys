@@ -46,3 +46,32 @@ export function compararMonto(pagado: number | null, total: number | null) {
   }
   return { tono: 'naranja' as const, dif, texto: 'Pagó de menos' }
 }
+
+// ── Traer automático (app_settings.pagos_me_horario) ───────────────────────
+/** A estas horas (de Venezuela) y estos días (1 = lunes … 7 = domingo) el despertador trae solo. */
+export interface HorarioME { activo: boolean; horas: string[]; dias: number[] }
+export const HORARIO_DEFECTO: HorarioME = { activo: true, horas: ['08:00', '12:00', '16:00', '19:00'], dias: [1, 2, 3, 4, 5, 6] }
+export const DIAS_SEMANA = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
+
+export function leerHorario(valor: string | null | undefined): HorarioME {
+  try {
+    const h = JSON.parse(valor ?? '')
+    const horas = (Array.isArray(h?.horas) ? h.horas : []).filter((x: unknown) => typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x))
+    const dias = (Array.isArray(h?.dias) ? h.dias : []).filter((x: unknown) => Number.isInteger(x) && (x as number) >= 1 && (x as number) <= 7)
+    return { activo: h?.activo !== false, horas: [...new Set<string>(horas)].sort(), dias: [...new Set<number>(dias)].sort() }
+  } catch {
+    return HORARIO_DEFECTO
+  }
+}
+
+/** Próxima corrida automática a partir de `dia` (1-7) y `hm` ("HH:MM") de Venezuela, o null. */
+export function proximoAuto(h: HorarioME, dia: number, hm: string): { dia: number; hora: string; hoy: boolean } | null {
+  if (!h.activo || !h.horas.length || !h.dias.length) return null
+  for (let k = 0; k < 8; k++) {
+    const d = ((dia - 1 + k) % 7) + 1
+    if (!h.dias.includes(d)) continue
+    const hora = h.horas.find(x => k > 0 || x > hm)
+    if (hora) return { dia: d, hora, hoy: k === 0 }
+  }
+  return null
+}

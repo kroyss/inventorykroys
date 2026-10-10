@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader, EmptyState } from '@/components/ui'
-import type { PagoME } from '@/lib/pagosMEComun'
+import { DIAS_SEMANA, proximoAuto, type HorarioME, type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
 
 type Filtro = 'pendiente' | 'valido' | 'invalido' | 'todos'
@@ -12,8 +12,10 @@ interface Datos {
   vigilante: {
     clave: boolean
     latidos: { perfil: string; visto_at: string; conectado: boolean }[]
-    pedido: { id: number; pedido_at: string; vigente: boolean; resultados: Record<string, Resultado> } | null
+    pedido: { id: number; pedido_at: string; vigente: boolean; automatico: boolean; resultados: Record<string, Resultado> } | null
   }
+  horario: HorarioME
+  ahora: { dia: number; hm: string }
 }
 
 const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
@@ -137,7 +139,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
         </div>
         {pedido && (
           <div className="text-neutral-500">
-            Último pedido {hora(pedido.pedido_at)}:{' '}
+            Último pedido {hora(pedido.pedido_at)}{pedido.automatico ? ' (automático)' : ''}:{' '}
             {Object.keys(pedido.resultados).length === 0 && (pedido.vigente ? 'esperando al vigilante…' : 'nadie lo tomó (¿PC apagada?)')}
             {Object.entries(pedido.resultados).map(([perfil, r]) => (
               <span key={perfil} className="mr-3">
@@ -155,6 +157,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
       </div>
+
+      {datos && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
@@ -268,6 +272,86 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
                 <button onClick={() => { marcar('invalido', [ver.id]); setVer(null) }} className="btn-secondary text-sm text-red-700">✗ Inválido</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Pagos ME → Configuración: a qué horas y qué días el despertador trae solo (además del botón). */
+function TraerAutomatico({ horario, ahora, isAdmin, onGuardado }: {
+  horario: HorarioME; ahora: { dia: number; hm: string }; isAdmin: boolean; onGuardado: () => void
+}) {
+  const [editando, setEditando] = useState<HorarioME | null>(null)
+  const [nueva, setNueva] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const prox = proximoAuto(horario, ahora.dia, ahora.hm)
+  const dias = (d: number[]) => d.length === 7 ? 'todos los días'
+    : d.length === 6 && !d.includes(7) ? 'lun a sáb'
+    : d.length === 5 && !d.includes(6) && !d.includes(7) ? 'lun a vie'
+    : d.map(x => DIAS_SEMANA[x - 1]).join(', ')
+  const h12 = (hm: string) => { const [h, m] = hm.split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}` }
+
+  const guardar = async () => {
+    if (!editando) return
+    setGuardando(true); setError(null)
+    const r = await fetch('/api/pagos-me/horario', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editando) })
+    const d = await r.json().catch(() => ({}))
+    setGuardando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    setEditando(null); onGuardado()
+  }
+
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-medium text-neutral-800">Traer automático:</span>
+        {horario.activo && horario.horas.length && horario.dias.length ? <>
+          <span>{horario.horas.map(h12).join(' · ')} · {dias(horario.dias)}</span>
+          {prox && <span className="text-neutral-400">próximo: {prox.hoy ? 'hoy' : DIAS_SEMANA[prox.dia - 1]} {h12(prox.hora)}</span>}
+        </> : <span className="text-amber-700">apagado (solo con el botón)</span>}
+        {isAdmin && !editando && (
+          <button onClick={() => { setEditando({ ...horario, activo: horario.activo }); setError(null) }} className="ml-auto underline text-neutral-500 hover:text-neutral-800">Configurar</button>
+        )}
+      </div>
+
+      {editando && (
+        <div className="border-t border-neutral-100 pt-3 space-y-3">
+          <label className="flex items-center gap-2 text-sm text-neutral-800">
+            <input type="checkbox" checked={editando.activo} onChange={e => setEditando({ ...editando, activo: e.target.checked })} />
+            Traer solo a estas horas (hora de Venezuela; la PC tiene que estar prendida)
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-neutral-500 w-12">Horas</span>
+            {editando.horas.map(h => (
+              <span key={h} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-sm text-neutral-800">
+                {h12(h)}
+                <button onClick={() => setEditando({ ...editando, horas: editando.horas.filter(x => x !== h) })}
+                  className="text-neutral-400 hover:text-red-600" aria-label={`Quitar ${h}`}>✕</button>
+              </span>
+            ))}
+            <input type="time" value={nueva} onChange={e => setNueva(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1 text-sm" />
+            <button disabled={!nueva || editando.horas.includes(nueva)}
+              onClick={() => { setEditando({ ...editando, horas: [...editando.horas, nueva].sort() }); setNueva('') }}
+              className="btn-ghost text-xs px-2 py-1 disabled:opacity-40">+ Agregar hora</button>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-neutral-500 w-12">Días</span>
+            {DIAS_SEMANA.map((n, i) => {
+              const d = i + 1, on = editando.dias.includes(d)
+              return (
+                <button key={d} onClick={() => setEditando({ ...editando, dias: on ? editando.dias.filter(x => x !== d) : [...editando.dias, d].sort() })}
+                  className={`px-2.5 py-1 rounded-full text-xs border ${on ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-500'}`}>{n}</button>
+              )
+            })}
+          </div>
+          <p className="text-neutral-400">Si a esa hora la PC estaba apagada, trae apenas prende. Si alguien trajo con el botón poco antes, no se repite.</p>
+          <div className="flex items-center gap-2">
+            {error && <span className="text-red-600">{error}</span>}
+            <button onClick={() => setEditando(null)} className="ml-auto btn-ghost text-xs px-2.5 py-1">Cancelar</button>
+            <button onClick={guardar} disabled={guardando} className="btn-primary text-xs px-3 py-1">{guardando ? 'Guardando…' : 'Guardar'}</button>
           </div>
         </div>
       )}
