@@ -31,9 +31,20 @@ if (-not $unico.WaitOne(0)) { exit 0 }
 $cfg = Get-Content (Join-Path $dir 'despertador.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $chrome = $cfg.chrome
 if (-not $chrome -or -not (Test-Path $chrome)) {
-  $chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+  # ProgramW6432 = "Program Files" real aunque este PowerShell sea de 32 bits (ahi el ProgramFiles
+  # apunta a "(x86)" y un Chrome de 64 bits no aparece). Ultimo recurso: App Paths del registro.
+  $chrome = @("$env:ProgramW6432\Google\Chrome\Application\chrome.exe",
+              "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
               "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
-              "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+              "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+  if (-not $chrome) {
+    foreach ($k in 'HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe',
+                   'HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe',
+                   'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe') {
+      $v = (Get-ItemProperty $k -ErrorAction SilentlyContinue).'(default)'
+      if ($v -and (Test-Path $v.Trim('"'))) { $chrome = $v.Trim('"'); break }
+    }
+  }
 }
 if (-not $chrome) {
   Anotar 'No se encontro chrome.exe: ponlo en "chrome" dentro de despertador.json'

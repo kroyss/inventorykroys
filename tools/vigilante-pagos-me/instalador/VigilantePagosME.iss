@@ -8,7 +8,7 @@
 ; (y en el registro, para precargarlos al actualizar): instalar encima NO los borra.
 
 #define AppName    "Vigilante Pagos ME"
-#define AppVersion "1.2.0"
+#define AppVersion "1.2.1"
 #define Publisher  "El Comerciante Digital"
 
 [Setup]
@@ -54,7 +54,7 @@ Name: "{autoprograms}\{#AppName}\Carpeta de la extension de Chrome"; Filename: "
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\despertador.ps1"""; \
-  Description: "Arrancar el despertador ahora"; Flags: nowait postinstall runhidden
+  Description: "Arrancar el despertador ahora"; Flags: nowait postinstall runhidden 64bit; Check: IsWin64
 Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension (para cargarla en Chrome)"; \
   Flags: nowait postinstall shellexec unchecked
 
