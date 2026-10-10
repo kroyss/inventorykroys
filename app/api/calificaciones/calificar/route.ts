@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { ordenes } = Body.parse(await req.json())
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
     const p = leerPlantillasCal(pl?.value)
-    const resultados: { id: string; ok: boolean; detalle?: string }[] = []
+    const resultados: { id: string; ok: boolean; detalle?: string; quitada?: boolean }[] = []
     const demo = await esDemo(s.db)   // lib/demo.ts: se registra sin llamar a MercadoLibre
 
     for (const o of ordenes) {
@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
           if (v?.purchase && !v.sale) {
             await s.db.query(`UPDATE ml_ordenes SET cal_vendedor = 'cerrada_ml' WHERE id = $1 AND cal_vendedor IS NULL`, [o.id])
             const f = v.purchase.date_created
-            resultados.push({ id: o.id, ok: false, detalle:
-              `MercadoLibre ya no permite calificarla (el comprador calificó${f ? ` el ${f.slice(8, 10)}/${f.slice(5, 7)}` : ''} y pasó el plazo). Se quitó de la lista.` })
+            resultados.push({ id: o.id, ok: false, quitada: true, detalle:
+              `el comprador calificó${f ? ` el ${f.slice(8, 10)}/${f.slice(5, 7)}` : ''} y pasó el plazo` })
             continue
           }
         }

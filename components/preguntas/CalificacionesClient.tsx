@@ -39,7 +39,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   const [elegidas, setElegidas] = useState<Record<string, Tipo | null>>({})
   const [filtro, setFiltro] = useState<'todas' | Tipo>('todas')
   const [corriendo, setCorriendo] = useState(false)
-  const [progreso, setProgreso] = useState<{ hechas: number; total: number; errores: string[] } | null>(null)
+  const [progreso, setProgreso] = useState<{ hechas: number; total: number; errores: string[]; quitadas: string[] } | null>(null)
   const [actualizando, setActualizando] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const parar = useRef(false)
@@ -91,7 +91,8 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
     setCorriendo(true); parar.current = false
     const cola = aCalificar.map(o => ({ id: o.id, tipo: elegidas[o.id] as Tipo }))
     const errores: string[] = []
-    setProgreso({ hechas: 0, total: cola.length, errores })
+    const quitadas: string[] = []   // ML ya no permitía calificarlas: no es un error, salen de la lista
+    setProgreso({ hechas: 0, total: cola.length, errores, quitadas })
     try {
       for (let i = 0; i < cola.length && !parar.current; i += 5) {
         const r = await fetch('/api/calificaciones/calificar', {
@@ -99,8 +100,11 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
         })
         const d = await r.json().catch(() => ({}))
         if (!r.ok) { errores.push(d.error ?? 'Se cortó'); break }
-        for (const x of d.resultados as { id: string; ok: boolean; detalle?: string }[]) if (!x.ok) errores.push(`${x.id}: ${x.detalle}`)
-        setProgreso({ hechas: Math.min(i + 5, cola.length), total: cola.length, errores: [...errores] })
+        for (const x of d.resultados as { id: string; ok: boolean; detalle?: string; quitada?: boolean }[]) {
+          if (x.quitada) quitadas.push(`${x.id}: ${x.detalle}`)
+          else if (!x.ok) errores.push(`${x.id}: ${x.detalle}`)
+        }
+        setProgreso({ hechas: Math.min(i + 5, cola.length), total: cola.length, errores: [...errores], quitadas: [...quitadas] })
       }
     } finally {
       setCorriendo(false)
@@ -151,13 +155,24 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
             </div>
           )}
 
-          {progreso && (
+          {progreso && (() => {
+            const calificadas = progreso.hechas - progreso.errores.length - progreso.quitadas.length
+            return <>
+            {(corriendo || calificadas > 0 || progreso.errores.length > 0 || progreso.quitadas.length === 0) && (
             <div className={`px-4 py-2.5 rounded-lg text-sm border ${progreso.errores.length ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
-              {corriendo ? 'Calificando' : 'Listo'}: {progreso.hechas} de {progreso.total}
+              {corriendo ? `Calificando: ${progreso.hechas} de ${progreso.total}` : `Listo: ${Math.max(0, calificadas)} calificada${calificadas === 1 ? '' : 's'}`}
               {progreso.errores.length > 0 && <> · {progreso.errores.length} con problema
                 <ul className="mt-1 text-xs list-disc pl-5 max-h-32 overflow-y-auto">{progreso.errores.map((e, i) => <li key={i}>{e}</li>)}</ul></>}
             </div>
-          )}
+            )}
+            {progreso.quitadas.length > 0 && (
+              <div className="px-4 py-2.5 rounded-lg text-sm border bg-neutral-50 border-neutral-200 text-neutral-700">
+                {progreso.quitadas.length} quitada{progreso.quitadas.length === 1 ? '' : 's'} de la lista: MercadoLibre ya no permitía calificarla{progreso.quitadas.length === 1 ? '' : 's'}. No tienes que hacer nada.
+                <ul className="mt-1 text-xs text-neutral-500 list-disc pl-5 max-h-32 overflow-y-auto">{progreso.quitadas.map((e, i) => <li key={i}>{e}</li>)}</ul>
+              </div>
+            )}
+            </>
+          })()}
 
           {visibles.length === 0 ? (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
