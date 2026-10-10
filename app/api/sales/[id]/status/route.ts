@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { tieneModulo } from '@/lib/modulos'
 import { requestConnection } from '@/lib/requestConnection'
 import { localCostFactor } from '@/lib/localCost'
 import { parseShippingTable, shippingCostVE } from '@/lib/mlShipping'
@@ -237,6 +238,17 @@ export async function PUT(
            WHERE id=$2`,
           [userId, id]
         )
+        // Pagos ME: verificar el pago en Ventas (a mano, contra el banco) lo deja Válido también en
+        // Pagos ME, por número de venta (o de las órdenes de su paquete). Solo los pendientes: un
+        // "inválido" puesto a mano no se pisa. Así Despachos no frena esa guía.
+        if (tieneModulo(session.user, 'pagos_me')) {
+          await db.query(
+            `UPDATE me_pagos SET verificacion = 'valido', verificado_por = $1, verificado_at = NOW(),
+                    nota = COALESCE(nota, 'verificado en Ventas')
+             WHERE verificacion = 'pendiente'
+               AND (venta = $2 OR venta IN (SELECT id::text FROM ml_ordenes WHERE pack_id::text = $2))`,
+            [userId, sale.ml_order_number])
+        }
 
       } else if (newStatus === 'PROCESADA') {
         // CO no usa "verificar pago": se procesa directo desde BORRADOR.
