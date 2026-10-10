@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 
 interface Pregunta {
-  id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null
+  id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null
   texto: string; estado: string; fecha: string
   respuesta: string | null; respuesta_estado: string | null; respuesta_fecha: string | null
   borrador: string | null; borrador_confianza: 'alta' | 'media' | 'baja' | null; borrador_falta: string | null
@@ -35,6 +35,19 @@ function linkPublicacion(p: Pregunta) {
   return `https://articulo.mercadolibre.${dominio}/${m[1]}-${m[2]}-_JM`
 }
 
+/** Miniatura de la publicación (como en ML): títulos parecidos se distinguen de un vistazo. Abre la publicación. */
+function Foto({ p, chica = false }: { p: Pregunta; chica?: boolean }) {
+  const link = linkPublicacion(p)
+  const tam = chica ? 'w-10 h-10' : 'w-12 h-12 sm:w-14 sm:h-14'
+  const caja = `${tam} shrink-0 rounded-lg border border-neutral-200 bg-white overflow-hidden flex items-center justify-center`
+  const img = p.item_imagen
+    ? <img src={p.item_imagen} alt="" loading="lazy" className="w-full h-full object-contain" />
+    : <svg viewBox="0 0 24 24" className="w-5 h-5 text-neutral-300" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 17l-5-5-9 8" /></svg>
+  return link
+    ? <a href={link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre" className={`${caja} hover:border-neutral-400`}>{img}</a>
+    : <div className={`${caja} bg-neutral-50`}>{img}</div>
+}
+
 /** Producto de la pregunta: nombre del sistema (o título de ML) + código + stock. */
 // Límite de precio de las respuestas rápidas (p. ej. "menos de $3 → mínimo 2 unidades"):
 // debajo de él el precio se resalta para responder con la regla correcta.
@@ -51,20 +64,20 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
       {link
         ? <a href={link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
-            className={`truncate max-w-[30rem] hover:underline underline-offset-2 ${nombre ? 'font-medium text-neutral-800' : 'text-neutral-500'}`}>
+            className={`line-clamp-2 sm:truncate max-w-[30rem] hover:underline underline-offset-2 ${nombre ? 'font-medium text-neutral-800' : 'text-neutral-500'}`}>
             {nombre ?? 'Publicación sin vincular a un producto'} <span className="text-neutral-400">↗</span>
           </a>
         : nombre
-          ? <span className="font-medium text-neutral-800 truncate max-w-[30rem]">{nombre}</span>
+          ? <span className="font-medium text-neutral-800 line-clamp-2 sm:truncate max-w-[30rem]">{nombre}</span>
           : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
-      {p.producto_code && <span className="font-mono text-neutral-400">{p.producto_code}</span>}
+      {p.producto_code && <span className="hidden sm:inline font-mono text-neutral-400">{p.producto_code}</span>}
       <Precio p={p} umbral={umbral} />
       {p.producto_stock !== null && (
         <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'}>
           {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
         </span>
       )}
-      <span className="font-mono text-neutral-400">{p.item_id}</span>
+      <span className="hidden sm:inline font-mono text-neutral-400">{p.item_id}</span>
     </span>
   )
 }
@@ -335,15 +348,20 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
 
   return (
     <article className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
-        <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{p.cuenta}</span>
-        <Producto p={p} umbral={umbralDe(plantillas)} />
-        {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {estadoItem === 'paused' ? 'pausada' : estadoItem} · no se puede responder</span>}
-        <span className="ml-auto whitespace-nowrap" title={new Date(p.fecha).toLocaleString('es-VE')}>{hace(p.fecha)}</span>
-        {p.comprador_id && (
-          <PreguntasPrevias n={p.previas} cargar={() =>
-            fetch(`/api/preguntas/comprador?id=${p.comprador_id}&excluir=${p.id}`).then(r => (r.ok ? r.json() : []))} />
-        )}
+      <header className="flex gap-3 text-xs text-neutral-500">
+        <Foto p={p} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{p.cuenta}</span>
+            {pausada && <span className="text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-full px-2 py-0.5">Publicación {estadoItem === 'paused' ? 'pausada' : estadoItem} · no se puede responder</span>}
+            <span className="ml-auto whitespace-nowrap" title={new Date(p.fecha).toLocaleString('es-VE')}>{hace(p.fecha)}</span>
+            {p.comprador_id && (
+              <PreguntasPrevias n={p.previas} cargar={() =>
+                fetch(`/api/preguntas/comprador?id=${p.comprador_id}&excluir=${p.id}`).then(r => (r.ok ? r.json() : []))} />
+            )}
+          </div>
+          <Producto p={p} umbral={umbralDe(plantillas)} />
+        </div>
       </header>
 
       <p className="text-base text-neutral-900">{p.texto}</p>
@@ -432,7 +450,9 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
 function FilaHistorial({ p }: { p: Pregunta }) {
   const e = ESTADO_RESP[p.estado] ?? { status: 'INACTIVO', label: p.estado }
   return (
-    <div className="px-4 py-3 text-sm space-y-1">
+    <div className="px-4 py-3 text-sm flex gap-3">
+      <Foto p={p} chica />
+      <div className="min-w-0 flex-1 space-y-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
         <span className="font-semibold text-neutral-700">{p.cuenta}</span>
         <Producto p={p} />
@@ -446,6 +466,7 @@ function FilaHistorial({ p }: { p: Pregunta }) {
           <span className="text-xs text-neutral-400"> · {p.respondida_por ?? 'desde MercadoLibre'}</span>
         </p>
       )}
+      </div>
     </div>
   )
 }
