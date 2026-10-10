@@ -24,7 +24,7 @@ confirma, no paga y no cambia nada en el portal.
 
 ## Despertador (recomendado): Chrome cerrado, se abre solo al traer
 
-Como el Radar: un script chico corre minimizado en la barra de tareas desde que se inicia sesión en Windows y cada minuto
+Como el Radar: un script chico corre con un ícono **ME** junto al reloj (verde en espera, azul trayendo, rojo sin conexión; clic derecho: Ver registro / Salir) desde que se inicia sesión en Windows y cada minuto
 pregunta al sistema si alguien tocó "Traer pagos y guías". Solo entonces abre Chrome en el portal con
 cada perfil; la extensión trabaja y **cierra su ventana sola**. Si un perfil no tiene la sesión de
 MercadoEnvíos iniciada, esa ventana queda abierta para iniciarla ahí.
