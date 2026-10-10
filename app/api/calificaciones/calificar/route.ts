@@ -56,6 +56,22 @@ export async function POST(req: NextRequest) {
         // Si ML dice que ya existe, se registra como calificada para que salga de la lista.
         if (e instanceof ErrorML && /already|exist/i.test(JSON.stringify(e.datos ?? ''))) {
           await s.db.query(`UPDATE ml_ordenes SET cal_vendedor = COALESCE(cal_vendedor, 'ya_calificada') WHERE id = $1`, [o.id])
+          resultados.push({ id: o.id, ok: false, detalle: msg })
+          continue
+        }
+        // ML cierra la calificación del vendedor cuando el comprador ya calificó y pasó el plazo
+        // (visto con SHOPIT_VE: compradores arrepentidos que calificaron el mismo día). Se confirma
+        // releyendo: si el comprador calificó y ML rechazó (4xx, no sesión ni límite), sale de la lista.
+        if (e instanceof ErrorML && e.status >= 400 && e.status < 500 && ![401, 429].includes(e.status)) {
+          const v = await mlFetch<{ sale: unknown; purchase: { date_created?: string } | null }>(
+            s.db, fila.conexion_id, `/orders/${o.id}/feedback`).catch(() => null)
+          if (v?.purchase && !v.sale) {
+            await s.db.query(`UPDATE ml_ordenes SET cal_vendedor = 'cerrada_ml' WHERE id = $1 AND cal_vendedor IS NULL`, [o.id])
+            const f = v.purchase.date_created
+            resultados.push({ id: o.id, ok: false, detalle:
+              `MercadoLibre ya no permite calificarla (el comprador calificó${f ? ` el ${f.slice(8, 10)}/${f.slice(5, 7)}` : ''} y pasó el plazo). Se quitó de la lista.` })
+            continue
+          }
         }
         resultados.push({ id: o.id, ok: false, detalle: msg })
       }

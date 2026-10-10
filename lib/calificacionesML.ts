@@ -64,7 +64,8 @@ export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqued
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
      ON CONFLICT (empresa_id, id) DO UPDATE SET items = EXCLUDED.items, detalle = EXCLUDED.detalle,
        estado = EXCLUDED.estado,
-       cal_vendedor = EXCLUDED.cal_vendedor, cal_concretada = EXCLUDED.cal_concretada,
+       -- 'cerrada_ml': ML ya no deja calificarla (la marca calificar/route.ts); la sync no la revive.
+       cal_vendedor = COALESCE(EXCLUDED.cal_vendedor, CASE WHEN ml_ordenes.cal_vendedor = 'cerrada_ml' THEN 'cerrada_ml' END), cal_concretada = EXCLUDED.cal_concretada,
        cal_comprador = EXCLUDED.cal_comprador, actualizada_at = NOW()`,
     [o.id, conexionId, o.pack_id, o.date_created, o.buyer?.nickname ?? null,
      o.order_items.map(i => `${i.quantity} × ${i.item.title}`).join(' · '),
