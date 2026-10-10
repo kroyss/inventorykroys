@@ -94,7 +94,7 @@ export default function MensajesClient() {
 function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
-  const [items, setItems] = useState<{ id: string; titulo: string; cantidad: number; link: string | null }[] | null>(null)
+  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [texto, setTexto] = useState('')
   // De dónde salió el texto (se guarda al enviar, migración 062).
@@ -210,6 +210,9 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
                   ? <a href={it.link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
                       className="hover:underline underline-offset-2">{it.titulo} <span className="text-neutral-400">↗</span></a>
                   : it.titulo}
+                {it.variante && (
+                  <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>
+                )}
               </span>
             ))}
           </p>
@@ -456,13 +459,13 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
 
   if (!datos) return null
   const editor = editando && (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <textarea value={editando.texto} onChange={e => setEditando({ ...editando, texto: e.target.value })} rows={2} maxLength={300} autoFocus
         placeholder="Ej.: el comprador cambia a la talla L · garantía, espera fotos…"
-        className="w-full border border-amber-300 rounded-lg px-2.5 py-1.5 text-sm bg-white resize-y" />
+        className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white resize-y focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300" />
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-amber-700/70">{editando.texto.length}/300 · el comprador no la ve</span>
-        <button onClick={() => setEditando(null)} className="ml-auto btn-ghost text-xs px-2 py-1">Cancelar</button>
+        <span className="text-[11px] text-neutral-400">{editando.texto.length}/300 · el comprador no la ve</span>
+        <button onClick={() => setEditando(null)} className="ml-auto btn-ghost text-xs px-2.5 py-1">Cancelar</button>
         <button onClick={guardar} disabled={guardando || !editando.texto.trim()} className="btn-primary text-xs px-3 py-1">
           {guardando ? 'Guardando…' : 'Guardar en ML'}
         </button>
@@ -470,28 +473,51 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
     </div>
   )
 
+  // Sin notas: solo un botón discreto (no un renglón de texto vacío).
+  if (!datos.notas.length && !editando) return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => setEditando({ id: null, texto: '' })}
+        className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:border-amber-400 hover:text-amber-800 hover:bg-amber-50 transition-colors">
+        <IconoNota /> Agregar nota a la venta
+      </button>
+      {datos.error && <span className="text-[11px] text-neutral-400">No se pudieron leer las notas ({datos.error})</span>}
+      {error && <span className="text-xs text-red-600">{error}</span>}
+    </div>
+  )
+
   return (
-    <div className={`rounded-lg px-3 py-2 space-y-1.5 ${datos.notas.length || editando ? 'bg-amber-50 border border-amber-200' : ''}`}>
-      <div className="flex items-center gap-2">
-        <p className={`text-[11px] font-semibold ${datos.notas.length ? 'text-amber-800' : 'text-neutral-400'}`}>
-          {datos.notas.length ? 'Notas de la venta en MercadoLibre' : datos.error ? `No se pudieron leer las notas (${datos.error})` : 'Sin notas en la venta'}
-        </p>
+    <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5 space-y-2">
+      <div className="flex items-center gap-1.5 text-amber-800">
+        <IconoNota />
+        <p className="text-[11px] font-semibold uppercase tracking-wide">Nota de la venta</p>
+        <span className="text-[11px] text-amber-700/60 normal-case">· en MercadoLibre, el comprador no la ve</span>
         {!editando && (
-          <button onClick={() => setEditando({ id: null, texto: '' })} className="ml-auto text-xs text-amber-800 underline underline-offset-2">+ Agregar nota</button>
+          <button onClick={() => setEditando({ id: null, texto: '' })} className="ml-auto text-xs font-medium text-amber-800 hover:bg-amber-100 rounded-md px-2 py-0.5">+ Otra</button>
         )}
       </div>
       {datos.notas.map(n => editando?.id === n.id ? <div key={n.id}>{editor}</div> : (
-        <div key={n.id} className="flex items-start gap-2 text-sm text-amber-900">
-          <p className="whitespace-pre-line flex-1">{n.texto} <span className="text-[11px] text-amber-700/70">· {new Date(n.fecha).toLocaleDateString('es-VE')}</span></p>
-          {!editando && <>
-            <button onClick={() => setEditando({ id: n.id, texto: n.texto })} className="text-[11px] text-amber-800 hover:underline">Editar</button>
-            <button onClick={() => borrar(n)} className="text-[11px] text-amber-700/70 hover:text-red-600">Borrar</button>
-          </>}
+        <div key={n.id} className="group flex items-start gap-3 rounded-md bg-white/70 px-2.5 py-1.5">
+          <p className="whitespace-pre-line flex-1 text-sm text-neutral-800">{n.texto}</p>
+          <span className="text-[11px] text-neutral-400 whitespace-nowrap pt-0.5">{new Date(n.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
+          {!editando && (
+            <span className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+              <button onClick={() => setEditando({ id: n.id, texto: n.texto })} className="text-[11px] text-neutral-500 hover:text-neutral-900 px-1">Editar</button>
+              <button onClick={() => borrar(n)} className="text-[11px] text-neutral-400 hover:text-red-600 px-1">Borrar</button>
+            </span>
+          )}
         </div>
       ))}
       {editando && editando.id === null && editor}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
+  )
+}
+
+function IconoNota() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h5" />
+    </svg>
   )
 }
 

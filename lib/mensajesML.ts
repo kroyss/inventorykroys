@@ -53,7 +53,7 @@ async function sellerDe(db: Pool, conexionId: number): Promise<number> {
 }
 
 type OrdenVenta = {
-  order_items: { item: { id: string; title: string }; quantity: number }[]
+  order_items: { item: { id: string; title: string; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number }[]
   buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
 }
 
@@ -82,7 +82,10 @@ async function datosDeVenta(db: Pool, conexionId: number, pack: string) {
   try {
     const ordenes = await ordenesDeVenta(db, conexionId, pack)
     return {
-      productos: ordenes.flatMap(o => o.order_items).map(i => `${i.quantity} × ${i.item.title}`).join(' · ') || null,
+      productos: ordenes.flatMap(o => o.order_items).map(i => {
+        const v = (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => a.value_name).join(' / ')
+        return `${i.quantity} × ${i.item.title}${v ? ` (${v})` : ''}`
+      }).join(' · ') || null,
       ...compradorDe(ordenes),
     }
   } catch { return { productos: null, nick: null, nombre: null } }
@@ -228,7 +231,8 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
   return d.id
 }
 
-export interface ItemVenta { id: string; titulo: string; cantidad: number; link: string | null }
+/** `variante`: lo que eligió el comprador ("Color: Azul · Talla: M"); el título solo no lo dice. */
+export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; link: string | null }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
@@ -238,7 +242,8 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
   const items: ItemVenta[] = ordenes.flatMap(o => o.order_items).map(i => {
     const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
     const link = m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` : null
-    return { id: i.item.id, titulo: i.item.title, cantidad: i.quantity, link }
+    const variante = (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
+    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, link }
   })
   return { items, comprador }
 }

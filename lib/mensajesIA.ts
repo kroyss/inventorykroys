@@ -73,7 +73,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     L.push('PRODUCTOS DE LA VENTA:')
     for (const it of venta.items) {
       const s = stock.find(x => x.ml_code === it.id.replace(/^[A-Z]{3}/, ''))
-      L.push(`- ${it.cantidad} × ${it.titulo}${s ? ` (stock real en el sistema: ${s.stock})` : ''}`)
+      L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — variante: ${it.variante}` : ''}${s ? ` (stock real en el sistema: ${s.stock})` : ''}`)
     }
   }
   // Producto: ficha técnica (catálogo), descripción (ML) y ficha de conocimiento (lo que el
