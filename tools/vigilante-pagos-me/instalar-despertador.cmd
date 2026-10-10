@@ -16,7 +16,7 @@ if errorlevel 1 (
   exit /b 1
 )
 rem Si ya habia uno corriendo (otra instalacion), se cierra para no quedar dos.
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -like '*despertador.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*despertador.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
 start "" powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0despertador.ps1"
 echo.
 echo Listo: el despertador quedo corriendo y arranca solo al iniciar Windows.
