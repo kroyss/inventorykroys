@@ -1,6 +1,7 @@
 # Despertador del Vigilante Pagos MercadoEnvios (uso interno).
 #
-# Corre escondido desde que se inicia sesion en Windows (instalar-despertador.cmd). Cada minuto le
+# Corre minimizado en la barra de tareas desde que se inicia sesion en Windows (instalar-despertador.cmd),
+# como el Reportador y el vigilante del Radar: abrir la ventana muestra lo que va haciendo. Cada minuto le
 # pregunta SOLO al sistema si alguien toco "Traer pagos y guias". Si hay pedido, abre Chrome en el
 # portal con cada perfil que todavia no lo hizo; la extension trabaja y cierra su ventana sola.
 # Chrome queda cerrado el resto del tiempo. Configuracion: despertador.json (misma carpeta).
@@ -11,8 +12,10 @@ $ErrorActionPreference = 'Stop'
 
 $dir = $PSScriptRoot
 $log = Join-Path $dir 'despertador.log'
+$Host.UI.RawUI.WindowTitle = 'Despertador Pagos ME (no cerrar)'
 function Anotar($texto) {
   $linea = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $texto"
+  Write-Host $linea
   Add-Content -Path $log -Value $linea -Encoding UTF8
   # El registro no crece sin fin: quedan las ultimas 500 lineas.
   $l = Get-Content $log -Encoding UTF8
@@ -34,10 +37,15 @@ $abiertos = @{}      # "pedido|perfil" ya abiertos: cada perfil se abre una sola
 $errores = 0
 
 Anotar "Arranca el despertador (Chrome: $chrome)"
+Write-Host 'Cada minuto pregunta al sistema si alguien toco "Traer pagos y guias". Minimizar esta ventana, no cerrarla.'
+$ultimoEstado = ''
 while ($true) {
   try {
     $r = Invoke-RestMethod -Method Post -Uri $url -Headers $headers -ContentType 'application/json' -Body '{}' -TimeoutSec 30
     if ($errores -gt 0) { Anotar 'Conexion con el sistema recuperada'; $errores = 0 }
+    # En la ventana: una linea cuando cambia el estado (sin llenarla cada minuto).
+    $estado = if ($r.pedido) { "pedido $($r.pedido)" } else { 'en espera' }
+    if ($estado -ne $ultimoEstado) { Write-Host "$(Get-Date -Format 'HH:mm')  Conectado al sistema: $estado"; $ultimoEstado = $estado }
     if ($r.pedido) {
       foreach ($p in $cfg.perfiles) {
         $k = "$($r.pedido)|$($p.perfil)"
