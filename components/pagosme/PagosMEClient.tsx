@@ -24,7 +24,7 @@ const FILTROS: { k: Filtro; t: string }[] = [
   { k: 'invalido', t: 'Inválidos' }, { k: 'todos', t: 'Todos' },
 ]
 const ERROR_PERFIL: Record<string, string> = {
-  sin_sesion: 'no tiene la sesión de MercadoEnvíos iniciada: entra al portal en ese perfil y vuelve a traer',
+  sin_sesion: 'no tiene la sesión de MercadoEnvíos iniciada: en la PC quedó abierta esa ventana; inicia sesión ahí y vuelve a traer',
 }
 
 export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
@@ -49,8 +49,13 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
 
   // Mientras el vigilante trabaja (pedido vigente sin el resultado de todos los perfiles), se refresca solo.
   const pedido = datos?.vigilante.pedido
-  const perfiles = datos?.vigilante.latidos ?? []
-  const trabajando = !!pedido?.vigente && perfiles.filter(l => l.conectado).some(l => !pedido.resultados[l.perfil])
+  // Con despertador (despertador.ps1) Chrome está cerrado: la señal es la de la PC, y los perfiles
+  // solo se abren al traer. Sin despertador, cada perfil (Chrome abierto) manda su propia señal.
+  const despertador = datos?.vigilante.latidos.find(l => l.perfil === 'DESPERTADOR')
+  const perfiles = (datos?.vigilante.latidos ?? []).filter(l => l.perfil !== 'DESPERTADOR')
+  const trabajando = !!pedido?.vigente && (despertador
+    ? despertador.conectado && perfiles.some(l => !pedido.resultados[l.perfil])
+    : perfiles.filter(l => l.conectado).some(l => !pedido.resultados[l.perfil]))
   useEffect(() => {
     if (!trabajando) return
     const t = setInterval(cargar, 8000)
@@ -107,6 +112,15 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="font-medium text-neutral-800">Vigilante:</span>
+          {despertador ? <>
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${despertador.conectado ? 'bg-green-500' : 'bg-red-400'}`} />
+              {despertador.conectado ? 'PC en espera' : `PC sin señal desde ${hora(despertador.visto_at)} (¿apagada?)`}
+            </span>
+            {perfiles.length > 0 && (
+              <span className="text-neutral-400">abre Chrome solo al traer: {perfiles.map(l => l.perfil).join(' · ')}</span>
+            )}
+          </> : <>
           {perfiles.length === 0 && <span className="text-amber-700">ningún perfil se ha conectado todavía</span>}
           {perfiles.map(l => (
             <span key={l.perfil} className="flex items-center gap-1.5">
@@ -114,6 +128,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
               {l.perfil} <span className="text-neutral-400">{l.conectado ? 'conectado' : `sin señal desde ${hora(l.visto_at)}`}</span>
             </span>
           ))}
+          </>}
           {isAdmin && (
             <button onClick={generarClave} className="ml-auto underline text-neutral-500 hover:text-neutral-800">
               {datos?.vigilante.clave ? 'Generar clave nueva' : 'Generar clave del vigilante'}

@@ -22,9 +22,28 @@ confirma, no paga y no cambia nada en el portal.
    - **Guardar** y **Probar conexión** → debe decir "Conectado ✓".
 4. En ese perfil, **iniciar sesión en mercadoenvios.com.ve** con la cuenta correspondiente.
 
+## Despertador (recomendado): Chrome cerrado, se abre solo al traer
+
+Como el Radar: un script chico corre escondido desde que se inicia sesión en Windows y cada minuto
+pregunta al sistema si alguien tocó "Traer pagos y guías". Solo entonces abre Chrome en el portal con
+cada perfil; la extensión trabaja y **cierra su ventana sola**. Si un perfil no tiene la sesión de
+MercadoEnvíos iniciada, esa ventana queda abierta para iniciarla ahí.
+
+1. Instalar la extensión en cada perfil (pasos de arriba, versión 1.1.0 o más nueva).
+2. Editar `despertador.json` (Bloc de notas):
+   - `clave`: la misma clave del vigilante.
+   - `perfiles`: el nombre que se puso en la extensión (`perfil`) y la carpeta de Chrome de ese perfil
+     (`carpeta`: en esa ventana, `chrome://version` → "Ruta del perfil", lo último: `Profile 1`, `Profile 2`…).
+   - `chrome`: vacío (se busca solo) o la ruta de `chrome.exe`.
+3. Doble clic en `instalar-despertador.cmd`. Queda corriendo y arranca solo al iniciar Windows.
+4. Cerrar las ventanas de Chrome. En el sistema, **Pagos ME** debe decir **"PC en espera"**.
+5. Registro: `despertador.log` en la misma carpeta. Quitar: `schtasks /delete /tn "Despertador Pagos ME" /f`.
+
+Necesita que Windows entre solo (sin clave) para arrancar después de un apagado.
+
 ## Uso
 
-- Las dos ventanas de Chrome (un perfil cada una) quedan **abiertas**. Para que se abran solas al
+- Sin despertador: las dos ventanas de Chrome (un perfil cada una) quedan **abiertas**. Para que se abran solas al
   prender la PC, un acceso directo en la carpeta de Inicio:
   `chrome.exe --profile-directory="Profile 1"` (y otro con el perfil de la otra cuenta).
 - En **Pagos ME** se ve si cada perfil está conectado y el resultado del último "Traer".

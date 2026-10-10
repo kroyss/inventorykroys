@@ -1,0 +1,9 @@
+{
+  "servidor": "https://app.elcomerciantedigital.com",
+  "clave": "PEGAR_AQUI_LA_CLAVE_me_",
+  "chrome": "",
+  "perfiles": [
+    { "perfil": "PIKEKE", "carpeta": "Profile 1" },
+    { "perfil": "SOLUCIONES_MC", "carpeta": "Profile 2" }
+  ]
+}

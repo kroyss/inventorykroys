@@ -4,14 +4,20 @@
 // entonces abre el portal de MercadoEnvíos (con la sesión de este perfil), lee las órdenes pagadas de
 // los últimos 7 días y sube al sistema las que faltan: datos del pago, comprobante y guía.
 // Solo LEE el portal: no confirma, no paga, no cambia nada.
+//
+// Con el despertador (despertador.ps1) Chrome queda CERRADO: el script lo abre en el portal con
+// "#vigilante" al haber un pedido; la extensión trabaja apenas arranca y cierra esa ventana al terminar
+// (salvo sin sesión: queda abierta para iniciarla ahí).
 
 const DIAS = 7
 const PORTAL = 'https://www.mercadoenvios.com.ve'
+const MARCA = '#vigilante'   // la pone el despertador en la dirección que abre
 
 let trabajando = false
 
 chrome.runtime.onInstalled.addListener(() => chrome.alarms.create('latido', { periodInMinutes: 1 }))
-chrome.runtime.onStartup.addListener(() => chrome.alarms.create('latido', { periodInMinutes: 1 }))
+// Abierto por el despertador: no espera la alarma (1 min), pregunta ya.
+chrome.runtime.onStartup.addListener(() => { chrome.alarms.create('latido', { periodInMinutes: 1 }); latido() })
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'latido') latido() })
 chrome.runtime.onMessage.addListener((m, _s, responder) => {
   if (m?.tipo === 'latido') { latido().then(responder); return true }
@@ -43,6 +49,8 @@ async function latido() {
   try {
     const d = await api(cfg, 'latido')
     if (d.pedido && !trabajando) procesar(cfg, d.pedido)
+    // Abierto por el despertador pero ya no hay nada que hacer aquí (otro lo hizo, venció): se cierra.
+    if (!d.pedido && !trabajando) for (const t of await tabsDelDespertador()) cerrarVentana(t)
     const texto = d.pedido ? `Conectado: trayendo pagos y guías (pedido ${d.pedido})…` : 'Conectado ✓ (esperando pedidos)'
     if (!trabajando) await anotar(texto)
     return { texto }
@@ -58,11 +66,16 @@ async function procesar(cfg, pedido) {
   let creada = false
   let vistas = 0
   let nuevas = 0
+  let despertada = null
+  let sinSesion = false
   try {
-    // Una pestaña del portal (si no hay, se abre una en segundo plano y se cierra al terminar).
-    const [abierta] = await chrome.tabs.query({ url: `${PORTAL}/*` })
+    // La pestaña que abrió el despertador; si no, una del portal; si no, una nueva en segundo plano.
+    const [delDespertador] = await tabsDelDespertador()
+    const [abierta] = delDespertador ? [delDespertador] : await chrome.tabs.query({ url: `${PORTAL}/*` })
+    if (delDespertador) despertada = delDespertador
     if (abierta) {
       tabId = abierta.id
+      if (abierta.status !== 'complete') await esperarCarga(tabId)
     } else {
       const t = await chrome.tabs.create({ url: `${PORTAL}/vendedor/orden`, active: false })
       tabId = t.id
@@ -99,14 +112,37 @@ async function procesar(cfg, pedido) {
     await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.`)
   } catch (e) {
     const error = String(e.message || e).slice(0, 280)
+    sinSesion = error === 'sin_sesion'
     await api(cfg, 'fin', { pedido, ok: false, vistas, nuevas, error }).catch(() => {})
     await anotar(error === 'sin_sesion'
       ? 'La sesión de MercadoEnvíos de este perfil se cerró: inicia sesión en el portal.'
       : `Error: ${error}`)
   } finally {
     if (creada && tabId != null) chrome.tabs.remove(tabId).catch(() => {})
+    // Sin sesión la ventana queda abierta: quien entre a la PC inicia sesión ahí mismo.
+    if (despertada && !sinSesion) cerrarVentana(despertada)
     trabajando = false
   }
+}
+
+// El portal puede reescribir la dirección y perder la marca: se anota la pestaña apenas aparece.
+const anotarMarca = async (tabId, url) => {
+  if (!(url || '').includes(MARCA)) return
+  const { marcadas = [] } = await chrome.storage.session.get('marcadas')
+  if (!marcadas.includes(tabId)) await chrome.storage.session.set({ marcadas: [...marcadas, tabId] })
+}
+chrome.tabs.onCreated.addListener(t => anotarMarca(t.id, t.pendingUrl || t.url))
+chrome.tabs.onUpdated.addListener((id, info, t) => anotarMarca(id, info.url || t.pendingUrl || t.url))
+
+async function tabsDelDespertador() {
+  const tabs = await chrome.tabs.query({})
+  const { marcadas = [] } = await chrome.storage.session.get('marcadas')
+  return tabs.filter(t => marcadas.includes(t.id) || (t.url || t.pendingUrl || '').includes(MARCA))
+}
+
+// Cierra la ventana que abrió el despertador; si era la única, Chrome se cierra en este perfil.
+function cerrarVentana(tab) {
+  chrome.windows.remove(tab.windowId).catch(() => {})
 }
 
 function esperarCarga(tabId) {
