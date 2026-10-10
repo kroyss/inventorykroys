@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
@@ -24,7 +25,7 @@ export async function GET() {
     if (tieneModulo(u, 'preguntas')) {
       const { rows: [r] } = await db.query(
         `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS p,
-                (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS m`)
+                (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0 AND ${SQL_MENSAJE_VIGENTE})::int AS m`)
       out.preguntas = r.p; out.mensajes = r.m
       if (tieneModulo(u, 'alertas_stock')) { out.alertas = (await contarAlertas(db)).agotadas }  // solo agotadas (= pestaña Agotadas)
       {

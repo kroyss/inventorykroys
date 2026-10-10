@@ -99,6 +99,11 @@ async function guardarComprador(db: Pool, pack: string, nick: string | null, nom
      WHERE pack_id::text = $1`, [pack, nick, nombre])
 }
 
+/** Conversaciones cuyo último mensaje tiene más de esto no se muestran ni se cuentan: la venta ya
+ *  está cerrada y ML a veces las sigue reportando "sin leer" por años (nadie las abrió en ML). */
+export const DIAS_MENSAJES = 60
+export const SQL_MENSAJE_VIGENTE = `(ultimo_at IS NULL OR ultimo_at > NOW() - INTERVAL '${DIAS_MENSAJES} days')`
+
 /** Sincroniza los sin leer de una cuenta. Las que ya no están sin leer pasan a 0. */
 export async function sincronizarMensajes(db: Pool, conexionId: number) {
   const seller = await sellerDe(db, conexionId)

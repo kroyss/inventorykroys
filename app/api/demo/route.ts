@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { esDemo } from '@/lib/demo'
@@ -28,7 +29,7 @@ export async function GET() {
          (SELECT COUNT(*) FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id JOIN despacho_jornadas j ON j.id = l.jornada_id
             WHERE ${SQL_REPORTABLE} AND ${SQL_PENDIENTE})::int AS reportador,
          (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS preguntas,
-         (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0)::int AS mensajes,
+         (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0 AND ${SQL_MENSAJE_VIGENTE})::int AS mensajes,
          (SELECT COUNT(*) FROM (${SQL_BANDEJA_ML}) b WHERE b.sugerencia <> 'esperar')::int AS calificaciones,
          (SELECT COUNT(*) FROM ml_stock_alertas WHERE disponible < 3 AND actualizado_at > NOW() - INTERVAL '1 day')::int AS stock`, [3])
     return NextResponse.json({ secciones: SECCIONES_DEMO.map(x => ({ ...x, pendientes: n[x.id] as number })), esAdmin: s.session.user.role === 'admin', max: MAX_DEMO })

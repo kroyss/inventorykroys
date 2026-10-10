@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { leerMensajesRapidos, MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
+import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { tieneModulo } from '@/lib/modulos'
 
 // GET /api/mensajes?vista=sin_leer|con_nota|todas → conversaciones post-venta de las cuentas de
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   const vista = new URL(req.url).searchParams.get('vista')
-  const filtro = vista === 'todas' ? '' : vista === 'con_nota' ? 'WHERE c.notas IS NOT NULL' : 'WHERE c.sin_leer > 0'
+  const filtro = `WHERE ${SQL_MENSAJE_VIGENTE}` + (vista === 'todas' ? '' : vista === 'con_nota' ? ' AND c.notas IS NOT NULL' : ' AND c.sin_leer > 0')
   try {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     const { rows: [n] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE sin_leer > 0)::int AS conversaciones, COALESCE(SUM(sin_leer), 0)::int AS mensajes,
               COUNT(*) FILTER (WHERE notas IS NOT NULL)::int AS con_nota
-       FROM ml_conversaciones`)
+       FROM ml_conversaciones WHERE ${SQL_MENSAJE_VIGENTE}`)
     // Respuestas rápidas (botones en cada conversación); `sugeridas` = ejemplos para el editor.
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
