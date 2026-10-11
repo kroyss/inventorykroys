@@ -2,11 +2,14 @@
 // Ventas → Nueva venta (2026-10-11): el pago de MercadoEnvíos y "lo que se habló" en el mismo
 // formulario, para verificar y registrar la venta sin ir a MercadoEnvíos ni a MercadoLibre.
 //   - PagoDeVenta: el pago traído por el vigilante (o "no está · última traída · Traer ahora"),
-//     el detalle completo con el comprobante, y "✓ Pago correcto" (al guardar: pago válido, venta
-//     procesada y guía a Despachos).
-//   - LoQueSeHablo: lo ofertado (foto, variante, cantidad, precio), notas, mensajes y preguntas
-//     previas; se pide a ML solo al abrirlo.
+//     el comprobante con su detalle (ventana aparte) y "Pago correcto" (al guardar: pago válido,
+//     venta procesada y guía a Despachos).
+//   - LoQueSeHablo: botón que abre una ventana aparte con lo ofertado (foto, variante, cantidad,
+//     precio), notas, mensajes y preguntas previas; se pide a ML solo al abrirla.
+// Las ventanas van por portal al body (dentro del panel lateral, que tiene transform, quedaban
+// encajonadas) y se cierran con Esc, con ✕ o tocando afuera.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from '@/components/pagosme/PagoME'
 
@@ -16,6 +19,45 @@ const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit',
 }) : '—'
 
+// ── Ventana aparte (comprobante, conversación) ──────────────────────────────
+function Ventana({ titulo, subtitulo, onCerrar, pie, ancho = 'max-w-4xl', children }: {
+  titulo: string; subtitulo?: ReactNode; onCerrar: () => void; pie?: ReactNode; ancho?: string; children: ReactNode
+}) {
+  // Esc cierra solo esta ventana (en captura: no llega al formulario de atrás).
+  const cerrar = useRef(onCerrar)
+  useEffect(() => { cerrar.current = onCerrar })
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); cerrar.current() } }
+    document.addEventListener('keydown', h, true)
+    return () => document.removeEventListener('keydown', h, true)
+  }, [])
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-3 sm:p-6"
+      onMouseDown={e => { if (e.target === e.currentTarget) onCerrar() }} role="dialog" aria-modal="true">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${ancho} max-h-[92vh] flex flex-col overflow-hidden`}>
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-neutral-100">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-neutral-900">{titulo}</h3>
+            {subtitulo && <p className="text-xs text-neutral-500 truncate">{subtitulo}</p>}
+          </div>
+          <button type="button" onClick={onCerrar} autoFocus aria-label="Cerrar (Esc)" title="Cerrar (Esc)"
+            className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 text-lg">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-neutral-100 bg-neutral-50">
+          <span className="text-[11px] text-neutral-400">Esc para cerrar</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={onCerrar} className="btn-secondary text-sm">Cerrar</button>
+            {pie}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+// ── El pago ─────────────────────────────────────────────────────────────────
 export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }: {
   numero: string
   pagoOk: boolean
@@ -45,13 +87,13 @@ export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }
     return () => { cancel = true; clearTimeout(t) }
   }, [buscar])
 
-  // Traída pedida desde aquí: se consulta cada 5 s hasta que termine (máx. 4 min).
+  // Traída pedida desde aquí: se consulta cada 5 s hasta que termine (máx. 5 min).
   useEffect(() => {
     if (pidiendo == null) return
     const t = setInterval(async () => {
       const d = await buscar()
       const fin = d?.traida?.terminada_at ? new Date(d.traida.terminada_at).getTime() : 0
-      if ((d?.pago) || (d?.traida && !d.traida.trabajando && fin >= pidiendo - 5000) || Date.now() - pidiendo > 240000) setPidiendo(null)
+      if ((d?.pago) || (d?.traida && !d.traida.trabajando && fin >= pidiendo - 5000) || Date.now() - pidiendo > 300000) setPidiendo(null)
     }, 5000)
     return () => clearInterval(t)
   }, [pidiendo, buscar])
@@ -69,9 +111,9 @@ export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }
 
   if (!pago) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs space-y-1.5">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="font-medium text-amber-900">
+          <span className="text-sm font-medium text-amber-900">
             {trayendo ? 'Trayendo pagos y guías de MercadoEnvíos…' : 'Este pago no está en Pagos ME'}
           </span>
           <button type="button" onClick={traer} disabled={trayendo} className="btn-secondary text-xs">
@@ -91,84 +133,124 @@ export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }
   }
 
   const v = VERIF[pago.verificacion]
+  const invalido = pago.verificacion === 'invalido'
   return (
-    <div className={`rounded-lg border px-3 py-2 text-xs space-y-1.5 ${pagoOk ? 'border-emerald-300 bg-emerald-50/70' : 'border-violet-200 bg-violet-50/60'}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium text-violet-900">Pago en MercadoEnvíos{pago.cuenta ? ` (${pago.cuenta})` : ''}</span>
-        <span className={`px-2 py-0.5 rounded-full ${v.c}`}>{v.t}{pago.verificado_por ? ` · ${pago.verificado_por}` : ''}</span>
+    <div className={`rounded-xl border text-sm transition-colors ${pagoOk ? 'border-emerald-300 bg-emerald-50/60' : invalido ? 'border-red-200 bg-red-50/50' : 'border-violet-200 bg-violet-50/40'}`}>
+      {/* De dónde viene y su estado */}
+      <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+        <span className="text-xs font-medium text-violet-900">
+          Pago en MercadoEnvíos{pago.cuenta ? <span className="font-normal text-violet-700/80"> · {pago.cuenta}</span> : null}
+        </span>
+        <span className={`text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap ${v.c}`}>{v.t}{pago.verificado_por ? ` · ${pago.verificado_por}` : ''}</span>
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-neutral-700">
-        <span>{metodoPago(pago.metodo_pago)}</span>
-        {(pago.banco_emisor || pago.banco_receptor) && <span>{pago.banco_emisor ?? '?'} → {pago.banco_receptor ?? '?'}</span>}
-        {pago.referencia && <span>Ref <b className="font-mono">{pago.referencia}</b></span>}
-        <span><b>{bs(pago.monto_pagado)}</b></span>
-        <Monto p={pago} />
-        <button type="button" onClick={() => setDetalle(true)} className="underline text-violet-800">
-          {pago.tiene_comprobante ? 'Ver comprobante y detalle' : 'Ver detalle'}
+
+      {/* Monto y datos del pago */}
+      <div className="flex items-center gap-3 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-lg font-semibold text-neutral-900 tabular-nums">{bs(pago.monto_pagado)}</span>
+            <Monto p={pago} />
+          </div>
+          <div className="text-xs text-neutral-600 mt-0.5">
+            {metodoPago(pago.metodo_pago)}
+            {(pago.banco_emisor || pago.banco_receptor) && <> · {pago.banco_emisor ?? '?'} → {pago.banco_receptor ?? '?'}</>}
+            {pago.referencia && <> · Ref <span className="font-mono font-medium text-neutral-800">{pago.referencia}</span></>}
+          </div>
+        </div>
+        <button type="button" onClick={() => setDetalle(true)}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-50">
+          <span aria-hidden>🧾</span>{pago.tiene_comprobante ? 'Ver comprobante' : 'Ver detalle'}
         </button>
       </div>
-      {pago.verificacion === 'invalido' ? (
-        <p className="text-red-700">Este pago se marcó INVÁLIDO en Pagos ME: revísalo antes de seguir.</p>
+
+      {/* Verificación */}
+      {invalido ? (
+        <p className="px-3 pb-2.5 text-xs text-red-700">Este pago se marcó INVÁLIDO en Pagos ME: revísalo antes de seguir.</p>
       ) : puedeVerificar ? (
-        <label className="flex items-center gap-2 pt-0.5 cursor-pointer select-none">
-          <input type="checkbox" checked={pagoOk} onChange={e => onPagoOk(e.target.checked)} className="w-4 h-4 accent-emerald-600" />
-          <span className={pagoOk ? 'text-emerald-800 font-medium' : 'text-neutral-700'}>
-            ✓ Pago correcto (lo verifiqué contra el banco)
+        <label className={`mx-3 mb-2 flex items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer select-none transition-colors ${
+          pagoOk ? 'border-emerald-400 bg-white' : 'border-neutral-200 bg-white hover:border-emerald-300'}`}>
+          <input type="checkbox" checked={pagoOk} onChange={e => onPagoOk(e.target.checked)} className="w-4 h-4 accent-emerald-600 shrink-0" />
+          <span className={`text-sm ${pagoOk ? 'text-emerald-800 font-medium' : 'text-neutral-800'}`}>
+            Pago correcto <span className="font-normal text-neutral-500">— lo verifiqué contra el banco</span>
           </span>
         </label>
       ) : null}
-      <p className="text-neutral-500">
+      <p className="px-3 pb-2.5 text-[11px] text-neutral-500">
         {pagoOk
           ? 'Al guardar: el pago queda verificado, la venta PROCESADA y su guía entra al lote de Despachos.'
           : pago.verificacion === 'valido'
             ? 'Pago ya verificado: al guardar, la venta queda en Pago verificado y su guía entra al lote de Despachos.'
-            : 'Al guardar sin marcarlo, la guía entra al lote de Despachos pero no se imprime hasta verificar el pago.'}
-        {!pago.tiene_guia && ' (Todavía no tiene guía en MercadoEnvíos.)'}
+            : 'Sin marcarlo, la guía entra al lote de Despachos pero no se imprime hasta verificar el pago.'}
+        {!pago.tiene_guia && ' Todavía no tiene guía en MercadoEnvíos.'}
       </p>
-      {detalle && <DetallePago p={pago} onCerrar={() => setDetalle(false)} />}
+      {detalle && (
+        <DetallePago p={pago} onCerrar={() => setDetalle(false)}
+          puedeMarcar={puedeVerificar && !invalido && !pagoOk}
+          onMarcar={() => { onPagoOk(true); setDetalle(false) }} />
+      )}
     </div>
   )
 }
 
-/** Todo lo que se trajo del pago, con el comprobante en grande. */
-function DetallePago({ p, onCerrar }: { p: PagoME; onCerrar: () => void }) {
+/** Comprobante en grande y todo lo que se trajo del pago. */
+function DetallePago({ p, onCerrar, puedeMarcar, onMarcar }: {
+  p: PagoME; onCerrar: () => void; puedeMarcar: boolean; onMarcar: () => void
+}) {
   const [esPdf, setEsPdf] = useState(false)
+  const [copiado, setCopiado] = useState(false)
   const url = `/api/pagos-me/${p.id}/archivo?tipo=comprobante`
+  const copiar = async () => {
+    if (!p.referencia) return
+    await navigator.clipboard.writeText(p.referencia).catch(() => {})
+    setCopiado(true); setTimeout(() => setCopiado(false), 1500)
+  }
   const filas: [string, ReactNode][] = [
-    ['Venta', <span key="v" className="font-mono">{p.venta}</span>],
-    ['Cuenta', p.cuenta ?? '—'],
-    ['Estado en MercadoEnvíos', p.estado_me ?? '—'],
-    ['Fecha de la orden', hora(p.fecha_orden)],
     ['Método', metodoPago(p.metodo_pago)],
-    ['Banco emisor → receptor', `${p.banco_emisor ?? '?'} → ${p.banco_receptor ?? '?'}`],
-    ['Referencia', <b key="r" className="font-mono">{p.referencia ?? '—'}</b>],
+    ['Bancos', `${p.banco_emisor ?? '?'} → ${p.banco_receptor ?? '?'}`],
+    ['Referencia', <>
+      <span className="font-mono font-medium">{p.referencia ?? '—'}</span>
+      {p.referencia && <button type="button" onClick={copiar} className="ml-2 text-xs text-violet-700 hover:underline">{copiado ? 'copiada ✓' : 'copiar'}</button>}
+    </>],
     ['Fecha del pago', p.fecha_pago ?? '—'],
-    ['Pagado / total de la orden', <span key="m">{bs(p.monto_pagado)} / {bs(p.total_orden)} <Monto p={p} /></span>],
+    ['Fecha de la orden', hora(p.fecha_orden)],
     ['Envío', [p.carrier, p.envio_metodo, p.envio_opcion].filter(Boolean).join(' · ') || '—'],
     ['Guía', p.guia ?? (p.tiene_guia ? 'sí' : 'todavía no')],
   ]
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-auto p-4 space-y-3" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Pago en MercadoEnvíos</h3>
-          <button type="button" onClick={onCerrar} className="text-neutral-500 text-sm">Cerrar ✕</button>
+    <Ventana titulo="Comprobante de pago" onCerrar={onCerrar}
+      subtitulo={<>Venta <span className="font-mono">{p.venta}</span>{p.cuenta ? ` · ${p.cuenta}` : ''}</>}
+      pie={puedeMarcar ? <button type="button" onClick={onMarcar} className="btn-primary text-sm">✓ Pago correcto</button> : null}>
+      <div className="grid md:grid-cols-[1fr_20rem] min-h-full">
+        <div className="bg-neutral-50 p-4 flex items-start justify-center min-h-[16rem]">
+          {p.tiene_comprobante ? (esPdf
+            ? <iframe src={url} title="Comprobante" className="w-full h-[68vh] rounded-lg border bg-white" />
+            : <a href={url} target="_blank" rel="noreferrer" title="Abrir en otra pestaña">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="Comprobante de pago" onError={() => setEsPdf(true)}
+                  className="max-h-[68vh] w-auto max-w-full rounded-lg border bg-white shadow-sm" />
+              </a>)
+            : <p className="text-sm text-neutral-400 self-center">MercadoEnvíos no trajo imagen del comprobante.</p>}
         </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-          {filas.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt className="text-neutral-500">{k}</dt>
-              <dd className="text-neutral-800">{v}</dd>
+        <div className="p-5 space-y-4">
+          <div>
+            <div className="text-xs text-neutral-500">Pagado</div>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-2xl font-semibold tabular-nums">{bs(p.monto_pagado)}</span>
+              <Monto p={p} />
             </div>
-          ))}
-        </dl>
-        {p.tiene_comprobante && (esPdf
-          ? <iframe src={url} title="Comprobante" className="w-full h-[60vh] rounded border" />
-          // eslint-disable-next-line @next/next/no-img-element
-          : <img src={url} alt="Comprobante de pago" onError={() => setEsPdf(true)} className="w-full rounded border" />)}
-        {p.tiene_comprobante && <a href={url} target="_blank" rel="noreferrer" className="text-xs underline text-violet-800">Abrir el comprobante en otra pestaña</a>}
+            <div className="text-xs text-neutral-500">Total de la orden: {bs(p.total_orden)}</div>
+          </div>
+          <dl>
+            {filas.map(([k, v]) => (
+              <div key={k} className="flex items-baseline justify-between gap-3 py-1.5 border-b border-neutral-100 last:border-0">
+                <dt className="text-xs text-neutral-500 shrink-0">{k}</dt>
+                <dd className="text-sm text-neutral-900 text-right min-w-0 break-words">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
-    </div>
+    </Ventana>
   )
 }
 
@@ -192,7 +274,7 @@ export function LoQueSeHablo({ numero }: { numero: string }) {
   const [cargando, setCargando] = useState(false)
 
   const abrir = async () => {
-    setAbierto(a => !a)
+    setAbierto(true)
     if (ctx !== undefined || cargando) return
     setCargando(true)
     const r = await fetch(`/api/sales/ml-orden/contexto?numero=${encodeURIComponent(numero)}`).catch(() => null)
@@ -201,79 +283,83 @@ export function LoQueSeHablo({ numero }: { numero: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white text-xs">
-      <button type="button" onClick={abrir} className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-neutral-50 rounded-lg">
-        <span className="font-medium text-neutral-800">💬 Lo que se habló en MercadoLibre</span>
-        <span className="text-neutral-400">{abierto ? 'Ocultar ▲' : 'Ver producto ofertado, notas y mensajes ▼'}</span>
+    <>
+      <button type="button" onClick={abrir}
+        className="w-full flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-left hover:border-sky-300 hover:bg-sky-50/40 transition-colors">
+        <span className="text-sm font-medium text-neutral-800">💬 Lo que se habló en MercadoLibre</span>
+        <span className="text-xs text-sky-700">Ver producto ofertado, notas y mensajes →</span>
       </button>
       {abierto && (
-        <div className="border-t border-neutral-100 px-3 py-2 space-y-3">
-          {cargando || ctx === undefined ? <p className="text-neutral-400">Buscando en MercadoLibre…</p>
-            : ctx === null ? <p className="text-neutral-500">No se pudo traer de MercadoLibre.</p>
-            : <>
-              <div className="space-y-1.5">
-                <div className="text-neutral-500">Lo que ofertó{ctx.cuenta ? ` (${ctx.cuenta})` : ''}</div>
-                {ctx.items.map((i, k) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <div className="w-10 h-10 shrink-0 rounded border border-neutral-200 bg-white overflow-hidden flex items-center justify-center">
-                      {i.imagen
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={i.imagen} alt="" loading="lazy" className="w-full h-full object-contain" />
-                        : <span className="text-neutral-300">—</span>}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-neutral-800">
-                        <b>{i.cantidad} ×</b>{' '}
-                        {i.link ? <a href={i.link} target="_blank" rel="noreferrer" className="hover:underline">{i.titulo} ↗</a> : i.titulo}
+        <Ventana titulo="Lo que se habló en MercadoLibre" ancho="max-w-2xl" onCerrar={() => setAbierto(false)}
+          subtitulo={<>Venta <span className="font-mono">{numero}</span>{ctx?.cuenta ? ` · ${ctx.cuenta}` : ''}</>}>
+          <div className="p-5 space-y-5 text-sm">
+            {cargando || ctx === undefined ? <p className="text-neutral-400">Buscando en MercadoLibre…</p>
+              : ctx === null ? <p className="text-neutral-500">No se pudo traer de MercadoLibre.</p>
+              : <>
+                <section className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Lo que ofertó</h4>
+                  {ctx.items.map((i, k) => (
+                    <div key={k} className="flex items-center gap-3 rounded-lg border border-neutral-200 p-2">
+                      <div className="w-14 h-14 shrink-0 rounded-md border border-neutral-200 bg-white overflow-hidden flex items-center justify-center">
+                        {i.imagen
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={i.imagen} alt="" loading="lazy" className="w-full h-full object-contain" />
+                          : <span className="text-neutral-300">—</span>}
                       </div>
-                      <div className="text-neutral-500">
-                        {i.variante && <span className="font-medium text-neutral-700">{i.variante}</span>}
-                        {i.variante && i.precio != null && ' · '}
-                        {i.precio != null && <span>{precio(i.precio, i.moneda)} c/u</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {ctx.total != null && <div className="text-right text-neutral-600">Total de la orden: <b>{precio(ctx.total, ctx.moneda)}</b></div>}
-              </div>
-
-              <div>
-                <div className="text-neutral-500 mb-0.5">Notas de la venta</div>
-                {ctx.notas.length
-                  ? ctx.notas.map((n, k) => <div key={k} className="rounded bg-amber-50 border border-amber-100 px-2 py-1 text-amber-900 mb-1">{n}</div>)
-                  : <div className="text-neutral-400">Sin notas.</div>}
-              </div>
-
-              <div>
-                <div className="text-neutral-500 mb-0.5">Últimos mensajes</div>
-                {ctx.mensajes.length ? (
-                  <div className="space-y-1">
-                    {ctx.mensajes.map((m, k) => (
-                      <div key={k} className={`rounded px-2 py-1 max-w-[90%] ${m.propio ? 'ml-auto bg-neutral-800 text-white' : 'bg-neutral-100 text-neutral-800'}`}>
-                        {plano(m.texto)}
-                        <div className={`text-[10px] ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                          {m.propio ? 'Tú' : 'Comprador'} · {hora(m.fecha)}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-neutral-900">
+                          <b>{i.cantidad} ×</b>{' '}
+                          {i.link ? <a href={i.link} target="_blank" rel="noreferrer" className="hover:underline">{i.titulo} ↗</a> : i.titulo}
+                        </div>
+                        <div className="text-xs text-neutral-500 mt-0.5">
+                          {i.variante && <span className="inline-block rounded bg-sky-50 border border-sky-100 px-1.5 py-0.5 font-medium text-sky-900 mr-2">{i.variante}</span>}
+                          {i.precio != null && <span>{precio(i.precio, i.moneda)} c/u</span>}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : <div className="text-neutral-400">Sin mensajes.</div>}
-              </div>
-
-              {ctx.preguntas.length > 0 && (
-                <div>
-                  <div className="text-neutral-500 mb-0.5">Preguntó antes de comprar</div>
-                  {ctx.preguntas.slice(0, 5).map(p => (
-                    <div key={p.id} className="mb-1">
-                      <div className="text-neutral-800">“{p.texto}”{p.item_titulo && <span className="text-neutral-400"> · {p.item_titulo}</span>}</div>
-                      {p.respuesta && <div className="text-neutral-500 pl-2">↳ {p.respuesta}</div>}
                     </div>
                   ))}
-                </div>
-              )}
-            </>}
-        </div>
+                  {ctx.total != null && <div className="text-right text-xs text-neutral-600">Total de la orden: <b>{precio(ctx.total, ctx.moneda)}</b></div>}
+                </section>
+
+                <section className="space-y-1.5">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Notas de la venta</h4>
+                  {ctx.notas.length
+                    ? ctx.notas.map((n, k) => <div key={k} className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-amber-900">{n}</div>)
+                    : <p className="text-neutral-400">Sin notas.</p>}
+                </section>
+
+                <section className="space-y-1.5">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Últimos mensajes</h4>
+                  {ctx.mensajes.length ? (
+                    <div className="space-y-1.5">
+                      {ctx.mensajes.map((m, k) => (
+                        <div key={k} className={`rounded-lg px-3 py-2 max-w-[85%] ${m.propio ? 'ml-auto bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-900'}`}>
+                          {plano(m.texto)}
+                          <div className={`text-[10px] mt-0.5 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                            {m.propio ? 'Tú' : 'Comprador'} · {hora(m.fecha)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-neutral-400">Sin mensajes.</p>}
+                </section>
+
+                {ctx.preguntas.length > 0 && (
+                  <section className="space-y-1.5">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Preguntó antes de comprar</h4>
+                    {ctx.preguntas.slice(0, 5).map(p => (
+                      <div key={p.id} className="rounded-lg border border-neutral-200 px-3 py-2">
+                        <div className="text-neutral-900">“{p.texto}”</div>
+                        {p.item_titulo && <div className="text-[11px] text-neutral-400">{p.item_titulo}</div>}
+                        {p.respuesta && <div className="text-xs text-neutral-600 mt-1">↳ {p.respuesta}</div>}
+                      </div>
+                    ))}
+                  </section>
+                )}
+              </>}
+          </div>
+        </Ventana>
       )}
-    </div>
+    </>
   )
 }
