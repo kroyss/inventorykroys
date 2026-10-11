@@ -198,17 +198,20 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     setLotes(prev => ({ ...prev, [loteId]: d }))
   }
 
-  // Sin inventario: imprimir o no el título de la publicación en la etiqueta (opción de la empresa).
-  const [sinTitulo, setSinTitulo] = useState(false)
+  // Sin inventario: imprimir o no el título y la nota en la etiqueta (opción de la empresa, admin).
+  const [impresion, setImpresion] = useState<Impresion>({ sin_titulo: false, sin_nota: false })
   useEffect(() => {
     if (!desdeML) return
-    fetch('/api/despachos/config').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setSinTitulo(!!d.sin_titulo) }).catch(() => {})
+    fetch('/api/despachos/config').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setImpresion(d) }).catch(() => {})
   }, [desdeML])
-  const cambiarSinTitulo = async (v: boolean) => {
+  const cambiarImpresion = async (cambio: Partial<Impresion>) => {
+    setImpresion(prev => ({ ...prev, ...cambio }))
     const r = await fetch('/api/despachos/config', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sin_titulo: v }),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambio),
     })
-    if (r.ok) setSinTitulo(v)
+    const d = await r.json().catch(() => null)
+    if (r.ok && d) setImpresion(d)
+    else { setImpresion(prev => ({ ...prev, ...Object.fromEntries(Object.entries(cambio).map(([k, v]) => [k, !v])) })); setError('No se pudo guardar la opción de impresión') }
   }
 
   const generar = async (lote: LoteDetalle) => {
@@ -314,7 +317,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
 
       {pendientes.map(l => (
         <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML}
-          sinTitulo={sinTitulo} onSinTitulo={isAdmin ? cambiarSinTitulo : undefined}
+          impresion={impresion} onImpresion={isAdmin ? cambiarImpresion : undefined}
           onNota={(e, nota) => patchEtiqueta(l.id, e, { nota })}
           onToggle={e => patchEtiqueta(l.id, e, { incluida: !e.incluida })}
           onForzarPago={(e, v) => patchEtiqueta(l.id, e, { forzar_pago: v })}
@@ -467,6 +470,25 @@ function Dropzone({ onFiles, busy, compact, agregaALote }: {
   )
 }
 
+// ── Qué se imprime en la etiqueta (sin inventario) ─────────────────────────
+type Impresion = { sin_titulo: boolean; sin_nota: boolean }
+
+/** Interruptor ON/OFF en el encabezado de la columna. Sin onChange (no admin) se ve pero no se mueve. */
+function Interruptor({ on, onChange, ayuda }: { on: boolean; onChange?: (v: boolean) => void; ayuda: [string, string] }) {
+  const titulo = `${on ? ayuda[0] : ayuda[1]}${onChange ? '' : ' (lo cambia un administrador)'}`
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={titulo} title={titulo}
+      onClick={() => onChange?.(!on)} disabled={!onChange}
+      className={`inline-flex items-center gap-1.5 rounded-full pl-0.5 pr-2 py-0.5 text-[11px] font-semibold normal-case transition-colors ${
+        on ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-500'} ${onChange ? 'cursor-pointer hover:brightness-95' : 'cursor-default opacity-80'}`}>
+      <span className={`relative inline-block w-7 h-4 rounded-full transition-colors ${on ? 'bg-emerald-500' : 'bg-neutral-400'}`}>
+        <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-3' : ''}`} />
+      </span>
+      {on ? 'Se imprime' : 'No se imprime'}
+    </button>
+  )
+}
+
 // ── Nota del paquete (sin inventario) ───────────────────────────────────────
 // La de ML viene precargada; un clic la edita o agrega. Lo escrito aquí manda sobre ML (✎) y se
 // puede volver a la de ML. Enter guarda, Esc cancela.
@@ -502,11 +524,11 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, sinTitulo, onSinTitulo, onNota, onToggle, onForzarPago, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, onToggle, onForzarPago, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
-  sinTitulo: boolean
-  onSinTitulo?: (v: boolean) => void
+  impresion: Impresion
+  onImpresion?: (cambio: Partial<Impresion>) => void
   onNota: (e: Etiqueta, nota: string | null) => void
   busy: string | null
   onToggle: (e: Etiqueta) => void
@@ -530,13 +552,7 @@ function LotePendiente({ lote, busy, desdeML, sinTitulo, onSinTitulo, onNota, on
             {conProblema > 0 && <> · <span className="text-red-700">{conProblema} con problema</span></>}
             {' '}· subido {hora(lote.created_at)}{lote.created_by ? ` por ${lote.created_by}` : ''}
           </p>
-          {desdeML && (
-            <label className={`mt-1 inline-flex items-center gap-1.5 text-xs text-neutral-600 ${onSinTitulo ? 'cursor-pointer' : ''}`}
-              title="Apagado: la etiqueta lleva solo la cantidad y la nota (para guiarte por la nota cuando el comprador pide otra variante)">
-              <input type="checkbox" checked={!sinTitulo} disabled={!onSinTitulo} onChange={ev => onSinTitulo?.(!ev.target.checked)} />
-              Imprimir el título de la publicación en la etiqueta
-            </label>
-          )}
+
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onRevalidar} className="btn-secondary text-xs" title={desdeML ? 'Volver a buscar las ventas y las notas en MercadoLibre' : 'Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)'}>↻ Revalidar</button>
@@ -555,8 +571,24 @@ function LotePendiente({ lote, busy, desdeML, sinTitulo, onSinTitulo, onNota, on
               <th className="px-3 py-2 text-left">Venta</th>
               <th className="px-3 py-2 text-left">Guía</th>
               <th className="px-3 py-2 text-left">Remitente</th>
-              <th className="px-3 py-2 text-left">{desdeML ? 'Productos (de MercadoLibre)' : 'Productos (del sistema)'}</th>
-              <th className="px-3 py-2 text-left">Nota</th>
+              <th className="px-3 py-2 text-left">
+                {desdeML ? (
+                  <span className="inline-flex items-center gap-2">
+                    Productos (de MercadoLibre)
+                    <Interruptor on={!impresion.sin_titulo} onChange={onImpresion && (v => onImpresion({ sin_titulo: !v }))}
+                      ayuda={['Se imprime el título de la publicación en la etiqueta', 'El título NO se imprime: la etiqueta lleva la cantidad y la nota']} />
+                  </span>
+                ) : 'Productos (del sistema)'}
+              </th>
+              <th className="px-3 py-2 text-left">
+                {desdeML ? (
+                  <span className="inline-flex items-center gap-2">
+                    Nota
+                    <Interruptor on={!impresion.sin_nota} onChange={onImpresion && (v => onImpresion({ sin_nota: !v }))}
+                      ayuda={['Se imprime la nota en la etiqueta', 'La nota NO se imprime en la etiqueta']} />
+                  </span>
+                ) : 'Nota'}
+              </th>
               <th className="px-3 py-2 text-left">Estado</th>
             </tr>
           </thead>
@@ -580,11 +612,12 @@ function LotePendiente({ lote, busy, desdeML, sinTitulo, onSinTitulo, onNota, on
                     {e.carrier === 'TEALCA' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-sans">Tealca</span>}
                   </td>
                   <td className="px-3 py-2 text-xs">{e.remitente?.slice(0, 22) ?? '—'}</td>
-                  <td className={`px-3 py-2 text-xs ${desdeML && sinTitulo ? 'text-neutral-400' : ''}`}
-                    title={desdeML && sinTitulo ? 'El título no se imprime: en la etiqueta va la cantidad y la nota' : undefined}>
+                  <td className={`px-3 py-2 text-xs ${desdeML && impresion.sin_titulo ? 'text-neutral-400' : ''}`}
+                    title={desdeML && impresion.sin_titulo ? 'El título no se imprime: en la etiqueta va la cantidad y la nota' : undefined}>
                     {e.items.length === 0 ? '—' : e.items.map((i, k) => <div key={k}>{i.quantity} - {i.product_name}</div>)}
                   </td>
-                  <td className="px-3 py-2 text-xs text-neutral-600">
+                  <td className={`px-3 py-2 text-xs ${desdeML && impresion.sin_nota ? 'text-neutral-400' : 'text-neutral-600'}`}
+                    title={desdeML && impresion.sin_nota ? 'La nota no se imprime en la etiqueta' : undefined}>
                     {desdeML && e.venta ? <NotaEditable e={e} onGuardar={n => onNota(e, n)} /> : nota}
                   </td>
                   <td className="px-3 py-2 text-xs">

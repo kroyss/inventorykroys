@@ -36,11 +36,14 @@ export async function remitenteConfigurado(db: Pick<Pool, 'query'>) {
   return (cfg?.r as string | undefined)?.trim() || 'Remitente'
 }
 
-// Sin inventario: ¿se imprime el título de la publicación en la etiqueta? (app_settings
-// `despacho_sin_titulo` = 'true' → no: solo cantidad y nota, para quien se guía por la nota).
-export async function sinTituloEnEtiqueta(db: Pick<Pool, 'query'>) {
-  const { rows: [cfg] } = await db.query(`SELECT value FROM app_settings WHERE key = 'despacho_sin_titulo'`)
-  return cfg?.value === 'true'
+// Sin inventario: qué se imprime en la etiqueta además de la cantidad (siempre va). app_settings
+// `despacho_sin_titulo` / `despacho_sin_nota` = 'true' → no se imprime el título de la publicación
+// (para quien se guía por la nota) / la nota (para quien escribe todo a mano).
+export async function impresionEtiqueta(db: Pick<Pool, 'query'>) {
+  const { rows } = await db.query(
+    `SELECT key, value FROM app_settings WHERE key IN ('despacho_sin_titulo', 'despacho_sin_nota')`)
+  const v = (k: string) => rows.find(r => r.key === k)?.value === 'true'
+  return { sin_titulo: v('despacho_sin_titulo'), sin_nota: v('despacho_sin_nota') }
 }
 
 // Largo exigido de la guía FINAL de Tealca (la que genera Tealca, no la pre-guía de la etiqueta).
