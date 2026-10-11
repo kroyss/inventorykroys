@@ -186,7 +186,10 @@ def armar_sales_map(filas):
     for f in filas:
         venta = str(f["venta"]).strip()
         lineas, nota_previa = sales_map.get(venta, ([], ""))
-        lineas.append(f"{str(f['cantidad']).strip()} - {clip_text(f['producto'])}")
+        producto = (f.get("producto") or "").strip()
+        # Sin título (opción de la empresa): solo la cantidad; lo que va es lo que dice la nota.
+        lineas.append(f"{str(f['cantidad']).strip()} - {clip_text(producto)}" if producto
+                      else f"{str(f['cantidad']).strip()} und.")
         nota = (f.get("nota") or "").strip()
         sales_map[venta] = (lineas, nota_previa or nota)
     return sales_map

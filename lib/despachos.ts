@@ -36,6 +36,13 @@ export async function remitenteConfigurado(db: Pick<Pool, 'query'>) {
   return (cfg?.r as string | undefined)?.trim() || 'Remitente'
 }
 
+// Sin inventario: ¿se imprime el título de la publicación en la etiqueta? (app_settings
+// `despacho_sin_titulo` = 'true' → no: solo cantidad y nota, para quien se guía por la nota).
+export async function sinTituloEnEtiqueta(db: Pick<Pool, 'query'>) {
+  const { rows: [cfg] } = await db.query(`SELECT value FROM app_settings WHERE key = 'despacho_sin_titulo'`)
+  return cfg?.value === 'true'
+}
+
 // Largo exigido de la guía FINAL de Tealca (la que genera Tealca, no la pre-guía de la etiqueta).
 export const GUIA_TEALCA_DIGITOS_DEFAULT = 8
 export async function digitosGuiaTealca(db: Pick<Pool, 'query'>) {
@@ -220,6 +227,9 @@ export interface EtiquetaValidada {
   items: { product_name: string; quantity: number; notes: string | null }[]
   /** Sin inventario: la venta de ML que se encontró (sale_id queda null). */
   orden_ml?: string | null
+  /** Sin inventario: nota de la venta en ML y la escrita en Despachos (manda si no es null). */
+  nota_ml?: string | null
+  nota_despacho?: string | null
   /** Pagos MercadoEnvíos: el pago de la venta traído del portal (null = no hay o módulo apagado). */
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
   estado: EstadoEtiqueta
@@ -232,13 +242,14 @@ const VENTA_NUM = `CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END`
 // ── Empresas sin inventario: las ventas salen de MercadoLibre ───────────────────
 // Misma forma que las ventas del sistema (product_name, quantity, notes, customer_name,
 // sale_notes), así el armado, el manifiesto, las jornadas y el Reportador no cambian.
-// Producto = título tal cual en ML (+ variante); nota = las notas de la venta en ML (se
-// escriben allá, aquí no se editan).
+// Producto = título tal cual en ML (+ variante); nota = la escrita en el lote pendiente
+// (nota_despacho, migración 079) o, si no, las notas de la venta en ML.
 const SQL_DESDE_ML = `
   SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
          e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
          e.incluida, e.impresa,
-         NULL::int AS sale_id, o.estado AS sale_status, o.comprador AS customer_name, o.notas AS sale_notes,
+         NULL::int AS sale_id, o.estado AS sale_status, o.comprador AS customer_name,
+         COALESCE(e.nota_despacho, o.notas) AS sale_notes, o.notas AS nota_ml, e.nota_despacho,
          o.id::text AS orden_ml,
          COALESCE((
            SELECT JSON_AGG(JSON_BUILD_OBJECT(

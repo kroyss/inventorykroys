@@ -5,7 +5,12 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import { despachosForbidden } from '@/lib/despachos'
 
 // incluida: incluir/excluir del PDF · forzar_pago: "Despachar igual" con el pago sin verificar (Pagos ME)
-const Schema = z.object({ incluida: z.boolean().optional(), forzar_pago: z.boolean().optional() })
+// nota: la nota del paquete escrita en Despachos (sin inventario; manda sobre la de ML). null = volver a
+// la de ML, '' = sin nota. Se guarda en todas las etiquetas de esa venta del lote (migración 079).
+const Schema = z.object({
+  incluida: z.boolean().optional(), forzar_pago: z.boolean().optional(),
+  nota: z.string().trim().max(150).nullable().optional(),
+})
 
 /** PATCH /api/despachos/lotes/[id]/etiquetas/[eid] — incluir/excluir una etiqueta de un lote pendiente, o "Despachar igual" */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; eid: string }> }) {
@@ -19,6 +24,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const b = Schema.parse(await req.json())
     const userId = parseInt(session.user.id, 10)
+    if (b.nota !== undefined) {
+      const { rowCount } = await db.query(
+        `UPDATE despacho_etiquetas e SET nota_despacho = $1, nota_por = $4, nota_at = NOW()
+         FROM despacho_lotes l
+         WHERE e.lote_id = $3 AND l.id = e.lote_id AND l.status = 'PENDIENTE'
+           AND (e.id = $2 OR e.venta = (SELECT venta FROM despacho_etiquetas WHERE id = $2 AND lote_id = $3))`,
+        [b.nota, eid, id, userId])
+      if (!rowCount) return NextResponse.json({ error: 'Etiqueta no encontrada en un lote pendiente' }, { status: 400 })
+      if (b.incluida === undefined && b.forzar_pago === undefined) return NextResponse.json({ ok: true })
+    }
     const { rowCount } = await db.query(
       `UPDATE despacho_etiquetas e SET
          incluida = COALESCE($1, e.incluida),

@@ -5,7 +5,7 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import {
   armarLote, despachosForbidden, esGuiaDuplicada, etiquetasValidadas, filasDeVentas, guardarArchivo,
   IMPRIMIBLE, leerOriginal, MAX_POR_LOTE, respuestaServicio,
-  refrescarVentasML,
+  refrescarVentasML, sinTituloEnEtiqueta,
 } from '@/lib/despachos'
 import { llevaInventario, tieneModulo } from '@/lib/modulos'
 
@@ -70,7 +70,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const pdfs  = await Promise.all(aImprimir.map(e => leerOriginal(e.file_path, e.sha256)))
-    const filas = filasDeVentas(aImprimir)
+    // Sin inventario con el título apagado: la etiqueta lleva solo la cantidad y la nota.
+    const sinTitulo = desdeML && await sinTituloEnEtiqueta(client)
+    const filas = filasDeVentas(aImprimir).map(f => sinTitulo ? { ...f, producto: '' } : f)
     const { pdf, paginas, verificacion } = await armarLote(pdfs, filas, aImprimir.map(e => e.venta ?? ''))
 
     const fallas = verificacion

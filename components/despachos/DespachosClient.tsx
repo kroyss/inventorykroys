@@ -20,6 +20,10 @@ interface Etiqueta {
   incluida: boolean
   sale_status: string | null
   sale_notes: string | null
+  customer_name?: string | null
+  // Sin inventario: nota de la venta en ML y la escrita aquí (manda si no es null; '' = sin nota)
+  nota_ml?: string | null
+  nota_despacho?: string | null
   items: { product_name: string; quantity: number; notes: string | null }[]
   // Pagos MercadoEnvíos (solo la empresa de la plataforma): pago traído del portal
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
@@ -185,13 +189,26 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     pegarRef.current = (files: File[]) => { if (!busy) subir(files, loteDestino) }
   })
 
-  const patchEtiqueta = async (loteId: number, e: Etiqueta, body: { incluida?: boolean; forzar_pago?: boolean }) => {
+  const patchEtiqueta = async (loteId: number, e: Etiqueta, body: { incluida?: boolean; forzar_pago?: boolean; nota?: string | null }) => {
     await fetch(`/api/despachos/lotes/${loteId}/etiquetas/${e.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
     const d = await fetch(`/api/despachos/lotes/${loteId}`).then(r => r.json())
     setLotes(prev => ({ ...prev, [loteId]: d }))
+  }
+
+  // Sin inventario: imprimir o no el título de la publicación en la etiqueta (opción de la empresa).
+  const [sinTitulo, setSinTitulo] = useState(false)
+  useEffect(() => {
+    if (!desdeML) return
+    fetch('/api/despachos/config').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setSinTitulo(!!d.sin_titulo) }).catch(() => {})
+  }, [desdeML])
+  const cambiarSinTitulo = async (v: boolean) => {
+    const r = await fetch('/api/despachos/config', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sin_titulo: v }),
+    })
+    if (r.ok) setSinTitulo(v)
   }
 
   const generar = async (lote: LoteDetalle) => {
@@ -297,6 +314,8 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
 
       {pendientes.map(l => (
         <LotePendiente key={l.id} lote={l} busy={busy} desdeML={desdeML}
+          sinTitulo={sinTitulo} onSinTitulo={isAdmin ? cambiarSinTitulo : undefined}
+          onNota={(e, nota) => patchEtiqueta(l.id, e, { nota })}
           onToggle={e => patchEtiqueta(l.id, e, { incluida: !e.incluida })}
           onForzarPago={(e, v) => patchEtiqueta(l.id, e, { forzar_pago: v })}
           onRevalidar={cargar}
@@ -448,10 +467,47 @@ function Dropzone({ onFiles, busy, compact, agregaALote }: {
   )
 }
 
+// ── Nota del paquete (sin inventario) ───────────────────────────────────────
+// La de ML viene precargada; un clic la edita o agrega. Lo escrito aquí manda sobre ML (✎) y se
+// puede volver a la de ML. Enter guarda, Esc cancela.
+function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string | null) => void }) {
+  const actual = e.nota_despacho ?? e.nota_ml ?? ''
+  const editada = e.nota_despacho != null
+  const [editando, setEditando] = useState(false)
+  const [texto, setTexto] = useState(actual)
+  if (editando) {
+    const guardar = () => { setEditando(false); if (texto.trim() !== actual) onGuardar(texto.trim()) }
+    return (
+      <div className="space-y-1 min-w-[12rem]">
+        <input autoFocus value={texto} maxLength={150} onChange={ev => setTexto(ev.target.value)}
+          onKeyDown={ev => { if (ev.key === 'Enter') guardar(); if (ev.key === 'Escape') { setTexto(actual); setEditando(false) } }}
+          onBlur={guardar} placeholder="Ej.: lleva el NEGRO, no el azul"
+          className="w-full border border-neutral-300 rounded px-2 py-1 text-xs" />
+        {editada && (
+          <button onMouseDown={ev => { ev.preventDefault(); setEditando(false); onGuardar(null) }} className="text-neutral-400 hover:text-neutral-700 underline">
+            volver a la nota de MercadoLibre
+          </button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <button onClick={() => { setTexto(actual); setEditando(true) }} className="text-left w-full group"
+      title={editada ? 'Nota escrita en Despachos (manda sobre la de MercadoLibre). Clic para cambiarla' : 'Clic para escribir o corregir la nota de este paquete'}>
+      {actual
+        ? <span>{editada && <span className="text-sky-700 mr-1">✎</span>}{actual}</span>
+        : <span className="text-neutral-300 group-hover:text-neutral-500">+ nota</span>}
+    </button>
+  )
+}
+
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, onToggle, onForzarPago, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, sinTitulo, onSinTitulo, onNota, onToggle, onForzarPago, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
+  sinTitulo: boolean
+  onSinTitulo?: (v: boolean) => void
+  onNota: (e: Etiqueta, nota: string | null) => void
   busy: string | null
   onToggle: (e: Etiqueta) => void
   onForzarPago: (e: Etiqueta, forzar: boolean) => void
@@ -474,6 +530,13 @@ function LotePendiente({ lote, busy, desdeML, onToggle, onForzarPago, onRevalida
             {conProblema > 0 && <> · <span className="text-red-700">{conProblema} con problema</span></>}
             {' '}· subido {hora(lote.created_at)}{lote.created_by ? ` por ${lote.created_by}` : ''}
           </p>
+          {desdeML && (
+            <label className={`mt-1 inline-flex items-center gap-1.5 text-xs text-neutral-600 ${onSinTitulo ? 'cursor-pointer' : ''}`}
+              title="Apagado: la etiqueta lleva solo la cantidad y la nota (para guiarte por la nota cuando el comprador pide otra variante)">
+              <input type="checkbox" checked={!sinTitulo} disabled={!onSinTitulo} onChange={ev => onSinTitulo?.(!ev.target.checked)} />
+              Imprimir el título de la publicación en la etiqueta
+            </label>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onRevalidar} className="btn-secondary text-xs" title={desdeML ? 'Volver a buscar las ventas y las notas en MercadoLibre' : 'Volver a cruzar con las ventas (p.ej. después de cargar una venta que faltaba)'}>↻ Revalidar</button>
@@ -508,16 +571,22 @@ function LotePendiente({ lote, busy, desdeML, onToggle, onForzarPago, onRevalida
                       <input type="checkbox" checked={e.incluida} onChange={() => onToggle(e)} title="Incluir en el PDF" />
                     )}
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs">{e.venta ?? <span className="text-neutral-400">{e.original_name}</span>}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    {e.venta ?? <span className="text-neutral-400">{e.original_name}</span>}
+                    {e.customer_name && <div className="font-sans text-neutral-500">{e.customer_name}</div>}
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {e.guia ?? '—'}
                     {e.carrier === 'TEALCA' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-sans">Tealca</span>}
                   </td>
                   <td className="px-3 py-2 text-xs">{e.remitente?.slice(0, 22) ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className={`px-3 py-2 text-xs ${desdeML && sinTitulo ? 'text-neutral-400' : ''}`}
+                    title={desdeML && sinTitulo ? 'El título no se imprime: en la etiqueta va la cantidad y la nota' : undefined}>
                     {e.items.length === 0 ? '—' : e.items.map((i, k) => <div key={k}>{i.quantity} - {i.product_name}</div>)}
                   </td>
-                  <td className="px-3 py-2 text-xs text-neutral-600">{nota}</td>
+                  <td className="px-3 py-2 text-xs text-neutral-600">
+                    {desdeML && e.venta ? <NotaEditable e={e} onGuardar={n => onNota(e, n)} /> : nota}
+                  </td>
                   <td className="px-3 py-2 text-xs">
                     <span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span>
                     {e.detalle && <div className="text-neutral-500 mt-0.5">{e.detalle}</div>}
