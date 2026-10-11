@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { leerHorario } from '@/lib/pagosMEComun'
 import { apiError } from '@/lib/apiError'
-import { LATIDO_MIN, PEDIDO_VIGENTE_MIN, SELECT_PAGOS, sesionPagosME } from '@/lib/pagosME'
+import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
 
 /**
  * GET /api/pagos-me?estado=pendiente|valido|invalido|todos  → pagos traídos por el vigilante + su estado
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       // 12:01 · Traer ahora" y para saber cuándo terminó la que se pidió desde el formulario).
       const [{ rows: [pedido] }, { rows: latidos }] = await Promise.all([
         s.db.query(`SELECT pedido_at, resultados, pedido_at > NOW() - make_interval(mins => $1) AS vigente
-                    FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN]),
+                    FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
         s.db.query(`SELECT perfil, visto_at > NOW() - make_interval(mins => $1) AS conectado FROM me_latidos`, [LATIDO_MIN]),
       ])
       const resultados = (pedido?.resultados ?? {}) as Record<string, { ok: boolean; at: string }>
@@ -30,11 +30,13 @@ export async function GET(req: NextRequest) {
         ? perfiles.some(pf => !resultados[pf]) && (despertador ? !!despertador.conectado : latidos.some(l => l.conectado))
         : Object.keys(resultados).length === 0)
       const fin = Object.values(resultados).map(r => r.at).sort().pop() ?? null
+      const noRespondieron = trabajando ? [] : perfiles.filter(pf => pedido && !resultados[pf])
       return NextResponse.json({
         pago: p ?? null,
         traida: pedido ? {
           pedido_at: pedido.pedido_at, trabajando, terminada_at: trabajando ? null : fin,
           con_error: Object.values(resultados).some(r => !r.ok),
+          no_respondieron: noRespondieron,
         } : null,
       })
     }
@@ -49,8 +51,9 @@ export async function GET(req: NextRequest) {
                   WHERE fecha_orden > NOW() - INTERVAL '30 days' GROUP BY 1`),
       s.db.query(`SELECT perfil, visto_at, visto_at > NOW() - make_interval(mins => $1) AS conectado
                   FROM me_latidos ORDER BY perfil`, [LATIDO_MIN]),
+      // vigente (para la pantalla) = todavía "trayendo"; pasado TRAIDA_EN_CURSO_MIN se muestra incompleta.
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
-                  FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN]),
+                  FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
       s.db.query(`SELECT creado_at FROM me_vigilante`),
       s.db.query(`SELECT value FROM app_settings WHERE key = 'pagos_me_horario'`),
       // Día (1 = lunes) y hora de Venezuela (la conexión tiene el TimeZone de la empresa), para "Próximo automático".

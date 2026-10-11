@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from '@/components/pagosme/PagoME'
 
-interface Traida { pedido_at: string; trabajando: boolean; terminada_at: string | null; con_error: boolean }
+interface Traida { pedido_at: string; trabajando: boolean; terminada_at: string | null; con_error: boolean; no_respondieron?: string[] }
 
 const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit',
@@ -82,7 +82,8 @@ export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }
           {trayendo
             ? 'Se traen todos los pagos nuevos de una vez; cuando aparezca este, se muestra aquí solo.'
             : <>Última traída: <b>{traida ? hora(traida.terminada_at ?? traida.pedido_at) : 'nunca'}</b>
-              {traida?.con_error && <span className="text-red-700"> (con error: revisa Pagos ME)</span>}.
+              {traida?.con_error && <span className="text-red-700"> (con error: revisa Pagos ME)</span>}
+              {!!traida?.no_respondieron?.length && <span className="text-red-700"> ({traida.no_respondieron.join(', ')} no respondió: revisa la PC de Venezuela)</span>}.
               {' '}Si el comprador pagó después, tráelo ahora. Si pagó por otro medio, verifica desde el detalle de la venta como siempre.</>}
         </p>
       </div>
