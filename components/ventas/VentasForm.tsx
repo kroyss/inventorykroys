@@ -30,7 +30,12 @@ interface Props {
 interface MlVenta {
   cuenta: string
   comprador: { nombre: string | null; nick: string | null }
-  items: { itemId: string; titulo: string; cantidad: number; producto: { id: number; code: string; name: string } | null }[]
+  fecha?: string | null
+  items: {
+    itemId: string; titulo: string; cantidad: number
+    producto: { id: number; code: string; name: string } | null   // solo si el código ML está en UN producto
+    opciones?: { id: number; code: string; name: string }[]        // todos los productos con ese código
+  }[]
 }
 
 const money = (n: number) =>
@@ -181,10 +186,12 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   }
 
   // Agrega los productos de la venta de ML que tienen su código cargado (con la cantidad comprada).
-  const agregarDeMl = (lista: MlVenta['items']) => {
+  // Si el código está en varios productos, se agrega el que la persona elige (`elegido`).
+  const agregarDeMl = (lista: MlVenta['items'], elegido?: number) => {
     const nuevos: FormItem[] = []
     for (const i of lista) {
-      const p = i.producto && products.find(x => x.product_id === i.producto!.id)
+      const id = elegido ?? i.producto?.id
+      const p = id != null && products.find(x => x.product_id === id)
       if (!p || items.some(x => x.product_id === p.product_id) || nuevos.some(x => x.product_id === p.product_id)) continue
       nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad, unit_price: defaultPrice(p) })
     }
@@ -376,7 +383,7 @@ Revísala en el detalle que se abre ahora.`
           </div>
 
           {numeroCompleto && country === 'VE' && (
-            <PagoDeVenta key={`pago-${numeroActual}`} numero={numeroActual} onPago={alPago} puedeVerificar={puedeVerificar}
+            <PagoDeVenta key={`pago-${numeroActual}`} numero={numeroActual} compraAt={mlVenta?.fecha ?? null} onPago={alPago} puedeVerificar={puedeVerificar}
               pagoOk={pagoOk} onPagoOk={v => setPagoOkDe(v ? numeroActual : null)} />
           )}
           {/* Claves distintas: son hermanos (con la misma clave React los confunde y los duplica). */}
@@ -395,13 +402,33 @@ Revísala en el detalle que se abre ahora.`
                 </div>
                 {mlVenta.items.map((i, k) => {
                   const ya = i.producto && items.some(x => x.product_id === i.producto!.id)
+                  const varios = !i.producto && (i.opciones?.length ?? 0) > 1 ? i.opciones! : null
+                  const elegido = varios?.find(o => items.some(x => x.product_id === o.id))
                   return (
-                    <div key={k} className="flex items-baseline justify-between gap-2">
-                      <span className="text-neutral-700 min-w-0 truncate" title={i.titulo}>{i.cantidad} × {i.titulo}</span>
-                      {i.producto ? (ya
-                        ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
-                        : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)
-                        : <span className="shrink-0 text-neutral-400" title="Ningún producto tiene este código ML: búscalo abajo">sin vincular</span>}
+                    <div key={k} className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-neutral-700 min-w-0 truncate" title={i.titulo}>{i.cantidad} × {i.titulo}</span>
+                        {i.producto ? (ya
+                          ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
+                          : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)
+                          : varios ? (elegido
+                            ? <span className="shrink-0 text-emerald-700">✓ {elegido.code}</span>
+                            : <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Elige el producto</span>)
+                          : <span className="shrink-0 text-neutral-400" title="Ningún producto tiene este código ML: búscalo abajo">sin vincular</span>}
+                      </div>
+                      {varios && !elegido && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                          <p className="text-[11px] text-amber-800">Esta publicación está en {varios.length} productos. ¿Cuál vendiste?</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {varios.map(o => (
+                              <button key={o.id} type="button" onClick={() => agregarDeMl([i], o.id)} title={o.name}
+                                className="max-w-full truncate rounded-md border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-neutral-700 hover:border-amber-500 hover:bg-amber-100">
+                                <span className="font-mono text-neutral-500">{o.code}</span> {o.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}

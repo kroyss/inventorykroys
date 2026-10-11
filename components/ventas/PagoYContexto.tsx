@@ -1,7 +1,7 @@
 'use client'
 // Ventas → Nueva venta (2026-10-11): el pago de MercadoEnvíos y "lo que se habló" en el mismo
 // formulario, para verificar y registrar la venta sin ir a MercadoEnvíos ni a MercadoLibre.
-//   - PagoDeVenta: el pago traído por el vigilante (o "no está · última traída · Traer ahora"),
+//   - PagoDeVenta: el pago traído por el vigilante (o, si no está, cuál es el caso + "Buscar pago"),
 //     el comprobante con su detalle (ventana aparte) y "Pago correcto" (al guardar: pago válido,
 //     venta procesada y guía a Despachos).
 //   - LoQueSeHablo: botón que abre una ventana aparte con lo ofertado (foto, variante, cantidad,
@@ -57,9 +57,93 @@ function Ventana({ titulo, subtitulo, onCerrar, pie, ancho = 'max-w-4xl', childr
   )
 }
 
+// ── Botón "Buscar pago" ─────────────────────────────────────────────────────
+function IconoBuscar({ girando }: { girando: boolean }) {
+  return girando ? (
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity=".25" strokeWidth="2.5" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+      <path d="M20 5v6h-6" />
+    </svg>
+  )
+}
+
+function BotonBuscar({ trayendo, onClick, principal, texto = 'Buscar pago' }: {
+  trayendo: boolean; onClick: () => void; principal?: boolean; texto?: string
+}) {
+  return (
+    <button type="button" onClick={onClick} disabled={trayendo}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-wait ${
+        principal
+          ? 'bg-sky-600 text-white shadow-sm hover:bg-sky-700 disabled:bg-sky-400'
+          : 'border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50 disabled:text-neutral-400'}`}>
+      <IconoBuscar girando={trayendo} />
+      {trayendo ? 'Buscando…' : texto}
+    </button>
+  )
+}
+
+// Sin pago en Pagos ME (2026-10-12): dice cuál de los casos es, comparando la hora de la compra con la
+// de la última búsqueda. La extensión solo trae pagos con referencia y comprobante, así que "no pagó"
+// y "no subió el comprobante" no se distinguen; "todavía no se buscó" sí.
+function SinPago({ trayendo, traida, compraAt, onBuscar }: {
+  trayendo: boolean; traida: Traida | null; compraAt: string | null; onBuscar: () => void
+}) {
+  const ultima = traida ? (traida.terminada_at ?? traida.pedido_at) : null
+  const fallo = !trayendo && !!traida && (traida.con_error || !!traida.no_respondieron?.length)
+  const caso: 'buscando' | 'fallo' | 'sin_buscar' | 'esperando' | 'no_esta' =
+    trayendo ? 'buscando'
+    : fallo ? 'fallo'
+    : compraAt && (!ultima || new Date(ultima) < new Date(compraAt)) ? 'sin_buscar'
+    : compraAt ? 'esperando'
+    : 'no_esta'
+  const estilo = {
+    buscando: 'border-sky-200 bg-sky-50 text-sky-900',
+    fallo: 'border-red-200 bg-red-50 text-red-900',
+    sin_buscar: 'border-sky-200 bg-sky-50 text-sky-900',
+    esperando: 'border-amber-200 bg-amber-50 text-amber-900',
+    no_esta: 'border-amber-200 bg-amber-50 text-amber-900',
+  }[caso]
+  const titulo = {
+    buscando: 'Buscando el pago en MercadoEnvíos…',
+    fallo: 'La última búsqueda no terminó bien',
+    sin_buscar: 'Todavía no se ha buscado este pago',
+    esperando: 'El cliente todavía no ha pagado',
+    no_esta: 'Este pago no está en Pagos ME',
+  }[caso]
+  const detalle = {
+    buscando: <>Se traen todos los pagos nuevos de una vez (1–2 min). Si aparece este, se muestra aquí solo.</>,
+    fallo: traida?.no_respondieron?.length
+      ? <>{traida.no_respondieron.join(', ')} no respondió: revisa que la PC de Venezuela esté prendida y vuelve a buscar.</>
+      : <>Hubo un error al traer los pagos. Vuelve a buscar; si se repite, revisa Pagos ME.</>,
+    sin_buscar: <>La compra fue el <b>{hora(compraAt)}</b> y la última búsqueda, {ultima ? <>el <b>{hora(ultima)}</b></> : 'nunca'}. Búscalo ahora.</>,
+    esperando: <>Se buscó el <b>{hora(ultima)}</b>, después de la compra, y no apareció: el cliente no ha pagado o no ha subido el comprobante. Escríbele o espera; si pagó por otro medio, verifica desde el detalle de la venta.</>,
+    no_esta: <>Última búsqueda: <b>{ultima ? hora(ultima) : 'nunca'}</b>. Si el cliente pagó después, búscalo ahora.</>,
+  }[caso]
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${estilo}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-medium">{titulo}</span>
+        {caso !== 'buscando' && (
+          <BotonBuscar trayendo={false} onClick={onBuscar} principal={caso === 'sin_buscar' || caso === 'fallo'}
+            texto={caso === 'esperando' ? 'Buscar de nuevo' : 'Buscar pago'} />
+        )}
+        {caso === 'buscando' && <span className="text-sky-700"><IconoBuscar girando /></span>}
+      </div>
+      <p className="mt-1 text-xs opacity-80 leading-relaxed">{detalle}</p>
+    </div>
+  )
+}
+
 // ── El pago ─────────────────────────────────────────────────────────────────
-export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }: {
+export function PagoDeVenta({ numero, compraAt, pagoOk, onPagoOk, onPago, puedeVerificar }: {
   numero: string
+  compraAt?: string | null   // cuándo se compró en ML: separa "todavía no se buscó" de "el cliente no ha pagado"
   pagoOk: boolean
   onPagoOk: (v: boolean) => void
   onPago: (p: PagoME | null) => void
@@ -109,28 +193,7 @@ export function PagoDeVenta({ numero, pagoOk, onPagoOk, onPago, puedeVerificar }
   const { pago, traida } = datos
   const trayendo = pidiendo != null || !!traida?.trabajando
 
-  if (!pago) {
-    return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs space-y-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-amber-900">
-            {trayendo ? 'Trayendo pagos y guías de MercadoEnvíos…' : 'Este pago no está en Pagos ME'}
-          </span>
-          <button type="button" onClick={traer} disabled={trayendo} className="btn-secondary text-xs">
-            {trayendo ? 'Trayendo… (1–2 min)' : 'Traer pagos ahora'}
-          </button>
-        </div>
-        <p className="text-amber-800/80">
-          {trayendo
-            ? 'Se traen todos los pagos nuevos de una vez; cuando aparezca este, se muestra aquí solo.'
-            : <>Última traída: <b>{traida ? hora(traida.terminada_at ?? traida.pedido_at) : 'nunca'}</b>
-              {traida?.con_error && <span className="text-red-700"> (con error: revisa Pagos ME)</span>}
-              {!!traida?.no_respondieron?.length && <span className="text-red-700"> ({traida.no_respondieron.join(', ')} no respondió: revisa la PC de Venezuela)</span>}.
-              {' '}Si el comprador pagó después, tráelo ahora. Si pagó por otro medio, verifica desde el detalle de la venta como siempre.</>}
-        </p>
-      </div>
-    )
-  }
+  if (!pago) return <SinPago trayendo={trayendo} traida={traida} compraAt={compraAt ?? null} onBuscar={traer} />
 
   const v = VERIF[pago.verificacion]
   const invalido = pago.verificacion === 'invalido'

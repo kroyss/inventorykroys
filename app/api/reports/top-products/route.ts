@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN product_pricing pp  ON pp.product_id = p.id
       LEFT JOIN profit_categories pc ON pc.id = pp.profit_category_id
       WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-        AND DATE(s.created_at) BETWEEN $1 AND $2
+        AND DATE(COALESCE(s.processed_at, s.created_at)) BETWEEN $1 AND $2
         AND p.is_active = TRUE
         ${catFilter}
       GROUP BY p.id, p.code, p.name, pc.name

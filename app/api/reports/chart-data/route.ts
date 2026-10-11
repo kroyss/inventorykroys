@@ -21,16 +21,16 @@ export async function GET(req: NextRequest) {
 
   switch (period) {
     case 'today':
-      rangeSql = `s.created_at BETWEEN CURRENT_DATE AND NOW()`
+      rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN CURRENT_DATE AND NOW()`
       trunc    = 'hour'
       break
     case 'quarter':
       // Rolling 3-month window INCLUDING the current month (so today's sales show)
-      rangeSql = `s.created_at BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '2 months' AND NOW()`
+      rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) - INTERVAL '2 months' AND NOW()`
       trunc    = 'day'
       break
     case 'year':
-      rangeSql = `s.created_at BETWEEN DATE_TRUNC('year', NOW()) AND NOW()`
+      rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('year', NOW()) AND NOW()`
       trunc    = 'month'
       break
     case 'custom':
@@ -41,12 +41,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Formato de fecha inválido (YYYY-MM-DD)' }, { status: 400 })
       }
       // Use parameterized query for user-supplied dates (defense-in-depth)
-      rangeSql = `s.created_at BETWEEN $1::date AND $2::date`
+      rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN $1::date AND $2::date`
       queryParams = [dateFrom, dateTo]
       trunc       = 'day'
       break
     default: // month
-      rangeSql = `s.created_at BETWEEN DATE_TRUNC('month', NOW()) AND NOW()`
+      rangeSql = `COALESCE(s.processed_at, s.created_at) BETWEEN DATE_TRUNC('month', NOW()) AND NOW()`
       trunc    = 'day'
   }
 
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   try {
     const { rows } = await db.query(`
       SELECT
-        DATE_TRUNC('${trunc}', s.created_at)          AS periodo,
+        DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at))          AS periodo,
         COALESCE(SUM(s.total_amount), 0)              AS ventas,
         COALESCE(SUM(si_cost.costo), 0)               AS costos,
         COUNT(DISTINCT s.id)                          AS cantidad_ventas

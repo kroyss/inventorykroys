@@ -15,23 +15,23 @@ export async function GET(_: NextRequest) {
     const [{ rows: daily }, { rows: prev }] = await Promise.all([
       // Conteo por día del mes actual
       db.query(`
-        SELECT EXTRACT(DAY FROM created_at)::int AS day, COUNT(*) AS count
+        SELECT EXTRACT(DAY FROM COALESCE(processed_at, created_at))::int AS day, COUNT(*) AS count
         FROM sales
         WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW())
         GROUP BY 1
         ORDER BY 1
       `),
       // Conteo POR DÍA de los 2 meses anteriores (para acumulado comparable)
       db.query(`
         SELECT
-          TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS ym,
-          EXTRACT(DAY FROM created_at)::int AS day,
+          TO_CHAR(DATE_TRUNC('month', COALESCE(processed_at, created_at)), 'YYYY-MM') AS ym,
+          EXTRACT(DAY FROM COALESCE(processed_at, created_at))::int AS day,
           COUNT(*) AS count
         FROM sales
         WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND created_at >= DATE_TRUNC('month', NOW()) - INTERVAL '2 months'
-          AND created_at <  DATE_TRUNC('month', NOW())
+          AND COALESCE(processed_at, created_at) >= DATE_TRUNC('month', NOW()) - INTERVAL '2 months'
+          AND COALESCE(processed_at, created_at) <  DATE_TRUNC('month', NOW())
         GROUP BY 1, 2
       `),
     ])

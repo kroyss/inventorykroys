@@ -23,7 +23,7 @@ export async function GET(_: NextRequest) {
         SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
         FROM sales
         WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW())
       `),
       db.query(`
         SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total,
@@ -31,7 +31,7 @@ export async function GET(_: NextRequest) {
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', s.created_at) = DATE_TRUNC('month', NOW())
+          AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW())
       `),
       db.query(`
         SELECT COUNT(*) AS n FROM inventory i
@@ -55,8 +55,8 @@ export async function GET(_: NextRequest) {
         SELECT COALESCE(SUM(total_amount), 0) AS total
         FROM sales
         WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-          AND created_at < NOW() - INTERVAL '1 month'
+          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+          AND COALESCE(processed_at, created_at) < NOW() - INTERVAL '1 month'
       `),
       db.query(`
         -- Costos del mes anterior, mismo tramo de días (para ganancia comparable)
@@ -65,8 +65,8 @@ export async function GET(_: NextRequest) {
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', s.created_at) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-          AND s.created_at < NOW() - INTERVAL '1 month'
+          AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+          AND COALESCE(s.processed_at, s.created_at) < NOW() - INTERVAL '1 month'
       `),
     ])
 

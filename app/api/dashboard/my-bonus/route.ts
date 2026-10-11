@@ -13,13 +13,13 @@ export async function GET(_: NextRequest) {
         SELECT COALESCE(SUM(total_amount), 0) AS total
         FROM sales
         WHERE status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW())
       `),
       db.query(`
         SELECT COALESCE(SUM(total_amount), 0) AS total
         FROM sales
         WHERE status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
       `),
       db.query(`SELECT key, value FROM app_settings WHERE key LIKE 'bono\\_%'`),
     ])

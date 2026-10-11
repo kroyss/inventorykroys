@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN sale_items si ON si.sale_id = s.id
       LEFT JOIN products p    ON p.id = si.product_id
       WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-        AND DATE(s.created_at) BETWEEN $1 AND $2
+        AND DATE(COALESCE(s.processed_at, s.created_at)) BETWEEN $1 AND $2
       GROUP BY s.id, u.username
       ORDER BY s.created_at DESC
     `, [dateFrom, dateTo])

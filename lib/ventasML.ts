@@ -42,6 +42,7 @@ export async function ventaParaFormulario(db: Pool, numero: string) {
         nick: b?.nickname ?? null,
       },
       items: ordenes.flatMap(o => o.order_items).map(i => ({ itemId: i.item.id, titulo: i.item.title, cantidad: i.quantity })),
+      fecha: ordenes.map(o => o.date_created).sort()[0] ?? null,   // cuándo se compró (aviso del pago)
     }
   }
   return null
