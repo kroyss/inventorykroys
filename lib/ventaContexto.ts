@@ -48,15 +48,16 @@ export async function contextoDeVenta(db: Pool, numero: string): Promise<Context
   const pack = String(ordenes[0]?.pack_id ?? numero)
   const comprador = ordenes.find(o => o.buyer)?.buyer
 
-  // Foto de cada publicación (la miniatura; si falla, sin foto).
+  // Foto de cada publicación (la miniatura; si falla, sin foto). Una tras otra: la conexión a la
+  // base es una sola por request y pg no quiere consultas en paralelo sobre la misma.
   const ids = [...new Set(ordenes.flatMap(o => o.order_items.map(i => i.item.id)))]
   const fotos = new Map<string, string | null>()
-  await Promise.all(ids.map(async id => {
+  for (const id of ids) {
     try {
       const it = await mlFetch<{ secure_thumbnail?: string; thumbnail?: string }>(db, conexionId, `/items/${id}?attributes=secure_thumbnail,thumbnail`)
       fotos.set(id, it.secure_thumbnail || it.thumbnail || null)
     } catch { fotos.set(id, null) }
-  }))
+  }
 
   const items: ItemOfertado[] = ordenes.flatMap(o => o.order_items.map(i => {
     const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
@@ -69,11 +70,9 @@ export async function contextoDeVenta(db: Pool, numero: string): Promise<Context
     }
   }))
 
-  const [notas, hilo, preguntas] = await Promise.all([
-    leerNotas(db, conexionId, numero).then(r => r.notas.map(n => n.texto.trim()).filter(Boolean)).catch(() => []),
-    leerHilo(db, conexionId, pack, Number(c.ml_user_id), false).catch(() => null),
-    comprador?.id ? preguntasDeComprador(db, comprador.id, null, 10).catch(() => []) : Promise.resolve([]),
-  ])
+  const notas = await leerNotas(db, conexionId, numero).then(r => r.notas.map(n => n.texto.trim()).filter(Boolean)).catch(() => [])
+  const hilo = await leerHilo(db, conexionId, pack, Number(c.ml_user_id), false).catch(() => null)
+  const preguntas = comprador?.id ? await preguntasDeComprador(db, comprador.id, null, 10).catch(() => []) : []
   const mensajes = (hilo?.mensajes ?? []).filter(m => m.texto?.trim()).slice(-MAX_MENSAJES)
     .map(m => ({ propio: m.propio, texto: m.texto, fecha: m.fecha }))
 
