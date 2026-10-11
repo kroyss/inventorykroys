@@ -6,6 +6,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { requestConnection } from '@/lib/requestConnection'
 import { localCostFactor } from '@/lib/localCost'
 import { parseShippingTable, shippingCostVE } from '@/lib/mlShipping'
+import { conectarVenta } from '@/lib/pagosME'
 
 const Schema = z.object({
   // 'REABIERTA' action → reverts sale to BORRADOR
@@ -360,6 +361,14 @@ export async function PUT(
       }
 
       await db.query('COMMIT')
+      // Pagos ME (2026-10-11): verificar o procesar desde aquí también manda la guía traída del portal
+      // al lote pendiente de Despachos (antes solo lo hacía el formulario y el "Traer"). Ya confirmado
+      // el cambio de estado; si falla, la venta queda igual y la guía entra con el próximo "Traer".
+      if (tieneModulo(session.user, 'pagos_me') && ['PAGO_VERIFICADO', 'PROCESADA'].includes(newStatus)
+          && !(sale.ml_order_number as string).startsWith('LOCAL-')) {
+        await conectarVenta(pool, sale.ml_order_number as string, userId)
+          .catch(e => console.error('[pagos-me guia al lote]', sale.ml_order_number, e))
+      }
       return NextResponse.json({ ok: true })
     } catch (e) {
       await db.query('ROLLBACK')
