@@ -9,7 +9,8 @@ import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
 
 export const DIAS_VENTANA = 90          // ventas que se traen de ML
-export const SYNC_MINUTOS = 30          // cada cuánto el cron refresca las ventas
+export const SYNC_MINUTOS = 58          // cada cuánto el cron refresca las ventas (≈ cada hora; 58 y no 60 para
+                                        // no saltarse la hora de las 3 a. m. por el minuto que corre el cron)
 export const DIAS_RECIENTES = 9         // lo que se relee cada SYNC_MINUTOS (Por confirmar mira 8 días)
 
 export interface PlantillasCalificacion {
@@ -100,7 +101,7 @@ export async function traerOrden(db: Pool, conexionId: number, id: string) {
 }
 
 /** Trae las ventas de una cuenta (más nuevas primero) y las guarda en ml_ordenes.
- *  Cada SYNC_MINUTOS (2026-10-12) solo las de los últimos DIAS_RECIENTES: ahí están las nuevas y lo
+ *  Cada SYNC_MINUTOS (2026-10-12; cada hora desde el 11-10, el botón trae al momento) solo las de los últimos DIAS_RECIENTES: ahí están las nuevas y lo
  *  que cambia seguido (canceladas, lo que mira Ventas → Por confirmar). Los DIAS_VENTANA completos,
  *  una vez por noche (3 a. m. de la empresa) o si la cuenta llevaba más de un día sin sincronizar
  *  (empresa inactiva que vuelve). Antes releía los 90 días cada 30 min: ~40 páginas por cuenta.

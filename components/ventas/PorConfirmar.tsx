@@ -147,6 +147,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
 }) {
   const [actualizando, setActualizando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
   const [verVencidas, setVerVencidas] = useState(false)
 
   const actualizar = async () => {
@@ -155,6 +156,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
       const r = await fetch('/api/sales/por-confirmar', { method: 'POST' })
       const j = await r.json().catch(() => null)
       if (!r.ok || (j && !j.ok)) setError(j?.errores?.join(' · ') || j?.error || 'No se pudo traer de MercadoLibre')
+      else setRevisado({ at: new Date().toISOString(), nuevas: Number(j?.nuevas) || 0 })
       await onRecargar()
     } finally { setActualizando(false) }
   }
@@ -170,12 +172,17 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
     <div className="space-y-3">
       <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-neutral-500 leading-relaxed">
-          Ventas de MercadoLibre que todavía no están registradas. Se traen solas cada 30 min
-          {datos.sincronizadas_at && <> (última: <b className="text-neutral-700">{hora(datos.sincronizadas_at)}</b>)</>}.
+          Ventas de MercadoLibre que todavía no están registradas. Se traen solas cada hora
+          {revisado
+            ? <> (revisado recién: <b className="text-neutral-700">{hora(revisado.at)}</b> ·{' '}
+                <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
+                  {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'venta nueva' : 'ventas nuevas'}` : 'nada nuevo'}
+                </b>)</>
+            : datos.sincronizadas_at && <> (última: <b className="text-neutral-700">{hora(datos.sincronizadas_at)}</b>)</>}.
           Al confirmar se abre la venta con el cliente, el pago y los productos cargados.
         </p>
         <button type="button" onClick={actualizar} disabled={actualizando}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-wait disabled:text-neutral-400">
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
           <IconoActualizar girando={actualizando} />
           {actualizando ? 'Trayendo…' : 'Traer nuevas'}
         </button>

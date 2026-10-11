@@ -31,11 +31,14 @@ export async function POST() {
   try {
     const { rows: cuentas } = await s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
     const errores: string[] = []
+    const contar = async () => (await s.db.query(`SELECT COUNT(*)::int AS n FROM ml_ordenes`)).rows[0].n as number
+    const antes = await contar()
     for (const c of cuentas) {
       try { await sincronizarOrdenes(s.db, c.id, true, 1) }
       catch (e) { errores.push(`${c.nickname}: ${e instanceof Error ? e.message : String(e)}`) }
     }
-    return NextResponse.json({ ok: !errores.length, errores, dias: DIAS_MAX })
+    // nuevas = ventas que ML tenía y nosotros todavía no (para el aviso "revisado recién · N nuevas").
+    return NextResponse.json({ ok: !errores.length, errores, dias: DIAS_MAX, nuevas: (await contar()) - antes })
   } catch (err) {
     return apiError(err)
   }
