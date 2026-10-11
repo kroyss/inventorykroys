@@ -14,6 +14,8 @@ interface Pregunta {
   respuesta: string | null; respuesta_estado: string | null; respuesta_fecha: string | null
   borrador: string | null; borrador_confianza: 'alta' | 'media' | 'baja' | null; borrador_falta: string | null
   borrador_web: boolean; borrador_at: string | null
+  /** Respuesta rápida que el sistema eligió (sin IA, probada en el historial): lib/sugerenciasServidor.ts */
+  sugerida?: { plantilla: string; titulo: string; texto: string; respaldo: number; sin_confirmar: boolean } | null
   cuenta: string; respondida_por: string | null
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
   producto_precio: number | null
@@ -187,6 +189,10 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [datos, setDatos] = useState<Datos | null>(null)
+  // Sugeridas cuyo cuadro se cambió (no entran en "Enviar las sugeridas") y el envío en lote.
+  const [editadas, setEditadas] = useState<Set<string>>(new Set())
+  const [enviandoLote, setEnviandoLote] = useState<{ hechas: number; total: number } | null>(null)
+  const confirmar = useConfirm()
   // De qué pestaña son los `datos` que hay en pantalla. Al pasar de Historial a Sin responder,
   // durante el viaje al servidor seguían los del Historial (ya respondidas) dibujados como
   // tarjetas pendientes. Mientras no coincida, se muestra "Cargando".
@@ -296,9 +302,55 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
           ) : vista === 'pendientes' ? (
             <div className="space-y-3">
+              {(() => {
+                const listas = datos.preguntas.filter(p => !p.borrador && p.sugerida && !editadas.has(p.id))
+                if (!listas.length && !enviandoLote) return null
+                const enviarLote = async () => {
+                  const ok = await confirmar({
+                    title: `Enviar ${listas.length} respuesta${listas.length === 1 ? '' : 's'} sugerida${listas.length === 1 ? '' : 's'}`,
+                    message: 'Se publican tal cual en MercadoLibre (no se pueden editar después):\n\n' +
+                      listas.slice(0, 12).map(p => `• "${p.texto.slice(0, 60)}" → ${p.sugerida!.titulo}`).join('\n') +
+                      (listas.length > 12 ? `\n… y ${listas.length - 12} más` : ''),
+                    confirmText: `Enviar ${listas.length}`,
+                  })
+                  if (!ok) return
+                  let publicadas = 0
+                  const fallas: string[] = []
+                  setEnviandoLote({ hechas: 0, total: listas.length })
+                  for (const [i, p] of listas.entries()) {
+                    const s = p.sugerida!
+                    const r = await fetch(`/api/preguntas/${p.id}/responder`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ texto: s.texto, fuente: 'sugerida', base: s.texto, plantilla: s.plantilla }),
+                    }).catch(() => null)
+                    const d = r ? await r.json().catch(() => ({})) : {}
+                    if (r?.ok && d.publicada) publicadas++
+                    else fallas.push(`"${p.texto.slice(0, 40)}": ${d.error ?? d.aviso ?? 'no se pudo'}`)
+                    setEnviandoLote({ hechas: i + 1, total: listas.length })
+                  }
+                  setEnviandoLote(null)
+                  setAviso(fallas.length
+                    ? { tipo: 'error', texto: `${publicadas} publicadas · ${fallas.length} con problema: ${fallas.join(' · ')}` }
+                    : { tipo: 'ok', texto: `${publicadas} respuestas sugeridas publicadas.` })
+                  cargar()
+                }
+                return (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-sky-900">
+                    <span className="flex-1 min-w-[14rem]">
+                      {enviandoLote
+                        ? <>Publicando {enviandoLote.hechas} de {enviandoLote.total}…</>
+                        : <><b>{listas.length}</b> pregunta{listas.length === 1 ? '' : 's'} con respuesta sugerida, ya escrita abajo. Revísalas de un vistazo; las que cambies no entran.</>}
+                    </span>
+                    <button onClick={enviarLote} disabled={!!enviandoLote || !listas.length} className="btn-primary text-sm whitespace-nowrap">
+                      Enviar las {listas.length} sugeridas
+                    </button>
+                  </div>
+                )
+              })()}
               {datos.preguntas.map(p => (
                 <TarjetaPendiente key={p.id} p={p} esAdmin={isAdmin} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
-                  onRespondida={msg => { setAviso(msg); cargar() }} />
+                  onRespondida={msg => { setAviso(msg); cargar() }}
+                  onCambioSugerida={(id, intacta) => setEditadas(e => { const n = new Set(e); if (intacta) n.delete(id); else n.add(id); return n })} />
               ))}
             </div>
           ) : (
@@ -316,15 +368,25 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
 }
 
 // ── Pregunta sin responder ─────────────────────────────────────────────────
-function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
+function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCambioSugerida }: {
   p: Pregunta; esAdmin: boolean; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
+  /** Avisa si el cuadro sigue con la sugerida sin cambios (entra en "Enviar las sugeridas"). */
+  onCambioSugerida?: (id: string, intacta: boolean) => void
 }) {
   const confirm = useConfirm()
-  const [texto, setTexto] = useState(p.borrador ?? '')
-  // De dónde salió el texto (se guarda al publicar, migración 062): IA, parecida, rápida o propia.
-  const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'propia'; base: string }>(
-    p.borrador ? { fuente: 'ia', base: p.borrador } : { fuente: 'propia', base: '' })
-  const usar = (t: string, fuente: 'ia' | 'parecida' | 'rapida') => { setTexto(t); setOrigen({ fuente, base: t }) }
+  // Sin borrador de la IA, la sugerida (respuesta rápida elegida por el sistema) viene ya escrita.
+  const sug = !p.borrador ? p.sugerida ?? null : null
+  const [texto, setTextoCrudo] = useState(p.borrador ?? sug?.texto ?? '')
+  // De dónde salió el texto (se guarda al publicar, migración 062): IA, parecida, rápida, sugerida o propia.
+  const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'sugerida' | 'propia'; base: string; plantilla?: string }>(
+    p.borrador ? { fuente: 'ia', base: p.borrador }
+    : sug ? { fuente: 'sugerida', base: sug.texto, plantilla: sug.plantilla }
+    : { fuente: 'propia', base: '' })
+  const setTexto = (t: string) => {
+    setTextoCrudo(t)
+    if (sug) onCambioSugerida?.(p.id, t.trim() === sug.texto.trim())
+  }
+  const usar = (t: string, fuente: 'ia' | 'parecida' | 'rapida', plantilla?: string) => { setTexto(t); setOrigen({ fuente, base: t, plantilla }) }
   const [eliminando, setEliminando] = useState(false)
   const [meta, setMeta] = useState({ confianza: p.borrador_confianza, falta: p.borrador_falta, web: p.borrador_web })
   const [pidiendo, setPidiendo] = useState<null | 'normal' | 'web'>(null)
@@ -425,6 +487,19 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
       <p className="text-base text-neutral-900">{p.texto}</p>
 
       <div className="space-y-2">
+        {sug && texto.trim() === sug.texto.trim() && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full px-2 py-0.5 ring-1 ring-inset bg-sky-50 text-sky-800 ring-sky-200"
+              title="El sistema eligió esta respuesta rápida: con tus respuestas anteriores a preguntas así, coincidió este porcentaje de las veces.">
+              Sugerida: {sug.titulo} · coincidió {sug.respaldo}% en tu historial
+            </span>
+            {sug.sin_confirmar && (
+              <span className="text-amber-700" title="Cuando la envíes sin cambios, el sistema aprende que este producto tiene envío gratis.">
+                envío gratis sin confirmar en este producto
+              </span>
+            )}
+          </div>
+        )}
         <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={3} maxLength={2000}
           placeholder="Escribe la respuesta o pídele una propuesta a la IA…"
           className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
@@ -454,7 +529,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida }: {
             const aplica = plantillaAplica(pl, precioUSD(p))
             const condicionada = pl.precio_desde != null || pl.precio_hasta != null
             return (
-              <button key={i} type="button" onClick={() => { usar(pl.texto, 'rapida'); setMeta({ confianza: null, falta: null, web: false }) }}
+              <button key={i} type="button" onClick={() => { usar(pl.texto, 'rapida', pl.id); setMeta({ confianza: null, falta: null, web: false }) }}
                 title={`${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
                 className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   aplica && condicionada ? 'bg-lime-50 border-lime-300 text-lime-900 hover:bg-lime-100'

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sugeridasPara } from '@/lib/sugerenciasServidor'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlConfigurado } from '@/lib/ml'
@@ -57,6 +58,11 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
     const { rows: cuentas } = await s.db.query(
       `SELECT id, nickname, estado, ultima_sync, ultimo_error FROM ml_conexiones ORDER BY nickname`)
+    // Respuestas sugeridas (sin IA, probadas en el historial de la empresa): solo en pendientes.
+    if (vista === 'pendientes') {
+      const sug = await sugeridasPara(s.db, rows).catch(e => { console.error('[sugeridas]', e); return new Map() })
+      for (const r of rows) r.sugerida = sug.get(r.id) ?? null
+    }
     return NextResponse.json({
       preguntas: rows, total: tot.n, page, tam: TAM, contadores: n, cuentas,
       plantillas: leerPlantillas(pl?.value),

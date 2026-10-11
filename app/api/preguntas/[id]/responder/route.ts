@@ -5,6 +5,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { problemasDelTexto } from '@/lib/preguntas'
 import { OrigenRespuesta, registrarOrigen } from '@/lib/respuestasOrigen'
+import { aprenderDeRespuesta } from '@/lib/sugerenciasServidor'
 
 const Body = z.object({ texto: z.string().min(1).max(2000) }).merge(OrigenRespuesta)
 
@@ -20,12 +21,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'Pregunta inválida' }, { status: 400 })
 
   try {
-    const { texto, fuente, base } = Body.parse(await req.json())
+    const { texto, fuente, base, plantilla } = Body.parse(await req.json())
     const problemas = problemasDelTexto(texto)
     if (problemas.length) {
       return NextResponse.json({ error: 'MercadoLibre rechazaría esta respuesta', problemas }, { status: 422 })
     }
-    const { rows: [q] } = await s.db.query(`SELECT conexion_id, estado FROM ml_preguntas WHERE id = $1`, [id])
+    const { rows: [q] } = await s.db.query(
+      `SELECT conexion_id, estado, item_id, CASE WHEN COALESCE(item_moneda, 'USD') = 'USD' THEN item_precio::float END AS precio
+       FROM ml_preguntas WHERE id = $1`, [id])
     if (!q) return NextResponse.json({ error: 'Pregunta no encontrada' }, { status: 404 })
     if (q.estado !== 'UNANSWERED') return NextResponse.json({ error: 'Esta pregunta ya no está sin responder' }, { status: 409 })
 
@@ -54,7 +57,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       [id, v.status, v.answer?.text ?? texto.trim(), v.answer?.status ?? null,
        v.answer?.date_created?.replace(/(\.\d{6})\d+/, '$1') ?? new Date().toISOString(), Number(s.session.user.id)])
     const publicada = v.status === 'ANSWERED' && v.answer?.status === 'ACTIVE'
-    await registrarOrigen(s.db, { modulo: 'preguntas', ref: id, fuente, base, texto, usuarioId: s.session.user.id })
+    await registrarOrigen(s.db, { modulo: 'preguntas', ref: id, fuente, base, texto, usuarioId: s.session.user.id, plantilla, itemId: q.item_id })
+    // Aprende de la publicación (envío gratis sí/no): lib/sugerenciasServidor.ts.
+    if (publicada) await aprenderDeRespuesta(s.db, { itemId: q.item_id, precio: q.precio, texto, fuente, base, plantilla })
     return NextResponse.json({
       publicada, estado: v.status, respuesta_estado: v.answer?.status ?? null,
       aviso: publicada ? null : `MercadoLibre la dejó en "${v.answer?.status ?? v.status}": revísala en MercadoLibre.`,

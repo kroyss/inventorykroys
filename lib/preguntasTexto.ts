@@ -1,12 +1,22 @@
 // ── Respuestas rápidas (app_settings `preguntas_plantillas`, JSON) ─────────
 // Como las de MercadoLibre, con una condición opcional de precio del producto (USD):
 // p. ej. "desde $3" → envío gratis; "menos de $3" → mínimo 2 unidades.
-export interface Plantilla { titulo: string; texto: string; precio_desde?: number | null; precio_hasta?: number | null }
+export interface Plantilla {
+  /** Fijo aunque cambie el título: con él se cuentan sus usos (respuestas_origen.plantilla). */
+  id?: string
+  titulo: string; texto: string; precio_desde?: number | null; precio_hasta?: number | null
+}
+
+/** Id de una respuesta rápida: el guardado o, en las viejas, uno derivado del título. */
+export const idPlantilla = (p: Pick<Plantilla, 'id' | 'titulo'>) =>
+  p.id || 't_' + p.titulo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40)
 
 export function leerPlantillas(json: string | null | undefined): Plantilla[] {
   try {
     const v = JSON.parse(json ?? '[]')
-    return Array.isArray(v) ? v.filter(p => p && typeof p.titulo === 'string' && typeof p.texto === 'string') : []
+    return Array.isArray(v)
+      ? v.filter(p => p && typeof p.titulo === 'string' && typeof p.texto === 'string').map(p => ({ ...p, id: idPlantilla(p) }))
+      : []
   } catch { return [] }
 }
 
