@@ -1,13 +1,13 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { digitsOnly } from '@/lib/inputGuards'
 import NumberInput from '@/components/ui/NumberInput'
 import { matchTokens } from '@/lib/search'
 import { orderLenLabel, mlOrderError } from '@/lib/orderNumber'
-import { PagoVenta } from '@/components/pagosme/PagoME'
 import type { PagoME } from '@/lib/pagosMEComun'
+import { PagoDeVenta, LoQueSeHablo } from './PagoYContexto'
 
 interface FormItem {
   product_id: number
@@ -110,22 +110,16 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     }, 500)
     return () => { vivo = false; clearTimeout(t) }
   }, [numeroCompleto, orderNumber])
-  // Pagos MercadoEnvíos (módulo pagos_me): el pago que trajo el vigilante para este número.
-  // Sin el módulo la API responde 403 y no se muestra nada.
+  // Pagos MercadoEnvíos (módulo pagos_me): el pago que trajo el vigilante para este número, lo
+  // busca <PagoDeVenta> (sin el módulo no muestra nada). "✓ Pago correcto" (2026-10-11): al guardar,
+  // el pago queda válido, la venta PROCESADA (descuenta stock) y su guía entra a Despachos.
+  const numeroActual = orderNumber.trim()
   const [pagoME, setPagoME] = useState<{ numero: string; pago: PagoME | null } | null>(null)
-  useEffect(() => {
-    if (!numeroCompleto || country !== 'VE') return
-    const numero = orderNumber.trim()
-    let vivo = true
-    const t = setTimeout(() => {
-      fetch(`/api/pagos-me?venta=${encodeURIComponent(numero)}`)
-        .then(r => (r.ok ? r.json() : null))
-        .then((p: PagoME | null) => { if (vivo) setPagoME({ numero, pago: p }) })
-        .catch(() => {})
-    }, 500)
-    return () => { vivo = false; clearTimeout(t) }
-  }, [numeroCompleto, orderNumber, country])
-  const pagoActual = numeroCompleto && pagoME?.numero === orderNumber.trim() ? pagoME.pago : null
+  const [pagoOkDe, setPagoOkDe] = useState<string | null>(null)   // número de orden marcado como "pago correcto"
+  const alPago = useCallback((p: PagoME | null) => setPagoME({ numero: numeroActual, pago: p }), [numeroActual])
+  const pagoActual = numeroCompleto && pagoME?.numero === numeroActual ? pagoME.pago : null
+  const pagoOk = !!pagoActual && pagoActual.verificacion !== 'invalido' && pagoOkDe === numeroActual
+  const puedeVerificar = !editing || editing.status === 'BORRADOR'
 
   // Solo vale lo encontrado para el número que está escrito ahora.
   const mlActual = numeroCompleto && ml?.numero === orderNumber.trim() ? ml : null
@@ -240,18 +234,40 @@ export default function VentasForm({ editing, products, country, onClose, onSave
       ? await fetch(`/api/sales/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       : await fetch('/api/sales',                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await res.json().catch(() => ({}))
-    if (res.ok && pagoActual) {
-      // Pago verificado → la venta pasa a Pago verificado; y la guía entra al lote de Despachos.
-      await fetch('/api/pagos-me/vincular', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ venta: orderNumber.trim() }),
-      }).catch(() => {})
-    }
-    setBusy(false)
     if (!res.ok) {
+      setBusy(false)
       setError(data.error ?? 'Error')
       return
     }
+    const saleId: number | undefined = editing?.id ?? data.id
+    if (pagoActual && pagoOk && saleId) {
+      // Pago correcto: el pago queda válido (la venta pasa a Pago verificado y su guía entra al lote)
+      // y la venta se PROCESA (descuenta stock). Si no se puede procesar (p. ej. sin stock), queda en
+      // Pago verificado y se abre su detalle para resolverlo.
+      const verif = pagoActual.verificacion === 'valido'
+        ? await fetch('/api/pagos-me/vincular', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venta: numeroActual }) }).catch(() => null)
+        : await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [pagoActual.id], verificacion: 'valido' }) }).catch(() => null)
+      const proc = verif?.ok
+        ? await fetch(`/api/sales/${saleId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'PROCESADA' }) }).catch(() => null)
+        : null
+      setBusy(false)
+      if (!proc?.ok) {
+        const d = proc ? await proc.json().catch(() => ({})) : {}
+        window.alert(verif?.ok
+          ? `La venta se guardó con el pago verificado, pero no se pudo procesar: ${d.error ?? 'error'}.
+Revísala en el detalle que se abre ahora.`
+          : 'La venta se guardó, pero no se pudo marcar el pago como verificado. Revísala en el detalle que se abre ahora.')
+        if (onContinue) onContinue(saleId); else onSaved()
+        return
+      }
+    } else if (pagoActual) {
+      // Sin marcar: la guía entra al lote (y si el pago ya estaba verificado, la venta pasa a Pago verificado).
+      await fetch('/api/pagos-me/vincular', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venta: numeroActual }),
+      }).catch(() => {})
+    }
+    setBusy(false)
     if (mode === 'continue') {
       const targetId = editing?.id ?? data.id
       if (targetId && onContinue) onContinue(targetId)
@@ -359,7 +375,11 @@ export default function VentasForm({ editing, products, country, onClose, onSave
             </div>
           </div>
 
-          {pagoActual && <PagoVenta p={pagoActual} />}
+          {numeroCompleto && country === 'VE' && (
+            <PagoDeVenta key={numeroActual} numero={numeroActual} onPago={alPago} puedeVerificar={puedeVerificar}
+              pagoOk={pagoOk} onPagoOk={v => setPagoOkDe(v ? numeroActual : null)} />
+          )}
+          {mlVenta && <LoQueSeHablo key={numeroActual} numero={numeroActual} />}
 
           {/* Lo que compró en MercadoLibre */}
           {mlVenta && mlVenta.items.length > 0 && (() => {
@@ -496,12 +516,12 @@ export default function VentasForm({ editing, products, country, onClose, onSave
           <button onClick={close} className="btn-secondary text-sm">Cancelar</button>
           {editing ? (
             <button onClick={() => save('close')} disabled={busy || noCustomer || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
-              {busy ? 'Guardando…' : 'Actualizar'}
+              {busy ? 'Guardando…' : pagoOk ? 'Actualizar y procesar' : 'Actualizar'}
             </button>
           ) : (
             <>
-              <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-secondary text-sm">
-                {busy ? 'Guardando…' : 'Crear venta'}
+              <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className={pagoOk ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>
+                {busy ? 'Guardando…' : pagoOk ? 'Crear y procesar' : 'Crear venta'}
               </button>
               <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
                 {busy ? 'Guardando…' : 'Crear y continuar'}

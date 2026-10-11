@@ -15,7 +15,28 @@ export async function GET(req: NextRequest) {
     if (venta) {
       if (!/^\d{6,20}$/.test(venta)) return NextResponse.json(null)
       const { rows: [p] } = await s.db.query(`${SELECT_PAGOS} WHERE p.venta = $1`, [venta])
-      return NextResponse.json(p ?? null)
+      if (req.nextUrl.searchParams.get('traida') !== '1') return NextResponse.json(p ?? null)
+      // Nueva venta (2026-10-11): además, cómo está la última traída (para "no está · última traída
+      // 12:01 · Traer ahora" y para saber cuándo terminó la que se pidió desde el formulario).
+      const [{ rows: [pedido] }, { rows: latidos }] = await Promise.all([
+        s.db.query(`SELECT pedido_at, resultados, pedido_at > NOW() - make_interval(mins => $1) AS vigente
+                    FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN]),
+        s.db.query(`SELECT perfil, visto_at > NOW() - make_interval(mins => $1) AS conectado FROM me_latidos`, [LATIDO_MIN]),
+      ])
+      const resultados = (pedido?.resultados ?? {}) as Record<string, { ok: boolean; at: string }>
+      const perfiles = latidos.filter(l => l.perfil !== 'DESPERTADOR').map(l => l.perfil as string)
+      const despertador = latidos.find(l => l.perfil === 'DESPERTADOR')
+      const trabajando = !!pedido?.vigente && (perfiles.length
+        ? perfiles.some(pf => !resultados[pf]) && (despertador ? !!despertador.conectado : latidos.some(l => l.conectado))
+        : Object.keys(resultados).length === 0)
+      const fin = Object.values(resultados).map(r => r.at).sort().pop() ?? null
+      return NextResponse.json({
+        pago: p ?? null,
+        traida: pedido ? {
+          pedido_at: pedido.pedido_at, trabajando, terminada_at: trabajando ? null : fin,
+          con_error: Object.values(resultados).some(r => !r.ok),
+        } : null,
+      })
     }
     const estado = req.nextUrl.searchParams.get('estado') ?? 'pendiente'
     const filtro = ['pendiente', 'valido', 'invalido'].includes(estado) ? estado : null
