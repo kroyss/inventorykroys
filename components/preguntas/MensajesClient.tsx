@@ -102,6 +102,9 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [archivos, setArchivos] = useState<File[]>([])
+  // Lo recién enviado se muestra con la copia local hasta que ML termina de procesar el adjunto
+  // (justo después de enviar, el mensaje puede volver sin él); se relee la conversación en unos segundos.
+  const [recienEnviados, setRecienEnviados] = useState<{ url: string | null; nombre: string }[]>([])
   const [ampliada, setAmpliada] = useState<{ url: string; nombre: string } | null>(null)
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([])
   const [pensando, setPensando] = useState(false)
@@ -176,6 +179,10 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
       const r = await fetch(`/api/mensajes/${c.pack_id}`, init)
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
+      if (archivos.length) {
+        setRecienEnviados(archivos.map(f => ({ url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null, nombre: f.name })))
+        for (const ms of [4000, 12000]) setTimeout(() => { leer() }, ms)
+      }
       setMensajes(d.mensajes); setTexto(''); setOrigen({ fuente: 'propia', base: '' }); setArchivos([]); setMeta(null); setSugerencias([]); onCambio()
       const ultimo = (d.mensajes as Mensaje[]).filter(m => m.propio).pop()
       if (ultimo?.moderacion && ultimo.moderacion !== 'clean') setError(`MercadoLibre moderó el mensaje (${ultimo.moderacion})`)
@@ -224,7 +231,10 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
         <NotasVenta pack={c.pack_id} onCambio={onCambio} />
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[12rem]">
-        {!mensajes ? <p className="text-sm text-neutral-400">Cargando…</p> : mensajes.map((m, i) => (
+        {!mensajes ? <p className="text-sm text-neutral-400">Cargando…</p> : mensajes.map((m, i) => {
+          const ultimoPropio = m.propio && !mensajes.slice(i + 1).some(x => x.propio)
+          const locales = ultimoPropio && m.adjuntos.length === 0 ? recienEnviados : []
+          return (
           <div key={i} className={`text-sm rounded-lg px-3 py-2 max-w-[85%] whitespace-pre-line ${m.propio ? 'ml-auto bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-900'}`}>
             <TextoConLinks texto={m.texto} />
             {m.adjuntos.length > 0 && (
@@ -234,8 +244,7 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
                   const imagen = a.tipo?.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(a.archivo)
                   return imagen ? (
                     <button key={a.archivo} type="button" onClick={() => setAmpliada({ url, nombre: a.nombre })} title="Ampliar">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={a.nombre} className="max-h-48 max-w-full rounded-md border border-black/10 bg-white cursor-zoom-in" />
+                      <ImagenAdjunto url={url} nombre={a.nombre} />
                     </button>
                   ) : (
                     <a key={a.archivo} href={url} target="_blank" rel="noreferrer"
@@ -244,13 +253,23 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
                 })}
               </div>
             )}
+            {locales.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {locales.map((a, k) => a.url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img key={k} src={a.url} alt={a.nombre} title="Enviada (MercadoLibre la está procesando)"
+                    className="max-h-48 max-w-full rounded-md border border-black/10 bg-white" />
+                ) : <span key={k} className="text-xs opacity-80">📎 {a.nombre}</span>)}
+              </div>
+            )}
             <div className={`text-[11px] mt-1 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
               {new Date(m.fecha).toLocaleString('es-VE')}
               {m.propio && m.moderacion && m.moderacion !== 'clean' ? ` · ${m.moderacion}` : ''}
               {!m.propio && !m.leido ? ' · sin leer' : ''}
             </div>
           </div>
-        ))}
+          )
+        })}
         <div ref={fin} />
       </div>
       <footer className="border-t border-neutral-100 p-3 space-y-2">
@@ -382,6 +401,17 @@ function nombrar(f: File) {
   if (f.name && f.name !== 'image.png') return f
   const ext = f.type === 'image/jpeg' ? 'jpg' : 'png'
   return new File([f], `captura-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${Math.random().toString(36).slice(2, 6)}.${ext}`, { type: f.type })
+}
+
+/** Foto de la conversación: si ML todavía no la tiene lista (recién enviada), reintenta unas veces. */
+function ImagenAdjunto({ url, nombre }: { url: string; nombre: string }) {
+  const [intento, setIntento] = useState(0)
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={intento ? `${url}&r=${intento}` : url} alt={nombre}
+      onError={() => { if (intento < 4) setTimeout(() => setIntento(n => n + 1), 3000) }}
+      className="max-h-48 max-w-full rounded-md border border-black/10 bg-white cursor-zoom-in" />
+  )
 }
 
 function Previa({ f, onQuitar }: { f: File; onQuitar: () => void }) {
