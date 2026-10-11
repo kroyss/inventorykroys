@@ -10,6 +10,7 @@ import { esDemo } from '@/lib/demo'
 
 export const DIAS_VENTANA = 90          // ventas que se traen de ML
 export const SYNC_MINUTOS = 30          // cada cuánto el cron refresca las ventas
+export const DIAS_RECIENTES = 9         // lo que se relee cada SYNC_MINUTOS (Por confirmar mira 8 días)
 
 export interface PlantillasCalificacion {
   concretada:   { rating: 'positive' | 'neutral' | 'negative'; mensaje: string }
@@ -98,14 +99,24 @@ export async function traerOrden(db: Pool, conexionId: number, id: string) {
   }
 }
 
-/** Trae las ventas de los últimos DIAS_VENTANA días de una cuenta (más nuevas primero).
- *  `dias` menor = solo lo reciente (Ventas → Por confirmar: unas pocas páginas, rápido). */
-export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = false, dias = DIAS_VENTANA) {
+/** Trae las ventas de una cuenta (más nuevas primero) y las guarda en ml_ordenes.
+ *  Cada SYNC_MINUTOS (2026-10-12) solo las de los últimos DIAS_RECIENTES: ahí están las nuevas y lo
+ *  que cambia seguido (canceladas, lo que mira Ventas → Por confirmar). Los DIAS_VENTANA completos,
+ *  una vez por noche (3 a. m. de la empresa) o si la cuenta llevaba más de un día sin sincronizar
+ *  (empresa inactiva que vuelve). Antes releía los 90 días cada 30 min: ~40 páginas por cuenta.
+ *  `dias` explícito (botón Actualizar / Traer nuevas) manda sobre esa regla. */
+export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = false, dias?: number) {
   if (await esDemo(db)) return 0     // demostración: las ventas son las sembradas
   const { rows: [c] } = await db.query(
-    `SELECT ml_user_id, ordenes_sync_at FROM ml_conexiones WHERE id = $1`, [conexionId])
+    `SELECT ml_user_id, ordenes_sync_at, ordenes_sync_at < NOW() - INTERVAL '1 day' AS atrasada,
+            EXTRACT(HOUR FROM NOW())::int AS hora
+     FROM ml_conexiones WHERE id = $1`, [conexionId])
   if (!forzar && c.ordenes_sync_at && Date.now() - new Date(c.ordenes_sync_at).getTime() < SYNC_MINUTOS * 60_000) return 0
-  const desde = Date.now() - dias * 86_400_000
+  const completa = dias === undefined
+    ? (!c.ordenes_sync_at || c.atrasada || c.hora === 3 || forzar)
+    : dias >= DIAS_VENTANA
+  const ventana = dias ?? (completa ? DIAS_VENTANA : DIAS_RECIENTES)
+  const desde = Date.now() - ventana * 86_400_000
   let n = 0
   for (let offset = 0; offset < 5000; offset += 50) {
     const r = await mlFetch<{ results: OrdenBusqueda[] }>(db, conexionId,
@@ -119,10 +130,12 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
     }
     if (viejas || lote.length < 50) break
   }
-  if (dias < DIAS_VENTANA) return n      // parcial: no cuenta como sincronización completa
+  if (dias !== undefined && !completa) return n     // "Traer nuevas": no cambia el ritmo del cron
   await db.query(`UPDATE ml_conexiones SET ordenes_sync_at = NOW() WHERE id = $1`, [conexionId])
-  await db.query(`DELETE FROM ml_ordenes WHERE conexion_id = $1 AND fecha < NOW() - make_interval(days => $2)`,
-    [conexionId, DIAS_VENTANA + 30])
+  if (completa) {
+    await db.query(`DELETE FROM ml_ordenes WHERE conexion_id = $1 AND fecha < NOW() - make_interval(days => $2)`,
+      [conexionId, DIAS_VENTANA + 30])
+  }
   return n
 }
 
