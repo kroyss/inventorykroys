@@ -128,7 +128,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
         ...(isAdmin ? [{ value: 'config' as const, label: 'Configuración' }] : []),
       ]} />
 
-      {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} onGuardado={cargar} /> : (
+      {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} desdeML={!!datos.desdeML} onGuardado={cargar} /> : (
         <>
           {datos.plantillas.auto && vista === 'listas' && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
@@ -258,7 +258,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   )
 }
 
-function Configuracion({ plantillas, onGuardado }: { plantillas: Plantillas; onGuardado: () => void }) {
+function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Plantillas; desdeML: boolean; onGuardado: () => void }) {
   const [p, setP] = useState(plantillas)
   const [msg, setMsg] = useState<string | null>(null)
   const guardar = async () => {
@@ -286,17 +286,15 @@ function Configuracion({ plantillas, onGuardado }: { plantillas: Plantillas; onG
         </label>
       </section>
       <section className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-1">
-        <h2 className="font-semibold text-neutral-900">Días de espera para calificar</h2>
-        <label className="text-sm text-neutral-600 flex flex-wrap items-center gap-2">
+        <h2 className="font-semibold text-neutral-900">Días de espera</h2>
+        <label className="text-sm text-neutral-700 flex flex-wrap items-center gap-2">
+          Esperar
           <input type="number" min={0} max={60} value={p.esperaDias}
             onChange={e => setP({ ...p, esperaDias: Math.max(0, Math.min(60, Math.round(Number(e.target.value) || 0))) })}
             className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
-          días
+          días desde la compra antes de calificar
         </label>
-        <p className="text-xs text-neutral-500">
-          Las ventas más nuevas que esto se ven en la lista, pero no entran al lote. Ejemplo: con 2, el día 3 se califican solo
-          las ventas del día 1 hacia atrás. 0 = sin espera.
-        </p>
+        <p className="text-xs text-neutral-500">Ej.: con 3, una venta del lunes se califica desde el jueves. 0 = sin esperar.</p>
       </section>
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-2">
         <h2 className="font-semibold text-neutral-900">Venta concretada</h2>
@@ -318,7 +316,7 @@ function Configuracion({ plantillas, onGuardado }: { plantillas: Plantillas; onG
           <label className="text-sm text-neutral-600 flex items-center gap-1">a los
             <input type="number" min={1} max={60} value={p.noConcretada.dias}
               onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, dias: Math.max(1, Number(e.target.value) || 3) } })}
-              className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" /> días sin cargar
+              className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" /> días {desdeML ? 'sin despachar en Despachos' : 'sin cargar en Ventas'}
           </label>
         </div>
         <input value={p.noConcretada.mensaje} maxLength={160} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, mensaje: e.target.value } })}
