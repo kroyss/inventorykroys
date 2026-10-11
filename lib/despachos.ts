@@ -233,6 +233,8 @@ export interface EtiquetaValidada {
   /** Sin inventario: nota de la venta en ML y la escrita en Despachos (manda si no es null). */
   nota_ml?: string | null
   nota_despacho?: string | null
+  /** Sin inventario: nombre real del comprador (customer_name es el apodo de ML). */
+  comprador_nombre?: string | null
   /** Pagos MercadoEnvíos: el pago de la venta traído del portal (null = no hay o módulo apagado). */
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
   estado: EstadoEtiqueta
@@ -253,6 +255,9 @@ const SQL_DESDE_ML = `
          e.incluida, e.impresa,
          NULL::int AS sale_id, o.estado AS sale_status, o.comprador AS customer_name,
          COALESCE(e.nota_despacho, o.notas) AS sale_notes, o.notas AS nota_ml, e.nota_despacho,
+         -- Nombre real del comprador (de la mensajería); customer_name es su apodo de ML.
+         (SELECT NULLIF(TRIM(c.comprador_nombre), '') FROM ml_conversaciones c
+           WHERE c.pack_id = COALESCE(o.pack_id, o.id) LIMIT 1) AS comprador_nombre,
          o.id::text AS orden_ml,
          COALESCE((
            SELECT JSON_AGG(JSON_BUILD_OBJECT(

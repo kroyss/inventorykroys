@@ -21,6 +21,7 @@ interface Etiqueta {
   sale_status: string | null
   sale_notes: string | null
   customer_name?: string | null
+  comprador_nombre?: string | null   // sin inventario: nombre real (customer_name es el apodo de ML)
   // Sin inventario: nota de la venta en ML y la escrita aquí (manda si no es null; '' = sin nota)
   nota_ml?: string | null
   nota_despacho?: string | null
@@ -628,7 +629,11 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {e.venta ?? <span className="text-neutral-400">{e.original_name}</span>}
-                    {e.customer_name && <div className="font-sans text-neutral-500">{e.customer_name}</div>}
+                    {desdeML
+                      ? (e.comprador_nombre
+                        ? <div className="font-sans text-neutral-500" title={e.customer_name ? `@${e.customer_name} en MercadoLibre` : undefined}>{e.comprador_nombre}</div>
+                        : e.customer_name && <div className="font-sans text-neutral-400" title="Apodo del comprador en MercadoLibre">@{e.customer_name}</div>)
+                      : e.customer_name && <div className="font-sans text-neutral-500">{e.customer_name}</div>}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {e.guia ?? '—'}
