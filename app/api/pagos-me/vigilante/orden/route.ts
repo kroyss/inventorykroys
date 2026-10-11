@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { autenticarVigilante, guardarArchivoME, MAX_ARCHIVO } from '@/lib/pagosME'
+import { autenticarVigilante, conectarVenta, guardarArchivoME, MAX_ARCHIVO } from '@/lib/pagosME'
 
 const txt = (n: number) => z.string().trim().max(n).nullish().transform(v => v || null)
 const num = z.number().finite().nullish().transform(v => v ?? null)
@@ -55,6 +55,21 @@ export async function POST(req: NextRequest) {
       [o.venta, b.cuenta ?? a.perfil, o.estado_me, o.fecha_orden, o.total_orden, o.total_orden_usd, o.metodo_pago,
        o.banco_emisor, o.banco_receptor, o.referencia, o.fecha_pago, o.monto_pagado, o.envio_metodo,
        o.envio_opcion, o.carrier, o.guia, guiaPath, compPath])
+
+    // Venta ya registrada (2026-10-11): la que se verificó a mano en Ventas deja el pago VÁLIDO (si nadie
+    // lo marcó antes), y su guía entra sola al lote pendiente de Despachos si todavía no está.
+    const { rows: [s] } = await a.db.query(
+      `SELECT id, status, COALESCE(payment_verified_by, created_by) AS usuario, payment_verified_by, payment_verified_at
+       FROM sales WHERE ml_order_number = $1 ORDER BY id DESC LIMIT 1`, [o.venta])
+    if (s) {
+      if (!['BORRADOR', 'REABIERTA'].includes(s.status)) {
+        await a.db.query(
+          `UPDATE me_pagos SET verificacion = 'valido', verificado_por = $2, verificado_at = COALESCE($3, NOW()),
+                  nota = COALESCE(nota, 'Verificado en Ventas'), actualizado_at = NOW()
+           WHERE venta = $1 AND verificacion = 'pendiente'`, [o.venta, s.payment_verified_by, s.payment_verified_at])
+      }
+      if (s.usuario) await conectarVenta(a.db, o.venta, s.usuario)
+    }
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })

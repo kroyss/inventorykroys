@@ -85,7 +85,7 @@ function descargar(href: string) {
   document.body.removeChild(a)
 }
 
-interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number; manifiestos?: string[] }
+interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; ya_estaban?: number; subidas?: number; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number; manifiestos?: string[] }
 
 // Respuestas que no son JSON las corta el proxy (nginx) antes de llegar a la app.
 async function errorDe(res: Response): Promise<ApiBody> {
@@ -155,6 +155,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     setBusy('subir'); setError(null); setAviso(null); setFallas([])
     let lote = loteId
     const rechazados: string[] = [...ignorados]
+    let yaEstaban = 0, subidas = 0
     for (let i = 0; i < files.length; i += TANDA) {
       const fd = new FormData()
       files.slice(i, i + TANDA).forEach(f => fd.append('files', f))
@@ -167,10 +168,16 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
         setError([`${body.error}${subidos}`, ...rechazados].join(' · '))
         setBusy(null); cargar(); return
       }
-      lote = body.lote_id
+      lote = body.lote_id ?? lote
+      yaEstaban += body.ya_estaban ?? 0
+      subidas += body.subidas ?? 0
     }
     setBusy(null)
-    if (rechazados.length) setAviso(`No se tomaron: ${rechazados.join(' · ')}`)
+    const avisos = [
+      yaEstaban > 0 && `${yaEstaban} guía${yaEstaban === 1 ? '' : 's'} ya estaba${yaEstaban === 1 ? '' : 'n'} en el lote (entraron solas desde Pagos ME o se subieron antes): no se agregaron de nuevo. Se agregaron ${subidas}.`,
+      rechazados.length > 0 && `No se tomaron: ${rechazados.join(' · ')}`,
+    ].filter(Boolean)
+    if (avisos.length) setAviso(avisos.join(' '))
     cargar()
   }
 
