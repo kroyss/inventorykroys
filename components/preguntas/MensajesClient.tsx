@@ -514,29 +514,35 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
     </div>
   )
 
-  return (
+  // Una sola nota por venta (como en ML, que la deja editar pero no agregar otra), en una línea.
+  if (editando) return (
     <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5 space-y-2">
       <div className="flex items-center gap-1.5 text-amber-800">
         <IconoNota />
         <p className="text-[11px] font-semibold uppercase tracking-wide">Nota de la venta</p>
-        <span className="text-[11px] text-amber-700/60 normal-case">· en MercadoLibre, el comprador no la ve</span>
-        {!editando && (
-          <button onClick={() => setEditando({ id: null, texto: '' })} className="ml-auto text-xs font-medium text-amber-800 hover:bg-amber-100 rounded-md px-2 py-0.5">+ Otra</button>
-        )}
+        <span className="text-[11px] text-amber-700/60">· en MercadoLibre, el comprador no la ve</span>
       </div>
-      {datos.notas.map(n => editando?.id === n.id ? <div key={n.id}>{editor}</div> : (
-        <div key={n.id} className="group flex items-start gap-3 rounded-md bg-white/70 px-2.5 py-1.5">
-          <p className="whitespace-pre-line flex-1 text-sm text-neutral-800">{n.texto}</p>
-          <span className="text-[11px] text-neutral-400 whitespace-nowrap pt-0.5">{new Date(n.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
-          {!editando && (
-            <span className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-              <button onClick={() => setEditando({ id: n.id, texto: n.texto })} className="text-[11px] text-neutral-500 hover:text-neutral-900 px-1">Editar</button>
-              <button onClick={() => borrar(n)} className="text-[11px] text-neutral-400 hover:text-red-600 px-1">Borrar</button>
-            </span>
-          )}
+      {editor}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  )
+  return (
+    <div className="space-y-1">
+      {datos.notas.map(n => (
+        <div key={n.id} title="Nota de la venta en MercadoLibre: el comprador no la ve"
+          className="group flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-1.5">
+          <span className="flex shrink-0 items-center gap-1 text-amber-800">
+            <IconoNota />
+            <span className="text-[11px] font-semibold uppercase tracking-wide">Nota</span>
+          </span>
+          <p className="min-w-0 flex-1 truncate text-sm text-neutral-800" title={n.texto}>{n.texto}</p>
+          <span className="shrink-0 text-[11px] text-neutral-400">{new Date(n.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
+          <span className="flex shrink-0 gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <button onClick={() => setEditando({ id: n.id, texto: n.texto })} className="rounded px-1.5 text-[11px] text-neutral-500 hover:bg-amber-100 hover:text-neutral-900">Editar</button>
+            <button onClick={() => borrar(n)} className="rounded px-1.5 text-[11px] text-neutral-400 hover:bg-red-50 hover:text-red-600">Borrar</button>
+          </span>
         </div>
       ))}
-      {editando && editando.id === null && editor}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
