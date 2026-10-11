@@ -33,6 +33,19 @@ export async function estadoPlantillas(db: Pool): Promise<EstadoPlantilla[]> {
      WHERE modulo = 'preguntas' AND plantilla IS NOT NULL AND fecha > NOW() - make_interval(days => $1)
      GROUP BY plantilla`, [DIAS_USO])
   const m = new Map(rows.map(r => [r.plantilla as string, r]))
+  // Usos de antes de guardar el id (migración 078): se reconocen por el texto propuesto (base).
+  const { rows: viejos } = await db.query(
+    `SELECT base, editada FROM respuestas_origen
+     WHERE modulo = 'preguntas' AND fuente = 'rapida' AND plantilla IS NULL AND base IS NOT NULL
+       AND fecha > NOW() - make_interval(days => $1)`, [DIAS_USO])
+  const porTexto = new Map(plantillas.map(p => [p.texto.trim(), idPlantilla(p)]))
+  for (const v of viejos) {
+    const id = porTexto.get(String(v.base).trim())
+    if (!id) continue
+    const r = m.get(id) ?? { plantilla: id, usos: 0, sin_cambios: 0, automaticas: 0 }
+    r.usos++; if (!v.editada) r.sin_cambios++
+    m.set(id, r)
+  }
   return plantillas.map(p => {
     const id = idPlantilla(p)
     const r = m.get(id)
