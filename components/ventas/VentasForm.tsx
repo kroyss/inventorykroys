@@ -593,12 +593,16 @@ Revísala en el detalle que se abre ahora.`
             </button>
           ) : (
             <>
+              {/* Con "Pago correcto" un solo botón (verifica, procesa y manda la guía). Sin él (cobro en
+                  destino, pago por WhatsApp u otro medio): borrador o seguir en el detalle, como siempre. */}
               <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className={pagoOk ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>
-                {busy ? 'Guardando…' : pagoOk ? 'Crear y procesar' : 'Crear venta'}
+                {busy ? 'Guardando…' : pagoOk ? 'Crear y procesar' : 'Guardar borrador'}
               </button>
-              <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
-                {busy ? 'Guardando…' : 'Crear y continuar'}
-              </button>
+              {!pagoOk && (
+                <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
+                  {busy ? 'Guardando…' : 'Crear y continuar'}
+                </button>
+              )}
             </>
           )}
         </div>
