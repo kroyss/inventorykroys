@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DatosDeItem, DatosProductos } from './DatosProducto'
-import { RespuestasRapidas } from './RespuestasRapidas'
+import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -187,6 +187,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
   // ?vista=cuentas abre Políticas y respuestas rápidas (las cuentas de ML están en /cuentas-ml).
   const pedida = useSearchParams().get('vista')
   const [vista, setVista] = useState<Vista>(isAdmin && pedida === 'cuentas' ? 'cuentas' : 'pendientes')
+  const [subConfig, setSubConfig] = useState<'respuestas' | 'aprendido' | 'ia'>('respuestas')
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -278,9 +279,15 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       {vista === 'cuentas' ? (
         datos ? (
           <div className="space-y-4">
-            <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />
-            <CuentasYPoliticas />
-            <DatosProductos />
+            <div className="flex flex-wrap gap-1.5">
+              {([['respuestas', 'Respuestas rápidas'], ['aprendido', 'Lo aprendido de cada producto'], ['ia', 'Políticas para la IA']] as const).map(([k, t]) => (
+                <button key={k} onClick={() => setSubConfig(k)}
+                  className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
+              ))}
+            </div>
+            {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
+            {subConfig === 'aprendido' && <><LoAprendido /><DatosProductos /></>}
+            {subConfig === 'ia' && <CuentasYPoliticas />}
           </div>
         ) : <Cargando />
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (

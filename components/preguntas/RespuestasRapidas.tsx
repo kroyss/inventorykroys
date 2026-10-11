@@ -6,8 +6,9 @@ import type { Propuesta } from '@/lib/propuestasRespuestas'
 
 // Preguntas → Configuración: las respuestas rápidas con su camino a automática (2026-10-11).
 //   Con clic → Lista para automática (muchos usos sin cambios) → Automática (solo si el vendedor
-//   la activa). Debajo: propuestas de respuestas nuevas sacadas de lo que más repite, y lo que el
-//   sistema aprendió de cada producto (envío gratis sí/no), corregible.
+//   la activa). Lista compacta (una línea por respuesta, "Editar" abre el detalle); las propuestas
+//   de respuestas nuevas van como aviso de una línea. Lo aprendido de cada producto (envío gratis
+//   sí/no) vive en su propia pestaña (LoAprendido).
 
 interface EstadoPl {
   id: string; usos: number; sin_cambios: number; automaticas: number; estado: 'clic' | 'lista' | 'automatica'
@@ -29,20 +30,29 @@ const SEMAFORO = {
   automatica: { t: 'Automática', c: 'bg-sky-600 text-white' },
 } as const
 
+function useInfo() {
+  const [info, setInfo] = useState<Info | null>(null)
+  const cargar = useCallback(() => {
+    fetch('/api/preguntas/respuestas').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setInfo(d) }).catch(() => {})
+  }, [])
+  useEffect(() => { cargar() }, [cargar])
+  return [info, cargar] as const
+}
+
 export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuardado: () => void }) {
   const confirm = useConfirm()
   const [lista, setLista] = useState<Plantilla[]>(iniciales)
+  const [guardadas, setGuardadas] = useState(JSON.stringify(iniciales))
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
-  const [info, setInfo] = useState<Info | null>(null)
-  const [abierta, setAbierta] = useState<string | null>(null)   // detalle "probada en"
+  const [info, cargarInfo] = useInfo()
+  const [editando, setEditando] = useState<Set<string>>(new Set())
+  const [verAyuda, setVerAyuda] = useState(false)
+  const [verPropuestas, setVerPropuestas] = useState(false)
   const num = (v: string) => v.trim() === '' ? null : Number(v.replace(',', '.'))
   const cambiar = (i: number, c: Partial<Plantilla>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
-
-  const cargarInfo = useCallback(() => {
-    fetch('/api/preguntas/respuestas').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setInfo(d) }).catch(() => {})
-  }, [])
-  useEffect(() => { cargarInfo() }, [cargarInfo])
+  const alternar = (id: string) => setEditando(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const sinGuardar = JSON.stringify(lista) !== guardadas
 
   const guardarLista = async (nueva: Plantilla[]) => {
     const limpias = nueva.map(p => ({
@@ -58,8 +68,14 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
     })
     setGuardando(false)
     if (!r.ok) { setMsg({ ok: false, t: 'No se pudo guardar' }); return false }
-    setLista(limpias); setMsg({ ok: true, t: 'Guardadas' }); onGuardado(); cargarInfo()
+    setLista(limpias); setGuardadas(JSON.stringify(limpias)); setMsg({ ok: true, t: 'Guardadas' }); onGuardado(); cargarInfo()
     return true
+  }
+
+  const agregar = () => {
+    const id = nuevoId()
+    setLista(l => [...l, { id, titulo: '', texto: '', precio_desde: null, precio_hasta: null }])
+    setEditando(s => new Set(s).add(id))
   }
 
   const ponerAuto = async (i: number, auto: boolean) => {
@@ -81,8 +97,10 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
   }
 
   const crearPropuesta = async (p: Propuesta) => {
-    if (await guardarLista([...lista, { id: nuevoId(), titulo: p.titulo, texto: p.texto, palabras: p.palabras }])) {
-      setMsg({ ok: true, t: `Creada "${p.titulo}": revísala arriba (texto y palabras) y guarda si la cambias.` })
+    const id = nuevoId()
+    if (await guardarLista([...lista, { id, titulo: p.titulo, texto: p.texto, palabras: p.palabras }])) {
+      setEditando(s => new Set(s).add(id))
+      setMsg({ ok: true, t: `Creada "${p.titulo}": quedó abierta arriba por si quieres ajustar el texto o las palabras.` })
     }
   }
   const descartar = async (p: Propuesta) => {
@@ -92,6 +110,7 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
 
   const est = (p: Plantilla) => info?.plantillas.find(x => x.id === p.id)
   const hayAuto = lista.some(p => p.auto)
+  const nProp = info?.propuestas.length ?? 0
 
   return (
     <div className="space-y-4">
@@ -99,15 +118,23 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="font-semibold text-neutral-900">Respuestas rápidas</h2>
-            <p className="text-xs text-neutral-500 max-w-2xl">
-              Salen como botones en cada pregunta, y el sistema las <b>sugiere ya escritas</b> en las preguntas sencillas donde quedaron probadas
-              con tus respuestas anteriores (≥{info?.reglas.umbral ?? 80}% de acierto). Cuando una la envías {info?.reglas.lista_usos ?? 30}+ veces
-              casi siempre sin cambios ({info?.reglas.lista_pct ?? 95}%), se ofrece <b>hacerla automática</b>.
+            <p className="text-xs text-neutral-500">
+              Botones en cada pregunta; el sistema las sugiere ya escritas donde quedaron probadas.{' '}
+              <button onClick={() => setVerAyuda(v => !v)} className="text-sky-700 hover:underline">{verAyuda ? 'Ocultar' : '¿Cómo funciona?'}</button>
             </p>
           </div>
-          <button onClick={() => setLista(l => [...l, { id: nuevoId(), titulo: '', texto: '', precio_desde: null, precio_hasta: null }])}
-            className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
+          <button onClick={agregar} className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
         </div>
+
+        {verAyuda && (
+          <div className="rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-2 text-xs text-neutral-600 space-y-1">
+            <p>• El sistema la <b>sugiere ya escrita</b> en las preguntas sencillas donde coincidió con tus respuestas anteriores (≥{info?.reglas.umbral ?? 80}% de acierto).</p>
+            <p>• <span className={`rounded-full px-1.5 ${SEMAFORO.clic.c}`}>Con clic</span>: tú la revisas y la envías.
+              {' '}<span className={`rounded-full px-1.5 ${SEMAFORO.lista.c}`}>Lista para automática</span>: la enviaste {info?.reglas.lista_usos ?? 30}+ veces y ≥{info?.reglas.lista_pct ?? 95}% sin cambios; puedes activarla.
+              {' '}<span className={`rounded-full px-1.5 ${SEMAFORO.automatica.c}`}>Automática</span>: se publica sola (solo si tú la activaste).</p>
+            <p>• Si una la corriges seguido, conviene partirla en dos respuestas más precisas.</p>
+          </div>
+        )}
 
         {hayAuto && info && (
           <div className={`rounded-lg px-3 py-2 text-sm flex flex-wrap items-center gap-3 ${info.pausa ? 'bg-amber-50 text-amber-900 border border-amber-200' : 'bg-sky-50 text-sky-900 border border-sky-200'}`}>
@@ -119,98 +146,109 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
         )}
 
         {lista.length === 0 && <p className="text-sm text-neutral-400">Todavía no hay respuestas rápidas.</p>}
-        <div className="space-y-3">
+        <div className="divide-y divide-neutral-100 border border-neutral-200 rounded-lg">
           {lista.map((p, i) => {
             const e = est(p)
             const sem = SEMAFORO[p.auto ? 'automatica' : e?.estado ?? 'clic']
             const pct = e && e.usos ? Math.round((100 * e.sin_cambios) / e.usos) : null
+            const abierta = editando.has(p.id ?? String(i))
             return (
-              <div key={p.id ?? i} className="border border-neutral-200 rounded-lg p-3 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input value={p.titulo} onChange={ev => cambiar(i, { titulo: ev.target.value })} placeholder="Nombre corto (ej. Disponible + envío gratis)"
-                    className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
-                  <label className="text-xs text-neutral-500 flex items-center gap-1">desde $
-                    <input value={p.precio_desde ?? ''} onChange={ev => cambiar(i, { precio_desde: num(ev.target.value) })} inputMode="decimal"
-                      className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
-                  </label>
-                  <label className="text-xs text-neutral-500 flex items-center gap-1">menos de $
-                    <input value={p.precio_hasta ?? ''} onChange={ev => cambiar(i, { precio_hasta: num(ev.target.value) })} inputMode="decimal"
-                      className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
-                  </label>
-                  <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
-                </div>
-                <textarea value={p.texto} onChange={ev => cambiar(i, { texto: ev.target.value })} rows={2} maxLength={2000}
-                  placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
-                <label className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                  Palabras propias que la activan
-                  <input value={(p.palabras ?? []).join(', ')} onChange={ev => cambiar(i, { palabras: ev.target.value.split(',') })}
-                    placeholder="opcional, separadas por coma (ej. mrw, cobro destino)"
-                    className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
-                </label>
-
-                {/* Semáforo: usos, sin cambios, dónde quedó probada y el paso a automática */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500 pt-1 border-t border-neutral-100">
-                  <span className={`rounded-full px-2 py-0.5 font-medium ${sem.c}`}>{sem.t}</span>
-                  {e && <span>Usada {e.usos} {e.usos === 1 ? 'vez' : 'veces'} (90 días){pct !== null && ` · ${pct}% sin cambios`}{e.automaticas ? ` · ${e.automaticas} automáticas` : ''}</span>}
-                  {e && e.probadas.length > 0 && (
-                    <button onClick={() => setAbierta(abierta === p.id ? null : p.id ?? null)} className="text-sky-700 hover:underline">
-                      {e.probadas.some(x => x.activa) ? `Se sugiere en ${e.probadas.filter(x => x.activa).length} tipo(s) de pregunta` : 'Todavía no se sugiere'} {abierta === p.id ? '▲' : '▼'}
-                    </button>
-                  )}
+              <div key={p.id ?? i} className="p-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="text-sm font-medium text-neutral-900 min-w-0">{p.titulo || <span className="text-neutral-400">Nueva respuesta</span>}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sem.c}`}>{sem.t}</span>
+                  {e && e.usos > 0 && <span className="text-xs text-neutral-500">{e.usos} usos · {pct}% sin cambios{e.automaticas ? ` · ${e.automaticas} automáticas` : ''}</span>}
                   <span className="ml-auto flex gap-2">
                     {p.auto
                       ? <button onClick={() => ponerAuto(i, false)} disabled={guardando} className="btn-secondary text-xs">Desactivar automática</button>
                       : e?.estado === 'lista' && <button onClick={() => ponerAuto(i, true)} disabled={guardando} className="btn-primary text-xs">Activar automática</button>}
+                    <button onClick={() => alternar(p.id ?? String(i))} className="btn-ghost text-xs">{abierta ? 'Cerrar' : 'Editar'}</button>
                   </span>
                 </div>
-                {abierta === p.id && e && (
-                  <ul className="text-xs text-neutral-600 space-y-0.5 pl-1">
-                    {e.probadas.map(x => (
-                      <li key={x.temas} className={x.activa ? '' : 'text-neutral-400'}>
-                        {x.activa ? '✓' : '✗'} Preguntas de {x.temas}: coincidió {x.pct}% en {x.n} respuestas anteriores{x.activa ? '' : ' (no alcanza, no se sugiere)'}
-                      </li>
-                    ))}
-                  </ul>
+
+                {abierta && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input value={p.titulo} onChange={ev => cambiar(i, { titulo: ev.target.value })} placeholder="Nombre corto (ej. Disponible + envío gratis)"
+                        className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
+                      <label className="text-xs text-neutral-500 flex items-center gap-1">desde $
+                        <input value={p.precio_desde ?? ''} onChange={ev => cambiar(i, { precio_desde: num(ev.target.value) })} inputMode="decimal"
+                          className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
+                      </label>
+                      <label className="text-xs text-neutral-500 flex items-center gap-1">menos de $
+                        <input value={p.precio_hasta ?? ''} onChange={ev => cambiar(i, { precio_hasta: num(ev.target.value) })} inputMode="decimal"
+                          className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
+                      </label>
+                    </div>
+                    <textarea value={p.texto} onChange={ev => cambiar(i, { texto: ev.target.value })} rows={2} maxLength={2000}
+                      placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
+                    <label className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                      Palabras propias que la activan
+                      <input value={(p.palabras ?? []).join(', ')} onChange={ev => cambiar(i, { palabras: ev.target.value.split(',') })}
+                        placeholder="opcional, separadas por coma (ej. mrw, cobro destino)"
+                        className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
+                    </label>
+                    {e && e.probadas.length > 0 && (
+                      <ul className="text-xs text-neutral-600 space-y-0.5">
+                        {e.probadas.map(x => (
+                          <li key={x.temas} className={x.activa ? '' : 'text-neutral-400'}>
+                            {x.activa ? '✓' : '✗'} Preguntas de {x.temas}: coincidió {x.pct}% en {x.n} respuestas anteriores{x.activa ? '' : ' (no alcanza, no se sugiere)'}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="text-right">
+                      <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar respuesta</button>
+                    </div>
+                  </div>
                 )}
               </div>
             )
           })}
         </div>
-        <div className="flex items-center justify-end gap-3">
-          {msg && <span className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.t}</span>}
-          <button onClick={() => guardarLista(lista)} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
-        </div>
+        {(sinGuardar || msg) && (
+          <div className="flex items-center justify-end gap-3">
+            {msg && <span className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.t}</span>}
+            {sinGuardar && <button onClick={() => guardarLista(lista)} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar cambios'}</button>}
+          </div>
+        )}
       </section>
 
-      {info && info.propuestas.length > 0 && (
-        <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-          <div>
-            <h2 className="font-semibold text-neutral-900">Respuestas que más repites</h2>
-            <p className="text-xs text-neutral-500">Sacadas de lo que respondiste en los últimos 90 días y que todavía no es respuesta rápida. Créala con un clic (después puedes cambiar el texto y las palabras) o descártala.</p>
+      {nProp > 0 && info && (
+        <section className="bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="flex-1">💡 Tienes <b>{nProp}</b> {nProp === 1 ? 'respuesta que repites' : 'respuestas que repites'} seguido y podrías guardar como respuesta rápida.</span>
+            <button onClick={() => setVerPropuestas(v => !v)} className="btn-secondary text-xs">{verPropuestas ? 'Ocultar' : 'Ver'}</button>
           </div>
-          <div className="space-y-2">
-            {info.propuestas.map(p => (
-              <div key={p.texto} className="border border-neutral-200 rounded-lg p-3 flex flex-wrap gap-3">
-                <div className="flex-1 min-w-[16rem] space-y-1">
-                  <div className="text-sm"><b>{p.titulo}</b> <span className="text-xs text-neutral-500">· la respondiste {p.veces} veces</span></div>
-                  <p className="text-sm text-neutral-800">&ldquo;{p.texto}&rdquo;</p>
-                  {p.palabras.length > 0 && <p className="text-xs text-neutral-500">Se activaría con: {p.palabras.join(', ')}</p>}
-                  <p className="text-xs text-neutral-400">Ej.: {p.ejemplos.slice(0, 2).map(x => `"${x.slice(0, 60)}"`).join(' · ')}</p>
+          {verPropuestas && (
+            <div className="space-y-2">
+              {info.propuestas.map(p => (
+                <div key={p.texto} className="border border-neutral-200 rounded-lg p-3 flex flex-wrap gap-3">
+                  <div className="flex-1 min-w-[16rem] space-y-1">
+                    <div className="text-sm"><b>{p.titulo}</b> <span className="text-xs text-neutral-500">· la respondiste {p.veces} veces</span></div>
+                    <p className="text-sm text-neutral-800">&ldquo;{p.texto}&rdquo;</p>
+                    {p.palabras.length > 0 && <p className="text-xs text-neutral-500">Se activaría con: {p.palabras.join(', ')}</p>}
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <button onClick={() => descartar(p)} className="btn-ghost text-xs">Descartar</button>
+                    <button onClick={() => crearPropuesta(p)} disabled={guardando} className="btn-primary text-xs">Crear</button>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <button onClick={() => descartar(p)} className="btn-ghost text-xs">Descartar</button>
-                  <button onClick={() => crearPropuesta(p)} disabled={guardando} className="btn-primary text-xs">Crear</button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
-
-      {info && <AprendidoProductos hechos={info.hechos} onCambio={cargarInfo} />}
     </div>
   )
 }
+
+/** Pestaña "Lo aprendido": envío gratis por producto (sistema). */
+export function LoAprendido() {
+  const [info, cargarInfo] = useInfo()
+  return info ? <AprendidoProductos hechos={info.hechos} onCambio={cargarInfo} /> : <p className="text-sm text-neutral-400">Cargando…</p>
+}
+
 
 /** Lo que el sistema aprendió de cada producto (envío gratis sí / no), corregible. */
 function AprendidoProductos({ hechos, onCambio }: { hechos: Hecho[]; onCambio: () => void }) {
