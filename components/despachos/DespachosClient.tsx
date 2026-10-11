@@ -189,11 +189,34 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     pegarRef.current = (files: File[]) => { if (!busy) subir(files, loteDestino) }
   })
 
+  // Marcar/desmarcar y la nota se ven al instante y se guardan de fondo (recargar el lote entero
+  // revalida todo y, sin inventario, consulta ML: era lento en cada clic). "Despachar igual"
+  // cambia el estado de la etiqueta, así que ese sí recarga el lote.
   const patchEtiqueta = async (loteId: number, e: Etiqueta, body: { incluida?: boolean; forzar_pago?: boolean; nota?: string | null }) => {
-    await fetch(`/api/despachos/lotes/${loteId}/etiquetas/${e.id}`, {
+    const local = body.forzar_pago === undefined
+    const aplicar = (cambio: (x: Etiqueta) => Etiqueta) => setLotes(prev => {
+      const l = prev[loteId]
+      if (!l) return prev
+      const etiquetas = l.etiquetas.map(x => (x.id === e.id || (body.nota !== undefined && e.venta && x.venta === e.venta)) ? cambio(x) : x)
+      return { ...prev, [loteId]: { ...l, etiquetas, imprimibles: etiquetas.filter(x => x.incluida && IMPRIMIBLE[x.estado]).length } }
+    })
+    const antes = { incluida: e.incluida, nota_despacho: e.nota_despacho ?? null, sale_notes: e.sale_notes }
+    if (local) aplicar(x => ({
+      ...x,
+      ...(body.incluida !== undefined ? { incluida: body.incluida } : {}),
+      ...(body.nota !== undefined ? { nota_despacho: body.nota, sale_notes: body.nota ?? x.nota_ml ?? null } : {}),
+    }))
+    const r = await fetch(`/api/despachos/lotes/${loteId}/etiquetas/${e.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    })
+    }).catch(() => null)
+    if (local && r?.ok) return
+    if (local) {
+      aplicar(x => ({ ...x, ...(body.incluida !== undefined ? { incluida: antes.incluida } : {}),
+        ...(body.nota !== undefined ? { nota_despacho: antes.nota_despacho, sale_notes: antes.sale_notes } : {}) }))
+      setError('No se pudo guardar el cambio. Revisa tu conexión y vuelve a intentar.')
+      return
+    }
     const d = await fetch(`/api/despachos/lotes/${loteId}`).then(r => r.json())
     setLotes(prev => ({ ...prev, [loteId]: d }))
   }
