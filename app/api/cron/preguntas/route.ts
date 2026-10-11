@@ -4,6 +4,7 @@ import { conEmpresa, dbEmpresa, dbGlobal } from '@/lib/db'
 import { revisarStockPendiente } from '@/lib/alertasStock'
 import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
+import { calificarAutomatico } from '@/lib/calificacionesAuto'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   const { rows: todas } = await dbGlobal().query(
     // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
     // Inactiva: ningún usuario suyo usó el sistema en DIAS_INACTIVA días (la plataforma nunca).
-    `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock,
+    `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario,
             o.estado <> 'propietario' AND COALESCE((
               SELECT MAX(GREATEST(u.ultima_actividad, u.last_login)) FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
               WHERE ue.empresa_id = e.id) < NOW() - INTERVAL '${DIAS_INACTIVA} days', TRUE) AS inactiva
@@ -61,6 +62,16 @@ export async function GET(req: NextRequest) {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
       } catch (err) {
         console.error('[alertas stock]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Calificación automática de las concretadas (lib/calificacionesAuto.ts): solo empresas que la
+    // prendieron, una vez al día desde las 10:00 de su país. Antes del contexto de la IA (que tarda).
+    for (const e of sincronizadas) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => calificarAutomatico(db, e.inventario))
+        if (r) console.log('[calificacion automatica]', e.id, r)
+      } catch (err) {
+        console.error('[calificacion automatica]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Contexto de la IA (lib/catalogoML.ts, lib/fichasIA.ts): catálogo cada 6 h por cuenta, el

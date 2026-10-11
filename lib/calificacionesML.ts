@@ -17,11 +17,14 @@ export interface PlantillasCalificacion {
   /** Días de espera antes de calificar: con 2, hoy (día 3) solo entran al lote las ventas del día 1
    *  hacia atrás (las más nuevas se ven, pero no se pueden calificar todavía). 0 = sin espera. */
   esperaDias: number
+  /** Calificar solas, una vez al día, las CONCRETADAS (lib/calificacionesAuto.ts). Apagado por defecto. */
+  auto: boolean
 }
 export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   concretada:   { rating: 'positive', mensaje: 'Excelente, persona seria y responsable, un placer !' },
   noConcretada: { rating: 'neutral', motivo: 'BUYER_NOT_ENOUGH_MONEY', mensaje: 'No tenemos su compra registrada', dias: 3 },
   esperaDias: 0,
+  auto: false,
 }
 
 export function leerPlantillasCal(json: string | null | undefined): PlantillasCalificacion {
@@ -31,6 +34,7 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
       concretada: { ...PLANTILLAS_DEFAULT.concretada, ...(v?.concretada ?? {}) },
       noConcretada: { ...PLANTILLAS_DEFAULT.noConcretada, ...(v?.noConcretada ?? {}) },
       esperaDias: Math.max(0, Math.min(60, Math.round(Number(v?.esperaDias) || 0))),
+      auto: v?.auto === true,
     }
   } catch { return PLANTILLAS_DEFAULT }
 }

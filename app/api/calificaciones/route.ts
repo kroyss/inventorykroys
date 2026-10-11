@@ -29,9 +29,12 @@ export async function GET(req: NextRequest) {
               COUNT(*) FILTER (WHERE sugerencia = 'no_concretada')::int AS no_concretadas,
               COUNT(*) FILTER (WHERE sugerencia = 'esperar')::int AS esperando
        FROM (${SQL_BANDEJA}) b`, [dias])
+    const { rows: [ua] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_auto_ultimo'`)
+    let autoUltimo: unknown = null
+    try { autoUltimo = ua ? JSON.parse(ua.value) : null } catch { /* ignorado */ }
     const { rows: cuentas } = await s.db.query(
       `SELECT nickname, ordenes_sync_at FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
-    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML })
+    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML, autoUltimo })
   } catch (err) {
     return apiError(err)
   }

@@ -13,12 +13,15 @@ interface Plantillas {
   concretada: { rating: string; mensaje: string }
   noConcretada: { rating: string; motivo: string; mensaje: string; dias: number }
   esperaDias: number
+  auto: boolean
 }
 interface Datos {
   ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; esperando: number }
   plantillas: Plantillas; cuentas: { nickname: string; ordenes_sync_at: string | null }[]
   /** Empresa sin inventario: "en el sistema" = despachada (etiqueta impresa en Despachos). */
   desdeML?: boolean
+  /** Última calificación automática (lib/calificacionesAuto.ts). */
+  autoUltimo: { fecha: string; estado: string; at?: string; calificadas?: number; errores?: number; quitadas?: number } | null
 }
 type Tipo = 'concretada' | 'no_concretada'
 
@@ -127,6 +130,16 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
 
       {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} onGuardado={cargar} /> : (
         <>
+          {datos.plantillas.auto && vista === 'listas' && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+              <b>Calificación automática activa:</b> todos los días desde las 10:00 se califican solas las <b>concretadas</b>; las no concretadas siguen esperando que las revises.
+              {datos.autoUltimo?.estado === 'listo' && (
+                <> Última: {new Date(datos.autoUltimo.at ?? datos.autoUltimo.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {datos.autoUltimo.calificadas ?? 0} calificadas
+                  {datos.autoUltimo.quitadas ? ` · ${datos.autoUltimo.quitadas} que ML ya no permitía` : ''}
+                  {datos.autoUltimo.errores ? <span className="text-amber-800"> · {datos.autoUltimo.errores} con error (quedan en la lista)</span> : ''}.</>
+              )}
+            </div>
+          )}
           <p className="text-xs text-neutral-500">
             {datos.desdeML ? (vista === 'listas'
               ? <>Despachada (su etiqueta salió en Despachos) → <b>concretada</b>. Sin despachar después de {datos.plantillas.noConcretada.dias} días, o cancelada en MercadoLibre → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
@@ -257,6 +270,21 @@ function Configuracion({ plantillas, onGuardado }: { plantillas: Plantillas; onG
   const sel = 'border border-neutral-300 rounded-lg px-2 py-1.5 text-sm'
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <section className={`lg:col-span-2 rounded-xl border shadow-sm p-4 space-y-2 ${p.auto ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={p.auto} onChange={e => setP({ ...p, auto: e.target.checked })} className="mt-1 w-4 h-4" />
+          <span>
+            <span className="font-semibold text-neutral-900">Calificar automáticamente las concretadas</span>
+            <span className="block text-sm text-neutral-600">
+              Una vez al día (desde las 10:00) el sistema califica solo, con el texto de &quot;Venta concretada&quot;, las ventas que ya
+              {' '}están en el sistema o despachadas y pasaron los días de espera. Las <b>no concretadas nunca</b> se califican solas.
+            </span>
+            <span className="block text-xs text-neutral-500 mt-1">
+              Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prenderlo aceptas que se publiquen sin revisarlas una por una.
+            </span>
+          </span>
+        </label>
+      </section>
       <section className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-1">
         <h2 className="font-semibold text-neutral-900">Días de espera para calificar</h2>
         <label className="text-sm text-neutral-600 flex flex-wrap items-center gap-2">
