@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Sale, InventoryItem, Country } from '@/lib/types'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { digitsOnly } from '@/lib/inputGuards'
@@ -25,6 +25,7 @@ interface Props {
   onClose: () => void
   onSaved: () => void                 // guardar + cerrar panel
   onContinue?: (id: number) => void   // guardar y abrir el detalle para avanzar estados
+  numeroInicial?: string              // desde "Por confirmar": la venta de ML a registrar
 }
 
 interface MlVenta {
@@ -41,8 +42,8 @@ interface MlVenta {
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function VentasForm({ editing, products, country, onClose, onSaved, onContinue }: Props) {
-  const [orderNumber, setOrderNumber] = useState(editing?.ml_order_number ?? '')
+export default function VentasForm({ editing, products, country, onClose, onSaved, onContinue, numeroInicial }: Props) {
+  const [orderNumber, setOrderNumber] = useState(editing?.ml_order_number ?? numeroInicial ?? '')
   const [customer,    setCustomer]    = useState(editing?.customer_name ?? '')
   const [discount,    setDiscount]    = useState(editing?.discount_percent ?? 0)
   const [notes,       setNotes]       = useState(editing?.notes ?? '')
@@ -196,6 +197,31 @@ export default function VentasForm({ editing, products, country, onClose, onSave
       nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad, unit_price: defaultPrice(p) })
     }
     if (nuevos.length) setItems([...items, ...nuevos])
+  }
+
+  // Desde "Por confirmar": los productos con su código ML vinculado entran solos, una vez.
+  const autoAgregado = useRef(false)
+  useEffect(() => {
+    if (!numeroInicial || autoAgregado.current || !mlVenta || orderNumber.trim() !== numeroInicial) return
+    autoAgregado.current = true
+    agregarDeMl(mlVenta.items.filter(i => i.producto))
+  })
+
+  // "Esta publicación siempre es este producto" (2026-10-12): queda vinculada para las próximas ventas.
+  const [vinculando, setVinculando] = useState<string | null>(null)
+  const vincularMl = async (itemId: string, it: FormItem) => {
+    if (!mlVenta) return
+    setVinculando(itemId)
+    try {
+      const r = await fetch('/api/sales/vincular-ml', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: it.product_id, cuenta: mlVenta.cuenta, item_id: itemId }),
+      })
+      if (!r.ok) { alert((await r.json().catch(() => null))?.error ?? 'No se pudo vincular'); return }
+      const producto = { id: it.product_id, code: it.product_code, name: it.product_name }
+      setMl(m => m?.venta ? { ...m, venta: { ...m.venta, items: m.venta.items.map(i =>
+        i.itemId === itemId ? { ...i, producto, opciones: [producto] } : i) } } : m)
+    } finally { setVinculando(null) }
   }
 
   const updateItem = (idx: number, patch: Partial<FormItem>) => {
@@ -416,6 +442,25 @@ Revísala en el detalle que se abre ahora.`
                             : <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Elige el producto</span>)
                           : <span className="shrink-0 text-neutral-400" title="Ningún producto tiene este código ML: búscalo abajo">sin vincular</span>}
                       </div>
+                      {!i.producto && !varios && (() => {
+                        // Productos de la venta que no salen de otra publicación: candidatos a "es este".
+                        const usados = new Set(mlVenta.items.flatMap(x => (x.opciones ?? []).map(o => o.id)))
+                        const libres = items.filter(it => !usados.has(it.product_id))
+                        if (!libres.length) return null
+                        return (
+                          <div className="flex flex-wrap items-center gap-1 pl-3 text-[11px] text-neutral-500">
+                            <span>¿Esta publicación siempre es</span>
+                            {libres.map(it => (
+                              <button key={it.product_id} type="button" disabled={vinculando === i.itemId}
+                                onClick={() => vincularMl(i.itemId, it)} title={`Vincular ${i.itemId} a ${it.product_name}`}
+                                className="rounded-md border border-sky-300 bg-white px-1.5 py-0.5 text-sky-800 hover:bg-sky-100 disabled:opacity-50">
+                                <span className="font-mono">{it.product_code}</span>?
+                              </button>
+                            ))}
+                            <span className="text-neutral-400">· queda vinculada para las próximas</span>
+                          </div>
+                        )
+                      })()}
                       {varios && !elegido && (
                         <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
                           <p className="text-[11px] text-amber-800">Esta publicación está en {varios.length} productos. ¿Cuál vendiste?</p>

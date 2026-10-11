@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth'
-import { facturasHabilitadas } from '@/lib/modulos'
+import { facturasHabilitadas, tieneModulo } from '@/lib/modulos'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import VentasClient from '@/components/ventas/VentasClient'
@@ -32,6 +32,7 @@ export default async function VentasPage() {
       userRole={session!.user.role}
       country={session!.user.country}
       facturas={facturasHabilitadas(session!.user)}
+      porConfirmar={tieneModulo(session!.user, 'preguntas')}
     />
   )
 }

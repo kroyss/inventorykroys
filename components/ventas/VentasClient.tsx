@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
+import PorConfirmar, { usePorConfirmar } from './PorConfirmar'
 import FacturaForm from '@/components/facturas/FacturaForm'
 import { bs, type Invoice } from '@/lib/invoices'
 import { Pagination, PageHeader, StatusBadge, chipCls } from '@/components/ui'
@@ -63,6 +64,7 @@ interface Props {
   userRole: UserRole
   country: Country
   facturas: boolean   // módulo Facturas (solo VE): sin él no se muestra el cuadro de factura
+  porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
 }
 
 type Filter = 'all' | SaleStatus
@@ -72,7 +74,12 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar }: Props) {
+  // Por confirmar (2026-10-12): ventas de ML sin registrar; "Confirmar" abre el form con ese número.
+  const [vistaPC, setVistaPC] = useState(false)
+  const [numeroNuevo, setNumeroNuevo] = useState<string | null>(null)
+  const pc = usePorConfirmar(porConfirmar)
+  const pendientesPC = pc.datos?.filas.filter(f => !f.vencida).length ?? 0
   // Productos en estado (no solo el prop del server): se refrescan al volver el
   // foco a la pestaña, para detectar stock ajustado o productos nuevos creados
   // en paralelo sin recargar la página.
@@ -152,7 +159,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (invoicing)     { setInvoicing(false) }
-      else if (showForm) { setShowForm(false); setEditing(null) }
+      else if (showForm) { setShowForm(false); setEditing(null); setNumeroNuevo(null) }
       else if (selected) { setSelected(null) }
     }
     document.addEventListener('keydown', h)
@@ -346,13 +353,21 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       <div className="mb-4 space-y-2">
         {/* Fila 1: chips de estado */}
         <div className="flex flex-wrap gap-1.5">
+          {porConfirmar && (
+            <button onClick={() => setVistaPC(true)} title="Ventas de MercadoLibre que todavía no están registradas"
+              className={vistaPC || !pendientesPC ? chipCls(vistaPC)
+                : 'px-3 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap bg-amber-50 text-amber-900 border-amber-300 hover:border-amber-500'}>
+              Por confirmar <span className={vistaPC ? 'text-white/60' : pendientesPC ? 'text-amber-600' : 'text-neutral-400'}>{pc.datos ? pendientesPC : '·'}</span>
+            </button>
+          )}
+          {porConfirmar && <span className="mx-0.5 w-px self-stretch bg-neutral-200" aria-hidden="true" />}
           {(['all','BORRADOR','PAGO_VERIFICADO','PROCESADA','DESCARGADA','DESCARGADA_LOCAL'] as Filter[])
             .filter(f => country !== 'CO' || f !== 'PAGO_VERIFICADO')
             .map(f => {
             const count  = f === 'all' ? counts.all : counts[f as keyof Counts]
-            const active = filter === f
+            const active = !vistaPC && filter === f
             return (
-              <button key={f} onClick={() => setFilter(f)}
+              <button key={f} onClick={() => { setVistaPC(false); setFilter(f) }}
                 className={chipCls(active)}>
                 {CHIP_LABELS[f]} <span className={active ? 'text-white/60' : 'text-neutral-400'}>{count}</span>
               </button>
@@ -361,6 +376,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
         </div>
 
         {/* Fila 2: búsqueda + fechas (izq) · acciones (der) — apila en mobile */}
+        {!vistaPC && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <input
@@ -432,10 +448,16 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             )}
           </div>
         </div>
+        )}
       </div>
 
+      {vistaPC && (
+        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar}
+          onConfirmar={n => { setNumeroNuevo(n); setEditing(null); setShowForm(true) }} />
+      )}
+
       {/* Tabla (desktop) / tarjetas (mobile) */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+      {!vistaPC && <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-xs text-neutral-500">
@@ -534,7 +556,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
         </div>
 
         <Pagination total={total} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
-      </div>
+      </div>}
 
       {/* Slide-over detalle */}
       {selected && (
@@ -699,10 +721,11 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           editing={editing}
           products={products}
           country={country}
-          onClose={() => { setShowForm(false); setEditing(null) }}
-          onSaved={() => { setShowForm(false); setEditing(null); reload() }}
+          numeroInicial={editing ? undefined : numeroNuevo ?? undefined}
+          onClose={() => { setShowForm(false); setEditing(null); setNumeroNuevo(null) }}
+          onSaved={() => { setShowForm(false); setEditing(null); setNumeroNuevo(null); reload(); pc.cargar() }}
           onContinue={async (id) => {
-            setShowForm(false); setEditing(null)
+            setShowForm(false); setEditing(null); setNumeroNuevo(null); pc.cargar()
             const fresh: Sale = await fetch(`/api/sales/${id}`).then(r => r.json())
             if (fresh?.id) setSelected(fresh)
             reload()

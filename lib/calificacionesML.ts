@@ -98,13 +98,14 @@ export async function traerOrden(db: Pool, conexionId: number, id: string) {
   }
 }
 
-/** Trae las ventas de los últimos DIAS_VENTANA días de una cuenta (más nuevas primero). */
-export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = false) {
+/** Trae las ventas de los últimos DIAS_VENTANA días de una cuenta (más nuevas primero).
+ *  `dias` menor = solo lo reciente (Ventas → Por confirmar: unas pocas páginas, rápido). */
+export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = false, dias = DIAS_VENTANA) {
   if (await esDemo(db)) return 0     // demostración: las ventas son las sembradas
   const { rows: [c] } = await db.query(
     `SELECT ml_user_id, ordenes_sync_at FROM ml_conexiones WHERE id = $1`, [conexionId])
   if (!forzar && c.ordenes_sync_at && Date.now() - new Date(c.ordenes_sync_at).getTime() < SYNC_MINUTOS * 60_000) return 0
-  const desde = Date.now() - DIAS_VENTANA * 86_400_000
+  const desde = Date.now() - dias * 86_400_000
   let n = 0
   for (let offset = 0; offset < 5000; offset += 50) {
     const r = await mlFetch<{ results: OrdenBusqueda[] }>(db, conexionId,
@@ -118,6 +119,7 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
     }
     if (viejas || lote.length < 50) break
   }
+  if (dias < DIAS_VENTANA) return n      // parcial: no cuenta como sincronización completa
   await db.query(`UPDATE ml_conexiones SET ordenes_sync_at = NOW() WHERE id = $1`, [conexionId])
   await db.query(`DELETE FROM ml_ordenes WHERE conexion_id = $1 AND fecha < NOW() - make_interval(days => $2)`,
     [conexionId, DIAS_VENTANA + 30])
