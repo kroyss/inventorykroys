@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { DIAS_SEMANA, proximoAuto, type HorarioME, type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
@@ -137,18 +137,6 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
             </button>
           )}
         </div>
-        {pedido && (
-          <div className="text-neutral-500">
-            Último pedido {hora(pedido.pedido_at)}{pedido.automatico ? ' (automático)' : ''}:{' '}
-            {Object.keys(pedido.resultados).length === 0 && (pedido.vigente ? 'esperando al vigilante…' : 'nadie lo tomó (¿PC apagada?)')}
-            {Object.entries(pedido.resultados).map(([perfil, r]) => (
-              <span key={perfil} className="mr-3">
-                <b>{perfil}</b>{' '}
-                {r.ok ? `${r.vistas} órdenes pagadas vistas · ${r.nuevas} nuevas` : <span className="text-red-700">{ERROR_PERFIL[r.error ?? ''] ?? r.error ?? 'error'}</span>}
-              </span>
-            ))}
-          </div>
-        )}
         {clave && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
             Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
@@ -157,6 +145,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
       </div>
+
+      {pedido && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} trabajando={trabajando} />}
 
       {datos && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
 
@@ -280,6 +270,45 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
 }
 
 /** Pagos ME → Configuración: a qué horas y qué días el despertador trae solo (además del botón). */
+/** Cómo terminó la última traída, bien a la vista: trayendo / listo (ya puede despachar) / con problemas. */
+function EstadoTraida({ pedido, perfiles, trabajando }: {
+  pedido: NonNullable<Datos['vigilante']['pedido']>; perfiles: string[]; trabajando: boolean
+}) {
+  const res = Object.entries(pedido.resultados)
+  const faltan = perfiles.filter(p => !pedido.resultados[p])
+  const fallas = res.filter(([, r]) => !r.ok)
+  const nuevas = res.reduce((s, [, r]) => s + (r.ok ? r.nuevas : 0), 0)
+  const dia = (s: string) => new Date(s).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' })
+  const cuando = `${dia(pedido.pedido_at) === dia(new Date().toISOString()) ? 'hoy' : dia(pedido.pedido_at)} ${
+    new Date(pedido.pedido_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })}`
+  const detalle = res.map(([perfil, r]) => (
+    <span key={perfil} className="mr-3 whitespace-nowrap">
+      <b>{perfil}</b>{' '}
+      {r.ok ? `${r.nuevas} nuevas (${r.vistas} revisadas)` : <span className="text-red-700">{ERROR_PERFIL[r.error ?? ''] ?? r.error ?? 'error'}</span>}
+    </span>
+  ))
+  const caja = (c: string, titulo: ReactNode, cuerpo?: ReactNode) => (
+    <div className={`rounded-xl border px-4 py-3 text-sm space-y-1 ${c}`}>
+      <div className="font-medium">{titulo}</div>
+      {cuerpo && <div className="text-xs opacity-90">{cuerpo}</div>}
+    </div>
+  )
+  const origen = pedido.automatico ? 'automática' : 'pedida a mano'
+
+  if (trabajando) return caja('bg-sky-50 border-sky-200 text-sky-900',
+    <>⏳ Trayendo pagos y guías ({origen}, {cuando})… no cierres la PC de Venezuela.</>,
+    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{p}</b> trabajando…</span>)}</>)
+  if (res.length === 0) return caja('bg-amber-50 border-amber-200 text-amber-900',
+    <>⚠️ La traída {origen} de {cuando} no se hizo: la PC de Venezuela no respondió (¿apagada?).</>,
+    'Enciéndela y dale a "Traer pagos y guías".')
+  if (fallas.length || faltan.length) return caja('bg-red-50 border-red-200 text-red-900',
+    <>❌ La traída de {cuando} quedó incompleta: revisa antes de despachar.</>,
+    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{p}</b> no respondió</span>)}</>)
+  return caja('bg-green-50 border-green-200 text-green-900',
+    <>✅ Listo: traída {origen} de {cuando} completa · {nuevas === 0 ? 'no había pagos nuevos' : `${nuevas} pago${nuevas === 1 ? '' : 's'} nuevo${nuevas === 1 ? '' : 's'}`}. Ya está todo al día: puedes cargar las ventas y despachar.</>,
+    detalle)
+}
+
 function TraerAutomatico({ horario, ahora, isAdmin, onGuardado }: {
   horario: HorarioME; ahora: { dia: number; hm: string }; isAdmin: boolean; onGuardado: () => void
 }) {
