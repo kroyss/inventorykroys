@@ -41,7 +41,7 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
 
 interface OrdenBusqueda {
   id: number; pack_id: number | null; date_created: string; total_amount: number; currency_id: string; status?: string
-  buyer: { nickname?: string }
+  buyer: { nickname?: string; first_name?: string; last_name?: string }
   order_items: {
     item: { id: string; title: string; variation_id?: number | null; variation_attributes?: { name?: string; value_name?: string | null }[] }
     quantity: number
@@ -64,10 +64,10 @@ export const detalleDeOrden = (o: Pick<OrdenBusqueda, 'order_items'>): DetalleOr
 export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqueda) {
   await db.query(
     `INSERT INTO ml_ordenes (id, conexion_id, pack_id, fecha, comprador, productos, total, moneda,
-                             cal_vendedor, cal_concretada, cal_comprador, items, detalle, estado, actualizada_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+                             cal_vendedor, cal_concretada, cal_comprador, items, detalle, estado, comprador_nombre, actualizada_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
      ON CONFLICT (empresa_id, id) DO UPDATE SET items = EXCLUDED.items, detalle = EXCLUDED.detalle,
-       estado = EXCLUDED.estado,
+       estado = EXCLUDED.estado, comprador_nombre = COALESCE(EXCLUDED.comprador_nombre, ml_ordenes.comprador_nombre),
        -- 'cerrada_ml': ML ya no deja calificarla (la marca calificar/route.ts); la sync no la revive.
        cal_vendedor = COALESCE(EXCLUDED.cal_vendedor, CASE WHEN ml_ordenes.cal_vendedor = 'cerrada_ml' THEN 'cerrada_ml' END), cal_concretada = EXCLUDED.cal_concretada,
        cal_comprador = EXCLUDED.cal_comprador, actualizada_at = NOW()`,
@@ -81,7 +81,9 @@ export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqued
      o.feedback?.buyer ? (o.feedback.buyer.rating ?? 'calificada') : null,
      // Qué se vendió: "MLV123" y, si tiene variante, también "MLV123:456" (para el módulo Stock).
      o.order_items.flatMap(i => i.item.variation_id ? [i.item.id, `${i.item.id}:${i.item.variation_id}`] : [i.item.id]),
-     JSON.stringify(detalleDeOrden(o)), o.status ?? null])
+     JSON.stringify(detalleDeOrden(o)), o.status ?? null,
+     // Nombre real (la venta suelta lo trae; la búsqueda a veces no): migración 080.
+     [o.buyer?.first_name, o.buyer?.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || null])
 }
 
 /** Trae una venta puntual de ML (por número) y la guarda. null = no es de esta cuenta. */

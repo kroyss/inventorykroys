@@ -255,9 +255,9 @@ const SQL_DESDE_ML = `
          e.incluida, e.impresa,
          NULL::int AS sale_id, o.estado AS sale_status, o.comprador AS customer_name,
          COALESCE(e.nota_despacho, o.notas) AS sale_notes, o.notas AS nota_ml, e.nota_despacho,
-         -- Nombre real del comprador (de la mensajería); customer_name es su apodo de ML.
-         (SELECT NULLIF(TRIM(c.comprador_nombre), '') FROM ml_conversaciones c
-           WHERE c.pack_id = COALESCE(o.pack_id, o.id) LIMIT 1) AS comprador_nombre,
+         -- Nombre real del comprador (migración 080, o el de la mensajería); customer_name es su apodo de ML.
+         COALESCE(NULLIF(o.comprador_nombre, ''), (SELECT NULLIF(TRIM(c.comprador_nombre), '') FROM ml_conversaciones c
+           WHERE c.pack_id = COALESCE(o.pack_id, o.id) LIMIT 1)) AS comprador_nombre,
          o.id::text AS orden_ml,
          COALESCE((
            SELECT JSON_AGG(JSON_BUILD_OBJECT(
@@ -277,7 +277,7 @@ const SQL_DESDE_ML = `
            WHERE d.lote_id = e.lote_id AND d.guia = e.guia) AS primera_con_guia
   FROM despacho_etiquetas e
   LEFT JOIN LATERAL (
-    SELECT id, estado, comprador, notas, detalle FROM ml_ordenes
+    SELECT id, pack_id, estado, comprador, comprador_nombre, notas, detalle FROM ml_ordenes
     WHERE id = ${VENTA_NUM} OR pack_id = ${VENTA_NUM}
     ORDER BY (id = ${VENTA_NUM}) DESC LIMIT 1
   ) o ON TRUE
@@ -289,17 +289,23 @@ const SQL_DESDE_ML = `
  *  Nunca hace fallar la vista: lo que no se pudo traer queda como estaba. */
 export async function refrescarVentasML(db: Pool, loteId: number) {
   const { rows } = await db.query(
-    `SELECT DISTINCT e.venta, o.conexion_id, (o.notas_at IS NULL OR o.notas_at < NOW() - INTERVAL '2 minutes') AS releer
+    `SELECT DISTINCT e.venta, o.conexion_id, (o.notas_at IS NULL OR o.notas_at < NOW() - INTERVAL '2 minutes') AS releer,
+            (o.id IS NOT NULL AND o.comprador_nombre IS NULL) AS sin_nombre
      FROM despacho_etiquetas e
      LEFT JOIN ml_ordenes o ON o.id = ${VENTA_NUM}
      WHERE e.lote_id = $1 AND e.venta ~ '^[0-9]{1,18}$'`, [loteId])
   const { rows: cuentas } = await db.query(`SELECT id FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
-  const pendientes = rows.filter(r => !r.conexion_id || r.releer) as { venta: string; conexion_id: number | null }[]
-  const uno = async (r: { venta: string; conexion_id: number | null }) => {
+  const pendientes = rows.filter(r => !r.conexion_id || r.releer || r.sin_nombre) as { venta: string; conexion_id: number | null; sin_nombre: boolean }[]
+  const uno = async (r: { venta: string; conexion_id: number | null; sin_nombre: boolean }) => {
     let conexion = r.conexion_id
     if (!conexion) {
       for (const c of cuentas) if (await traerOrden(db, c.id, r.venta)) { conexion = c.id; break }
       if (!conexion) return
+    } else if (r.sin_nombre) {
+      // La venta suelta trae el nombre real del comprador (la búsqueda no): se completa una sola vez.
+      await traerOrden(db, conexion, r.venta)
+      // '' = ya se intentó y ML no lo dio (no se vuelve a pedir en cada vista del lote).
+      await db.query(`UPDATE ml_ordenes SET comprador_nombre = COALESCE(comprador_nombre, '') WHERE id = $1::bigint`, [r.venta])
     }
     const { notas, error } = await leerNotas(db, conexion, r.venta)
     if (!error) await db.query(
