@@ -12,6 +12,7 @@ import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
+import { completarNombres } from '@/lib/porConfirmar'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
 import { esDemo } from '@/lib/demo'
@@ -164,6 +165,10 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       }
       res.push({ cuenta: c.nickname, error: msg })
     }
+  }
+  // Ventas → Por confirmar: nombre real de las que tienen pago (lib/porConfirmar.ts).
+  try { await completarNombres(db) } catch (e) {
+    console.error('[ML nombres]', e instanceof Error ? e.message : e)
   }
   return res
 }

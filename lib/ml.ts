@@ -145,6 +145,20 @@ export class ErrorML extends Error {
 const espera = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 /** GET/POST a la API con el token de la conexión. Reintenta 429/5xx y renueva ante 401. */
+// Conteo de llamadas a MercadoLibre (2026-10-12): por tipo (/orders, /questions…), en memoria del
+// proceso; cada hora se escribe en el log "[ML llamadas]" y se reinicia. Para saber cuánto se consulta.
+const conteoML = new Map<string, number>()
+let conteoDesde = Date.now()
+function contarML(ruta: string) {
+  const tipo = ruta.split('?')[0].split('/')[1] ?? '?'
+  conteoML.set(tipo, (conteoML.get(tipo) ?? 0) + 1)
+  if (Date.now() - conteoDesde >= 3_600_000) {
+    const total = [...conteoML.values()].reduce((a, b) => a + b, 0)
+    console.log('[ML llamadas]', JSON.stringify({ desde: new Date(conteoDesde).toISOString(), total, ...Object.fromEntries(conteoML) }))
+    conteoML.clear(); conteoDesde = Date.now()
+  }
+}
+
 export async function mlFetch<T = unknown>(db: Pool, conexionId: number, ruta: string, init?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<T> {
   let token: string
   try {
@@ -156,6 +170,7 @@ export async function mlFetch<T = unknown>(db: Pool, conexionId: number, ruta: s
   }
   let renovado = false
   for (let intento = 0; ; intento++) {
+    contarML(ruta)
     const r = await fetch(`${ML_API}${ruta}`, {
       method: init?.method ?? 'GET',
       headers: {

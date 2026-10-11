@@ -8,7 +8,7 @@
 //   - Vencida: pasaron los días de "no concretada" de Calificaciones sin registrarla.
 //   - A los DIAS_MAX (ML no deja concretarla después) o cancelada en ML: sale de la lista.
 import type { Pool } from 'pg'
-import { leerPlantillasCal } from '@/lib/calificacionesML'
+import { leerPlantillasCal, traerOrden } from '@/lib/calificacionesML'
 
 export const DIAS_MAX = 8
 
@@ -36,7 +36,7 @@ export async function ventasPorConfirmar(db: Pool) {
   const dias = leerPlantillasCal(pl?.value).noConcretada.dias
   const { rows } = await db.query(
     `SELECT COALESCE(o.pack_id, o.id)::text AS numero, o.fecha, x.nickname AS cuenta,
-            NULLIF(o.comprador_nombre, '') AS comprador, o.comprador AS nick, o.total::float, o.moneda,
+            COALESCE(NULLIF(o.comprador_nombre, ''), NULLIF(c.comprador_nombre, '')) AS comprador, o.comprador AS nick, o.total::float, o.moneda,
             o.items, o.detalle,
             p.verificacion, p.monto_pagado::float AS monto,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_texto END AS msg_texto,
@@ -81,4 +81,25 @@ export async function ventasPorConfirmar(db: Pool) {
   // Un pack con varias órdenes sale una sola vez (la primera, la más nueva).
   const vistos = new Set<string>()
   return { dias, filas: filas.filter(f => !vistos.has(f.numero) && !!vistos.add(f.numero)) }
+}
+
+/** Nombre real de las "Con pago" que no lo tienen (2026-10-12): la búsqueda de ventas de ML a veces
+ *  trae solo el apodo; la venta suelta (/orders/{id}) trae nombre y apellido. Solo las que tienen pago
+ *  (las que se trabajan), si la mensajería tampoco lo sabe, y cada una UNA vez: si ML no lo da, queda
+ *  '' y no se vuelve a pedir. Lo llama el cron después de sincronizar (pocas por pasada). */
+export async function completarNombres(db: Pool, maximo = 5) {
+  const { rows } = await db.query(
+    `SELECT o.id::text, o.conexion_id
+     FROM ml_ordenes o
+     JOIN me_pagos p ON p.venta IN (o.id::text, o.pack_id::text) AND p.verificacion <> 'invalido'
+     LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
+     WHERE o.comprador_nombre IS NULL AND NULLIF(c.comprador_nombre, '') IS NULL
+       AND o.fecha > NOW() - make_interval(days => $1) AND COALESCE(o.estado, '') <> 'cancelled'
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
+     ORDER BY o.fecha DESC LIMIT $2`, [DIAS_MAX, maximo])
+  for (const r of rows) {
+    try { await traerOrden(db, r.conexion_id, r.id) } catch { /* sin nombre: queda el apodo */ }
+    await db.query(`UPDATE ml_ordenes SET comprador_nombre = '' WHERE id = $1 AND comprador_nombre IS NULL`, [r.id])
+  }
+  return rows.length
 }
