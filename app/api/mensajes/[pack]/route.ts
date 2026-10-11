@@ -40,7 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
   }
 }
 
-const Body = z.object({ texto: z.string().trim().min(1, 'Escribe un mensaje').max(350), dejarSinLeer: z.boolean().optional() })
+// El texto puede ir vacío si va un archivo (2026-10-11: a veces solo se manda la foto).
+const Body = z.object({ texto: z.string().trim().max(350), dejarSinLeer: z.boolean().optional() })
   .merge(OrigenRespuesta)
 const MAX_MB = 15
 const EXT_OK = /\.(jpe?g|png|pdf|txt)$/i
@@ -59,12 +60,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
       archivos = form.getAll('archivo').filter((f): f is File => f instanceof File && f.size > 0)
     } else raw = await req.json()
     const { texto, dejarSinLeer, fuente, base } = Body.parse(raw)
+    if (!texto && archivos.length === 0) return NextResponse.json({ error: 'Escribe un mensaje' }, { status: 400 })
     if (archivos.length > 5) return NextResponse.json({ error: 'Máximo 5 archivos por mensaje' }, { status: 400 })
     for (const f of archivos) {
       if (!EXT_OK.test(f.name)) return NextResponse.json({ error: `"${f.name}": solo fotos JPG/PNG, PDF o TXT` }, { status: 400 })
       if (f.size > MAX_MB * 1024 * 1024) return NextResponse.json({ error: `"${f.name}" pesa más de ${MAX_MB} MB` }, { status: 400 })
     }
-    const problemas = problemasDelTexto(texto, 'mensaje')
+    const problemas = texto ? problemasDelTexto(texto, 'mensaje') : []
     if (problemas.length) return NextResponse.json({ error: 'MercadoLibre rechazaría este mensaje', problemas }, { status: 422 })
     const c = await conversacion(s.db, pack)
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
@@ -72,10 +74,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
       const ids: string[] = []
       for (const f of archivos) ids.push(await subirAdjunto(s.db, c.conexion_id, f))
       const h = await responderHilo(s.db, c.conexion_id, pack, texto, dejarSinLeer, ids)
-      await registrarOrigen(s.db, { modulo: 'mensajes', ref: pack, fuente, base, texto, usuarioId: s.session.user.id })
+      if (texto) await registrarOrigen(s.db, { modulo: 'mensajes', ref: pack, fuente, base, texto, usuarioId: s.session.user.id })
       return NextResponse.json({ cuenta: c.nickname, ...h })
     } catch (e) {
-      if (e instanceof ErrorML) return NextResponse.json({ error: e.message, detalle: e.datos }, { status: 502 })
+      if (e instanceof ErrorML) {
+        // Por si MercadoLibre exige texto junto al archivo: se dice claro en vez del error crudo.
+        const error = !texto && archivos.length && e.status === 400
+          ? 'MercadoLibre no aceptó el archivo sin texto: escribe al menos una palabra y vuelve a enviar'
+          : e.message
+        return NextResponse.json({ error, detalle: e.datos }, { status: 502 })
+      }
       throw e
     }
   } catch (err) {

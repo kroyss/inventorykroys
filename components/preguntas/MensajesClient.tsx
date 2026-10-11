@@ -302,8 +302,7 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
             {pensando ? 'Pensando…' : texto ? 'Proponer otra' : 'Proponer con IA'}
             {!pensando && <span className="ml-1.5 text-xs font-normal text-neutral-400">· {CREDITOS_TXT}</span>}
           </button>
-          <button onClick={enviar} disabled={enviando || !texto.trim() || problemas.length > 0} className="btn-primary text-sm"
-            title={!texto.trim() && archivos.length ? 'Escribe un mensaje para acompañar el archivo' : undefined}>
+          <button onClick={enviar} disabled={enviando || (!texto.trim() && archivos.length === 0) || problemas.length > 0} className="btn-primary text-sm">
             {enviando ? 'Enviando…' : 'Responder'}
           </button>
         </div>

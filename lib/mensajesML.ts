@@ -190,7 +190,7 @@ export async function responderHilo(db: Pool, conexionId: number, pack: string, 
   const sinLeer = dejarSinLeer ? await sinLeerEnML(db, conexionId, pack, seller) : 0
   await db.query(
     `UPDATE ml_conversaciones SET sin_leer = $4, ultimo_texto = $2, ultimo_de_comprador = FALSE, ultimo_at = $3,
-            actualizada_at = NOW() WHERE pack_id = $1`, [pack, ultimo?.texto ?? texto, ultimo?.fecha ?? new Date().toISOString(), sinLeer])
+            actualizada_at = NOW() WHERE pack_id = $1`, [pack, ultimo?.texto || texto || (adjuntos.length ? '📎 Archivo' : ''), ultimo?.fecha ?? new Date().toISOString(), sinLeer])
   return { ...despues, sinLeer }
 }
 
