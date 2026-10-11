@@ -5,6 +5,7 @@ import { revisarStockPendiente } from '@/lib/alertasStock'
 import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
 import { calificarAutomatico } from '@/lib/calificacionesAuto'
+import { responderAutomaticas } from '@/lib/automaticasPreguntas'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
@@ -62,6 +63,16 @@ export async function GET(req: NextRequest) {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
       } catch (err) {
         console.error('[alertas stock]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Respuestas automáticas (lib/automaticasPreguntas.ts): solo las respuestas rápidas que el
+    // vendedor activó como automáticas; lo primero, para responder en menos de un minuto.
+    for (const e of sincronizadas) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => responderAutomaticas(db))
+        if (r) console.log('[respuestas automaticas]', e.id, r)
+      } catch (err) {
+        console.error('[respuestas automaticas]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Calificación automática de las concretadas (lib/calificacionesAuto.ts): solo empresas que la

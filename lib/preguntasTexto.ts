@@ -5,6 +5,10 @@ export interface Plantilla {
   /** Fijo aunque cambie el título: con él se cuentan sus usos (respuestas_origen.plantilla). */
   id?: string
   titulo: string; texto: string; precio_desde?: number | null; precio_hasta?: number | null
+  /** Palabras propias que la activan (además de los temas que el sistema reconoce), p. ej. ["mrw"]. */
+  palabras?: string[] | null
+  /** Se publica sola cuando aplica (paso 4): solo si el vendedor la activó. */
+  auto?: boolean
 }
 
 /** Id de una respuesta rápida: el guardado o, en las viejas, uno derivado del título. */

@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DatosDeItem, DatosProductos } from './DatosProducto'
+import { RespuestasRapidas } from './RespuestasRapidas'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -277,7 +278,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       {vista === 'cuentas' ? (
         datos ? (
           <div className="space-y-4">
-            <Plantillas iniciales={datos.plantillas} onGuardado={cargar} />
+            <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />
             <CuentasYPoliticas />
             <DatosProductos />
           </div>
@@ -643,67 +644,6 @@ function CuentasYPoliticas() {
   )
 }
 
-// ── Respuestas rápidas (editor) ────────────────────────────────────────────
-function Plantillas({ iniciales, onGuardado }: { iniciales: Plantilla[]; onGuardado: () => void }) {
-  const [lista, setLista] = useState<Plantilla[]>(iniciales)
-  const [guardando, setGuardando] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
-  const num = (v: string) => v.trim() === '' ? null : Number(v.replace(',', '.'))
-  const cambiar = (i: number, c: Partial<Plantilla>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
-
-  const guardar = async () => {
-    const limpias = lista.map(p => ({ ...p, titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
-    const malas = limpias.filter(p => problemasDelTexto(p.texto).length)
-    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto).join(', ')}` }); return }
-    setGuardando(true)
-    const r = await fetch('/api/settings', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ preguntas_plantillas: JSON.stringify(limpias) }),
-    })
-    setGuardando(false)
-    if (!r.ok) { setMsg({ ok: false, t: 'No se pudo guardar' }); return }
-    setLista(limpias); setMsg({ ok: true, t: 'Guardadas' }); onGuardado()
-  }
-
-  return (
-    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="font-semibold text-neutral-900">Respuestas rápidas</h2>
-          <p className="text-xs text-neutral-500">Salen como botones en cada pregunta (un clic y la puedes retocar). La IA también las usa. Con precio, se marca en verde la que corresponde al producto.</p>
-        </div>
-        <button onClick={() => setLista(l => [...l, { titulo: '', texto: '', precio_desde: null, precio_hasta: null }])}
-          className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
-      </div>
-      {lista.length === 0 && <p className="text-sm text-neutral-400">Todavía no hay respuestas rápidas.</p>}
-      <div className="space-y-3">
-        {lista.map((p, i) => (
-          <div key={i} className="border border-neutral-200 rounded-lg p-3 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto (ej. Disponible + envío gratis)"
-                className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
-              <label className="text-xs text-neutral-500 flex items-center gap-1">desde $
-                <input value={p.precio_desde ?? ''} onChange={e => cambiar(i, { precio_desde: num(e.target.value) })} inputMode="decimal"
-                  className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
-              </label>
-              <label className="text-xs text-neutral-500 flex items-center gap-1">menos de $
-                <input value={p.precio_hasta ?? ''} onChange={e => cambiar(i, { precio_hasta: num(e.target.value) })} inputMode="decimal"
-                  className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
-              </label>
-              <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
-            </div>
-            <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={2000}
-              placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center justify-end gap-3">
-        {msg && <span className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.t}</span>}
-        <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
-      </div>
-    </section>
-  )
-}
 
 /** Publicación pausada (sin stock): MercadoLibre no deja responder. Reponer la cantidad desde aquí
  *  (admin) y, si ya hay respuesta escrita, publicarla en el mismo paso. */

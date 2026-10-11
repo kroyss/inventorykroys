@@ -3,7 +3,7 @@
 import type { Pool } from 'pg'
 import { z } from 'zod'
 
-export const FUENTES = ['ia', 'parecida', 'rapida', 'sugerida', 'propia'] as const
+export const FUENTES = ['ia', 'parecida', 'rapida', 'sugerida', 'automatica', 'propia'] as const
 export const OrigenRespuesta = z.object({
   fuente: z.enum(FUENTES).optional(),
   base: z.string().max(4000).optional(),
@@ -28,6 +28,6 @@ export async function registrarOrigen(db: Pool, o: {
       `INSERT INTO respuestas_origen (modulo, ref, fuente, editada, base, texto, usuario_id, plantilla, item_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [o.modulo, o.ref, fuente, base !== null && normal(base) !== normal(o.texto), base, o.texto.trim(),
-       o.usuarioId ? Number(o.usuarioId) : null, ['rapida', 'sugerida'].includes(fuente) ? o.plantilla ?? null : null, o.itemId ?? null])
+       o.usuarioId ? Number(o.usuarioId) : null, ['rapida', 'sugerida', 'automatica'].includes(fuente) ? o.plantilla ?? null : null, o.itemId ?? null])
   } catch (e) { console.error('[respuestas_origen]', e) }
 }

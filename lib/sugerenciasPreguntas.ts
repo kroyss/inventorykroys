@@ -36,15 +36,21 @@ export function temasDe(texto: string): string[] {
   const t = normalizar(texto)
   return Object.entries(TEMAS).filter(([, v]) => v.palabras.some(p => tiene(t, p))).map(([k]) => k)
 }
-export function riesgoDe(texto: string): string | null {
+export function riesgoDe(texto: string, permitidas: string[] = []): string | null {
   const t = normalizar(texto)
   if (/\d/.test(t)) return 'tiene números'
-  return RIESGO.find(p => tiene(t, p)) ?? null
+  return RIESGO.find(p => tiene(t, p) && !permitidas.some(x => normalizar(x) === p || normalizar(x).includes(p))) ?? null
 }
+
+/** Tema propio de una respuesta con palabras propias ("p:<id>"). */
+const temaPropio = (p: Plantilla) => `p:${p.id ?? p.titulo}`
+/** ¿La pregunta trae alguna de las palabras propias de la respuesta? */
+const activaPropia = (p: Plantilla, t: string) => (p.palabras ?? []).some(w => w.trim() && tiene(t, normalizar(w)))
 
 /** Temas que cubre una respuesta rápida: los suyos (disparadores) o, si no tiene, los de su texto. */
 export function temasDePlantilla(p: Plantilla & { temas?: string[] | null }): string[] {
-  return p.temas?.length ? p.temas : temasDe(`${p.titulo} ${p.texto}`)
+  const base = p.temas?.length ? p.temas : temasDe(`${p.titulo} ${p.texto}`)
+  return p.palabras?.some(w => w.trim()) ? [...base, temaPropio(p)] : base
 }
 
 /** ¿La respuesta promete envío gratis? (la de "mínimo 2 unidades… de lo contrario no" no). */
@@ -71,8 +77,12 @@ export type Sugerencia =
  */
 export function sugerir(pregunta: string, item: ItemDatos,
   plantillas: (Plantilla & { temas?: string[] | null; excluidos?: string[] | null })[]): Sugerencia {
-  const temas = temasDe(pregunta)
-  const r = riesgoDe(pregunta)
+  const tn = normalizar(pregunta)
+  // Respuestas con palabras propias que la pregunta trae: suman su tema y esas palabras dejan de ser
+  // "de riesgo" (una respuesta para "MRW, cobro a destino" se activa con "mrw").
+  const propias = plantillas.filter(p => activaPropia(p, tn))
+  const temas = [...temasDe(pregunta), ...propias.map(temaPropio)]
+  const r = riesgoDe(pregunta, propias.flatMap(p => p.palabras ?? []))
   if (r) return { tipo: 'humano', motivo: `depende del caso (${r})`, temas }
   if (!temas.length) return { tipo: 'humano', motivo: 'no se reconoce el tema', temas }
   const candidatas = plantillas.map((p, indice) => ({ p, indice, cubre: temasDePlantilla(p) }))
@@ -90,6 +100,7 @@ export function sugerir(pregunta: string, item: ItemDatos,
   // respuesta estándar y no cuentan como de más.
   const costo = (cubre: string[]) =>
     cubre.filter(t => !temas.includes(t) && !['disponible', 'envio', 'precio'].includes(t)).length * 10 + cubre.length
+      - cubre.filter(t => t.startsWith('p:') && temas.includes(t)).length * 5   // la de palabras propias que activó, primero
   conStock.sort((a, b) => costo(a.cubre) - costo(b.cubre))
   // Una respuesta que agrega un tema especial que NO preguntaron (p. ej. "Retiro" para "¿precio?")
   // no se sugiere: pasa cuando no se sabe el precio y las de envío gratis quedan fuera.
