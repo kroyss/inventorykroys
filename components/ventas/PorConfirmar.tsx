@@ -111,6 +111,24 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
   )
 }
 
+function Grupo({ titulo, nota, filas, d, onConfirmar }: {
+  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void
+}) {
+  if (!filas.length) return null
+  return (
+    <section className="border-b border-neutral-100 last:border-b-0">
+      <div className="flex items-baseline gap-2 bg-neutral-50 px-4 py-2 border-b border-neutral-100">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">{titulo}</h3>
+        <span className="text-xs font-medium text-neutral-400">{filas.length}</span>
+        <span className="hidden sm:inline text-[11px] text-neutral-400">· {nota}</span>
+      </div>
+      <ul className="divide-y divide-neutral-100">
+        {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} />)}
+      </ul>
+    </section>
+  )
+}
+
 export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
@@ -134,6 +152,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
 
   const vigentes = datos.filas.filter(f => !f.vencida)
   const vencidas = datos.filas.filter(f => f.vencida)
+  const conPago = vigentes.filter(f => f.pago && f.pago.verificacion !== 'invalido')
+  const sinPago = vigentes.filter(f => !conPago.includes(f))
 
   return (
     <div className="space-y-3">
@@ -153,9 +173,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         {vigentes.length ? (
-          <ul className="divide-y divide-neutral-100">
-            {vigentes.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} />)}
-          </ul>
+          datos.pagosME ? <>
+            <Grupo titulo="Con pago" nota="Listas para revisar y confirmar" filas={conPago} d={datos} onConfirmar={onConfirmar} />
+            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} />
+          </> : (
+            <ul className="divide-y divide-neutral-100">
+              {vigentes.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} />)}
+            </ul>
+          )
         ) : (
           <div className="px-4 py-10 text-center">
             <p className="text-sm font-medium text-neutral-700">Todo al día</p>
