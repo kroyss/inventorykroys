@@ -111,20 +111,31 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
   )
 }
 
-function Grupo({ titulo, nota, filas, d, onConfirmar }: {
-  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void
+function Grupo({ titulo, nota, filas, d, onConfirmar, plegable }: {
+  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void; plegable?: boolean
 }) {
+  const [abierto, setAbierto] = useState(!plegable)
   if (!filas.length) return null
   return (
     <section className="border-b border-neutral-100 last:border-b-0">
-      <div className="flex items-baseline gap-2 bg-neutral-50 px-4 py-2 border-b border-neutral-100">
+      <button type="button" onClick={() => plegable && setAbierto(a => !a)} disabled={!plegable}
+        className={`flex w-full items-baseline gap-2 bg-neutral-50 px-4 py-2 text-left ${abierto ? 'border-b border-neutral-100' : ''} ${plegable ? 'hover:bg-neutral-100' : 'cursor-default'}`}>
+        {plegable && (
+          <svg className={`h-3 w-3 self-center text-neutral-400 transition-transform ${abierto ? 'rotate-90' : ''}`} viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        )}
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">{titulo}</h3>
         <span className="text-xs font-medium text-neutral-400">{filas.length}</span>
         <span className="hidden sm:inline text-[11px] text-neutral-400">· {nota}</span>
-      </div>
-      <ul className="divide-y divide-neutral-100">
-        {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} />)}
-      </ul>
+        {plegable && <span className="ml-auto text-[11px] text-neutral-400">{abierto ? 'Ocultar' : 'Ver'}</span>}
+      </button>
+      {abierto && (
+        <ul className="divide-y divide-neutral-100">
+          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} />)}
+        </ul>
+      )}
     </section>
   )
 }
@@ -175,7 +186,13 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
         {vigentes.length ? (
           datos.pagosME ? <>
             <Grupo titulo="Con pago" nota="Listas para revisar y confirmar" filas={conPago} d={datos} onConfirmar={onConfirmar} />
-            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} />
+            {!conPago.length && (
+              <div className="px-4 py-6 text-center border-b border-neutral-100">
+                <p className="text-sm font-medium text-neutral-700">Nada con pago por confirmar</p>
+                <p className="mt-1 text-xs text-neutral-400">Cuando un cliente pague, su venta aparece aquí después de buscar los pagos.</p>
+              </div>
+            )}
+            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} plegable />
           </> : (
             <ul className="divide-y divide-neutral-100">
               {vigentes.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} />)}

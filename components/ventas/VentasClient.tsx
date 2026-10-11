@@ -79,7 +79,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const [vistaPC, setVistaPC] = useState(false)
   const [numeroNuevo, setNumeroNuevo] = useState<string | null>(null)
   const pc = usePorConfirmar(porConfirmar)
-  const pendientesPC = pc.datos?.filas.filter(f => !f.vencida).length ?? 0
+  // El número del chip: solo las que tienen pago (las que hay que trabajar; 0 = al día). Sin Pagos ME, todas las vigentes.
+  const pendientesPC = pc.datos?.filas.filter(f => !f.vencida
+    && (!pc.datos!.pagosME || (!!f.pago && f.pago.verificacion !== 'invalido'))).length ?? 0
   // Productos en estado (no solo el prop del server): se refrescan al volver el
   // foco a la pestaña, para detectar stock ajustado o productos nuevos creados
   // en paralelo sin recargar la página.
