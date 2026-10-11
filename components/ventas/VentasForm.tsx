@@ -376,10 +376,11 @@ Revísala en el detalle que se abre ahora.`
           </div>
 
           {numeroCompleto && country === 'VE' && (
-            <PagoDeVenta key={numeroActual} numero={numeroActual} onPago={alPago} puedeVerificar={puedeVerificar}
+            <PagoDeVenta key={`pago-${numeroActual}`} numero={numeroActual} onPago={alPago} puedeVerificar={puedeVerificar}
               pagoOk={pagoOk} onPagoOk={v => setPagoOkDe(v ? numeroActual : null)} />
           )}
-          {mlVenta && <LoQueSeHablo key={numeroActual} numero={numeroActual} />}
+          {/* Claves distintas: son hermanos (con la misma clave React los confunde y los duplica). */}
+          {mlVenta && <LoQueSeHablo key={`hablo-${numeroActual}`} numero={numeroActual} />}
 
           {/* Lo que compró en MercadoLibre */}
           {mlVenta && mlVenta.items.length > 0 && (() => {

@@ -24,7 +24,7 @@ export const MAX_ARCHIVO = 5 * 1024 * 1024
 export const PEDIDO_VIGENTE_MIN = 30
 /** En pantalla, una traída se muestra "trayendo" a lo sumo esto (una normal tarda 1–2 min): pasado
  *  este tiempo, la cuenta que no respondió se muestra como "no respondió: revisa la PC". */
-export const TRAIDA_EN_CURSO_MIN = 6
+export const TRAIDA_EN_CURSO_MIN = 5
 /** Sin latido en estos minutos, el perfil se muestra como desconectado. */
 export const LATIDO_MIN = 3
 
