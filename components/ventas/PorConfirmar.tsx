@@ -149,6 +149,31 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
   const [error, setError] = useState<string | null>(null)
   const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
   const [verVencidas, setVerVencidas] = useState(false)
+  // "Traer ME" (2026-10-12; Pagos ME salió del menú de los usuarios): le pide a la PC del vigilante que traiga
+  // los pagos y guías del portal. Tarda 1-3 min: se recarga la lista cada 10 s hasta que llega la búsqueda nueva.
+  const [pidiendoME, setPidiendoME] = useState<number | null>(null)
+  const [avisoME, setAvisoME] = useState<string | null>(null)
+  const ultimaME = datos?.ultimaBusqueda ? new Date(datos.ultimaBusqueda).getTime() : 0
+  // Buscando = se pidió y todavía no llegó una búsqueda terminada después del pedido.
+  const buscandoME = pidiendoME != null && ultimaME < pidiendoME - 5000
+  useEffect(() => {
+    if (!buscandoME || pidiendoME == null) return
+    const t = setInterval(() => {
+      if (Date.now() - pidiendoME > 5 * 60_000) {
+        setPidiendoME(null)
+        setAvisoME('La PC de los pagos no respondió en 5 minutos: revisa que esté encendida (Pagos MercadoEnvíos, en el menú de la cuenta del administrador).')
+        return
+      }
+      onRecargar()
+    }, 10_000)
+    return () => clearInterval(t)
+  }, [buscandoME, pidiendoME, onRecargar])
+  const traerME = async () => {
+    setAvisoME(null)
+    const r = await fetch('/api/pagos-me/traer', { method: 'POST' }).catch(() => null)
+    if (r?.ok) setPidiendoME(Date.now())
+    else setAvisoME('No se pudo pedir la búsqueda de pagos.')
+  }
 
   const actualizar = async () => {
     setActualizando(true); setError(null)
@@ -179,15 +204,28 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
                   {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'venta nueva' : 'ventas nuevas'}` : 'nada nuevo'}
                 </b>)</>
             : datos.sincronizadas_at && <> (última: <b className="text-neutral-700">{hora(datos.sincronizadas_at)}</b>)</>}.
-          Al confirmar se abre la venta con el cliente, el pago y los productos cargados.
+          {datos.pagosME && <> Pagos: {buscandoME
+            ? <b className="text-violet-700">buscando en MercadoEnvíos (1 a 3 min)…</b>
+            : datos.ultimaBusqueda ? <>última búsqueda <b className="text-neutral-700">{hora(datos.ultimaBusqueda)}</b></> : 'sin buscar todavía'}.</>}
+          {' '}Al confirmar se abre la venta con el cliente, el pago y los productos cargados.
         </p>
-        <button type="button" onClick={actualizar} disabled={actualizando}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
-          <IconoActualizar girando={actualizando} />
-          {actualizando ? 'Trayendo…' : 'Traer nuevas'}
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
+            <IconoActualizar girando={actualizando} />
+            {actualizando ? 'Trayendo…' : 'Traer ML'}
+          </button>
+          {datos.pagosME && (
+            <button type="button" onClick={traerME} disabled={buscandoME} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
+              <IconoActualizar girando={buscandoME} />
+              {buscandoME ? 'Buscando pagos…' : 'Traer ME'}
+            </button>
+          )}
+        </div>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
+      {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         {vigentes.length ? (

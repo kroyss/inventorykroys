@@ -14,7 +14,8 @@ export async function GET() {
     const { dias, filas } = await ventasPorConfirmar(s.db)
     let ultimaBusqueda: string | null = null
     if (tieneModulo(s.session.user, 'pagos_me')) {
-      const { rows: [p] } = await s.db.query(`SELECT pedido_at, resultados FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`)
+      // La última búsqueda TERMINADA (un pedido recién hecho, sin resultados, no cuenta: "Traer ME" espera la nueva).
+      const { rows: [p] } = await s.db.query(`SELECT pedido_at, resultados FROM me_pedidos WHERE resultados <> '{}'::jsonb ORDER BY pedido_at DESC LIMIT 1`)
       const fin = Object.values((p?.resultados ?? {}) as Record<string, { at: string }>).map(r => r.at).sort().pop()
       ultimaBusqueda = fin ?? (p ? new Date(p.pedido_at).toISOString() : null)
     }
