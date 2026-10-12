@@ -13,6 +13,7 @@ interface Calificacion {
   fecha: string; rating: string; antes: string | null; calificada_at: string; mensaje: string | null
   vista_at: string | null; dias_restantes: number; con_mensajes: boolean
   contradictoria: boolean; concretada: boolean | null
+  cambio_estado: string | null; cambio_at: string | null
 }
 interface Datos { cuentas: Cuenta[]; calificaciones: Calificacion[]; dias: number; pais: 'VE' | 'CO'; por_revisar: number }
 
@@ -103,12 +104,17 @@ function TarjetaCuenta({ c }: { c: Cuenta }) {
   )
 }
 
-function FilaCalificacion({ c, pais, onVista, ocupado }: {
-  c: Calificacion; pais: 'VE' | 'CO'; onVista: (c: Calificacion, v: boolean) => void; ocupado: boolean
+// Estado del pedido de cambio, como lo informa ML (purchase.change_request.status).
+const CAMBIO: Record<string, string> = { pending: 'esperando respuesta del comprador', rejected: 'el comprador no la cambió',
+  accepted: 'el comprador aceptó', expired: 'el comprador no respondió' }
+
+function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
+  c: Calificacion; pais: 'VE' | 'CO'; onVista: (c: Calificacion, v: boolean) => void; onPedido: (c: Calificacion) => void; ocupado: boolean
 }) {
   const cambio = !!c.antes && c.rating !== c.antes
   // Neutral o negativa sin cambiar: se puede pedir el cambio (una positiva solo aparece si es contradictoria).
-  const pedible = !cambio && (c.rating === 'neutral' || c.rating === 'negative')
+  const pedido = !!c.cambio_estado
+  const pedible = !cambio && !pedido && (c.rating === 'neutral' || c.rating === 'negative')
   const negativa = c.rating === 'negative'
   const urgente = c.dias_restantes <= 5
   const etiqueta = cambio
@@ -122,12 +128,9 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
   // la cambia, queda. Por eso se confirma antes de abrirla.
   const urlCambio = `https://feedback.mercadolibre.com.${pais === 'CO' ? 'co' : 've'}/changeRequest?orderId=${c.id}`
   const confirmarCambio = (e: React.MouseEvent) => {
-    if (!window.confirm(`Pedir el cambio de calificación a ${c.nombre ?? c.nick ?? 'este comprador'}.
-
-`
-      + `MercadoLibre deja pedirlo UNA sola vez por venta. Se abre en MercadoLibre: tienes que estar dentro con la cuenta ${c.cuenta}.
-
-¿Abrir?`)) e.preventDefault()
+    if (!window.confirm(`Pedir el cambio de calificación a ${c.nombre ?? c.nick ?? 'este comprador'}.\n\n`
+      + `MercadoLibre deja pedirlo UNA sola vez por venta. Se abre en MercadoLibre: tienes que estar dentro con la cuenta ${c.cuenta}.\n\n¿Abrir?`)) e.preventDefault()
+    else onPedido(c)
   }
   return (
     <li className={`px-4 py-3 ${c.vista_at || cambio ? 'bg-neutral-50/60' : ''}`}>
@@ -149,8 +152,17 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
           {c.productos && <p className="mt-1 truncate text-xs text-neutral-600" title={c.productos}>{c.productos}</p>}
           {c.mensaje && <p className="mt-1.5 border-l-2 border-neutral-200 pl-2 text-xs italic text-neutral-600">“{c.mensaje}”</p>}
           <p className="mt-1 text-[11px] text-neutral-400">Calificó {hace(c.calificada_at)} · {c.cuenta} · venta {c.pack}</p>
+          {pedido && !cambio && (
+            <p className="mt-1 text-[11px] text-sky-700">
+              Cambio pedido {hace(c.cambio_at ?? c.calificada_at)}: {CAMBIO[c.cambio_estado!] ?? c.cambio_estado}.
+              {c.cambio_estado === 'pending' && ' Si no responde en 5 días, ML quita la calificación.'}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+          {pedido && !cambio && (
+            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Cambio pedido</span>
+          )}
           {pedible && (
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${urgente ? 'bg-red-50 text-red-700' : 'bg-neutral-100 text-neutral-600'}`}
               title="ML deja pedir el cambio hasta 30 días después de recibirla">
@@ -165,7 +177,7 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
             {c.con_mensajes
               ? <Link href={`/mensajes?pack=${c.pack}`} className="btn-secondary text-xs">Escribirle</Link>
               : <a href={urlML} target="_blank" rel="noreferrer" className="btn-secondary text-xs" title="Abre la venta en MercadoLibre para escribirle">Escribirle en ML</a>}
-            {!cambio && (
+            {!cambio && !pedido && (
               <button type="button" onClick={() => onVista(c, !c.vista_at)} disabled={ocupado} className="btn-secondary text-xs">
                 {c.vista_at ? 'Volver a avisar' : 'Ya la vi'}
               </button>
@@ -197,11 +209,19 @@ export default function ReputacionClient() {
     if (!r.ok) { setError('No se pudo guardar'); return }
     setDatos(d => d && { ...d, calificaciones: d.calificaciones.map(x => x.id === c.id ? { ...x, vista_at: vista ? new Date().toISOString() : null } : x) })
   }
+  // Abrió "Pedir cambio": queda como pedido (el cron lo confirma con ML en la próxima pasada).
+  const pedir = (c: Calificacion) => {
+    fetch('/api/reputacion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id, pedido: true }) }).catch(() => {})
+    setDatos(d => d && { ...d, calificaciones: d.calificaciones.map(x => x.id === c.id
+      ? { ...x, cambio_estado: x.cambio_estado ?? 'pending', cambio_at: x.cambio_at ?? new Date().toISOString() } : x) })
+  }
 
   const lista = datos?.calificaciones ?? []
   const cambiadas = lista.filter(c => c.antes && c.rating !== c.antes)
-  const pendientes = lista.filter(c => !cambiadas.includes(c) && !c.vista_at)
-  const vistas = lista.filter(c => !cambiadas.includes(c) && c.vista_at)
+  // Atendidas: cambiadas, con el cambio pedido o marcadas "Ya la vi".
+  const pedidas = lista.filter(c => !cambiadas.includes(c) && c.cambio_estado)
+  const pendientes = lista.filter(c => !cambiadas.includes(c) && !pedidas.includes(c) && !c.vista_at)
+  const vistas = lista.filter(c => !cambiadas.includes(c) && !pedidas.includes(c) && c.vista_at)
   const negativas = pendientes.filter(c => c.rating === 'negative').length
   const neutrales = pendientes.filter(c => c.rating === 'neutral').length
   const contradictorias = pendientes.filter(c => c.contradictoria).length
@@ -230,20 +250,20 @@ export default function ReputacionClient() {
             </div>
             {pendientes.length ? (
               <ul className="divide-y divide-neutral-100">
-                {pendientes.map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} ocupado={ocupado === c.id} />)}
+                {pendientes.map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} ocupado={ocupado === c.id} />)}
               </ul>
             ) : (
               <EmptyState message={`Ninguna neutral ni negativa por atender en los últimos ${datos.dias} días.`} />
             )}
           </div>
 
-          {(cambiadas.length > 0 || vistas.length > 0) && (
+          {(cambiadas.length > 0 || pedidas.length > 0 || vistas.length > 0) && (
             <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
               <div className="border-b border-neutral-100 bg-neutral-50 px-4 py-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Ya vistas o cambiadas</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Atendidas: cambio pedido, cambiadas o vistas</h2>
               </div>
               <ul className="divide-y divide-neutral-100">
-                {[...cambiadas, ...vistas].map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} ocupado={ocupado === c.id} />)}
+                {[...pedidas, ...cambiadas, ...vistas].map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} ocupado={ocupado === c.id} />)}
               </ul>
             </div>
           )}

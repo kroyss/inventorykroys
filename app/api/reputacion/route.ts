@@ -10,6 +10,8 @@ import { DIAS_AVISO } from '@/lib/reputacionML'
 // GET  → termómetro de cada cuenta + neutrales/negativas de los últimos DIAS_AVISO días (y las que se cambiaron
 //        y las contradictorias, aunque sean positivas: esas no cuentan en el menú).
 // POST → { id, vista } marca (o desmarca) una calificación como vista: deja de contar en el menú.
+//        { id, pedido: true } al abrir "Pedir cambio": se da por pedido ya y se vuelve a mirar en ML en la próxima
+//        pasada del cron (si en ML no figura el pedido, vuelve a aparecer el botón).
 export async function GET() {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
@@ -23,6 +25,7 @@ export async function GET() {
               o.productos, o.fecha, o.cal_recibida AS rating, o.cal_recibida_antes AS antes, o.cal_recibida_at AS calificada_at,
               o.cal_recibida_msg AS mensaje, o.cal_recibida_vista_at AS vista_at,
               COALESCE(o.cal_contradictoria, false) AS contradictoria, o.cal_recibida_concretada AS concretada,
+              o.cal_cambio_estado AS cambio_estado, o.cal_cambio_at AS cambio_at,
               GREATEST(0, CEIL(EXTRACT(EPOCH FROM (o.cal_recibida_at + make_interval(days => $1) - NOW())) / 86400))::int AS dias_restantes,
               c.pack_id IS NOT NULL AS con_mensajes
        FROM ml_ordenes o
@@ -40,15 +43,21 @@ export async function GET() {
   }
 }
 
-const Body = z.object({ id: z.string().regex(/^\d{5,20}$/), vista: z.boolean() })
+const Body = z.object({ id: z.string().regex(/^\d{5,20}$/), vista: z.boolean().optional(), pedido: z.literal(true).optional() })
 
 export async function POST(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   if (!puede(s.session.user, 'ver_calificaciones')) return forbidden()
   try {
-    const { id, vista } = Body.parse(await req.json())
-    await s.db.query(`UPDATE ml_ordenes SET cal_recibida_vista_at = CASE WHEN $2 THEN NOW() END WHERE id = $1`, [id, vista])
+    const { id, vista, pedido } = Body.parse(await req.json())
+    if (pedido) {
+      await s.db.query(
+        `UPDATE ml_ordenes SET cal_cambio_estado = COALESCE(cal_cambio_estado, 'pending'), cal_cambio_at = COALESCE(cal_cambio_at, NOW()),
+                cal_recibida_revisada_at = NULL WHERE id = $1`, [id])
+    } else if (vista !== undefined) {
+      await s.db.query(`UPDATE ml_ordenes SET cal_recibida_vista_at = CASE WHEN $2 THEN NOW() END WHERE id = $1`, [id, vista])
+    }
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message ?? err.message }, { status: 400 })

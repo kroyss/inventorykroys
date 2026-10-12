@@ -13,6 +13,7 @@ export const DIAS_AVISO = 30
 const HORAS_REPUTACION = 6
 const POR_PASADA = 15
 const DIAS_BUSCAR = 60          // ventas más viejas no interesan (su aviso ya habría vencido)
+const HORAS_REVISAR = 3         // neutrales/negativas: cada cuánto se vuelven a mirar (¿la cambió? ¿se pidió el cambio?)
 
 export interface Reputacion {
   level_id: string | null                 // "5_green", "4_light_green", "3_yellow", "2_orange", "1_red"
@@ -30,8 +31,11 @@ export async function leerReputacion(db: Pool, conexionId: number, mlUserId: str
 
 // concretada: lo que dijo el comprador; contradictoria: si no coincide con lo que dijimos nosotros
 // (null = nosotros todavía no calificamos).
-type Calif = { rating: string; fecha: string | null; mensaje: string | null; concretada: boolean | null; contradictoria: boolean | null }
-type LadoFeedback = { rating?: string; date_created?: string; message?: string | null; fulfilled?: boolean | null } | null
+// cambio: el pedido de cambio de calificación (lo pide el vendedor en la página de ML, no por API).
+type Calif = { rating: string; fecha: string | null; mensaje: string | null; concretada: boolean | null; contradictoria: boolean | null
+               cambio: { estado: string; fecha: string | null } | null }
+type LadoFeedback = { rating?: string; date_created?: string; message?: string | null; fulfilled?: boolean | null
+                      change_request?: { status?: string; sent_date?: string } | null } | null
 /** La calificación que dejó el comprador en una venta. null = ML no la tiene (404). */
 export async function leerCalificacionRecibida(db: Pool, conexionId: number, ordenId: string): Promise<Calif | null> {
   try {
@@ -40,7 +44,9 @@ export async function leerCalificacionRecibida(db: Pool, conexionId: number, ord
     const suya = typeof f.purchase.fulfilled === 'boolean' ? f.purchase.fulfilled : null
     const nuestra = typeof f.sale?.fulfilled === 'boolean' ? f.sale.fulfilled : null
     return { rating: f.purchase.rating, fecha: f.purchase.date_created ?? null, mensaje: f.purchase.message?.trim() || null,
-             concretada: suya, contradictoria: suya === null || nuestra === null ? null : suya !== nuestra }
+             concretada: suya, contradictoria: suya === null || nuestra === null ? null : suya !== nuestra,
+             cambio: f.purchase.change_request?.status
+               ? { estado: f.purchase.change_request.status, fecha: f.purchase.change_request.sent_date ?? null } : null }
   } catch (e) {
     if (e instanceof ErrorML && e.status === 404) return null
     throw e
@@ -66,9 +72,10 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
        (cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - make_interval(days => $2))
        OR (cal_recibida_at > NOW() - make_interval(days => $3)
            AND (cal_recibida IN ('neutral', 'negative') OR (cal_recibida <> '' AND cal_contradictoria IS NULL AND cal_vendedor IS NOT NULL))
-           AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - INTERVAL '1 day')))
+           AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - make_interval(hours =>
+                CASE WHEN cal_recibida IN ('neutral', 'negative') THEN $5 ELSE 24 END))))
      ORDER BY cal_recibida IS NULL DESC, fecha DESC LIMIT $4`,
-    [conexionId, DIAS_BUSCAR, DIAS_AVISO, POR_PASADA])
+    [conexionId, DIAS_BUSCAR, DIAS_AVISO, POR_PASADA, HORAS_REVISAR])
   for (const o of rows) {
     const cal = await leerCalificacionRecibida(db, conexionId, o.id)
     await db.query(
@@ -78,12 +85,14 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
                                    THEN cal_recibida ELSE cal_recibida_antes END,
          cal_recibida = COALESCE($2, ''), cal_recibida_at = COALESCE($3::timestamptz, cal_recibida_at),
          cal_recibida_msg = COALESCE($4, cal_recibida_msg), cal_recibida_revisada_at = NOW(),
-         cal_recibida_concretada = $5, cal_contradictoria = $6
-       WHERE id = $1`, [o.id, cal?.rating ?? null, cal?.fecha ?? null, cal?.mensaje ?? null, cal?.concretada ?? null, cal?.contradictoria ?? null])
+         cal_recibida_concretada = $5, cal_contradictoria = $6, cal_cambio_estado = $7, cal_cambio_at = $8::timestamptz
+       WHERE id = $1`, [o.id, cal?.rating ?? null, cal?.fecha ?? null, cal?.mensaje ?? null, cal?.concretada ?? null, cal?.contradictoria ?? null,
+                        cal?.cambio?.estado ?? null, cal?.cambio?.fecha ?? null])
   }
   return rows.length
 }
 
-/** Lo que cuenta en el menú: neutrales y negativas de los últimos DIAS_AVISO días que nadie marcó como vistas. */
+/** Lo que cuenta en el menú: neutrales y negativas de los últimos DIAS_AVISO días que nadie marcó como vistas
+ *  ni tienen el cambio pedido (ahí ya no queda nada por hacer). */
 export const SQL_AVISO_REPUTACION = `cal_recibida IN ('neutral', 'negative')
-  AND cal_recibida_at > NOW() - INTERVAL '${DIAS_AVISO} days' AND cal_recibida_vista_at IS NULL`
+  AND cal_recibida_at > NOW() - INTERVAL '${DIAS_AVISO} days' AND cal_recibida_vista_at IS NULL AND cal_cambio_estado IS NULL`
