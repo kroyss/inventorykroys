@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
-import PorConfirmar, { usePorConfirmar } from './PorConfirmar'
+import PorConfirmar, { usePorConfirmar, pendientesPorConfirmar, NumeroBoton } from './PorConfirmar'
 import FacturaForm from '@/components/facturas/FacturaForm'
 import { bs, type Invoice } from '@/lib/invoices'
 import { Pagination, PageHeader, StatusBadge, chipCls } from '@/components/ui'
@@ -83,8 +83,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const [numeroNuevo, setNumeroNuevo] = useState<string | null>(null)
   const pc = usePorConfirmar(porConfirmar)
   // El número del chip: solo las que tienen pago (las que hay que trabajar; 0 = al día). Sin Pagos ME, todas las vigentes.
-  const pendientesPC = pc.datos?.filas.filter(f => !f.vencida
-    && (!pc.datos!.pagosME || (!!f.pago && f.pago.verificacion !== 'invalido'))).length ?? 0
+  const pendientesPC = pendientesPorConfirmar(pc.datos)
   // Productos en estado (no solo el prop del server): se refrescan al volver el
   // foco a la pestaña, para detectar stock ajustado o productos nuevos creados
   // en paralelo sin recargar la página.
@@ -192,9 +191,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const [urlEstado] = useDeepLinkParam('estado', DEEP_LINK_STATUSES)
   useEffect(() => { if (urlEstado) setFilter(urlEstado as Filter) }, [urlEstado])
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('new') === '1') {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('new') === '1') {
       setEditing(null); setShowForm(true)
-    }
+    } else if (q.get('vista') === 'confirmar' && porConfirmar) setVistaPC(true)
   }, [])
 
   // Guard de "última petición": al entrar desde el dashboard salen dos consultas
@@ -346,9 +346,19 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   return (
     <div>
       <PageHeader title="Ventas" subtitle="Órdenes de MercadoLibre y ventas locales" actions={
-        <button onClick={() => { setEditing(null); setShowForm(true) }} className="btn-primary text-sm whitespace-nowrap">
-          Nueva venta
-        </button>
+        <>
+          {/* Con ML conectado lo normal es confirmar las ventas que ya llegaron; "Nueva venta" queda para lo suelto (LOCAL…). */}
+          {porConfirmar && (
+            <button onClick={() => setVistaPC(true)} title="Ventas de MercadoLibre que todavía no están registradas"
+              className="btn-primary text-sm whitespace-nowrap">
+              Por confirmar<NumeroBoton n={pendientesPC} cargando={!pc.datos} />
+            </button>
+          )}
+          <button onClick={() => { setEditing(null); setShowForm(true) }}
+            className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>
+            + Nueva venta
+          </button>
+        </>
       } />
       {error && (
         <div className="mb-3 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded">{error}</div>

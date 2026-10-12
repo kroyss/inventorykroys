@@ -6,6 +6,7 @@ import BonusPipeline from './BonusPipeline'
 import SalesMiniChart from './SalesMiniChart'
 import { parseLocalDate } from '@/lib/tz'
 import AvisoStockVerificar from './AvisoStockVerificar'
+import { usePorConfirmar, pendientesPorConfirmar } from '@/components/ventas/PorConfirmar'
 
 interface Summary {
   active_products: number
@@ -40,11 +41,14 @@ interface Rate {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
-export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true }: {
+export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true, porConfirmar = false }: {
   country: Country; bonos: boolean; importaciones: boolean
+  porConfirmar?: boolean     // cuentas de ML conectadas: tarjeta "Por confirmar" (lo normal) antes de "Nueva venta"
   verificarPagos?: boolean   // módulo verificar_pagos: sin él (Inventario simple) no hay "Pago verificado" ni "Por descargar"
   etapas?: boolean           // módulo compras_etapas: sin él no hay recepciones en camino
 }) {
+  const pc = usePorConfirmar(porConfirmar)
+  const pendientesPC = pendientesPorConfirmar(pc.datos)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [saleCounts, setSaleCounts] = useState<SaleStateCounts>({ borrador: 0, verificado: 0, procesada: 0 })
   const [recv, setRecv] = useState<ReceptionCounts>({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
@@ -86,10 +90,17 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
       <AvisoStockVerificar n={(summary as { por_verificar?: number }).por_verificar ?? 0} />
       {/* ───────── Ventas ───────── */}
       <Panel title="Ventas">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? (verificarPagos ? 'md:grid-cols-5' : 'md:grid-cols-4') : (verificarPagos ? 'md:grid-cols-4' : 'md:grid-cols-3')}`}>
+          {porConfirmar && (
+            <Link href="/ventas?vista=confirmar" title="Ventas de MercadoLibre que todavía no están registradas"
+              className="rounded-xl bg-neutral-900 p-3 text-white transition hover:bg-neutral-800 flex flex-col items-center justify-center text-center">
+              <div className="text-sm font-semibold">Por confirmar</div>
+              <div className={`text-2xl font-bold mt-1 num ${pendientesPC > 0 ? 'text-white' : 'text-white/50'}`}>{pc.datos ? pendientesPC : '·'}</div>
+            </Link>
+          )}
           <Link href="/ventas?new=1"
             className="rounded-xl border-2 border-dashed border-green-300 hover:border-green-500 hover:bg-green-50/30 p-3 transition flex flex-col items-center justify-center text-center">
-            <div className="text-sm font-semibold text-emerald-700">Nueva venta</div>
+            <div className="text-sm font-semibold text-emerald-700">{porConfirmar ? '+ Nueva venta' : 'Nueva venta'}</div>
             <div className="text-2xl font-bold text-green-600 mt-1">+</div>
           </Link>
           <StatCard label="Borrador"        value={saleCounts.borrador}
