@@ -114,11 +114,18 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
   const cambio = !!c.antes && c.rating !== c.antes
   // Neutral o negativa sin cambiar: se puede pedir el cambio (una positiva solo aparece si es contradictoria).
   const pedido = !!c.cambio_estado
+  // ML le da 5 días al comprador para responder el pedido de cambio.
+  const diasRespuesta = c.cambio_at ? Math.max(0, 5 - Math.floor((Date.now() - new Date(c.cambio_at).getTime()) / 86_400_000)) : 0
   const pedible = !cambio && !pedido && (c.rating === 'neutral' || c.rating === 'negative')
   const negativa = c.rating === 'negative'
   const urgente = c.dias_restantes <= 5
+  // Cómo terminó (se compara lo que era con lo que hay ahora en ML).
+  const nombre = (r: string | null) => r === 'negative' ? 'negativa' : r === 'neutral' ? 'neutral' : 'positiva'
   const etiqueta = cambio
-    ? { txt: `La cambió: era ${c.antes === 'negative' ? 'negativa' : 'neutral'}${c.rating === 'positive' ? ', ahora positiva' : ''}`, cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' }
+    ? (!c.rating ? { txt: `ML la quitó (era ${nombre(c.antes)})`, cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' }
+      : c.antes === 'neutral' && c.rating === 'negative'
+        ? { txt: 'Empeoró: de neutral a negativa', cls: 'bg-red-50 text-red-700', dot: 'bg-red-500' }
+        : { txt: `La cambió: de ${nombre(c.antes)} a ${nombre(c.rating)}`, cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' })
     : negativa ? { txt: 'Negativa', cls: 'bg-red-50 text-red-700', dot: 'bg-red-500' }
     : c.rating === 'positive' ? { txt: 'Positiva', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' }
     : { txt: 'Neutral', cls: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' }
@@ -154,8 +161,10 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
           <p className="mt-1 text-[11px] text-neutral-400">Calificó {hace(c.calificada_at)} · {c.cuenta} · venta {c.pack}</p>
           {pedido && !cambio && (
             <p className="mt-1 text-[11px] text-sky-700">
-              Cambio pedido {hace(c.cambio_at ?? c.calificada_at)}: {CAMBIO[c.cambio_estado!] ?? c.cambio_estado}.
-              {c.cambio_estado === 'pending' && ' Si no responde en 5 días, ML quita la calificación.'}
+              Cambio pedido {hace(c.cambio_at ?? c.calificada_at)}: {CAMBIO[c.cambio_estado!] ?? c.cambio_estado}
+              {c.cambio_estado === 'pending' && (diasRespuesta > 0
+                ? ` · le quedan ${diasRespuesta} ${diasRespuesta === 1 ? 'día' : 'días'} para responder; si no, ML la quita.`
+                : ' · ya pasaron los 5 días: ML debería quitarla en estos días.')}
             </p>
           )}
         </div>

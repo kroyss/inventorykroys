@@ -34,13 +34,21 @@ export async function leerReputacion(db: Pool, conexionId: number, mlUserId: str
 // cambio: el pedido de cambio de calificación (lo pide el vendedor en la página de ML, no por API).
 type Calif = { rating: string; fecha: string | null; mensaje: string | null; concretada: boolean | null; contradictoria: boolean | null
                cambio: { estado: string; fecha: string | null } | null }
-type LadoFeedback = { rating?: string; date_created?: string; message?: string | null; fulfilled?: boolean | null
+type LadoFeedback = { rating?: string; date_created?: string; message?: string | null; fulfilled?: boolean | null; status?: string
                       change_request?: { status?: string; sent_date?: string } | null } | null
-/** La calificación que dejó el comprador en una venta. null = ML no la tiene (404). */
+// Estados conocidos; uno nuevo se anota en el log para ajustar los textos (2026-10-12: todavía no vimos
+// cómo informa ML una calificación quitada por no responder al pedido de cambio).
+const ESTADOS_CAMBIO = ['pending', 'rejected', 'accepted', 'expired']
+/** La calificación que dejó el comprador en una venta. null = ML no la tiene (404) o ya no cuenta
+ *  (status distinto de 'active': p. ej. la quitó ML porque no respondió al pedido de cambio). */
 export async function leerCalificacionRecibida(db: Pool, conexionId: number, ordenId: string): Promise<Calif | null> {
   try {
     const f = await mlFetch<{ purchase?: LadoFeedback; sale?: LadoFeedback }>(db, conexionId, `/orders/${ordenId}/feedback`)
-    if (!f.purchase?.rating) return null
+    const est = f.purchase?.status, pedido = f.purchase?.change_request?.status
+    if ((est && est !== 'active') || (pedido && !ESTADOS_CAMBIO.includes(pedido))) {
+      console.log('[reputacion] estado de ML', ordenId, JSON.stringify({ status: est, change_request: f.purchase?.change_request }))
+    }
+    if (!f.purchase?.rating || (est && est !== 'active')) return null
     const suya = typeof f.purchase.fulfilled === 'boolean' ? f.purchase.fulfilled : null
     const nuestra = typeof f.sale?.fulfilled === 'boolean' ? f.sale.fulfilled : null
     return { rating: f.purchase.rating, fecha: f.purchase.date_created ?? null, mensaje: f.purchase.message?.trim() || null,
