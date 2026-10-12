@@ -26,9 +26,11 @@ export interface ContextoVenta {
   items: ItemOfertado[]
   total: number | null; moneda: string | null
   notas: string[]
-  mensajes: { propio: boolean; texto: string; fecha: string }[]
+  mensajes: { propio: boolean; texto: string; fecha: string; adjuntos: AdjuntoMensaje[] }[]
   preguntas: PreguntaPrevia[]
 }
+/** Adjunto de un mensaje: se ve por /api/mensajes/[pack]/adjunto (lo trae de ML, solo de ese hilo). */
+export interface AdjuntoMensaje { url: string; nombre: string; imagen: boolean }
 
 const MAX_MENSAJES = 8
 
@@ -73,8 +75,12 @@ export async function contextoDeVenta(db: Pool, numero: string): Promise<Context
   const notas = await leerNotas(db, conexionId, numero).then(r => r.notas.map(n => n.texto.trim()).filter(Boolean)).catch(() => [])
   const hilo = await leerHilo(db, conexionId, pack, Number(c.ml_user_id), false).catch(() => null)
   const preguntas = comprador?.id ? await preguntasDeComprador(db, comprador.id, null, 10).catch(() => []) : []
-  const mensajes = (hilo?.mensajes ?? []).filter(m => m.texto?.trim()).slice(-MAX_MENSAJES)
-    .map(m => ({ propio: m.propio, texto: m.texto, fecha: m.fecha }))
+  const mensajes = (hilo?.mensajes ?? []).filter(m => m.texto?.trim() || m.adjuntos.length).slice(-MAX_MENSAJES)
+    .map(m => ({ propio: m.propio, texto: m.texto ?? '', fecha: m.fecha,
+      adjuntos: m.adjuntos.map(a => ({
+        url: `/api/mensajes/${pack}/adjunto?f=${encodeURIComponent(a.archivo)}`, nombre: a.nombre,
+        imagen: !!a.tipo?.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(a.archivo),
+      })) }))
 
   const total = ordenes.reduce((s, o) => s + (o.total_amount ?? 0), 0)
   return {

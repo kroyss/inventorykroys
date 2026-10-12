@@ -18,7 +18,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
   const f = new URL(req.url).searchParams.get('f') ?? ''
   if (!/^\d+$/.test(pack) || !/^[\w.\-]{1,200}$/.test(f)) return NextResponse.json({ error: 'Adjunto inválido' }, { status: 400 })
   try {
-    const { rows: [c] } = await s.db.query(`SELECT conexion_id FROM ml_conversaciones WHERE pack_id = $1`, [pack])
+    const { rows: [c] } = await s.db.query(
+      `SELECT conexion_id FROM ml_conversaciones WHERE pack_id = $1::bigint
+       UNION ALL SELECT conexion_id FROM ml_ordenes WHERE COALESCE(pack_id, id) = $1::bigint
+       LIMIT 1`, [pack])
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
     const r = await adjuntoDeHilo(s.db, c.conexion_id, pack, f)
     if (!r) return NextResponse.json({ error: 'El adjunto no es de esta conversación' }, { status: 404 })

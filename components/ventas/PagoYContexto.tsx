@@ -323,7 +323,7 @@ interface Contexto {
   items: { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; imagen: string | null; link: string | null }[]
   total: number | null; moneda: string | null
   notas: string[]
-  mensajes: { propio: boolean; texto: string; fecha: string }[]
+  mensajes: { propio: boolean; texto: string; fecha: string; adjuntos?: { url: string; nombre: string; imagen: boolean }[] }[]
   preguntas: { id: string; item_titulo: string | null; texto: string; respuesta: string | null; fecha: string }[]
 }
 
@@ -398,6 +398,20 @@ export function LoQueSeHablo({ numero }: { numero: string }) {
                       {ctx.mensajes.map((m, k) => (
                         <div key={k} className={`rounded-lg px-3 py-2 max-w-[85%] ${m.propio ? 'ml-auto bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-900'}`}>
                           {plano(m.texto)}
+                          {!!m.adjuntos?.length && (
+                            <div className={`flex flex-wrap gap-2 ${m.texto.trim() ? 'mt-2' : ''}`}>
+                              {m.adjuntos.map(a => a.imagen ? (
+                                <a key={a.url} href={a.url} target="_blank" rel="noreferrer" title="Ver en grande">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={a.url} alt={a.nombre} loading="lazy"
+                                    className="max-h-44 max-w-full rounded-md border border-black/10 bg-white" />
+                                </a>
+                              ) : (
+                                <a key={a.url} href={a.url} target="_blank" rel="noreferrer"
+                                  className="text-xs underline underline-offset-2 opacity-80 hover:opacity-100">📎 {a.nombre}</a>
+                              ))}
+                            </div>
+                          )}
                           <div className={`text-[10px] mt-0.5 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
                             {m.propio ? 'Tú' : 'Comprador'} · {hora(m.fecha)}
                           </div>
