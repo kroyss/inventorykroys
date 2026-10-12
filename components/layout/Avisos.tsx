@@ -12,7 +12,9 @@ const Ctx = createContext<Avisos>(VACIO)
 
 export function useAvisos() { return useContext(Ctx) }
 
-/** Cuántos avisos tiene cada página del menú (urgente = rojo, si no ámbar). */
+/** Cuántos avisos tiene cada página del menú. Dos estilos (2026-10-12):
+ *  urgente = ALERTA (rojo): preguntas y mensajes sin responder, calificaciones negativas.
+ *  si no = TRABAJO del día (gris): despachos, reportador, por calificar, stock; y las neutrales. */
 export const AVISO_DE_RUTA: Record<string, { clave: keyof Avisos; urgente: boolean }> = {
   '/preguntas':  { clave: 'preguntas',  urgente: true },
   '/mensajes':   { clave: 'mensajes',   urgente: true },
@@ -22,19 +24,25 @@ export const AVISO_DE_RUTA: Record<string, { clave: keyof Avisos; urgente: boole
   '/alertas-stock': { clave: 'alertas', urgente: false },
 }
 
-/** Reputación lleva DOS numeritos: negativas (rojo) y neutrales (naranja). */
+const tope = (n: number) => (n > 99 ? '99+' : n)
+const PILDORA = 'inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 text-[11px] font-semibold leading-none num'
+
+/** Me calificaron: una sola cápsula partida, negativas (rojo, alerta) | neutrales (naranja suave, no alerta).
+ *  Solo aparece la parte que tenga algo. */
 export function NumeritosReputacion({ avisos, className = '' }: { avisos: Avisos; className?: string }) {
+  const { negativas: neg, neutrales: neu } = avisos
+  if (neg <= 0 && neu <= 0) return null
   return (
-    <>
-      <Numerito n={avisos.negativas} urgente className={className} />
-      {avisos.neutrales > 0 && (
-        <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[11px] font-semibold leading-none num bg-orange-500 text-white ${className}`}
-          title="Neutrales nuevas">
-          {avisos.neutrales > 99 ? '99+' : avisos.neutrales}
-        </span>
-      )}
-    </>
+    <span className={`inline-flex overflow-hidden rounded-full ${className}`}>
+      {neg > 0 && <span className={`${PILDORA} bg-red-500 text-white`} title="Negativas nuevas">{tope(neg)}</span>}
+      {neu > 0 && <span className={`${PILDORA} bg-orange-100 text-orange-700`} title="Neutrales nuevas">{tope(neu)}</span>}
+    </span>
   )
+}
+
+/** ¿Hay alguna alerta (rojo) en estas rutas? Para el punto de "Más" y del espacio. */
+export function hayAlerta(avisos: Avisos, rutas: string[]) {
+  return rutas.some(r => (AVISO_DE_RUTA[r]?.urgente && avisos[AVISO_DE_RUTA[r].clave] > 0) || (r === '/calificaciones' && avisos.negativas > 0))
 }
 
 export function AvisosProvider({ children }: { children: React.ReactNode }) {
@@ -79,9 +87,8 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
 export function Numerito({ n, urgente, className = '' }: { n: number; urgente: boolean; className?: string }) {
   if (n <= 0) return null
   return (
-    <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[11px] font-semibold leading-none num ${
-      urgente ? 'bg-red-500 text-white' : 'bg-amber-400 text-amber-950'} ${className}`}>
-      {n > 99 ? '99+' : n}
+    <span className={`${PILDORA} rounded-full ${urgente ? 'bg-red-500 text-white' : 'bg-neutral-200 text-neutral-700'} ${className}`}>
+      {tope(n)}
     </span>
   )
 }

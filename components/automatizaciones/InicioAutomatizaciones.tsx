@@ -71,7 +71,7 @@ export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esA
                   <div className="flex items-center justify-between gap-2 text-xs font-medium text-neutral-500">
                     {h.titulo}<span className="text-neutral-300 group-hover:text-neutral-500">→</span>
                   </div>
-                  <div className={`text-2xl font-semibold tracking-tight num mt-1 ${h.urgente ? 'text-red-600' : 'text-amber-600'}`}>{n}</div>
+                  <div className={`text-2xl font-semibold tracking-tight num mt-1 ${h.urgente ? 'text-red-600' : 'text-neutral-900'}`}>{n}</div>
                   <div className="text-xs text-neutral-500 mt-0.5">{h.pendiente}</div>
                 </Link>
               )
@@ -98,7 +98,7 @@ export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esA
                     <div className="flex items-center gap-2">
                       <h3 className={`font-semibold ${h.activa ? 'text-neutral-900' : 'text-neutral-500'}`}>{h.titulo}</h3>
                       {h.activa && n > 0 && (
-                        <span className={`min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[11px] font-semibold flex items-center justify-center num ${h.urgente ? 'bg-red-500 text-white' : 'bg-amber-400 text-amber-950'}`}>{n}</span>
+                        <span className={`min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[11px] font-semibold flex items-center justify-center num ${h.urgente ? 'bg-red-500 text-white' : 'bg-neutral-200 text-neutral-700'}`}>{n}</span>
                       )}
                       {!h.activa && <span className="text-[11px] font-medium bg-neutral-100 text-neutral-500 rounded-full px-2 py-0.5">No incluido</span>}
                       {h.activa && <span className="ml-auto text-sm text-neutral-300 group-hover:text-neutral-700">→</span>}

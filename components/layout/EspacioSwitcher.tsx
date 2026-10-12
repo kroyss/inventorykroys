@@ -27,7 +27,7 @@ export default function EspacioSwitcher({ automatizaciones, inventario, radarUrl
   const actual = espacioActual(pathname, inventario ? ['inventario'] : [])
   const [abierto, setAbierto] = useState(false)
   const avisos = useAvisos()
-  const urgentesAuto = avisos.preguntas + avisos.mensajes
+  const urgentesAuto = avisos.preguntas + avisos.mensajes + avisos.negativas
   const totalAuto = urgentesAuto + avisos.reportador + avisos.calificaciones + avisos.despachos
   const caja = useRef<HTMLDivElement>(null)
 
@@ -63,7 +63,7 @@ export default function EspacioSwitcher({ automatizaciones, inventario, radarUrl
         <span>{NOMBRES[actual]}</span>
         {/* Estando en otro espacio: punto si Automatizaciones tiene algo pendiente */}
         {actual !== 'automatizaciones' && totalAuto > 0 && (
-          <span className={`w-2 h-2 rounded-full ${urgentesAuto > 0 ? 'bg-red-500' : 'bg-amber-400'}`} title="Hay pendientes en Automatizaciones" />
+          <span className={`w-2 h-2 rounded-full ${urgentesAuto > 0 ? 'bg-red-500' : 'bg-neutral-400'}`} title="Hay pendientes en Automatizaciones" />
         )}
         <svg viewBox="0 0 24 24" className={`w-4 h-4 text-neutral-400 transition-transform ${abierto ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>

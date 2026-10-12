@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
-import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion } from './Avisos'
+import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion, hayAlerta } from './Avisos'
 
 const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio }[] = [
   { href: '/dashboard',  label: 'Inicio',    countries: ['VE', 'CO'] as Country[] },
@@ -94,7 +94,9 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
   const visibles = links.slice(0, caben)
   const ocultos = links.slice(caben)
   const masActivo = ocultos.some(l => activo(l.href))
-  const avisosOcultos = ocultos.filter(l => AVISO_DE_RUTA[l.href] && avisos[AVISO_DE_RUTA[l.href].clave] > 0)
+  const avisosOcultos = ocultos.filter(l => (AVISO_DE_RUTA[l.href] && avisos[AVISO_DE_RUTA[l.href].clave] > 0)
+    || (l.href === '/calificaciones' && avisos.negativas + avisos.neutrales > 0))
+  const alertaOculta = hayAlerta(avisos, ocultos.map(l => l.href))
 
   return (
     // En mobile la navegación vive en la barra inferior (BottomNav); acá se ocultan los links.
@@ -117,7 +119,8 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
           <button type="button" onClick={() => setAbierto(a => !a)} aria-expanded={abierto}
             className={`${CLASE_LINK} ${masActivo ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}>
             Más
-            {avisosOcultos.length > 0 && <span className="w-2 h-2 rounded-full bg-amber-400" title="Hay pendientes en las opciones de Más" />}
+            {avisosOcultos.length > 0 && <span className={`w-2 h-2 rounded-full ${alertaOculta ? 'bg-red-500' : 'bg-neutral-400'}`}
+              title={alertaOculta ? 'Hay alertas en las opciones de Más' : 'Hay pendientes en las opciones de Más'} />}
             <span aria-hidden="true">▾</span>
           </button>
           {abierto && (

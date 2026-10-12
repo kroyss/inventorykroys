@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
-import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion } from './Avisos'
+import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion, hayAlerta } from './Avisos'
 
 // Barra inferior del celular. Íconos de línea (mismo trazo en todos, estilo Lucide) en lugar de
 // emojis: se ven igual en Android/iPhone y combinan con el resto de la interfaz.
@@ -150,7 +150,8 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
               className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 ${showMore || enMas ? 'text-neutral-900' : 'text-neutral-500'}`}>
               <span className={`relative flex items-center justify-center h-8 w-14 rounded-full transition-colors ${showMore || enMas ? 'bg-lime-200/80' : ''}`}>
                 <Icono nombre="mas" />
-                {avisosMas > 0 && !showMore && <span className="absolute top-0.5 right-3 w-2 h-2 rounded-full bg-amber-500" />}
+                {avisosMas > 0 && !showMore && <span className={`absolute top-0.5 right-3 w-2 h-2 rounded-full ${
+                  hayAlerta(avisos, more.map(i => i.href)) ? 'bg-red-500' : 'bg-neutral-400'}`} />}
               </span>
               <span className={`text-[11px] leading-none ${showMore || enMas ? 'font-semibold' : 'font-medium'}`}>Más</span>
             </button>
