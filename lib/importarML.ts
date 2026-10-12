@@ -34,6 +34,22 @@ export interface FilaImportar {
   producto: { id: number; code: string; name: string; toda: boolean } | null   // vinculada (toda = por la publicación) o parecida
 }
 
+/** Trigramas como pg_trgm: por palabra (letras y números), en minúscula, con "  " delante y " " detrás. */
+function trigramas(texto: string) {
+  const set = new Set<string>()
+  for (const w of texto.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []) {
+    const p = `  ${w} `
+    for (let i = 0; i < p.length - 2; i++) set.add(p.slice(i, i + 3))
+  }
+  return set
+}
+function similitud(a: Set<string>, b: Set<string>) {
+  if (!a.size || !b.size) return 0
+  let comunes = 0
+  for (const t of a) if (b.has(t)) comunes++
+  return comunes / (a.size + b.size - comunes)
+}
+
 export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
   const { rows: cat } = await db.query(
     `SELECT c.item_id, c.titulo, c.precio::float AS precio, c.moneda, c.disponible, c.estado, c.permalink,
@@ -68,27 +84,24 @@ export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
     if (p) { f.estado = 'vinculada'; f.producto = { ...p, toda: !exacto } }
   }
 
-  // Parecidas: SKU = código del producto, o nombre parecido (trigramas). Solo productos SIN código ML
-  // en esa publicación (los que ya están vinculados a otra cosa igual pueden aparecer: un producto
-  // puede estar en varias publicaciones).
+  // Parecidas: SKU = código del producto, o nombre parecido (trigramas, como pg_trgm). Se calcula en
+  // memoria: en SQL eran ~8 ms por publicación aun con índice (títulos de ML largos) → 3 s por lista.
   const libres = filas.filter(f => f.estado === 'nueva')
   if (libres.length) {
-    // `%` usa el índice de trigramas (migración 082) con este umbral; la conexión es del request.
-    await db.query(`SELECT set_limit($1)`, [SIMILITUD_MIN])
-    const { rows: par } = await db.query(
-      `SELECT f.codigo, p.id, p.code, p.name
-       FROM unnest($1::text[], $2::text[], $3::text[]) AS f(codigo, titulo, sku)
-       CROSS JOIN LATERAL (
-         SELECT p.id, p.code, p.name FROM products p
-         WHERE p.is_active AND (p.name % f.titulo OR (f.sku IS NOT NULL AND lower(p.code) = lower(f.sku)))
-         ORDER BY lower(p.code) = lower(COALESCE(f.sku, '')) DESC, similarity(p.name, f.titulo) DESC
-         LIMIT 1) p`,
-      [libres.map(f => f.codigo), libres.map(f => f.variante ? `${f.titulo} ${f.variante}` : f.titulo),
-       libres.map(f => f.sku)])
-    const parecido = new Map(par.map(r => [r.codigo as string, { id: r.id as number, code: r.code as string, name: r.name as string, toda: false }]))
+    const { rows: prods } = await db.query(`SELECT id, code, name FROM products WHERE is_active`)
+    const conTri = prods.map(p => ({ id: p.id as number, code: p.code as string, name: p.name as string, tri: trigramas(p.name) }))
+    const porSku = new Map(conTri.map(p => [p.code.toLowerCase(), p]))
     for (const f of libres) {
-      const p = parecido.get(f.codigo)
-      if (p) { f.estado = 'parecida'; f.producto = p }
+      let mejor = f.sku ? porSku.get(f.sku.toLowerCase()) : undefined
+      if (!mejor) {
+        const t = trigramas(f.variante ? `${f.titulo} ${f.variante}` : f.titulo)
+        let max = SIMILITUD_MIN
+        for (const p of conTri) {
+          const sim = similitud(t, p.tri)
+          if (sim >= max) { max = sim; mejor = p }
+        }
+      }
+      if (mejor) { f.estado = 'parecida'; f.producto = { id: mejor.id, code: mejor.code, name: mejor.name, toda: false } }
     }
   }
   for (const f of filas) delete (f as { sku?: string | null }).sku   // el SKU solo servía para comparar

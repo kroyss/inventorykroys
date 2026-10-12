@@ -14,7 +14,3 @@ ALTER TABLE ml_catalogo ADD COLUMN IF NOT EXISTS sku       TEXT;
 ALTER TABLE ml_catalogo ADD COLUMN IF NOT EXISTS variantes JSONB;
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_por_verificar BOOLEAN NOT NULL DEFAULT FALSE;
-
--- "Se parece a uno tuyo": nombres parecidos por trigramas con índice (sin él, 500 publicaciones contra
--- 500 productos tardaban ~3 s).
-CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin (name gin_trgm_ops);
