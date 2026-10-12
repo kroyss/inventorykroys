@@ -317,7 +317,7 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
     .filter(item => {
       const matchSearch = matchTokens(search, item.code, item.name)
       const matchStatus = !statusF || item.status === statusF
-      return matchSearch && matchStatus && (!soloVerificar || !!item.stock_por_verificar)
+      return matchSearch && matchStatus && (!soloVerificar || porVerificar === 0 || !!item.stock_por_verificar)
     })
     .sort((a, b) => {
       const valueFor = (i: InventoryItem): number | string => {
