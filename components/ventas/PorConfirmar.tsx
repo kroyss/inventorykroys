@@ -173,6 +173,11 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
     }, 10_000)
     return () => clearInterval(t)
   }, [buscandoME, pidiendoME, onRecargar])
+  useEffect(() => {
+    if (pidiendoME == null || buscandoME) return
+    setPidiendoME(null)   // terminó (el tiempo agotado ya lo pone en null antes): ahora las ventas de ML
+    actualizar()
+  }, [pidiendoME, buscandoME])   // eslint-disable-line react-hooks/exhaustive-deps
   const traerME = async () => {
     setAvisoME(null)
     const r = await fetch('/api/pagos-me/traer', { method: 'POST' }).catch(() => null)
@@ -203,26 +208,21 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
       <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Una línea por botón: qué trae y cuándo fue la última vez. */}
         <div className="space-y-0.5 text-xs text-neutral-500">
+          {datos.pagosME && (
+            <p>
+              <b className="text-neutral-700">Traer ME</b>: pagos y guías de MercadoEnvíos (tarda 1 a 3 min; al terminar trae también las ventas) · {buscandoME
+                ? <b className="text-violet-700">buscando…</b>
+                : <>última <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
+            </p>
+          )}
           <p>
             <b className="text-neutral-700">Traer ML</b>: ventas nuevas de MercadoLibre (solas cada hora) · {revisado
               ? <>recién {hora(revisado.at)}: <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
                   {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'nueva' : 'nuevas'}` : 'nada nuevo'}</b></>
               : <>última <b className="text-neutral-700">{datos.sincronizadas_at ? hora(datos.sincronizadas_at) : '—'}</b></>}
           </p>
-          {datos.pagosME && (
-            <p>
-              <b className="text-neutral-700">Traer ME</b>: pagos y guías de MercadoEnvíos (tarda 1 a 3 min) · {buscandoME
-                ? <b className="text-violet-700">buscando…</b>
-                : <>última <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
-            </p>
-          )}
         </div>
         <div className="flex shrink-0 gap-2">
-          <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
-            <IconoActualizar girando={actualizando} />
-            {actualizando ? 'Trayendo…' : 'Traer ML'}
-          </button>
           {datos.pagosME && (
             <button type="button" onClick={traerME} disabled={buscandoME} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
@@ -230,6 +230,11 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
               {buscandoME ? 'Buscando pagos…' : 'Traer ME'}
             </button>
           )}
+          <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
+            <IconoActualizar girando={actualizando} />
+            {actualizando ? 'Trayendo…' : 'Traer ML'}
+          </button>
         </div>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
