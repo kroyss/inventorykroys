@@ -42,7 +42,7 @@ const ES_INICIO = (href: string) => href === '/dashboard' || href === '/automati
 function Casita() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round"
-      strokeLinejoin="round" className="h-[18px] w-[18px]">
+      strokeLinejoin="round" className="h-5 w-5">
       <path d="M3.5 10.5 12 3.5l8.5 7" />
       <path d="M5.5 9v9.5a1.5 1.5 0 0 0 1.5 1.5h3.5v-5.5h3V20H17a1.5 1.5 0 0 0 1.5-1.5V9" />
     </svg>
@@ -121,7 +121,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
 
       {visibles.map(l => (
         <Link key={l.href} href={l.href} title={ES_INICIO(l.href) ? 'Inicio' : undefined}
-          className={`${CLASE_LINK} ${ES_INICIO(l.href) ? '!px-2' : ''} ${activo(l.href) ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}>
+          className={`${CLASE_LINK} ${ES_INICIO(l.href) ? '!px-3.5' : ''} ${activo(l.href) ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}>
           {etiqueta(l)}
         </Link>
       ))}

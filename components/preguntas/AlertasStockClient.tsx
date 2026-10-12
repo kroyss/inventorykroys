@@ -230,12 +230,12 @@ export default function AlertasStockClient() {
         </ul>
       )}
 
-      {/* En el olvido: más de 7 días sin reponer, o quitadas con "No hay, quitar". Se ven, pero no suman al aviso. */}
+      {/* Con más de 7 días sin reponer, o quitadas con "No hay, quitar": se ven, pero no suman al aviso. */}
       {datos && datosDe === vista && olvido.length > 0 && (
         <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
           <button type="button" onClick={() => setVerOlvido(v => !v)}
             className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-50 rounded-xl">
-            <span><b className="text-neutral-800">En el olvido</b> · {olvido.length} · más de 7 días sin reponer o quitadas a mano. No suman al aviso.</span>
+            <span><b className="text-neutral-800">{vista === 'agotadas' ? 'Agotadas' : 'Por agotarse'} con más de 7 días</b> sin reponer o quitadas a mano · {olvido.length}. No suman al aviso.</span>
             <span className="text-neutral-400">{verOlvido ? '▴' : '▾'}</span>
           </button>
           {verOlvido && <ul className="divide-y divide-neutral-100 border-t border-neutral-100">{olvido.map(fila)}</ul>}
