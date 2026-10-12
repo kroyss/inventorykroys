@@ -148,6 +148,8 @@ export const SQL_BANDEJA = `
          x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada,
          CASE
            WHEN f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL') THEN 'concretada'
+           WHEN EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
+             THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
            WHEN s.id IS NULL AND o.fecha < NOW() - make_interval(days => $1) THEN 'no_concretada'
            ELSE 'esperar'
          END AS sugerencia
@@ -166,6 +168,8 @@ export const SQL_BANDEJA_ML = `
          x.nickname AS cuenta, CASE WHEN d.impresa THEN 'DESPACHADA' END AS sistema_estado, FALSE AS facturada,
          CASE
            WHEN d.impresa THEN 'concretada'
+           WHEN EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
+             THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
            WHEN o.estado = 'cancelled' OR o.fecha < NOW() - make_interval(days => $1) THEN 'no_concretada'
            ELSE 'esperar'
          END AS sugerencia

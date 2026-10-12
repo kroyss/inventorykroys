@@ -5,12 +5,15 @@
 // misma de Calificaciones) cruzada con `sales`. La venta nace recién cuando la persona la confirma
 // en el formulario. Así no hay duplicados, Pagos ME no puede mover nada que nadie revisó y
 // Calificaciones sigue igual (sin venta a los N días = no concretada).
-//   - Vencida: pasaron los días de "no concretada" de Calificaciones sin registrarla.
-//   - A los DIAS_MAX (ML no deja concretarla después) o cancelada en ML: sale de la lista.
+//   - Vencida: SIN pago y pasaron los días de "no concretada" de Calificaciones sin registrarla.
+//   - Con pago (Pagos ME) no vence (2026-10-12): el cliente puede comprar el 5 y pagar el 10, y la venta
+//     sigue siendo válida. Queda hasta registrarla o marcar el pago inválido (tope DIAS_CON_PAGO).
+//   - Sin pago, a los DIAS_MAX, o cancelada en ML: sale de la lista.
 import type { Pool } from 'pg'
 import { leerPlantillasCal, traerOrden } from '@/lib/calificacionesML'
 
 export const DIAS_MAX = 8
+export const DIAS_CON_PAGO = 30
 
 export type EstadoProductos = 'listo' | 'elegir' | 'sin_vincular'
 
@@ -26,7 +29,7 @@ export interface PorConfirmar {
   moneda: string | null
   lineas: LineaML[]
   productos: EstadoProductos
-  pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null; retiro: boolean } | null
+  pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null; retiro: boolean; at: string | null } | null
   mensaje: { texto: string; at: string } | null    // lo último que escribió el comprador (después de comprar)
   vencida: boolean
 }
@@ -42,15 +45,17 @@ export async function ventasPorConfirmar(db: Pool) {
             (p.envio_metodo ILIKE 'retiro en tienda%' OR p.carrier ILIKE 'retiro en tienda%') AS retiro,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_texto END AS msg_texto,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_at END AS msg_at,
-            o.fecha < NOW() - make_interval(days => $1) AS vencida
+            p.creado_at AS pago_at,
+            (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
      LEFT JOIN me_pagos p ON p.venta IN (o.id::text, o.pack_id::text)
      LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
-     WHERE o.fecha > NOW() - make_interval(days => $2)
+     WHERE (o.fecha > NOW() - make_interval(days => $2)
+            OR (p.verificacion <> 'invalido' AND o.fecha > NOW() - make_interval(days => $3)))
        AND COALESCE(o.estado, '') <> 'cancelled'
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
-     ORDER BY o.fecha DESC`, [dias, DIAS_MAX])
+     ORDER BY o.fecha DESC`, [dias, DIAS_MAX, DIAS_CON_PAGO])
 
   // Cuántos productos del sistema tiene cada publicación (sin el prefijo: MLV768007052 → 768007052) y
   // cada variante ("768007052:180012345", Importar desde ML). Primero la variante exacta, si no la
@@ -87,7 +92,7 @@ export async function ventasPorConfirmar(db: Pool) {
     return {
       numero: r.numero, fecha: r.fecha, cuenta: r.cuenta, comprador: r.comprador, nick: r.nick,
       total: r.total, moneda: r.moneda, lineas, productos,
-      pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto, retiro: !!r.retiro } : null,
+      pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto, retiro: !!r.retiro, at: r.pago_at } : null,
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       vencida: r.vencida,
     }
