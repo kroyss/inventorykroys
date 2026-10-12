@@ -150,6 +150,8 @@ export default async function ComprasPage() {
       acceso={accesoCompras(session!.user)}
       country={session!.user.country}
       importaciones={tieneModulo(session!.user, 'importaciones')}
+      etapas={tieneModulo(session!.user, 'compras_etapas')}
+      borradorKey={String(session!.user.empresaId)}
     />
   )
 }

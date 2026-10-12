@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { despachosForbidden, etiquetasValidadas, IMPRIMIBLE, refrescarVentasML } from '@/lib/despachos'
-import { llevaInventario, tieneModulo } from '@/lib/modulos'
+import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 
 /** GET /api/despachos/lotes/[id] — lote con sus etiquetas validadas contra las ventas actuales */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!lote) return NextResponse.json({ error: 'Lote no encontrado' }, { status: 404 })
 
     // Sin inventario: las ventas salen de ML (las que faltan y las notas se traen ahora).
-    const desdeML = !llevaInventario(session.user)
+    const desdeML = ventasDesdeML(session.user)
     if (desdeML && lote.status === 'PENDIENTE') await refrescarVentasML(db, lote.id)
     const etiquetas = await etiquetasValidadas(db, lote.id, desdeML, tieneModulo(session.user, 'pagos_me'))
     const imprimibles = etiquetas.filter(e => e.incluida && IMPRIMIBLE[e.estado]).length

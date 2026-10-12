@@ -4,8 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 // Numeritos del menú: preguntas sin responder, mensajes sin leer y guías por reportar.
 // Se piden cada minuto (el cron trae lo nuevo de ML cada minuto) y al volver a la pestaña.
 // El total urgente (preguntas + mensajes) también va en el título de la pestaña: "(5) Ventas".
-export interface Avisos { preguntas: number; mensajes: number; reportador: number; calificaciones: number; despachos: number; alertas: number }
-const VACIO: Avisos = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0 }
+// negativas / neutrales: calificaciones recibidas de los últimos 30 días sin ver (Reputación): rojo y naranja.
+export interface Avisos { preguntas: number; mensajes: number; reportador: number; calificaciones: number; despachos: number; alertas: number
+                          negativas: number; neutrales: number }
+const VACIO: Avisos = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0, negativas: 0, neutrales: 0 }
 const Ctx = createContext<Avisos>(VACIO)
 
 export function useAvisos() { return useContext(Ctx) }
@@ -18,6 +20,21 @@ export const AVISO_DE_RUTA: Record<string, { clave: keyof Avisos; urgente: boole
   '/reportador': { clave: 'reportador', urgente: false },
   '/calificaciones': { clave: 'calificaciones', urgente: false },
   '/alertas-stock': { clave: 'alertas', urgente: false },
+}
+
+/** Reputación lleva DOS numeritos: negativas (rojo) y neutrales (naranja). */
+export function NumeritosReputacion({ avisos, className = '' }: { avisos: Avisos; className?: string }) {
+  return (
+    <>
+      <Numerito n={avisos.negativas} urgente className={className} />
+      {avisos.neutrales > 0 && (
+        <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[11px] font-semibold leading-none num bg-orange-500 text-white ${className}`}
+          title="Neutrales nuevas">
+          {avisos.neutrales > 99 ? '99+' : avisos.neutrales}
+        </span>
+      )}
+    </>
+  )
 }
 
 export function AvisosProvider({ children }: { children: React.ReactNode }) {

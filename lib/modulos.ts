@@ -24,6 +24,13 @@ export const MODULOS = {
   // Solo la empresa de la plataforma (migración 076): el vigilante trae pagos y guías del portal de
   // MercadoEnvíos; se verifican por lote y Despachos no imprime guías con el pago sin verificar.
   pagos_me:       'Pagos MercadoEnvíos: traer pagos y guías del portal, verificarlos por lote (uso interno)',
+  // Inventario completo vs simple (2026-10-12, decidido con el dueño): UNA sola base; estas opciones
+  // prendidas = como trabaja SolucionesMC (migración 083 las prende a las empresas que ya llevaban
+  // inventario). Apagadas = el Inventario simple de los Fundadores. Lo de siempre, sin pantallas aparte.
+  verificar_pagos:    'Ventas: verificar el pago antes de procesar (Borrador → Pago verificado → Procesada). Apagado: se procesa directo (VE; CO ya trabaja así)',
+  despachos_ventas:   'Despachos y Calificaciones con las ventas CARGADAS en Ventas. Apagado: con las ventas de MercadoLibre, aunque lleve inventario',
+  compras_etapas:     'Compras por etapas (pago, en camino, recepción, finalizar). Apagado: "Entró mercancía", en un paso',
+  precios_categorias: 'Precios por categoría de ganancia y exceso ML. Apagado: el precio es lo publicado y el costo lo que se pagó',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -62,6 +69,11 @@ export function rutaHabilitada(href: string, modulos: string[]) {
 
 /** ¿La empresa lleva inventario? Si no, las ventas salen de MercadoLibre (ver MODULOS.inventario). */
 export const llevaInventario = (user: { modulos?: string[] } | null | undefined) => tieneModulo(user, 'inventario')
+
+/** ¿Despachos y Calificaciones trabajan con las ventas de MercadoLibre (y no con las cargadas en Ventas)?
+ *  Sin inventario siempre; con inventario, salvo que tenga "despachos_ventas" (SolucionesMC). */
+export const ventasDesdeML = (user: { modulos?: string[] } | null | undefined) =>
+  !llevaInventario(user) || !tieneModulo(user, 'despachos_ventas')
 
 /** Facturas: solo Venezuela (factura fiscal en Bs) y con el módulo prendido. */
 export function facturasHabilitadas(user: { country?: string; modulos?: string[] }) {

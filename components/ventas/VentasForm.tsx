@@ -26,6 +26,7 @@ interface Props {
   onSaved: () => void                 // guardar + cerrar panel
   onContinue?: (id: number) => void   // guardar y abrir el detalle para avanzar estados
   numeroInicial?: string              // desde "Por confirmar": la venta de ML a registrar
+  procesaDirecto?: boolean            // VE sin "verificar_pagos" (Inventario simple): se crea y se procesa
 }
 
 interface MlVenta {
@@ -42,7 +43,7 @@ interface MlVenta {
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function VentasForm({ editing, products, country, onClose, onSaved, onContinue, numeroInicial }: Props) {
+export default function VentasForm({ editing, products, country, onClose, onSaved, onContinue, numeroInicial, procesaDirecto = false }: Props) {
   const [orderNumber, setOrderNumber] = useState(editing?.ml_order_number ?? numeroInicial ?? '')
   const [customer,    setCustomer]    = useState(editing?.customer_name ?? '')
   const [discount,    setDiscount]    = useState(editing?.discount_percent ?? 0)
@@ -242,7 +243,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   }
 
   // mode: 'close' = guardar y cerrar | 'continue' = guardar y abrir detalle para avanzar estados
-  const save = async (mode: 'close' | 'continue' = 'close') => {
+  const save = async (mode: 'close' | 'continue' | 'procesar' = 'close') => {
     if (!orderNumber.trim()) { setError('Número de orden requerido'); return }
     if (!customer.trim())    { setError('El nombre del cliente es obligatorio'); return }
     if (items.length === 0)  { setError('Agrega al menos un producto'); return }
@@ -299,6 +300,23 @@ Revísala en el detalle que se abre ahora.`
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ venta: numeroActual }),
       }).catch(() => {})
+    }
+    if (mode === 'procesar' && saleId && !(pagoActual && pagoOk)) {
+      // Inventario simple: se procesa ya (descuenta el stock). LOCAL: "entregar" (PAGO_VERIFICADO la
+      // pasa directo a entregada). Si no se puede (p. ej. sin stock), queda en borrador y se abre su detalle.
+      const local = orderNumber.trim().startsWith('LOCAL-')
+      const proc = await fetch(`/api/sales/${saleId}/status`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: local ? 'PAGO_VERIFICADO' : 'PROCESADA' }),
+      }).catch(() => null)
+      if (!proc?.ok) {
+        const d = proc ? await proc.json().catch(() => ({})) : {}
+        setBusy(false)
+        window.alert(`La venta se guardó como borrador, pero no se pudo procesar: ${d.error ?? 'error'}.
+Revísala en el detalle que se abre ahora.`)
+        if (onContinue) onContinue(saleId); else onSaved()
+        return
+      }
     }
     setBusy(false)
     if (mode === 'continue') {
@@ -598,7 +616,12 @@ Revísala en el detalle que se abre ahora.`
               <button onClick={() => save('close')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className={pagoOk ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>
                 {busy ? 'Guardando…' : pagoOk ? 'Crear y procesar' : 'Guardar borrador'}
               </button>
-              {!pagoOk && (
+              {!pagoOk && procesaDirecto && (
+                <button onClick={() => save('procesar')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
+                  {busy ? 'Guardando…' : 'Crear y procesar'}
+                </button>
+              )}
+              {!pagoOk && !procesaDirecto && (
                 <button onClick={() => save('continue')} disabled={busy || noCustomer || items.length === 0 || !!orderDup || !!orderNumErr || hasInsufficientStock || hasInvalidQty} className="btn-primary text-sm">
                   {busy ? 'Guardando…' : 'Crear y continuar'}
                 </button>

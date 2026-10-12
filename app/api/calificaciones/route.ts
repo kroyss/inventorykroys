@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
-import { llevaInventario } from '@/lib/modulos'
+import { ventasDesdeML } from '@/lib/modulos'
 
 // GET /api/calificaciones?vista=listas|esperando
 //   listas    → sin calificar con sugerencia (concretada / no concretada)
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const plantillas = leerPlantillasCal(pl?.value)
     const dias = plantillas.noConcretada.dias
     // Sin inventario: "en el sistema" = despachada (etiqueta impresa), ver SQL_BANDEJA_ML.
-    const desdeML = !llevaInventario(s.session.user)
+    const desdeML = ventasDesdeML(s.session.user)
     const SQL_BANDEJA = sqlBandeja(desdeML)
     const { rows } = await s.db.query(
       // en_espera: más nueva que los días de espera de la empresa (fecha del país de la empresa:

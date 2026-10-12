@@ -89,7 +89,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   const final = p.finalPriceUsd ?? 0
   const rate  = p.veRate
   if (!rate || !(rate.parallel > 0) || !(rate.official > 0) || !(final > 0)) {
-    return <p className="text-xs text-neutral-400 px-1">Carga el costo y la categoría para ver la ganancia neta.</p>
+    return <p className="text-xs text-neutral-400 px-1">Carga el costo y el precio para ver la ganancia neta.</p>
   }
   const comisionPct = num(p.ml, 'ml_comision', 12)
   const realUsd   = final * rate.official / rate.parallel

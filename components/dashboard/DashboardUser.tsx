@@ -5,6 +5,7 @@ import type { Country } from '@/lib/types'
 import BonusPipeline from './BonusPipeline'
 import SalesMiniChart from './SalesMiniChart'
 import { parseLocalDate } from '@/lib/tz'
+import AvisoStockVerificar from './AvisoStockVerificar'
 
 interface Summary {
   active_products: number
@@ -39,7 +40,11 @@ interface Rate {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
-export default function DashboardUser({ country, bonos, importaciones }: { country: Country; bonos: boolean; importaciones: boolean }) {
+export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true }: {
+  country: Country; bonos: boolean; importaciones: boolean
+  verificarPagos?: boolean   // módulo verificar_pagos: sin él (Inventario simple) no hay "Pago verificado" ni "Por descargar"
+  etapas?: boolean           // módulo compras_etapas: sin él no hay recepciones en camino
+}) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [saleCounts, setSaleCounts] = useState<SaleStateCounts>({ borrador: 0, verificado: 0, procesada: 0 })
   const [recv, setRecv] = useState<ReceptionCounts>({ local: 0, imports: 0, imports_boxes: 0, por_finalizar: 0 })
@@ -78,6 +83,7 @@ export default function DashboardUser({ country, bonos, importaciones }: { count
 
   return (
     <div className="space-y-4">
+      <AvisoStockVerificar n={(summary as { por_verificar?: number }).por_verificar ?? 0} />
       {/* ───────── Ventas ───────── */}
       <Panel title="Ventas">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -89,10 +95,10 @@ export default function DashboardUser({ country, bonos, importaciones }: { count
           <StatCard label="Borrador"        value={saleCounts.borrador}
             accent={saleCounts.borrador   > 0 ? 'text-amber-600' : undefined}
             href="/ventas?estado=BORRADOR" />
-          <StatCard label="Pago verificado" value={saleCounts.verificado}
+          {verificarPagos && <StatCard label="Pago verificado" value={saleCounts.verificado}
             accent={saleCounts.verificado > 0 ? 'text-neutral-900' : undefined}
-            href="/ventas?estado=PAGO_VERIFICADO" />
-          <StatCard label="Por descargar"   value={saleCounts.procesada}
+            href="/ventas?estado=PAGO_VERIFICADO" />}
+          <StatCard label={verificarPagos ? 'Por descargar' : 'Procesadas'} value={saleCounts.procesada}
             accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
             href="/ventas?estado=PROCESADA" />
         </div>
@@ -103,8 +109,8 @@ export default function DashboardUser({ country, bonos, importaciones }: { count
         )}
       </Panel>
 
-      {/* ───────── Recepciones ───────── */}
-      <Panel title="Recepciones">
+      {/* ───────── Recepciones (solo con compras por etapas) ───────── */}
+      {etapas && <Panel title="Recepciones">
         <div className={`grid grid-cols-1 gap-3 ${importaciones ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
           {/* Cada card filtra por los MISMOS estados que cuenta (ver
               /api/dashboard/reception-counts), para que la lista de destino
@@ -121,7 +127,7 @@ export default function DashboardUser({ country, bonos, importaciones }: { count
             accent={recv.por_finalizar > 0 ? 'text-amber-600' : undefined}
             href="/compras?tab=local&estado=RECIBIDA,PARCIAL" />
         </div>
-      </Panel>
+      </Panel>}
 
       {/* ───────── Gráfico ventas del mes ───────── */}
       <SalesMiniChart />

@@ -1,19 +1,13 @@
 'use client'
 import NegocioSettings from '@/components/tasas/NegocioSettings'
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { Line } from 'react-chartjs-2'
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend,
-} from 'chart.js'
+import { useEffect, useState, useMemo } from 'react'
+import HistorialTasas from '@/components/tasas/HistorialTasas'
 import { KPICard } from '@/components/ui'
 import type { ProfitCategory } from '@/lib/types'
 import { parseLocalDate } from '@/lib/tz'
 import MlBreakdown from '@/components/productos/MlBreakdown'
 import { coPublishedPrice } from '@/lib/coPricing'
 import { etiquetaCategoria } from '@/lib/categoriasGanancia'
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 const fmtPeso = (n: number) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 0 })
 
@@ -38,25 +32,6 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
   const [busy,    setBusy]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [okMsg,   setOkMsg]   = useState<string | null>(null)
-
-  // Igualar la altura del historial para que la columna derecha termine
-  // exactamente donde termina el simulador (sin espacio vacío).
-  const leftRef  = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<HTMLDivElement>(null)
-  const [histMax, setHistMax] = useState<number | undefined>(undefined)
-  useEffect(() => {
-    const recompute = () => {
-      const lh = leftRef.current?.offsetHeight ?? 0
-      const ch = chartRef.current?.offsetHeight ?? 0
-      if (lh && ch) setHistMax(Math.max(140, lh - ch - 16))  // 16 = gap entre chart e historial
-    }
-    recompute()
-    const ro = new ResizeObserver(recompute)
-    if (leftRef.current)  ro.observe(leftRef.current)
-    if (chartRef.current) ro.observe(chartRef.current)
-    window.addEventListener('resize', recompute)
-    return () => { ro.disconnect(); window.removeEventListener('resize', recompute) }
-  })
 
   const loadAll = async () => {
     const [l, h, c, s] = await Promise.all([
@@ -138,7 +113,6 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
 
   if (!latest) return <div className="p-8 text-neutral-500">Cargando…</div>
 
-  const chrono = [...history].slice(0, 30).reverse()
 
   return (
     <div className="space-y-4">
@@ -177,7 +151,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Simulador */}
-        <div ref={leftRef} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
           <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -257,36 +231,10 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
           </div>
         </div>
 
-        {/* Columna derecha: gráfico + historial (igualan la altura del simulador) */}
+        {/* Columna derecha: historial corto (los últimos días; el resto en una ventana) */}
         <div className="flex flex-col gap-4">
-        {/* Evolución */}
-        <div ref={chartRef} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-          <h2 className="font-semibold mb-3">Evolución TRM (últimos {chrono.length})</h2>
-          {chrono.length > 1 ? (
-            <div className="relative h-56">
-              <Line
-                data={{
-                  labels: chrono.map(r => r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }) : ''),
-                  datasets: [
-                    { label: 'TRM', data: chrono.map(r => r.trm_rate), borderColor: '#16a34a', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 2 },
-                  ],
-                }}
-                options={{
-                  responsive: true, maintainAspectRatio: false,
-                  interaction: { mode: 'index', intersect: false },
-                  plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `TRM: $${fmtPeso(c.parsed.y ?? 0)}` } } },
-                  scales: { y: { ticks: { callback: v => '$' + fmtPeso(Number(v)) } }, x: { grid: { display: false } } },
-                }}
-              />
-            </div>
-          ) : (
-            <div className="text-neutral-400 text-sm text-center py-12">Pocos datos para graficar</div>
-          )}
-        </div>
-
         {/* Historial — compacto, scroll, últimos 30 días (solo referencia) */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-          <div className="overflow-y-auto" style={{ maxHeight: histMax }}>
+        <HistorialTasas filas={history} tabla={filas => (
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>
@@ -296,7 +244,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
                 </tr>
               </thead>
               <tbody>
-                {history.map((r, i) => (
+                {filas.map((r, i) => (
                   <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                     <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-CO') : ''}</td>
                     <td className="px-4 py-2 text-right font-medium">${fmtPeso(r.trm_rate)}</td>
@@ -305,13 +253,12 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
                     </td>
                   </tr>
                 ))}
-                {history.length === 0 && (
+                {filas.length === 0 && (
                   <tr><td colSpan={3} className="px-4 py-6 text-center text-neutral-400">Sin historial</td></tr>
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
+        )} />
         </div>
       </div>
 

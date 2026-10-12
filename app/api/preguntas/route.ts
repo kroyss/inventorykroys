@@ -35,15 +35,16 @@ export async function GET(req: NextRequest) {
        FROM ml_preguntas p
        JOIN ml_conexiones c ON c.id = p.conexion_id
        LEFT JOIN users u ON u.id = p.respondida_por
-       -- Producto del sistema por su código ML (se guarda sin el prefijo: MLV768007052 → 768007052)
+       -- Producto del sistema por su código ML (se guarda sin el prefijo: MLV768007052 → 768007052).
+       -- Con un producto por variante ("768007052:180012345") y ninguno de la publicación: la suma de todas.
        LEFT JOIN LATERAL (
-         SELECT pd.code, pd.name, COALESCE(i.quantity, 0)::int AS stock, pp.final_price_usd::float AS precio
+         SELECT pd.code, pd.name, (CASE WHEN m.ml_code LIKE '%:%' THEN SUM(COALESCE(i.quantity, 0)) OVER () ELSE COALESCE(i.quantity, 0) END)::int AS stock, pp.final_price_usd::float AS precio
          FROM product_ml_codes m
          JOIN products pd ON pd.id = m.product_id
          LEFT JOIN inventory i ON i.product_id = pd.id
          LEFT JOIN product_pricing pp ON pp.product_id = pd.id
-         WHERE m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '')
-         ORDER BY pd.is_active DESC LIMIT 1
+         WHERE split_part(m.ml_code, ':', 1) = regexp_replace(p.item_id, '^[A-Z]{3}', '')
+         ORDER BY (m.ml_code LIKE '%:%'), pd.is_active DESC LIMIT 1
        ) pr ON TRUE
        WHERE ${filtroEstado}${filtroTexto}
        ORDER BY ${vista === 'pendientes' ? 'p.fecha ASC' : 'COALESCE(p.respuesta_fecha, p.fecha) DESC'}

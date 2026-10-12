@@ -74,6 +74,8 @@ export async function POST(
         `UPDATE inventory SET quantity = $1, last_updated = NOW() WHERE product_id = $2`,
         [newQty, productId]
       )
+      // Cualquier movimiento a mano cuenta como revisado: el stock traído de ML ya no está "por verificar".
+      await db.query(`UPDATE products SET stock_por_verificar = FALSE WHERE id = $1 AND stock_por_verificar`, [productId])
       await db.query('COMMIT')
     } catch (e) {
       await db.query('ROLLBACK')

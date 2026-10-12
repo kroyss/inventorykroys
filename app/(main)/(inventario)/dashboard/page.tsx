@@ -19,7 +19,9 @@ export default async function DashboardPage() {
   if (puede(session!.user, 'costos')) return (
     <DashboardAdmin country={country} bonos={bonos} puedeTasas={esDuenoPlataforma(session!.user)}
       descuento={tieneModulo(session!.user, 'descuento_ml')} importaciones={importaciones}
-      analisisStock={tieneModulo(session!.user, 'analisis_stock')} />
+      analisisStock={tieneModulo(session!.user, 'analisis_stock')} etapas={tieneModulo(session!.user, 'compras_etapas')}
+      categorias={tieneModulo(session!.user, 'precios_categorias')} />
   )
-  return <DashboardUser country={country} bonos={bonos} importaciones={importaciones} />
+  return <DashboardUser country={country} bonos={bonos} importaciones={importaciones}
+    verificarPagos={country !== 'VE' || tieneModulo(session!.user, 'verificar_pagos')} etapas={tieneModulo(session!.user, 'compras_etapas')} />
 }

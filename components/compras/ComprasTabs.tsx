@@ -17,16 +17,18 @@ interface Props {
   acceso: AccesoCompras
   country: 'VE' | 'CO'
   importaciones: boolean   // módulo: sin él solo hay compras locales (sin pestaña ni opción de importar)
+  etapas?: boolean         // módulo compras_etapas; apagado = Inventario simple ("Entró mercancía")
+  borradorKey?: string     // borrador de compra nueva por empresa (ComprasClient)
 }
 
 export default function ComprasTabs({
-  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones,
+  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones, etapas = true, borradorKey = '',
 }: Props) {
   // Importaciones es la pestaña principal en ambos países → primera y por defecto.
   // Se recuerda entre F5 (el deep-link ?tab=import, más abajo, igual tiene prioridad).
-  const [tabGuardada, setTab] = usePersistedTab<'local' | 'import' | 'history'>('tab:compras', importaciones ? 'import' : 'local')
+  const [tabGuardada, setTab] = usePersistedTab<'local' | 'import' | 'history'>('tab:compras', importaciones ? 'import' : etapas ? 'local' : 'history')
   // Sin el módulo Importaciones nunca se queda en esa pestaña (aunque esté recordada o venga en el link).
-  const tab = !importaciones && tabGuardada === 'import' ? 'local' : tabGuardada
+  const tabPedida = !importaciones && tabGuardada === 'import' ? 'local' : tabGuardada
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
   // Botón unificado "+ Compra": menú abierto + tipo pendiente de crear
@@ -56,7 +58,7 @@ export default function ComprasTabs({
   }, [])
 
   // Re-consultar al cambiar de pestaña (y al montar).
-  useEffect(() => { refresh() }, [tab, refresh])
+  useEffect(() => { refresh() }, [tabPedida, refresh])
   // Y también al volver a la pestaña del navegador o cada minuto: la pantalla
   // suele quedar abierta y, si no, muestra el estado del momento en que se abrió.
   useRefetchOnFocus(refresh, true, 60_000)
@@ -73,6 +75,10 @@ export default function ComprasTabs({
   const localHist    = orders.filter(o => HIST.includes(o.status)).length
   const importHist   = imports.filter(o => HIST.includes(o.status)).length
   const historyTotal = localHist + importHist
+  // Inventario simple: las entradas nacen finalizadas, así que "En curso" solo aparece si quedó alguna
+  // compra a medias (p. ej. reabierta); si no, se va directo a Entradas.
+  const conEnCurso = etapas || localActive > 0
+  const tab = tabPedida === 'local' && !conEnCurso ? 'history' : tabPedida
 
   // deep-link: /compras?tab=import abre la pestaña de importaciones. Con
   // useSearchParams se re-aplica si cambia la URL sin desmontar la pantalla.
@@ -94,10 +100,11 @@ export default function ComprasTabs({
   return (
     <div>
       <PageHeader title={isAdmin ? 'Compras' : 'Recepciones'}
-        subtitle={isAdmin ? (importaciones ? 'Importaciones y compras locales, del pago a la recepción' : 'Compras a tus proveedores, del pago a la recepción')
+        subtitle={isAdmin ? (importaciones ? 'Importaciones y compras locales, del pago a la recepción'
+          : etapas ? 'Compras a tus proveedores, del pago a la recepción' : 'La mercancía que entra: suma al stock y registra lo que pagaste')
           : 'Mercancía que llega y hay que recibir'}
         actions={isAdmin && (!importaciones ? (
-          <button onClick={() => startCreate('local')} className="btn-primary text-sm whitespace-nowrap">+ Compra</button>
+          <button onClick={() => startCreate('local')} className="btn-primary text-sm whitespace-nowrap">{etapas ? '+ Compra' : '+ Entró mercancía'}</button>
         ) : (
           <div className="relative">
             <button onClick={() => setCreateOpen(o => !o)} className="btn-primary text-sm whitespace-nowrap">
@@ -120,12 +127,12 @@ export default function ComprasTabs({
       {/* Importaciones primero (lo más común) en VE y CO, luego Locales, luego Historial */}
       <Tabs className="mb-4" value={tab} onChange={setTab} items={[
         ...(importaciones ? [{ value: 'import' as const, label: 'Importaciones', count: importActive }] : []),
-        { value: 'local',   label: importaciones ? 'Locales' : 'En curso', count: localActive },
-        { value: 'history', label: 'Historial',     count: historyTotal },
+        ...(conEnCurso ? [{ value: 'local' as const, label: importaciones ? 'Locales' : 'En curso', count: localActive }] : []),
+        { value: 'history', label: etapas ? 'Historial' : 'Entradas', count: historyTotal },
       ]} />
 
       {tab === 'local' && (
-        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} onChanged={refresh}
+        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} borradorKey={borradorKey} onChanged={refresh}
           autoCreate={pendingCreate === 'local'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'import' && (
@@ -140,7 +147,7 @@ export default function ComprasTabs({
             {subBtn('import', `Importaciones (${importHist})`)}
           </div>}
           {histType === 'local' || !importaciones
-            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} onChanged={refresh} historyMode />
+            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} borradorKey={borradorKey} onChanged={refresh} historyMode />
             : <ImportsClient initialOrders={imports} suppliers={importSuppliers} acceso={acceso} onChanged={refresh} historyMode />}
         </div>
       )}

@@ -252,14 +252,15 @@ export async function PUT(
         }
 
       } else if (newStatus === 'PROCESADA') {
-        // CO no usa "verificar pago": se procesa directo desde BORRADOR.
-        // VE mantiene el paso PAGO_VERIFICADO obligatorio.
+        // CO no usa "verificar pago": se procesa directo desde BORRADOR. VE mantiene el paso
+        // PAGO_VERIFICADO obligatorio si la empresa tiene "verificar_pagos" (Inventario simple: no).
         const isCO = session.user.country === 'CO'
-        const allowedFrom = isCO ? ['BORRADOR', 'PAGO_VERIFICADO'] : ['PAGO_VERIFICADO']
+        const directo = isCO || !tieneModulo(session.user, 'verificar_pagos')
+        const allowedFrom = directo ? ['BORRADOR', 'PAGO_VERIFICADO'] : ['PAGO_VERIFICADO']
         if (!allowedFrom.includes(current)) {
           await db.query('ROLLBACK')
           return NextResponse.json(
-            { error: isCO ? 'Solo se puede procesar desde borrador' : 'Debe verificar el pago primero' },
+            { error: directo ? 'Solo se puede procesar desde borrador' : 'Debe verificar el pago primero' },
             { status: 409 }
           )
         }

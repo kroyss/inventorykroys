@@ -22,8 +22,25 @@ const HISTORIAL_POR_PASADA = 4             // publicaciones por pasada del cron 
 interface ItemCatalogo {
   id: string; title: string; status: string; price: number | null; currency_id: string | null
   category_id: string | null; available_quantity: number; permalink?: string
-  attributes?: { name: string; value_name: string | null }[]
+  attributes?: { id?: string; name: string; value_name: string | null }[]
+  thumbnail?: string; seller_custom_field?: string | null
+  variations?: { id: number; available_quantity?: number; seller_custom_field?: string | null
+                 attribute_combinations?: { name: string; value_name: string | null }[]
+                 attributes?: { id?: string; value_name: string | null }[] }[]
 }
+
+/** Variantes como las guarda ml_catalogo.variantes (migración 082): para importar un producto por variante. */
+export interface VarianteCatalogo { id: number; nombre: string | null; disponible: number; sku: string | null }
+const skuDe = (campo: string | null | undefined, attrs: { id?: string; value_name: string | null }[] | undefined) =>
+  campo?.trim() || attrs?.find(a => a.id === 'SELLER_SKU')?.value_name?.trim() || null
+const variantesDe = (it: ItemCatalogo): VarianteCatalogo[] | null => it.variations?.length
+  ? it.variations.map(v => ({
+      id: v.id,
+      nombre: (v.attribute_combinations ?? []).map(a => `${a.name}: ${a.value_name ?? '—'}`).join(' · ') || null,
+      disponible: v.available_quantity ?? 0,
+      sku: skuDe(v.seller_custom_field, v.attributes),
+    }))
+  : null
 
 // Atributos que no ayudan a responder (códigos internos, garantías de ML, etc.).
 const ATRIBUTO_INUTIL = /^(SKU|C[oó]digo universal|GTIN|Condici[oó]n del [ií]tem|Tipo de garant[ií]a|Tiempo de garant[ií]a|Es kit|Con env[ií]o gratis|Origen|Unidades por pack|Formato de venta)/i
@@ -32,12 +49,13 @@ export const fichaDeAtributos = (attrs: ItemCatalogo['attributes']) =>
   (attrs ?? []).filter(a => a.value_name && !ATRIBUTO_INUTIL.test(a.name))
     .slice(0, 18).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
 
-/** Refresca el catálogo de una cuenta si pasaron HORAS_CATALOGO (la reserva es atómica). */
-export async function actualizarCatalogo(db: Pool, conexionId: number) {
+/** Refresca el catálogo de una cuenta si pasaron HORAS_CATALOGO (la reserva es atómica).
+ *  `forzar`: ya (Importar desde ML → "Actualizar desde ML"), aunque no hayan pasado las horas. */
+export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = false) {
   const { rows: [c] } = await db.query(
     `UPDATE ml_conexiones SET catalogo_at = NOW()
-     WHERE id = $1 AND estado = 'activa' AND (catalogo_at IS NULL OR catalogo_at < NOW() - make_interval(hours => $2))
-     RETURNING ml_user_id`, [conexionId, HORAS_CATALOGO])
+     WHERE id = $1 AND estado = 'activa' AND ($3 OR catalogo_at IS NULL OR catalogo_at < NOW() - make_interval(hours => $2))
+     RETURNING ml_user_id`, [conexionId, HORAS_CATALOGO, forzar])
   if (!c) return null
   const seller = Number(c.ml_user_id)
   const ids = [...new Set([...await idsDe(db, conexionId, seller, 'active'), ...await idsDe(db, conexionId, seller, 'paused')])]
@@ -46,19 +64,23 @@ export async function actualizarCatalogo(db: Pool, conexionId: number) {
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
     const r = await mlFetch<{ code: number; body: ItemCatalogo }[]>(db, conexionId,
       `/items?ids=${ids.slice(i, i + POR_MULTIGET).join(',')}` +
-      '&attributes=id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes')
+      '&attributes=id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations')
     for (const x of r) {
       const it = x.code === 200 ? x.body : null
       if (!it || (it.status !== 'active' && it.status !== 'paused')) continue
       await db.query(
-        `INSERT INTO ml_catalogo (item_id, conexion_id, titulo, precio, moneda, category_id, disponible, estado, permalink, ficha, actualizado_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+        `INSERT INTO ml_catalogo (item_id, conexion_id, titulo, precio, moneda, category_id, disponible, estado, permalink, ficha,
+                                  thumbnail, sku, variantes, actualizado_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
          ON CONFLICT (empresa_id, item_id) DO UPDATE SET conexion_id = EXCLUDED.conexion_id, titulo = EXCLUDED.titulo,
            precio = EXCLUDED.precio, moneda = EXCLUDED.moneda, category_id = EXCLUDED.category_id,
            disponible = EXCLUDED.disponible, estado = EXCLUDED.estado, permalink = EXCLUDED.permalink,
-           ficha = EXCLUDED.ficha, actualizado_at = NOW()`,
+           ficha = EXCLUDED.ficha, thumbnail = EXCLUDED.thumbnail, sku = EXCLUDED.sku, variantes = EXCLUDED.variantes,
+           actualizado_at = NOW()`,
         [it.id, conexionId, it.title, it.price, it.currency_id, it.category_id, it.available_quantity ?? 0,
-         it.status, it.permalink ?? null, fichaDeAtributos(it.attributes)])
+         it.status, it.permalink ?? null, fichaDeAtributos(it.attributes),
+         it.thumbnail?.replace(/^http:/, 'https:') ?? null, skuDe(it.seller_custom_field, it.attributes),
+         variantesDe(it) ? JSON.stringify(variantesDe(it)) : null])
       n++
     }
   }

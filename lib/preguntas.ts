@@ -151,6 +151,10 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       try { await sincronizarOrdenes(db, c.id) } catch (e) {
         console.error('[ML ventas]', c.nickname, e instanceof Error ? e.message : e)
       }
+      // Reputación: termómetro de la cuenta y calificaciones recibidas (lib/reputacionML.ts).
+      try { await sincronizarReputacion(db, c.id) } catch (e) {
+        console.error('[ML reputacion]', c.nickname, e instanceof Error ? e.message : e)
+      }
       const fallas = await completarItems(db, c.id)
       if (fallas) {
         await db.query(`UPDATE ml_conexiones SET ultimo_error = $2 WHERE id = $1`,
@@ -176,6 +180,7 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
 // Revisión del texto: lib/preguntasTexto.ts (se usa también en el navegador).
 export { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerPlantillas, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
+import { sincronizarReputacion } from '@/lib/reputacionML'
 
 // ── Contexto para la IA ─────────────────────────────────────────────────────
 interface ItemML {
@@ -223,12 +228,13 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Producto propio: el código ML se guarda sin el prefijo del sitio (MLV768007052 → 768007052).
   const codigo = String(q.item_id).replace(/^[A-Z]{3}/, '')
   const { rows: [prod] } = await db.query(
-    `SELECT p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, pp.final_price_usd::float AS precio_usd
+    `SELECT p.code, p.name, (CASE WHEN m.ml_code LIKE '%:%' THEN SUM(COALESCE(i.quantity, 0)) OVER () ELSE COALESCE(i.quantity, 0) END)::int AS stock, pp.final_price_usd::float AS precio_usd
      FROM product_ml_codes m
      JOIN products p ON p.id = m.product_id
      LEFT JOIN inventory i ON i.product_id = p.id
      LEFT JOIN product_pricing pp ON pp.product_id = p.id
-     WHERE m.ml_code = $1 AND p.is_active
+     WHERE split_part(m.ml_code, ':', 1) = $1 AND p.is_active   -- también los productos por variante (stock sumado)
+     ORDER BY (m.ml_code LIKE '%:%')
      LIMIT 1`, [codigo])
   const { rows: [tasa] } = await db.query(
     `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)

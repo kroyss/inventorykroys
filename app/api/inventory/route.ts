@@ -5,7 +5,7 @@ const INVENTORY_SQL = `
   WITH v AS (
     SELECT
       p.id                                        AS product_id,
-      p.code, p.name, p.is_active,
+      p.code, p.name, p.is_active, p.stock_por_verificar,
       COALESCE(pp.base_cost,       0)::float      AS base_cost,
       COALESCE(pp.shipping_cost,   0)::float      AS shipping_cost,
       COALESCE(pp.total_cost,      0)::float      AS total_cost,

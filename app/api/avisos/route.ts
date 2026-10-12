@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { getSessionDb, unauthorized } from '@/lib/session'
-import { tieneModulo } from '@/lib/modulos'
+import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
 import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
 import { contarAlertas } from '@/lib/alertasStock'
+import { SQL_AVISO_REPUTACION } from '@/lib/reputacionML'
+import { puede } from '@/lib/permisos'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
 //   preguntas: sin responder · mensajes: conversaciones con mensajes sin leer
@@ -20,7 +22,7 @@ export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
   const u = session.user
-  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0 }
+  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0, negativas: 0, neutrales: 0 }
   try {
     if (tieneModulo(u, 'preguntas')) {
       const { rows: [r] } = await db.query(
@@ -31,9 +33,16 @@ export async function GET() {
       {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
         const { rows: [c] } = await db.query(
-          `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(!tieneModulo(u, 'inventario'))}) b WHERE sugerencia <> 'esperar'`,
+          `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(ventasDesdeML(u))}) b WHERE sugerencia <> 'esperar'`,
           [leerPlantillasCal(pl?.value).noConcretada.dias])
         out.calificaciones = c.n
+      }
+      // Reputación: neutrales y negativas recibidas en los últimos 30 días que nadie marcó como vistas.
+      if (puede(u, 'ver_calificaciones')) {
+        const { rows: [r] } = await db.query(
+          `SELECT COUNT(*) FILTER (WHERE cal_recibida = 'negative')::int AS neg, COUNT(*) FILTER (WHERE cal_recibida = 'neutral')::int AS neu
+           FROM ml_ordenes WHERE ${SQL_AVISO_REPUTACION}`)
+        out.negativas = r.neg; out.neutrales = r.neu
       }
     }
     if (u.country === 'VE' && tieneModulo(u, 'despachos')) {

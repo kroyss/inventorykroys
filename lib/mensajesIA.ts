@@ -67,9 +67,12 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   if (venta?.items.length) {
     const codigos = venta.items.map(i => i.id.replace(/^[A-Z]{3}/, ''))
     const { rows: stock } = await db.query(
-      `SELECT m.ml_code, p.name, COALESCE(i.quantity, 0)::int AS stock
+      `SELECT split_part(m.ml_code, ':', 1) AS ml_code,
+              COALESCE((array_agg(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code NOT LIKE '%:%'))[1],
+                       SUM(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code LIKE '%:%'))::int AS stock
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
-       WHERE m.ml_code = ANY($1::text[]) AND p.is_active`, [codigos])
+       WHERE split_part(m.ml_code, ':', 1) = ANY($1::text[]) AND p.is_active
+       GROUP BY 1`, [codigos])   // el de la publicación como siempre; si solo hay productos por variante, la suma
     L.push('PRODUCTOS DE LA VENTA:')
     for (const it of venta.items) {
       const s = stock.find(x => x.ml_code === it.id.replace(/^[A-Z]{3}/, ''))

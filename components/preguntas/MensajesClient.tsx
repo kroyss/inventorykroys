@@ -43,6 +43,14 @@ export default function MensajesClient() {
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
+  // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Reputación → "Escribirle").
+  const [packPedido] = useState(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('pack'))
+  useEffect(() => { if (packPedido) setVista('todas') }, [packPedido])
+  useEffect(() => {
+    if (!packPedido || !lista) return
+    const c = lista.find(x => x.pack_id === packPedido)
+    if (c) setAbierta(c)
+  }, [packPedido, lista])
 
   return (
     <div className="space-y-4">

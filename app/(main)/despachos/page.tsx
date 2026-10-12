@@ -5,7 +5,7 @@ import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import NegocioSettings from '@/components/tasas/NegocioSettings'
 import { redirect } from 'next/navigation'
-import { llevaInventario, tieneModulo } from '@/lib/modulos'
+import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Despachos' }
@@ -18,7 +18,7 @@ export default async function DespachosPage() {
   }
   // isAdmin = "Configurar automatizaciones" (lib/permisos.ts)
   const isAdmin = puede(session!.user, 'automatizaciones_config')
-  const desdeML = !llevaInventario(session!.user)
+  const desdeML = ventasDesdeML(session!.user)
   // Como todas las Automatizaciones: hasta conectar una cuenta de ML se explica qué gana y se ofrece conectar.
   if (tieneModulo(session!.user, 'preguntas') && await sinCuentasML(session!)) {
     return <SinCuentaML esAdmin={puede(session!.user, 'ml_cuentas')} titulo="Despachos" gancho="Imprime las etiquetas de todas tus cuentas, 4 por hoja, con el producto escrito."
@@ -29,8 +29,8 @@ export default async function DespachosPage() {
   return (
     <div className="space-y-6">
       <DespachosClient isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} />
-      {/* Sin inventario no hay Ajustes: el remitente del manifiesto se cambia aquí. */}
-      {isAdmin && desdeML && <NegocioSettings conDespachos soloRemitente />}
+      {/* El remitente del manifiesto se cambia aquí, para todas las empresas (ya no está en Ajustes). */}
+      {isAdmin && <NegocioSettings conDespachos soloRemitente />}
     </div>
   )
 }

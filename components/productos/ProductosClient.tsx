@@ -121,9 +121,13 @@ interface Props {
   country:          Country
   mlAccounts: string[]   // cuentas ML de la empresa (Ajustes o, si no hay, las conectadas)
   descuento: boolean     // módulo Descuento ML: sin él el descuento vale 0 (/api/settings) y no se muestra
+  importarML?: boolean   // permiso "Importar productos desde MercadoLibre" + cuentas de ML (Primeros pasos)
+  categorias?: boolean   // módulo precios_categorias. Apagado (Inventario simple): precio = lo publicado, sin categoría ni exceso
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true }: Props) {
+  // Inventario simple: el precio de venta es el que se guardó (lo publicado en ML), no costo × categoría × exceso.
+  const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
   const [search,    setSearch]    = useState('')
   const [selected,  setSelected]  = useState<number[]>([])
@@ -193,6 +197,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const effDiscountFor = (p: { weight_kg: number | null; total_cost: number; profit_percentage: number }): number =>
     country === 'VE' ? shipFor(p).effectiveDiscount : globalDiscount
 
+  // Precio y margen por producto: en modo simple, el guardado (sale_price); si no, el calculado en vivo.
+  const precioVE    = (p: Product) => simple ? p.sale_price : liveBaseVE(p)
+  const publicadoVE = (p: Product) => simple ? p.sale_price : livePublishedVE(p, veRate?.excess ?? 0)
+  const netDe = (p: Product, disc?: number) => simple
+    ? mlNetFor(country, p, veRate, coTrm, mlSettings, 0, shipTable, country === 'VE' ? p.sale_price : undefined)
+    : mlNetFor(country, p, veRate, coTrm, mlSettings, disc, shipTable)
+
   // Descuento efectivo del FORM (capado por el peso ingresado en el form).
   const formWeight = form.weight_kg.trim() === '' ? null : parseFloat(form.weight_kg)
   const formShip = shipInfo(isNaN(formWeight as number) ? null : formWeight, publishedPriceUsd, globalDiscount, shipTable)
@@ -212,13 +223,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   // no pelear con el usuario si luego borra el campo a mano).
   const [salePriceAutoFilled, setSalePriceAutoFilled] = useState(false)
   useEffect(() => {
-    if (country !== 'CO' || (modal !== 'create' && modal !== 'edit') || salePriceAutoFilled) return
+    if (country !== 'CO' || simple || (modal !== 'create' && modal !== 'edit') || salePriceAutoFilled) return
     if (form.sale_price > 0) { setSalePriceAutoFilled(true); return }
     if (suggestedPesos > 0) {
       setForm(f => ({ ...f, sale_price: suggestedPesos }))
       setSalePriceAutoFilled(true)
     }
-  }, [country, modal, salePriceAutoFilled, form.sale_price, suggestedPesos])
+  }, [country, simple, modal, salePriceAutoFilled, form.sale_price, suggestedPesos])
 
   // Open create modal when arriving via command palette (/productos?new=1)
   useEffect(() => {
@@ -310,15 +321,21 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       const isCO = country === 'CO'
       const weightNum = form.weight_kg.trim() === '' || isNaN(parseFloat(form.weight_kg))
         ? null : parseFloat(form.weight_kg)
+      // Inventario simple VE: el precio que se escribe es el publicado y se guarda tal cual (sin descuento).
+      const simpleVE = simple && !isCO
+      const precios = {
+        base_price_usd:      isCO ? 0 : simpleVE ? form.sale_price : basePriceUsd,
+        published_price_usd: isCO ? 0 : simpleVE ? form.sale_price : publishedPriceUsd,
+        final_price_usd:     isCO ? 0 : simpleVE ? form.sale_price : finalPriceUsd,
+        // descuento efectivo = global capado por el peso (envío gratis)
+        discount_percent:    isCO || simpleVE ? 0 : formEffDiscount,
+        // VE: el precio de inventario sigue al Precio Base (USD). CO y simple: el del input.
+        sale_price:          isCO || simpleVE ? form.sale_price : basePriceUsd,
+      }
       const payload = {
         ...form,
-        base_price_usd:      isCO ? 0 : basePriceUsd,
-        published_price_usd: isCO ? 0 : publishedPriceUsd,
-        final_price_usd:     isCO ? 0 : finalPriceUsd,
-        // descuento efectivo = global capado por el peso (envío gratis)
-        discount_percent:    isCO ? 0 : formEffDiscount,
-        // VE: el precio de inventario sigue al Precio Base (USD). CO: pesos del input.
-        sale_price:          isCO ? form.sale_price : basePriceUsd,
+        ...(simple ? { profit_category_id: null } : {}),
+        ...precios,
         weight_kg:           weightNum,
       }
 
@@ -335,14 +352,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name:               form.name,
-            profit_category_id: form.profit_category_id,
+            profit_category_id: simple ? null : form.profit_category_id,
             base_cost:          form.base_cost,
             shipping_cost:      form.shipping_cost,
-            base_price_usd:     isCO ? 0 : basePriceUsd,
-            published_price_usd:isCO ? 0 : publishedPriceUsd,
-            final_price_usd:    isCO ? 0 : finalPriceUsd,
-            discount_percent:   isCO ? 0 : formEffDiscount,
-            sale_price:         isCO ? form.sale_price : basePriceUsd,
+            ...precios,
             weight_kg:          weightNum,
             ml_codes:           form.ml_codes.filter(m => m.code.trim()),
           }),
@@ -460,15 +473,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
-    const margin = (p: Product) => mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p), shipTable)?.margen ?? -Infinity
+    const margin = (p: Product) => netDe(p, effDiscountFor(p))?.margen ?? -Infinity
     const valueFor = (p: Product): number | string => {
       switch (sortKey) {
         case 'code':     return p.code
         case 'name':     return p.name.toLowerCase()
         case 'category': return p.category_name ?? '￿'
         case 'cost':     return p.total_cost
-        case 'price':    return country === 'CO' ? p.sale_price : liveBaseVE(p)
-        case 'mlprice':  return livePublishedVE(p, veRate?.excess ?? 0)
+        case 'price':    return country === 'CO' ? p.sale_price : precioVE(p)
+        case 'mlprice':  return publicadoVE(p)
         case 'margin':   return margin(p)
         case 'stock':    return p.quantity
         case 'status':   return p.is_active ? 0 : 1
@@ -480,7 +493,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       return String(va).localeCompare(String(vb))
     })
     return sortDir === 'desc' ? arr.reverse() : arr
-  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings, globalDiscount, shipTable])
+  }, [filtered, sortKey, sortDir, country, veRate, coTrm, mlSettings, globalDiscount, shipTable, simple])
 
   const isSearching = search.trim().length > 0
   const displayed   = isSearching ? sorted : sorted.slice(0, visible)
@@ -492,13 +505,19 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     total:       products.length,
     activos:     products.filter(p => p.is_active).length,
     inactivos:   products.filter(p => !p.is_active).length,
-    sinCat:      products.filter(p => p.is_active && !p.profit_category_id).length,
+    sinCat:      products.filter(p => p.is_active && (simple ? !(p.total_cost > 0) : !p.profit_category_id)).length,
     valor:       products.filter(p => p.is_active).reduce((s, p) => s + p.quantity * p.total_cost, 0),
   }
 
   return (
     <div className="space-y-4">
       <PageHeader title="Productos" subtitle="Catálogo, precios y margen neto de cada producto" actions={<>
+        {importarML && (
+          <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"
+            title="Convertir tus publicaciones de MercadoLibre en productos, o vincularlas a los que ya tienes">
+            Importar desde ML
+          </Link>
+        )}
         {country === 'VE' && descuento && (
           <Link href="/productos/mercadoenvios" className="btn-secondary text-sm whitespace-nowrap">MercadoEnvíos</Link>
         )}
@@ -516,14 +535,14 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         <KPICard compact label="Productos" value={int(kpis.total)} />
         <KPICard compact label="Activos" value={int(kpis.activos)} />
         <KPICard compact label="Inactivos" value={int(kpis.inactivos)} tone={kpis.inactivos > 0 ? 'apagado' : 'neutro'} />
-        <KPICard compact label="Sin categoría" value={int(kpis.sinCat)} tone={kpis.sinCat > 0 ? 'atencion' : 'neutro'} />
+        <KPICard compact label={simple ? 'Sin costo' : 'Sin categoría'} value={int(kpis.sinCat)} tone={kpis.sinCat > 0 ? 'atencion' : 'neutro'} />
         <KPICard compact label="Valor catálogo (costo)" value={`$${fmt(kpis.valor)}`} />
       </div>
 
       {/* ── barra: búsqueda + acciones en lote ── */}
       <div className="flex flex-wrap items-center gap-3">
 
-        {selected.length > 0 && (
+        {selected.length > 0 && !simple && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-neutral-500">{selected.length} seleccionados</span>
             <select
@@ -577,10 +596,12 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Nombre{sortArrow('name')}
                 </th>
-                <th onClick={() => toggleSort('category')}
-                  className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
-                  Categoría{sortArrow('category')}
-                </th>
+                {!simple && (
+                  <th onClick={() => toggleSort('category')}
+                    className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                    Categoría{sortArrow('category')}
+                  </th>
+                )}
                 <th onClick={() => toggleSort('cost')}
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Costo{sortArrow('cost')}
@@ -589,7 +610,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Precio{sortArrow('price')}
                 </th>
-                {country === 'VE' && (
+                {country === 'VE' && !simple && (
                   <th onClick={() => toggleSort('mlprice')}
                     className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800"
                     title="Precio publicado en ML (con exceso, antes del descuento)">
@@ -614,13 +635,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={country === 'VE' ? 11 : 10} className="px-3 py-8 text-center text-neutral-400">
+                  <td colSpan={simple ? 9 : country === 'VE' ? 11 : 10} className="px-3 py-8 text-center text-neutral-400">
                     {search ? 'Sin resultados' : 'No hay productos'}
                   </td>
                 </tr>
               )}
               {displayed.map(p => {
-                const net = mlNetFor(country, p, veRate, coTrm, mlSettings, effDiscountFor(p), shipTable)
+                const net = netDe(p, effDiscountFor(p))
                 return (
                 <tr key={p.id} onClick={() => openView(p.id)}
                   className="border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer">
@@ -634,22 +655,24 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{p.code}</td>
                   <td className="px-3 py-2 font-medium text-neutral-900">{p.name}</td>
-                  <td className="px-3 py-2">
-                    {p.category_name ? (
-                      <span className="text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {etiquetaCategoria(p.category_name, p.profit_percentage)}
-                      </span>
-                    ) : (
-                      <span className="text-neutral-300">—</span>
-                    )}
-                  </td>
+                  {!simple && (
+                    <td className="px-3 py-2">
+                      {p.category_name ? (
+                        <span className="text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {etiquetaCategoria(p.category_name, p.profit_percentage)}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-300">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-3 py-2 text-right text-neutral-600">${fmt(p.total_cost)}</td>
                   <td className="px-3 py-2 text-right font-medium text-neutral-900">
-                    {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}
+                    {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(precioVE(p))}`}
                   </td>
-                  {country === 'VE' && (
+                  {country === 'VE' && !simple && (
                     <td className="px-3 py-2 text-right font-medium text-neutral-900 num">
-                      ${fmt(livePublishedVE(p, veRate?.excess ?? 0))}
+                      ${fmt(publicadoVE(p))}
                     </td>
                   )}
                   <td className="px-3 py-2 text-right">
@@ -685,14 +708,14 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <p className="px-3 py-8 text-center text-neutral-400">{search ? 'Sin resultados' : 'No hay productos'}</p>
           )}
           {displayed.map(p => {
-            const net = mlNetFor(country, p, veRate, coTrm, mlSettings, undefined, shipTable)
+            const net = netDe(p)
             return (
               <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-mono text-xs text-neutral-400">{p.code}</div>
                     <div className="font-medium text-neutral-900 truncate">{p.name}</div>
-                    {p.category_name && (
+                    {p.category_name && !simple && (
                       <span className="inline-block mt-1 text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{etiquetaCategoria(p.category_name, p.profit_percentage)}</span>
                     )}
                   </div>
@@ -701,9 +724,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-sm">
-                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(liveBaseVE(p))}`}</span></span>
-                  {country === 'VE' && (
-                    <span className="text-neutral-500">ML: <span className="font-medium text-neutral-900">${fmt(livePublishedVE(p, veRate?.excess ?? 0))}</span></span>
+                  <span className="text-neutral-500">Precio: <span className="font-medium text-neutral-900">{country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(precioVE(p))}`}</span></span>
+                  {country === 'VE' && !simple && (
+                    <span className="text-neutral-500">ML: <span className="font-medium text-neutral-900">${fmt(publicadoVE(p))}</span></span>
                   )}
                   {net && (
                     <span className={netColor(net.margen)}>{Math.round(net.margen)}% neto</span>
@@ -813,7 +836,30 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </div>
                 </div>
 
-                {/* categoría */}
+                {/* categoría (Inventario simple: no hay; el precio es lo publicado) */}
+                {simple ? (
+                  <div className="rounded-lg border-2 border-green-400 bg-green-50 p-3">
+                    <label className="mb-1 block text-[11px] font-medium text-green-700">
+                      Precio de venta {country === 'CO' ? '(pesos)' : '(USD)'} · lo que publicas en MercadoLibre
+                    </label>
+                    {country === 'CO' ? (
+                      <input type="text" inputMode="numeric" value={form.sale_price ? fmtPeso(form.sale_price) : ''}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/\D/g, '')
+                          setForm(f => ({ ...f, sale_price: digits ? parseInt(digits, 10) : 0 }))
+                        }}
+                        placeholder="0"
+                        className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-xl font-bold text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    ) : (
+                      <NumberInput min="0" step="0.01" value={form.sale_price}
+                        onValueChange={n => setForm(f => ({ ...f, sale_price: n }))}
+                        className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-xl font-bold text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    )}
+                    {country === 'VE' && form.sale_price > 0 && (veRate?.official ?? 0) > 0 && (
+                      <p className="mt-1 text-[10px] text-neutral-500">≈ Bs {fmt(form.sale_price * (veRate?.official ?? 0))} a la tasa oficial</p>
+                    )}
+                  </div>
+                ) : (
                 <div>
                   <label className="block text-xs font-medium text-neutral-600 mb-1">Categoría de ganancia</label>
                   <select
@@ -830,12 +876,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     ))}
                   </select>
                 </div>
+                )}
 
                 {/* Precios calculados (organización estilo legacy) */}
                 <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3 space-y-3">
-                  <p className="text-sm font-semibold text-neutral-700">Precios calculados</p>
+                  {!simple && <p className="text-sm font-semibold text-neutral-700">Precios calculados</p>}
 
-                  <div className="grid grid-cols-2 gap-2">
+                  {!simple && <div className="grid grid-cols-2 gap-2">
                     {/* Costo Base */}
                     <div className="bg-white border border-neutral-200 rounded-lg p-2.5">
                       <p className="text-[11px] text-neutral-500">Costo Base (Costo + Envío)</p>
@@ -865,7 +912,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                         </div>
                       </>
                     )}
-                  </div>
+                  </div>}
 
                   {country === 'VE' ? (
                     <>
@@ -879,7 +926,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                             className="w-28 border border-neutral-300 rounded px-2 py-1 text-sm text-right
                                        focus:outline-none focus:ring-2 focus:ring-neutral-800" />
                         </div>
-                        {descuento ? <>
+                        {descuento && !simple ? <>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-700">Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b></span>
                             <span className="text-[11px] text-neutral-500">Rec: {recDiscountLive.toFixed(1)}%</span>
@@ -899,7 +946,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       </div>
 
                     </>
-                  ) : (
+                  ) : simple ? null : (
                     /* Colombia — costo USD, precio de venta en PESOS (sugerido por TRM) */
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
@@ -953,10 +1000,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       country={country}
                       totalCost={totalCost}
                       ml={mlSettings}
-                      finalPriceUsd={finalPriceUsd}
+                      finalPriceUsd={simple ? form.sale_price : finalPriceUsd}
                       weightKg={formWeight != null && !isNaN(formWeight) ? formWeight : null}
                       veRate={veRate}
-                      priceBs={priceBs}
+                      priceBs={simple ? form.sale_price * (veRate?.official ?? 0) : priceBs}
                       salePrice={form.sale_price || suggestedPesos}
                       coTrm={coTrm}
                     />
@@ -966,7 +1013,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
               {/* Nota del precio de venta de inventario */}
               <p className="text-xs text-neutral-400 -mt-1">
-                {country === 'CO'
+                {simple
+                  ? <>El <b>precio de venta</b> se guarda tal cual: es lo que publicas en MercadoLibre. El costo, lo que pagaste.</>
+                  : country === 'CO'
                   ? <>El <b>costo</b> se guarda en USD y el <b>precio de venta</b> en pesos (${fmtPeso(form.sale_price)}).</>
                   : <>El precio de venta de inventario se guarda igual al <b>Precio Base</b> (${fmt(basePriceUsd)}).</>}
               </p>
@@ -1042,7 +1091,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         const v = viewing
         const vEff  = effDiscountFor(v)
         const vShip = country === 'VE' ? shipFor(v) : null
-        const net = mlNetFor(country, v, veRate, coTrm, mlSettings, vEff, shipTable)
+        const net = netDe(v, vEff)
+        // Precio que efectivamente se cobra en ML: el guardado (simple) o el calculado con descuento.
+        const vFinal = simple ? v.sale_price : liveFinalVE(v, veRate?.excess ?? 0, vEff)
         const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
           <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
             <p className="text-[11px] text-neutral-500">{label}</p>
@@ -1062,7 +1113,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
                       {v.is_active ? 'Activo' : 'Inactivo'}
                     </span>
-                    {v.category_name && (
+                    {v.category_name && !simple && (
                       <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{etiquetaCategoria(v.category_name, v.profit_percentage)}</span>
                     )}
                   </div>
@@ -1083,7 +1134,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                 <div>
                   <p className="text-sm font-semibold text-neutral-800 mb-2">Precios</p>
-                  {country === 'VE' ? (
+                  {country === 'VE' && simple ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Precio de venta (publicado)" value={`$${fmt(v.sale_price)}`} accent="text-neutral-900" />
+                      <Field label="Precio Bs" value={`Bs ${fmt(v.sale_price * (veRate?.official ?? 0))}`} />
+                      {net && (
+                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
+                      )}
+                    </div>
+                  ) : country === 'VE' ? (
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-neutral-900" />
                       <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
@@ -1113,10 +1172,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     country={country}
                     totalCost={v.total_cost}
                     ml={mlSettings}
-                    finalPriceUsd={liveFinalVE(v, veRate?.excess ?? 0, vEff)}
+                    finalPriceUsd={vFinal}
                     weightKg={v.weight_kg}
                     veRate={veRate}
-                    priceBs={liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0)}
+                    priceBs={vFinal * (veRate?.official ?? 0)}
                     salePrice={v.sale_price}
                     coTrm={coTrm}
                   />

@@ -51,22 +51,35 @@ export async function ventasPorConfirmar(db: Pool) {
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
      ORDER BY o.fecha DESC`, [dias, DIAS_MAX])
 
-  // Cuántos productos del sistema tiene cada publicación (sin el prefijo: MLV768007052 → 768007052).
-  const codigos = [...new Set(rows.flatMap(r => (r.items as string[] | null ?? []).filter(i => !i.includes(':'))
-    .map(i => i.replace(/^[A-Z]{3}/, ''))))]
-  const { rows: map } = codigos.length ? await db.query(
+  // Cuántos productos del sistema tiene cada publicación (sin el prefijo: MLV768007052 → 768007052) y
+  // cada variante ("768007052:180012345", Importar desde ML). Primero la variante exacta, si no la
+  // publicación; si solo hay productos de OTRAS variantes, hay que elegir (nunca se toma uno solo).
+  const sinPrefijo = (c: string) => c.replace(/^[A-Z]{3}/, '')
+  const publicaciones = [...new Set(rows.flatMap(r => (r.items as string[] | null ?? []).filter(i => !i.includes(':')).map(sinPrefijo)))]
+  const { rows: map } = publicaciones.length ? await db.query(
     `SELECT m.ml_code, COUNT(DISTINCT p.id)::int AS n
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id
-     WHERE m.is_active AND p.is_active AND m.ml_code = ANY($1::text[]) GROUP BY 1`, [codigos]) : { rows: [] }
+     WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[]) GROUP BY 1`, [publicaciones]) : { rows: [] }
   const productosDe = new Map(map.map(m => [m.ml_code as string, m.n as number]))
+  const cuantos = (codigo: string, variante: string | null) => {
+    const pub = sinPrefijo(codigo)
+    const exacta = variante ? productosDe.get(sinPrefijo(variante)) ?? 0 : 0
+    if (exacta) return exacta
+    const dePub = productosDe.get(pub) ?? 0
+    if (dePub) return dePub
+    const otras = [...productosDe].filter(([c]) => c.startsWith(pub + ':')).reduce((a, [, n]) => a + n, 0)
+    return otras ? Math.max(2, otras) : 0
+  }
 
   const filas: PorConfirmar[] = rows.map(r => {
-    const items = (r.items as string[] | null ?? []).filter(i => !i.includes(':'))
+    const todos = (r.items as string[] | null) ?? []
+    const items = todos.filter(i => !i.includes(':'))
     const detalle = (r.detalle as { titulo: string; variante: string | null; cantidad: number }[] | null) ?? []
     // detalle e items van en el mismo orden (uno por artículo de la orden).
     const lineas: LineaML[] = detalle.map((d, k) => {
       const codigo = items[k] ?? null
-      return { ...d, codigo, productos: codigo ? productosDe.get(codigo.replace(/^[A-Z]{3}/, '')) ?? 0 : 0 }
+      const variante = codigo ? todos.find(i => i.startsWith(codigo + ':')) ?? null : null
+      return { ...d, codigo, productos: codigo ? cuantos(codigo, variante) : 0 }
     })
     const productos: EstadoProductos =
       lineas.some(l => l.productos === 0) ? 'sin_vincular' : lineas.some(l => l.productos > 1) ? 'elegir' : 'listo'

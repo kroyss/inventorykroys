@@ -285,6 +285,24 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
     }
   }, [selected, adjForm, tab])
 
+  // Stock por verificar (Importar desde ML): el número vino de MercadoLibre y nadie lo confirmó.
+  const [soloVerificar, setSoloVerificar] = useState(false)
+  const [verificando, setVerificando] = useState(false)
+  const [urlVerificar] = useDeepLinkParam('verificar', ['1'] as const)   // aviso de Inicio
+  useEffect(() => { if (urlVerificar) setSoloVerificar(true) }, [urlVerificar])
+  const porVerificar = items.filter(i => i.is_active && i.stock_por_verificar).length
+  const confirmarStock = async () => {
+    if (!selected) return
+    setVerificando(true); setMsg(null)
+    const res = await fetch(`/api/inventory/${selected.product_id}/verificar`, { method: 'POST' })
+    setVerificando(false)
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setMsg({ type: 'error', text: d.error ?? 'Error' }); return }
+    setItems(prev => prev.map(i => i.product_id === selected.product_id ? { ...i, stock_por_verificar: false } : i))
+    setSelected({ ...selected, stock_por_verificar: false })
+    setMsg({ type: 'ok', text: 'Stock confirmado' })
+    setTimeout(() => setMsg(null), 2500)
+  }
+
   // pagination
   const PAGE_SIZE = 15
   const [page, setPage] = useState(1)
@@ -301,7 +319,7 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
     .filter(item => {
       const matchSearch = matchTokens(search, item.code, item.name)
       const matchStatus = !statusF || item.status === statusF
-      return matchSearch && matchStatus
+      return matchSearch && matchStatus && (!soloVerificar || porVerificar === 0 || !!item.stock_por_verificar)
     })
     .sort((a, b) => {
       const valueFor = (i: InventoryItem): number | string => {
@@ -324,7 +342,7 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
       return sortDir === 'desc' ? -cmp : cmp
     })
 
-  useEffect(() => { setPage(1) }, [search, statusF, sortKey, sortDir])
+  useEffect(() => { setPage(1) }, [search, statusF, sortKey, sortDir, soloVerificar])
 
   const displayed = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -394,6 +412,18 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
           {aviso.text}
         </div>
       )}
+      {porVerificar > 0 && (
+        <button type="button" onClick={() => setSoloVerificar(v => !v)}
+          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${
+            soloVerificar ? 'border-amber-400 bg-amber-50' : 'border-amber-200 bg-amber-50/60 hover:border-amber-300'}`}>
+          <span className="flex items-center gap-2 text-amber-900">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+            <span><b className="num">{porVerificar}</b> {porVerificar === 1 ? 'producto tiene' : 'productos tienen'} el stock que dijo MercadoLibre, sin verificar.
+              <span className="text-amber-700"> Revísalos uno por uno: confirma el número o ajústalo.</span></span>
+          </span>
+          <span className="shrink-0 text-xs font-medium text-amber-800">{soloVerificar ? 'Ver todos' : 'Ver solo esos'}</span>
+        </button>
+      )}
       {/* KPI cards clickeables (filtran la tabla) */}
       <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}>
         {CHIPS.filter(c => !c.adminOnly || isAdmin).map(c => (
@@ -449,6 +479,12 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{item.code}</td>
                   <td className="px-3 py-2 font-medium text-neutral-900">
                     {item.name}
+                    {item.stock_por_verificar && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-px align-middle text-[10px] font-semibold text-amber-800"
+                        title="El stock vino de MercadoLibre: confírmalo o ajústalo">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />por verificar
+                      </span>
+                    )}
                   </td>
                   <td className={`px-3 py-2 text-right font-semibold num ${item.quantity === 0 && item.status !== 'INACTIVO' ? 'text-red-600' : 'text-neutral-900'}`}>{item.quantity}</td>
                   {/* Sin configurar (0): se muestra el recomendado por ventas, en gris y cursiva */}
@@ -497,6 +533,19 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
               {msg && (
                 <div className={`mt-2 px-3 py-1.5 rounded text-sm ${msg.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
                   {msg.text}
+                </div>
+              )}
+
+              {selected.stock_por_verificar && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span>Este stock (<b className="num">{selected.quantity}</b>) es el que decía MercadoLibre. ¿Es el real?</span>
+                  <span className="flex gap-2">
+                    <button type="button" onClick={confirmarStock} disabled={verificando}
+                      className="rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white hover:bg-amber-700 disabled:opacity-60">
+                      {verificando ? 'Guardando…' : `Sí, hay ${selected.quantity}`}
+                    </button>
+                    <span className="self-center text-amber-700">o corrígelo con un ajuste abajo</span>
+                  </span>
                 </div>
               )}
 

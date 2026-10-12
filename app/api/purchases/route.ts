@@ -5,6 +5,7 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { resolveSupplierId } from '@/lib/suppliers'
 import { puede } from '@/lib/permisos'
+import { tieneModulo } from '@/lib/modulos'
 
 const ORDERS_SQL = `
   SELECT
@@ -69,6 +70,9 @@ const CreateSchema = z.object({
   supplier_name: z.string().optional(),
   notes:         z.string().optional(),
   total_paid:    z.number().nonnegative().default(0),
+  // Inventario simple (sin "compras_etapas"): "Entró mercancía" = la compra nace FINALIZADA, pagada y
+  // recibida completa; suma el stock (con su movimiento) y el costo pasa a ser lo que se pagó.
+  entrada:       z.boolean().optional(),
   items: z.array(z.object({
     product_id:    z.number().int().positive(),
     quantity:      z.number().int().positive(),
@@ -106,6 +110,7 @@ export async function POST(req: NextRequest) {
     const orderNumber = `CL-${String(lastNum + 1).padStart(4, '0')}`
 
     const totalUsd = body.items.reduce((s, i) => s + i.quantity * i.unit_cost_usd, 0)
+    const entrada = !!body.entrada && !tieneModulo(session.user, 'compras_etapas')
 
     await db.query('BEGIN')
     try {
@@ -114,19 +119,41 @@ export async function POST(req: NextRequest) {
       })
       const { rows: [order] } = await db.query(
         `INSERT INTO purchase_orders
-           (order_number, supplier_id, status, order_type, total_usd, total_paid, notes, created_by)
-         VALUES ($1, $2, 'PENDIENTE', 'local', $3, $4, $5, $6)
+           (order_number, supplier_id, status, order_type, total_usd, total_paid, notes, created_by,
+            received_by, received_at)
+         VALUES ($1, $2, $7, 'local', $3, $4, $5, $6, $8, CASE WHEN $8::int IS NULL THEN NULL ELSE NOW() END)
          RETURNING id`,
-        [orderNumber, supplierId, totalUsd, body.total_paid, body.notes ?? null, userId]
+        [orderNumber, supplierId, totalUsd, entrada ? totalUsd : body.total_paid, body.notes ?? null, userId,
+         entrada ? 'FINALIZADA' : 'PENDIENTE', entrada ? userId : null]
       )
       for (const item of body.items) {
         await db.query(
           `INSERT INTO purchase_order_items
-             (purchase_order_id, product_id, quantity, unit_cost_usd, total_cost_usd, notes)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+             (purchase_order_id, product_id, quantity, unit_cost_usd, total_cost_usd, notes, received_qty, total_received_qty)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
           [order.id, item.product_id, item.quantity, item.unit_cost_usd,
-           item.quantity * item.unit_cost_usd, item.notes ?? null]
+           item.quantity * item.unit_cost_usd, item.notes ?? null, entrada ? item.quantity : null]
         )
+        if (entrada) {
+          // Igual que finalizar una compra (purchases/[id]/status): suma el stock con su movimiento IN,
+          // así "Reabrir" la revierte exactamente. Y el costo del producto pasa a ser lo que se pagó.
+          const { rowCount } = await db.query(
+            `UPDATE inventory SET quantity = quantity + $1, last_updated = NOW() WHERE product_id = $2`,
+            [item.quantity, item.product_id])
+          if (!rowCount) {
+            await db.query(`INSERT INTO inventory (product_id, quantity, min_stock, max_stock, sale_price) VALUES ($1, $2, 0, 0, 0)`,
+              [item.product_id, item.quantity])
+          }
+          await db.query(
+            `INSERT INTO inventory_movements (product_id, movement_type, quantity, reference, notes, created_by)
+             VALUES ($1, 'IN', $2, $3, $4, $5)`,
+            [item.product_id, item.quantity, orderNumber, `Entró mercancía ${orderNumber}`, userId])
+          if (item.unit_cost_usd > 0) {
+            await db.query(
+              `UPDATE product_pricing SET base_cost = $1, total_cost = $1 + COALESCE(shipping_cost, 0) WHERE product_id = $2`,
+              [item.unit_cost_usd, item.product_id])
+          }
+        }
       }
       await db.query('COMMIT')
 

@@ -72,6 +72,10 @@ interface Props {
   initialOrders: PurchaseOrder[]
   initialSuppliers: Supplier[]
   acceso: AccesoCompras
+  /** Módulo "compras_etapas". Apagado (Inventario simple): crear = "Entró mercancía" (nace finalizada). */
+  etapas?: boolean
+  /** Para el borrador de la compra nueva en este navegador (uno por empresa). */
+  borradorKey?: string
   historyMode?: boolean
   /** Aviso al padre (ComprasTabs) tras cualquier cambio, para refrescar contadores y la otra pestaña. */
   onChanged?: () => void
@@ -80,7 +84,7 @@ interface Props {
   onAutoCreateHandled?: () => void
 }
 
-export default function ComprasClient({ initialOrders, initialSuppliers, acceso, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
+export default function ComprasClient({ initialOrders, initialSuppliers, acceso, etapas = true, borradorKey = '', historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
   // Permisos (lib/permisos.ts): crear/editar compras y ver costos van por separado.
   const isAdmin = acceso.editar
   const verCostos = acceso.costos
@@ -243,12 +247,43 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
 
   const paginatedOrders = visibleOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  function openCreate() {
-    setEditId(null)
+  // ── Borrador de la compra NUEVA (2026-10-12): mientras se llena se guarda en este navegador, así
+  // cerrar el formulario (Esc, ×, afuera o Cancelar) no pierde nada. Se borra al guardar la compra o
+  // con "Descartar". No aplica a editar una compra existente.
+  type Borrador = { supplierName: string; supplierId: number | null; notes: string; items: typeof formItems }
+  const claveBorrador = `borrador:compra:${borradorKey}`
+  const leerBorrador = (): Borrador | null => {
+    try { const r = localStorage.getItem(claveBorrador); return r ? JSON.parse(r) as Borrador : null } catch { return null }
+  }
+  const [borrador, setBorrador] = useState<Borrador | null>(null)
+  const [recuperado, setRecuperado] = useState(false)
+  useEffect(() => { if (!historyMode) setBorrador(leerBorrador()) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!showForm || editId || historyMode) return
+    const b: Borrador = { supplierName: formSupplierName, supplierId: formSupplierId, notes: formNotes, items: formItems }
+    const vacio = !b.supplierName.trim() && !b.notes.trim() && b.items.length === 0
+    try { if (vacio) localStorage.removeItem(claveBorrador); else localStorage.setItem(claveBorrador, JSON.stringify(b)) } catch { /* sin almacenamiento */ }
+    setBorrador(vacio ? null : b)
+  }, [showForm, editId, historyMode, formSupplierName, formSupplierId, formNotes, formItems, claveBorrador])
+  function limpiarForm() {
     setFormSupplierName('')
     setFormSupplierId(null)
     setFormNotes('')
     setFormItems([])
+  }
+  function descartarBorrador() {
+    try { localStorage.removeItem(claveBorrador) } catch { /* nada */ }
+    setBorrador(null); setRecuperado(false)
+    limpiarForm()
+  }
+
+  function openCreate() {
+    setEditId(null)
+    const b = historyMode ? null : leerBorrador()
+    if (b) {
+      setFormSupplierName(b.supplierName); setFormSupplierId(b.supplierId); setFormNotes(b.notes); setFormItems(b.items)
+    } else limpiarForm()
+    setRecuperado(!!b)
     setError('')
     setShowForm(true)
   }
@@ -341,6 +376,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
       supplier_name: formSupplierName.trim(),
       notes: formNotes || undefined,
       items: formItems.map(i => ({ product_id: i.product_id, quantity: i.quantity, unit_cost_usd: i.unit_cost_usd })),
+      ...(!etapas && !editId ? { entrada: true } : {}),
     }
     const url = editId ? `/api/purchases/${editId}` : '/api/purchases'
     const method = editId ? 'PUT' : 'POST'
@@ -348,6 +384,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
     const data = await r.json()
     setSaving(false)
     if (!r.ok) { setError(data.error ?? 'Error'); return }
+    if (!editId) { try { localStorage.removeItem(claveBorrador) } catch { /* nada */ } setBorrador(null); setRecuperado(false) }
     await reload()
 
     if (mode === 'another' && !editId) {
@@ -606,6 +643,20 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
           />
         </div>
       </div>
+
+      {borrador && !showForm && !historyMode && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-sm">
+          <span className="flex items-center gap-2 text-amber-900">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+            Tienes una compra sin terminar{borrador.supplierName.trim() ? <> de <b>{borrador.supplierName}</b></> : ''}
+            {borrador.items.length > 0 && <span className="text-amber-700"> · {borrador.items.length} {borrador.items.length === 1 ? 'producto' : 'productos'}</span>}
+          </span>
+          <span className="flex gap-2">
+            <button type="button" onClick={descartarBorrador} className="btn-secondary text-xs">Descartar</button>
+            <button type="button" onClick={openCreate} className="btn-primary text-xs">Continuar</button>
+          </span>
+        </div>
+      )}
 
       {/* Resumen financiero compacto */}
       {verCostos && (
@@ -911,12 +962,23 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowForm(false)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
             <div className="p-5 border-b flex justify-between shrink-0">
-              <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : 'Nueva orden de compra'}</h3>
+              <div>
+                <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : etapas ? 'Nueva orden de compra' : 'Entró mercancía'}</h3>
+                {!etapas && !editId && (
+                  <p className="text-xs text-neutral-500 mt-0.5">Se suma al stock al guardar, y el costo de cada producto pasa a ser lo que pagaste.</p>
+                )}
+              </div>
               <button onClick={() => setShowForm(false)} className="text-neutral-400 hover:text-neutral-700 text-xl">×</button>
             </div>
             <div className="p-5 space-y-4 flex-1 overflow-y-auto">
               {error && <div className="bg-red-50 text-red-700 p-3 rounded text-sm">{error}</div>}
               {formMsg && <div className="bg-green-50 text-green-700 border border-green-200 p-3 rounded text-sm">{formMsg}</div>}
+              {recuperado && !editId && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span>Seguiste donde lo dejaste: esta compra no se había guardado.</span>
+                  <button type="button" onClick={descartarBorrador} className="font-semibold text-amber-800 underline-offset-2 hover:underline">Empezar de cero</button>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1031,6 +1093,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
               {editId ? (
                 <button onClick={() => saveOrder('close')} disabled={saving} className="btn-primary">
                   {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              ) : !etapas ? (
+                <button onClick={() => saveOrder('close')} disabled={saving} className="btn-primary">
+                  {saving ? 'Guardando...' : 'Registrar entrada'}
                 </button>
               ) : (
                 <>

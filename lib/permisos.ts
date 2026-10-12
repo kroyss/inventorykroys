@@ -52,6 +52,8 @@ export const PERMISOS = {
                              detalle: 'Configuración de Preguntas, Calificaciones y Stock, respuestas rápidas de Mensajes, impresión y remitente de Despachos, equipos y textos del Reportador, guías Tealca' },
   reponer_stock:           { tipo: 'accion', nombre: 'Cambiar el stock en MercadoLibre', usuario: false, modulo: 'preguntas',
                              detalle: 'Reponer una publicación agotada desde Preguntas y actualizar cantidades desde Stock' },
+  importar_ml:             { tipo: 'accion', nombre: 'Importar productos desde MercadoLibre', usuario: false, modulo: 'inventario',
+                             detalle: 'Primeros pasos en Productos: crear y vincular productos a partir de las publicaciones (necesita ver Productos)' },
   pagos_me_config:         { tipo: 'accion', nombre: 'Configurar Pagos ME', usuario: false, modulo: 'pagos_me', soloVE: true,
                              detalle: 'Clave de MercadoEnvíos y horario automático' },
 } as const satisfies Record<string, DefPermiso>

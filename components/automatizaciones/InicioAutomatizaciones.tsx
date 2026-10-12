@@ -6,6 +6,7 @@ import { useAvisos, type Avisos } from '@/components/layout/Avisos'
 const ICONOS = {
   preguntas: <><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z" /><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" /></>,
   mensajes: <><path d="M4 5h16v11H8l-4 4V5z" /><path d="M8 9h8M8 12h5" /></>,
+  reputacion: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>,
   calificaciones: <><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" /></>,
   despachos: <><path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></>,
   reportador: <><path d="M3 11l18-8-8 18-2-8-8-2z" /></>,
