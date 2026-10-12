@@ -42,8 +42,8 @@ function ShipRowInputs({ row, onChange, onRemove }: {
 
 // descuento / finanzas: módulos (lib/modulos.ts). Sin Descuento ML no se ven el descuento global, el
 // recomendado ni la tabla de MercadoEnvíos (queda el exceso); sin Finanzas, su factor de tránsito.
-export default function TasasClient({ bonos, puedeTasas, despachos, descuento, finanzas, categorias = true }: {
-  bonos: boolean; puedeTasas: boolean; despachos: boolean; descuento: boolean; finanzas: boolean
+export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, categorias = true }: {
+  bonos: boolean; puedeTasas: boolean; descuento: boolean; finanzas: boolean
   categorias?: boolean   // módulo precios_categorias: sin él (Inventario simple) no hay exceso que configurar
 }) {
   const [latest,   setLatest]   = useState<Rate | null>(null)
@@ -439,7 +439,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
           </div>}
 
           {/* Bonos por ventas del mes (metas y montos) */}
-          <NegocioSettings conDespachos={despachos} />
+          <NegocioSettings conDespachos={false} />
 
           {bonos && <BonusSettings />}
         </div>

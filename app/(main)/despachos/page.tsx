@@ -29,8 +29,8 @@ export default async function DespachosPage() {
   return (
     <div className="space-y-6">
       <DespachosClient isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} />
-      {/* Sin inventario no hay Ajustes: el remitente del manifiesto se cambia aquí. */}
-      {isAdmin && desdeML && <NegocioSettings conDespachos soloRemitente />}
+      {/* El remitente del manifiesto se cambia aquí, para todas las empresas (ya no está en Ajustes). */}
+      {isAdmin && <NegocioSettings conDespachos soloRemitente />}
     </div>
   )
 }
