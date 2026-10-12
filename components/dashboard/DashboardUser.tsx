@@ -95,7 +95,7 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
         <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {porConfirmar && (
             <StatCard label="Por confirmar" value={pc.datos ? pendientesPC : '·'}
-              accent={pendientesPC > 0 ? 'text-amber-600' : undefined} href="/ventas?vista=confirmar" />
+              accent="text-amber-600" href="/ventas?vista=confirmar" />
           )}
           <StatCard label="Nueva venta" value="+" accent="text-green-600" href="/ventas?new=1" />
           <StatCard label="Borrador"        value={saleCounts.borrador}
