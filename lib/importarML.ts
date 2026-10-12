@@ -73,16 +73,18 @@ export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
   // puede estar en varias publicaciones).
   const libres = filas.filter(f => f.estado === 'nueva')
   if (libres.length) {
+    // `%` usa el índice de trigramas (migración 082) con este umbral; la conexión es del request.
+    await db.query(`SELECT set_limit($1)`, [SIMILITUD_MIN])
     const { rows: par } = await db.query(
       `SELECT f.codigo, p.id, p.code, p.name
        FROM unnest($1::text[], $2::text[], $3::text[]) AS f(codigo, titulo, sku)
        CROSS JOIN LATERAL (
          SELECT p.id, p.code, p.name FROM products p
-         WHERE p.is_active AND (lower(p.code) = lower(COALESCE(f.sku, '')) OR similarity(p.name, f.titulo) >= $4)
+         WHERE p.is_active AND (p.name % f.titulo OR (f.sku IS NOT NULL AND lower(p.code) = lower(f.sku)))
          ORDER BY lower(p.code) = lower(COALESCE(f.sku, '')) DESC, similarity(p.name, f.titulo) DESC
          LIMIT 1) p`,
       [libres.map(f => f.codigo), libres.map(f => f.variante ? `${f.titulo} ${f.variante}` : f.titulo),
-       libres.map(f => f.sku), SIMILITUD_MIN])
+       libres.map(f => f.sku)])
     const parecido = new Map(par.map(r => [r.codigo as string, { id: r.id as number, code: r.code as string, name: r.name as string, toda: false }]))
     for (const f of libres) {
       const p = parecido.get(f.codigo)

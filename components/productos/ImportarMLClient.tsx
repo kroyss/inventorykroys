@@ -146,7 +146,9 @@ export default function ImportarMLClient({ conCuentas }: { conCuentas: boolean }
     if (!ok) { setAviso({ ok: false, texto: d.error ?? 'No se pudo vincular' }); return }
     setEligiendo(null); setEleccion('')
     setAviso({ ok: true, texto: `${f.titulo}${f.variante ? ` (${f.variante})` : ''} quedó vinculada a ${code}.` })
-    cargar()
+    // Al instante en pantalla (la lista completa tarda en rehacerse).
+    setDatos(d => d && { ...d, filas: d.filas.map(x => x.codigo === f.codigo
+      ? { ...x, estado: 'vinculada', producto: { id: productId, code, name: x.producto?.id === productId ? x.producto.name : '', toda: false } } : x) })
   }
 
   const crear = async () => {
@@ -203,7 +205,7 @@ export default function ImportarMLClient({ conCuentas }: { conCuentas: boolean }
         <p>
           El stock de los productos nuevos es el que <b>MercadoLibre</b> dice que hay, y suele no ser exacto: quedan marcados
           <b> “stock por verificar”</b> hasta que lo confirmes producto por producto en Inventario. El costo lo puedes dejar
-          vacío y completarlo después. Publicaciones del catálogo al {fecha(datos?.actualizado_at ?? null)}.
+          vacío y completarlo después. Publicaciones del catálogo al {fecha(datos?.actualizado_at ?? null)}
         </p>
       </div>
 
