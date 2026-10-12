@@ -28,14 +28,19 @@ export async function leerReputacion(db: Pool, conexionId: number, mlUserId: str
   return u.seller_reputation ?? null
 }
 
-type Calif = { rating: string; fecha: string | null; mensaje: string | null }
+// concretada: lo que dijo el comprador; contradictoria: si no coincide con lo que dijimos nosotros
+// (null = nosotros todavía no calificamos).
+type Calif = { rating: string; fecha: string | null; mensaje: string | null; concretada: boolean | null; contradictoria: boolean | null }
+type LadoFeedback = { rating?: string; date_created?: string; message?: string | null; fulfilled?: boolean | null } | null
 /** La calificación que dejó el comprador en una venta. null = ML no la tiene (404). */
 export async function leerCalificacionRecibida(db: Pool, conexionId: number, ordenId: string): Promise<Calif | null> {
   try {
-    const f = await mlFetch<{ purchase?: { rating?: string; date_created?: string; message?: string | null } | null }>(
-      db, conexionId, `/orders/${ordenId}/feedback`)
+    const f = await mlFetch<{ purchase?: LadoFeedback; sale?: LadoFeedback }>(db, conexionId, `/orders/${ordenId}/feedback`)
     if (!f.purchase?.rating) return null
-    return { rating: f.purchase.rating, fecha: f.purchase.date_created ?? null, mensaje: f.purchase.message?.trim() || null }
+    const suya = typeof f.purchase.fulfilled === 'boolean' ? f.purchase.fulfilled : null
+    const nuestra = typeof f.sale?.fulfilled === 'boolean' ? f.sale.fulfilled : null
+    return { rating: f.purchase.rating, fecha: f.purchase.date_created ?? null, mensaje: f.purchase.message?.trim() || null,
+             concretada: suya, contradictoria: suya === null || nuestra === null ? null : suya !== nuestra }
   } catch (e) {
     if (e instanceof ErrorML && e.status === 404) return null
     throw e
@@ -53,12 +58,14 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
     await db.query(`UPDATE ml_conexiones SET reputacion = $2 WHERE id = $1`, [conexionId, rep ? JSON.stringify(rep) : null])
   }
 
-  // Nuevas calificadas (sin tipo todavía) y, una vez al día, las neutrales/negativas que siguen avisando.
+  // Nuevas calificadas (sin tipo todavía) y, una vez al día mientras dura el aviso: las neutrales/negativas
+  // (por si la cambió) y las que no sabíamos si eran contradictorias porque faltaba nuestra calificación.
   const { rows } = await db.query(
     `SELECT id::text, cal_recibida FROM ml_ordenes
      WHERE conexion_id = $1 AND (
        (cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - make_interval(days => $2))
-       OR (cal_recibida IN ('neutral', 'negative') AND cal_recibida_at > NOW() - make_interval(days => $3)
+       OR (cal_recibida_at > NOW() - make_interval(days => $3)
+           AND (cal_recibida IN ('neutral', 'negative') OR (cal_recibida <> '' AND cal_contradictoria IS NULL AND cal_vendedor IS NOT NULL))
            AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - INTERVAL '1 day')))
      ORDER BY cal_recibida IS NULL DESC, fecha DESC LIMIT $4`,
     [conexionId, DIAS_BUSCAR, DIAS_AVISO, POR_PASADA])
@@ -70,8 +77,9 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
          cal_recibida_antes = CASE WHEN cal_recibida IN ('neutral', 'negative') AND $2::text IS DISTINCT FROM cal_recibida
                                    THEN cal_recibida ELSE cal_recibida_antes END,
          cal_recibida = COALESCE($2, ''), cal_recibida_at = COALESCE($3::timestamptz, cal_recibida_at),
-         cal_recibida_msg = COALESCE($4, cal_recibida_msg), cal_recibida_revisada_at = NOW()
-       WHERE id = $1`, [o.id, cal?.rating ?? null, cal?.fecha ?? null, cal?.mensaje ?? null])
+         cal_recibida_msg = COALESCE($4, cal_recibida_msg), cal_recibida_revisada_at = NOW(),
+         cal_recibida_concretada = $5, cal_contradictoria = $6
+       WHERE id = $1`, [o.id, cal?.rating ?? null, cal?.fecha ?? null, cal?.mensaje ?? null, cal?.concretada ?? null, cal?.contradictoria ?? null])
   }
   return rows.length
 }

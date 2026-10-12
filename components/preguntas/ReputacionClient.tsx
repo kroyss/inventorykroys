@@ -12,6 +12,7 @@ interface Calificacion {
   id: string; pack: string; cuenta: string; nombre: string | null; nick: string | null; productos: string | null
   fecha: string; rating: string; antes: string | null; calificada_at: string; mensaje: string | null
   vista_at: string | null; dias_restantes: number; con_mensajes: boolean
+  contradictoria: boolean; concretada: boolean | null
 }
 interface Datos { cuentas: Cuenta[]; calificaciones: Calificacion[]; dias: number; pais: 'VE' | 'CO'; por_revisar: number }
 
@@ -106,11 +107,14 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
   c: Calificacion; pais: 'VE' | 'CO'; onVista: (c: Calificacion, v: boolean) => void; ocupado: boolean
 }) {
   const cambio = !!c.antes && c.rating !== c.antes
+  // Neutral o negativa sin cambiar: se puede pedir el cambio (una positiva solo aparece si es contradictoria).
+  const pedible = !cambio && (c.rating === 'neutral' || c.rating === 'negative')
   const negativa = c.rating === 'negative'
   const urgente = c.dias_restantes <= 5
   const etiqueta = cambio
     ? { txt: `La cambió: era ${c.antes === 'negative' ? 'negativa' : 'neutral'}${c.rating === 'positive' ? ', ahora positiva' : ''}`, cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' }
     : negativa ? { txt: 'Negativa', cls: 'bg-red-50 text-red-700', dot: 'bg-red-500' }
+    : c.rating === 'positive' ? { txt: 'Positiva', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' }
     : { txt: 'Neutral', cls: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' }
   const urlML = `https://www.mercadolibre.com.${pais === 'CO' ? 'co' : 've'}/ventas/${c.id}/detalle`
   // "Solicitar cambio de calificación" de ML: no está en su API, es su propia página (la misma del menú ⋮ de la
@@ -133,6 +137,12 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${etiqueta.cls}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${etiqueta.dot}`} />{etiqueta.txt}
             </span>
+            {c.contradictoria && (
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700"
+                title={`Contradictoria: el comprador dijo que la venta ${c.concretada ? 'SÍ' : 'NO'} se concretó y tú dijiste lo contrario`}>
+                Contradictoria
+              </span>
+            )}
             <span className="truncate text-sm font-medium text-neutral-900">{c.nombre ?? c.nick ?? 'Comprador'}</span>
             {c.nombre && c.nick && <span className="text-xs text-neutral-400">@{c.nick}</span>}
           </div>
@@ -141,14 +151,14 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
           <p className="mt-1 text-[11px] text-neutral-400">Calificó {hace(c.calificada_at)} · {c.cuenta} · venta {c.pack}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-          {!cambio && (
+          {pedible && (
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${urgente ? 'bg-red-50 text-red-700' : 'bg-neutral-100 text-neutral-600'}`}
               title="ML deja pedir el cambio hasta 30 días después de recibirla">
               {c.dias_restantes > 0 ? `Quedan ${c.dias_restantes} ${c.dias_restantes === 1 ? 'día' : 'días'} para pedir el cambio` : 'Vence hoy'}
             </span>
           )}
           <div className="flex flex-wrap gap-1.5 sm:justify-end">
-            {!cambio && c.dias_restantes > 0 && (
+            {pedible && c.dias_restantes > 0 && (
               <a href={urlCambio} target="_blank" rel="noreferrer" onClick={confirmarCambio} className="btn-primary text-xs"
                 title="Abre en MercadoLibre la solicitud de cambio de calificación (se pide una sola vez)">Pedir cambio</a>
             )}
@@ -193,6 +203,8 @@ export default function ReputacionClient() {
   const pendientes = lista.filter(c => !cambiadas.includes(c) && !c.vista_at)
   const vistas = lista.filter(c => !cambiadas.includes(c) && c.vista_at)
   const negativas = pendientes.filter(c => c.rating === 'negative').length
+  const neutrales = pendientes.filter(c => c.rating === 'neutral').length
+  const contradictorias = pendientes.filter(c => c.contradictoria).length
 
   return (
     <div className="space-y-4">
@@ -209,7 +221,8 @@ export default function ReputacionClient() {
             <div className="flex flex-wrap items-baseline gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-2">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Para atender</h2>
               <span className="text-xs text-neutral-400">
-                {negativas} {negativas === 1 ? 'negativa' : 'negativas'} · {pendientes.length - negativas} {pendientes.length - negativas === 1 ? 'neutral' : 'neutrales'}
+                {negativas} {negativas === 1 ? 'negativa' : 'negativas'} · {neutrales} {neutrales === 1 ? 'neutral' : 'neutrales'}
+                {contradictorias > 0 && ` · ${contradictorias} ${contradictorias === 1 ? 'contradictoria' : 'contradictorias'}`}
               </span>
               {datos.por_revisar > 0 && (
                 <span className="ml-auto text-[11px] text-neutral-400">Revisando {datos.por_revisar} calificaciones recientes en MercadoLibre…</span>
