@@ -4,7 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { conectarVenta, sesionPagosME } from '@/lib/pagosME'
 
 const Body = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(300),
+  ids: z.array(z.coerce.number().int().positive()).min(1).max(300),   // me_pagos.id es BIGINT: pg lo entrega como texto
   verificacion: z.enum(['pendiente', 'valido', 'invalido']),
   nota: z.string().trim().max(300).optional(),
 })
