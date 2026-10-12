@@ -151,6 +151,10 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       try { await sincronizarOrdenes(db, c.id) } catch (e) {
         console.error('[ML ventas]', c.nickname, e instanceof Error ? e.message : e)
       }
+      // Reputación: termómetro de la cuenta y calificaciones recibidas (lib/reputacionML.ts).
+      try { await sincronizarReputacion(db, c.id) } catch (e) {
+        console.error('[ML reputacion]', c.nickname, e instanceof Error ? e.message : e)
+      }
       const fallas = await completarItems(db, c.id)
       if (fallas) {
         await db.query(`UPDATE ml_conexiones SET ultimo_error = $2 WHERE id = $1`,
@@ -176,6 +180,7 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
 // Revisión del texto: lib/preguntasTexto.ts (se usa también en el navegador).
 export { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerPlantillas, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
+import { sincronizarReputacion } from '@/lib/reputacionML'
 
 // ── Contexto para la IA ─────────────────────────────────────────────────────
 interface ItemML {

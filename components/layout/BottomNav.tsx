@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
-import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
+import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion } from './Avisos'
 
 // Barra inferior del celular. Íconos de línea (mismo trazo en todos, estilo Lucide) en lugar de
 // emojis: se ven igual en Android/iPhone y combinan con el resto de la interfaz.
@@ -17,6 +17,7 @@ const ICONOS: Record<string, React.ReactNode> = {
   despachos: <><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /><path d="M15 18H9" /><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" /><circle cx="17" cy="18" r="2" /><circle cx="7" cy="18" r="2" /></>,
   calificaciones: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
   reportador: <><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>,
+  reputacion: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>,
   stock: <><path d="M22 17 13.5 8.5l-5 5L2 7" /><path d="M16 17h6v-6" /></>,
   inventario: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><path d="M3.27 6.96 12 12.01l8.73-5.05" /><path d="M12 22.08V12" /></>,
   aprendizaje: <><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" /><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" /></>,
@@ -72,6 +73,7 @@ const PRIMARY_AUTO: NavItem[] = [
 ]
 const MORE_AUTO: NavItem[] = [
   { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
+  { href: '/reputacion',       label: 'Reputación', icon: 'reputacion', countries: ['VE', 'CO'] },
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
   { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      countries: ['VE', 'CO'] },
   { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
@@ -95,7 +97,8 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
     (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href + '/'))
   const enMas   = more.some(i => activo(i.href))
   // Avisos de lo que quedó en "Más" (p. ej. calificaciones): un punto en el botón.
-  const avisosMas = more.reduce((a, i) => a + (AVISO_DE_RUTA[i.href] ? avisos[AVISO_DE_RUTA[i.href].clave] : 0), 0)
+  const avisosMas = more.reduce((a, i) => a + (AVISO_DE_RUTA[i.href] ? avisos[AVISO_DE_RUTA[i.href].clave] : 0)
+    + (i.href === '/reputacion' ? avisos.negativas + avisos.neutrales : 0), 0)
   const etiqueta = (i: NavItem) => i.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : i.label
 
   const boton = (i: NavItem) => {
@@ -129,6 +132,9 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
                   <Icono nombre={i.icon} className="w-6 h-6" />
                   <span className="text-xs font-medium leading-tight">{etiqueta(i)}</span>
                   {aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} className="absolute top-1.5 right-3" />}
+                  {i.href === '/reputacion' && (
+                    <span className="absolute top-1.5 right-2 flex gap-0.5"><NumeritosReputacion avisos={avisos} /></span>
+                  )}
                 </Link>
               )
             })}

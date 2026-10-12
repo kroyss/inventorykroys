@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
-import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
+import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion } from './Avisos'
 
 const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio }[] = [
   { href: '/dashboard',  label: 'Inicio',    countries: ['VE', 'CO'] as Country[] },
@@ -26,6 +26,7 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   { href: '/preguntas',        label: 'Preguntas',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/calificaciones',   label: 'Calificaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/reputacion',       label: 'Reputación',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/alertas-stock',    label: 'Stock',         countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
@@ -52,6 +53,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
     <>
       {l.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : l.label}
       {AVISO_DE_RUTA[l.href] && <Numerito n={avisos[AVISO_DE_RUTA[l.href].clave]} urgente={AVISO_DE_RUTA[l.href].urgente} />}
+      {l.href === '/reputacion' && <NumeritosReputacion avisos={avisos} />}
     </>
   )
 

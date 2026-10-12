@@ -18,10 +18,11 @@ interface Props {
   country: 'VE' | 'CO'
   importaciones: boolean   // módulo: sin él solo hay compras locales (sin pestaña ni opción de importar)
   etapas?: boolean         // módulo compras_etapas; apagado = Inventario simple ("Entró mercancía")
+  borradorKey?: string     // borrador de compra nueva por empresa (ComprasClient)
 }
 
 export default function ComprasTabs({
-  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones, etapas = true,
+  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones, etapas = true, borradorKey = '',
 }: Props) {
   // Importaciones es la pestaña principal en ambos países → primera y por defecto.
   // Se recuerda entre F5 (el deep-link ?tab=import, más abajo, igual tiene prioridad).
@@ -131,7 +132,7 @@ export default function ComprasTabs({
       ]} />
 
       {tab === 'local' && (
-        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} onChanged={refresh}
+        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} borradorKey={borradorKey} onChanged={refresh}
           autoCreate={pendingCreate === 'local'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'import' && (
@@ -146,7 +147,7 @@ export default function ComprasTabs({
             {subBtn('import', `Importaciones (${importHist})`)}
           </div>}
           {histType === 'local' || !importaciones
-            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} onChanged={refresh} historyMode />
+            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} borradorKey={borradorKey} onChanged={refresh} historyMode />
             : <ImportsClient initialOrders={imports} suppliers={importSuppliers} acceso={acceso} onChanged={refresh} historyMode />}
         </div>
       )}
