@@ -6,7 +6,7 @@ import { puede } from '@/lib/permisos'
 export async function GET(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (!puede(session.user, 'ver_reportes') || puede(session.user, 'costos')) return forbidden()
+  if (!puede(session.user, 'ver_reportes') && !puede(session.user, 'costos')) return forbidden()
 
   const url    = new URL(req.url)
   const period = url.searchParams.get('period') ?? 'month'
