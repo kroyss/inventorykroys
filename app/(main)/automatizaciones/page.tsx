@@ -53,6 +53,9 @@ export default async function AutomatizacionesPage() {
         { href: '/calificaciones', titulo: 'Calificaciones', icono: 'calificaciones', activa: ml, aviso: 'calificaciones',
           pendiente: 'ventas por calificar',
           texto: 'Las ventas sin calificar cruzadas con el sistema: lo cargado se concretó (positiva), lo que nunca entró no. Calificas en bloque.' },
+        { href: '/reputacion', titulo: 'Reputación', icono: 'reputacion', activa: ml, aviso: 'negativas', urgente: true,
+          pendiente: 'negativas nuevas',
+          texto: 'Tu termómetro de MercadoLibre y un aviso apenas te dejan una neutral o una negativa, con los 30 días que tienes para pedir que la cambien.' },
       ],
     },
   ]
