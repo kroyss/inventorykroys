@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { Country } from '@/lib/types'
@@ -39,6 +39,8 @@ export default function UsuariosClient({ country }: { country: Country }) {
   const [permisosDe, setPermisosDe] = useState<Usuario | null>(null)
   const [disponibles, setDisponibles] = useState<PermisoDisponible[]>([])
   const [predeterminado, setPredeterminado] = useState<string[]>([])
+  const { update } = useSession()
+  const [entrandoComo, setEntrandoComo] = useState<number | null>(null)
 
   const cargar = useCallback(() => fetch('/api/users').then(async r => {
     const d = await r.json()
@@ -75,6 +77,13 @@ export default function UsuariosClient({ country }: { country: Country }) {
       confirmText: 'Cambiar',
     })) return
     actualizar(u, { role }, `Rol de ${u.username} actualizado.`)
+  }
+
+  // "Ver como": el sistema con el rol y los permisos de esa persona, en solo lectura (lib/auth.ts, proxy.ts).
+  const verComo = async (u: Usuario) => {
+    setEntrandoComo(u.id); setError(null)
+    await update({ verComo: u.id })
+    window.location.assign('/')
   }
 
   const renombrar = async (u: Usuario) => {
@@ -151,6 +160,17 @@ export default function UsuariosClient({ country }: { country: Country }) {
                       : <span className="px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-600">Inactivo</span>}
                   </td>
                   <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
+                    {u.role === 'user' && u.is_active && !yo && (
+                      <button onClick={() => verComo(u)} disabled={entrandoComo !== null}
+                        className="btn-secondary text-xs inline-flex items-center gap-1.5 align-middle"
+                        title="Ver el sistema exactamente como lo ve esta persona (solo lectura)">
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
+                        </svg>
+                        {entrandoComo === u.id ? 'Entrando…' : 'Ver como'}
+                      </button>
+                    )}
                     <button onClick={() => { setClaveDe(u); setError(null) }} className="btn-secondary text-xs">Cambiar contraseña</button>
                     {!yo && (
                       <button onClick={() => toggleActivo(u)} className="btn-secondary text-xs">
@@ -167,7 +187,7 @@ export default function UsuariosClient({ country }: { country: Country }) {
       <p className="text-xs text-neutral-500">
         <b>Admin</b>: todo el sistema, incluidos Usuarios y Ajustes. <b>Usuario</b>: lo que le marques en <b>Permisos</b>; si no lo
         tocas, lo predeterminado (inicio simple, ventas, inventario, recepciones y automatizaciones, sin costos ni configuración).
-        Los permisos se aplican al instante. Desactivar o cambiar la contraseña cierra las sesiones abiertas de esa persona.
+        Los permisos se aplican al instante. <b>Ver como</b> te muestra el sistema exactamente como lo ve esa persona, sin poder guardar nada. Desactivar o cambiar la contraseña cierra las sesiones abiertas de esa persona.
       </p>
     </div>
   )

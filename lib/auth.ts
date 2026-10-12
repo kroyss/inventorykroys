@@ -125,7 +125,13 @@ export const authOptions: NextAuthOptions = {
       // update({ country }), el selector VE/CO de siempre.
       let actual = empresas.find(e => e.id === token.empresaId) ?? null
       if (trigger === 'update') {
-        const pedido = session as { empresaId?: unknown; country?: unknown } | undefined
+        const pedido = session as { empresaId?: unknown; country?: unknown; verComo?: unknown } | undefined
+        // "Ver como este usuario" (Usuarios): un admin ve el sistema con el rol y los permisos de otra
+        // persona de la empresa, en solo lectura (proxy.ts). null = volver a su cuenta.
+        if (pedido && 'verComo' in pedido) {
+          const id = Number(pedido.verComo)
+          token.verComo = pedido.verComo !== null && id > 0 && String(id) !== token.sub ? { id, nombre: '' } : null
+        }
         const otra = elegir(empresas, pedido?.empresaId, pedido?.country)
         if (otra && (pedido?.empresaId !== undefined ? otra.id === Number(pedido.empresaId) : otra.country === pedido?.country)) {
           actual = otra
@@ -133,7 +139,24 @@ export const authOptions: NextAuthOptions = {
       }
       if (!actual) throw new Error('Sesión cerrada: ya no tienes acceso a esta empresa (o su cuenta venció)')
 
-      Object.assign(token, datosEmpresa(actual))
+      const datos = datosEmpresa(actual)
+      // Ver como: se revalida en CADA request con el rol REAL (actual.role, el del admin en esta
+      // empresa): si deja de ser admin, la persona ya no es de la empresa, está inactiva o es admin,
+      // se termina solo. Lo que cambia es solo el rol y los permisos; la cuenta (token.sub) sigue
+      // siendo la del admin.
+      if (token.verComo) {
+        const { rows: [v] } = actual.role === 'admin' ? await dbGlobal().query(
+          `SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) AS nombre, ue.role, ue.permisos
+           FROM users u JOIN usuario_empresas ue ON ue.user_id = u.id AND ue.empresa_id = $2
+           WHERE u.id = $1 AND u.is_active`, [token.verComo.id, actual.id]) : { rows: [] }
+        if (!v || v.role === 'admin') token.verComo = null
+        else {
+          token.verComo = { id: v.id, nombre: v.nombre }
+          datos.role = v.role
+          datos.permisos = permisosEfectivos(v.role, v.permisos)
+        }
+      }
+      Object.assign(token, datos)
       return token
     },
     session({ session, token }) {
@@ -146,6 +169,7 @@ export const authOptions: NextAuthOptions = {
         session.user.empresaNombre = token.empresaNombre
         session.user.modulos       = token.modulos
         session.user.organizacionId = token.organizacionId
+        session.user.verComo       = token.verComo ?? null
       }
       return session
     },

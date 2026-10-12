@@ -9,6 +9,7 @@ import { AvisosProvider } from '@/components/layout/Avisos'
 import AvisoCuenta from '@/components/layout/AvisoCuenta'
 import BienvenidaVideo from '@/components/aprendizaje/BienvenidaVideo'
 import AvisoDisco from '@/components/layout/AvisoDisco'
+import VerComoBarra from '@/components/layout/VerComoBarra'
 import { esDuenoPlataforma } from '@/lib/empresa'
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           COPIA DE PRUEBAS (staging) · los cambios aquí no afectan el sistema real · Reportador desactivado
         </div>
       )}
+      {session.user.verComo && <VerComoBarra nombre={session.user.verComo.nombre} />}
       <Navbar />
       {esDuenoPlataforma(session.user) && <AvisoDisco />}
       <AvisoCuenta organizacionId={session.user.organizacionId} esAdmin={role === 'admin'} />
