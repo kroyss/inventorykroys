@@ -196,19 +196,22 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-neutral-500 leading-relaxed">
-          Ventas de MercadoLibre que todavía no están registradas. Se traen solas cada hora
-          {revisado
-            ? <> (revisado recién: <b className="text-neutral-700">{hora(revisado.at)}</b> ·{' '}
-                <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
-                  {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'venta nueva' : 'ventas nuevas'}` : 'nada nuevo'}
-                </b>)</>
-            : datos.sincronizadas_at && <> (última: <b className="text-neutral-700">{hora(datos.sincronizadas_at)}</b>)</>}.
-          {datos.pagosME && <> Pagos: {buscandoME
-            ? <b className="text-violet-700">buscando en MercadoEnvíos (1 a 3 min)…</b>
-            : datos.ultimaBusqueda ? <>última búsqueda <b className="text-neutral-700">{hora(datos.ultimaBusqueda)}</b></> : 'sin buscar todavía'}.</>}
-          {' '}Al confirmar se abre la venta con el cliente, el pago y los productos cargados.
-        </p>
+        {/* Una línea por botón: qué trae y cuándo fue la última vez. */}
+        <div className="space-y-0.5 text-xs text-neutral-500">
+          <p>
+            <b className="text-neutral-700">Traer ML</b>: ventas nuevas de MercadoLibre (solas cada hora) · {revisado
+              ? <>recién {hora(revisado.at)}: <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
+                  {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'nueva' : 'nuevas'}` : 'nada nuevo'}</b></>
+              : <>última <b className="text-neutral-700">{datos.sincronizadas_at ? hora(datos.sincronizadas_at) : '—'}</b></>}
+          </p>
+          {datos.pagosME && (
+            <p>
+              <b className="text-neutral-700">Traer ME</b>: pagos y guías de MercadoEnvíos (tarda 1 a 3 min) · {buscandoME
+                ? <b className="text-violet-700">buscando…</b>
+                : <>última <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
+            </p>
+          )}
+        </div>
         <div className="flex shrink-0 gap-2">
           <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
             className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
