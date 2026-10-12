@@ -113,6 +113,18 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
     : negativa ? { txt: 'Negativa', cls: 'bg-red-50 text-red-700', dot: 'bg-red-500' }
     : { txt: 'Neutral', cls: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' }
   const urlML = `https://www.mercadolibre.com.${pais === 'CO' ? 'co' : 've'}/ventas/${c.id}/detalle`
+  // "Solicitar cambio de calificación" de ML: no está en su API, es su propia página (la misma del menú ⋮ de la
+  // venta). Se pide UNA sola vez: si el comprador no responde, ML la borra a los pocos días; si responde y no
+  // la cambia, queda. Por eso se confirma antes de abrirla.
+  const urlCambio = `https://feedback.mercadolibre.com.${pais === 'CO' ? 'co' : 've'}/changeRequest?orderId=${c.id}`
+  const confirmarCambio = (e: React.MouseEvent) => {
+    if (!window.confirm(`Pedir el cambio de calificación a ${c.nombre ?? c.nick ?? 'este comprador'}.
+
+`
+      + `MercadoLibre deja pedirlo UNA sola vez por venta. Se abre en MercadoLibre: tienes que estar dentro con la cuenta ${c.cuenta}.
+
+¿Abrir?`)) e.preventDefault()
+  }
   return (
     <li className={`px-4 py-3 ${c.vista_at || cambio ? 'bg-neutral-50/60' : ''}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -135,10 +147,14 @@ function FilaCalificacion({ c, pais, onVista, ocupado }: {
               {c.dias_restantes > 0 ? `Quedan ${c.dias_restantes} ${c.dias_restantes === 1 ? 'día' : 'días'} para pedir el cambio` : 'Vence hoy'}
             </span>
           )}
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5 sm:justify-end">
+            {!cambio && c.dias_restantes > 0 && (
+              <a href={urlCambio} target="_blank" rel="noreferrer" onClick={confirmarCambio} className="btn-primary text-xs"
+                title="Abre en MercadoLibre la solicitud de cambio de calificación (se pide una sola vez)">Pedir cambio</a>
+            )}
             {c.con_mensajes
-              ? <Link href={`/mensajes?pack=${c.pack}`} className="btn-primary text-xs">Escribirle</Link>
-              : <a href={urlML} target="_blank" rel="noreferrer" className="btn-primary text-xs" title="Abre la venta en MercadoLibre para escribirle">Escribirle en ML</a>}
+              ? <Link href={`/mensajes?pack=${c.pack}`} className="btn-secondary text-xs">Escribirle</Link>
+              : <a href={urlML} target="_blank" rel="noreferrer" className="btn-secondary text-xs" title="Abre la venta en MercadoLibre para escribirle">Escribirle en ML</a>}
             {!cambio && (
               <button type="button" onClick={() => onVista(c, !c.vista_at)} disabled={ocupado} className="btn-secondary text-xs">
                 {c.vista_at ? 'Volver a avisar' : 'Ya la vi'}
