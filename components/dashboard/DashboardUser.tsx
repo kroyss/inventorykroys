@@ -41,7 +41,8 @@ interface Rate {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
-export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true, porConfirmar = false }: {
+export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true, porConfirmar = false, despachos = false }: {
+  despachos?: boolean        // módulo y permiso de Despachos: "Por descargar" lleva ahí (las guías por generar)
   country: Country; bonos: boolean; importaciones: boolean
   porConfirmar?: boolean     // cuentas de ML conectadas: tarjeta "Por confirmar" (lo normal) antes de "Nueva venta"
   verificarPagos?: boolean   // módulo verificar_pagos: sin él (Inventario simple) no hay "Pago verificado" ni "Por descargar"
@@ -90,28 +91,20 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
       <AvisoStockVerificar n={(summary as { por_verificar?: number }).por_verificar ?? 0} />
       {/* ───────── Ventas ───────── */}
       <Panel title="Ventas">
-        <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? (verificarPagos ? 'md:grid-cols-5' : 'md:grid-cols-4') : (verificarPagos ? 'md:grid-cols-4' : 'md:grid-cols-3')}`}>
+        {/* Todas iguales (borde gris): "Nueva venta" se distingue por el + verde y "Por confirmar" por su número ámbar. */}
+        <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {porConfirmar && (
-            <Link href="/ventas?vista=confirmar" title="Ventas de MercadoLibre que todavía no están registradas"
-              className="rounded-xl border-2 border-dashed border-orange-200 hover:border-orange-400 hover:bg-orange-50/30 p-3 transition flex flex-col items-center justify-center text-center">
-              <div className="text-sm font-semibold text-orange-600">Por confirmar</div>
-              <div className={`text-2xl font-bold mt-1 num ${pendientesPC > 0 ? 'text-orange-500' : 'text-neutral-300'}`}>{pc.datos ? pendientesPC : '·'}</div>
-            </Link>
+            <StatCard label="Por confirmar" value={pc.datos ? pendientesPC : '·'}
+              accent={pendientesPC > 0 ? 'text-amber-600' : undefined} href="/ventas?vista=confirmar" />
           )}
-          <Link href="/ventas?new=1"
-            className="rounded-xl border-2 border-dashed border-green-300 hover:border-green-500 hover:bg-green-50/30 p-3 transition flex flex-col items-center justify-center text-center">
-            <div className="text-sm font-semibold text-emerald-700">Nueva venta</div>
-            <div className="text-2xl font-bold text-green-600 mt-1">+</div>
-          </Link>
+          <StatCard label="Nueva venta" value="+" accent="text-green-600" href="/ventas?new=1" />
           <StatCard label="Borrador"        value={saleCounts.borrador}
             accent={saleCounts.borrador   > 0 ? 'text-amber-600' : undefined}
             href="/ventas?estado=BORRADOR" />
-          {verificarPagos && <StatCard label="Pago verificado" value={saleCounts.verificado}
-            accent={saleCounts.verificado > 0 ? 'text-neutral-900' : undefined}
-            href="/ventas?estado=PAGO_VERIFICADO" />}
+          {/* Lo procesado sigue en Despachos (ahí se generan las guías); sin Despachos, en Ventas. */}
           <StatCard label={verificarPagos ? 'Por descargar' : 'Procesadas'} value={saleCounts.procesada}
             accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
-            href="/ventas?estado=PROCESADA" />
+            href={despachos ? '/despachos' : '/ventas?estado=PROCESADA'} />
         </div>
         {country === 'VE' && bonos && (
           <div className="mt-4">
@@ -175,7 +168,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function StatCard({ label, value, accent, href }: {
-  label: string; value: number; accent?: string; href?: string
+  label: string; value: number | string; accent?: string; href?: string
 }) {
   const inner = (
     <div className="rounded-xl border border-neutral-200 bg-white p-3 text-center hover:border-neutral-400 hover:shadow-sm transition">

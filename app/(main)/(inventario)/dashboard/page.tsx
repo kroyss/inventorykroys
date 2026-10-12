@@ -26,5 +26,5 @@ export default async function DashboardPage() {
   )
   return <DashboardUser country={country} bonos={bonos} importaciones={importaciones}
     verificarPagos={country !== 'VE' || tieneModulo(session!.user, 'verificar_pagos')} etapas={tieneModulo(session!.user, 'compras_etapas')}
-    porConfirmar={porConfirmar} />
+    porConfirmar={porConfirmar} despachos={tieneModulo(session!.user, 'despachos') && puede(session!.user, 'ver_despachos')} />
 }
