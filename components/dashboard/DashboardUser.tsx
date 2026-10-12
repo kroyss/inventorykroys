@@ -93,9 +93,9 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
         <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? (verificarPagos ? 'md:grid-cols-5' : 'md:grid-cols-4') : (verificarPagos ? 'md:grid-cols-4' : 'md:grid-cols-3')}`}>
           {porConfirmar && (
             <Link href="/ventas?vista=confirmar" title="Ventas de MercadoLibre que todavía no están registradas"
-              className="rounded-xl border-2 border-dashed border-orange-300 hover:border-orange-500 hover:bg-orange-50/30 p-3 transition flex flex-col items-center justify-center text-center">
-              <div className="text-sm font-semibold text-orange-700">Por confirmar</div>
-              <div className={`text-2xl font-bold mt-1 num ${pendientesPC > 0 ? 'text-orange-600' : 'text-orange-300'}`}>{pc.datos ? pendientesPC : '·'}</div>
+              className="rounded-xl border-2 border-dashed border-orange-200 hover:border-orange-400 hover:bg-orange-50/30 p-3 transition flex flex-col items-center justify-center text-center">
+              <div className="text-sm font-semibold text-orange-600">Por confirmar</div>
+              <div className={`text-2xl font-bold mt-1 num ${pendientesPC > 0 ? 'text-orange-500' : 'text-neutral-300'}`}>{pc.datos ? pendientesPC : '·'}</div>
             </Link>
           )}
           <Link href="/ventas?new=1"
