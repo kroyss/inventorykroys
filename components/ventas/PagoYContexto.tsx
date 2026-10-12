@@ -10,7 +10,7 @@
 // encajonadas) y se cierran con Esc, con ✕ o tocando afuera.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { PagoME } from '@/lib/pagosMEComun'
+import { esRetiroEnTienda, type PagoME } from '@/lib/pagosMEComun'
 import { Hilo, type Conversacion } from '@/components/preguntas/MensajesClient'
 import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import { Monto, VERIF, bs, metodoPago } from '@/components/pagosme/PagoME'
@@ -199,6 +199,7 @@ export function PagoDeVenta({ numero, compraAt, pagoOk, onPagoOk, onPago, puedeV
 
   const v = VERIF[pago.verificacion]
   const invalido = pago.verificacion === 'invalido'
+  const retiro = esRetiroEnTienda(pago)
   return (
     <div className={`rounded-xl border text-sm transition-colors ${pagoOk ? 'border-emerald-300 bg-emerald-50/60' : invalido ? 'border-red-200 bg-red-50/50' : 'border-violet-200 bg-violet-50/40'}`}>
       {/* De dónde viene y su estado */}
@@ -208,6 +209,12 @@ export function PagoDeVenta({ numero, compraAt, pagoOk, onPagoOk, onPago, puedeV
         </span>
         <span className={`text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap ${v.c}`}>{v.t}{pago.verificado_por ? ` · ${pago.verificado_por}` : ''}</span>
       </div>
+
+      {retiro && (
+        <div className="mx-3 mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+          <b>🏪 Retiro en tienda</b> — el comprador pasa a buscarlo. No lleva guía: no pasa por Despachos.
+        </div>
+      )}
 
       {/* Monto y datos del pago */}
       <div className="flex items-center gap-3 px-3 py-2">
@@ -241,12 +248,16 @@ export function PagoDeVenta({ numero, compraAt, pagoOk, onPagoOk, onPago, puedeV
         </label>
       ) : null}
       <p className="px-3 pb-2.5 text-[11px] text-neutral-500">
-        {pagoOk
+        {retiro
+          ? (pagoOk || pago.verificacion === 'valido'
+            ? 'Al guardar: el pago queda verificado y la venta queda CERRADA (se descuenta el stock). Solo falta que la retire.'
+            : 'Sin marcarlo, la venta queda en borrador hasta verificar el pago.')
+          : pagoOk
           ? 'Al guardar: el pago queda verificado, la venta PROCESADA y su guía entra al lote de Despachos.'
           : pago.verificacion === 'valido'
             ? 'Pago ya verificado: al guardar, la venta queda en Pago verificado y su guía entra al lote de Despachos.'
             : 'Sin marcarlo, la guía entra al lote de Despachos pero no se imprime hasta verificar el pago.'}
-        {!pago.tiene_guia && ' Todavía no tiene guía en MercadoEnvíos.'}
+        {!retiro && !pago.tiene_guia && ' Todavía no tiene guía en MercadoEnvíos.'}
       </p>
       {detalle && (
         <DetallePago p={pago} onCerrar={() => setDetalle(false)}

@@ -1,5 +1,11 @@
 // Pagos MercadoEnvíos: tipos y reglas que usan el servidor y las pantallas (sin dependencias de servidor).
 
+/** Retiro en tienda (2026-10-12): el comprador pasa a buscarlo. No hay guía de envío: no entra a Despachos,
+ *  el Reportador no le escribe y la venta queda cerrada (DESCARGADA) al procesarla. */
+export const esRetiroEnTienda = (p: { envio_metodo?: string | null; carrier?: string | null } | null | undefined) =>
+  !!p && [p.envio_metodo, p.carrier].some(x => /retiro en tienda/i.test(x ?? ''))
+export const SQL_RETIRO_EN_TIENDA = `(envio_metodo ILIKE 'retiro en tienda%' OR carrier ILIKE 'retiro en tienda%')`
+
 export interface PagoME {
   id: number
   venta: string

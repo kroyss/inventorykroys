@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { SQL_RETIRO_EN_TIENDA } from '@/lib/pagosMEComun'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized } from '@/lib/session'
@@ -309,12 +310,15 @@ export async function PUT(
         }
         await snapshotCost()
           await snapshotCommission()
+        // Retiro en tienda (2026-10-12): sin guía no pasa por Despachos; pagada y procesada queda cerrada.
+        const { rows: [retiro] } = (sale.ml_order_number as string).startsWith('LOCAL-') ? { rows: [] } : await db.query(
+          `SELECT 1 FROM me_pagos WHERE venta = $1 AND ${SQL_RETIRO_EN_TIENDA} LIMIT 1`, [sale.ml_order_number])
         await db.query(
           `UPDATE sales
-           SET status='PROCESADA', processed_by=$1, processed_at=NOW(), updated_at=NOW(),
+           SET status=$4, processed_by=$1, processed_at=NOW(), updated_at=NOW(),
                is_flex = COALESCE($3, is_flex)
            WHERE id=$2`,
-          [userId, id, isFlexBody ?? null]
+          [userId, id, isFlexBody ?? null, retiro ? 'DESCARGADA' : 'PROCESADA']
         )
 
       } else if (newStatus === 'DESCARGADA') {

@@ -92,6 +92,7 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           <Etiqueta tono={prod.tono} title={prod.title}>{prod.texto}</Etiqueta>
           {pago && <Etiqueta tono={pago.tono} title={pago.title}>{pago.texto}</Etiqueta>}
+          {f.pago?.retiro && <Etiqueta tono="ambar" title="El comprador pasa a buscarlo: no lleva guía ni pasa por Despachos">🏪 Retiro en tienda</Etiqueta>}
           {!f.vencida && quedan <= 2 && <Etiqueta tono="rojo">{quedan <= 0 ? 'Vence hoy' : `Quedan ${quedan} día${quedan === 1 ? '' : 's'}`}</Etiqueta>}
           <span className="text-[11px] text-neutral-400">{hace(f.fecha)} · {f.cuenta}</span>
         </div>

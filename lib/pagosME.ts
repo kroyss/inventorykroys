@@ -5,6 +5,7 @@
 // guía. Aquí se guardan (me_pagos), se verifican por lote y, al registrar la venta, su guía entra
 // sola al lote pendiente de Despachos. Despachos no imprime una guía con el pago sin verificar
 // salvo "Despachar igual" (despacho_etiquetas.pago_forzado_*).
+import { SQL_RETIRO_EN_TIENDA } from '@/lib/pagosMEComun'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
 import { mkdir, readFile, writeFile } from 'fs/promises'
@@ -90,7 +91,7 @@ export const leerArchivoME = (p: string) => readFile(p)
  */
 export async function conectarVenta(db: Pool, venta: string, userId: number) {
   const { rows: [p] } = await db.query(
-    `SELECT id, verificacion, guia_path FROM me_pagos WHERE venta = $1`, [venta])
+    `SELECT id, verificacion, guia_path, ${SQL_RETIRO_EN_TIENDA} AS retiro FROM me_pagos WHERE venta = $1`, [venta])
   if (!p) return { pago: false }
   const { rows: [s] } = await db.query(
     `SELECT id, status FROM sales WHERE ml_order_number = $1 ORDER BY id DESC LIMIT 1`, [venta])
@@ -102,8 +103,10 @@ export async function conectarVenta(db: Pool, venta: string, userId: number) {
        WHERE id = $2 AND status = 'BORRADOR'`, [userId, s.id])
     verificada = !!rowCount
   }
-  let guia: 'agregada' | 'ya_estaba' | 'sin_guia' = 'sin_guia'
-  if (p.guia_path) guia = await guiaALote(db, venta, p.guia_path, userId)
+  let guia: 'agregada' | 'ya_estaba' | 'sin_guia' | 'retiro' = 'sin_guia'
+  // Retiro en tienda: su PDF es el comprobante de retiro, no una guía: no va a Despachos.
+  if (p.retiro) guia = 'retiro'
+  else if (p.guia_path) guia = await guiaALote(db, venta, p.guia_path, userId)
   return { pago: true, venta: true, verificada, guia }
 }
 

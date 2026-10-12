@@ -26,7 +26,7 @@ export interface PorConfirmar {
   moneda: string | null
   lineas: LineaML[]
   productos: EstadoProductos
-  pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null } | null
+  pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null; retiro: boolean } | null
   mensaje: { texto: string; at: string } | null    // lo último que escribió el comprador (después de comprar)
   vencida: boolean
 }
@@ -39,6 +39,7 @@ export async function ventasPorConfirmar(db: Pool) {
             COALESCE(NULLIF(o.comprador_nombre, ''), NULLIF(c.comprador_nombre, '')) AS comprador, o.comprador AS nick, o.total::float, o.moneda,
             o.items, o.detalle,
             p.verificacion, p.monto_pagado::float AS monto,
+            (p.envio_metodo ILIKE 'retiro en tienda%' OR p.carrier ILIKE 'retiro en tienda%') AS retiro,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_texto END AS msg_texto,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_at END AS msg_at,
             o.fecha < NOW() - make_interval(days => $1) AS vencida
@@ -86,7 +87,7 @@ export async function ventasPorConfirmar(db: Pool) {
     return {
       numero: r.numero, fecha: r.fecha, cuenta: r.cuenta, comprador: r.comprador, nick: r.nick,
       total: r.total, moneda: r.moneda, lineas, productos,
-      pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto } : null,
+      pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto, retiro: !!r.retiro } : null,
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       vencida: r.vencida,
     }
