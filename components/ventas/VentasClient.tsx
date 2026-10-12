@@ -350,13 +350,13 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           {/* Con ML conectado lo normal es confirmar las ventas que ya llegaron; "Nueva venta" queda para lo suelto (LOCAL…). */}
           {porConfirmar && (
             <button onClick={() => setVistaPC(true)} title="Ventas de MercadoLibre que todavía no están registradas"
-              className="btn-primary text-sm whitespace-nowrap">
+              className="btn-secondary text-sm whitespace-nowrap">
               Por confirmar<NumeroBoton n={pendientesPC} cargando={!pc.datos} />
             </button>
           )}
           <button onClick={() => { setEditing(null); setShowForm(true) }}
             className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>
-            + Nueva venta
+            Nueva venta
           </button>
         </>
       } />

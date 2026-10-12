@@ -142,11 +142,11 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       <PageHeader title="Inicio" subtitle="Cómo va tu negocio este mes" actions={
         <>
           {porConfirmar && (
-            <Link href="/ventas?vista=confirmar" className="btn-primary text-sm whitespace-nowrap" title="Ventas de MercadoLibre que todavía no están registradas">
+            <Link href="/ventas?vista=confirmar" className="btn-secondary text-sm whitespace-nowrap" title="Ventas de MercadoLibre que todavía no están registradas">
               Por confirmar<NumeroBoton n={pendientesPorConfirmar(pc.datos)} cargando={!pc.datos} />
             </Link>
           )}
-          <Link href="/ventas?new=1" className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>+ Nueva venta</Link>
+          <Link href="/ventas?new=1" className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>Nueva venta</Link>
           {!importaciones ? (
             <Link href="/compras?new=1" className="btn-secondary text-sm">Nueva compra</Link>
           ) : <div className="relative">

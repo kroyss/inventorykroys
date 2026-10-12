@@ -240,11 +240,11 @@ export function pendientesPorConfirmar(datos: Datos | null) {
   return datos?.filas.filter(f => !f.vencida && (!datos.pagosME || (!!f.pago && f.pago.verificacion !== 'invalido'))).length ?? 0
 }
 
-/** Número dentro del botón principal "Por confirmar" (fondo oscuro). */
+/** Número dentro del botón "Por confirmar" (botón blanco): naranja si hay ventas por confirmar. */
 export function NumeroBoton({ n, cargando = false }: { n: number; cargando?: boolean }) {
   return (
     <span className={`ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-xs font-semibold num ${
-      n > 0 ? 'bg-white text-neutral-900' : 'bg-white/15 text-white/70'}`}>
+      n > 0 ? 'bg-orange-500 text-white' : 'bg-neutral-100 text-neutral-400'}`}>
       {cargando ? '·' : n}
     </span>
   )

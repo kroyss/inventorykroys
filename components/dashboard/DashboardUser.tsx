@@ -93,15 +93,14 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
         <div className={`grid grid-cols-2 gap-3 ${porConfirmar ? (verificarPagos ? 'md:grid-cols-5' : 'md:grid-cols-4') : (verificarPagos ? 'md:grid-cols-4' : 'md:grid-cols-3')}`}>
           {porConfirmar && (
             <Link href="/ventas?vista=confirmar" title="Ventas de MercadoLibre que todavía no están registradas"
-              className={`rounded-xl border p-3 text-center transition hover:shadow-sm ${pendientesPC > 0
-                ? 'border-amber-300 bg-amber-50/60 hover:border-amber-500' : 'border-neutral-200 bg-white hover:border-neutral-400'}`}>
-              <div className={`text-xs ${pendientesPC > 0 ? 'font-medium text-amber-800' : 'text-neutral-500'}`}>Por confirmar</div>
-              <div className={`text-2xl font-bold mt-1 num ${pendientesPC > 0 ? 'text-amber-600' : 'text-neutral-900'}`}>{pc.datos ? pendientesPC : '·'}</div>
+              className="rounded-xl border-2 border-dashed border-orange-300 hover:border-orange-500 hover:bg-orange-50/30 p-3 transition flex flex-col items-center justify-center text-center">
+              <div className="text-sm font-semibold text-orange-700">Por confirmar</div>
+              <div className={`text-2xl font-bold mt-1 num ${pendientesPC > 0 ? 'text-orange-600' : 'text-orange-300'}`}>{pc.datos ? pendientesPC : '·'}</div>
             </Link>
           )}
           <Link href="/ventas?new=1"
             className="rounded-xl border-2 border-dashed border-green-300 hover:border-green-500 hover:bg-green-50/30 p-3 transition flex flex-col items-center justify-center text-center">
-            <div className="text-sm font-semibold text-emerald-700">{porConfirmar ? '+ Nueva venta' : 'Nueva venta'}</div>
+            <div className="text-sm font-semibold text-emerald-700">Nueva venta</div>
             <div className="text-2xl font-bold text-green-600 mt-1">+</div>
           </Link>
           <StatCard label="Borrador"        value={saleCounts.borrador}

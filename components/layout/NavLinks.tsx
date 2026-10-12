@@ -37,6 +37,18 @@ interface Props {
 }
 
 const CLASE_LINK = 'inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 xl:px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
+const ES_INICIO = (href: string) => href === '/dashboard' || href === '/automatizaciones'
+
+/** "Inicio" como casita (el nombre queda en el tooltip y para lectores de pantalla). */
+function Casita() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round"
+      strokeLinejoin="round" className="h-[18px] w-[18px]">
+      <path d="M3.5 10.5 12 3.5l8.5 7" />
+      <path d="M5.5 9v9.5a1.5 1.5 0 0 0 1.5 1.5h3.5v-5.5h3V20H17a1.5 1.5 0 0 0 1.5-1.5V9" />
+    </svg>
+  )
+}
 
 export default function NavLinks({ role, permisos, country, modulos }: Props) {
   const u = { role, permisos }
@@ -50,7 +62,8 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))
   const etiqueta = (l: typeof links[number]) => (
     <>
-      {l.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : l.label}
+      {ES_INICIO(l.href) ? <><Casita /><span className="sr-only">{l.label}</span></>
+        : l.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : l.label}
       {AVISO_DE_RUTA[l.href] && <Numerito n={avisos[AVISO_DE_RUTA[l.href].clave]} urgente={AVISO_DE_RUTA[l.href].urgente} />}
       {l.href === '/calificaciones' && <NumeritosReputacion avisos={avisos} />}
     </>
@@ -108,8 +121,8 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
       </div>
 
       {visibles.map(l => (
-        <Link key={l.href} href={l.href}
-          className={`${CLASE_LINK} ${activo(l.href) ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}>
+        <Link key={l.href} href={l.href} title={ES_INICIO(l.href) ? 'Inicio' : undefined}
+          className={`${CLASE_LINK} ${ES_INICIO(l.href) ? '!px-2' : ''} ${activo(l.href) ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}`}>
           {etiqueta(l)}
         </Link>
       ))}
