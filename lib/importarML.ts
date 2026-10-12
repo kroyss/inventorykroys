@@ -53,7 +53,7 @@ function similitud(a: Set<string>, b: Set<string>) {
 export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
   const { rows: cat } = await db.query(
     `SELECT c.item_id, c.titulo, c.precio::float AS precio, c.moneda, c.disponible, c.estado, c.permalink,
-            c.thumbnail, c.sku, c.variantes, x.nickname AS cuenta
+            c.thumbnail, c.sku, c.variantes, UPPER(x.nickname) AS cuenta   -- como lib/mlCuentas (ficha del producto)
      FROM ml_catalogo c JOIN ml_conexiones x ON x.id = c.conexion_id
      ORDER BY c.estado = 'active' DESC, c.titulo`)
   const filas: (FilaImportar & { sku: string | null })[] = []

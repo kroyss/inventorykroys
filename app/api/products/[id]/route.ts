@@ -57,7 +57,7 @@ export async function GET(
 
   const { rows: mlRows } = await db.query(
     `SELECT ml_account AS account, ml_code AS code
-     FROM product_ml_codes WHERE product_id = $1 AND is_active = TRUE`,
+     FROM product_ml_codes WHERE product_id = $1 AND is_active = TRUE ORDER BY id`,
     [id]
   )
   return NextResponse.json({ ...rows[0], ml_codes: mlRows })
@@ -124,19 +124,25 @@ export async function PUT(
       }
 
       if (body.ml_codes !== undefined) {
-        // La tabla product_ml_codes no tiene índice único (product_id, ml_account),
-        // así que no se puede usar ON CONFLICT: se borran y reinsertan SOLO las cuentas que
-        // vienen en el formulario. Los códigos de una cuenta que ya no está en Ajustes se
-        // conservan (antes se borraban al guardar el producto).
-        await db.query(`DELETE FROM product_ml_codes WHERE product_id = $1 AND ml_account = ANY($2)`,
-          [id, body.ml_codes.map(c => c.account)])
+        // El formulario muestra UN código por cuenta (el primero). Un producto puede tener más en la
+        // misma cuenta (vinculados desde Ventas → Por confirmar o Importar desde ML, o uno por variante):
+        // se cambia o borra SOLO ese primero y los demás se conservan (2026-10-12; antes se borraban
+        // todos los de la cuenta al guardar). Las cuentas que no vienen en el formulario no se tocan.
         for (const { account, code } of body.ml_codes) {
-          if (!code.trim()) continue
-          await db.query(
-            `INSERT INTO product_ml_codes (product_id, ml_account, ml_code, is_active)
-             VALUES ($1, $2, $3, TRUE)`,
-            [id, account, code.trim()]
-          )
+          const { rows: [primero] } = await db.query(
+            `SELECT id FROM product_ml_codes WHERE product_id = $1 AND ml_account = $2 AND is_active ORDER BY id LIMIT 1`,
+            [id, account])
+          if (!code.trim()) {
+            if (primero) await db.query(`DELETE FROM product_ml_codes WHERE id = $1`, [primero.id])
+          } else if (primero) {
+            await db.query(`UPDATE product_ml_codes SET ml_code = $2, updated_at = NOW() WHERE id = $1`, [primero.id, code.trim()])
+          } else {
+            await db.query(
+              `INSERT INTO product_ml_codes (product_id, ml_account, ml_code, is_active)
+               VALUES ($1, $2, $3, TRUE)`,
+              [id, account, code.trim()]
+            )
+          }
         }
       }
 

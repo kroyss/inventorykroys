@@ -130,6 +130,7 @@ export interface InventoryItem {
   min_stock_rec: number
   max_stock_rec: number
   status: StockStatus
+  stock_por_verificar?: boolean   // vino de MercadoLibre (Importar desde ML) y nadie lo confirmó todavía
 }
 
 export interface InventoryMovement {
