@@ -55,7 +55,6 @@ const PRIMARY: NavItem[] = [
 const MORE: NavItem[] = [
   { href: '/inventario', label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
   { href: '/automatizaciones', label: 'Automatizaciones', icon: 'automatizaciones', countries: ['VE', 'CO'] },
-  { href: '/pagos-me',   label: 'Pagos ME',   icon: 'pagos',      countries: ['VE'] },
   { href: '/facturas',   label: 'Facturas',   icon: 'facturas',   countries: ['VE'] },
   { href: '/productos',  label: 'Productos',  icon: 'productos',  countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   countries: ['VE', 'CO'] },
@@ -97,7 +96,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const enMas   = more.some(i => activo(i.href))
   // Avisos de lo que quedó en "Más" (p. ej. calificaciones): un punto en el botón.
   const avisosMas = more.reduce((a, i) => a + (AVISO_DE_RUTA[i.href] ? avisos[AVISO_DE_RUTA[i.href].clave] : 0)
-    + (i.href === '/calificaciones' ? avisos.negativas + avisos.neutrales : 0), 0)
+    + (i.href === '/calificaciones' ? avisos.negativas : 0), 0)
   const etiqueta = (i: NavItem) => i.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : i.label
 
   const boton = (i: NavItem) => {

@@ -13,11 +13,12 @@ interface Props {
   usuarios: boolean
   plataforma: boolean
   demo?: boolean
+  pagosME?: boolean
 }
 
 // Menú de la cuenta (arriba a la derecha): lo que se toca poco (Ajustes, Usuarios,
 // Plataforma) y Cerrar sesión, para que la barra quede solo con el trabajo del día.
-export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo }: Props) {
+export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false }: Props) {
   const pathname = usePathname()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -35,6 +36,8 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
   const links = [
     // Ajustes es del inventario (tasa, exceso, categorías): en Automatizaciones cada herramienta tiene los suyos adentro.
     ajustes && espacioDe(pathname) === 'inventario' && { href: '/tasas', label: 'Ajustes' },
+    // Pagos ME (2026-10-12): se verifica desde Ventas; aquí queda el vigilante, el horario y el historial.
+    pagosME && espacioDe(pathname) === 'inventario' && { href: '/pagos-me', label: 'Pagos MercadoEnvíos' },
     usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },
     demo       && { href: '/demo',       label: 'Demo · restaurar' },

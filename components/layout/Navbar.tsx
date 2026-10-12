@@ -42,7 +42,8 @@ export default async function Navbar() {
           )}
           {session?.user && (
             <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
-              ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'} plataforma={esDuenoPlataforma(session.user)} demo={demo} />
+              ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'}
+              pagosME={role === 'admin' && modulos.includes('pagos_me') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} />
           )}
         </div>
 

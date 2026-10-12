@@ -11,7 +11,6 @@ import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } 
 const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio }[] = [
   { href: '/dashboard',  label: 'Inicio',    countries: ['VE', 'CO'] as Country[] },
   { href: '/ventas',     label: 'Ventas',    countries: ['VE', 'CO'] as Country[] },
-  { href: '/pagos-me',   label: 'Pagos ME',  countries: ['VE']       as Country[] },
   { href: '/facturas',   label: 'Facturas',  countries: ['VE']       as Country[] },
   { href: '/inventario', label: 'Inventario',countries: ['VE', 'CO'] as Country[] },
   { href: '/compras',    label: 'Compras',   countries: ['VE', 'CO'] as Country[] },
@@ -108,7 +107,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
   const ocultos = links.slice(caben)
   const masActivo = ocultos.some(l => activo(l.href))
   const avisosOcultos = ocultos.filter(l => (AVISO_DE_RUTA[l.href] && avisos[AVISO_DE_RUTA[l.href].clave] > 0)
-    || (l.href === '/calificaciones' && avisos.negativas + avisos.neutrales > 0))
+    || (l.href === '/calificaciones' && avisos.negativas > 0))
   const alertaOculta = hayAlerta(avisos, ocultos.map(l => l.href))
 
   return (
