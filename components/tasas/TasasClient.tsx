@@ -1,10 +1,6 @@
 'use client'
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { Line } from 'react-chartjs-2'
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend,
-} from 'chart.js'
+import { useEffect, useState, useMemo } from 'react'
+import HistorialTasas from '@/components/tasas/HistorialTasas'
 import { KPICard, money } from '@/components/ui'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { parseLocalDate } from '@/lib/tz'
@@ -12,8 +8,6 @@ import { parseShippingTable, type ShipTier } from '@/lib/mlShipping'
 import MlBreakdown from '@/components/productos/MlBreakdown'
 import BonusSettings from '@/components/tasas/BonusSettings'
 import NegocioSettings from '@/components/tasas/NegocioSettings'
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 interface Rate {
   id?: number
@@ -71,25 +65,6 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
   const [error,    setError]    = useState<string | null>(null)
   const [okMsg,    setOkMsg]    = useState<string | null>(null)
   const [manualOpen, setManualOpen] = useState(false)  // edición manual bloqueada por defecto
-
-  // Igualar la altura del historial para que la columna derecha termine
-  // exactamente donde termina el simulador (sin espacio vacío).
-  const leftRef  = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<HTMLDivElement>(null)
-  const [histMax, setHistMax] = useState<number | undefined>(undefined)
-  useEffect(() => {
-    const recompute = () => {
-      const lh = leftRef.current?.offsetHeight ?? 0
-      const ch = chartRef.current?.offsetHeight ?? 0
-      if (lh && ch) setHistMax(Math.max(140, lh - ch - 16))  // 16 = gap entre chart e historial
-    }
-    recompute()
-    const ro = new ResizeObserver(recompute)
-    if (leftRef.current)  ro.observe(leftRef.current)
-    if (chartRef.current) ro.observe(chartRef.current)
-    window.addEventListener('resize', recompute)
-    return () => { ro.disconnect(); window.removeEventListener('resize', recompute) }
-  })
 
   const loadAll = async () => {
     const [l, h, s] = await Promise.all([
@@ -223,8 +198,6 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
 
   if (!latest) return <div className="p-8 text-neutral-500">Cargando…</div>
 
-  // chart data (chronological) — solo los últimos 30 para que sea legible
-  const chrono = [...history].slice(0, 30).reverse()
 
   return (
     <div className="space-y-4">
@@ -368,7 +341,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Price simulator */}
-        <div ref={leftRef} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
           <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
           <div className="flex items-end gap-3 mb-4">
@@ -386,33 +359,52 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
 
           {/* Parámetros + ganancia neta real en ML Venezuela */}
           <div className="mt-1 border-t border-neutral-100 pt-4">
-            <p className="text-sm font-semibold text-neutral-700 mb-2">Costos de ML Venezuela</p>
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <div>
-                <label className="text-[11px] text-neutral-500">Comisión %</label>
-                <input type="number" step="0.5" value={veComision} onChange={e => setVeComision(e.target.value)}
-                  className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
-              </div>
-              <div>
-                <label className="text-[11px] text-neutral-500">Envío $</label>
-                <input type="number" step="0.01" value={veEnvio} onChange={e => setVeEnvio(e.target.value)}
-                  className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
-              </div>
-              <div>
-                <label className="text-[11px] text-neutral-500"
-                  title="Solo se usa para productos SIN peso registrado. Los que tienen peso toman el mínimo de su rango en la Tabla MercadoEnvíos.">
-                  Envío gratis desde $ <span className="text-neutral-400">(sin peso)</span>
-                </label>
-                <input type="number" step="0.5" value={veUmbral} onChange={e => setVeUmbral(e.target.value)}
-                  className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
-              </div>
-            </div>
-            <div className="flex justify-end mb-3">
-              <button onClick={saveSettings} disabled={busy}
-                className="text-xs px-3 py-1.5 rounded-lg border-2 border-neutral-900/40 font-semibold text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-colors disabled:opacity-60 whitespace-nowrap">
-                {busy ? 'Guardando…' : '💾 Guardar parámetros'}
-              </button>
-            </div>
+            {(() => {
+              const parametros = (
+                <>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div>
+                    <label className="text-[11px] text-neutral-500">Comisión %</label>
+                    <input type="number" step="0.5" value={veComision} onChange={e => setVeComision(e.target.value)}
+                      className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-neutral-500">Envío $</label>
+                    <input type="number" step="0.01" value={veEnvio} onChange={e => setVeEnvio(e.target.value)}
+                      className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-neutral-500"
+                      title="Solo se usa para productos SIN peso registrado. Los que tienen peso toman el mínimo de su rango en la Tabla MercadoEnvíos.">
+                      Envío gratis desde $ <span className="text-neutral-400">(sin peso)</span>
+                    </label>
+                    <input type="number" step="0.5" value={veUmbral} onChange={e => setVeUmbral(e.target.value)}
+                      className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+                  </div>
+                </div>
+                <div className="flex justify-end mb-3">
+                  <button onClick={saveSettings} disabled={busy}
+                    className="text-xs px-3 py-1.5 rounded-lg border-2 border-neutral-900/40 font-semibold text-neutral-800 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-colors disabled:opacity-60 whitespace-nowrap">
+                    {busy ? 'Guardando…' : '💾 Guardar parámetros'}
+                  </button>
+                </div>
+                </>
+              )
+              // Inventario simple (Fundadores): los costos de ML quedan con los valores normales, cerrados.
+              return categorias ? (
+                <>
+                  <p className="text-sm font-semibold text-neutral-700 mb-2">Costos de ML Venezuela</p>
+                  {parametros}
+                </>
+              ) : (
+                <details className="mb-3 rounded-lg border border-neutral-200 px-3 py-2 [&[open]]:pb-0">
+                  <summary className="cursor-pointer select-none text-xs text-neutral-500 hover:text-neutral-800">
+                    Ajustar costos de ML (avanzado) · comisión {veComision}% · envío ${veEnvio}
+                  </summary>
+                  <div className="mt-3">{parametros}</div>
+                </details>
+              )
+            })()}
             <MlBreakdown
               country="VE"
               totalCost={parseFloat(simCost) || 0}
@@ -452,37 +444,10 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
           {bonos && <BonusSettings />}
         </div>
 
-        {/* Right column: gráfico + historial (igualan la altura del simulador) */}
+        {/* Columna derecha: historial corto (los últimos días; el resto en una ventana) */}
         <div className="flex flex-col gap-4">
-        {/* Evolution chart */}
-        <div ref={chartRef} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
-          <h2 className="font-semibold mb-3">Evolución (últimos {chrono.length})</h2>
-          {chrono.length > 1 ? (
-            <div className="relative h-56">
-              <Line
-                data={{
-                  labels: chrono.map(r => r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : ''),
-                  datasets: [
-                    { label: 'Oficial',  data: chrono.map(r => r.official_rate), borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 2 },
-                    { label: 'Paralelo', data: chrono.map(r => r.parallel_rate), borderColor: '#f97316', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 2 },
-                  ],
-                }}
-                options={{
-                  responsive: true, maintainAspectRatio: false,
-                  interaction: { mode: 'index', intersect: false },
-                  plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: Bs ${money(c.parsed.y ?? 0)}` } } },
-                  scales: { y: { ticks: { callback: v => 'Bs ' + money(Number(v)) } }, x: { grid: { display: false } } },
-                }}
-              />
-            </div>
-          ) : (
-            <div className="text-neutral-400 text-sm text-center py-12">Pocos datos para graficar</div>
-          )}
-        </div>
-
         {/* History — compacto, scroll, últimos 30 días (solo referencia) */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-          <div className="overflow-y-auto" style={{ maxHeight: histMax }}>
+        <HistorialTasas filas={history} tabla={filas => (
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-neutral-500 text-xs sticky top-0 z-10">
                 <tr>
@@ -495,7 +460,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
                 </tr>
               </thead>
               <tbody>
-                {history.map((r, i) => (
+                {filas.map((r, i) => (
                   <tr key={r.id} className={`border-t border-neutral-50 hover:bg-neutral-50 ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                     <td className="px-4 py-2">{r.rate_date ? parseLocalDate(r.rate_date).toLocaleDateString('es-VE') : ''}</td>
                     <td className="px-4 py-2 text-right">Bs {money(r.official_rate)}</td>
@@ -507,13 +472,12 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
                     </td>
                   </tr>
                 ))}
-                {history.length === 0 && (
+                {filas.length === 0 && (
                   <tr><td colSpan={6} className="px-4 py-6 text-center text-neutral-400">Sin historial</td></tr>
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
+        )} />
         </div>
       </div>
 
