@@ -51,7 +51,6 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/preguntas': 'preguntas',
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
-  '/reputacion':     'preguntas',
   '/alertas-stock': 'alertas_stock',
   '/pagos-me':       'pagos_me',
   '/productos/mercadoenvios': 'descuento_ml',

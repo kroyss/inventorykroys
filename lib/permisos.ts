@@ -33,7 +33,6 @@ export const PERMISOS = {
   ver_preguntas:      { tipo: 'seccion', nombre: 'Preguntas', usuario: true, modulo: 'preguntas' },
   ver_mensajes:       { tipo: 'seccion', nombre: 'Mensajes', usuario: true, modulo: 'preguntas' },
   ver_calificaciones: { tipo: 'seccion', nombre: 'Calificaciones', usuario: true, modulo: 'preguntas' },
-  ver_reputacion:     { tipo: 'seccion', nombre: 'Reputación', usuario: true, modulo: 'preguntas' },
   ver_despachos:      { tipo: 'seccion', nombre: 'Despachos', usuario: true, modulo: 'despachos', soloVE: true },
   ver_reportador:     { tipo: 'seccion', nombre: 'Reportador', usuario: true, modulo: 'reportador', soloVE: true },
   ver_stock:          { tipo: 'seccion', nombre: 'Stock (publicaciones por agotarse)', usuario: true, modulo: 'alertas_stock' },
@@ -92,7 +91,7 @@ const SECCION_DE_RUTA: [string, Permiso][] = [
   ['/ventas', 'ver_ventas'], ['/pagos-me', 'ver_pagos_me'], ['/facturas', 'ver_facturas'],
   ['/inventario', 'ver_inventario'], ['/compras', 'ver_compras'], ['/productos', 'ver_productos'],
   ['/reportes', 'ver_reportes'], ['/finanzas', 'ver_finanzas'], ['/preguntas', 'ver_preguntas'],
-  ['/mensajes', 'ver_mensajes'], ['/calificaciones', 'ver_calificaciones'], ['/reputacion', 'ver_reputacion'], ['/despachos', 'ver_despachos'],
+  ['/mensajes', 'ver_mensajes'], ['/calificaciones', 'ver_calificaciones'], ['/despachos', 'ver_despachos'],
   ['/reportador', 'ver_reportador'], ['/alertas-stock', 'ver_stock'], ['/aprendizaje', 'ver_aprendizaje'],
 ]
 const SOLO_ADMIN = ['/tasas', '/usuarios', '/plataforma']

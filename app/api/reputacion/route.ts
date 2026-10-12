@@ -13,7 +13,7 @@ import { DIAS_AVISO } from '@/lib/reputacionML'
 export async function GET() {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
-  if (!puede(s.session.user, 'ver_reputacion')) return forbidden()
+  if (!puede(s.session.user, 'ver_calificaciones')) return forbidden()
   try {
     const { rows: cuentas } = await s.db.query(
       `SELECT id, nickname, reputacion, reputacion_at FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
@@ -45,7 +45,7 @@ const Body = z.object({ id: z.string().regex(/^\d{5,20}$/), vista: z.boolean() }
 export async function POST(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
-  if (!puede(s.session.user, 'ver_reputacion')) return forbidden()
+  if (!puede(s.session.user, 'ver_calificaciones')) return forbidden()
   try {
     const { id, vista } = Body.parse(await req.json())
     await s.db.query(`UPDATE ml_ordenes SET cal_recibida_vista_at = CASE WHEN $2 THEN NOW() END WHERE id = $1`, [id, vista])

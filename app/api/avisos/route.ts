@@ -38,7 +38,7 @@ export async function GET() {
         out.calificaciones = c.n
       }
       // Reputación: neutrales y negativas recibidas en los últimos 30 días que nadie marcó como vistas.
-      if (puede(u, 'ver_reputacion')) {
+      if (puede(u, 'ver_calificaciones')) {
         const { rows: [r] } = await db.query(
           `SELECT COUNT(*) FILTER (WHERE cal_recibida = 'negative')::int AS neg, COUNT(*) FILTER (WHERE cal_recibida = 'neutral')::int AS neu
            FROM ml_ordenes WHERE ${SQL_AVISO_REPUTACION}`)

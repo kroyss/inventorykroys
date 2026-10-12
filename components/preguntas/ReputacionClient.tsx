@@ -208,8 +208,8 @@ export default function ReputacionClient() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Reputación"
-        subtitle={`Tu termómetro en MercadoLibre y las neutrales o negativas de los últimos ${datos?.dias ?? 30} días, para intentar que las cambien`} />
+      <PageHeader title="Calificaciones"
+        subtitle={`Las que te dieron los compradores: tu termómetro en MercadoLibre y las neutrales o negativas de los últimos ${datos?.dias ?? 30} días, para intentar que las cambien`} />
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       {!datos ? <Cargando /> : (
         <>

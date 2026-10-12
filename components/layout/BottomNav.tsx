@@ -73,7 +73,6 @@ const PRIMARY_AUTO: NavItem[] = [
 ]
 const MORE_AUTO: NavItem[] = [
   { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
-  { href: '/reputacion',       label: 'Reputación', icon: 'reputacion', countries: ['VE', 'CO'] },
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
   { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      countries: ['VE', 'CO'] },
   { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
@@ -98,7 +97,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const enMas   = more.some(i => activo(i.href))
   // Avisos de lo que quedó en "Más" (p. ej. calificaciones): un punto en el botón.
   const avisosMas = more.reduce((a, i) => a + (AVISO_DE_RUTA[i.href] ? avisos[AVISO_DE_RUTA[i.href].clave] : 0)
-    + (i.href === '/reputacion' ? avisos.negativas + avisos.neutrales : 0), 0)
+    + (i.href === '/calificaciones' ? avisos.negativas + avisos.neutrales : 0), 0)
   const etiqueta = (i: NavItem) => i.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : i.label
 
   const boton = (i: NavItem) => {
@@ -131,10 +130,10 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
                   className={`relative flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl text-center ${on ? 'bg-lime-100 text-neutral-900' : 'text-neutral-600 active:bg-neutral-100'}`}>
                   <Icono nombre={i.icon} className="w-6 h-6" />
                   <span className="text-xs font-medium leading-tight">{etiqueta(i)}</span>
-                  {aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} className="absolute top-1.5 right-3" />}
-                  {i.href === '/reputacion' && (
-                    <span className="absolute top-1.5 right-2 flex gap-0.5"><NumeritosReputacion avisos={avisos} /></span>
-                  )}
+                  <span className="absolute top-1.5 right-2 flex gap-0.5">
+                    {aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} />}
+                    {i.href === '/calificaciones' && <NumeritosReputacion avisos={avisos} />}
+                  </span>
                 </Link>
               )
             })}

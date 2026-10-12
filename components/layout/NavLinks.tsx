@@ -26,7 +26,6 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   { href: '/preguntas',        label: 'Preguntas',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/calificaciones',   label: 'Calificaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/reputacion',       label: 'Reputación',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/alertas-stock',    label: 'Stock',         countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
@@ -53,7 +52,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
     <>
       {l.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : l.label}
       {AVISO_DE_RUTA[l.href] && <Numerito n={avisos[AVISO_DE_RUTA[l.href].clave]} urgente={AVISO_DE_RUTA[l.href].urgente} />}
-      {l.href === '/reputacion' && <NumeritosReputacion avisos={avisos} />}
+      {l.href === '/calificaciones' && <NumeritosReputacion avisos={avisos} />}
     </>
   )
 
