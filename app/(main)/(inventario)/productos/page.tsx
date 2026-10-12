@@ -52,6 +52,7 @@ export default async function ProductosPage() {
       country={session.user.country}
       mlAccounts={await cuentasML(db)}
       descuento={tieneModulo(session.user, 'descuento_ml')}
+      importarML={puede(session.user, 'importar_ml') && tieneModulo(session.user, 'preguntas')}
     />
   )
 }

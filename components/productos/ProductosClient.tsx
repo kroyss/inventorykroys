@@ -121,9 +121,10 @@ interface Props {
   country:          Country
   mlAccounts: string[]   // cuentas ML de la empresa (Ajustes o, si no hay, las conectadas)
   descuento: boolean     // módulo Descuento ML: sin él el descuento vale 0 (/api/settings) y no se muestra
+  importarML?: boolean   // permiso "Importar productos desde MercadoLibre" + cuentas de ML (Primeros pasos)
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false }: Props) {
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
   const [search,    setSearch]    = useState('')
   const [selected,  setSelected]  = useState<number[]>([])
@@ -499,6 +500,12 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   return (
     <div className="space-y-4">
       <PageHeader title="Productos" subtitle="Catálogo, precios y margen neto de cada producto" actions={<>
+        {importarML && (
+          <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"
+            title="Convertir tus publicaciones de MercadoLibre en productos, o vincularlas a los que ya tienes">
+            Importar desde ML
+          </Link>
+        )}
         {country === 'VE' && descuento && (
           <Link href="/productos/mercadoenvios" className="btn-secondary text-sm whitespace-nowrap">MercadoEnvíos</Link>
         )}
