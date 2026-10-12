@@ -6,8 +6,9 @@ const fecha = (s: string) => new Date(s).toLocaleDateString('es-VE', { day: '2-d
 
 /** Enlace chico "Preguntó antes (n)" que despliega, solo si se toca, las preguntas anteriores del
  *  mismo comprador (con su respuesta). `cargar` las pide recién al abrir; o vienen en `lista`. */
-export function PreguntasPrevias({ n, lista, cargar, etiqueta = 'Preguntó antes' }: {
+export function PreguntasPrevias({ n, lista, cargar, etiqueta = 'Preguntó antes', destacado = false }: {
   n: number; lista?: PreguntaPrevia[]; cargar?: () => Promise<PreguntaPrevia[]>; etiqueta?: string
+  destacado?: boolean   // como etiqueta (fondo celeste) en vez de enlace chico: en la conversación de Mensajes
 }) {
   const [abierto, setAbierto] = useState(false)
   const [cargadas, setDatos] = useState<PreguntaPrevia[] | null>(null)
@@ -21,7 +22,9 @@ export function PreguntasPrevias({ n, lista, cargar, etiqueta = 'Preguntó antes
   return (
     <span className="contents">
       <button type="button" onClick={alternar} title="Preguntas anteriores de este comprador"
-        className="text-xs text-sky-700 hover:underline underline-offset-2 whitespace-nowrap">
+        className={destacado
+          ? 'whitespace-nowrap rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-inset ring-sky-200 hover:bg-sky-100'
+          : 'text-xs text-sky-700 hover:underline underline-offset-2 whitespace-nowrap'}>
         ↺ {etiqueta} ({n}) {abierto ? '▴' : '▾'}
       </button>
       {abierto && (

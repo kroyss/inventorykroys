@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import type { MensajeRapido } from '@/lib/mensajesRapidos'
 
-interface Conversacion {
+export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
   ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null
   comprador_nick: string | null; comprador_nombre: string | null
@@ -99,7 +99,9 @@ export default function MensajesClient() {
   )
 }
 
-function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void }) {
+/** La conversación de una venta. La usan la bandeja y Ventas → Nueva venta ("Lo que se habló", 2026-10-12).
+ *  soloLectura: sin permiso de Mensajes se lee (y se ven las notas) pero no se responde. */
+export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null }[] | null>(null)
@@ -234,7 +236,7 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
         ) : c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
-          <PreguntasPrevias n={previas.length} lista={previas} etiqueta="Preguntó antes de comprar" />
+          <PreguntasPrevias n={previas.length} lista={previas} etiqueta="Preguntó antes de comprar" destacado />
         </div>
         <NotasVenta pack={c.pack_id} onCambio={onCambio} />
       </header>
@@ -280,7 +282,9 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
         })}
         <div ref={fin} />
       </div>
-      <footer className="border-t border-neutral-100 p-3 space-y-2">
+      {soloLectura ? (
+        <p className="border-t border-neutral-100 px-4 py-2.5 text-xs text-neutral-400">Para responder desde aquí hace falta el permiso de Mensajes.</p>
+      ) : <footer className="border-t border-neutral-100 p-3 space-y-2">
         {ultimoEsComprador && !texto.trim() && (
           <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setOrigen({ fuente: 'parecida', base: t }); setMeta(null) }} />
         )}
@@ -333,7 +337,7 @@ function Hilo({ c, rapidas, onCambio }: { c: Conversacion; rapidas: MensajeRapid
             {enviando ? 'Enviando…' : 'Responder'}
           </button>
         </div>
-      </footer>
+      </footer>}
     </section>
   )
 }

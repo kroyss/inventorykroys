@@ -10,7 +10,8 @@ import { mlFetch, ErrorML } from '@/lib/ml'
 export interface OrdenML {
   id: number; pack_id: number | null; status: string; date_created: string; tags: string[]
   seller: { id: number }; buyer: { id: number; nickname?: string; first_name?: string; last_name?: string }
-  order_items: { item: { id: string; title: string; variation_id?: number | null }; quantity: number }[]
+  order_items: { item: { id: string; title: string; variation_id?: number | null
+                          variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number }[]
   total_amount: number; currency_id: string
   feedback: { seller: unknown; buyer: unknown }
 }
@@ -42,7 +43,9 @@ export async function ventaParaFormulario(db: Pool, numero: string) {
         nick: b?.nickname ?? null,
       },
       items: ordenes.flatMap(o => o.order_items).map(i => ({
-        itemId: i.item.id, variacionId: i.item.variation_id ?? null, titulo: i.item.title, cantidad: i.quantity })),
+        itemId: i.item.id, variacionId: i.item.variation_id ?? null, titulo: i.item.title, cantidad: i.quantity,
+        // "Color: Negro · Talla: M": lo que eligió el comprador (se muestra en Nueva venta).
+        variante: (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null })),
       fecha: ordenes.map(o => o.date_created).sort()[0] ?? null,   // cuándo se compró (aviso del pago)
     }
   }

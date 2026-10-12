@@ -82,8 +82,10 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
         <div className="text-sm text-neutral-700 space-y-0.5">
           {f.lineas.map((l, k) => (
             <div key={k} className="truncate" title={l.titulo}>
-              <span className="font-medium">{l.cantidad} ×</span> {l.titulo}
-              {l.variante && <span className="text-neutral-400"> · {l.variante}</span>}
+              {/* La variante va antes del título: en títulos largos quedaba cortada al final. */}
+              <span className="font-medium">{l.cantidad} ×</span>{' '}
+              {l.variante && <span className="mr-1 inline-block rounded-full bg-sky-50 px-1.5 py-px text-[11px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 align-middle">{l.variante}</span>}
+              {l.titulo}
             </div>
           ))}
         </div>

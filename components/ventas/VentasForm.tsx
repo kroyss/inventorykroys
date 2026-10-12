@@ -34,7 +34,7 @@ interface MlVenta {
   comprador: { nombre: string | null; nick: string | null }
   fecha?: string | null
   items: {
-    itemId: string; titulo: string; cantidad: number
+    itemId: string; titulo: string; cantidad: number; variante?: string | null
     producto: { id: number; code: string; name: string } | null   // solo si el código ML está en UN producto
     opciones?: { id: number; code: string; name: string }[]        // todos los productos con ese código
   }[]
@@ -451,7 +451,11 @@ Revísala en el detalle que se abre ahora.`)
                   return (
                     <div key={k} className="space-y-1">
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-neutral-700 min-w-0 truncate" title={i.titulo}>{i.cantidad} × {i.titulo}</span>
+                        <span className="text-neutral-700 min-w-0 truncate" title={i.variante ? `${i.titulo} · ${i.variante}` : i.titulo}>
+                          {i.cantidad} ×{' '}
+                          {i.variante && <span className="mr-1 inline-block rounded-full bg-sky-50 px-1.5 py-px text-[11px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 align-middle">{i.variante}</span>}
+                          {i.titulo}
+                        </span>
                         {i.producto ? (ya
                           ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
                           : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)

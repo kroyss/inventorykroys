@@ -4,13 +4,15 @@
 //   - PagoDeVenta: el pago traído por el vigilante (o, si no está, cuál es el caso + "Buscar pago"),
 //     el comprobante con su detalle (ventana aparte) y "Pago correcto" (al guardar: pago válido,
 //     venta procesada y guía a Despachos).
-//   - LoQueSeHablo: botón que abre una ventana aparte con lo ofertado (foto, variante, cantidad,
-//     precio), notas, mensajes y preguntas previas; se pide a ML solo al abrirla.
+//   - LoQueSeHablo: botón que abre en una ventana aparte la conversación de Mensajes de esa venta
+//     (mensajes con fotos, responder, notas, variante y preguntas previas).
 // Las ventanas van por portal al body (dentro del panel lateral, que tiene transform, quedaban
 // encajonadas) y se cierran con Esc, con ✕ o tocando afuera.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { PagoME } from '@/lib/pagosMEComun'
+import { Hilo, type Conversacion } from '@/components/preguntas/MensajesClient'
+import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import { Monto, VERIF, bs, metodoPago } from '@/components/pagosme/PagoME'
 
 interface Traida { pedido_at: string; trabajando: boolean; terminada_at: string | null; con_error: boolean; no_respondieron?: string[] }
@@ -318,31 +320,21 @@ function DetallePago({ p, onCerrar, puedeMarcar, onMarcar }: {
 }
 
 // ── Lo que se habló ─────────────────────────────────────────────────────────
-interface Contexto {
-  cuenta: string | null
-  items: { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; imagen: string | null; link: string | null }[]
-  total: number | null; moneda: string | null
-  notas: string[]
-  mensajes: { propio: boolean; texto: string; fecha: string; adjuntos?: { url: string; nombre: string; imagen: boolean }[] }[]
-  preguntas: { id: string; item_titulo: string | null; texto: string; respuesta: string | null; fecha: string }[]
-}
-
-const plano = (t: string) => t.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
-const precio = (n: number | null, m: string | null) =>
-  n == null ? '' : `${m === 'VES' ? 'Bs' : m === 'COP' ? '$' : 'US$'} ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+// 2026-10-12: es la MISMA conversación de Mensajes (components/preguntas/MensajesClient → Hilo): mensajes
+// con fotos, responder y adjuntar, notas editables, producto con su variante y lo que preguntó antes.
+type ConversacionVenta = { conversacion: Conversacion; rapidas: MensajeRapido[]; puedeEscribir: boolean }
 
 export function LoQueSeHablo({ numero }: { numero: string }) {
   const [abierto, setAbierto] = useState(false)
-  const [ctx, setCtx] = useState<Contexto | null | undefined>(undefined)   // undefined = sin pedir
-  const [cargando, setCargando] = useState(false)
+  const [conv, setConv] = useState<ConversacionVenta | string | undefined>(undefined)   // string = error; undefined = sin pedir
 
   const abrir = async () => {
     setAbierto(true)
-    if (ctx !== undefined || cargando) return
-    setCargando(true)
-    const r = await fetch(`/api/sales/ml-orden/contexto?numero=${encodeURIComponent(numero)}`).catch(() => null)
-    setCtx(r?.ok ? await r.json() : null)
-    setCargando(false)
+    if (conv !== undefined && typeof conv !== 'string') return
+    setConv(undefined)
+    const r = await fetch(`/api/mensajes/de-venta?numero=${encodeURIComponent(numero)}`).catch(() => null)
+    const d = r ? await r.json().catch(() => ({})) : {}
+    setConv(r?.ok && d.conversacion ? d : (d.error ?? 'No se pudo abrir la conversación'))
   }
 
   return (
@@ -350,90 +342,15 @@ export function LoQueSeHablo({ numero }: { numero: string }) {
       <button type="button" onClick={abrir}
         className="w-full flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-left hover:border-sky-300 hover:bg-sky-50/40 transition-colors">
         <span className="text-sm font-medium text-neutral-800">💬 Lo que se habló en MercadoLibre</span>
-        <span className="text-xs text-sky-700">Ver producto ofertado, notas y mensajes →</span>
+        <span className="text-xs text-sky-700">Mensajes, notas, variante y preguntas →</span>
       </button>
       {abierto && (
-        <Ventana titulo="Lo que se habló en MercadoLibre" ancho="max-w-2xl" onCerrar={() => setAbierto(false)}
-          subtitulo={<>Venta <span className="font-mono">{numero}</span>{ctx?.cuenta ? ` · ${ctx.cuenta}` : ''}</>}>
-          <div className="p-5 space-y-5 text-sm">
-            {cargando || ctx === undefined ? <p className="text-neutral-400">Buscando en MercadoLibre…</p>
-              : ctx === null ? <p className="text-neutral-500">No se pudo traer de MercadoLibre.</p>
-              : <>
-                <section className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Lo que ofertó</h4>
-                  {ctx.items.map((i, k) => (
-                    <div key={k} className="flex items-center gap-3 rounded-lg border border-neutral-200 p-2">
-                      <div className="w-14 h-14 shrink-0 rounded-md border border-neutral-200 bg-white overflow-hidden flex items-center justify-center">
-                        {i.imagen
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={i.imagen} alt="" loading="lazy" className="w-full h-full object-contain" />
-                          : <span className="text-neutral-300">—</span>}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-neutral-900">
-                          <b>{i.cantidad} ×</b>{' '}
-                          {i.link ? <a href={i.link} target="_blank" rel="noreferrer" className="hover:underline">{i.titulo} ↗</a> : i.titulo}
-                        </div>
-                        <div className="text-xs text-neutral-500 mt-0.5">
-                          {i.variante && <span className="inline-block rounded bg-sky-50 border border-sky-100 px-1.5 py-0.5 font-medium text-sky-900 mr-2">{i.variante}</span>}
-                          {i.precio != null && <span>{precio(i.precio, i.moneda)} c/u</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {ctx.total != null && <div className="text-right text-xs text-neutral-600">Total de la orden: <b>{precio(ctx.total, ctx.moneda)}</b></div>}
-                </section>
-
-                <section className="space-y-1.5">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Notas de la venta</h4>
-                  {ctx.notas.length
-                    ? ctx.notas.map((n, k) => <div key={k} className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-amber-900">{n}</div>)
-                    : <p className="text-neutral-400">Sin notas.</p>}
-                </section>
-
-                <section className="space-y-1.5">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Últimos mensajes</h4>
-                  {ctx.mensajes.length ? (
-                    <div className="space-y-1.5">
-                      {ctx.mensajes.map((m, k) => (
-                        <div key={k} className={`rounded-lg px-3 py-2 max-w-[85%] ${m.propio ? 'ml-auto bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-900'}`}>
-                          {plano(m.texto)}
-                          {!!m.adjuntos?.length && (
-                            <div className={`flex flex-wrap gap-2 ${m.texto.trim() ? 'mt-2' : ''}`}>
-                              {m.adjuntos.map(a => a.imagen ? (
-                                <a key={a.url} href={a.url} target="_blank" rel="noreferrer" title="Ver en grande">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={a.url} alt={a.nombre} loading="lazy"
-                                    className="max-h-44 max-w-full rounded-md border border-black/10 bg-white" />
-                                </a>
-                              ) : (
-                                <a key={a.url} href={a.url} target="_blank" rel="noreferrer"
-                                  className="text-xs underline underline-offset-2 opacity-80 hover:opacity-100">📎 {a.nombre}</a>
-                              ))}
-                            </div>
-                          )}
-                          <div className={`text-[10px] mt-0.5 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                            {m.propio ? 'Tú' : 'Comprador'} · {hora(m.fecha)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-neutral-400">Sin mensajes.</p>}
-                </section>
-
-                {ctx.preguntas.length > 0 && (
-                  <section className="space-y-1.5">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Preguntó antes de comprar</h4>
-                    {ctx.preguntas.slice(0, 5).map(p => (
-                      <div key={p.id} className="rounded-lg border border-neutral-200 px-3 py-2">
-                        <div className="text-neutral-900">“{p.texto}”</div>
-                        {p.item_titulo && <div className="text-[11px] text-neutral-400">{p.item_titulo}</div>}
-                        {p.respuesta && <div className="text-xs text-neutral-600 mt-1">↳ {p.respuesta}</div>}
-                      </div>
-                    ))}
-                  </section>
-                )}
-              </>}
+        <Ventana titulo="Lo que se habló en MercadoLibre" ancho="max-w-3xl" onCerrar={() => setAbierto(false)}
+          subtitulo={<>Venta <span className="font-mono">{numero}</span></>}>
+          <div className="p-3">
+            {conv === undefined ? <p className="p-4 text-sm text-neutral-400">Abriendo la conversación…</p>
+              : typeof conv === 'string' ? <p className="p-4 text-sm text-neutral-500">{conv}</p>
+              : <Hilo c={conv.conversacion} rapidas={conv.rapidas} onCambio={() => {}} soloLectura={!conv.puedeEscribir} />}
           </div>
         </Ventana>
       )}
