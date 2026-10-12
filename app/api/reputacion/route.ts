@@ -9,6 +9,8 @@ import { DIAS_AVISO } from '@/lib/reputacionML'
 // Automatizaciones → Reputación (lib/reputacionML.ts).
 // GET  → termómetro de cada cuenta + neutrales/negativas de los últimos DIAS_AVISO días (y las que se cambiaron
 //        y las contradictorias, aunque sean positivas: esas no cuentan en el menú).
+//        Contradictoria = solo la que importa: el comprador dice que SÍ se concretó y nosotros que NO (al revés,
+//        nosotros SÍ y él NO, ML igual la cobra: no se marca).
 // POST → { id, vista } marca (o desmarca) una calificación como vista: deja de contar en el menú.
 //        { id, pedido: true } al abrir "Pedir cambio": se da por pedido ya y se vuelve a mirar en ML en la próxima
 //        pasada del cron (si en ML no figura el pedido, vuelve a aparecer el botón).
@@ -24,7 +26,7 @@ export async function GET() {
               COALESCE(NULLIF(o.comprador_nombre, ''), NULLIF(c.comprador_nombre, '')) AS nombre, o.comprador AS nick,
               o.productos, o.fecha, o.cal_recibida AS rating, o.cal_recibida_antes AS antes, o.cal_recibida_at AS calificada_at,
               o.cal_recibida_msg AS mensaje, o.cal_recibida_vista_at AS vista_at,
-              COALESCE(o.cal_contradictoria, false) AS contradictoria, o.cal_recibida_concretada AS concretada,
+              COALESCE(o.cal_contradictoria AND o.cal_recibida_concretada, false) AS contradictoria, o.cal_recibida_concretada AS concretada,
               o.cal_cambio_estado AS cambio_estado, o.cal_cambio_at AS cambio_at,
               GREATEST(0, CEIL(EXTRACT(EPOCH FROM (o.cal_recibida_at + make_interval(days => $1) - NOW())) / 86400))::int AS dias_restantes,
               c.pack_id IS NOT NULL AS con_mensajes
@@ -32,7 +34,7 @@ export async function GET() {
        JOIN ml_conexiones x ON x.id = o.conexion_id
        LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
        WHERE o.cal_recibida_at > NOW() - make_interval(days => $1)
-         AND (o.cal_recibida IN ('neutral', 'negative') OR o.cal_recibida_antes IS NOT NULL OR o.cal_contradictoria)
+         AND (o.cal_recibida IN ('neutral', 'negative') OR o.cal_recibida_antes IS NOT NULL OR (o.cal_contradictoria AND o.cal_recibida_concretada))
        ORDER BY o.cal_recibida_at DESC`, [DIAS_AVISO])
     const { rows: [pend] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - INTERVAL '60 days')::int AS n

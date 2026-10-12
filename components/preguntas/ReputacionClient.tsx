@@ -149,7 +149,7 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
             </span>
             {c.contradictoria && (
               <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700"
-                title={`Contradictoria: el comprador dijo que la venta ${c.concretada ? 'SÍ' : 'NO'} se concretó y tú dijiste lo contrario`}>
+                title="Contradictoria: el comprador dijo que la venta SÍ se concretó y tú marcaste que NO">
                 Contradictoria
               </span>
             )}
