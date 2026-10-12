@@ -1,5 +1,6 @@
 'use client'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 // Numeritos del menú: preguntas sin responder, mensajes sin leer y guías por reportar.
 // Se piden cada minuto (el cron trae lo nuevo de ML cada minuto) y al volver a la pestaña.
@@ -47,8 +48,11 @@ export function hayAlerta(avisos: Avisos, rutas: string[]) {
 export function AvisosProvider({ children }: { children: React.ReactNode }) {
   const [avisos, setAvisos] = useState<Avisos>(VACIO)
   const tituloBase = useRef<string | null>(null)
+  const pathname = usePathname()
+  const ultimaCarga = useRef(0)
 
   const cargar = useCallback(async () => {
+    ultimaCarga.current = Date.now()
     try {
       const r = await fetch('/api/avisos', { cache: 'no-store' })
       if (r.ok) setAvisos(await r.json())
@@ -62,6 +66,11 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', alVolver)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [cargar])
+  // También al cambiar de pantalla (2026-10-12): al volver a Inicio después de responder o calificar,
+  // los números se ponen al día sin F5. Como mucho una vez cada 3 s.
+  useEffect(() => {
+    if (Date.now() - ultimaCarga.current > 3000) cargar()
+  }, [pathname, cargar])
 
   // "(N) " delante del título de la página, sin pisar el título que pone Next.
   useEffect(() => {
