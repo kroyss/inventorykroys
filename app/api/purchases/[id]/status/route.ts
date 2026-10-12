@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { revertStock } from '@/lib/inventoryOps'
+import { puede } from '@/lib/permisos'
 
 const Schema = z.object({
   action: z.enum(['advance', 'reopen', 'inconsistente', 'finalize', 'reset_reception', 'undo']),
@@ -56,7 +57,7 @@ export async function PUT(
     const { action, note } = Schema.parse(await req.json())
 
     // Non-admin users may only perform reception actions (reset_reception, undo)
-    if (session.user.role !== 'admin' && !RECEPTION_ACTIONS.has(action)) {
+    if (!puede(session.user, 'compras_editar') && !RECEPTION_ACTIONS.has(action)) {
       return forbidden()
     }
 

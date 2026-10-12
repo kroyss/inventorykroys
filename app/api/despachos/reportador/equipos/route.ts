@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { reportadorForbidden } from '@/lib/despachos'
 import { nuevoCodigo } from '@/lib/reportador'
+import { puede } from '@/lib/permisos'
 
 /** POST /api/despachos/reportador/equipos — genera un código de vinculación (vence en 15 min) */
 export async function POST() {
@@ -10,7 +11,7 @@ export async function POST() {
   if (!session || !db) return unauthorized()
   const denied = reportadorForbidden(session)
   if (denied) return denied
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'automatizaciones_config')) return forbidden()
 
   try {
     // Reintenta si el código aleatorio choca con otro vigente (índice único).

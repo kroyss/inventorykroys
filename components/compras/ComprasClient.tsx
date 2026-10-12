@@ -11,6 +11,7 @@ import { useDeepLinkList } from '@/lib/useDeepLinkParam'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { matchTokens, matchFuzzy, dateTokens } from '@/lib/search'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
+import type { AccesoCompras } from '@/lib/permisos'
 
 const PAGE_SIZE = 15
 
@@ -70,7 +71,7 @@ interface RecvItem {
 interface Props {
   initialOrders: PurchaseOrder[]
   initialSuppliers: Supplier[]
-  userRole: UserRole
+  acceso: AccesoCompras
   historyMode?: boolean
   /** Aviso al padre (ComprasTabs) tras cualquier cambio, para refrescar contadores y la otra pestaña. */
   onChanged?: () => void
@@ -79,8 +80,10 @@ interface Props {
   onAutoCreateHandled?: () => void
 }
 
-export default function ComprasClient({ initialOrders, initialSuppliers, userRole, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
-  const isAdmin = userRole === 'admin'
+export default function ComprasClient({ initialOrders, initialSuppliers, acceso, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
+  // Permisos (lib/permisos.ts): crear/editar compras y ver costos van por separado.
+  const isAdmin = acceso.editar
+  const verCostos = acceso.costos
   const confirm = useConfirm()
 
   const [orders, setOrders]       = useState<PurchaseOrder[]>(initialOrders)
@@ -605,7 +608,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
       </div>
 
       {/* Resumen financiero compacto */}
-      {isAdmin && (
+      {verCostos && (
         <div className="text-xs text-neutral-500 -mt-2">
           Valor activo: <span className="font-semibold text-neutral-800">${fmt(kpis.valorActivo)}</span>
           <span className="mx-2 text-neutral-300">·</span>
@@ -624,7 +627,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
               <th className="px-3 py-2 text-left">Detalle</th>
               <SortableTh label="Productos" sortKey="productos" sort={sort} onSort={onSort} align="right" title="Productos distintos (completos/total en recepción)" />
               <SortableTh label="Cantidad" sortKey="cantidad" sort={sort} onSort={onSort} align="right" title="Unidades totales (recibidas/total en recepción)" />
-              {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
+              {verCostos && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
               <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
               <SortableTh label="Estado" sortKey="estado" sort={sort} onSort={onSort} align="center" />
               {historyMode && <th className="px-2 py-2 text-center">Inconsistente</th>}
@@ -632,7 +635,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
           </thead>
           <tbody>
             {visibleOrders.length === 0 && (
-              <tr><td colSpan={(isAdmin ? 8 : 7) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
+              <tr><td colSpan={(verCostos ? 8 : 7) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
             )}
             {paginatedOrders.map((o, idx) => {
               const dateSrc = o.updated_at ?? o.created_at
@@ -676,7 +679,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                     )}
                     <span className="text-neutral-400 text-xs"> und</span>
                   </td>
-                  {isAdmin && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
+                  {verCostos && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
                   <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
                   <td className="px-3 py-2 text-center">
                     <StatusBadge status={o.status} label={STATUS_LABELS[o.status]} />
@@ -731,7 +734,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-              {isAdmin && (
+              {verCostos && (
                 <div>
                   <span className="text-neutral-500">Total:</span>
                   <span className="ml-2 font-semibold">${fmt(selected.total_usd)}</span>
@@ -858,8 +861,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                 <tr>
                   <th className="px-4 py-2 text-left">Producto</th>
                   <th className="px-4 py-2 text-right">Cant.</th>
-                  {isAdmin && <th className="px-4 py-2 text-right">C/U</th>}
-                  {isAdmin && <th className="px-4 py-2 text-right">Total</th>}
+                  {verCostos && <th className="px-4 py-2 text-right">C/U</th>}
+                  {verCostos && <th className="px-4 py-2 text-right">Total</th>}
                   <th className="px-4 py-2 text-right">Recibido</th>
                 </tr>
               </thead>
@@ -871,8 +874,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                       {item.product_name}
                     </td>
                     <td className="px-4 py-2 text-right">{item.quantity}</td>
-                    {isAdmin && <td className="px-4 py-2 text-right">${fmt(item.unit_cost_usd)}</td>}
-                    {isAdmin && <td className="px-4 py-2 text-right font-semibold">${fmt(item.total_cost_usd)}</td>}
+                    {verCostos && <td className="px-4 py-2 text-right">${fmt(item.unit_cost_usd)}</td>}
+                    {verCostos && <td className="px-4 py-2 text-right font-semibold">${fmt(item.total_cost_usd)}</td>}
                     <td className="px-4 py-2 text-right">
                       {(() => {
                         // total_received_qty puede venir 0/null en finalizadas (datos legacy
@@ -888,7 +891,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, userRol
                     </td>
                   </tr>
                 ))}
-                {isAdmin && (
+                {verCostos && (
                   <tr className="border-t bg-neutral-50 font-semibold">
                     <td colSpan={3} className="px-4 py-2 text-right text-neutral-600">Total:</td>
                     <td className="px-4 py-2 text-right">${fmt(selected.total_usd)}</td>

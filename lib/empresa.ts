@@ -9,6 +9,7 @@ export interface EmpresaAcceso {
   country: Country
   modulos: string[]
   role: UserRole
+  permisos: string[] | null   // usuario_empresas.permisos (lib/permisos.ts; NULL = los de su rol)
   organizacionId: number
   habilitada: boolean      // la cuenta de su organización está al día (no vencida)
 }
@@ -18,7 +19,7 @@ export interface EmpresaAcceso {
  *  decir "tu prueba terminó" en vez de "usuario o contraseña incorrectos"). */
 export async function empresasDeUsuario(userId: number | string, { incluirVencidas = false } = {}): Promise<EmpresaAcceso[]> {
   const { rows } = await dbGlobal().query(
-    `SELECT e.id, e.nombre, e.country, e.modulos, ue.role, e.organizacion_id AS "organizacionId",
+    `SELECT e.id, e.nombre, e.country, e.modulos, ue.role, ue.permisos, e.organizacion_id AS "organizacionId",
             ${SQL_CUENTA_HABILITADA} AS habilitada
      FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
      JOIN organizaciones o ON o.id = e.organizacion_id

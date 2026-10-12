@@ -4,50 +4,53 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
+import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
 import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
 
-const allLinks: { href: string; label: string; roles: UserRole[]; countries: Country[]; espacio?: Espacio }[] = [
-  { href: '/dashboard',  label: 'Inicio',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/ventas',     label: 'Ventas',    roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/pagos-me',   label: 'Pagos ME',  roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
-  { href: '/facturas',   label: 'Facturas',  roles: ['admin', 'user'] as UserRole[], countries: ['VE']       as Country[] },
-  { href: '/inventario', label: 'Inventario',roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/compras',    label: 'Compras',   roles: ['admin', 'user'] as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/productos',  label: 'Productos', roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/reportes',   label: 'Reportes',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
-  { href: '/finanzas',   label: 'Finanzas',  roles: ['admin']         as UserRole[], countries: ['VE', 'CO'] as Country[] },
+const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio }[] = [
+  { href: '/dashboard',  label: 'Inicio',    countries: ['VE', 'CO'] as Country[] },
+  { href: '/ventas',     label: 'Ventas',    countries: ['VE', 'CO'] as Country[] },
+  { href: '/pagos-me',   label: 'Pagos ME',  countries: ['VE']       as Country[] },
+  { href: '/facturas',   label: 'Facturas',  countries: ['VE']       as Country[] },
+  { href: '/inventario', label: 'Inventario',countries: ['VE', 'CO'] as Country[] },
+  { href: '/compras',    label: 'Compras',   countries: ['VE', 'CO'] as Country[] },
+  { href: '/productos',  label: 'Productos', countries: ['VE', 'CO'] as Country[] },
+  { href: '/reportes',   label: 'Reportes',  countries: ['VE', 'CO'] as Country[] },
+  { href: '/finanzas',   label: 'Finanzas',  countries: ['VE', 'CO'] as Country[] },
   // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
-  { href: '/automatizaciones', label: 'Inicio',     roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/despachos',        label: 'Despachos',  roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
-  { href: '/reportador',       label: 'Reportador', roles: ['admin', 'user'], countries: ['VE'],       espacio: 'automatizaciones' },
-  { href: '/preguntas',        label: 'Preguntas',  roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/mensajes',         label: 'Mensajes',   roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/calificaciones',   label: 'Calificaciones', roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/alertas-stock',    label: 'Stock',         roles: ['admin', 'user'], countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/automatizaciones', label: 'Inicio',     countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/despachos',        label: 'Despachos',  countries: ['VE'],       espacio: 'automatizaciones' },
+  { href: '/reportador',       label: 'Reportador', countries: ['VE'],       espacio: 'automatizaciones' },
+  { href: '/preguntas',        label: 'Preguntas',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/calificaciones',   label: 'Calificaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/alertas-stock',    label: 'Stock',         countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
 interface Props {
   role: UserRole
+  permisos: string[]
   country: Country
   modulos: string[]
 }
 
 const CLASE_LINK = 'inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 xl:px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
 
-export default function NavLinks({ role, country, modulos }: Props) {
+export default function NavLinks({ role, permisos, country, modulos }: Props) {
+  const u = { role, permisos }
   const pathname = usePathname()
   const avisos = useAvisos()
   const links = allLinks.filter(
-    l => l.roles.includes(role) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
+    l => rutaPermitida(l.href, u) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
       && (l.espacio ?? 'inventario') === espacioActual(pathname, modulos)
   )
   const activo = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))
   const etiqueta = (l: typeof links[number]) => (
     <>
-      {l.href === '/compras' && role === 'user' ? 'Recepciones' : l.label}
+      {l.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : l.label}
       {AVISO_DE_RUTA[l.href] && <Numerito n={avisos[AVISO_DE_RUTA[l.href].clave]} urgente={AVISO_DE_RUTA[l.href].urgente} />}
     </>
   )

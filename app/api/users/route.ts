@@ -5,6 +5,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
+import { PERMISOS, PREDETERMINADO_USUARIO, permisosDeEmpresa } from '@/lib/permisos'
 
 // Usuarios de la EMPRESA de la sesión (usuario_empresas). `users` es global y sin RLS:
 // todo acceso se acota por usuario_empresas.empresa_id. Solo admin. Contraseñas: bcrypt.
@@ -22,10 +23,13 @@ export async function GET() {
   if (session.user.role !== 'admin') return forbidden()
   try {
     const { rows } = await db.query(
-      `SELECT u.id, u.username, u.full_name, ue.role, u.is_active, u.created_at, u.last_login
+      `SELECT u.id, u.username, u.full_name, ue.role, ue.permisos, u.is_active, u.created_at, u.last_login
        FROM users u JOIN usuario_empresas ue ON ue.user_id = u.id AND ue.empresa_id = $1
        ORDER BY u.is_active DESC, ue.role, u.username`, [session.user.empresaId])
-    return NextResponse.json({ users: rows, me: parseInt(session.user.id, 10) })
+    // Permisos que aplican a ESTA empresa (según sus módulos y país), para la ficha de cada usuario.
+    const disponibles = permisosDeEmpresa(session.user.modulos, session.user.country)
+      .map(clave => ({ clave, ...PERMISOS[clave] }))
+    return NextResponse.json({ users: rows, me: parseInt(session.user.id, 10), disponibles, predeterminado: PREDETERMINADO_USUARIO })
   } catch (err) {
     return apiError(err)
   }

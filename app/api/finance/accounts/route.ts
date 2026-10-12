@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getFinanceSession } from '@/lib/finance'
 import { unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 const AccountSchema = z.object({
   name:          z.string().min(1).max(120),
@@ -17,7 +18,7 @@ const AccountSchema = z.object({
 export async function GET(_: NextRequest) {
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   const { rows } = await db.query(`
     SELECT id, name, type, currency, balance::float AS balance,
@@ -32,7 +33,7 @@ export async function GET(_: NextRequest) {
 export async function POST(req: NextRequest) {
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     const b = AccountSchema.parse(await req.json())

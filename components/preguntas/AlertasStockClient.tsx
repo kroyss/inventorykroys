@@ -10,7 +10,7 @@ interface Fila {
 }
 interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number }; umbral: number
-  revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean
+  revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean; puedeStock: boolean
 }
 type Vista = 'agotadas' | 'bajas'
 
@@ -140,7 +140,7 @@ export default function AlertasStockClient() {
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
       </div>
 
-      {datos?.esAdmin && (datos.filas.length > 0 || aviso) && (
+      {datos?.puedeStock && (datos.filas.length > 0 || aviso) && (
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-2.5">
           <p className="text-sm text-neutral-600">
             {aviso ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
@@ -161,7 +161,7 @@ export default function AlertasStockClient() {
         <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
           {filas.map(f => (
             <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex items-center gap-3">
-              {datos.esAdmin && (
+              {datos.puedeStock && (
                 <input type="checkbox" checked={marcadas.has(clave(f))} onChange={() => alternar(f)} disabled={(nuevo[clave(f)] ?? '') === ''}
                   title={(nuevo[clave(f)] ?? '') === '' ? 'Escribe primero el stock nuevo' : 'Incluir en la actualización'}
                   className="w-4 h-4 accent-neutral-900 shrink-0" />
@@ -183,7 +183,7 @@ export default function AlertasStockClient() {
                 </p>
                 {resultado[clave(f)] && !resultado[clave(f)].ok && <p className="text-xs text-red-600">{resultado[clave(f)].error}</p>}
               </div>
-              {datos.esAdmin && (
+              {datos.puedeStock && (
                 <input inputMode="numeric" value={nuevo[clave(f)] ?? ''} onChange={e => escribir(f, e.target.value)} placeholder="Nuevo"
                   aria-label={`Stock nuevo de ${f.titulo}`}
                   className="w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />

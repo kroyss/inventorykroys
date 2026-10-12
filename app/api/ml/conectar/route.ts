@@ -9,7 +9,7 @@ import { mlConfigurado, urlAutorizacion } from '@/lib/ml'
 // (/cuentas-ml?ml_error) y sin sesión se pasa por el login, que vuelve aquí.
 export async function GET(req: NextRequest) {
   const base = process.env.NEXTAUTH_URL ?? req.url
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas('ml_cuentas')
   if ('error' in s && s.error) {
     if (s.error.status === 401) return NextResponse.redirect(new URL('/login?callbackUrl=%2Fconectar', base))
     const { error } = await s.error.json().catch(() => ({ error: 'No puedes conectar cuentas' }))

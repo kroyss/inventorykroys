@@ -3,23 +3,25 @@ import { getSessionDb } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import type { Session } from 'next-auth'
 import { dbDeSesion } from '@/lib/session'
+import { puede, type Permiso } from '@/lib/permisos'
 
-/** Sesión + conexión de la empresa para las rutas de Preguntas (módulo `preguntas`). */
-export async function sesionPreguntas(soloAdmin = false) {
+/** Sesión + conexión de la empresa para las rutas de Preguntas (módulo `preguntas`). `permiso`: lo que
+ *  además hace falta (lib/permisos.ts; antes era "solo admin"). */
+export async function sesionPreguntas(permiso?: Permiso) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: NextResponse.json({ error: 'No autorizado' }, { status: 401 }) } as const
   if (!tieneModulo(session.user, 'preguntas')) {
     return { error: NextResponse.json({ error: 'Tu empresa no tiene el módulo Preguntas' }, { status: 403 }) } as const
   }
-  if (soloAdmin && session.user.role !== 'admin') {
-    return { error: NextResponse.json({ error: 'Solo un administrador puede hacer esto' }, { status: 403 }) } as const
+  if (permiso && !puede(session.user, permiso)) {
+    return { error: NextResponse.json({ error: 'No tienes permiso para hacer esto (lo da un administrador en Usuarios)' }, { status: 403 }) } as const
   }
   return { session, db } as const
 }
 
 /** Stock (alertas de stock): sesión de Preguntas (conexiones de ML) + su módulo `alertas_stock`. */
-export async function sesionStock(soloAdmin = false) {
-  const s = await sesionPreguntas(soloAdmin)
+export async function sesionStock(permiso?: Permiso) {
+  const s = await sesionPreguntas(permiso)
   if ('error' in s) return s
   if (!tieneModulo(s.session.user, 'alertas_stock')) {
     return { error: NextResponse.json({ error: 'Tu empresa no tiene el módulo Stock' }, { status: 403 }) } as const

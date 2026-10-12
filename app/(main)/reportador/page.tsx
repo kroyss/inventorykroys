@@ -9,6 +9,7 @@ import ReportadorApi from '@/components/despachos/ReportadorApi'
 import ReportadorVistas from '@/components/despachos/ReportadorVistas'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Reportador' }
 
@@ -18,10 +19,11 @@ export const metadata = { title: 'Reportador' }
 export default async function ReportadorPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const session = await getServerSession(authOptions)
   if (!tieneModulo(session?.user, 'reportador') || !tieneModulo(session?.user, 'despachos')) redirect('/automatizaciones')
-  if (session!.user.country !== 'VE') redirect('/automatizaciones')
-  const isAdmin = session!.user.role === 'admin'
+  if (session!.user.country !== 'VE' || !puede(session!.user, 'ver_reportador')) redirect('/automatizaciones')
+  // isAdmin = "Configurar automatizaciones" (lib/permisos.ts)
+  const isAdmin = puede(session!.user, 'automatizaciones_config')
   if (await sinCuentasML(session!)) {
-    return <SinCuentaML esAdmin={isAdmin} titulo="Reportador" gancho="Le escribe a cada comprador su número de guía, sin copiar y pegar."
+    return <SinCuentaML esAdmin={puede(session!.user, 'ml_cuentas')} titulo="Reportador" gancho="Le escribe a cada comprador su número de guía, sin copiar y pegar."
       beneficios={['Toma las guías de tus despachos y le manda a cada comprador su mensaje en MercadoLibre.',
         'Tus propias plantillas de mensaje, por cuenta.',
         'Corre en segundo plano: puedes cerrar la pantalla, y queda el historial de lo enviado.']} />

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_productos')) return forbidden()
 
   const { rows } = await db.query(`
     SELECT

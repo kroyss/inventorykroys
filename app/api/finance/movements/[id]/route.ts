@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getFinanceSession } from '@/lib/finance'
 import { unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 const UpdateSchema = z.object({
   date:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -19,7 +20,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     const b = UpdateSchema.parse(await req.json())
@@ -48,7 +49,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     const { rows: [mov] } = await db.query(`SELECT source FROM finance_movements WHERE id = $1`, [id])

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 const Schema = z.object({
   visible_ids: z.array(z.number().int().positive()),
@@ -17,7 +18,7 @@ export async function PUT(
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
 
   try {
     const { visible_ids } = Schema.parse(await req.json())

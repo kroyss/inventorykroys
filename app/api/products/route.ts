@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
+import { puede } from '@/lib/permisos'
 
 const PRODUCTS_SQL = `
   SELECT
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
   if (!session || !pool) return unauthorized()
   // Una sola conexión para todo el request: las transacciones son atómicas.
   const db = await requestConnection(pool)
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_productos')) return forbidden()
 
   try {
     const body = CreateSchema.parse(await req.json())

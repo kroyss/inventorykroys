@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 // Llena de una vez el stock mínimo / máximo que NO está configurado (0) con el recomendado
 // por ventas de los últimos 6 meses — la misma fórmula que muestra Inventario:
@@ -10,7 +11,7 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 export async function POST() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'inventario_config')) return forbidden()
 
   try {
     const { rows: [r] } = await db.query(`

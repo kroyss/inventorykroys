@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 const LIST_SQL = `
   SELECT c.id, c.code, c.name, c.status, c.origin_country, c.tracking_number,
@@ -19,7 +20,7 @@ const LIST_SQL = `
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
   const { rows } = await db.query(LIST_SQL)
   return NextResponse.json(rows)
 }
@@ -38,7 +39,7 @@ const CreateSchema = z.object({
 export async function POST(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
 
   try {
     const b = CreateSchema.parse(await req.json())

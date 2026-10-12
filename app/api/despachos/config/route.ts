@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { despachosForbidden, impresionEtiqueta } from '@/lib/despachos'
+import { puede } from '@/lib/permisos'
 
 // GET/PUT /api/despachos/config → qué se imprime en la etiqueta (empresas sin inventario): el título
 // de la publicación y la nota, cada uno prendido o apagado para toda la empresa. Cambiarlo es de admin.
@@ -24,7 +25,7 @@ export async function PUT(req: NextRequest) {
   if (!session || !db) return unauthorized()
   const denied = despachosForbidden(session)
   if (denied) return denied
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'automatizaciones_config')) return forbidden()
   try {
     const b = Body.parse(await req.json())
     for (const k of ['sin_titulo', 'sin_nota'] as const) {

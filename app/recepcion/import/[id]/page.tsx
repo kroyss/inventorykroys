@@ -4,6 +4,7 @@ import { dbDeSesion } from '@/lib/session'
 import { marca } from '@/lib/marca'
 import { notFound, redirect } from 'next/navigation'
 import ReceptionPrint from '@/components/recepcion/ReceptionPrint'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Lista de recepción · Importación' }
 
@@ -41,7 +42,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   // Fotos adjuntas (solo imágenes) — importantes para verificar la recepción.
   // El usuario normal solo ve las marcadas como visibles (no pagos ni internas).
-  const visClause = session.user.role === 'admin' ? '' : 'AND visible_to_user = TRUE'
+  const visClause = puede(session.user, 'importaciones_archivos') ? '' : 'AND visible_to_user = TRUE'
   const { rows: files } = await db.query(
     `SELECT id, file_name FROM import_order_files
      WHERE import_order_id = $1 AND COALESCE(file_type, '') LIKE 'image/%' ${visClause}

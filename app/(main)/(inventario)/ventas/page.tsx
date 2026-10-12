@@ -4,11 +4,14 @@ import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import VentasClient from '@/components/ventas/VentasClient'
 import type { InventoryItem } from '@/lib/types'
+import { puede } from '@/lib/permisos'
+import { redirect } from 'next/navigation'
 
 export const metadata = { title: 'Ventas' }
 
 export default async function VentasPage() {
   const session = await getServerSession(authOptions)
+  if (!puede(session?.user, 'ver_ventas')) redirect('/dashboard')
   const db      = dbDeSesion(session!)
 
   // Sales are fetched client-side with server pagination (10/page) via /api/sales.

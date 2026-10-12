@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { hashClave, nuevaClave, sesionPagosME } from '@/lib/pagosME'
+import { puede } from '@/lib/permisos'
 
 /** POST /api/pagos-me/clave (admin) → clave nueva del vigilante. Se muestra UNA vez; la anterior deja de valer. */
 export async function POST() {
   const s = await sesionPagosME()
   if ('error' in s) return s.error
-  if (s.session.user.role !== 'admin') return NextResponse.json({ error: 'Solo un administrador' }, { status: 403 })
+  if (!puede(s.session.user, 'pagos_me_config')) return NextResponse.json({ error: 'Solo un administrador' }, { status: 403 })
   try {
     const clave = nuevaClave()
     await s.db.query(

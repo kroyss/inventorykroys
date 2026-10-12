@@ -3,11 +3,14 @@ import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import InventarioClient from '@/components/inventario/InventarioClient'
 import type { InventoryItem } from '@/lib/types'
+import { puede } from '@/lib/permisos'
+import { redirect } from 'next/navigation'
 
 export const metadata = { title: 'Inventario' }
 
 export default async function InventarioPage() {
   const session = await getServerSession(authOptions)
+  if (!puede(session?.user, 'ver_inventario')) redirect('/dashboard')
   const db      = dbDeSesion(session!)
 
   const { rows } = await db.query(`
@@ -62,7 +65,7 @@ export default async function InventarioPage() {
   return (
     <InventarioClient
       initialItems={rows as InventoryItem[]}
-      userRole={session!.user.role}
+      acceso={{ config: puede(session!.user, 'inventario_config'), costos: puede(session!.user, 'costos') }}
       country={session!.user.country}
     />
   )

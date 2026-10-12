@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { tieneModulo, type Modulo } from '@/lib/modulos'
+import { puede } from '@/lib/permisos'
 
 // Claves que solo existen con su módulo: sin él no se guardan (y ml_descuento se lee como 0).
 const DE_MODULO: Record<string, Modulo> = {
@@ -28,16 +29,25 @@ const ALLOWED = new Set([
   'bono_monto_1', 'bono_monto_2', 'bono_monto_3', 'bono_monto_4',   // Bonos: monto de cada fase
 ])
 
+// Lo que puede leer y guardar quien tiene "Configurar automatizaciones" sin ser admin (lib/permisos.ts).
+// El resto (costos ML, bonos, finanzas…) es de Ajustes: solo admin.
+const DE_AUTOMATIZACIONES = new Set(['despacho_remitente', 'preguntas_politicas', 'preguntas_plantillas',
+                                     'mensajes_plantillas', 'calificaciones_plantillas'])
+const accesoAjustes = (user: Parameters<typeof puede>[0] & { role: string }) =>
+  user.role === 'admin' ? 'todo' : puede(user, 'automatizaciones_config') ? 'automatizaciones' : null
+
 // GET /api/settings → { key: value, ... } del país de la sesión
 export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  // Leer: también quien ve Productos (los precios usan los costos ML de aquí).
+  const acceso = puede(session.user, 'ver_productos') ? 'todo' : accesoAjustes(session.user)
+  if (!acceso) return forbidden()
 
   try {
     const { rows } = await db.query(`SELECT key, value FROM app_settings`)
     const out: Record<string, string> = {}
-    for (const r of rows) out[r.key] = r.value
+    for (const r of rows) if (acceso === 'todo' || DE_AUTOMATIZACIONES.has(r.key)) out[r.key] = r.value
     // Sin el módulo Descuento ML, el descuento global es 0: publicado = final en todas las pantallas.
     if (!tieneModulo(session.user, 'descuento_ml')) out.ml_descuento = '0'
     return NextResponse.json(out)
@@ -50,12 +60,13 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  const acceso = accesoAjustes(session.user)
+  if (!acceso) return forbidden()
 
   try {
     const body = z.record(z.string(), z.union([z.string(), z.number()])).parse(await req.json())
     const entries = Object.entries(body)
-      .filter(([k]) => ALLOWED.has(k) && (!DE_MODULO[k] || tieneModulo(session.user, DE_MODULO[k])))
+      .filter(([k]) => ALLOWED.has(k) && (acceso === 'todo' || DE_AUTOMATIZACIONES.has(k)) && (!DE_MODULO[k] || tieneModulo(session.user, DE_MODULO[k])))
     if (entries.length === 0) {
       return NextResponse.json({ error: 'Sin claves válidas' }, { status: 400 })
     }

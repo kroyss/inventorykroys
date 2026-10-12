@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { revertStock } from '@/lib/inventoryOps'
+import { puede } from '@/lib/permisos'
 
 const IMPORT_FLOW = [
   'PENDIENTE', 'PAGO_PARCIAL', 'ESPERANDO_FOTOS', 'PAGADA',
@@ -57,7 +58,7 @@ export async function PUT(
     const userId = parseInt(session.user.id, 10)
 
     // Usuarios normales solo pueden ejecutar acciones de recepción
-    if (session.user.role !== 'admin' && !RECEPTION_STATUSES.has(body.status)) {
+    if (!puede(session.user, 'compras_editar') && !RECEPTION_STATUSES.has(body.status)) {
       return forbidden()
     }
 

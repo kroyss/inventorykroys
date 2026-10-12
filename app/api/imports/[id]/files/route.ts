@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { mkdir, writeFile, unlink, rmdir } from 'fs/promises'
 import path from 'path'
+import { puede } from '@/lib/permisos'
 
 const UPLOAD_DIR   = process.env.UPLOAD_DIR ?? './uploads'
 const ALLOWED_EXTS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.pdf','.xlsx','.xls','.doc','.docx'])
@@ -16,9 +17,9 @@ export async function GET(
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
 
-  // El usuario normal solo ve las fotos que el admin marcó como visibles.
-  const isAdmin = session.user.role === 'admin'
-  const visClause = isAdmin ? '' : 'AND f.visible_to_user = TRUE'
+  // Sin el permiso "Ver todos los archivos", solo las fotos que el admin marcó como visibles.
+  const verTodos = puede(session.user, 'importaciones_archivos')
+  const visClause = verTodos ? '' : 'AND f.visible_to_user = TRUE'
 
   const { rows } = await db.query(`
     SELECT f.id, f.file_name, f.file_path, f.file_type,

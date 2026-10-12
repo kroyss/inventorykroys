@@ -23,7 +23,7 @@ const Body = z.object({
  * Variante: PUT /items/{id}/variations/{vid} (no se manda el arreglo de variantes, que pisaría las demás).
  */
 export async function POST(req: NextRequest) {
-  const s = await sesionStock(true)
+  const s = await sesionStock('reponer_stock')
   if ('error' in s) return s.error
   try {
     const { cambios } = Body.parse(await req.json())

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 const Schema = z.object({
   product_ids:       z.array(z.number().int().positive()),
@@ -11,7 +12,7 @@ const Schema = z.object({
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_productos')) return forbidden()
 
   try {
     const body = Schema.parse(await req.json())

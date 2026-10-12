@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPagosME } from '@/lib/pagosME'
 import { leerHorario } from '@/lib/pagosMEComun'
+import { puede } from '@/lib/permisos'
 
 const Body = z.object({
   activo: z.boolean(),
@@ -24,7 +25,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const s = await sesionPagosME()
   if ('error' in s) return s.error
-  if (s.session.user.role !== 'admin') return NextResponse.json({ error: 'Solo el administrador' }, { status: 403 })
+  if (!puede(s.session.user, 'pagos_me_config')) return NextResponse.json({ error: 'Solo el administrador' }, { status: 403 })
   try {
     const b = Body.parse(await req.json())
     const h = leerHorario(JSON.stringify(b))   // ordena y quita repetidas

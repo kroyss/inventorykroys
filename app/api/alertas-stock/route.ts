@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
 import { SQL_VENDIDA, umbralStock } from '@/lib/alertasStock'
+import { puede } from '@/lib/permisos'
 
 // GET /api/alertas-stock?vista=agotadas|bajas → publicaciones (y variantes) de ML vendidas en los
 // últimos 30 días que están agotadas o por agotarse (menos del límite), con los contadores.
@@ -30,14 +31,14 @@ export async function GET(req: NextRequest) {
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),
     ])
-    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: s.session.user.role === 'admin' })
+    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock') })
   } catch (err) {
     return apiError(err)
   }
 }
 
 export async function PUT(req: NextRequest) {
-  const s = await sesionStock(true)
+  const s = await sesionStock('automatizaciones_config')
   if ('error' in s) return s.error
   try {
     const { umbral } = z.object({ umbral: z.number().int().min(1).max(100) }).parse(await req.json())

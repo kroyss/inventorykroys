@@ -39,8 +39,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       </footer>
       {/* El primer video de Aprendizaje se abre solo hasta completarlo (no a la organización de la plataforma: lo decide la API). */}
       <BienvenidaVideo />
-      <BottomNav role={role} country={country} modulos={modulos} />
-      <CommandPalette role={role} country={country} modulos={modulos} />
+      <BottomNav role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
+      <CommandPalette role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
     </div>
     </AvisosProvider>
   )

@@ -7,6 +7,7 @@ import {
   avisosConfig, cuentaPorVenta, EN_LINEA_SEGUNDOS, leerConfig, LIMITE_CARACTERES, plantillasSugeridas, problemasConfig,
   SQL_PENDIENTE, SQL_REPORTABLE,
 } from '@/lib/reportador'
+import { puede } from '@/lib/permisos'
 
 /** GET /api/despachos/reportador — equipos vinculados (en línea, qué hacen, última orden),
  *  envíos pendientes de reportar y configuración de mensajes */
@@ -75,7 +76,7 @@ export async function PUT(req: NextRequest) {
   if (!session || !db) return unauthorized()
   const denied = reportadorForbidden(session)
   if (denied) return denied
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'automatizaciones_config')) return forbidden()
 
   try {
     const config = Schema.parse(await req.json())

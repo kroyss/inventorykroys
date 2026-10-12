@@ -6,7 +6,7 @@ import { cifrar } from '@/lib/ml'
 // DELETE /api/ml/conexiones/[id] → desconecta la cuenta: borra sus tokens y deja de
 // sincronizarla. Las preguntas ya guardadas se conservan (son el histórico de la IA).
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas('ml_cuentas')
   if ('error' in s) return s.error
   const { id } = await params
   try {

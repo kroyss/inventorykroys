@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { resolveSupplierId } from '@/lib/suppliers'
+import { puede } from '@/lib/permisos'
 
 const ORDERS_SQL = `
   SELECT
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
   if (!session || !pool) return unauthorized()
   // Una sola conexión para todo el request: las transacciones son atómicas.
   const db = await requestConnection(pool)
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
 
   try {
     const body   = CreateSchema.parse(await req.json())

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { mlConfigurado } from '@/lib/ml'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
+import { puede } from '@/lib/permisos'
 
 // GET /api/ml/conexiones → las cuentas de MercadoLibre de la empresa (pantalla Cuentas de MercadoLibre).
 export async function GET() {
@@ -10,7 +11,7 @@ export async function GET() {
   try {
     const { rows } = await s.db.query(
       `SELECT id, nickname, estado, ultima_sync, ultimo_error FROM ml_conexiones ORDER BY nickname`)
-    return NextResponse.json({ cuentas: rows, mlListo: mlConfigurado(), esAdmin: s.session.user.role === 'admin' })
+    return NextResponse.json({ cuentas: rows, mlListo: mlConfigurado(), esAdmin: puede(s.session.user, 'ml_cuentas') })
   } catch (err) {
     return apiError(err)
   }

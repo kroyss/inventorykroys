@@ -7,19 +7,20 @@ import type { PurchaseOrder, ImportOrder, Supplier, UserRole } from '@/lib/types
 import ComprasClient from './ComprasClient'
 import ImportsClient from './ImportsClient'
 import { PageHeader, Tabs, chipCls } from '@/components/ui'
+import type { AccesoCompras } from '@/lib/permisos'
 
 interface Props {
   initialOrders: PurchaseOrder[]
   initialImports: ImportOrder[]
   localSuppliers: Supplier[]
   importSuppliers: Supplier[]
-  userRole: UserRole
+  acceso: AccesoCompras
   country: 'VE' | 'CO'
   importaciones: boolean   // módulo: sin él solo hay compras locales (sin pestaña ni opción de importar)
 }
 
 export default function ComprasTabs({
-  initialOrders, initialImports, localSuppliers, importSuppliers, userRole, importaciones,
+  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones,
 }: Props) {
   // Importaciones es la pestaña principal en ambos países → primera y por defecto.
   // Se recuerda entre F5 (el deep-link ?tab=import, más abajo, igual tiene prioridad).
@@ -63,7 +64,7 @@ export default function ComprasTabs({
   // Contadores que coinciden con lo que muestra cada pestaña.
   // Activas = no finalizadas/inconsistentes (esas van en Historial). El usuario
   // normal solo ve EN_CAMINO/RECIBIDA/PARCIAL, así que su contador lo refleja.
-  const isAdmin = userRole === 'admin'
+  const isAdmin = acceso.editar      // sin "Crear y editar compras": la pantalla es Recepciones
   const HIST = ['FINALIZADA', 'INCONSISTENTE']
   const isActive = (status: string) =>
     !HIST.includes(status) && (isAdmin || ['EN_CAMINO', 'RECIBIDA', 'PARCIAL'].includes(status))
@@ -124,11 +125,11 @@ export default function ComprasTabs({
       ]} />
 
       {tab === 'local' && (
-        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} userRole={userRole} onChanged={refresh}
+        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} onChanged={refresh}
           autoCreate={pendingCreate === 'local'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'import' && (
-        <ImportsClient initialOrders={imports} suppliers={importSuppliers} userRole={userRole} onChanged={refresh}
+        <ImportsClient initialOrders={imports} suppliers={importSuppliers} acceso={acceso} onChanged={refresh}
           autoCreate={pendingCreate === 'import'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'history' && (
@@ -139,8 +140,8 @@ export default function ComprasTabs({
             {subBtn('import', `Importaciones (${importHist})`)}
           </div>}
           {histType === 'local' || !importaciones
-            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} userRole={userRole} onChanged={refresh} historyMode />
-            : <ImportsClient initialOrders={imports} suppliers={importSuppliers} userRole={userRole} onChanged={refresh} historyMode />}
+            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} onChanged={refresh} historyMode />
+            : <ImportsClient initialOrders={imports} suppliers={importSuppliers} acceso={acceso} onChanged={refresh} historyMode />}
         </div>
       )}
     </div>

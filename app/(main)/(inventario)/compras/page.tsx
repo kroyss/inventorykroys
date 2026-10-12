@@ -4,11 +4,14 @@ import { dbDeSesion } from '@/lib/session'
 import ComprasTabs from '@/components/compras/ComprasTabs'
 import { tieneModulo } from '@/lib/modulos'
 import type { PurchaseOrder, ImportOrder, Supplier } from '@/lib/types'
+import { accesoCompras, puede } from '@/lib/permisos'
+import { redirect } from 'next/navigation'
 
 export const metadata = { title: 'Compras' }
 
 export default async function ComprasPage() {
   const session = await getServerSession(authOptions)
+  if (!puede(session?.user, 'ver_compras')) redirect('/dashboard')
   const db      = dbDeSesion(session!)
 
   const [{ rows: orders }, { rows: imports }, { rows: localSup }, { rows: importSup }] = await Promise.all([
@@ -144,7 +147,7 @@ export default async function ComprasPage() {
       initialImports={imports as ImportOrder[]}
       localSuppliers={localSup as Supplier[]}
       importSuppliers={importSup as Supplier[]}
-      userRole={session!.user.role}
+      acceso={accesoCompras(session!.user)}
       country={session!.user.country}
       importaciones={tieneModulo(session!.user, 'importaciones')}
     />

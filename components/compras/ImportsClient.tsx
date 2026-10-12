@@ -12,6 +12,7 @@ import { useDeepLinkList } from '@/lib/useDeepLinkParam'
 import { matchFuzzy, dateTokens } from '@/lib/search'
 import { SortableTh, toggleSort, type SortState } from './SortableTh'
 import { Combobox } from '@/components/ui/Combobox'
+import type { AccesoCompras } from '@/lib/permisos'
 
 const PAGE_SIZE = 15
 
@@ -77,7 +78,7 @@ interface RecvItem {
 interface Props {
   initialOrders: ImportOrder[]
   suppliers: Supplier[]
-  userRole: UserRole
+  acceso: AccesoCompras
   historyMode?: boolean
   /** Aviso al padre (ComprasTabs) tras cualquier cambio, para refrescar contadores y la otra pestaña. */
   onChanged?: () => void
@@ -86,8 +87,10 @@ interface Props {
   onAutoCreateHandled?: () => void
 }
 
-export default function ImportsClient({ initialOrders, suppliers, userRole, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
-  const isAdmin = userRole === 'admin'
+export default function ImportsClient({ initialOrders, suppliers, acceso, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
+  // Permisos (lib/permisos.ts): crear/editar importaciones y ver costos van por separado.
+  const isAdmin = acceso.editar
+  const verCostos = acceso.costos
   const confirm = useConfirm()
 
   const [orders, setOrders]       = useState<ImportOrder[]>(initialOrders)
@@ -675,7 +678,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
       </div>
 
       {/* Resumen financiero compacto */}
-      {isAdmin && (
+      {verCostos && (
         <div className="text-xs text-neutral-500 -mt-2 mb-2">
           Valor activo: <span className="font-semibold text-neutral-800">${fmt(kpis.valorActivo)}</span>
           <span className="mx-2 text-neutral-300">·</span>
@@ -695,7 +698,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 <SortableTh label="Prod." sortKey="productos" sort={sort} onSort={onSort} align="right" className="px-1" title="Productos distintos (completos/total en recepción)" />
                 <SortableTh label="Cant." sortKey="cantidad" sort={sort} onSort={onSort} align="right" className="px-1" title="Unidades totales (recibidas/total en recepción)" />
                 <SortableTh label="Cajas" sortKey="cajas" sort={sort} onSort={onSort} align="right" className="px-1" title="Cantidad de cajas de la orden" />
-                {isAdmin && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
+                {verCostos && <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} align="right" />}
                 <SortableTh label="Últ. mov." sortKey="updated_at" sort={sort} onSort={onSort} align="right" title="Fecha del último movimiento" />
                 <SortableTh label="Transportista" sortKey="transportista" sort={sort} onSort={onSort} title="Transportista (clic para agrupar)" />
                 <SortableTh label="Tracking" sortKey="tracking" sort={sort} onSort={onSort} title="Número de tracking (clic para agrupar)" />
@@ -706,7 +709,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
             </thead>
             <tbody>
               {visibleOrders.length === 0 && (
-                <tr><td colSpan={(isAdmin ? 12 : 11) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
+                <tr><td colSpan={(verCostos ? 12 : 11) + (historyMode ? 1 : 0)} className="px-3 py-8 text-center text-neutral-400">Sin órdenes</td></tr>
               )}
               {paginatedOrders.map((o, idx) => {
                 const dateSrc = o.updated_at ?? o.created_at
@@ -758,7 +761,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                         ? <span className="font-medium text-neutral-700">{o.box_count}</span>
                         : <span className="text-neutral-300">—</span>}
                     </td>
-                    {isAdmin && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
+                    {verCostos && <td className="px-3 py-2 text-right font-bold text-neutral-900 whitespace-nowrap">${fmt(o.total_usd)}</td>}
                     <td className="px-3 py-2 text-right text-neutral-400 text-xs whitespace-nowrap">{date}</td>
                     <td className="px-3 py-2 text-xs text-neutral-600 whitespace-nowrap max-w-[10rem] truncate">
                       {o.origin_country || <span className="text-neutral-300">—</span>}
@@ -803,8 +806,8 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 <div className="font-mono text-sm text-neutral-500">{selected.order_number}</div>
                 <div className="font-semibold mt-0.5">{selected.supplier_name}</div>
                 <div className="text-xs text-neutral-400 mt-0.5">
-                  {isAdmin && <>Total: <span className="font-medium">${fmt(selected.total_usd)}</span></>}
-                  {selected.origin_country && <span className={isAdmin ? 'ml-2' : ''}>{isAdmin ? '· ' : ''}🚚 {selected.origin_country}</span>}
+                  {verCostos && <>Total: <span className="font-medium">${fmt(selected.total_usd)}</span></>}
+                  {selected.origin_country && <span className={verCostos ? 'ml-2' : ''}>{verCostos ? '· ' : ''}🚚 {selected.origin_country}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -826,7 +829,7 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 />
 
                 {/* Payment summary — solo admin (montos) */}
-                {isAdmin && (
+                {verCostos && (
                   <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
                     <div className={`p-2 rounded ${selected.paid_50_done ? 'bg-green-50' : 'bg-neutral-100'}`}>
                       <div className="text-neutral-500">Pago 50%</div>
@@ -844,10 +847,10 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                 )}
 
                 {/* Shipping info — tracking y cajas siempre; envío (monto) solo admin */}
-                {(selected.tracking_number || selected.box_count > 0 || (isAdmin && selected.shipping_cost > 0)) && (
+                {(selected.tracking_number || selected.box_count > 0 || (verCostos && selected.shipping_cost > 0)) && (
                   <div className="mt-3 text-xs space-y-1 text-neutral-600">
                     {selected.tracking_number && <div>Tracking: <span className="font-mono">{selected.tracking_number}</span></div>}
-                    {isAdmin && selected.shipping_cost > 0 && <div>Envío: ${fmt(selected.shipping_cost)}</div>}
+                    {verCostos && selected.shipping_cost > 0 && <div>Envío: ${fmt(selected.shipping_cost)}</div>}
                     {selected.box_count > 0 && <div>Cajas: {selected.box_count}</div>}
                   </div>
                 )}
@@ -1066,8 +1069,8 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                     <tr>
                       <th className="px-3 py-2 text-left">Producto</th>
                       <th className="px-3 py-2 text-right">Cant.</th>
-                      {isAdmin && <th className="px-3 py-2 text-right">$/u</th>}
-                      {isAdmin && <th className="px-3 py-2 text-right">Total</th>}
+                      {verCostos && <th className="px-3 py-2 text-right">$/u</th>}
+                      {verCostos && <th className="px-3 py-2 text-right">Total</th>}
                       <th className="px-3 py-2 text-right">Recibido</th>
                     </tr>
                   </thead>
@@ -1079,8 +1082,8 @@ export default function ImportsClient({ initialOrders, suppliers, userRole, hist
                           {i.product_name}
                         </td>
                         <td className="px-3 py-2 text-right">{i.quantity}</td>
-                        {isAdmin && <td className="px-3 py-2 text-right">${fmt(i.unit_cost_usd)}</td>}
-                        {isAdmin && <td className="px-3 py-2 text-right">${fmt(i.total_cost_usd)}</td>}
+                        {verCostos && <td className="px-3 py-2 text-right">${fmt(i.unit_cost_usd)}</td>}
+                        {verCostos && <td className="px-3 py-2 text-right">${fmt(i.total_cost_usd)}</td>}
                         <td className="px-3 py-2 text-right">
                           {/* Una FINALIZADA está recibida al 100%, aunque el dato venga 0 (legacy/vía completa) */}
                           {i.total_received_qty || i.received_qty ||

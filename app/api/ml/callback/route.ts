@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return r
   }
 
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas('ml_cuentas')
   if ('error' in s) return volver({ ml_error: 'Tu sesión no puede conectar cuentas' })
 
   const url = new URL(req.url)

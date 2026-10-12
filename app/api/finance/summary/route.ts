@@ -4,13 +4,14 @@ import { getFinanceSession } from '@/lib/finance'
 import { unauthorized, forbidden } from '@/lib/session'
 import { getMonthlyClose } from '@/lib/financeData'
 import { currentYearMonth } from '@/lib/tz'
+import { puede } from '@/lib/permisos'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
 
 export async function GET(req: NextRequest) {
   const { session, db, dbs } = await getFinanceSession()
   if (!session || !db || !dbs) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     const m = new URL(req.url).searchParams.get('month') ?? ''

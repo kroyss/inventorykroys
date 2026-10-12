@@ -3,16 +3,17 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
+import { puede, rutaPermitida, type Permiso } from '@/lib/permisos'
 
 interface Command {
   label: string
   hint: string
   action: () => void
-  roles: string[]
+  permiso?: Permiso
   countries: string[]
 }
 
-export default function CommandPalette({ role, country, modulos }: { role: UserRole; country: Country; modulos: string[] }) {
+export default function CommandPalette({ role, permisos, country, modulos }: { role: UserRole; permisos: string[]; country: Country; modulos: string[] }) {
   const router = useRouter()
   const [open, setOpen]   = useState(false)
   const [query, setQuery] = useState('')
@@ -36,23 +37,24 @@ export default function CommandPalette({ role, country, modulos }: { role: UserR
   const go = (href: string) => Object.assign(() => { setOpen(false); router.push(href) }, { href })
 
   const commands = useMemo<Command[]>(() => [
-    { label: 'Ir a Inicio',       hint: 'Dashboard', action: go('/dashboard'),  roles: ['admin','user'], countries: ['VE','CO'] },
-    { label: 'Ir a Ventas',       hint: 'Navegar',   action: go('/ventas'),     roles: ['admin','user'], countries: ['VE','CO'] },
-    { label: 'Ir a Inventario',   hint: 'Navegar',   action: go('/inventario'), roles: ['admin','user'], countries: ['VE','CO'] },
-    { label: 'Ir a Despachos',    hint: 'Navegar',   action: go('/despachos'),  roles: ['admin','user'], countries: ['VE'] },
-    { label: 'Ir a Facturas',     hint: 'Navegar',   action: go('/facturas'),   roles: ['admin','user'], countries: ['VE'] },
-    { label: role === 'user' ? 'Ir a Recepciones' : 'Ir a Compras', hint: 'Navegar', action: go('/compras'), roles: ['admin','user'], countries: ['VE','CO'] },
-    { label: 'Ir a Productos',    hint: 'Navegar',   action: go('/productos'),  roles: ['admin'],        countries: ['VE','CO'] },
-    { label: 'Ir a Reportes',     hint: 'Navegar',   action: go('/reportes'),   roles: ['admin'],        countries: ['VE','CO'] },
-    { label: 'Ir a Ajustes',      hint: 'Navegar',   action: go('/tasas'),      roles: ['admin'],        countries: ['VE', 'CO'] },
-    { label: 'Ir a Usuarios',     hint: 'Navegar',   action: go('/usuarios'),   roles: ['admin'],        countries: ['VE', 'CO'] },
-    { label: 'Nueva venta',       hint: 'Acción',    action: go('/ventas?new=1'),    roles: ['admin','user'], countries: ['VE','CO'] },
-    { label: 'Nueva compra',      hint: 'Acción',    action: go('/compras?new=1'),   roles: ['admin'],        countries: ['VE','CO'] },
-    { label: 'Nuevo producto',    hint: 'Acción',    action: go('/productos?new=1'), roles: ['admin'],        countries: ['VE','CO'] },
-  ].filter(c => c.roles.includes(role) && c.countries.includes(country)
+    { label: 'Ir a Inicio',       hint: 'Dashboard', action: go('/dashboard'),  countries: ['VE','CO'] },
+    { label: 'Ir a Ventas',       hint: 'Navegar',   action: go('/ventas'),     countries: ['VE','CO'] },
+    { label: 'Ir a Inventario',   hint: 'Navegar',   action: go('/inventario'), countries: ['VE','CO'] },
+    { label: 'Ir a Despachos',    hint: 'Navegar',   action: go('/despachos'),  countries: ['VE'] },
+    { label: 'Ir a Facturas',     hint: 'Navegar',   action: go('/facturas'),   countries: ['VE'] },
+    { label: !puede({ role, permisos }, 'compras_editar') ? 'Ir a Recepciones' : 'Ir a Compras', hint: 'Navegar', action: go('/compras'), countries: ['VE','CO'] },
+    { label: 'Ir a Productos',    hint: 'Navegar',   action: go('/productos'),  countries: ['VE','CO'] },
+    { label: 'Ir a Reportes',     hint: 'Navegar',   action: go('/reportes'),   countries: ['VE','CO'] },
+    { label: 'Ir a Ajustes',      hint: 'Navegar',   action: go('/tasas'),      countries: ['VE', 'CO'] },
+    { label: 'Ir a Usuarios',     hint: 'Navegar',   action: go('/usuarios'),   countries: ['VE', 'CO'] },
+    { label: 'Nueva venta',       hint: 'Acción',    action: go('/ventas?new=1'),    countries: ['VE','CO'] },
+    { label: 'Nueva compra',      hint: 'Acción',    action: go('/compras?new=1'),   permiso: 'compras_editar' as Permiso,        countries: ['VE','CO'] },
+    { label: 'Nuevo producto',    hint: 'Acción',    action: go('/productos?new=1'), countries: ['VE','CO'] },
+  ].filter(c => rutaPermitida((c.action as { href?: string }).href?.split('?')[0] ?? '', { role, permisos })
+      && (!c.permiso || puede({ role, permisos }, c.permiso)) && c.countries.includes(country)
       && !(c.label === 'Ir a Despachos' && !modulos.includes('despachos'))
       && !(c.label === 'Ir a Facturas' && !modulos.includes('facturas'))
-      && rutaHabilitada((c.action as { href?: string }).href?.split('?')[0] ?? '', modulos)), [role, country, modulos, router])
+      && rutaHabilitada((c.action as { href?: string }).href?.split('?')[0] ?? '', modulos)), [role, permisos, country, modulos, router])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

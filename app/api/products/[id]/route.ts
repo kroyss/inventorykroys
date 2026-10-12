@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
+import { puede } from '@/lib/permisos'
 
 const UpdateSchema = z.object({
   name:               z.string().min(1).max(200).optional(),
@@ -72,7 +73,7 @@ export async function PUT(
   if (!session || !pool) return unauthorized()
   // Una sola conexión para todo el request: las transacciones son atómicas.
   const db = await requestConnection(pool)
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_productos')) return forbidden()
 
   try {
     const body = UpdateSchema.parse(await req.json())

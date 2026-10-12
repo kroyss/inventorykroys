@@ -5,6 +5,7 @@ import { tieneModulo } from '@/lib/modulos'
 import PreguntasClient from '@/components/preguntas/PreguntasClient'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Preguntas' }
 
@@ -12,14 +13,15 @@ export const metadata = { title: 'Preguntas' }
 // MercadoLibre de la empresa, con borrador de la IA que una persona revisa y publica.
 export default async function PreguntasPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const session = await getServerSession(authOptions)
-  if (!tieneModulo(session?.user, 'preguntas')) redirect('/automatizaciones')
+  if (!tieneModulo(session?.user, 'preguntas') || !puede(session?.user, 'ver_preguntas')) redirect('/automatizaciones')
   if (await sinCuentasML(session!)) {
     const { ml_error } = await searchParams
-    return <SinCuentaML esAdmin={session!.user.role === 'admin'} error={ml_error ?? null} titulo="Preguntas"
+    return <SinCuentaML esAdmin={puede(session!.user, 'ml_cuentas')} error={ml_error ?? null} titulo="Preguntas"
       gancho="Todas las preguntas de tus cuentas de MercadoLibre en una bandeja, con respuesta sugerida por IA."
       beneficios={['Las preguntas de todas tus cuentas en un solo lugar, con el stock y el producto a la vista.',
         'La IA te propone cada respuesta con tus políticas; tú la revisas y la publicas.',
         'Respuestas rápidas y tus respuestas anteriores a preguntas parecidas, gratis y a un clic.']} />
   }
-  return <PreguntasClient isAdmin={session!.user.role === 'admin'} />
+  return <PreguntasClient isAdmin={puede(session!.user, 'automatizaciones_config')}
+    puedeCuentas={puede(session!.user, 'ml_cuentas')} puedeReponer={puede(session!.user, 'reponer_stock')} />
 }

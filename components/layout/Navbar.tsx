@@ -32,7 +32,7 @@ export default async function Navbar() {
 
         <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} radarUrl={conRadar ? radarUrl() : null} />
 
-        <NavLinks role={role} country={country} modulos={session?.user.modulos ?? []} />
+        <NavLinks role={role} permisos={session?.user.permisos ?? []} country={country} modulos={session?.user.modulos ?? []} />
 
         <div className="flex items-center gap-2 xl:gap-3 shrink-0 ml-auto">
           <AprendizajeNav />

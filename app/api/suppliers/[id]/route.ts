@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 export async function DELETE(
   _: NextRequest,
@@ -8,7 +9,7 @@ export async function DELETE(
   const { id } = await params
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
 
   // Bloquear si tiene CUALQUIER orden registrada (compra local o importación, cualquier estado)
   const [{ rows: po }, { rows: io }] = await Promise.all([

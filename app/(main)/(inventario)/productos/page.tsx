@@ -6,12 +6,13 @@ import ProductosClient from '@/components/productos/ProductosClient'
 import { cuentasML } from '@/lib/mlCuentas'
 import { tieneModulo } from '@/lib/modulos'
 import type { Product, ProfitCategory } from '@/lib/types'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Productos' }
 
 export default async function ProductosPage() {
   const session = await getServerSession(authOptions)
-  if (session?.user.role !== 'admin') redirect('/dashboard')
+  if (!session || !puede(session.user, 'ver_productos')) redirect('/dashboard')
 
   const db = dbDeSesion(session)
   const [productsRes, catsRes] = await Promise.all([

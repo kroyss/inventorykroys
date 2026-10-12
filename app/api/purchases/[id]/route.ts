@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { resolveSupplierId } from '@/lib/suppliers'
+import { puede } from '@/lib/permisos'
 
 const EditSchema = z.object({
   supplier_id:   z.number().int().positive().optional(),
@@ -27,7 +28,7 @@ export async function PUT(
   if (!session || !pool) return unauthorized()
   // Una sola conexión para todo el request: las transacciones son atómicas.
   const db = await requestConnection(pool)
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
 
   try {
     const body = EditSchema.parse(await req.json())
@@ -98,7 +99,7 @@ export async function DELETE(
   if (!session || !pool) return unauthorized()
   // Una sola conexión para todo el request: las transacciones son atómicas.
   const db = await requestConnection(pool)
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'compras_editar')) return forbidden()
 
   const { rows: [order] } = await db.query(
     `SELECT status FROM purchase_orders WHERE id = $1`,

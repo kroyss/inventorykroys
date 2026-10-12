@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { TODOS } from '@/lib/permisos'
 
 const Schema = z.object({
   full_name: z.string().trim().min(2).max(100).optional(),
   role:      z.enum(['admin', 'user']).optional(),
   is_active: z.boolean().optional(),
+  // Permisos del usuario en ESTA empresa (lib/permisos.ts). null = volver a los de su rol.
+  permisos:  z.array(z.enum(TODOS as [string, ...string[]])).max(TODOS.length).nullable().optional(),
 })
 
 /**
- * PUT /api/users/[id] — nombre, rol, activo (admin).
+ * PUT /api/users/[id] — nombre, rol, activo y permisos (admin).
  * El rol es el de ESTA empresa (usuario_empresas) y se aplica en el siguiente request.
  * Desactivar es global (la persona no entra a ninguna empresa) y cierra sus sesiones.
  * Protecciones: no te puedes desactivar ni quitar el admin a ti mismo, y siempre queda
@@ -54,6 +57,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
          ${desactiva ? ', session_version = session_version + 1' : ''}
        WHERE id = $1`,
       [u.id, body.full_name ?? null, body.is_active ?? null])
+    if (body.permisos !== undefined) {
+      // Se guarda la lista completa (o NULL); se aplica en el siguiente request, sin volver a entrar.
+      await db.query(`UPDATE usuario_empresas SET permisos = $3 WHERE user_id = $1 AND empresa_id = $2`,
+        [u.id, session.user.empresaId, body.permisos === null ? null : [...new Set(body.permisos)]])
+    }
     if (body.role !== undefined) {
       await db.query(`UPDATE usuario_empresas SET role = $3 WHERE user_id = $1 AND empresa_id = $2`,
         [u.id, session.user.empresaId, body.role])

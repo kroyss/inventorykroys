@@ -7,8 +7,11 @@ import type { Country } from '@/lib/types'
 
 interface Usuario {
   id: number; username: string; full_name: string | null; role: 'admin' | 'user'
+  permisos: string[] | null     // null = los de su rol (lib/permisos.ts)
   is_active: boolean; created_at: string | null; last_login: string | null
 }
+
+interface PermisoDisponible { clave: string; tipo: 'seccion' | 'accion'; nombre: string; detalle?: string; usuario: boolean }
 
 const PASSWORD_MIN = 8
 const fecha = (s: string | null) => s
@@ -23,7 +26,7 @@ function generarPassword() {
   return Array.from(buf, n => abc[n % abc.length]).join('')
 }
 
-const ROL_TXT = { admin: 'Admin (todo)', user: 'Usuario (ventas, despachos, inventario, recepciones)' }
+const ROL_TXT = { admin: 'Admin (todo)', user: 'Usuario (lo que marques en Permisos)' }
 
 export default function UsuariosClient({ country }: { country: Country }) {
   const confirm = useConfirm()
@@ -33,11 +36,14 @@ export default function UsuariosClient({ country }: { country: Country }) {
   const [aviso, setAviso] = useState<string | null>(null)
   const [nuevo, setNuevo] = useState(false)
   const [claveDe, setClaveDe] = useState<Usuario | null>(null)
+  const [permisosDe, setPermisosDe] = useState<Usuario | null>(null)
+  const [disponibles, setDisponibles] = useState<PermisoDisponible[]>([])
+  const [predeterminado, setPredeterminado] = useState<string[]>([])
 
   const cargar = useCallback(() => fetch('/api/users').then(async r => {
     const d = await r.json()
     if (!r.ok) { setError(d.error ?? 'Error'); return }
-    setUsers(d.users); setMe(d.me)
+    setUsers(d.users); setMe(d.me); setDisponibles(d.disponibles ?? []); setPredeterminado(d.predeterminado ?? [])
   }), [])
   useEffect(() => { cargar() }, [cargar])
 
@@ -89,6 +95,11 @@ export default function UsuariosClient({ country }: { country: Country }) {
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
 
       {nuevo && <NuevoUsuario onCancelar={() => setNuevo(false)} onCreado={(msg) => { setNuevo(false); setAviso(msg); cargar() }} />}
+      {permisosDe && (
+        <PermisosUsuario key={permisosDe.id} u={permisosDe} disponibles={disponibles} predeterminado={predeterminado}
+          onCancelar={() => setPermisosDe(null)}
+          onGuardado={msg => { setPermisosDe(null); setAviso(msg); cargar() }} />
+      )}
       {claveDe && (
         <CambiarClave u={claveDe} esYo={claveDe.id === me}
           onCancelar={() => setClaveDe(null)}
@@ -106,6 +117,7 @@ export default function UsuariosClient({ country }: { country: Country }) {
               <th className="px-4 py-2 text-left">Usuario</th>
               <th className="px-4 py-2 text-left">Nombre</th>
               <th className="px-4 py-2 text-left">Rol</th>
+              <th className="px-4 py-2 text-left">Permisos</th>
               <th className="px-4 py-2 text-left">Último ingreso</th>
               <th className="px-4 py-2 text-left">Estado</th>
               <th />
@@ -128,6 +140,10 @@ export default function UsuariosClient({ country }: { country: Country }) {
                       <option value="user">Usuario</option>
                     </select>
                   </td>
+                  <td className="px-4 py-2">
+                    <ResumenPermisos u={u} disponibles={disponibles} predeterminado={predeterminado}
+                      onAbrir={() => { setPermisosDe(u); setClaveDe(null); setError(null) }} />
+                  </td>
                   <td className="px-4 py-2 text-neutral-500 text-xs">{fecha(u.last_login)}</td>
                   <td className="px-4 py-2 text-xs">
                     {u.is_active
@@ -149,8 +165,9 @@ export default function UsuariosClient({ country }: { country: Country }) {
         </table>
       </div>
       <p className="text-xs text-neutral-500">
-        <b>Admin</b>: todo el sistema. <b>Usuario</b>: dashboard simple, ventas, despachos, inventario (ajustes de stock) y recepciones.
-        Desactivar o cambiar la contraseña cierra las sesiones abiertas de esa persona.
+        <b>Admin</b>: todo el sistema, incluidos Usuarios y Ajustes. <b>Usuario</b>: lo que le marques en <b>Permisos</b>; si no lo
+        tocas, lo predeterminado (inicio simple, ventas, inventario, recepciones y automatizaciones, sin costos ni configuración).
+        Los permisos se aplican al instante. Desactivar o cambiar la contraseña cierra las sesiones abiertas de esa persona.
       </p>
     </div>
   )
@@ -240,6 +257,137 @@ function CambiarClave({ u, esYo, onCancelar, onListo }: {
       <div className="flex justify-end gap-2">
         <button onClick={onCancelar} className="btn-secondary text-sm">Cancelar</button>
         <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar'}</button>
+      </div>
+    </section>
+  )
+}
+
+// ── Permisos (lib/permisos.ts) ──────────────────────────────────────────────
+
+/** Celda de la tabla: "Todo" para el admin; para el usuario, si son los de su rol o personalizados. */
+function ResumenPermisos({ u, disponibles, predeterminado, onAbrir }: {
+  u: Usuario; disponibles: PermisoDisponible[]; predeterminado: string[]; onAbrir: () => void
+}) {
+  if (u.role === 'admin') return <span className="text-xs text-neutral-400">Todo</span>
+  const tiene = new Set(u.permisos ?? predeterminado)
+  const n = disponibles.filter(d => tiene.has(d.clave)).length
+  return (
+    <button type="button" onClick={onAbrir} disabled={!u.is_active}
+      className="group inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2.5 py-0.5 text-xs text-neutral-700 transition-colors hover:border-neutral-400 disabled:cursor-default disabled:hover:border-neutral-200"
+      title="Ver y cambiar lo que puede ver y hacer">
+      <span className={`h-1.5 w-1.5 rounded-full ${u.permisos ? 'bg-amber-500' : 'bg-neutral-300'}`} />
+      {u.permisos ? 'Personalizados' : 'Predeterminados'}
+      <span className="num text-neutral-400">{n}/{disponibles.length}</span>
+      <svg className="h-3 w-3 text-neutral-400 group-hover:text-neutral-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+    </button>
+  )
+}
+
+function Llave({ on, onChange, etiqueta }: { on: boolean; onChange: (v: boolean) => void; etiqueta: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={etiqueta} onClick={() => onChange(!on)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
+        on ? 'bg-emerald-500' : 'bg-neutral-300'}`}>
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+    </button>
+  )
+}
+
+function FilaPermiso({ d, on, cambiado, onChange }: {
+  d: PermisoDisponible; on: boolean; cambiado: boolean; onChange: (v: boolean) => void
+}) {
+  return (
+    <li className="flex items-start justify-between gap-3 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className={`text-sm ${on ? 'text-neutral-900' : 'text-neutral-500'}`}>
+          {d.nombre}
+          {cambiado && <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-px align-middle text-[10px] font-medium text-amber-700">cambiado</span>}
+        </p>
+        {d.detalle && <p className="mt-0.5 text-xs leading-snug text-neutral-400">{d.detalle}</p>}
+      </div>
+      <div className="pt-0.5"><Llave on={on} onChange={onChange} etiqueta={d.nombre} /></div>
+    </li>
+  )
+}
+
+function PermisosUsuario({ u, disponibles, predeterminado, onCancelar, onGuardado }: {
+  u: Usuario; disponibles: PermisoDisponible[]; predeterminado: string[]
+  onCancelar: () => void; onGuardado: (msg: string) => void
+}) {
+  // Se parte de lo que tiene hoy y se manda la lista COMPLETA: los permisos de módulos que esta
+  // empresa no tiene (no se muestran) se conservan tal cual.
+  const [sel, setSel] = useState(() => new Set(u.permisos ?? predeterminado))
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const nombre = u.full_name ?? u.username
+  const defecto = new Set(predeterminado)
+  const cambiado = (clave: string) => sel.has(clave) !== defecto.has(clave)
+  const personalizado = disponibles.some(d => cambiado(d.clave))
+  const poner = (clave: string, on: boolean) => setSel(prev => {
+    const s = new Set(prev)
+    if (on) s.add(clave); else s.delete(clave)
+    return s
+  })
+
+  const guardar = async () => {
+    setGuardando(true); setError(null)
+    const r = await fetch(`/api/users/${u.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      // Igual a lo predeterminado = se guarda NULL: si mañana cambia lo del rol, lo sigue.
+      body: JSON.stringify({ permisos: personalizado ? [...sel] : null }),
+    })
+    const d = await r.json().catch(() => ({}))
+    setGuardando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    onGuardado(`Permisos de ${nombre} guardados. Si tiene el sistema abierto, los ve al cambiar de pantalla.`)
+  }
+
+  const grupo = (tipo: PermisoDisponible['tipo'], titulo: string, nota: string) => {
+    const lista = disponibles.filter(d => d.tipo === tipo)
+    if (!lista.length) return null
+    return (
+      <div className="min-w-0">
+        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">{titulo}</h3>
+          <span className="text-[11px] text-neutral-400">{nota}</span>
+        </div>
+        <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+          {lista.map(d => (
+            <FilaPermiso key={d.clave} d={d} on={sel.has(d.clave)} cambiado={cambiado(d.clave)} onChange={v => poner(d.clave, v)} />
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-neutral-800">Permisos de {nombre}</h2>
+          <p className="mt-0.5 text-xs text-neutral-500">Lo que ve y puede hacer en esta empresa. Usuarios y Ajustes son siempre solo de un admin.</p>
+        </div>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+          personalizado ? 'bg-amber-50 text-amber-800' : 'bg-neutral-100 text-neutral-600'}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${personalizado ? 'bg-amber-500' : 'bg-neutral-400'}`} />
+          {personalizado ? 'Personalizados' : 'Predeterminados del rol'}
+        </span>
+      </div>
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
+      <div className="grid gap-4 md:grid-cols-2">
+        {grupo('seccion', 'Secciones', 'Qué ve en el menú')}
+        {grupo('accion', 'Acciones', 'Qué puede hacer dentro')}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-3">
+        <button type="button" onClick={() => setSel(new Set(predeterminado))} disabled={!personalizado}
+          className="text-xs text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline disabled:text-neutral-300 disabled:no-underline">
+          Volver a lo predeterminado
+        </button>
+        <div className="flex gap-2">
+          <button onClick={onCancelar} className="btn-secondary text-sm">Cancelar</button>
+          <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar permisos'}</button>
+        </div>
       </div>
     </section>
   )

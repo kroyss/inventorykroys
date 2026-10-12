@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { readFile } from 'fs/promises'
 import { resolveUploadPath } from '@/lib/uploads'
+import { puede } from '@/lib/permisos'
 
 export async function GET(
   req: NextRequest,
@@ -19,7 +20,7 @@ export async function GET(
 
   // El usuario normal no puede descargar fotos no marcadas como visibles
   // (p.ej. comprobantes de pago) aunque adivine la URL.
-  if (session.user.role !== 'admin' && !file.visible_to_user) {
+  if (!puede(session.user, 'importaciones_archivos') && !file.visible_to_user) {
     return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 // PUT /api/products/reprice — cambia la categoría de ganancia de varios productos
 // (VE) y deja sus precios guardados al día, en una sola transacción.
@@ -27,7 +28,7 @@ const Schema = z.object({ items: z.array(Item).min(1).max(500) })
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_productos')) return forbidden()
   if (session.user.country !== 'VE') {
     return NextResponse.json({ error: 'Solo disponible para Venezuela' }, { status: 400 })
   }

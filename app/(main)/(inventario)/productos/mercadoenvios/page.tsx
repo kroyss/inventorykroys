@@ -5,12 +5,13 @@ import { redirect } from 'next/navigation'
 import { tieneModulo } from '@/lib/modulos'
 import MercadoEnviosClient from '@/components/productos/MercadoEnviosClient'
 import type { Product } from '@/lib/types'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'MercadoEnvíos' }
 
 export default async function MercadoEnviosPage() {
   const session = await getServerSession(authOptions)
-  if (session?.user.role !== 'admin') redirect('/dashboard')
+  if (!session || !puede(session.user, 'ver_productos')) redirect('/dashboard')
   // Función exclusiva de VE (tabla de envíos por peso de ML Venezuela).
   if (session.user.country !== 'VE' || !tieneModulo(session.user, 'descuento_ml')) redirect('/productos')
 

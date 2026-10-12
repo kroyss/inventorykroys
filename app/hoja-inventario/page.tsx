@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import HojaInventario, { type HojaRow } from '@/components/inventario/HojaInventario'
 import { localCostFactor } from '@/lib/localCost'
 import { COUNTRY_TZ, DEFAULT_TZ, currentDate } from '@/lib/tz'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Hoja de inventario' }
 
@@ -12,7 +13,7 @@ export default async function HojaInventarioPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
   // Solo admin genera la hoja (mismo criterio que el reporte de inventario).
-  if (session.user.role !== 'admin') redirect('/inventario')
+  if (!puede(session.user, 'inventario_config')) redirect('/inventario')
 
   const db = dbDeSesion(session)
   // CO: el costo (USD) se expresa en pesos (×TRM), igual que en /api/reports/inventory.

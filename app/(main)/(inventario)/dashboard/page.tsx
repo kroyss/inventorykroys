@@ -4,18 +4,19 @@ import DashboardAdmin from '@/components/dashboard/DashboardAdmin'
 import DashboardUser  from '@/components/dashboard/DashboardUser'
 import { tieneModulo } from '@/lib/modulos'
 import { esDuenoPlataforma } from '@/lib/empresa'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Inicio' }
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
-  const role    = session!.user.role
   const country = session!.user.country
 
   const bonos   = tieneModulo(session!.user, 'bonos')
 
   const importaciones = tieneModulo(session!.user, 'importaciones')
-  if (role === 'admin') return (
+  // Inicio completo (ventas, ganancia, bonos de todos) = permiso "Ver costos y ganancias".
+  if (puede(session!.user, 'costos')) return (
     <DashboardAdmin country={country} bonos={bonos} puedeTasas={esDuenoPlataforma(session!.user)}
       descuento={tieneModulo(session!.user, 'descuento_ml')} importaciones={importaciones}
       analisisStock={tieneModulo(session!.user, 'analisis_stock')} />

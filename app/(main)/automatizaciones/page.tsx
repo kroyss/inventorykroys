@@ -5,6 +5,7 @@ import { dbDeSesion } from '@/lib/session'
 import { PageHeader } from '@/components/ui'
 import CuentasConectadas, { type CuentaML } from '@/components/automatizaciones/CuentasConectadas'
 import InicioAutomatizaciones, { type Herramienta } from '@/components/automatizaciones/InicioAutomatizaciones'
+import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Automatizaciones' }
 
@@ -59,8 +60,8 @@ export default async function AutomatizacionesPage() {
   return (
     <div>
       <PageHeader title="Automatizaciones" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones"
-        actions={ml && !sinCuentas ? <CuentasConectadas cuentas={cuentas} esAdmin={u.role === 'admin'} /> : undefined} />
-      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={u.role === 'admin'} />
+        actions={ml && !sinCuentas ? <CuentasConectadas cuentas={cuentas} esAdmin={puede(u, 'ml_cuentas')} /> : undefined} />
+      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={puede(u, 'ml_cuentas')} />
     </div>
   )
 }

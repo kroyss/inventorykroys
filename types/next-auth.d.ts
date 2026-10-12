@@ -7,6 +7,7 @@ import type { Country, UserRole } from '@/lib/types'
 declare module 'next-auth' {
   interface User {
     role:          UserRole
+    permisos:      string[]   // lib/permisos.ts (admin: todos)
     country:       Country
     empresaId:     number
     empresaNombre: string
@@ -18,6 +19,7 @@ declare module 'next-auth' {
     user: DefaultSession['user'] & {
       id:            string
       role:          UserRole
+    permisos:      string[]   // lib/permisos.ts (admin: todos)
       country:       Country
       empresaId:     number
       empresaNombre: string
@@ -30,6 +32,7 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     role:          UserRole
+    permisos:      string[]   // lib/permisos.ts (admin: todos)
     country:       Country
     empresaId:     number
     empresaNombre: string

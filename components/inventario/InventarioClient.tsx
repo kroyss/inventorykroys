@@ -122,12 +122,14 @@ function AdjustFields({ form, setForm, currentQty }: {
 // ─── component ──────────────────────────────────────────────────────────────
 interface Props {
   initialItems: InventoryItem[]
-  userRole:     UserRole
+  acceso:       { config: boolean; costos: boolean }   // lib/permisos.ts
   country:      Country
 }
 
-export default function InventarioClient({ initialItems, userRole, country }: Props) {
-  const isAdmin = userRole === 'admin'
+export default function InventarioClient({ initialItems, acceso, country }: Props) {
+  // "Configurar inventario" (mín/máx, recomendados, ventas 6m) y "Ver costos" van por separado.
+  const isAdmin = acceso.config
+  const verCostos = acceso.costos
   const isCO    = country === 'CO'
   const isVE    = country === 'VE'
   // En CO el precio de venta está en pesos (sin decimales); en VE en USD.
@@ -403,7 +405,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        {isAdmin && (
+        {verCostos && (
           <div className="text-xs text-neutral-500 flex flex-wrap gap-x-4">
             <span>Valor a costo: <span className="font-semibold text-neutral-800">${fmt(valorCosto)}{isCO ? ' USD' : ''}</span></span>
             <span>Valor a venta: <span className="font-semibold text-emerald-700">{priceLabel(valorVenta)}{isCO ? ' pesos' : ''}</span></span>
@@ -503,7 +505,7 @@ export default function InventarioClient({ initialItems, userRole, country }: Pr
                   <span className="text-neutral-400 text-xs">Stock</span>
                   <p className="font-bold text-neutral-900">{selected.quantity}</p>
                 </div>
-                {isAdmin && (
+                {verCostos && (
                   <>
                     <div>
                       <span className="text-neutral-400 text-xs">Valor stock</span>

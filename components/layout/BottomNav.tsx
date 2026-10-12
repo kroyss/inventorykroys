@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
+import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
 import { useAvisos, AVISO_DE_RUTA, Numerito } from './Avisos'
 
@@ -22,6 +23,7 @@ const ICONOS: Record<string, React.ReactNode> = {
   ventas: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /><path d="M12 17.5v-11" /></>,
   compras: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></>,
   reportes: <><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></>,
+  pagos: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></>,
   facturas: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" /></>,
   productos: <><path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.42l8.7 8.7a2.43 2.43 0 0 0 3.42 0l6.58-6.58a2.43 2.43 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r="1" /></>,
   finanzas: <><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></>,
@@ -40,48 +42,50 @@ function Icono({ nombre, className = 'w-[22px] h-[22px]' }: { nombre: string; cl
   )
 }
 
-interface NavItem { href: string; label: string; icon: string; roles: UserRole[]; countries: Country[] }
+interface NavItem { href: string; label: string; icon: string; countries: Country[] }
 
 const PRIMARY: NavItem[] = [
-  { href: '/dashboard',  label: 'Inicio',  icon: 'inicio',   roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/ventas',     label: 'Ventas',  icon: 'ventas',   roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/compras',    label: 'Compras', icon: 'compras',  roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/reportes',   label: 'Reportes',icon: 'reportes', roles: ['admin'],         countries: ['VE', 'CO'] },
+  { href: '/dashboard',  label: 'Inicio',  icon: 'inicio',   countries: ['VE', 'CO'] },
+  { href: '/ventas',     label: 'Ventas',  icon: 'ventas',   countries: ['VE', 'CO'] },
+  { href: '/compras',    label: 'Compras', icon: 'compras',  countries: ['VE', 'CO'] },
+  { href: '/reportes',   label: 'Reportes',icon: 'reportes', countries: ['VE', 'CO'] },
 ]
 
 const MORE: NavItem[] = [
-  { href: '/inventario', label: 'Inventario', icon: 'inventario', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/automatizaciones', label: 'Automatizaciones', icon: 'automatizaciones', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/facturas',   label: 'Facturas',   icon: 'facturas',   roles: ['admin', 'user'], countries: ['VE'] },
-  { href: '/productos',  label: 'Productos',  icon: 'productos',  roles: ['admin'],        countries: ['VE', 'CO'] },
-  { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   roles: ['admin'],        countries: ['VE', 'CO'] },
-  { href: '/tasas',      label: 'Ajustes',    icon: 'ajustes',    roles: ['admin'],        countries: ['VE', 'CO'] },
-  { href: '/usuarios',   label: 'Usuarios',   icon: 'usuarios',   roles: ['admin'],        countries: ['VE', 'CO'] },
-  { href: '/aprendizaje', label: 'Aprendizaje', icon: 'aprendizaje', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
+  { href: '/inventario', label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
+  { href: '/automatizaciones', label: 'Automatizaciones', icon: 'automatizaciones', countries: ['VE', 'CO'] },
+  { href: '/pagos-me',   label: 'Pagos ME',   icon: 'pagos',      countries: ['VE'] },
+  { href: '/facturas',   label: 'Facturas',   icon: 'facturas',   countries: ['VE'] },
+  { href: '/productos',  label: 'Productos',  icon: 'productos',  countries: ['VE', 'CO'] },
+  { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   countries: ['VE', 'CO'] },
+  { href: '/tasas',      label: 'Ajustes',    icon: 'ajustes',    countries: ['VE', 'CO'] },
+  { href: '/usuarios',   label: 'Usuarios',   icon: 'usuarios',   countries: ['VE', 'CO'] },
+  { href: '/aprendizaje', label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
 ]
 
 // Espacio Automatizaciones (móvil): lo del día a día abajo; el resto en "Más".
 const PRIMARY_AUTO: NavItem[] = [
-  { href: '/automatizaciones', label: 'Inicio',     icon: 'inicio',     roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/preguntas',        label: 'Preguntas',  icon: 'preguntas',  roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/mensajes',         label: 'Mensajes',   icon: 'mensajes',   roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  roles: ['admin', 'user'], countries: ['VE'] },
+  { href: '/automatizaciones', label: 'Inicio',     icon: 'inicio',     countries: ['VE', 'CO'] },
+  { href: '/preguntas',        label: 'Preguntas',  icon: 'preguntas',  countries: ['VE', 'CO'] },
+  { href: '/mensajes',         label: 'Mensajes',   icon: 'mensajes',   countries: ['VE', 'CO'] },
+  { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  countries: ['VE'] },
 ]
 const MORE_AUTO: NavItem[] = [
-  { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/reportador',       label: 'Reportador', icon: 'reportador', roles: ['admin', 'user'], countries: ['VE'] },
-  { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/dashboard',        label: 'Inventario', icon: 'inventario', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
-  { href: '/aprendizaje',      label: 'Aprendizaje', icon: 'aprendizaje', roles: ['admin', 'user'], countries: ['VE', 'CO'] },
+  { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
+  { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
+  { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      countries: ['VE', 'CO'] },
+  { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
+  { href: '/aprendizaje',      label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
 ]
 
-export default function BottomNav({ role, country, modulos }: { role: UserRole; country: Country; modulos: string[] }) {
+export default function BottomNav({ role, permisos, country, modulos }: { role: UserRole; permisos: string[]; country: Country; modulos: string[] }) {
+  const u = { role, permisos }
   const pathname = usePathname()
   const avisos = useAvisos()
   const [showMore, setShowMore] = useState(false)
 
   const visible = (items: NavItem[]) =>
-    items.filter(i => i.roles.includes(role) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
+    items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
 
   const auto    = espacioActual(pathname, modulos) === 'automatizaciones'
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador') || modulos.includes('preguntas')
@@ -92,7 +96,7 @@ export default function BottomNav({ role, country, modulos }: { role: UserRole; 
   const enMas   = more.some(i => activo(i.href))
   // Avisos de lo que quedó en "Más" (p. ej. calificaciones): un punto en el botón.
   const avisosMas = more.reduce((a, i) => a + (AVISO_DE_RUTA[i.href] ? avisos[AVISO_DE_RUTA[i.href].clave] : 0), 0)
-  const etiqueta = (i: NavItem) => i.href === '/compras' && role === 'user' ? 'Recepciones' : i.label
+  const etiqueta = (i: NavItem) => i.href === '/compras' && !puede(u, 'compras_editar') ? 'Recepciones' : i.label
 
   const boton = (i: NavItem) => {
     const on = activo(i.href)

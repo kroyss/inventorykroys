@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { despachosForbidden, digitosGuiaTealca } from '@/lib/despachos'
+import { puede } from '@/lib/permisos'
 
 /**
  * GET /api/despachos/tealca — envíos TEALCA impresos que aún no se reportaron, con su
@@ -113,7 +114,7 @@ export async function PATCH(req: NextRequest) {
   if (!session || !db) return unauthorized()
   const denied = despachosForbidden(session)
   if (denied) return denied
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'automatizaciones_config')) return forbidden()
 
   try {
     const { digitos } = SchemaDigitos.parse(await req.json())

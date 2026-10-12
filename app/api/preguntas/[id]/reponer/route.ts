@@ -15,7 +15,7 @@ interface ItemML {
 }
 
 async function datos(id: string) {
-  const s = await sesionPreguntas(true)
+  const s = await sesionPreguntas('reponer_stock')
   if ('error' in s) return { error: s.error } as const
   if (!/^\d+$/.test(id)) return { error: NextResponse.json({ error: 'Pregunta inválida' }, { status: 400 }) } as const
   const { rows: [q] } = await s.db.query(`SELECT conexion_id, item_id FROM ml_preguntas WHERE id = $1`, [id])

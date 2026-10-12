@@ -183,7 +183,9 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
   UNDER_REVIEW: { status: 'PAGO_VERIFICADO', label: 'En revisión de ML' },
 }
 
-export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
+// isAdmin = "Configurar automatizaciones" (pestaña Configuración); conectar cuentas y reponer stock
+// son permisos aparte (lib/permisos.ts).
+export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean }) {
   // ?vista=cuentas abre Políticas y respuestas rápidas (las cuentas de ML están en /cuentas-ml).
   const pedida = useSearchParams().get('vista')
   const [vista, setVista] = useState<Vista>(isAdmin && pedida === 'cuentas' ? 'cuentas' : 'pendientes')
@@ -293,7 +295,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
           <EmptyState message="Aquí llegan las preguntas de todas tus cuentas de MercadoLibre, y la IA te propone cada respuesta para que solo la revises y publiques. Conecta tu cuenta para empezar: nunca se publica nada sin que tú lo revises."
-            cta={isAdmin
+            cta={puedeCuentas
               ? <a href="/conectar" className="btn-primary text-sm">Conectar ahora</a>
               : <span className="text-xs text-neutral-400">Pídele a un administrador que conecte las cuentas.</span>} />
         </div>
@@ -356,7 +358,7 @@ export default function PreguntasClient({ isAdmin }: { isAdmin: boolean }) {
                 )
               })()}
               {datos.preguntas.map(p => (
-                <TarjetaPendiente key={p.id} p={p} esAdmin={isAdmin} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
+                <TarjetaPendiente key={p.id} p={p} esAdmin={puedeReponer} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
                   onRespondida={msg => { setAviso(msg); cargar() }}
                   onCambioSugerida={(id, intacta) => setEditadas(e => { const n = new Set(e); if (intacta) n.delete(id); else n.add(id); return n })} />
               ))}

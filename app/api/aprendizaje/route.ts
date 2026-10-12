@@ -8,6 +8,7 @@ import { sinCuentasML } from '@/lib/preguntasSesion'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { esDemoEmpresa } from '@/lib/demo'
 import { unauthorized } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 // GET /api/aprendizaje → videos activos con el avance del usuario y el link de "agendar".
 export async function GET() {
@@ -22,7 +23,7 @@ export async function GET() {
     // Demostración: sin ventana de bienvenida (se graba la cuenta desde el primer login).
     const demo = session.user.empresaId ? await esDemoEmpresa(session.user.empresaId, session.user.country) : false
     // inventario: si la empresa lo lleva (si no, al terminar se le ofrece activarlo).
-    return NextResponse.json({ videos, agendar, sinCuentas, esAdmin: session.user.role === 'admin', exento, demo,
+    return NextResponse.json({ videos, agendar, sinCuentas, esAdmin: puede(session.user, 'ml_cuentas'), exento, demo,
       inventario: llevaInventario(session.user) },
       { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {

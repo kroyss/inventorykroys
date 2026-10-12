@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { reportadorForbidden } from '@/lib/despachos'
+import { puede } from '@/lib/permisos'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -16,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!session || !db) return unauthorized()
   const denied = reportadorForbidden(session)
   if (denied) return denied
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'automatizaciones_config')) return forbidden()
 
   try {
     const b = Patch.parse(await req.json())
@@ -37,7 +38,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   if (!session || !db) return unauthorized()
   const denied = reportadorForbidden(session)
   if (denied) return denied
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'automatizaciones_config')) return forbidden()
 
   try {
     await db.query(`UPDATE reportador_equipos SET revocado_at = NOW() WHERE id = $1`, [id])

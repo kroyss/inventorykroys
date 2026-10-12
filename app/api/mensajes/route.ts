@@ -4,6 +4,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { leerMensajesRapidos, MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
 import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { tieneModulo } from '@/lib/modulos'
+import { puede } from '@/lib/permisos'
 
 // GET /api/mensajes?vista=sin_leer|con_nota|todas → conversaciones post-venta de las cuentas de
 // la empresa (las sin leer primero) con su estado en Despachos (o cancelada en ML) y sus notas de ML.
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
     return NextResponse.json({
-      conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: s.session.user.role === 'admin',
+      conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
     })
   } catch (err) {

@@ -5,6 +5,7 @@ import { empresasDeUsuario, type EmpresaAcceso } from '@/lib/empresa'
 import { CUENTA_VENCIDA } from '@/lib/cuenta'
 import type { NextAuthOptions } from 'next-auth'
 import type { Country, UserRole } from '@/lib/types'
+import { permisosEfectivos } from '@/lib/permisos'
 
 // Multiempresa: el usuario es uno solo (users es global) y entra a una de SUS empresas
 // (usuario_empresas). La sesión guarda esa empresa; su país y su rol salen de ahí.
@@ -25,6 +26,7 @@ function datosEmpresa(e: EmpresaAcceso) {
     empresaNombre: e.nombre,
     country:       e.country,
     role:          e.role,
+    permisos:      permisosEfectivos(e.role, e.permisos),
     modulos:       e.modulos,
     organizacionId: e.organizacionId,
   }
@@ -80,8 +82,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        const u = user as { role: UserRole; country: Country; empresaId: number; empresaNombre: string; modulos: string[]; organizacionId: number; sv?: number }
+        const u = user as { role: UserRole; permisos: string[]; country: Country; empresaId: number; empresaNombre: string; modulos: string[]; organizacionId: number; sv?: number }
         token.role          = u.role
+        token.permisos      = u.permisos
         token.country       = u.country
         token.empresaId     = u.empresaId
         token.empresaNombre = u.empresaNombre
@@ -137,6 +140,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id            = token.sub!
         session.user.role          = token.role
+        session.user.permisos      = token.permisos
         session.user.country       = token.country
         session.user.empresaId     = token.empresaId
         session.user.empresaNombre = token.empresaNombre

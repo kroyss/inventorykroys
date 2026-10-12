@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getFinanceSession } from '@/lib/finance'
 import { unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 const UpdateSchema = z.object({
   name:          z.string().min(1).max(120).optional(),
@@ -18,7 +19,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     const b = UpdateSchema.parse(await req.json())
@@ -47,7 +48,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     // Soft delete: si tiene movimientos, se desactiva; si no, se borra.

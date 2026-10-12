@@ -3,11 +3,12 @@ import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
 import { getFinanceSession } from '@/lib/finance'
 import { unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   const { rows } = await db.query(`
     SELECT id, name, kind, is_active, display_order
@@ -28,7 +29,7 @@ const CreateSchema = z.object({
 export async function POST(req: NextRequest) {
   const { session, db } = await getFinanceSession()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_finanzas')) return forbidden()
 
   try {
     const { name, kind } = CreateSchema.parse(await req.json())

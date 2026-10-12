@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { localCostFactor } from '@/lib/localCost'
+import { puede } from '@/lib/permisos'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (session.user.role !== 'admin') return forbidden()
+  if (!puede(session.user, 'ver_reportes')) return forbidden()
 
   try {
     // Valuación de inventario "a hoy": en CO el costo (USD) se expresa en pesos (×TRM)
