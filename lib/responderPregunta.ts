@@ -12,6 +12,23 @@ export type ResultadoPublicar =
   | { ok: true; publicada: boolean; estado: string; respuesta_estado: string | null; aviso: string | null }
   | { ok: false; status: number; codigo?: string; error: string }
 
+// Ya respondida (desde ML, el celular u otra persona, o un doble clic): ML contesta 400 "is not unanswered".
+// Se relee de ML, se guarda como está y se avisa claro; la tarjeta sale de "Sin responder".
+async function yaRespondida(db: Pool, id: string, conexionId: number): Promise<ResultadoPublicar> {
+  let texto: string | null = null
+  try {
+    const v = await mlFetch<PreguntaML>(db, conexionId, `/questions/${id}?api_version=4`)
+    texto = v.answer?.text ?? null
+    await db.query(
+      `UPDATE ml_preguntas SET estado = $2, respuesta = COALESCE($3, respuesta), respuesta_estado = $4,
+              respuesta_fecha = COALESCE($5, respuesta_fecha), sincronizada_at = NOW()
+       WHERE id = $1`,
+      [id, v.status, texto, v.answer?.status ?? null, v.answer?.date_created?.replace(/(\.\d{6})\d+/, '$1') ?? null])
+  } catch { /* si no se pudo releer, igual se avisa: la próxima sincronización la pone al día */ }
+  return { ok: false, status: 409, codigo: 'ya_respondida',
+    error: `Esta pregunta ya estaba respondida en MercadoLibre${texto ? `: “${texto.length > 120 ? texto.slice(0, 117) + '…' : texto}”` : ''}. Se quitó de la lista.` }
+}
+
 export async function publicarRespuesta(db: Pool, id: string, texto: string, o: {
   usuarioId?: number | string | null; fuente?: string; base?: string; plantilla?: string | null
 }): Promise<ResultadoPublicar> {
@@ -19,7 +36,7 @@ export async function publicarRespuesta(db: Pool, id: string, texto: string, o: 
     `SELECT conexion_id, estado, item_id, CASE WHEN COALESCE(item_moneda, 'USD') = 'USD' THEN item_precio::float END AS precio
      FROM ml_preguntas WHERE id = $1`, [id])
   if (!q) return { ok: false, status: 404, error: 'Pregunta no encontrada' }
-  if (q.estado !== 'UNANSWERED') return { ok: false, status: 409, error: 'Esta pregunta ya no está sin responder' }
+  if (q.estado !== 'UNANSWERED') return { ok: false, status: 409, codigo: 'ya_respondida', error: 'Esta pregunta ya estaba respondida. Se quitó de la lista.' }
   try {
     await mlFetch(db, q.conexion_id, '/answers', { method: 'POST', body: { question_id: Number(id), text: texto.trim() } })
   } catch (e) {
@@ -29,6 +46,7 @@ export async function publicarRespuesta(db: Pool, id: string, texto: string, o: 
       return { ok: false, status: 409, codigo: 'item_inactivo',
         error: 'La publicación está pausada (sin stock): MercadoLibre no deja responder hasta que vuelva a tener stock. Repón el stock aquí abajo o elimina la pregunta.' }
     }
+    if (e instanceof ErrorML && /not unanswered/i.test(e.message)) return yaRespondida(db, id, q.conexion_id)
     if (e instanceof ErrorML) return { ok: false, status: 502, error: `MercadoLibre no aceptó la respuesta (${e.message})` }
     throw e
   }

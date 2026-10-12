@@ -440,6 +440,8 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
       })
       const d = await r.json().catch(() => ({}))
       if (d.codigo === 'item_inactivo') setEstadoItem('paused')
+      // Ya estaba respondida (en ML, el celular u otra persona): no es un error, sale de la lista con el aviso.
+      if (d.codigo === 'ya_respondida') { onRespondida({ tipo: 'ok', texto: d.error }); return }
       if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
       onRespondida(d.publicada
         ? { tipo: 'ok', texto: `Respuesta publicada en ${p.cuenta}.` }
