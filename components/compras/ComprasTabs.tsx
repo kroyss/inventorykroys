@@ -27,7 +27,7 @@ export default function ComprasTabs({
   // Se recuerda entre F5 (el deep-link ?tab=import, más abajo, igual tiene prioridad).
   const [tabGuardada, setTab] = usePersistedTab<'local' | 'import' | 'history'>('tab:compras', importaciones ? 'import' : etapas ? 'local' : 'history')
   // Sin el módulo Importaciones nunca se queda en esa pestaña (aunque esté recordada o venga en el link).
-  const tab = !importaciones && tabGuardada === 'import' ? 'local' : tabGuardada
+  const tabPedida = !importaciones && tabGuardada === 'import' ? 'local' : tabGuardada
   // Dentro de Historial, qué tipo se ve
   const [histType, setHistType] = useState<'local' | 'import'>('local')
   // Botón unificado "+ Compra": menú abierto + tipo pendiente de crear
@@ -57,7 +57,7 @@ export default function ComprasTabs({
   }, [])
 
   // Re-consultar al cambiar de pestaña (y al montar).
-  useEffect(() => { refresh() }, [tab, refresh])
+  useEffect(() => { refresh() }, [tabPedida, refresh])
   // Y también al volver a la pestaña del navegador o cada minuto: la pantalla
   // suele quedar abierta y, si no, muestra el estado del momento en que se abrió.
   useRefetchOnFocus(refresh, true, 60_000)
@@ -74,6 +74,10 @@ export default function ComprasTabs({
   const localHist    = orders.filter(o => HIST.includes(o.status)).length
   const importHist   = imports.filter(o => HIST.includes(o.status)).length
   const historyTotal = localHist + importHist
+  // Inventario simple: las entradas nacen finalizadas, así que "En curso" solo aparece si quedó alguna
+  // compra a medias (p. ej. reabierta); si no, se va directo a Entradas.
+  const conEnCurso = etapas || localActive > 0
+  const tab = tabPedida === 'local' && !conEnCurso ? 'history' : tabPedida
 
   // deep-link: /compras?tab=import abre la pestaña de importaciones. Con
   // useSearchParams se re-aplica si cambia la URL sin desmontar la pantalla.
@@ -122,7 +126,7 @@ export default function ComprasTabs({
       {/* Importaciones primero (lo más común) en VE y CO, luego Locales, luego Historial */}
       <Tabs className="mb-4" value={tab} onChange={setTab} items={[
         ...(importaciones ? [{ value: 'import' as const, label: 'Importaciones', count: importActive }] : []),
-        { value: 'local',   label: importaciones ? 'Locales' : 'En curso', count: localActive },
+        ...(conEnCurso ? [{ value: 'local' as const, label: importaciones ? 'Locales' : 'En curso', count: localActive }] : []),
         { value: 'history', label: etapas ? 'Historial' : 'Entradas', count: historyTotal },
       ]} />
 
