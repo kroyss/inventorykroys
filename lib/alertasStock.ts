@@ -14,6 +14,13 @@ import { esDemo } from '@/lib/demo'
 export const UMBRAL_DEFAULT = 3            // "por agotarse" = menos de esto (por empresa en Ajustes del módulo)
 export const MINUTOS_ENTRE_REVISIONES = 120   // cada 2 h por cuenta: cuida las llamadas a ML al crecer
 export const DIAS_VENDIDAS = 30
+export const DIAS_CALIENTE = 7
+
+/** "En caliente" (2026-10-12, migración 087): se agotó (o bajó del límite) en los últimos DIAS_CALIENTE días
+ *  y nadie la quitó con "No hay, quitar" después de eso. Solo esto suma al aviso; lo demás es "En el olvido".
+ *  `desde` = a.agotada_desde (agotadas) o a.bajo_desde (por agotarse). */
+export const sqlCaliente = (desde: 'a.agotada_desde' | 'a.bajo_desde') =>
+  `(${desde} > NOW() - INTERVAL '${DIAS_CALIENTE} days' AND (a.descartada_at IS NULL OR a.descartada_at < ${desde}))`
 
 /** Condición SQL sobre ml_stock_alertas `a`: se vendió en los últimos DIAS_VENDIDAS días.
  *  Con IN (subconsulta) Postgres arma UNA vez la lista de lo vendido y la consulta como hash; con
@@ -122,12 +129,12 @@ export async function revisarStockPendiente(db: Pool) {
   return c ? revisarStockCuenta(db, c.id) : null
 }
 
-/** Cuántas alertas hay ahora (agotadas + por agotarse, vendidas en 30 días), para el numerito del menú. */
+/** Cuántas alertas EN CALIENTE hay (agotadas + por agotarse, vendidas en 30 días), para el numerito del menú. */
 export async function contarAlertas(db: Pool) {
   const umbral = await umbralStock(db)
   const { rows: [r] } = await db.query(
-    `SELECT COUNT(*) FILTER (WHERE a.disponible <= 0)::int AS agotadas,
-            COUNT(*) FILTER (WHERE a.disponible > 0 AND a.disponible < $1)::int AS bajas
+    `SELECT COUNT(*) FILTER (WHERE a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')})::int AS agotadas,
+            COUNT(*) FILTER (WHERE a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas
      FROM ml_stock_alertas a WHERE a.actualizado_at > NOW() - INTERVAL '1 day' AND ${SQL_VENDIDA}`, [umbral])
   return { agotadas: r.agotadas as number, bajas: r.bajas as number }
 }

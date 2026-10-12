@@ -7,6 +7,7 @@ interface Fila {
   item_id: string; variante_id: string; titulo: string; variante: string | null; disponible: number; estado: string
   permalink: string | null; imagen: string | null; agotada_desde: string | null; bajo_desde: string | null
   ultima_agotada_at: string | null; cuenta: string
+  caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
 }
 interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number }; umbral: number
@@ -41,6 +42,19 @@ export default function AlertasStockClient() {
   const [resultado, setResultado] = useState<Record<string, { ok: boolean; error?: string }>>({})
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null)
   const clave = (f: Fila) => `${f.item_id}:${f.variante_id}`
+  const [verOlvido, setVerOlvido] = useState(false)
+  const [quitando, setQuitando] = useState<string | null>(null)
+  // "No hay, quitar" / "Volver a avisar": se mueve al instante y se recarga detrás.
+  const descartar = async (f: Fila, quitar: boolean) => {
+    setQuitando(clave(f))
+    try {
+      const r = await fetch('/api/alertas-stock/descartar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: f.item_id, variante_id: f.variante_id, quitar }) })
+      if (r.ok) setDatos(d => d && { ...d,
+        filas: d.filas.map(x => clave(x) === clave(f) ? { ...x, caliente: !quitar, descartada_at: quitar ? new Date().toISOString() : null } : x),
+        contadores: { ...d.contadores, [vista]: Math.max(0, d.contadores[vista] + (quitar ? -1 : 1)) } })
+    } finally { setQuitando(null); setVez(n => n + 1) }
+  }
 
   useEffect(() => {
     let vivo = true
@@ -106,11 +120,64 @@ export default function AlertasStockClient() {
 
   const q = buscar.trim().toLowerCase()
   const filas = (datos?.filas ?? []).filter(f => !q || `${f.titulo} ${f.variante ?? ''} ${f.item_id} ${f.cuenta}`.toLowerCase().includes(q))
+  const calientes = filas.filter(f => f.caliente)
+  const olvido = filas.filter(f => !f.caliente)
+
+
+  const reciente = (f: Fila) => {
+    const d = vista === 'agotadas' ? f.agotada_desde : f.bajo_desde
+    return !!d && Date.now() - new Date(d).getTime() < 7 * 86_400_000
+  }
+  const fila = (f: Fila) => (
+    <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex items-center gap-3">
+      {datos?.puedeStock && (
+        <input type="checkbox" checked={marcadas.has(clave(f))} onChange={() => alternar(f)} disabled={(nuevo[clave(f)] ?? '') === ''}
+          title={(nuevo[clave(f)] ?? '') === '' ? 'Escribe primero el stock nuevo' : 'Incluir en la actualización'}
+          className="w-4 h-4 accent-neutral-900 shrink-0" />
+      )}
+      {f.imagen
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="w-11 h-11 rounded object-cover bg-neutral-100 shrink-0" />
+        : <span className="w-11 h-11 rounded bg-neutral-100 shrink-0" />}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-neutral-900 truncate">
+          {f.permalink
+            ? <a href={f.permalink} target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">{f.titulo} <span className="text-neutral-400">↗</span></a>
+            : f.titulo}
+        </p>
+        <p className="text-xs text-neutral-500 truncate">
+          {f.variante && <span className="text-neutral-700 font-medium">{f.variante} · </span>}
+          {f.cuenta} · {f.item_id}
+          {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML</span>}
+        </p>
+        {resultado[clave(f)] && !resultado[clave(f)].ok && <p className="text-xs text-red-600">{resultado[clave(f)].error}</p>}
+      </div>
+      {datos?.puedeStock && (
+        <input inputMode="numeric" value={nuevo[clave(f)] ?? ''} onChange={e => escribir(f, e.target.value)} placeholder="Nuevo"
+          aria-label={`Stock nuevo de ${f.titulo}`}
+          className="w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
+      )}
+      {/* "Volver a avisar" solo si la quitaron a mano y todavía está dentro de los 7 días (si no, ya es vieja). */}
+      {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
+        title={f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
+        className="btn-ghost text-xs px-2 py-1 shrink-0 text-neutral-500 hover:text-neutral-900 disabled:opacity-40">
+        {f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
+      </button>}
+      <div className="text-right shrink-0">
+        <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
+          {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
+        </p>
+        <p className="text-[11px] text-neutral-400">
+          {vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
+        </p>
+      </div>
+    </li>
+  )
 
   return (
     <div className="space-y-4">
       <PageHeader title="Stock"
-        subtitle="Lo que vendiste en los últimos 30 días y se agotó o está por agotarse en MercadoLibre, por variante"
+        subtitle="Lo que vendiste en los últimos 30 días y se agotó o está por agotarse en MercadoLibre, por variante. El aviso cuenta solo lo de los últimos 7 días"
         actions={<button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
@@ -153,52 +220,26 @@ export default function AlertasStockClient() {
       )}
 
       {/* Al cambiar de pestaña no se muestra la lista anterior mientras llega la nueva. */}
-      {!datos || datosDe !== vista ? <Cargando /> : filas.length === 0 ? (
+      {!datos || datosDe !== vista ? <Cargando /> : calientes.length === 0 ? (
         <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">
-          {vista === 'agotadas' ? 'Nada de lo vendido en 30 días está agotado. 👌' : 'Nada de lo vendido en 30 días está por agotarse.'}
+          {vista === 'agotadas' ? 'Nada nuevo agotado en los últimos 7 días. Todo al día. 👌' : 'Nada nuevo por agotarse en los últimos 7 días.'}
         </p>
       ) : (
         <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
-          {filas.map(f => (
-            <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex items-center gap-3">
-              {datos.puedeStock && (
-                <input type="checkbox" checked={marcadas.has(clave(f))} onChange={() => alternar(f)} disabled={(nuevo[clave(f)] ?? '') === ''}
-                  title={(nuevo[clave(f)] ?? '') === '' ? 'Escribe primero el stock nuevo' : 'Incluir en la actualización'}
-                  className="w-4 h-4 accent-neutral-900 shrink-0" />
-              )}
-              {f.imagen
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="w-11 h-11 rounded object-cover bg-neutral-100 shrink-0" />
-                : <span className="w-11 h-11 rounded bg-neutral-100 shrink-0" />}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-neutral-900 truncate">
-                  {f.permalink
-                    ? <a href={f.permalink} target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">{f.titulo} <span className="text-neutral-400">↗</span></a>
-                    : f.titulo}
-                </p>
-                <p className="text-xs text-neutral-500 truncate">
-                  {f.variante && <span className="text-neutral-700 font-medium">{f.variante} · </span>}
-                  {f.cuenta} · {f.item_id}
-                  {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML</span>}
-                </p>
-                {resultado[clave(f)] && !resultado[clave(f)].ok && <p className="text-xs text-red-600">{resultado[clave(f)].error}</p>}
-              </div>
-              {datos.puedeStock && (
-                <input inputMode="numeric" value={nuevo[clave(f)] ?? ''} onChange={e => escribir(f, e.target.value)} placeholder="Nuevo"
-                  aria-label={`Stock nuevo de ${f.titulo}`}
-                  className="w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
-              )}
-              <div className="text-right shrink-0">
-                <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
-                  {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
-                </p>
-                <p className="text-[11px] text-neutral-400">
-                  {vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
-                </p>
-              </div>
-            </li>
-          ))}
+          {calientes.map(fila)}
         </ul>
+      )}
+
+      {/* En el olvido: más de 7 días sin reponer, o quitadas con "No hay, quitar". Se ven, pero no suman al aviso. */}
+      {datos && datosDe === vista && olvido.length > 0 && (
+        <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+          <button type="button" onClick={() => setVerOlvido(v => !v)}
+            className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-50 rounded-xl">
+            <span><b className="text-neutral-800">En el olvido</b> · {olvido.length} · más de 7 días sin reponer o quitadas a mano. No suman al aviso.</span>
+            <span className="text-neutral-400">{verOlvido ? '▴' : '▾'}</span>
+          </button>
+          {verOlvido && <ul className="divide-y divide-neutral-100 border-t border-neutral-100">{olvido.map(fila)}</ul>}
+        </div>
       )}
     </div>
   )

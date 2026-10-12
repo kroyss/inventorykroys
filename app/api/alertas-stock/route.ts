@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
-import { SQL_VENDIDA, umbralStock } from '@/lib/alertasStock'
+import { SQL_VENDIDA, sqlCaliente, umbralStock } from '@/lib/alertasStock'
 import { puede } from '@/lib/permisos'
 
 // GET /api/alertas-stock?vista=agotadas|bajas → publicaciones (y variantes) de ML vendidas en los
-// últimos 30 días que están agotadas o por agotarse (menos del límite), con los contadores.
+// últimos 30 días que están agotadas o por agotarse (menos del límite). `caliente`: de los últimos 7 días y
+// sin quitar (lo único que cuentan los contadores y el aviso); el resto va a "En el olvido".
 // PUT { umbral } (admin) → el límite de "por agotarse" de la empresa.
 const FRESCA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND ${SQL_VENDIDA}`
 
@@ -18,15 +19,17 @@ export async function GET(req: NextRequest) {
     const umbral = await umbralStock(s.db)
     const filtro = vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
     const orden = vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
+    const caliente = vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
     const [{ rows }, { rows: [n] }, { rows: [rev] }] = await Promise.all([
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
-                a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, c.nickname AS cuenta
+                a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, c.nickname AS cuenta,
+                ${caliente} AS caliente, a.descartada_at
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
-         WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${orden}, a.titulo LIMIT 500`, [umbral]),
+         WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
-        `SELECT COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible <= 0)::int AS agotadas,
-                COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1)::int AS bajas
+        `SELECT COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')})::int AS agotadas,
+                COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas
          FROM ml_stock_alertas a`, [umbral]),
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),
