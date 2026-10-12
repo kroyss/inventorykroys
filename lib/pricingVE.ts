@@ -51,6 +51,8 @@ export function mlNetFor(
   p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number; weight_kg?: number | null },
   veRate: VeRate | null, coTrm: number, ml: Record<string, string>, discount?: number,
   shipTable?: ShipTier[],
+  /** Inventario simple (sin "precios_categorias"): el precio es el GUARDADO (lo publicado), no el calculado. */
+  precioFijo?: number,
 ): { ganancia: number; margen: number; pesos: boolean } | null {
   const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
   if (country === 'CO') {
@@ -66,7 +68,7 @@ export function mlNetFor(
   // la calculadora — así no se desincroniza con el final_price_usd guardado (que queda viejo
   // cuando cambia el exceso o no se re-guardó el producto).
   if (!veRate || !(veRate.parallel > 0) || !(veRate.official > 0)) return null
-  const finalLive = liveFinalVE(p, veRate.excess ?? 0, discount)
+  const finalLive = precioFijo ?? liveFinalVE(p, veRate.excess ?? 0, discount)
   if (!(finalLive > 0)) return null
   const realUsd  = finalLive * veRate.official / veRate.parallel
   // Envío según el mínimo del rango de peso del producto (tabla de MercadoEnvíos).

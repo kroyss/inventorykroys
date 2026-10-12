@@ -112,7 +112,11 @@ export async function GET(_: NextRequest) {
         AND stock < (ventas_6m / 6.0) * 4
     `)
 
+    // Importados desde MercadoLibre con el stock sin confirmar (aviso en Inicio).
+    const { rows: [a11] } = await db.query(`SELECT COUNT(*) AS n FROM products WHERE is_active AND stock_por_verificar`)
+
     return NextResponse.json({
+      por_verificar:           parseInt(a11.n, 10),
       active_products:         parseInt(a1.n, 10),
       sales_count_month:       parseInt(a2.cnt, 10),
       sales_amount_month:      Math.round(salesAmount * 100) / 100,

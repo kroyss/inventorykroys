@@ -17,14 +17,15 @@ interface Props {
   acceso: AccesoCompras
   country: 'VE' | 'CO'
   importaciones: boolean   // módulo: sin él solo hay compras locales (sin pestaña ni opción de importar)
+  etapas?: boolean         // módulo compras_etapas; apagado = Inventario simple ("Entró mercancía")
 }
 
 export default function ComprasTabs({
-  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones,
+  initialOrders, initialImports, localSuppliers, importSuppliers, acceso, importaciones, etapas = true,
 }: Props) {
   // Importaciones es la pestaña principal en ambos países → primera y por defecto.
   // Se recuerda entre F5 (el deep-link ?tab=import, más abajo, igual tiene prioridad).
-  const [tabGuardada, setTab] = usePersistedTab<'local' | 'import' | 'history'>('tab:compras', importaciones ? 'import' : 'local')
+  const [tabGuardada, setTab] = usePersistedTab<'local' | 'import' | 'history'>('tab:compras', importaciones ? 'import' : etapas ? 'local' : 'history')
   // Sin el módulo Importaciones nunca se queda en esa pestaña (aunque esté recordada o venga en el link).
   const tab = !importaciones && tabGuardada === 'import' ? 'local' : tabGuardada
   // Dentro de Historial, qué tipo se ve
@@ -94,10 +95,11 @@ export default function ComprasTabs({
   return (
     <div>
       <PageHeader title={isAdmin ? 'Compras' : 'Recepciones'}
-        subtitle={isAdmin ? (importaciones ? 'Importaciones y compras locales, del pago a la recepción' : 'Compras a tus proveedores, del pago a la recepción')
+        subtitle={isAdmin ? (importaciones ? 'Importaciones y compras locales, del pago a la recepción'
+          : etapas ? 'Compras a tus proveedores, del pago a la recepción' : 'La mercancía que entra: suma al stock y registra lo que pagaste')
           : 'Mercancía que llega y hay que recibir'}
         actions={isAdmin && (!importaciones ? (
-          <button onClick={() => startCreate('local')} className="btn-primary text-sm whitespace-nowrap">+ Compra</button>
+          <button onClick={() => startCreate('local')} className="btn-primary text-sm whitespace-nowrap">{etapas ? '+ Compra' : '+ Entró mercancía'}</button>
         ) : (
           <div className="relative">
             <button onClick={() => setCreateOpen(o => !o)} className="btn-primary text-sm whitespace-nowrap">
@@ -121,11 +123,11 @@ export default function ComprasTabs({
       <Tabs className="mb-4" value={tab} onChange={setTab} items={[
         ...(importaciones ? [{ value: 'import' as const, label: 'Importaciones', count: importActive }] : []),
         { value: 'local',   label: importaciones ? 'Locales' : 'En curso', count: localActive },
-        { value: 'history', label: 'Historial',     count: historyTotal },
+        { value: 'history', label: etapas ? 'Historial' : 'Entradas', count: historyTotal },
       ]} />
 
       {tab === 'local' && (
-        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} onChanged={refresh}
+        <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} onChanged={refresh}
           autoCreate={pendingCreate === 'local'} onAutoCreateHandled={() => setPendingCreate(null)} />
       )}
       {tab === 'import' && (
@@ -140,7 +142,7 @@ export default function ComprasTabs({
             {subBtn('import', `Importaciones (${importHist})`)}
           </div>}
           {histType === 'local' || !importaciones
-            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} onChanged={refresh} historyMode />
+            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} onChanged={refresh} historyMode />
             : <ImportsClient initialOrders={imports} suppliers={importSuppliers} acceso={acceso} onChanged={refresh} historyMode />}
         </div>
       )}

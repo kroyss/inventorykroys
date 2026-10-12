@@ -18,5 +18,6 @@ export default async function TasasPage() {
   return country === 'CO'
     ? <TasasCoClient puedeTasas={puedeTasas} />
     : <TasasClient bonos={tieneModulo(session.user, 'bonos')} puedeTasas={puedeTasas} despachos={tieneModulo(session.user, 'despachos')}
-        descuento={tieneModulo(session.user, 'descuento_ml')} finanzas={tieneModulo(session.user, 'finanzas')} />
+        descuento={tieneModulo(session.user, 'descuento_ml')} finanzas={tieneModulo(session.user, 'finanzas')}
+        categorias={tieneModulo(session.user, 'precios_categorias')} />
 }

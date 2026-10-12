@@ -36,6 +36,7 @@ export default async function VentasPage() {
       country={session!.user.country}
       facturas={facturasHabilitadas(session!.user)}
       porConfirmar={tieneModulo(session!.user, 'preguntas')}
+      verificarPagos={tieneModulo(session!.user, 'verificar_pagos')}
     />
   )
 }

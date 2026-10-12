@@ -72,6 +72,8 @@ interface Props {
   initialOrders: PurchaseOrder[]
   initialSuppliers: Supplier[]
   acceso: AccesoCompras
+  /** Módulo "compras_etapas". Apagado (Inventario simple): crear = "Entró mercancía" (nace finalizada). */
+  etapas?: boolean
   historyMode?: boolean
   /** Aviso al padre (ComprasTabs) tras cualquier cambio, para refrescar contadores y la otra pestaña. */
   onChanged?: () => void
@@ -80,7 +82,7 @@ interface Props {
   onAutoCreateHandled?: () => void
 }
 
-export default function ComprasClient({ initialOrders, initialSuppliers, acceso, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
+export default function ComprasClient({ initialOrders, initialSuppliers, acceso, etapas = true, historyMode = false, onChanged, autoCreate = false, onAutoCreateHandled }: Props) {
   // Permisos (lib/permisos.ts): crear/editar compras y ver costos van por separado.
   const isAdmin = acceso.editar
   const verCostos = acceso.costos
@@ -341,6 +343,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
       supplier_name: formSupplierName.trim(),
       notes: formNotes || undefined,
       items: formItems.map(i => ({ product_id: i.product_id, quantity: i.quantity, unit_cost_usd: i.unit_cost_usd })),
+      ...(!etapas && !editId ? { entrada: true } : {}),
     }
     const url = editId ? `/api/purchases/${editId}` : '/api/purchases'
     const method = editId ? 'PUT' : 'POST'
@@ -911,7 +914,12 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowForm(false)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
             <div className="p-5 border-b flex justify-between shrink-0">
-              <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : 'Nueva orden de compra'}</h3>
+              <div>
+                <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : etapas ? 'Nueva orden de compra' : 'Entró mercancía'}</h3>
+                {!etapas && !editId && (
+                  <p className="text-xs text-neutral-500 mt-0.5">Se suma al stock al guardar, y el costo de cada producto pasa a ser lo que pagaste.</p>
+                )}
+              </div>
               <button onClick={() => setShowForm(false)} className="text-neutral-400 hover:text-neutral-700 text-xl">×</button>
             </div>
             <div className="p-5 space-y-4 flex-1 overflow-y-auto">
@@ -1031,6 +1039,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
               {editId ? (
                 <button onClick={() => saveOrder('close')} disabled={saving} className="btn-primary">
                   {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              ) : !etapas ? (
+                <button onClick={() => saveOrder('close')} disabled={saving} className="btn-primary">
+                  {saving ? 'Guardando...' : 'Registrar entrada'}
                 </button>
               ) : (
                 <>

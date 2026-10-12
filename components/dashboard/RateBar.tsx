@@ -16,7 +16,10 @@ const fmt = (n: number) =>
   Math.round(Number(n)).toLocaleString('de-DE')
 
 // descuento: módulo Descuento ML. Sin él no se muestra el descuento sugerido (solo tasas y exceso).
-export default function RateBar({ puedeActualizar = false, descuento = true }: { puedeActualizar?: boolean; descuento?: boolean }) {
+export default function RateBar({ puedeActualizar = false, descuento = true, exceso = true }: {
+  puedeActualizar?: boolean; descuento?: boolean
+  exceso?: boolean   // módulo precios_categorias: sin él (Inventario simple) no hay exceso
+}) {
   const [rate, setRate] = useState<Rate | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -47,7 +50,7 @@ export default function RateBar({ puedeActualizar = false, descuento = true }: {
           <span className="text-neutral-400 text-xs">al {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE')}</span>
         )}
         <span>Spread: <span className="font-semibold text-neutral-800">{rate.spread_percentage}%</span></span>
-        <span>Exceso: <span className="font-semibold text-neutral-800">{rate.excess_percentage}%</span></span>
+        {exceso && <span>Exceso: <span className="font-semibold text-neutral-800">{rate.excess_percentage}%</span></span>}
       </div>
 
       {/* La tasa es común a todas las empresas: solo la actualiza el dueño de la plataforma

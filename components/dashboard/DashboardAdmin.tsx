@@ -13,10 +13,12 @@ import { KPICard, PageHeader, Cargando, chipCls } from '@/components/ui'
 import BonusPipeline from './BonusPipeline'
 import RateBar from './RateBar'
 import { DateField } from '@/components/ui/DateField'
+import AvisoStockVerificar from './AvisoStockVerificar'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
 interface Summary {
+  por_verificar?: number
   active_products: number
   sales_count_month: number
   sales_amount_month: number
@@ -47,8 +49,10 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock }: {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true }: {
   country: Country; bonos: boolean; puedeTasas: boolean
+  etapas?: boolean   // módulo compras_etapas (sin él no hay compras en tránsito)
+  categorias?: boolean   // módulo precios_categorias (sin él no se muestra el exceso)
   descuento: boolean; importaciones: boolean; analisisStock: boolean   // módulos (lib/modulos.ts)
 }) {
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -154,7 +158,9 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
         </>
       } />
 
-      {country === 'VE' && <RateBar puedeActualizar={puedeTasas} descuento={descuento} />}
+      {country === 'VE' && <RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} />}
+
+      <AvisoStockVerificar n={summary.por_verificar ?? 0} />
 
       {/* Requiere atención — clickable */}
       <div>
@@ -164,7 +170,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
           <KPICard label="Sin stock"            value={summary.no_stock}        tone={summary.no_stock > 0 ? 'problema' : 'apagado'} href="/inventario?estado=SIN_STOCK" />
           <KPICard label="Stock bajo"           value={summary.low_stock_alerts} tone={summary.low_stock_alerts > 0 ? 'atencion' : 'apagado'} href="/inventario?estado=BAJO" />
           <KPICard label="Ventas borrador"      value={summary.pending_sales}   tone={summary.pending_sales > 0 ? 'atencion' : 'apagado'} href="/ventas?estado=BORRADOR" />
-          <KPICard label="Compras en tránsito"  value={summary.in_transit}      tone={summary.in_transit > 0 ? 'neutro' : 'apagado'} href="/reportes?tab=transito" />
+          {etapas && <KPICard label="Compras en tránsito"  value={summary.in_transit}      tone={summary.in_transit > 0 ? 'neutro' : 'apagado'} href="/reportes?tab=transito" />}
           {analisisStock && <KPICard label="En revisión (remate)" value={summary.remate_count}    tone={summary.remate_count > 0 ? 'atencion' : 'apagado'} href="/reportes?tab=stock&sub=remate" />}
         </div>
       </div>

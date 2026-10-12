@@ -65,6 +65,7 @@ interface Props {
   country: Country
   facturas: boolean   // módulo Facturas (solo VE): sin él no se muestra el cuadro de factura
   porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
+  verificarPagos?: boolean   // VE: paso "Pago verificado" antes de procesar (módulo verificar_pagos; apagado = Inventario simple)
 }
 
 type Filter = 'all' | SaleStatus
@@ -74,7 +75,9 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true }: Props) {
+  // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
+  const directoVE = country === 'VE' && !verificarPagos
   // Por confirmar (2026-10-12): ventas de ML sin registrar; "Confirmar" abre el form con ese número.
   const [vistaPC, setVistaPC] = useState(false)
   const [numeroNuevo, setNumeroNuevo] = useState<string | null>(null)
@@ -364,7 +367,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           )}
           {porConfirmar && <span className="mx-0.5 w-px self-stretch bg-neutral-200" aria-hidden="true" />}
           {(['all','BORRADOR','PAGO_VERIFICADO','PROCESADA','DESCARGADA','DESCARGADA_LOCAL'] as Filter[])
-            .filter(f => country !== 'CO' || f !== 'PAGO_VERIFICADO')
+            .filter(f => (country !== 'CO' && !directoVE) || f !== 'PAGO_VERIFICADO')
             .map(f => {
             const count  = f === 'all' ? counts.all : counts[f as keyof Counts]
             const active = !vistaPC && filter === f
@@ -673,8 +676,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   {selected.ml_order_number.startsWith('LOCAL-') ? (
                     // LOCAL: salta a entregada (descuenta inventario) en un paso
                     <button onClick={() => doAction('PAGO_VERIFICADO')} disabled={busy || !canAdvance} className="btn-primary text-sm">
-                      {country === 'CO' ? 'Entregar' : 'Verificar y entregar'}
+                      {country === 'CO' || directoVE ? 'Entregar' : 'Verificar y entregar'}
                     </button>
+                  ) : directoVE ? (
+                    <button onClick={() => doAction('PROCESADA')} disabled={busy || !canAdvance} className="btn-primary text-sm">Procesar</button>
                   ) : country === 'CO' ? (
                     // CO: sin verificar pago. El FLEX se marca al crear la venta:
                     // FLEX → PROCESADA (espera Excel); no FLEX → DESCARGADA directo
@@ -723,6 +728,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           editing={editing}
           products={products}
           country={country}
+          procesaDirecto={directoVE}
           numeroInicial={editing ? undefined : numeroNuevo ?? undefined}
           onClose={() => { setShowForm(false); setEditing(null); setNumeroNuevo(null) }}
           onSaved={() => { setShowForm(false); setEditing(null); setNumeroNuevo(null); reload(); pc.cargar() }}

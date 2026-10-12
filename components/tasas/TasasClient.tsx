@@ -48,8 +48,9 @@ function ShipRowInputs({ row, onChange, onRemove }: {
 
 // descuento / finanzas: módulos (lib/modulos.ts). Sin Descuento ML no se ven el descuento global, el
 // recomendado ni la tabla de MercadoEnvíos (queda el exceso); sin Finanzas, su factor de tránsito.
-export default function TasasClient({ bonos, puedeTasas, despachos, descuento, finanzas }: {
+export default function TasasClient({ bonos, puedeTasas, despachos, descuento, finanzas, categorias = true }: {
   bonos: boolean; puedeTasas: boolean; despachos: boolean; descuento: boolean; finanzas: boolean
+  categorias?: boolean   // módulo precios_categorias: sin él (Inventario simple) no hay exceso que configurar
 }) {
   const [latest,   setLatest]   = useState<Rate | null>(null)
   const [history,  setHistory]  = useState<Rate[]>([])
@@ -291,7 +292,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
         </div>}
 
         {/* Config Exceso ML */}
-        <div className="border-l border-neutral-200 pl-3 shrink-0">
+        {categorias && <div className="border-l border-neutral-200 pl-3 shrink-0">
           <label className="text-[11px] text-neutral-500 block mb-1 whitespace-nowrap"
             title={descuento ? 'Margen del precio publicado sobre el base. Afecta el descuento recomendado.'
               : 'Cuánto subes el precio publicado sobre lo que quieres recibir, para cubrir el diferencial: MercadoLibre te paga en bolívares a tasa oficial y tú los cambias al paralelo.'}>Exceso ML</label>
@@ -309,7 +310,7 @@ export default function TasasClient({ bonos, puedeTasas, despachos, descuento, f
               </div>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Config Descuento ML (manual GLOBAL) — se aplica a TODOS los productos */}
         {descuento && <div className="border-l border-neutral-200 pl-3 shrink-0">

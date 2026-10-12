@@ -7,7 +7,7 @@ import {
   IMPRIMIBLE, leerOriginal, MAX_POR_LOTE, respuestaServicio,
   refrescarVentasML, impresionEtiqueta,
 } from '@/lib/despachos'
-import { llevaInventario, tieneModulo } from '@/lib/modulos'
+import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 
 /**
  * POST /api/despachos/lotes/[id]/generar — arma el PDF 4xA4 del lote.
@@ -28,7 +28,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const userId = parseInt(session.user.id, 10)
   // Sin inventario: las ventas son las de MercadoLibre; no hay venta del sistema que bloquear
   // ni pasar a DESCARGADA. Todo lo demás (armado, jornada, manifiesto, Reportador) es igual.
-  const desdeML = !llevaInventario(session.user)
+  const desdeML = ventasDesdeML(session.user)
   if (desdeML) await refrescarVentasML(db, parseInt(id, 10)).catch(() => {})
   const client = await db.connect()
   let outputPath: string | null = null

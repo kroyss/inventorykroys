@@ -288,6 +288,8 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
   // Stock por verificar (Importar desde ML): el número vino de MercadoLibre y nadie lo confirmó.
   const [soloVerificar, setSoloVerificar] = useState(false)
   const [verificando, setVerificando] = useState(false)
+  const [urlVerificar] = useDeepLinkParam('verificar', ['1'] as const)   // aviso de Inicio
+  useEffect(() => { if (urlVerificar) setSoloVerificar(true) }, [urlVerificar])
   const porVerificar = items.filter(i => i.is_active && i.stock_por_verificar).length
   const confirmarStock = async () => {
     if (!selected) return
