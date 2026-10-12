@@ -43,12 +43,11 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
 
   return (
     <div ref={caja} className="relative shrink-0">
-      <button type="button" onClick={() => setAbierto(a => !a)} aria-haspopup="menu" aria-expanded={abierto}
-        className={`flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-lg transition-colors ${abierto ? 'bg-neutral-100' : 'hover:bg-neutral-100'}`}>
+      <button type="button" onClick={() => setAbierto(a => !a)} aria-haspopup="menu" aria-expanded={abierto} title={nombre}
+        className={`flex items-center gap-1 pl-1 pr-1 py-1 rounded-lg transition-colors ${abierto ? 'bg-neutral-100' : 'hover:bg-neutral-100'}`}>
         <span className="w-7 h-7 rounded-full bg-neutral-900 text-white text-[11px] font-semibold flex items-center justify-center">
           {iniciales}
         </span>
-        <span className="text-sm text-neutral-700 hidden lg:block max-w-[10rem] truncate">{nombre}</span>
         <svg viewBox="0 0 24 24" className={`w-4 h-4 text-neutral-400 transition-transform ${abierto ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>

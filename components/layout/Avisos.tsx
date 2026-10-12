@@ -27,13 +27,14 @@ export const AVISO_DE_RUTA: Record<string, { clave: keyof Avisos; urgente: boole
 const tope = (n: number) => (n > 99 ? '99+' : n)
 const PILDORA = 'inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 text-[11px] font-semibold leading-none num'
 
-/** Me calificaron: una sola cápsula partida, negativas (rojo, alerta) | neutrales (naranja suave, no alerta).
- *  Solo aparece la parte que tenga algo. */
-export function NumeritosReputacion({ avisos, className = '' }: { avisos: Avisos; className?: string }) {
-  const { negativas: neg, neutrales: neu } = avisos
-  if (neg <= 0 && neu <= 0) return null
+/** Calificaciones: UNA cápsula partida [por calificar (gris) | negativas (rojo) | neutrales (naranja suave)].
+ *  Solo aparecen las partes que tengan algo. */
+export function NumerosCalificaciones({ avisos, className = '' }: { avisos: Avisos; className?: string }) {
+  const { calificaciones: cal, negativas: neg, neutrales: neu } = avisos
+  if (cal <= 0 && neg <= 0 && neu <= 0) return null
   return (
     <span className={`inline-flex overflow-hidden rounded-full ${className}`}>
+      {cal > 0 && <span className={`${PILDORA} bg-neutral-200 text-neutral-700`} title="Ventas por calificar">{tope(cal)}</span>}
       {neg > 0 && <span className={`${PILDORA} bg-red-500 text-white`} title="Negativas nuevas">{tope(neg)}</span>}
       {neu > 0 && <span className={`${PILDORA} bg-orange-100 text-orange-700`} title="Neutrales nuevas">{tope(neu)}</span>}
     </span>

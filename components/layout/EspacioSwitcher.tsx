@@ -19,6 +19,7 @@ function Icono({ de }: { de: keyof typeof ICONOS }) {
 }
 
 const NOMBRES = { inventario: 'Inventario', automatizaciones: 'Automatizaciones' } as const
+const CORTOS = { inventario: 'Inventario', automatizaciones: 'Automatiza' } as const   // botón de la barra
 
 // Selector de espacio junto al logo: muestra dónde estás y abre un menú con los demás.
 // Solo aparece si hay más de un espacio.
@@ -60,7 +61,7 @@ export default function EspacioSwitcher({ automatizaciones, inventario, radarUrl
         className={`flex items-center gap-2 pl-2 pr-1.5 py-1.5 rounded-lg text-sm font-semibold text-neutral-800 transition-colors ${
           abierto ? 'bg-neutral-100' : 'hover:bg-neutral-100'}`}>
         <Icono de={actual} />
-        <span>{NOMBRES[actual]}</span>
+        <span title={NOMBRES[actual]}>{CORTOS[actual]}</span>
         {/* Estando en otro espacio: punto si Automatizaciones tiene algo pendiente */}
         {actual !== 'automatizaciones' && totalAuto > 0 && (
           <span className={`w-2 h-2 rounded-full ${urgentesAuto > 0 ? 'bg-red-500' : 'bg-neutral-400'}`} title="Hay pendientes en Automatizaciones" />

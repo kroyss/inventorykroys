@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
-import { useAvisos, AVISO_DE_RUTA, Numerito, NumeritosReputacion, hayAlerta } from './Avisos'
+import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 // Barra inferior del celular. Íconos de línea (mismo trazo en todos, estilo Lucide) en lugar de
 // emojis: se ven igual en Android/iPhone y combinan con el resto de la interfaz.
@@ -131,8 +131,8 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
                   <Icono nombre={i.icon} className="w-6 h-6" />
                   <span className="text-xs font-medium leading-tight">{etiqueta(i)}</span>
                   <span className="absolute top-1.5 right-2 flex gap-0.5">
-                    {aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} />}
-                    {i.href === '/calificaciones' && <NumeritosReputacion avisos={avisos} />}
+                    {i.href === '/calificaciones' ? <NumerosCalificaciones avisos={avisos} />
+                      : aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} />}
                   </span>
                 </Link>
               )
