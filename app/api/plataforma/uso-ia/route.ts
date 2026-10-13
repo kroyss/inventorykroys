@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { dbEmpresa, dbGlobal } from '@/lib/db'
+import { conEmpresa, dbGlobal } from '@/lib/db'
 import { cupoIA } from '@/lib/ia'
 import type { Country } from '@/lib/types'
 import { soloDueno } from '@/lib/plataforma'
@@ -39,9 +39,12 @@ export async function GET() {
     ])
     // Créditos usados: los mismos que ve el cliente (cupoIA cuenta desde ia_creditos_desde si es más
     // reciente que el día 1; el detalle por día no puede saberlo).
-    await Promise.all(empresas.map(async e => {
-      e.creditos = await cupoIA(dbEmpresa(e.id, e.country as Country), e.id).then(c => c.usados).catch(() => null)
-    }))
+    // De a UNA empresa con conEmpresa (devuelve la conexión al terminar con ella). NUNCA dbEmpresa en un
+    // bucle: retiene una conexión por empresa hasta el final del request y con más empresas que
+    // conexiones del pool (10) trababa la copia entera (13-10: "Interno no sirve", Plataforma paralizada).
+    for (const e of empresas) {
+      e.creditos = await conEmpresa(e.id, e.country as Country, db => cupoIA(db, e.id)).then(c => c.usados).catch(() => null)
+    }
     const hoy = currentDate()
     const diasMes = new Date(Date.UTC(y, m, 0)).getUTCDate()
     return NextResponse.json({ meses, filas: rows, detalle, empresas, hoy, diasMes, diaHoy: Number(hoy.slice(8, 10)) })

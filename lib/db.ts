@@ -21,7 +21,9 @@ import type { Country } from '@/lib/types'
 
 // connectionTimeoutMillis: si el pool se agota, el pedido falla a los 20 s (con error en el log) en vez
 // de quedarse esperando para siempre y colgar la app (13-10: el cron retenía todas las conexiones).
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 20_000 })
+// max 15 (13-10, antes 10 por defecto): Plataforma pide ~15 consultas a la vez. Producción: 3 contenedores
+// (inventory_ecd, inventory_ecd_b, inventory_next) × 15 = 45 de las 100 que acepta la base.
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 15, connectionTimeoutMillis: 20_000 })
 
 export function dbGlobal() {
   return pool
@@ -43,6 +45,7 @@ type Query = PoolClient['query']
 export class EmpresaDb {
   private listo: Promise<PoolClient> | null = null
   private enTransaccion = false
+  private liberada = false
 
   constructor(readonly empresaId: number, readonly country: Country) {}
 
@@ -60,6 +63,15 @@ export class EmpresaDb {
           throw e
         }
         after(() => this.liberar(client))
+        // Red de seguridad (13-10): si el request nunca llega a after() (quedaron 5 conexiones retenidas
+        // y el pool se iba quedando corto), a los 5 min se cierra igual y se avisa en el log.
+        const vigia = setTimeout(() => {
+          if (this.liberada) return
+          console.error('[db] conexión retenida 5 min sin liberar: se cierra', { empresa: this.empresaId })
+          this.liberada = true
+          client.release(new Error('retenida'))
+        }, 5 * 60_000)
+        vigia.unref?.()
         return client
       })()
     }
@@ -67,6 +79,8 @@ export class EmpresaDb {
   }
 
   private async liberar(client: PoolClient) {
+    if (this.liberada) return
+    this.liberada = true
     let rota: Error | undefined
     try {
       if (this.enTransaccion) await client.query('ROLLBACK')
