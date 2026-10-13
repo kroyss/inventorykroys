@@ -118,7 +118,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
 
 /** La conversación de una venta. La usan la bandeja y Ventas → Nueva venta ("Lo que se habló", 2026-10-12).
  *  soloLectura: sin permiso de Mensajes se lee (y se ven las notas) pero no se responde. */
-export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean }) {
+export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean; sinNotas?: boolean }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null; imagen?: string | null }[] | null>(null)
@@ -263,7 +263,8 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Convers
           <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
           <PreguntasPrevias n={previas.length} lista={previas} etiqueta="Preguntó antes de comprar" destacado />
         </div>
-        <NotasVenta pack={c.pack_id} onCambio={onCambio} />
+        {/* En Ventas las notas van junto a los productos (VentasForm): aquí no se repiten. */}
+        {!sinNotas && <NotasVenta pack={c.pack_id} onCambio={onCambio} />}
         {recordatorio && !soloLectura && <RecordatorioVenta pack={c.pack_id} r={recordatorio} onCambio={setRecordatorio} />}
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[12rem]">
@@ -489,7 +490,11 @@ interface NotaML { id: string; texto: string; fecha: string; fuente: 'orden' | '
 
 /** Notas de la venta en MercadoLibre: se ven, se agregan, se cambian y se borran (el
  *  comprador no las ve). */
-function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) {
+const unir = (notas: NotaML[]) => notas.map(n => n.texto.trim()).filter(Boolean).join(' · ')   // = unirNotas (lib/notasML)
+
+/** Notas de la venta en MercadoLibre (las mismas en Mensajes y en Ventas): se guardan al instante en ML.
+ *  `onNotas`: el texto de todas juntas cada vez que cambian (Ventas lo usa como nota de la venta). */
+export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio: () => void; onNotas?: (texto: string) => void }) {
   const [datos, setDatos] = useState<{ notas: NotaML[]; error: string | null } | null>(null)
   const [editando, setEditando] = useState<{ id: string | null; texto: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -498,7 +503,8 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
 
   useEffect(() => {
     let vivo = true
-    fetch(`/api/mensajes/${pack}/notas`).then(r => r.ok ? r.json() : null).then(d => { if (vivo) setDatos(d) })
+    // Al abrir, si ML no tiene notas no se pisa la que ya tenía la venta.
+    fetch(`/api/mensajes/${pack}/notas`).then(r => r.ok ? r.json() : null).then(d => { if (vivo) { setDatos(d); if (d && !d.error && unir(d.notas)) onNotas?.(unir(d.notas)) } })
     return () => { vivo = false }
   }, [pack])
 
@@ -510,7 +516,7 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'No se pudo guardar la nota'); return }
-      setDatos(d); setEditando(null); onCambio()
+      setDatos(d); setEditando(null); onCambio(); onNotas?.(unir(d.notas))
     } finally { setGuardando(false) }
   }
   const guardar = () => {

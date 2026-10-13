@@ -8,6 +8,7 @@ import { matchTokens } from '@/lib/search'
 import { orderLenLabel, mlOrderError } from '@/lib/orderNumber'
 import type { PagoME } from '@/lib/pagosMEComun'
 import { PagoDeVenta, LoQueSeHablo } from './PagoYContexto'
+import { NotasVenta } from '@/components/preguntas/MensajesClient'
 
 interface FormItem {
   product_id: number
@@ -580,9 +581,18 @@ Revísala en el detalle que se abre ahora.`)
           )}
 
           {/* Cierre en una sola franja (2026-10-13): notas, descuento, cantidad y total. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 pt-3">
-            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas (opcional)" aria-label="Notas"
-              className="flex-1 min-w-[12rem] border rounded px-3 py-1.5 text-sm" />
+          {/* Venta de ML: sus notas de MercadoLibre (las mismas de Mensajes, se guardan al instante y se
+              imprimen en Despachos). LOCAL u otra: el campo de texto de siempre. */}
+          {mlVenta && (
+            <div className="border-t border-neutral-100 pt-3">
+              <NotasVenta key={`notas-${numeroActual}`} pack={numeroActual} onCambio={() => {}} onNotas={t => setNotes(t)} />
+            </div>
+          )}
+          <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 ${mlVenta ? '' : 'border-t border-neutral-100 pt-3'}`}>
+            {!mlVenta && (
+              <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas (opcional)" aria-label="Notas"
+                className="flex-1 min-w-[12rem] border rounded px-3 py-1.5 text-sm" />
+            )}
             <label className="flex items-center gap-1.5 text-xs text-neutral-500">
               Desc.
               <NumberInput min={0} max={100} step="0.01" value={discount}

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML } from '@/lib/ml'
-import { borrarNota, copiarNotas, crearNota, editarNota, LARGO_NOTA, leerNotas, unirNotas } from '@/lib/notasML'
+import { borrarNota, conexionDeVenta, copiarNotas, crearNota, editarNota, LARGO_NOTA, leerNotas, unirNotas } from '@/lib/notasML'
 
 // Notas de la venta en MercadoLibre, desde la conversación de Mensajes:
 //   GET    → las notas (y se actualiza la copia de la bandeja)
@@ -19,8 +19,10 @@ async function contexto(ctx: Ctx) {
   const { pack } = await ctx.params
   if (!/^\d+$/.test(pack)) return { error: NextResponse.json({ error: 'Venta inválida' }, { status: 400 }) }
   const { rows: [c] } = await s.db.query(`SELECT conexion_id FROM ml_conversaciones WHERE pack_id = $1`, [pack])
-  if (!c) return { error: NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 }) }
-  return { db: s.db, pack, conexionId: c.conexion_id as number }
+  // Sin conversación (Ventas → Por confirmar de alguien que nunca escribió): la cuenta de la venta.
+  const conexionId = (c?.conexion_id as number | undefined) ?? await conexionDeVenta(s.db, pack)
+  if (!conexionId) return { error: NextResponse.json({ error: 'Venta no encontrada en tus cuentas de MercadoLibre' }, { status: 404 }) }
+  return { db: s.db, pack, conexionId }
 }
 
 async function responder(db: import('pg').Pool, conexionId: number, pack: string, escribio = false) {

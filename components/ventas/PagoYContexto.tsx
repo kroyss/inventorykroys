@@ -361,7 +361,7 @@ export function LoQueSeHablo({ numero }: { numero: string }) {
           <div className="p-3">
             {conv === undefined ? <p className="p-4 text-sm text-neutral-400">Abriendo la conversación…</p>
               : typeof conv === 'string' ? <p className="p-4 text-sm text-neutral-500">{conv}</p>
-              : <Hilo c={conv.conversacion} rapidas={conv.rapidas} onCambio={() => {}} soloLectura={!conv.puedeEscribir} />}
+              : <Hilo c={conv.conversacion} rapidas={conv.rapidas} onCambio={() => {}} soloLectura={!conv.puedeEscribir} sinNotas />}
           </div>
         </Ventana>
       )}

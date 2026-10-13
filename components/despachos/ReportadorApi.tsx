@@ -32,7 +32,7 @@ const hora = (s: string) => new Date(s).toLocaleTimeString('es-VE', { hour: '2-d
 
 /** Reportador por API: el servidor le escribe la guía a cada comprador, sin el programa. La corrida
  *  sigue EN EL SERVIDOR aunque se cierre esta pantalla (lib/reportadorCorrida.ts); aquí se ve el avance. */
-export default function ReportadorApi() {
+export default function ReportadorApi({ conEscritorio = false }: { conEscritorio?: boolean }) {
   const confirm = useConfirm()
   const [estado, setEstado] = useState<Estado | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -124,7 +124,7 @@ export default function ReportadorApi() {
       </div>
       <p className="text-xs text-neutral-500">
         Cuentas conectadas a la API: {conectadas.length ? <b className="text-neutral-800">{conectadas.join(', ')}</b> : 'ninguna'}
-        {' · '}las ventas de otras cuentas quedan para el programa de escritorio (abajo, de respaldo).{' '}
+        {conEscritorio && <>{' · '}las ventas de otras cuentas quedan para el programa de escritorio (abajo, de respaldo).</>}{' '}
         <Link href="/cuentas-ml" className="underline underline-offset-2 hover:text-neutral-800">Conectar cuentas</Link>
       </p>
 

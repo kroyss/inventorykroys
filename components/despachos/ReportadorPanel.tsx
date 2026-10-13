@@ -62,7 +62,7 @@ function VistaPrevia({ plantilla, bloque, pagina }: { plantilla: string; bloque:
 }
 
 /** Mensajes y cuentas del Reportador + programa de escritorio (respaldo de la API). */
-export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
+export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { isAdmin: boolean; conEscritorio?: boolean }) {
   const confirm = useConfirm()
   const [estado, setEstado]   = useState<Estado | null>(null)
   const [editando, setEditando] = useState<Config | null>(null)
@@ -154,11 +154,10 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
           <div>
             <h2 className="text-sm font-semibold text-neutral-800">Mensaje al comprador</h2>
             <p className="text-xs text-neutral-500">
-              {config.plantillas.length} plantilla(s) que se eligen al azar ·{' '}
+              {config.plantillas.length > 1 ? `${config.plantillas.length} versiones que se eligen al azar · ` : ''}
               {porVenta
                 ? <>cada mensaje sale desde la cuenta de MercadoLibre de su venta{conectadas.length ? ` (${conectadas.join(', ')})` : ''}.</>
                 : <>cuentas: {config.cuentas.map(c => c.nombre).join(', ')}.</>}
-              {' '}Lo usan el reporte por API y el programa de escritorio.
             </p>
           </div>
           {isAdmin && !editando && !sinMensajes && (
@@ -170,8 +169,8 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
             <div>
               <p className="text-sm font-semibold text-sky-900">Antes de tu primer reporte: revisa el mensaje que recibirá tu comprador</p>
               <p className="text-xs text-sky-800 mt-0.5">
-                Te dejamos estos mensajes listos. Se elige uno al azar para cada comprador y el sistema pone su guía y el transportista
-                (ZOOM o TEALCA) solo. Puedes usarlos así o cambiarlos.
+                Te dejamos este mensaje listo: el sistema pone la guía y el transportista (ZOOM o TEALCA) de cada comprador.
+                Puedes usarlo así o cambiarlo.
               </p>
             </div>
             <ul className="text-xs text-neutral-700 space-y-1 list-disc pl-5">
@@ -184,10 +183,10 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
             {isAdmin ? (
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => guardar({ ...config, ...sugeridas })} disabled={guardando} className="btn-primary text-sm">
-                  {guardando ? 'Guardando…' : 'Usar estos mensajes'}
+                  {guardando ? 'Guardando…' : 'Usar este mensaje'}
                 </button>
                 <button onClick={() => setEditando({ ...structuredClone(config), ...structuredClone(sugeridas) })} className="btn-secondary text-sm">
-                  Cambiarlos
+                  Cambiarlo
                 </button>
               </div>
             ) : (
@@ -211,8 +210,8 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
         )}
       </section>
 
-      {/* Programa de escritorio: queda de respaldo por si la API falla algún día. */}
-      <details open={enUso} className="bg-white rounded-xl border border-neutral-200 shadow-sm group">
+      {/* Programa de escritorio: queda de respaldo por si la API falla algún día. Solo el equipo de la plataforma. */}
+      {conEscritorio && <details open={enUso} className="bg-white rounded-xl border border-neutral-200 shadow-sm group">
         <summary className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 cursor-pointer list-none">
           <div>
             <h2 className="text-sm font-semibold text-neutral-800">
@@ -250,7 +249,7 @@ export default function ReportadorPanel({ isAdmin }: { isAdmin: boolean }) {
                 ))}
           </div>
         </div>
-      </details>
+      </details>}
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
     </>
   )
@@ -394,23 +393,12 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
           </p>
           {cuentasEditor}
         </div>
-      ) : (
-        <details className="text-xs">
-          <summary className="cursor-pointer text-neutral-500">
-            Cuentas: cada envío sale desde la cuenta de MercadoLibre de su venta{conectadas.length ? ` (${conectadas.join(', ')})` : ''}. <u>Avanzado</u>
-          </summary>
-          <p className="text-neutral-500 my-2">
-            Solo si usas el programa de escritorio con cuentas que <b>no</b> están conectadas al sistema: la cuenta se reconoce por el
-            comienzo del remitente de la etiqueta. Si no es tu caso, déjalo vacío.
-          </p>
-          {cuentasEditor}
-        </details>
-      )}
+      ) : null /* Sin cuentas escritas a mano: cada envío sale desde la cuenta de su venta (nada que configurar). */}
 
       <div>
-        <h3 className="text-xs font-semibold text-neutral-600 mb-1">Plantillas del mensaje</h3>
+        <h3 className="text-xs font-semibold text-neutral-600 mb-1">Mensaje</h3>
         <p className="text-xs text-neutral-500 mb-2">
-          Se elige una al azar por comprador. <code>{'{guia}'}</code> se cambia por la guía y <code>{'{transportista}'}</code> por
+          {config.plantillas.length > 1 && <>Con varias versiones se elige una al azar por comprador. </>}<code>{'{guia}'}</code> se cambia por la guía y <code>{'{transportista}'}</code> por
           ZOOM o TEALCA según el envío (no escribas el transportista a mano: un mensaje que dice TEALCA también le llegaría así a los
           de ZOOM). Estas dos variables no se pueden borrar, solo cambiar de lugar.
           {config.cuentas.length > 0 && <> <code>{'{pagina}'}</code> se cambia por la página de la cuenta.</>}
@@ -454,7 +442,7 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
           })}
           {config.plantillas.length < 10 && (
             <button onClick={() => onChange({ ...config, plantillas: [...config.plantillas, 'Buen día, su pedido fue despachado. Guía {transportista}: {guia}'] })}
-              className="text-xs text-neutral-600 underline">+ Agregar plantilla</button>
+              className="text-xs text-neutral-600 underline">+ Agregar otra versión (se elige una al azar)</button>
           )}
         </div>
       </div>
@@ -462,8 +450,7 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
       <div>
         <h3 className="text-xs font-semibold text-neutral-600 mb-1">Texto final (se agrega a todas las plantillas)</h3>
         <p className="text-xs text-neutral-500 mb-1">
-          Opcional. Por ejemplo: «¡Gracias por comprar en MI TIENDA! Síguenos en nuestra cuenta oficial:
-          {' '}{paginaML(conectadas[0] ?? 'tutienda')}» (empieza con un espacio; el link lo puedes cambiar).
+          Opcional. Por ejemplo: «¡Gracias por comprar en MI TIENDA!». Si tienes página en MercadoLibre, puedes poner su link aquí.
         </p>
         <textarea className={input} rows={5} value={config.bloque} onChange={e => onChange({ ...config, bloque: e.target.value })} />
         <p className="text-xs text-neutral-500 mt-1">

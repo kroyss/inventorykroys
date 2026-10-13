@@ -10,6 +10,7 @@ import ReportadorVistas from '@/components/despachos/ReportadorVistas'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
+import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 
 export const metadata = { title: 'Reportador' }
 
@@ -22,6 +23,8 @@ export default async function ReportadorPage({ searchParams }: { searchParams: P
   if (session!.user.country !== 'VE' || !puede(session!.user, 'ver_reportador')) redirect('/automatizaciones')
   // isAdmin = "Configurar automatizaciones" (lib/permisos.ts)
   const isAdmin = puede(session!.user, 'automatizaciones_config')
+  // Programa de escritorio (respaldo de la API): solo el equipo de la plataforma; los clientes reportan por API.
+  const conEscritorio = session!.user.organizacionId === ORGANIZACION_PLATAFORMA
   if (await sinCuentasML(session!)) {
     return <SinCuentaML esAdmin={puede(session!.user, 'ml_cuentas')} titulo="Reportador" gancho="Le escribe a cada comprador su número de guía, sin copiar y pegar."
       beneficios={['Toma las guías de tus despachos y le manda a cada comprador su mensaje en MercadoLibre.',
@@ -35,9 +38,9 @@ export default async function ReportadorPage({ searchParams }: { searchParams: P
       <PageHeader title="Reportador" subtitle="Le escribe a cada comprador su número de guía en MercadoLibre." />
       <ReportadorVistas vistaInicial={sp.vista === 'historial' || jornada ? 'historial' : 'reportar'} jornadaInicial={jornada}
         reportar={<>
-          <ReportadorApi />
+          <ReportadorApi conEscritorio={conEscritorio} />
           <GuiasTealca isAdmin={isAdmin} />
-          <ReportadorPanel isAdmin={isAdmin} />
+          <ReportadorPanel isAdmin={isAdmin} conEscritorio={conEscritorio} />
         </>} />
     </div>
   )
