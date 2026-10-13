@@ -55,7 +55,7 @@ export async function ventasPorConfirmar(db: Pool) {
        SELECT * FROM me_pagos p WHERE p.venta = o.id::text OR p.venta = o.pack_id::text
        ORDER BY p.verificacion = 'invalido' LIMIT 1) p ON true
      LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
-     WHERE o.fecha > NOW() - make_interval(days => GREATEST($2, $3))
+     WHERE o.fecha > NOW() - make_interval(days => GREATEST($2::int, $3::int))
        AND (o.fecha > NOW() - make_interval(days => $2)
             OR (p.verificacion <> 'invalido' AND o.fecha > NOW() - make_interval(days => $3)))
        AND COALESCE(o.estado, '') <> 'cancelled'
