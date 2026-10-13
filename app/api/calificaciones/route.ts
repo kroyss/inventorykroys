@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
       // la conexión tiene su TimeZone). Se muestra, pero no entra al lote.
       `SELECT b.*, (b.fecha::date > CURRENT_DATE - ${plantillas.esperaDias}) AS en_espera FROM (${SQL_BANDEJA}) b
        WHERE ${vista === 'esperando' ? `sugerencia = 'esperar'` : `sugerencia <> 'esperar'`}
-       ORDER BY fecha DESC LIMIT 1000`, [dias])
+       -- La más vieja primero (2026-10-13): es la que menos plazo le queda para calificar en ML.
+       ORDER BY fecha ASC LIMIT 1000`, [dias])
     const { rows: [n] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE sugerencia = 'concretada')::int AS concretadas,
               COUNT(*) FILTER (WHERE sugerencia = 'no_concretada')::int AS no_concretadas,

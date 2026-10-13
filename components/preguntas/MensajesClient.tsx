@@ -237,8 +237,21 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             : c.con_despachos && (c.despachada_at
               ? <span className="text-neutral-500" title="Su guía salió impresa en Despachos">· despachada {new Date(c.despachada_at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
               : <span className="text-neutral-400" title="No hay guía impresa en Despachos para esta venta (pudo despacharse sin registrarla aquí)">· sin despachar en sistema</span>)}
-          {c.sin_leer > 0 && (
-            <button onClick={() => leer(true)} className="ml-auto btn-ghost text-xs px-2 py-1">Marcar como leída</button>
+          {/* Como ML: sobre cerrado y en color = sin leer (clic la marca leída); abierto y gris = leída. */}
+          {c.sin_leer > 0 ? (
+            <button onClick={() => leer(true)} title="Marcar como leída" aria-label="Marcar como leída"
+              className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full text-sky-600 hover:bg-sky-50 hover:text-sky-700 transition-colors">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5v-11Zm2.3-.2 6.1 4.6a1 1 0 0 0 1.2 0l6.1-4.6A.5.5 0 0 0 18.5 6h-13a.5.5 0 0 0-.2.3Z" />
+              </svg>
+            </button>
+          ) : (
+            <span title="Leída" aria-label="Leída" className="ml-auto inline-flex h-8 w-8 items-center justify-center text-neutral-300">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3.5 10 12 4l8.5 6v8.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V10Z" />
+                <path d="m3.5 10 8.5 6 8.5-6" />
+              </svg>
+            </span>
           )}
         </div>
         {items?.length ? (
