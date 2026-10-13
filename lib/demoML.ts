@@ -4,7 +4,7 @@
 // Responde solo lo que usa el sistema; cualquier otra ruta da 404 (como una venta que no existe).
 import type { Pool } from 'pg'
 import { ErrorML } from '@/lib/ml'
-import { compradorDemo, productoDemo } from '@/lib/demoDatos'
+import { compradorDemo, imagen, productoDemo } from '@/lib/demoDatos'
 
 type Init = { method?: string; body?: unknown; headers?: Record<string, string> }
 
@@ -131,7 +131,7 @@ export async function mlDemo<T>(db: Pool, conexionId: number, ruta: string, init
     return r({
       id: item, title: prod.titulo, price: prod.precio, currency_id: 'USD', available_quantity: Math.max(0, disponible),
       condition: 'new', status: pausada ? 'paused' : 'active', sub_status: pausada ? ['out_of_stock'] : [],
-      permalink: null, category_id: null, warranty: 'Garantía del vendedor: 30 días',
+      permalink: null, category_id: null, thumbnail: imagen(prod), warranty: 'Garantía del vendedor: 30 días',
       shipping: { free_shipping: false }, variations: variaciones,
       attributes: [{ name: 'Condición del ítem', value_name: 'Nuevo' }],
     })

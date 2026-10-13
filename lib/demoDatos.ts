@@ -70,7 +70,7 @@ const item = (id: string, variante = 0, cantidad = 1): ItemEnvio => {
 }
 const totalDe = (items: ItemEnvio[]) => Math.round(items.reduce((a, x) => a + CATALOGO.get(x.item_id)!.precio * x.cantidad, 0) * 100) / 100
 
-const imagen = (p: ProductoDemo) => 'data:image/svg+xml,' + encodeURIComponent(
+export const imagen = (p: ProductoDemo) => 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${p.color}"/><text x="32" y="44" font-size="34" text-anchor="middle">${p.icono}</text></svg>`)
 
 // ── Secciones ───────────────────────────────────────────────────────────────

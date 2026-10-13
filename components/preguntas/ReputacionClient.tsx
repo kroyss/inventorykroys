@@ -129,7 +129,6 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
     : negativa ? { txt: 'Negativa', cls: 'bg-red-50 text-red-700', dot: 'bg-red-500' }
     : c.rating === 'positive' ? { txt: 'Positiva', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' }
     : { txt: 'Neutral', cls: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' }
-  const urlML = `https://www.mercadolibre.com.${pais === 'CO' ? 'co' : 've'}/ventas/${c.id}/detalle`
   // "Solicitar cambio de calificación" de ML: no está en su API, es su propia página (la misma del menú ⋮ de la
   // venta). Se pide UNA sola vez: si el comprador no responde, ML la borra a los pocos días; si responde y no
   // la cambia, queda. Por eso se confirma antes de abrirla.
@@ -183,9 +182,7 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
               <a href={urlCambio} target="_blank" rel="noreferrer" onClick={confirmarCambio} className="btn-primary text-xs"
                 title="Abre en MercadoLibre la solicitud de cambio de calificación (se pide una sola vez)">Pedir cambio</a>
             )}
-            {c.con_mensajes
-              ? <Link href={`/mensajes?pack=${c.pack}`} className="btn-secondary text-xs">Escribirle</Link>
-              : <a href={urlML} target="_blank" rel="noreferrer" className="btn-secondary text-xs" title="Abre la venta en MercadoLibre para escribirle">Escribirle en ML</a>}
+            <Link href={`/mensajes?pack=${c.pack}`} className="btn-secondary text-xs">Escribirle</Link>
             {!cambio && !pedido && (
               <button type="button" onClick={() => onVista(c, !c.vista_at)} disabled={ocupado} className="btn-secondary text-xs">
                 {c.vista_at ? 'Volver a avisar' : 'Ya la vi'}

@@ -532,7 +532,7 @@ function NotasVenta({ pack, onCambio }: { pack: string; onCambio: () => void }) 
     <div className="flex items-center gap-2">
       <button onClick={() => setEditando({ id: null, texto: '' })}
         className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-neutral-300 px-2.5 py-1 text-xs text-neutral-600 hover:border-amber-400 hover:text-amber-800 hover:bg-amber-50 transition-colors">
-        <IconoNota /> Agregar nota a la venta
+        <IconoNota /> + Nota
       </button>
       {datos.error && <span className="text-[11px] text-neutral-400">No se pudieron leer las notas ({datos.error})</span>}
       {error && <span className="text-xs text-red-600">{error}</span>}
