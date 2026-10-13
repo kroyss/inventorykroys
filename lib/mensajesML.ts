@@ -7,6 +7,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
+import { guardarOrden } from '@/lib/calificacionesML'
 
 interface MensajeApi {
   id: string
@@ -57,15 +58,22 @@ type OrdenVenta = {
   buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
 }
 
-/** Las órdenes de una venta (orden suelta o pack). */
+/** Las órdenes de una venta (orden suelta o pack). De paso se guardan en ml_ordenes (2026-10-13): una
+ *  compra recién hecha que escribe antes de la sincronización horaria ya queda con su producto (foto en
+ *  la bandeja) y aparece en Ventas → Por confirmar, sin ninguna llamada extra a ML. */
 async function ordenesDeVenta(db: Pool, conexionId: number, pack: string): Promise<OrdenVenta[]> {
+  let ordenes: OrdenVenta[]
   try {
-    return [await mlFetch<OrdenVenta>(db, conexionId, `/orders/${pack}`)]
+    ordenes = [await mlFetch<OrdenVenta>(db, conexionId, `/orders/${pack}`)]
   } catch (e) {
     if (!(e instanceof ErrorML)) throw e
     const p = await mlFetch<{ orders: { id: number }[] }>(db, conexionId, `/packs/${pack}`)
-    return Promise.all(p.orders.slice(0, 5).map(o => mlFetch<OrdenVenta>(db, conexionId, `/orders/${o.id}`)))
+    ordenes = await Promise.all(p.orders.slice(0, 5).map(o => mlFetch<OrdenVenta>(db, conexionId, `/orders/${o.id}`)))
   }
+  for (const o of ordenes) {
+    await guardarOrden(db, conexionId, o as unknown as Parameters<typeof guardarOrden>[2]).catch(e => console.error('[mensajes] guardar orden', e))
+  }
+  return ordenes
 }
 
 const compradorDe = (ordenes: OrdenVenta[]) => {
