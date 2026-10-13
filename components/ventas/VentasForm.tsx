@@ -430,8 +430,6 @@ Revísala en el detalle que se abre ahora.`)
             <PagoDeVenta key={`pago-${numeroActual}`} numero={numeroActual} compraAt={mlVenta?.fecha ?? null} onPago={alPago} puedeVerificar={puedeVerificar}
               pagoOk={pagoOk} onPagoOk={v => setPagoOkDe(v ? numeroActual : null)} />
           )}
-          {/* Claves distintas: son hermanos (con la misma clave React los confunde y los duplica). */}
-          {mlVenta && <LoQueSeHablo key={`hablo-${numeroActual}`} numero={numeroActual} />}
 
           {/* Lo que compró en MercadoLibre */}
           {mlVenta && mlVenta.items.length > 0 && (() => {
@@ -581,29 +579,28 @@ Revísala en el detalle que se abre ahora.`)
             </p>
           )}
 
-          <div className="flex items-end justify-between gap-4">
-            <div className="w-20 shrink-0">
-              <label className="text-xs text-neutral-500">Desc. %</label>
+          {/* Cierre en una sola franja (2026-10-13): notas, descuento, cantidad y total. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 pt-3">
+            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas (opcional)" aria-label="Notas"
+              className="flex-1 min-w-[12rem] border rounded px-3 py-1.5 text-sm" />
+            <label className="flex items-center gap-1.5 text-xs text-neutral-500">
+              Desc.
               <NumberInput min={0} max={100} step="0.01" value={discount}
                 onValueChange={setDiscount}
-                className="mt-1 w-full border rounded px-2 py-2 text-sm text-center" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-neutral-500">Cantidad</div>
-              <div className="text-lg font-semibold mt-1">{totalQty}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-neutral-500">Total</div>
-              <div className="text-2xl font-bold">${money(total)}</div>
-              {discount > 0 && <div className="text-xs text-neutral-400">Subtotal: ${money(subtotal)}</div>}
-            </div>
+                className="w-14 border rounded px-1.5 py-1.5 text-sm text-center" />
+              %
+            </label>
+            <span className="text-xs text-neutral-500">Cant. <b className="text-sm text-neutral-900 num">{totalQty}</b></span>
+            <span className="ml-auto text-right leading-tight">
+              <span className="text-xs text-neutral-500 mr-1.5">Total</span>
+              <span className="text-xl font-bold num">${money(total)}</span>
+              {discount > 0 && <span className="block text-[11px] text-neutral-400">Subtotal: ${money(subtotal)}</span>}
+            </span>
           </div>
 
-          <div>
-            <label className="text-xs text-neutral-500">Notas</label>
-            <input value={notes} onChange={e => setNotes(e.target.value)}
-              className="mt-1 w-full border rounded px-3 py-2 text-sm" />
-          </div>
+          {/* Lo que se habló, al final: primero lo de la venta (pago, productos, total), después la conversación.
+              Claves distintas a las de PagoDeVenta: son hermanos (con la misma clave React los confunde). */}
+          {mlVenta && <LoQueSeHablo key={`hablo-${numeroActual}`} numero={numeroActual} />}
         </div>
 
         {/* sticky footer */}
