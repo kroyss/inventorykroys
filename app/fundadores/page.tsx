@@ -91,6 +91,77 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
     <div className="min-h-screen bg-neutral-50">
       {/* El botón "Postúlate" baja suave hasta el formulario. */}
       <style>{'html { scroll-behavior: smooth; }'}</style>
+      {/* Seleccionados de la última ronda anunciada: qué tienen que hacer y qué pasa con el resto. ARRIBA de todo
+          mientras son la novedad (2026-10-13: el 97% entra por celular y no llegaba a verlos). Link directo: #resultados. */}
+      {anunciada && !resultadosViejos && (
+        <section id="resultados" className="bg-lime-50 border-b border-lime-200">
+          <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 grid gap-6 lg:grid-cols-[1fr_1.15fr] items-start">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-800">Resultados · Ronda {anunciada.numero}</p>
+              <h2 className="mt-2 text-2xl font-semibold text-neutral-900">🎉 ¡Ya están los seleccionados!</h2>
+              <p className="mt-2 text-sm text-neutral-600">Gracias a todos los que se postularon. La respuesta fue increíble.</p>
+              {/* En celular, el botón antes de la lista (en escritorio está al lado). */}
+              <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer"
+                className="lg:hidden mt-4 inline-flex items-center gap-2 bg-lime-400 text-neutral-950 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors">
+                ¿Quedaste? Escríbenos por Telegram <span aria-hidden="true">→</span>
+              </a>
+              <ul className="mt-4 space-y-1.5">
+                {seleccionados(anunciada.numero).map(x => (
+                  <li key={x} className="flex items-center gap-2 text-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-lime-600 shrink-0" />
+                    <span className="font-semibold text-neutral-900">{x}</span>
+                  </li>
+                ))}
+              </ul>
+              {conPlazo && espera.length > 0 && <>
+                <p className="mt-5 text-sm font-semibold text-neutral-900">Lista de espera</p>
+                <p className="text-xs text-neutral-500">Se confirma el {fechaTanda(FECHA_LISTA_ESPERA)} con los cupos que queden libres.</p>
+                <ul className="mt-2 space-y-1.5">
+                  {espera.map(x => (
+                    <li key={x} className="flex items-center gap-2 text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span className="font-medium text-neutral-700">{x}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>}
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-xl bg-white border border-lime-300 p-4">
+                <p className="text-sm font-semibold text-neutral-900">👉 ¿Quedaste seleccionado?</p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Escríbenos por privado a{' '}
+                  <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer" className="font-semibold text-lime-800 underline underline-offset-2">@{TELEGRAM_OFICIAL}</a>{' '}
+                  para darte tu acceso. Si te postulaste con Instagram, te escribimos por ahí.
+                </p>
+                {conPlazo && (
+                  <p className="mt-2 text-sm text-neutral-600">
+                    Tienes <b className="text-neutral-900">hasta el {fechaTanda(FECHA_LIMITE_ACTIVACION)}</b> para iniciar tu activación
+                    (conectar tu cuenta de MercadoLibre). Si no, tu cupo pasa a la lista de espera.
+                  </p>
+                )}
+                <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 bg-neutral-950 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-neutral-800 transition-colors">
+                  Escribir por Telegram <span aria-hidden="true">→</span>
+                </a>
+              </div>
+              {siguiente && (
+                <div className="rounded-xl bg-white border border-neutral-200 p-4 text-sm text-neutral-600 space-y-2">
+                  <p>
+                    <b className="text-neutral-900">¿Te postulaste y no quedaste esta vez?</b> Tu postulación <b className="text-neutral-900">sigue participando en la Ronda {siguiente.numero}</b>:
+                    no tienes que volver a postularte. La Ronda {siguiente.numero} tiene <b className="text-neutral-900">{siguiente.cupos} cupos</b>
+                    {diaResultados(siguiente) && <> y se anuncia el <b className="text-neutral-900">{fechaTanda(diaResultados(siguiente)!)}</b></>}.
+                  </p>
+                  {diasInscripcion(siguiente) && (
+                    <p><b className="text-neutral-900">¿Aún no te postulas?</b> Hazlo el <b className="text-neutral-900">{diasInscripcion(siguiente)}</b> en el formulario de abajo 🚀</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Portada */}
       <section className="relative overflow-hidden bg-neutral-950 text-white">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 w-[34rem] h-[34rem] rounded-full border border-lime-400/15" />
@@ -190,71 +261,6 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
           </div>
         </div>
       </section>
-
-      {/* Seleccionados de la última ronda anunciada: qué tienen que hacer y qué pasa con el resto */}
-      {anunciada && !resultadosViejos && (
-        <section className="bg-lime-50 border-b border-lime-200">
-          <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 grid gap-6 lg:grid-cols-[1fr_1.15fr] items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lime-800">Resultados · Ronda {anunciada.numero}</p>
-              <h2 className="mt-2 text-2xl font-semibold text-neutral-900">🎉 ¡Ya están los seleccionados!</h2>
-              <p className="mt-2 text-sm text-neutral-600">Gracias a todos los que se postularon. La respuesta fue increíble.</p>
-              <ul className="mt-4 space-y-1.5">
-                {seleccionados(anunciada.numero).map(x => (
-                  <li key={x} className="flex items-center gap-2 text-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-lime-600 shrink-0" />
-                    <span className="font-semibold text-neutral-900">{x}</span>
-                  </li>
-                ))}
-              </ul>
-              {conPlazo && espera.length > 0 && <>
-                <p className="mt-5 text-sm font-semibold text-neutral-900">Lista de espera</p>
-                <p className="text-xs text-neutral-500">Se confirma el {fechaTanda(FECHA_LISTA_ESPERA)} con los cupos que queden libres.</p>
-                <ul className="mt-2 space-y-1.5">
-                  {espera.map(x => (
-                    <li key={x} className="flex items-center gap-2 text-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                      <span className="font-medium text-neutral-700">{x}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>}
-            </div>
-            <div className="space-y-3">
-              <div className="rounded-xl bg-white border border-lime-300 p-4">
-                <p className="text-sm font-semibold text-neutral-900">👉 ¿Quedaste seleccionado?</p>
-                <p className="mt-1 text-sm text-neutral-600">
-                  Escríbenos por privado a{' '}
-                  <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer" className="font-semibold text-lime-800 underline underline-offset-2">@{TELEGRAM_OFICIAL}</a>{' '}
-                  para darte tu acceso. Si te postulaste con Instagram, te escribimos por ahí.
-                </p>
-                {conPlazo && (
-                  <p className="mt-2 text-sm text-neutral-600">
-                    Tienes <b className="text-neutral-900">hasta el {fechaTanda(FECHA_LIMITE_ACTIVACION)}</b> para iniciar tu activación
-                    (conectar tu cuenta de MercadoLibre). Si no, tu cupo pasa a la lista de espera.
-                  </p>
-                )}
-                <a href={`https://t.me/${TELEGRAM_OFICIAL}`} target="_blank" rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-2 bg-neutral-950 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-neutral-800 transition-colors">
-                  Escribir por Telegram <span aria-hidden="true">→</span>
-                </a>
-              </div>
-              {siguiente && (
-                <div className="rounded-xl bg-white border border-neutral-200 p-4 text-sm text-neutral-600 space-y-2">
-                  <p>
-                    <b className="text-neutral-900">¿Te postulaste y no quedaste esta vez?</b> Tu postulación <b className="text-neutral-900">sigue participando en la Ronda {siguiente.numero}</b>:
-                    no tienes que volver a postularte. La Ronda {siguiente.numero} tiene <b className="text-neutral-900">{siguiente.cupos} cupos</b>
-                    {diaResultados(siguiente) && <> y se anuncia el <b className="text-neutral-900">{fechaTanda(diaResultados(siguiente)!)}</b></>}.
-                  </p>
-                  {diasInscripcion(siguiente) && (
-                    <p><b className="text-neutral-900">¿Aún no te postulas?</b> Hazlo el <b className="text-neutral-900">{diasInscripcion(siguiente)}</b> en el formulario de abajo 🚀</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
 
       <main className="max-w-5xl mx-auto px-5 sm:px-8 py-12 grid gap-10 lg:grid-cols-[1fr_1.15fr]">
         {/* En celular (97% de las visitas) el formulario va antes de "Qué vas a probar". */}
