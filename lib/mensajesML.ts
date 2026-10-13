@@ -53,7 +53,7 @@ async function sellerDe(db: Pool, conexionId: number): Promise<number> {
 }
 
 type OrdenVenta = {
-  order_items: { item: { id: string; title: string; variation_id?: number | null; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number }[]
+  order_items: { item: { id: string; title: string; variation_id?: number | null; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number; unit_price?: number | null; currency_id?: string | null }[]
   buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
 }
 
@@ -237,7 +237,7 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
 }
 
 /** `variante`: lo que eligió el comprador ("Color: Azul · Talla: M"); el título solo no lo dice. */
-export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; link: string | null; imagen: string | null }
+export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; link: string | null; imagen: string | null }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
@@ -248,7 +248,7 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
     const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
     const link = m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` : null
     const variante = (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
-    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, link, imagen: null as string | null, varId: i.item.variation_id ?? null }
+    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, precio: i.unit_price ?? null, moneda: i.currency_id ?? null, link, imagen: null as string | null, varId: i.item.variation_id ?? null }
   })
   await Promise.all(items.map(async it => { it.imagen = await imagenDeItem(db, conexionId, it.id, it.varId).catch(() => null) }))
   return { items: items.map(({ varId: _v, ...it }) => it), comprador }

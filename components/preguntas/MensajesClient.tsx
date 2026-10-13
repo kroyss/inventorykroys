@@ -119,10 +119,14 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
 
 /** La conversación de una venta. La usan la bandeja y Ventas → Nueva venta ("Lo que se habló", 2026-10-12).
  *  soloLectura: sin permiso de Mensajes se lee (y se ven las notas) pero no se responde. */
+/** Monto de una venta de ML: USD con 2 decimales, pesos (COP) sin decimales. Formato de-DE (1.234,56). */
+const dinero = (n: number, moneda?: string | null) =>
+  `${moneda === 'COP' ? '$' : moneda === 'VES' ? 'Bs' : 'US$'} ${n.toLocaleString('de-DE', moneda === 'COP' ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
 export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean; sinNotas?: boolean }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
-  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null; imagen?: string | null }[] | null>(null)
+  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; link: string | null; imagen?: string | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
@@ -243,21 +247,31 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             // eslint-disable-next-line @next/next/no-img-element
             <img key={it.id + i} src={it.imagen!} alt="" className="h-12 w-12 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
           ))}
-          <p className="text-sm font-medium text-neutral-900">
+          <div className="min-w-0 space-y-1.5">
             {items.map((it, i) => (
-              <span key={it.id + i}>
-                {i > 0 && <span className="text-neutral-300"> · </span>}
-                {it.cantidad} ×{' '}
-                {it.link
-                  ? <a href={it.link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
-                      className="hover:underline underline-offset-2">{it.titulo} <span className="text-neutral-400">↗</span></a>
-                  : it.titulo}
-                {it.variante && (
-                  <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>
-                )}
-              </span>
+              <div key={it.id + i}>
+                <p className="text-sm font-medium text-neutral-900">
+                  {it.link
+                    ? <a href={it.link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
+                        className="hover:underline underline-offset-2">{it.titulo} <span className="text-neutral-400">↗</span></a>
+                    : it.titulo}
+                  {it.variante && (
+                    <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>
+                  )}
+                </p>
+                {/* Cantidad × precio = total (ML muestra "6 x precio" sin el total). */}
+                <p className="text-xs text-neutral-500 tabular-nums">
+                  {it.cantidad} × {it.precio != null ? dinero(it.precio, it.moneda) : 'precio no disponible'}
+                  {it.precio != null && <> = <b className="font-semibold text-neutral-900">{dinero(it.precio * it.cantidad, it.moneda)}</b></>}
+                </p>
+              </div>
             ))}
-          </p>
+            {items.length > 1 && items.every(it => it.precio != null) && (
+              <p className="text-xs text-neutral-500 tabular-nums border-t border-neutral-100 pt-1">
+                Total de la venta: <b className="font-semibold text-neutral-900">{dinero(items.reduce((a, it) => a + it.precio! * it.cantidad, 0), items[0].moneda)}</b>
+              </p>
+            )}
+          </div>
           </div>
         ) : c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">

@@ -91,7 +91,10 @@ export async function mlDemo<T>(db: Pool, conexionId: number, ruta: string, init
         const [itemId, varId] = (items[i] ?? '').split(':')
         return { item: { id: itemId || 'MLV0', title: d.titulo, variation_id: varId ? Number(varId) : null,
                          variation_attributes: d.variante ? [{ name: d.variante.split(':')[0], value_name: d.variante.split(':').slice(1).join(':').trim() }] : [] },
-                 quantity: d.cantidad }
+                 quantity: d.cantidad,
+                 // Precio unitario: el total repartido entre las unidades (la demo no guarda el de cada artículo).
+                 unit_price: o.total ? Math.round(Number(o.total) / detalle.reduce((a, x) => a + (x.cantidad || 1), 0) * 100) / 100 : null,
+                 currency_id: o.moneda ?? 'USD' }
       }),
       total_amount: o.total, currency_id: o.moneda ?? 'USD',
       feedback: { seller: o.cal_vendedor ? { rating: o.cal_vendedor } : null, buyer: null },
