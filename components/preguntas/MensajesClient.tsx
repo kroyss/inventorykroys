@@ -65,7 +65,10 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mensajes" subtitle="Mensajes de tus ventas en MercadoLibre, de todas tus cuentas, para que ninguno quede sin respuesta"
+      <PageHeader title="Mensajes" subtitle={<>
+        Mensajes de tus ventas en MercadoLibre, de todas tus cuentas, para que ninguno quede sin respuesta
+        <span className="block text-xs text-neutral-400 mt-0.5">Leer un mensaje aquí no lo marca como leído en MercadoLibre: se marca cuando respondes o tocas el sobre.</span>
+      </>}
         actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null) }} items={[
@@ -288,7 +291,6 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
           </div>
         ) : c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-          <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
           <PreguntasPrevias n={previas.length} lista={previas} etiqueta="Preguntó antes de comprar" destacado />
         </div>
         {/* En Ventas las notas van junto a los productos (VentasForm): aquí no se repiten. */}
