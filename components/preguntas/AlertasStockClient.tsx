@@ -158,12 +158,20 @@ export default function AlertasStockClient() {
           className="w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
       )}
       {/* "Volver a avisar" solo si la quitaron a mano y todavía está dentro de los 7 días (si no, ya es vieja). */}
-      {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
-        title={f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
-        className="btn-ghost text-xs px-2 py-1 shrink-0 text-neutral-500 hover:text-neutral-900 disabled:opacity-40">
-        {f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
-      </button>}
-      <div className="text-right shrink-0">
+      {/* Columna de ancho fijo (con o sin botón) para que el stock y el estado queden alineados. */}
+      <div className="sm:w-32 shrink-0 flex justify-end">
+        {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
+          title={f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
+            f.caliente ? 'border-neutral-300 text-neutral-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700'
+                       : 'border-neutral-300 text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'}`}>
+          {f.caliente
+            ? <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            : <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>}
+          {f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
+        </button>}
+      </div>
+      <div className="sm:w-36 text-right shrink-0">
         <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
           {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
