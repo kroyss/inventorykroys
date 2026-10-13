@@ -19,7 +19,9 @@ import { Pool, type PoolClient } from 'pg'
 import { COUNTRY_TZ } from '@/lib/tz'
 import type { Country } from '@/lib/types'
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+// connectionTimeoutMillis: si el pool se agota, el pedido falla a los 20 s (con error en el log) en vez
+// de quedarse esperando para siempre y colgar la app (13-10: el cron retenía todas las conexiones).
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 20_000 })
 
 export function dbGlobal() {
   return pool

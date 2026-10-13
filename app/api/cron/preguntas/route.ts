@@ -1,6 +1,6 @@
 import { DIAS_INACTIVA, MINUTOS_INACTIVA, SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import { after, NextRequest, NextResponse } from 'next/server'
-import { conEmpresa, dbEmpresa, dbGlobal } from '@/lib/db'
+import { conEmpresa, dbGlobal } from '@/lib/db'
 import { revisarStockPendiente } from '@/lib/alertasStock'
 import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
@@ -40,18 +40,21 @@ export async function GET(req: NextRequest) {
      WHERE e.is_active AND 'preguntas' = ANY(e.modulos) AND ${SQL_CUENTA_SINCRONIZA} ORDER BY e.id`)
   const resultado: Record<number, unknown> = {}
   const sincronizadas: typeof todas = []
+  // Cada empresa con conEmpresa (se devuelve la conexión al terminar con ESA empresa), NUNCA dbEmpresa:
+  // dbEmpresa la retiene hasta el final del request y con más empresas que conexiones del pool (10)
+  // el cron se quedaba esperando una que nunca llegaba y bloqueaba la app entera (13-10, 18 empresas).
   for (const e of todas) {
     try {
       // Inactiva: solo si su última sincronización tiene más de MINUTOS_INACTIVA minutos.
       if (e.inactiva) {
-        const { rows: [u] } = await dbEmpresa(e.id, e.country as Country).query(
-          `SELECT MAX(ultima_sync) > NOW() - INTERVAL '${MINUTOS_INACTIVA} minutes' AS reciente FROM ml_conexiones WHERE estado = 'activa'`)
+        const { rows: [u] } = await conEmpresa(e.id, e.country as Country, db => db.query(
+          `SELECT MAX(ultima_sync) > NOW() - INTERVAL '${MINUTOS_INACTIVA} minutes' AS reciente FROM ml_conexiones WHERE estado = 'activa'`))
         if (u?.reciente) { resultado[e.id] = { omitida: 'inactiva' }; continue }
       }
       // Demostración: datos sembrados, nada que traer ni revisar (lib/demo.ts).
       if (await esDemoEmpresa(e.id, e.country as Country)) { resultado[e.id] = { omitida: 'demo' }; continue }
       sincronizadas.push(e)
-      resultado[e.id] = await sincronizarEmpresa(dbEmpresa(e.id, e.country as Country))
+      resultado[e.id] = await conEmpresa(e.id, e.country as Country, db => sincronizarEmpresa(db))
     } catch (err) {
       resultado[e.id] = { error: err instanceof Error ? err.message : String(err) }
     }
