@@ -205,7 +205,7 @@ export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { is
           </div>
         )}
         {editando && (
-          <EditorConfig config={editando} limite={limite} onChange={setEditando} conectadas={conectadas}
+          <EditorConfig config={editando} original={config} sugerida={sugeridas.plantillas[0]} limite={limite} onChange={setEditando} conectadas={conectadas}
             onGuardar={() => guardar()} onCancelar={() => { setEditando(null); setError(null) }} guardando={guardando} />
         )}
       </section>
@@ -326,8 +326,8 @@ function FilaEquipo({ e, isAdmin, pendientes, configOk, onReportar, onDetener, o
   )
 }
 
-function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCancelar, guardando }: {
-  config: Config; limite: number; conectadas: string[]; onChange: (c: Config) => void
+function EditorConfig({ config, original, sugerida, limite, conectadas, onChange, onGuardar, onCancelar, guardando }: {
+  config: Config; original: Config; sugerida: string; limite: number; conectadas: string[]; onChange: (c: Config) => void
   onGuardar: () => void; onCancelar: () => void; guardando: boolean
 }) {
   const setCuenta = (i: number, k: keyof Cuenta, v: string) =>
@@ -357,6 +357,12 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
     const nuevo = (antes + variable + sin.slice(antes.length)).replace(/ {2,}/g, ' ')
     setAviso(null)
     onChange({ ...config, plantillas: config.plantillas.map((p, j) => (j === i ? nuevo : p)) })
+  }
+  // "Restablecer": vuelve al mensaje guardado (o al sugerido, si es una versión nueva) por si se desordenó.
+  const inicial = (i: number) => original.plantillas[i] ?? sugerida
+  const restablecer = (i: number) => {
+    setAviso(null)
+    onChange({ ...config, plantillas: config.plantillas.map((p, j) => (j === i ? inicial(i) : p)) })
   }
   const paginaEjemplo = config.cuentas.length ? config.cuentas[0].pagina : paginaML(conectadas[0] ?? 'tutienda')
   const paginaLarga = config.cuentas.length
@@ -435,6 +441,13 @@ function EditorConfig({ config, limite, conectadas, onChange, onGuardar, onCance
                     {p.includes(x) ? `Mover ${x} aquí` : `Poner ${x} aquí`}
                   </button>
                 ))}
+                {p !== inicial(i) && (
+                  <button type="button" onClick={() => restablecer(i)}
+                    title={original.plantillas[i] !== undefined ? 'Vuelve al mensaje como estaba guardado' : 'Vuelve al mensaje sugerido'}
+                    className="text-[11px] px-2 py-0.5 rounded-full border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100">
+                    ↺ Restablecer
+                  </button>
+                )}
               </div>
               {aviso?.i === i && <p className="text-[11px] text-amber-700 mt-1">{aviso.texto}</p>}
               </div>
