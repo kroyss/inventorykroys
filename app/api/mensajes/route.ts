@@ -47,6 +47,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
+      // Pestaña Recordatorios (lib/recordatoriosPago.ts): solo con Pagos ME.
+      recordatorios: tieneModulo(s.session.user, 'pagos_me') && s.session.user.country === 'VE',
     })
   } catch (err) {
     return apiError(err)

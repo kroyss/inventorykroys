@@ -5,6 +5,7 @@ import { revisarStockPendiente } from '@/lib/alertasStock'
 import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
 import { calificarAutomatico } from '@/lib/calificacionesAuto'
+import { recordarPagos } from '@/lib/recordatoriosPago'
 import { responderAutomaticas } from '@/lib/automaticasPreguntas'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   const { rows: todas } = await dbGlobal().query(
     // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
     // Inactiva: ningún usuario suyo usó el sistema en DIAS_INACTIVA días (la plataforma nunca).
-    `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario,
+    `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario, 'pagos_me' = ANY(e.modulos) AS pagos_me,
             o.estado <> 'propietario' AND COALESCE((
               SELECT MAX(GREATEST(u.ultima_actividad, u.last_login)) FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
               WHERE ue.empresa_id = e.id) < NOW() - INTERVAL '${DIAS_INACTIVA} days', TRUE) AS inactiva
@@ -83,6 +84,16 @@ export async function GET(req: NextRequest) {
         if (r) console.log('[calificacion automatica]', e.id, r)
       } catch (err) {
         console.error('[calificacion automatica]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Recordatorios de pago (lib/recordatoriosPago.ts): solo empresas con Pagos ME que los prendieron;
+    // cada turno pide "Traer ME", espera que termine y recién ahí manda.
+    for (const e of sincronizadas.filter(x => x.pagos_me && x.country === 'VE')) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => recordarPagos(db))
+        if (r) console.log('[recordatorios pago]', e.id, r)
+      } catch (err) {
+        console.error('[recordatorios pago]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Contexto de la IA (lib/catalogoML.ts, lib/fichasIA.ts): catálogo cada 6 h por cuenta, el

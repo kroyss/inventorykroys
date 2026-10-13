@@ -7,6 +7,7 @@ import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import type { MensajeRapido } from '@/lib/mensajesRapidos'
+import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
 
 export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -27,19 +28,21 @@ function hace(fecha: string | null) {
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
 export default function MensajesClient({ pack: packPedido = null }: { pack?: string | null }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'rapidas'>(packPedido ? 'todas' : 'sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'rapidas' | 'recordatorios'>(packPedido ? 'todas' : 'sin_leer')
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
+  const [conRecordatorios, setConRecordatorios] = useState(false)
   const [lista, setLista] = useState<Conversacion[] | null>(null)
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
-    const r = await fetch(`/api/mensajes?vista=${vista === 'rapidas' ? 'sin_leer' : vista}`)
+    const r = await fetch(`/api/mensajes?vista=${vista === 'rapidas' || vista === 'recordatorios' ? 'sin_leer' : vista}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setLista(d.conversaciones); setCont(d.sin_leer)
     setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
+    setConRecordatorios(!!d.recordatorios)
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
@@ -68,8 +71,9 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         { value: 'sin_leer', label: 'Sin leer', count: cont?.conversaciones },
         { value: 'todas', label: 'Recientes' },
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
+        ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
       ]} />
-      {vista === 'rapidas' ? (
+      {vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
@@ -119,6 +123,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Convers
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null; imagen?: string | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
+  const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
   // De dónde salió el texto (se guarda al enviar, migración 062).
   const [origen, setOrigen] = useState<{ fuente: 'ia' | 'parecida' | 'rapida' | 'propia'; base: string }>({ fuente: 'propia', base: '' })
@@ -178,6 +183,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Convers
     if (d.items) setItems(d.items)
     if (d.comprador) setComprador(d.comprador)
     if (Array.isArray(d.preguntas)) setPrevias(d.preguntas)
+    setRecordatorio(d.recordatorio ?? null)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
@@ -258,6 +264,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Convers
           <PreguntasPrevias n={previas.length} lista={previas} etiqueta="Preguntó antes de comprar" destacado />
         </div>
         <NotasVenta pack={c.pack_id} onCambio={onCambio} />
+        {recordatorio && !soloLectura && <RecordatorioVenta pack={c.pack_id} r={recordatorio} onCambio={setRecordatorio} />}
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[12rem]">
         {!mensajes ? <p className="text-sm text-neutral-400">Cargando…</p> : mensajes.map((m, i) => {
@@ -616,6 +623,27 @@ function VisorFoto({ url, nombre, onCerrar }: { url: string; nombre: string; onC
         className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/15 hover:bg-white/30 text-white text-2xl leading-10 text-center">×</button>
       <a href={url} download={nombre} onClick={e => e.stopPropagation()}
         className="absolute bottom-4 right-4 text-xs text-white/80 hover:text-white underline underline-offset-2">Descargar</a>
+    </div>
+  )
+}
+
+/** Recordatorios de pago de esta venta (lib/recordatoriosPago.ts): "Ya pagó, no recordar" o deshacerlo. */
+function RecordatorioVenta({ pack, r, onCambio }: {
+  pack: string; r: { enviados: number; detenido: string | null }; onCambio: (r: { enviados: number; detenido: string | null }) => void
+}) {
+  const [ocupado, setOcupado] = useState(false)
+  const cambiar = async (detener: boolean) => {
+    setOcupado(true)
+    const res = await fetch('/api/mensajes/recordatorios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack, detener }) })
+    if (res.ok) onCambio({ ...r, detenido: detener ? 'manual' : null })
+    setOcupado(false)
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+      <span>Recordatorios de pago: {r.enviados} {r.enviados === 1 ? 'enviado' : 'enviados'}{r.detenido ? ' · detenidos' : ''}</span>
+      {r.detenido === 'manual'
+        ? <button onClick={() => cambiar(false)} disabled={ocupado} className="btn-secondary text-xs">Volver a recordar</button>
+        : !r.detenido && <button onClick={() => cambiar(true)} disabled={ocupado} className="btn-secondary text-xs">Ya pagó, no recordar</button>}
     </div>
   )
 }

@@ -7,6 +7,8 @@ import { ErrorML } from '@/lib/ml'
 import { itemsDeVenta, leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
 import { preguntasDeComprador } from '@/lib/preguntasComprador'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
+import { tieneModulo } from '@/lib/modulos'
+import { leerConfigDb } from '@/lib/recordatoriosPago'
 
 async function conversacion(db: import('pg').Pool, pack: string) {
   const { rows: [c] } = await db.query(
@@ -34,7 +36,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
     if (marcar) await s.db.query(`UPDATE ml_conversaciones SET sin_leer = 0, actualizada_at = NOW() WHERE pack_id = $1`, [pack])
     // Lo que este comprador preguntó antes (de lo ya sincronizado en Preguntas).
     const preguntas = venta?.comprador.id ? await preguntasDeComprador(s.db, venta.comprador.id).catch(() => []) : []
-    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas })
+    // Recordatorios de pago (solo con Pagos ME): si ya se le mandaron, el botón "Ya pagó, no recordar".
+    let recordatorio: { enviados: number; detenido: string | null } | null = null
+    if (tieneModulo(s.session.user, 'pagos_me') && (await leerConfigDb(s.db)).activo) {
+      const { rows: [r] } = await s.db.query(`SELECT enviados, detenido FROM ml_recordatorios WHERE pack_id = $1::bigint`, [pack])
+      if (r && (r.enviados > 0 || r.detenido)) recordatorio = r
+    }
+    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas, recordatorio })
   } catch (err) {
     return apiError(err)
   }
