@@ -157,6 +157,20 @@ export default async function FundadoresPage({ searchParams }: { searchParams: P
                   )}
                 </div>
               )}
+              {/* Última ronda: ya no hay a cuál pasar. Quedan la lista de espera y los próximos anuncios (13-10). */}
+              {!siguiente && (
+                <div className="rounded-xl bg-white border border-neutral-200 p-4 text-sm text-neutral-600">
+                  <p>
+                    <b className="text-neutral-900">¿No quedaste esta vez?</b>{' '}
+                    {conPlazo && espera.length > 0
+                      ? <>Si estás en la <b className="text-neutral-900">lista de espera</b>, el {fechaTanda(FECHA_LISTA_ESPERA)} confirmamos los cupos que queden libres. </>
+                      : null}
+                    Atento a nuestra{' '}
+                    <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noreferrer" className="font-semibold text-lime-800 underline underline-offset-2">Comunidad de Vendedores</a>{' '}
+                    de Telegram para los próximos anuncios.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </section>
