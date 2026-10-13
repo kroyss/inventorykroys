@@ -1,4 +1,5 @@
 'use client'
+import TextoConPublicaciones from './TextoConPublicaciones'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
@@ -327,7 +328,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             ))}
           </div>
         )}
-        <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={350}
+        <TextoConPublicaciones value={texto} onTexto={setTexto} cuenta={c.cuenta} rows={2} maxLength={350}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && texto.trim() && !problemas.length) enviar() }}
           onPaste={pegar}
           placeholder="Escribe la respuesta… (Ctrl+V pega una foto · Ctrl+Enter para enviar)"

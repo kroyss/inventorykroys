@@ -49,12 +49,18 @@ export async function ventasPorConfirmar(db: Pool) {
             (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
-     LEFT JOIN me_pagos p ON p.venta IN (o.id::text, o.pack_id::text)
+     -- Cruces por igualdad (2026-10-13): con "IN (o.id, o.pack_id)" Postgres no usaba los índices y
+     -- comparaba cada orden contra todas las ventas (1,2 s por carga; así ~60 ms).
+     LEFT JOIN LATERAL (
+       SELECT * FROM me_pagos p WHERE p.venta = o.id::text OR p.venta = o.pack_id::text
+       ORDER BY p.verificacion = 'invalido' LIMIT 1) p ON true
      LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
-     WHERE (o.fecha > NOW() - make_interval(days => $2)
+     WHERE o.fecha > NOW() - make_interval(days => GREATEST($2, $3))
+       AND (o.fecha > NOW() - make_interval(days => $2)
             OR (p.verificacion <> 'invalido' AND o.fecha > NOW() - make_interval(days => $3)))
        AND COALESCE(o.estado, '') <> 'cancelled'
-       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
      ORDER BY o.fecha DESC`, [dias, DIAS_MAX, DIAS_CON_PAGO])
 
   // Cuántos productos del sistema tiene cada publicación (sin el prefijo: MLV768007052 → 768007052) y
@@ -114,7 +120,8 @@ export async function completarNombres(db: Pool, maximo = 5) {
      LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
      WHERE o.comprador_nombre IS NULL AND NULLIF(c.comprador_nombre, '') IS NULL
        AND o.fecha > NOW() - make_interval(days => $1) AND COALESCE(o.estado, '') <> 'cancelled'
-       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
      ORDER BY o.fecha DESC LIMIT $2`, [DIAS_MAX, maximo])
   for (const r of rows) {
     try { await traerOrden(db, r.conexion_id, r.id) } catch { /* sin nombre: queda el apodo */ }

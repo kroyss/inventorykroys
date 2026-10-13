@@ -1,4 +1,5 @@
 'use client'
+import TextoConPublicaciones from './TextoConPublicaciones'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DatosDeItem, DatosProductos } from './DatosProducto'
 import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
@@ -512,7 +513,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
             )}
           </div>
         )}
-        <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={3} maxLength={2000}
+        <TextoConPublicaciones value={texto} onTexto={setTexto} cuenta={p.cuenta} rows={3} maxLength={2000}
           placeholder="Escribe la respuesta o pídele una propuesta a la IA…"
           className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
         {(meta.confianza || meta.falta || meta.web) && (

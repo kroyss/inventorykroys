@@ -155,7 +155,8 @@ export const SQL_BANDEJA = `
          END AS sugerencia
   FROM ml_ordenes o
   JOIN ml_conexiones x ON x.id = o.conexion_id
-  LEFT JOIN sales s ON s.ml_order_number IN (o.id::text, o.pack_id::text)
+  -- LATERAL: busca la venta por índice orden a orden (un JOIN con IN comparaba contra todas las ventas).
+  LEFT JOIN LATERAL (SELECT s.id, s.status FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text) LIMIT 1) s ON TRUE
   LEFT JOIN LATERAL (SELECT i.id FROM invoices i WHERE i.sale_id = s.id AND i.status <> 'ANULADA' LIMIT 1) f ON TRUE
   WHERE o.cal_vendedor IS NULL`
 
