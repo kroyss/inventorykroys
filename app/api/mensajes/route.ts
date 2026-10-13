@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
               NULLIF(c.comprador_nick, '') AS comprador_nick, c.comprador_nombre,
-              x.nickname AS cuenta, d.despachada_at, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos
+              x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos
        FROM ml_conversaciones c
        JOIN ml_conexiones x ON x.id = c.conexion_id
        -- Lo que sirve para responder "¿ya lo enviaste?": si su guía ya salió en Despachos (en
@@ -27,8 +27,13 @@ export async function GET(req: NextRequest) {
          WHERE e.venta = c.pack_id::text AND e.impresa AND l.status = 'GENERADO' ORDER BY l.generated_at DESC LIMIT 1
        ) d ON TRUE
        LEFT JOIN LATERAL (
-         SELECT estado FROM ml_ordenes WHERE id = c.pack_id OR pack_id = c.pack_id LIMIT 1
+         SELECT estado, split_part(items[1], ':', 1) AS item FROM ml_ordenes WHERE id = c.pack_id OR pack_id = c.pack_id LIMIT 1
        ) o ON TRUE
+       -- Foto del primer producto, de lo ya guardado (catálogo o preguntas): la lista no consulta a ML.
+       LEFT JOIN LATERAL (
+         SELECT COALESCE((SELECT thumbnail FROM ml_catalogo k WHERE k.item_id = o.item),
+                         (SELECT item_imagen FROM ml_preguntas q WHERE q.item_id = o.item AND q.item_imagen IS NOT NULL LIMIT 1)) AS imagen
+       ) img ON TRUE
        ${filtro}
        ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST
        LIMIT 200`, [tieneModulo(s.session.user, 'despachos')])

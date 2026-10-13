@@ -165,9 +165,9 @@ async function base(db: Pool): Promise<Cuentas> {
   await db.query(`DELETE FROM ml_catalogo`)
   for (const [i, p] of D.catalogo.entries()) {
     await db.query(
-      `INSERT INTO ml_catalogo (item_id, conexion_id, titulo, precio, moneda, disponible, estado, ficha, actualizado_at, historial_at)
-       VALUES ($1, $2, $3, $4, 'USD', 15, 'active', $5, NOW(), NOW())`,
-      [p.id, cx[D.cuentas[i % 3 === 2 ? 1 : 0].nickname], p.titulo, p.precio, p.ficha])
+      `INSERT INTO ml_catalogo (item_id, conexion_id, titulo, precio, moneda, disponible, estado, ficha, thumbnail, actualizado_at, historial_at)
+       VALUES ($1, $2, $3, $4, 'USD', 15, 'active', $5, $6, NOW(), NOW())`,
+      [p.id, cx[D.cuentas[i % 3 === 2 ? 1 : 0].nickname], p.titulo, p.precio, p.ficha, imagen(p)])
   }
   await db.query(`DELETE FROM ml_item_notas`)
   for (const [itemId, texto] of NOTAS_ITEM) await db.query(`INSERT INTO ml_item_notas (item_id, texto) VALUES ($1, $2)`, [itemId, texto])

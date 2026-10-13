@@ -10,7 +10,7 @@ import type { MensajeRapido } from '@/lib/mensajesRapidos'
 
 export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
-  ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null
+  ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null; imagen?: string | null
   comprador_nick: string | null; comprador_nombre: string | null
 }
 interface Adjunto { archivo: string; nombre: string; tipo: string | null }
@@ -78,7 +78,12 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
               <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : 'Todavía no hay conversaciones.'} />
             ) : lista.map(c => (
               <button key={c.pack_id} onClick={() => setAbierta(c)}
-                className={`w-full text-left px-4 py-3 space-y-1 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
+                className={`w-full text-left px-4 py-3 flex gap-3 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
+                {c.imagen
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={c.imagen} alt="" loading="lazy" className="mt-0.5 h-11 w-11 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
+                  : <span className="mt-0.5 h-11 w-11 shrink-0 rounded-md bg-neutral-100" />}
+                <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-center gap-2 text-xs text-neutral-500">
                   <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{c.cuenta}</span>
                   <Comprador nick={c.comprador_nick} nombre={c.comprador_nombre} />
@@ -94,6 +99,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
                     <span className="font-semibold bg-amber-100 rounded px-1.5 py-0.5 mr-1.5">Nota</span>{c.notas}
                   </p>
                 )}
+                </div>
               </button>
             ))}
           </div>
