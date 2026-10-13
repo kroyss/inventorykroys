@@ -118,10 +118,14 @@ export function rellenar(plantilla: string, bloque: string, pagina: string, guia
  *  entiende, y las plantillas viejas con "ZOOM" escrito siguen funcionando igual. */
 export const conTransportista = (t: string) => t.split('{transportista}').join('ZOOM')
 
-/** El mensaje que recibe el comprador de un envío. */
+/** El mensaje que recibe el comprador de un envío. {transportista} → el del envío. El cambio ZOOM→TEALCA
+ *  solo en mensajes viejos (sin {transportista}, con ZOOM escrito); el texto final no se toca: puede
+ *  nombrar a los dos transportistas (p.ej. dónde rastrear en Zoom y en Tealca). */
 export function mensajeEnvio(plantilla: string, bloque: string, pagina: string, guia: string, carrier: string) {
-  const m = rellenar(conTransportista(plantilla), conTransportista(bloque), pagina, guia)
-  return carrier === 'TEALCA' ? paraTealca(m) : m
+  const nombre = carrier === 'TEALCA' ? 'TEALCA' : 'ZOOM'
+  const t = plantilla.includes('{transportista}') ? plantilla.split('{transportista}').join(nombre)
+    : nombre === 'TEALCA' ? paraTealca(plantilla) : plantilla
+  return rellenar(t, bloque.split('{transportista}').join(nombre), pagina, guia)
 }
 
 /** Página oficial de una cuenta de MercadoLibre Venezuela (la de su nickname, en minúsculas). Es el
@@ -160,7 +164,6 @@ export function avisosConfig(c: Pick<ConfigReportador, 'plantillas' | 'bloque'>)
   c.plantillas.forEach((t, i) => {
     if (/tealca/i.test(t)) a.push(`La plantilla ${i + 1} dice TEALCA: los compradores de ZOOM también leerían TEALCA. Usa {transportista} y el sistema pone el correcto.`)
   })
-  if (/tealca/i.test(c.bloque)) a.push('El texto final dice TEALCA: también lo leerían los compradores de ZOOM. Usa {transportista}.')
   return a
 }
 

@@ -30,13 +30,14 @@ const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
 const paraTealca = (t: string) =>
   t.replace(/zoom/gi, m => (m === m.toUpperCase() ? 'TEALCA' : m[0] === m[0].toUpperCase() ? 'Tealca' : 'tealca'))
 
-// Igual que lib/reportador.ts rellenar() y mensajeEnvio(): {transportista} → ZOOM, y en Tealca ZOOM → TEALCA.
+// Igual que lib/reportador.ts rellenar() y mensajeEnvio(): {transportista} → el del envío; ZOOM → TEALCA solo
+// en mensajes viejos sin {transportista}. El texto final no se toca (puede nombrar a los dos).
 const rellenar = (t: string, bloque: string, pagina: string, guia: string) =>
   (t + bloque).split('{pagina}').join(pagina).split('{guia}').join(guia)
-const conTransportista = (t: string) => t.split('{transportista}').join('ZOOM')
 const mensajeEnvio = (t: string, bloque: string, pagina: string, guia: string, carrier: 'ZOOM' | 'TEALCA') => {
-  const m = rellenar(conTransportista(t), conTransportista(bloque), pagina, guia)
-  return carrier === 'TEALCA' ? paraTealca(m) : m
+  const m = t.includes('{transportista}') ? t.split('{transportista}').join(carrier)
+    : carrier === 'TEALCA' ? paraTealca(t) : t
+  return rellenar(m, bloque.split('{transportista}').join(carrier), pagina, guia)
 }
 // Igual que lib/reportador.ts paginaML(): página oficial de la cuenta (sin cuentas escritas a mano).
 const paginaML = (nick: string) => `https://www.mercadolibre.com.ve/pagina/${nick.toLowerCase()}`
@@ -378,12 +379,13 @@ function EditorConfig({ config, original, sugerida, limite, conectadas, onChange
               <input className={input} placeholder="Remitente empieza con" value={c.filtro} onChange={e => setCuenta(i, 'filtro', e.target.value)} />
               <input className={input} placeholder="Página de la tienda (opcional)" value={c.pagina} onChange={e => setCuenta(i, 'pagina', e.target.value)} />
               <button onClick={() => onChange({ ...config, cuentas: config.cuentas.filter((_, j) => j !== i) })}
-                className="text-xs text-neutral-400 hover:text-red-600">Quitar</button>
+                title="Quitar esta cuenta" aria-label="Quitar esta cuenta"
+                className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors justify-self-end"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8" /></svg></button>
             </div>
           ))}
           {config.cuentas.length < 5 && (
             <button onClick={() => onChange({ ...config, cuentas: [...config.cuentas, { nombre: '', filtro: '', pagina: '' }] })}
-              className="text-xs text-neutral-600 underline">+ Agregar cuenta</button>
+              className="w-full rounded-lg border border-dashed border-neutral-300 bg-white py-2 text-xs font-medium text-neutral-600 hover:border-lime-500 hover:bg-lime-50 hover:text-neutral-900 transition-colors">+ Agregar cuenta</button>
           )}
         </div>
   )
@@ -428,23 +430,24 @@ function EditorConfig({ config, original, sugerida, limite, conectadas, onChange
               <div className="flex gap-2 items-start">
                 <textarea ref={el => { areas.current[i] = el }} className={`${input} min-h-[2.5rem]`} rows={2} value={p}
                   onChange={e => setPlantilla(i, e.target.value)} onDrop={e => e.preventDefault()} />
-                <span className={`text-xs whitespace-nowrap pt-1 ${largo > limite ? 'text-red-700 font-semibold' : 'text-neutral-500'}`}>
+                <span className={`text-xs whitespace-nowrap pt-2 ${largo > limite ? 'text-red-700 font-semibold' : 'text-neutral-500'}`}>
                   {largo}/{limite}
                 </span>
                 <button onClick={() => onChange({ ...config, plantillas: config.plantillas.filter((_, j) => j !== i) })}
-                  className="text-xs text-neutral-400 hover:text-red-600 pt-1">Quitar</button>
+                  title="Quitar esta versión" aria-label="Quitar esta versión"
+                  className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8" /></svg></button>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {VARIABLES.map(x => (
                   <button key={x} type="button" onMouseDown={e => e.preventDefault()} onClick={() => moverAqui(i, x)}
-                    className="text-[11px] px-2 py-0.5 rounded-full border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100">
+                    className="text-[11px] h-6 px-2.5 rounded-full border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100 transition-colors">
                     {p.includes(x) ? `Mover ${x} aquí` : `Poner ${x} aquí`}
                   </button>
                 ))}
                 {p !== inicial(i) && (
                   <button type="button" onClick={() => restablecer(i)}
                     title={original.plantillas[i] !== undefined ? 'Vuelve al mensaje como estaba guardado' : 'Vuelve al mensaje sugerido'}
-                    className="text-[11px] px-2 py-0.5 rounded-full border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100">
+                    className="text-[11px] h-6 px-2.5 rounded-full border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100 transition-colors">
                     ↺ Restablecer
                   </button>
                 )}
@@ -455,7 +458,7 @@ function EditorConfig({ config, original, sugerida, limite, conectadas, onChange
           })}
           {config.plantillas.length < 10 && (
             <button onClick={() => onChange({ ...config, plantillas: [...config.plantillas, 'Buen día, su pedido fue despachado. Guía {transportista}: {guia}'] })}
-              className="text-xs text-neutral-600 underline">+ Agregar otra versión (se elige una al azar)</button>
+              className="w-full rounded-lg border border-dashed border-neutral-300 bg-white py-2 text-xs font-medium text-neutral-600 hover:border-lime-500 hover:bg-lime-50 hover:text-neutral-900 transition-colors">+ Agregar otra versión <span className="font-normal text-neutral-400">(se elige una al azar)</span></button>
           )}
         </div>
       </div>
