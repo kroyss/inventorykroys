@@ -50,12 +50,20 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
   const tituloBase = useRef<string | null>(null)
   const pathname = usePathname()
   const ultimaCarga = useRef(0)
+  // Hubo una actualización del sistema: la versión del server ya no es la que cargó esta pestaña
+  // (<html data-dpl-id>, la pone Next con deploymentId). Ver scripts/rolling.sh.
+  const [versionNueva, setVersionNueva] = useState(false)
 
   const cargar = useCallback(async () => {
     ultimaCarga.current = Date.now()
     try {
       const r = await fetch('/api/avisos', { cache: 'no-store' })
-      if (r.ok) setAvisos(await r.json())
+      if (r.ok) {
+        const d = await r.json()
+        setAvisos(d)
+        const mia = document.documentElement.dataset.dplId
+        if (d.version && mia && d.version !== mia) setVersionNueva(true)
+      }
     } catch { /* sin red: se reintenta en el próximo minuto */ }
   }, [])
 
@@ -68,9 +76,14 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
   }, [cargar])
   // También al cambiar de pantalla (2026-10-12): al volver a Inicio después de responder o calificar,
   // los números se ponen al día sin F5. Como mucho una vez cada 3 s.
+  // Con versión nueva, cambiar de pantalla la abre ya actualizada (como un F5, sin que lo pidan).
+  // En la misma pantalla nunca se recarga sola: no se pierde lo que estén escribiendo.
+  const rutaVista = useRef(pathname)
   useEffect(() => {
+    if (versionNueva && rutaVista.current !== pathname) { window.location.reload(); return }
+    rutaVista.current = pathname
     if (Date.now() - ultimaCarga.current > 3000) cargar()
-  }, [pathname, cargar])
+  }, [pathname, cargar, versionNueva])
 
   // "(N) " delante del título de la página, sin pisar el título que pone Next.
   useEffect(() => {
@@ -89,7 +102,18 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     return () => obs?.disconnect()
   }, [avisos])
 
-  return <Ctx.Provider value={avisos}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={avisos}>
+      {children}
+      {versionNueva && (
+        <div role="status" className="fixed z-50 left-1/2 -translate-x-1/2 bottom-20 lg:bottom-5 flex items-center gap-3 rounded-full border border-neutral-200 bg-white text-neutral-800 text-sm pl-4 pr-1.5 py-1.5 shadow-lg whitespace-nowrap">
+          <span>Hay una versión nueva del sistema</span>
+          <button type="button" onClick={() => window.location.reload()}
+            className="rounded-full bg-lime-400 text-neutral-900 font-semibold px-3 py-1 hover:bg-lime-300">Recargar</button>
+        </div>
+      )}
+    </Ctx.Provider>
+  )
 }
 
 export function Numerito({ n, urgente, className = '' }: { n: number; urgente: boolean; className?: string }) {

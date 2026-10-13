@@ -10,6 +10,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Versión de la compilación (scripts/rolling.sh): next.config.ts → deploymentId.
+ARG DEPLOYMENT_ID=""
+ENV DEPLOYMENT_ID=$DEPLOYMENT_ID
 RUN npm run build
 
 # ── 3. run ───────────────────────────────────────────────
@@ -18,6 +21,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+# La misma versión en tiempo de ejecución: /api/avisos la devuelve y el navegador la compara.
+ARG DEPLOYMENT_ID=""
+ENV DEPLOYMENT_ID=$DEPLOYMENT_ID
 # Docker pone HOSTNAME=<id-contenedor> y el server.js de Next standalone se
 # enlaza a ese hostname (su IP de eth0), no a 127.0.0.1. Eso hace que el
 # healthcheck a localhost:3000 dé "connection refused" aunque el puerto

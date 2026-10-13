@@ -12,8 +12,11 @@ git fetch origin
 git checkout "$RAMA"
 git pull --ff-only origin "$RAMA"
 
-echo "→ build + up (solo contenedores *_staging)"
-docker compose -f docker-compose.staging.yml up -d --build
+echo "→ base y servicios auxiliares arriba (no se recrean si no cambiaron)"
+docker compose -f docker-compose.staging.yml up -d --no-recreate inventory_db_staging
+
+# Sin corte: dos copias detrás de nginx, se actualiza una por vez (scripts/rolling.sh).
+./scripts/rolling.sh docker-compose.staging.yml /etc/nginx/conf.d/staging_app.conf staging_app   inventory_next_staging:8511 inventory_next_staging_b:8512 inventory_etiquetas_staging
 
 echo "→ limpiando imágenes viejas"
 docker image prune -f >/dev/null

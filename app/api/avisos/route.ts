@@ -64,5 +64,6 @@ export async function GET() {
   } catch (e) {
     console.error('[avisos]', e instanceof Error ? e.message : e)
   }
-  return NextResponse.json(out, { headers: { 'Cache-Control': 'no-store' } })
+  // Versión del server (Dockerfile → DEPLOYMENT_ID): si no es la que tiene cargada el navegador, hubo una actualización.
+  return NextResponse.json({ ...out, version: process.env.DEPLOYMENT_ID || null }, { headers: { 'Cache-Control': 'no-store' } })
 }

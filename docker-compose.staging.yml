@@ -13,9 +13,13 @@ name: inventory_staging
 services:
   inventory_next_staging:
     container_name: inventory_next_staging
+    # Imagen con nombre: la copia B (inventory_next_staging_b) usa la MISMA (se compila una vez).
+    image: inventory_staging_app:latest
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
     restart: unless-stopped
     logging:
       driver: json-file
@@ -25,6 +29,39 @@ services:
     ports:
       # Solo local: nginx publica staging.* con clave (ver STAGING.md).
       - "127.0.0.1:8511:3000"
+    environment:
+      - TZ=America/Caracas
+      - APP_ENV=staging
+      - ETIQUETAS_URL=http://inventory_etiquetas_staging:8000
+    env_file:
+      - .env.staging
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      inventory_db_staging:
+        condition: service_healthy
+    networks:
+      - inventory_staging_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Copia B (2026-10-13): la misma app; nginx reparte entre las dos y al actualizar se cambia una
+  # por vez (scripts/rolling.sh), así nadie ve el sistema caído.
+  inventory_next_staging_b:
+    container_name: inventory_next_staging_b
+    image: inventory_staging_app:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:8512:3000"
     environment:
       - TZ=America/Caracas
       - APP_ENV=staging
