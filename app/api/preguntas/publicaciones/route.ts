@@ -24,7 +24,12 @@ export async function GET(req: NextRequest) {
        ORDER BY (${titulo} LIKE $3) DESC, m.disponible DESC, m.titulo
        LIMIT 8`,
       [cuenta, palabras.map(p => `%${p}%`), `${palabras[0]}%`])
-    return NextResponse.json(rows)
+    // Link corto (MLV-123-_JM, el mismo de Mensajes): sin el título, ML lleva a la misma publicación.
+    // Ahorra ~70 caracteres (los mensajes tienen tope de 350).
+    return NextResponse.json(rows.map(r => {
+      const m = /^(M[A-Z]{2})(\d+)$/.exec(r.item_id)
+      return m ? { ...r, permalink: `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` } : r
+    }))
   } catch (err) {
     return apiError(err)
   }
