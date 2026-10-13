@@ -6,6 +6,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Versión de la compilación (scripts/rolling.sh → next.config.ts deploymentId).
+        - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
     restart: unless-stopped
     # Rotación de logs: máx. 10MB por archivo × 5 archivos = 50MB tope por contenedor.
     # Al llegar al límite, Docker rota y borra el más viejo. No llena el disco.
@@ -66,6 +69,42 @@ services:
         max-file: "5"
     ports:
       - "127.0.0.1:8504:3000"
+    env_file:
+      - .env.production
+    environment:
+      - TZ=America/Caracas
+      - ETIQUETAS_URL=http://inventory_etiquetas:8000
+      - MARCA=ecd
+      - NEXTAUTH_URL=https://app.elcomerciantedigital.com
+    depends_on:
+      inventory_next:
+        condition: service_started
+      inventory_db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - inventory_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Copia B de inventory_ecd (2026-10-13): nginx reparte entre las dos (upstream ecd_app) y al
+  # actualizar se cambia una por vez (scripts/rolling.sh): nadie ve el sistema caído.
+  inventory_ecd_b:
+    container_name: inventory_ecd_b
+    image: inventory_app:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:8505:3000"
     env_file:
       - .env.production
     environment:
