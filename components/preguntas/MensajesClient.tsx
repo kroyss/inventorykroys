@@ -26,8 +26,8 @@ function hace(fecha: string | null) {
 }
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
-export default function MensajesClient() {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'rapidas'>('sin_leer')
+export default function MensajesClient({ pack: packPedido = null }: { pack?: string | null }) {
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'rapidas'>(packPedido ? 'todas' : 'sin_leer')
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [lista, setLista] = useState<Conversacion[] | null>(null)
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
@@ -43,14 +43,21 @@ export default function MensajesClient() {
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
-  // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Reputación → "Escribirle").
-  const [packPedido] = useState(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('pack'))
-  useEffect(() => { if (packPedido) setVista('todas') }, [packPedido])
+  // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Calificaciones → "Escribirle"): abre
+  // Recientes con esa conversación (si no está en la lista, la pide sola) y la trae a la vista en el celular.
+  const pedidoHecho = useRef(false)
+  const hiloRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!packPedido || !lista) return
+    if (!packPedido || !lista || pedidoHecho.current) return
+    pedidoHecho.current = true
     const c = lista.find(x => x.pack_id === packPedido)
-    if (c) setAbierta(c)
+    if (c) { setAbierta(c); return }
+    fetch(`/api/mensajes/de-venta?numero=${packPedido}`).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.conversacion) setAbierta(d.conversacion) }).catch(() => {})
   }, [packPedido, lista])
+  useEffect(() => {
+    if (packPedido && abierta?.pack_id === packPedido) hiloRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [packPedido, abierta])
 
   return (
     <div className="space-y-4">
@@ -91,7 +98,7 @@ export default function MensajesClient() {
             ))}
           </div>
           {abierta
-            ? <Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={cargar} />
+            ? <div ref={hiloRef} className="scroll-mt-4"><Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={cargar} /></div>
             : <div className="hidden lg:block bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">Elige una conversación</div>}
         </div>
       )}

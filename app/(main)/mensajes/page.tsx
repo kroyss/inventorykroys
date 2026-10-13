@@ -10,7 +10,7 @@ import { puede } from '@/lib/permisos'
 export const metadata = { title: 'Mensajes' }
 
 // Automatizaciones → Mensajes: conversaciones post-venta de MercadoLibre (módulo `preguntas`).
-export default async function MensajesPage() {
+export default async function MensajesPage({ searchParams }: { searchParams: Promise<{ pack?: string }> }) {
   const session = await getServerSession(authOptions)
   if (!tieneModulo(session?.user, 'preguntas') || !puede(session?.user, 'ver_mensajes')) redirect('/automatizaciones')
   if (await sinCuentasML(session!)) {
@@ -19,5 +19,6 @@ export default async function MensajesPage() {
         'Adjunta fotos o PDF (o pégalos con Ctrl+V) y deja notas en la venta para tu equipo.',
         'La IA te propone la respuesta; tú la revisas y la envías.']} />
   }
-  return <MensajesClient />
+  const { pack } = await searchParams
+  return <MensajesClient pack={pack && /^\d{6,20}$/.test(pack) ? pack : null} />
 }
