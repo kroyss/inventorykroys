@@ -171,7 +171,7 @@ export default function AlertasStockClient() {
           {f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
         </button>}
       </div>
-      <div className="sm:w-36 text-right shrink-0">
+      <div className="sm:w-44 text-right shrink-0">
         <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
           {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
