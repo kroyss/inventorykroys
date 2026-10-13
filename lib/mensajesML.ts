@@ -53,7 +53,7 @@ async function sellerDe(db: Pool, conexionId: number): Promise<number> {
 }
 
 type OrdenVenta = {
-  order_items: { item: { id: string; title: string; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number }[]
+  order_items: { item: { id: string; title: string; variation_id?: number | null; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number }[]
   buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
 }
 
@@ -237,20 +237,39 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
 }
 
 /** `variante`: lo que eligió el comprador ("Color: Azul · Talla: M"); el título solo no lo dice. */
-export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; link: string | null }
+export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; link: string | null; imagen: string | null }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
   const ordenes = await ordenesDeVenta(db, conexionId, pack)
   const comprador = compradorDe(ordenes)
   await guardarComprador(db, pack, comprador.nick, comprador.nombre)
-  const items: ItemVenta[] = ordenes.flatMap(o => o.order_items).map(i => {
+  const items: (ItemVenta & { varId: number | null })[] = ordenes.flatMap(o => o.order_items).map(i => {
     const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
     const link = m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` : null
     const variante = (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
-    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, link }
+    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, link, imagen: null as string | null, varId: i.item.variation_id ?? null }
   })
-  return { items, comprador }
+  await Promise.all(items.map(async it => { it.imagen = await imagenDeItem(db, conexionId, it.id, it.varId).catch(() => null) }))
+  return { items: items.map(({ varId: _v, ...it }) => it), comprador }
+}
+
+/** Foto del producto vendido: la de la variante (el color que compró) si la publicación tiene
+ *  variantes; si no, la portada ya guardada (catálogo o preguntas) sin consultar a ML. */
+async function imagenDeItem(db: Pool, conexionId: number, itemId: string, varId: number | null): Promise<string | null> {
+  const https = (u?: string | null) => u ? u.replace(/^http:/, 'https:') : null
+  if (!varId) {
+    const { rows: [g] } = await db.query(
+      `SELECT COALESCE((SELECT thumbnail FROM ml_catalogo WHERE item_id = $1),
+                       (SELECT item_imagen FROM ml_preguntas WHERE item_id = $1 AND item_imagen IS NOT NULL LIMIT 1)) AS img`, [itemId])
+    if (g?.img) return g.img
+  }
+  const it = await mlFetch<{ thumbnail?: string; pictures?: { id: string; secure_url?: string; url?: string }[];
+                             variations?: { id: number; picture_ids?: string[] }[] }>(
+    db, conexionId, `/items/${itemId}?attributes=thumbnail,pictures,variations`)
+  const fotoId = it.variations?.find(v => v.id === varId)?.picture_ids?.[0]
+  const foto = fotoId ? it.pictures?.find(p => p.id === fotoId) : null
+  return https(foto?.secure_url ?? foto?.url ?? it.thumbnail)
 }
 
 // ── Sugerencias (gratis, sin IA): lo que ya se respondió a mensajes parecidos ────────────────

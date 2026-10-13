@@ -111,7 +111,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
 export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
-  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null }[] | null>(null)
+  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; link: string | null; imagen?: string | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [texto, setTexto] = useState('')
   // De dónde salió el texto (se guarda al enviar, migración 062).
@@ -225,6 +225,11 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Convers
           )}
         </div>
         {items?.length ? (
+          <div className="flex items-start gap-2.5">
+          {items.filter(it => it.imagen).slice(0, 3).map((it, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={it.id + i} src={it.imagen!} alt="" className="h-12 w-12 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
+          ))}
           <p className="text-sm font-medium text-neutral-900">
             {items.map((it, i) => (
               <span key={it.id + i}>
@@ -240,6 +245,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false }: { c: Convers
               </span>
             ))}
           </p>
+          </div>
         ) : c.productos && <p className="text-sm font-medium text-neutral-900">{c.productos}</p>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <p className="text-[11px] text-neutral-400">Leerla aquí no la marca como leída en MercadoLibre.</p>
