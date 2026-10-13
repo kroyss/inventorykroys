@@ -178,9 +178,9 @@ export function normalizarInstagram(t: string) {
 // Instagram: letras, números, punto y _, hasta 30, con al menos una letra (un teléfono no pasa).
 export const INSTAGRAM_RE = /^(?=.*[a-z])[a-z0-9._]{1,30}$/
 
-/** El @ con el que se anuncia a alguien: Telegram si lo dio, si no Instagram. */
+/** El @ con el que se anuncia a alguien: Telegram si lo dio, si no Instagram (sin aclararlo: 13-10). */
 export const contactoDe = (s: { telegram: string | null; instagram?: string | null }) =>
-  s.telegram ? `@${s.telegram}` : s.instagram ? `@${s.instagram} (Instagram)` : '—'
+  s.telegram ? `@${s.telegram}` : s.instagram ? `@${s.instagram}` : '—'
 
 /** Mensaje libre opcional del formulario (corto: no es una carta, es "algo más que quieras contarnos"). */
 export const MENSAJE_MAX = 280
