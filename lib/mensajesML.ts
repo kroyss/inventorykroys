@@ -54,7 +54,10 @@ async function sellerDe(db: Pool, conexionId: number): Promise<number> {
 }
 
 type OrdenVenta = {
-  order_items: { item: { id: string; title: string; variation_id?: number | null; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number; unit_price?: number | null; currency_id?: string | null }[]
+  order_items: { item: { id: string; title: string; variation_id?: number | null; variation_attributes?: { name?: string; value_name?: string | null }[] }; quantity: number; unit_price?: number | null; currency_id?: string | null
+                 // Publicación en dólares cobrada en bolívares: ML guarda la moneda y la tasa de la conversión.
+                 base_currency_id?: string | null; base_exchange_rate?: number | null }[]
+  date_created?: string
   buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
 }
 
@@ -245,7 +248,10 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
 }
 
 /** `variante`: lo que eligió el comprador ("Color: Azul · Talla: M"); el título solo no lo dice. */
-export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; link: string | null; imagen: string | null }
+export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; link: string | null; imagen: string | null
+  /** Precio unitario en dólares al que se vendió (con el descuento): la conversión de ML o, si no la
+   *  trae, Bs ÷ tasa BCV del día de la venta (usd_aprox). */
+  usd?: number | null; usd_aprox?: boolean }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
@@ -256,8 +262,19 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
     const m = /^(M[A-Z]{2})(\d+)$/.exec(i.item.id)
     const link = m ? `https://articulo.mercadolibre.${m[1] === 'MCO' ? 'com.co' : 'com.ve'}/${m[1]}-${m[2]}-_JM` : null
     const variante = (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
-    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, precio: i.unit_price ?? null, moneda: i.currency_id ?? null, link, imagen: null as string | null, varId: i.item.variation_id ?? null }
+    const tasaML = i.base_currency_id === 'USD' && i.base_exchange_rate && i.base_exchange_rate > 0 ? i.base_exchange_rate : null
+    const usd = i.currency_id === 'USD' ? i.unit_price ?? null : tasaML && i.unit_price ? i.unit_price / tasaML : null
+    return { id: i.item.id, titulo: i.item.title, variante, cantidad: i.quantity, precio: i.unit_price ?? null, moneda: i.currency_id ?? null,
+             usd, usd_aprox: false, link, imagen: null as string | null, varId: i.item.variation_id ?? null }
   })
+  // Sin la conversión de ML: Bs ÷ tasa oficial (BCV) del día de la venta, marcado como aproximado.
+  if (items.some(it => it.usd == null && it.moneda === 'VES' && it.precio)) {
+    const dia = ordenes[0]?.date_created ? ordenes[0].date_created.slice(0, 10) : null
+    const { rows: [t] } = await db.query(
+      `SELECT official_rate::float AS r FROM venezuela_exchange_rates
+       WHERE ($1::date IS NULL OR rate_date <= $1::date) ORDER BY rate_date DESC, created_at DESC LIMIT 1`, [dia])
+    if (t?.r) for (const it of items) if (it.usd == null && it.moneda === 'VES' && it.precio) { it.usd = it.precio / t.r; it.usd_aprox = true }
+  }
   await Promise.all(items.map(async it => { it.imagen = await imagenDeItem(db, conexionId, it.id, it.varId).catch(() => null) }))
   return { items: items.map(({ varId: _v, ...it }) => it), comprador }
 }

@@ -52,10 +52,19 @@ export async function GET(req: NextRequest) {
          (SELECT item_imagen FROM ml_preguntas WHERE item_id = $1 AND item_imagen IS NOT NULL LIMIT 1) AS foto_preg`, [item])
     if (!g?.conexion_id) return NextResponse.json({ error: 'Publicación no encontrada en tus cuentas' }, { status: 404 })
     try {
-      const [it, desc] = await Promise.all([
+      const [it, desc, sp] = await Promise.all([
         mlFetch<ItemML>(s.db, g.conexion_id, `/items/${item}`),
         mlFetch<{ plain_text?: string }>(s.db, g.conexion_id, `/items/${item}/description`).catch(() => ({ plain_text: '' })),
+        // Precio con la promoción vigente (lo que paga hoy el comprador); /items trae el de lista.
+        mlFetch<{ amount?: number | null; regular_amount?: number | null; currency_id?: string | null }>(
+          s.db, g.conexion_id, `/items/${item}/sale_price?context=channel_marketplace`).catch(() => null),
       ])
+      if (sp?.amount) {
+        const lista = sp.regular_amount ?? it.original_price ?? it.price
+        it.price = sp.amount
+        it.original_price = lista && lista > sp.amount ? lista : null
+        if (sp.currency_id) it.currency_id = sp.currency_id
+      }
       const fotos = (it.pictures ?? []).map(p => p.secure_url ?? p.url ?? '').filter(Boolean).slice(0, 15)
       const ids = (it.pictures ?? []).map(p => p.id)
       const ficha: Ficha = {
