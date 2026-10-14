@@ -6,6 +6,7 @@
 // El envío por API se valida con la primera prueba real (desde la pantalla, lo hace el dueño).
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
+import { imagenDeItem } from '@/lib/mensajesML'
 
 export interface OrdenML {
   id: number; pack_id: number | null; status: string; date_created: string; tags: string[]
@@ -36,14 +37,17 @@ export async function ventaParaFormulario(db: Pool, numero: string) {
     }
     if (!ordenes.length) continue
     const b = ordenes.find(o => o.buyer)?.buyer
+    const lineas = ordenes.flatMap(o => o.order_items)
+    // Foto de lo que compró (la de su variante): para reconocerlo cuando el título no alcanza.
+    const fotos = await Promise.all(lineas.map(i => imagenDeItem(db, c.id, i.item.id, i.item.variation_id ?? null).catch(() => null)))
     return {
       cuenta: c.nickname as string,
       comprador: {
         nombre: [b?.first_name, b?.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || null,
         nick: b?.nickname ?? null,
       },
-      items: ordenes.flatMap(o => o.order_items).map(i => ({
-        itemId: i.item.id, variacionId: i.item.variation_id ?? null, titulo: i.item.title, cantidad: i.quantity,
+      items: lineas.map((i, k) => ({
+        itemId: i.item.id, variacionId: i.item.variation_id ?? null, titulo: i.item.title, cantidad: i.quantity, imagen: fotos[k],
         // "Color: Negro · Talla: M": lo que eligió el comprador (se muestra en Nueva venta).
         variante: (i.item.variation_attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null })),
       fecha: ordenes.map(o => o.date_created).sort()[0] ?? null,   // cuándo se compró (aviso del pago)

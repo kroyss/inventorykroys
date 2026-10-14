@@ -281,7 +281,7 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
 
 /** Foto del producto vendido: la de la variante (el color que compró) si la publicación tiene
  *  variantes; si no, la portada ya guardada (catálogo o preguntas) sin consultar a ML. */
-async function imagenDeItem(db: Pool, conexionId: number, itemId: string, varId: number | null): Promise<string | null> {
+export async function imagenDeItem(db: Pool, conexionId: number, itemId: string, varId: number | null): Promise<string | null> {
   const https = (u?: string | null) => u ? u.replace(/^http:/, 'https:') : null
   if (!varId) {
     const { rows: [g] } = await db.query(

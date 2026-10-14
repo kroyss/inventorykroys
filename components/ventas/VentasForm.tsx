@@ -9,6 +9,7 @@ import { orderLenLabel, mlOrderError } from '@/lib/orderNumber'
 import type { PagoME } from '@/lib/pagosMEComun'
 import { PagoDeVenta, LoQueSeHablo } from './PagoYContexto'
 import { NotasVenta } from '@/components/preguntas/MensajesClient'
+import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
 
 interface FormItem {
   product_id: number
@@ -35,7 +36,7 @@ interface MlVenta {
   comprador: { nombre: string | null; nick: string | null }
   fecha?: string | null
   items: {
-    itemId: string; titulo: string; cantidad: number; variante?: string | null
+    itemId: string; titulo: string; cantidad: number; variante?: string | null; imagen?: string | null
     producto: { id: number; code: string; name: string } | null   // solo si el código ML está en UN producto
     opciones?: { id: number; code: string; name: string }[]        // todos los productos con ese código
   }[]
@@ -449,8 +450,15 @@ Revísala en el detalle que se abre ahora.`)
                   const elegido = varios?.find(o => items.some(x => x.product_id === o.id))
                   return (
                     <div key={k} className="space-y-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-neutral-700 min-w-0 truncate" title={i.variante ? `${i.titulo} · ${i.variante}` : i.titulo}>
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Foto de lo que compró (su variante): toca para ver la publicación completa. */}
+                        {i.imagen && (
+                          <AbrirFicha item={i.itemId} title="Ver la publicación" className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-sky-200 bg-white hover:border-sky-400">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={i.imagen} alt="" className="h-full w-full object-contain" />
+                          </AbrirFicha>
+                        )}
+                        <span className="text-neutral-700 min-w-0 flex-1 truncate" title={i.variante ? `${i.titulo} · ${i.variante}` : i.titulo}>
                           {i.cantidad} ×{' '}
                           {i.variante && <span className="mr-1 inline-block rounded-full bg-sky-50 px-1.5 py-px text-[11px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 align-middle">{i.variante}</span>}
                           {i.titulo}

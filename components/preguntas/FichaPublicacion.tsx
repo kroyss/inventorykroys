@@ -4,6 +4,7 @@
 // características y descripción. Se lee de ML al abrirla (/api/preguntas/publicacion).
 import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
+import { createPortal } from 'react-dom'
 import type { Ficha } from '@/app/api/preguntas/publicacion/route'
 
 const dinero = (n: number, moneda: string) =>
@@ -33,19 +34,21 @@ export function FichaPublicacion({ item, onCerrar }: { item: string; onCerrar: (
 
   const n = f && !('error' in f) ? f.fotos.length : 0
   useEffect(() => {
+    // En captura y sin propagar: Esc cierra solo la ficha, no el formulario de atrás (Nueva venta).
     const tecla = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCerrar()
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onCerrar() }
       else if (e.key === 'ArrowRight' && n > 1) setFoto(i => (i + 1) % n)
       else if (e.key === 'ArrowLeft' && n > 1) setFoto(i => (i - 1 + n) % n)
     }
-    window.addEventListener('keydown', tecla)
+    document.addEventListener('keydown', tecla, true)
     const antes = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { window.removeEventListener('keydown', tecla); document.body.style.overflow = antes }
+    return () => { document.removeEventListener('keydown', tecla, true); document.body.style.overflow = antes }
   }, [n, onCerrar])
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={onCerrar} role="dialog" aria-modal="true" aria-label="Publicación">
+  // Portal al body: encima de cualquier ventana (p. ej. Nueva venta), sin heredar su posición.
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={e => { e.stopPropagation(); onCerrar() }} role="dialog" aria-modal="true" aria-label="Publicación">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2.5">
           <span className="font-mono text-xs text-neutral-400">{item}</span>
@@ -172,7 +175,8 @@ export function FichaPublicacion({ item, onCerrar }: { item: string; onCerrar: (
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
