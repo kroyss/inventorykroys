@@ -32,9 +32,12 @@ export async function GET() {
       if (tieneModulo(u, 'alertas_stock')) { out.alertas = (await contarAlertas(db)).agotadas }  // solo agotadas (= pestaña Agotadas)
       {
         const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
+        // Solo las que se pueden calificar ya: las que siguen en días de espera no cuentan (salen solas).
+        const plc = leerPlantillasCal(pl?.value)
         const { rows: [c] } = await db.query(
-          `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(ventasDesdeML(u))}) b WHERE sugerencia <> 'esperar'`,
-          [leerPlantillasCal(pl?.value).noConcretada.dias])
+          `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(ventasDesdeML(u))}) b
+           WHERE sugerencia <> 'esperar' AND b.fecha::date <= CURRENT_DATE - ${plc.esperaDias}`,
+          [plc.noConcretada.dias])
         out.calificaciones = c.n
       }
       // Reputación: neutrales y negativas recibidas en los últimos 30 días que nadie marcó como vistas.

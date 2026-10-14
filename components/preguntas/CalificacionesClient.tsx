@@ -7,7 +7,8 @@ interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
   cal_comprador: string | null; cuenta: string; sistema_estado: string | null; facturada: boolean
   sugerencia: 'concretada' | 'no_concretada' | 'esperar'
-  en_espera: boolean            // más nueva que los días de espera: todavía no se califica
+  en_espera: boolean            // más nueva que los días de espera: todavía no se califica (pestaña Próximas)
+  lista_el: string              // YYYY-MM-DD: el día en que sale de la espera
 }
 interface Plantillas {
   concretada: { rating: string; mensaje: string }
@@ -16,7 +17,7 @@ interface Plantillas {
   auto: boolean
 }
 interface Datos {
-  ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; esperando: number }
+  ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; proximas: number; esperando: number }
   plantillas: Plantillas; cuentas: { nickname: string; ordenes_sync_at: string | null }[]
   /** Empresa sin inventario: "en el sistema" = despachada (etiqueta impresa en Despachos). */
   desdeML?: boolean
@@ -24,6 +25,8 @@ interface Datos {
   autoUltimo: { fecha: string; estado: string; at?: string; calificadas?: number; errores?: number; quitadas?: number } | null
 }
 type Tipo = 'concretada' | 'no_concretada'
+/** 'YYYY-MM-DD' → 'dd/mm' (sin pasar por Date: no se corre un día). */
+const diaMes = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
 
 const RATING: Record<string, string> = { positive: 'positiva', neutral: 'neutral', negative: 'negativa' }
 const MOTIVOS: Record<string, string> = {
@@ -37,7 +40,7 @@ const MOTIVOS: Record<string, string> = {
 /** Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema. */
 export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) {
   const confirm = useConfirm()
-  const [vista, setVista] = useState<'listas' | 'esperando' | 'config'>('listas')
+  const [vista, setVista] = useState<'listas' | 'proximas' | 'esperando' | 'config'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [elegidas, setElegidas] = useState<Record<string, Tipo | null>>({})
   const [filtro, setFiltro] = useState<'todas' | Tipo>('todas')
@@ -48,7 +51,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   const parar = useRef(false)
 
   const cargar = useCallback(async () => {
-    const r = await fetch(`/api/calificaciones?vista=${vista === 'esperando' ? 'esperando' : 'listas'}`)
+    const r = await fetch(`/api/calificaciones?vista=${vista === 'config' ? 'listas' : vista}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setAviso(d.error ?? 'No se pudo cargar'); return }
     setDatos(d)
@@ -77,7 +80,6 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   const marcar = (o: Orden, si: boolean) => setElegidas(x => ({ ...x, [o.id]: si ? sugerida(o) : null }))
   const marcarTodas = (si: boolean) =>
     setElegidas(x => ({ ...x, ...Object.fromEntries(marcables.map(o => [o.id, si ? (x[o.id] ?? sugerida(o)) : null])) }))
-  const enEspera = visibles.filter(o => o.en_espera).length
   const n = (t: Tipo) => aCalificar.filter(o => elegidas[o.id] === t).length
 
   const calificar = async () => {
@@ -124,7 +126,10 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
 
       <Tabs value={vista} onChange={setVista} items={[
         { value: 'listas', label: 'Por calificar', count: datos ? datos.contadores.concretadas + datos.contadores.no_concretadas : undefined },
-        { value: 'esperando', label: 'Esperando', count: datos?.contadores.esperando },
+        // Próximas: ya se sabe el resultado y salen solas al cumplir los días de espera.
+        // Por definir: todavía no se sabe si se concretó (antes "Esperando", que se confundía con la espera).
+        ...(datos?.plantillas.esperaDias ? [{ value: 'proximas' as const, label: 'Próximas', count: datos.contadores.proximas }] : []),
+        { value: 'esperando', label: 'Por definir', count: datos?.contadores.esperando },
         ...(isAdmin ? [{ value: 'config' as const, label: 'Configuración' }] : []),
       ]} />
 
@@ -143,13 +148,14 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
           <p className="text-xs text-neutral-500">
             {datos.desdeML ? (vista === 'listas'
               ? <>Despachada (su etiqueta salió en Despachos) → <b>concretada</b>. Sin despachar después de {datos.plantillas.noConcretada.dias} días, o cancelada en MercadoLibre → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
-              : <>Ventas recientes que todavía no se despacharon: al imprimir su etiqueta pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no salieron, a no concretadas.</>)
+              : vista === 'proximas' ? null
+              : <>Todavía no se sabe si se concretaron: no se han despachado. Al imprimir su etiqueta pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no salieron, a no concretadas.</>)
             : vista === 'listas'
               ? <>En el sistema (cargada o facturada) → <b>concretada</b>. Sin cargar después de {datos.plantillas.noConcretada.dias} días → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
-              : <>Ventas recientes que todavía no están en el sistema: si se cargan, pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no aparecen, a no concretadas.</>}
-            {vista === 'listas' && datos.plantillas.esperaDias > 0 && (
-              <> · Espera de <b>{datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}</b>: las más nuevas se ven, pero todavía no se califican{enEspera > 0 ? ` (${enEspera} en espera)` : ''}.</>
-            )}
+              : vista === 'proximas' ? null
+              : <>Todavía no se sabe si se concretaron: no están en el sistema o están en borrador. Si se cargan, pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no aparecen, a no concretadas.</>}
+            {vista === 'proximas' && <>Ya se sabe cómo calificarlas, pero son de los últimos <b>{datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}</b> (tu espera).
+              {datos.plantillas.auto ? ' Las concretadas se califican solas ese día; las no concretadas pasan a Por calificar.' : ' Ese día pasan a Por calificar.'} No tienes que hacer nada.</>}
             {sinc && <> · Ventas actualizadas {new Date(sinc).toLocaleString('es-VE')}</>}
           </p>
 
@@ -190,7 +196,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
           {visibles.length === 0 ? (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
               <EmptyState message={datos.cuentas.length === 0 ? 'No hay cuentas de MercadoLibre conectadas (Automatizaciones → Cuentas de MercadoLibre).'
-                : vista === 'listas' ? 'No hay ventas por calificar. Si recién conectaste las cuentas, dale "Actualizar ventas".' : 'Nada esperando.'} />
+                : vista === 'listas' ? 'No hay ventas por calificar. Si recién conectaste las cuentas, dale "Actualizar ventas".' : vista === 'proximas' ? 'Nada en espera.' : 'Nada por definir.'} />
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
@@ -208,11 +214,12 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                     <th className="px-3 py-2 text-left">Productos</th>
                     <th className="px-3 py-2 text-left">En el sistema</th>
                     {vista === 'listas' && <th className="px-3 py-2 text-left">Calificar como</th>}
+                    {vista === 'proximas' && <th className="px-3 py-2 text-left">Cuándo</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {visibles.map(o => (
-                    <tr key={o.id} className={`border-b border-neutral-50 align-top ${o.en_espera ? 'opacity-50' : vista === 'listas' && !elegidas[o.id] ? 'opacity-60' : ''}`}>
+                    <tr key={o.id} className={`border-b border-neutral-50 align-top ${vista === 'listas' && !elegidas[o.id] ? 'opacity-60' : ''}`}>
                       {vista === 'listas' && (
                         <td className="pl-3 py-2">
                           <input type="checkbox" checked={!!elegidas[o.id] && !o.en_espera} disabled={o.en_espera}
@@ -237,13 +244,21 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       </td>
                       {vista === 'listas' && (
                         <td className="px-3 py-2">
-                          {o.en_espera ? <span className="text-xs text-neutral-500">En espera</span> : <select value={elegidas[o.id] ?? ''} onChange={e => setElegidas(x => ({ ...x, [o.id]: (e.target.value || null) as Tipo | null }))}
+                          {o.en_espera ? null : <select value={elegidas[o.id] ?? ''} onChange={e => setElegidas(x => ({ ...x, [o.id]: (e.target.value || null) as Tipo | null }))}
                             className={`border rounded-lg px-2 py-1 text-xs ${elegidas[o.id] === 'concretada' ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
                               : elegidas[o.id] === 'no_concretada' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-neutral-300'}`}>
                             <option value="concretada">Concretada · {RATING[datos.plantillas.concretada.rating]}</option>
                             <option value="no_concretada">No concretada · {RATING[datos.plantillas.noConcretada.rating]}</option>
                             <option value="">No calificar ahora</option>
                           </select>}
+                        </td>
+                      )}
+                      {vista === 'proximas' && (
+                        <td className="px-3 py-2 whitespace-nowrap text-xs">
+                          <span className={`font-medium ${o.sugerencia === 'concretada' ? 'text-emerald-700' : 'text-amber-800'}`}>
+                            {o.sugerencia === 'concretada' ? 'Concretada' : 'No concretada'}
+                          </span>
+                          <span className="text-neutral-500"> · {o.sugerencia === 'concretada' && datos.plantillas.auto ? 'se califica sola el' : 'pasa a Por calificar el'} {diaMes(o.lista_el)}</span>
                         </td>
                       )}
                     </tr>
