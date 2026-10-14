@@ -5,7 +5,7 @@ import { AbrirFicha, VerME } from './FichaPublicacion'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
-import { PageHeader, Tabs, EmptyState, Cargando } from '@/components/ui'
+import { PageHeader, Tabs, EmptyState, Cargando, Pagination } from '@/components/ui'
 import { problemasDelTexto, revisarTexto } from '@/lib/preguntasTexto'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -38,22 +38,29 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Atendidas: de a 30 ("Ver 30 más") y buscador (busca en todas las conversaciones, no solo las cargadas).
-  const [limite, setLimite] = useState(30)
-  const [hayMas, setHayMas] = useState(false)
+  // Atendidas: por páginas de 20 (Anterior / Siguiente, "21–40 de 340") y buscador (busca en todas
+  // las conversaciones, no solo la página).
+  const [pagina, setPagina] = useState(1)
+  const [pag, setPag] = useState<{ total: number; por: number } | null>(null)
   const [buscar, setBuscar] = useState('')
   const [q, setQ] = useState('')
-  useEffect(() => { const t = setTimeout(() => { setQ(buscar.trim()); setLimite(30) }, 300); return () => clearTimeout(t) }, [buscar])
+  useEffect(() => { const t = setTimeout(() => { setQ(buscar.trim()); setPagina(1) }, 300); return () => clearTimeout(t) }, [buscar])
+  const listaRef = useRef<HTMLDivElement>(null)
+  const irA = (p: number) => {
+    setPagina(p)
+    const top = listaRef.current?.getBoundingClientRect().top
+    if (top !== undefined && top < 0) listaRef.current?.scrollIntoView({ block: 'start' })
+  }
 
   const cargar = useCallback(async () => {
     const v = vista === 'rapidas' || vista === 'recordatorios' ? 'sin_leer' : vista
-    const r = await fetch(`/api/mensajes?vista=${v}&limite=${limite}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`)
+    const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
-    setLista(d.conversaciones); setHayMas(!!d.hay_mas); setCont(d.sin_leer)
+    setLista(d.conversaciones); setPag(d.total != null ? { total: d.total, por: d.por_pagina } : null); setCont(d.sin_leer)
     setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
     setConRecordatorios(!!d.recordatorios)
-  }, [vista, limite, q])
+  }, [vista, pagina, q])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
   // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Calificaciones → "Escribirle"): abre
@@ -81,7 +88,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       {/* Cada conversación está en UNA: con mensajes sin responder → Por atender; si no → Atendidas. */}
-      <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null); setLimite(30) }} items={[
+      <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null); setPagina(1) }} items={[
         { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
         { value: 'todas', label: 'Atendidas' },
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
@@ -93,7 +100,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
         // de la conversación estiraba la página y todo se corría de lado), y lista O conversación, no las dos.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
-          <div className={`space-y-2 min-w-0 ${abierta ? 'hidden lg:block' : ''}`}>
+          <div ref={listaRef} className={`scroll-mt-4 space-y-2 min-w-0 ${abierta ? 'hidden lg:block' : ''}`}>
           {vista === 'todas' && (
             <div className="relative">
               <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
@@ -131,13 +138,10 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
                 </div>
               </button>
             ))}
+            {vista === 'todas' && pag && pag.total > pag.por && (
+              <Pagination total={pag.total} page={pagina} pageSize={pag.por} onChange={irA} />
+            )}
           </div>
-          {vista === 'todas' && hayMas && (
-            <button type="button" onClick={() => setLimite(n => n + 30)}
-              className="w-full rounded-lg border border-dashed border-neutral-300 bg-white py-2 text-xs font-medium text-neutral-600 hover:border-neutral-500 hover:text-neutral-900">
-              Ver 30 más
-            </button>
-          )}
           </div>
           {abierta
             ? <div ref={hiloRef} className="scroll-mt-4 min-w-0 space-y-2">

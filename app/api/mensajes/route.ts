@@ -9,7 +9,8 @@ import { puede } from '@/lib/permisos'
 // GET /api/mensajes?vista=sin_leer|con_nota|todas&q=&limite= → conversaciones post-venta de las cuentas
 // de la empresa con su estado en Despachos (o cancelada en ML) y sus notas de ML.
 //   sin_leer ("Por atender") = las que tienen mensajes del comprador sin leer;
-//   todas ("Atendidas", 2026-10-14) = las demás, sin repetir las de arriba, de a `limite` (30 por página).
+//   todas ("Atendidas", 2026-10-14) = las demás, sin repetir las de arriba, por páginas de 20
+//   (`pagina`, con el total para "1–20 de 340"); `limite` sin `pagina` = el "Ver 30 más" anterior.
 //   q = buscar por comprador, nº de venta, producto o texto, en TODAS (atendidas o no).
 export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
   const vista = sp.get('vista')
   const q = (sp.get('q') ?? '').trim().slice(0, 60)
   const limite = Math.min(Math.max(Number(sp.get('limite')) || 30, 1), 300)
+  const pagina = sp.get('pagina') ? Math.min(Math.max(Math.floor(Number(sp.get('pagina'))) || 1, 1), 10_000) : null
+  const POR_PAGINA = 20
   const params: unknown[] = []
   let filtro = `WHERE ${SQL_MENSAJE_VIGENTE}`
   if (q) {
@@ -28,6 +31,7 @@ export async function GET(req: NextRequest) {
   }
   // Por atender: todas (son pocas); atendidas y búsqueda: de a `limite` (+1 para saber si hay más).
   const tope = vista === 'sin_leer' && !q ? 200 : limite + 1
+  const paginado = pagina !== null && (vista !== 'sin_leer' || !!q)
   try {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
@@ -50,10 +54,16 @@ export async function GET(req: NextRequest) {
                          (SELECT item_imagen FROM ml_preguntas q WHERE q.item_id = o.item AND q.item_imagen IS NOT NULL LIMIT 1)) AS imagen
        ) img ON TRUE
        ${filtro}
-       ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST
-       LIMIT ${tope}`, [tieneModulo(s.session.user, 'despachos'), ...params])
-    const hayMas = tope === limite + 1 && rows.length > limite
+       ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC
+       ${paginado ? `LIMIT ${POR_PAGINA} OFFSET ${(pagina! - 1) * POR_PAGINA}` : `LIMIT ${tope}`}`, [tieneModulo(s.session.user, 'despachos'), ...params])
+    const hayMas = !paginado && tope === limite + 1 && rows.length > limite
     if (hayMas) rows.pop()
+    let total: number | null = null
+    if (paginado) {
+      const { rows: [t] } = await s.db.query(
+        `SELECT COUNT(*)::int AS n FROM ml_conversaciones c ${filtro.replaceAll('$2', '$1')}`, params)
+      total = t.n
+    }
     const { rows: [n] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE sin_leer > 0)::int AS conversaciones, COALESCE(SUM(sin_leer), 0)::int AS mensajes,
               COUNT(*) FILTER (WHERE notas IS NOT NULL)::int AS con_nota
@@ -62,7 +72,7 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
     return NextResponse.json({
-      conversaciones: rows, hay_mas: hayMas, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
+      conversaciones: rows, hay_mas: hayMas, total, por_pagina: POR_PAGINA, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
       // Pestaña Recordatorios (lib/recordatoriosPago.ts): solo con Pagos ME.
       recordatorios: tieneModulo(s.session.user, 'pagos_me') && s.session.user.country === 'VE',

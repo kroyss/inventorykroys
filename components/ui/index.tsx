@@ -339,7 +339,7 @@ export function Pagination({ total, page, pageSize, onChange }: {
   const to    = Math.min(page * pageSize, total)
   if (total === 0) return null
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-neutral-100 text-xs bg-neutral-50">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-neutral-100 text-xs bg-neutral-50">
       <span className="text-neutral-500">{from}–{to} de {total}</span>
       <div className="flex items-center gap-1">
         <button disabled={page <= 1} onClick={() => onChange(page - 1)}
