@@ -13,6 +13,7 @@ import type { Propuesta } from '@/lib/propuestasRespuestas'
 interface EstadoPl {
   id: string; usos: number; sin_cambios: number; automaticas: number; estado: 'clic' | 'lista' | 'automatica'
   probadas: { temas: string; n: number; pct: number; activa: boolean }[]
+  aprendidas: { palabra: string; veces: number; pct: number; at: string }[]
 }
 interface Hecho {
   item_id: string; envio_gratis: boolean | null; fuente: string | null; precio_ref: number | null
@@ -20,6 +21,7 @@ interface Hecho {
 }
 interface Info {
   plantillas: EstadoPl[]; hechos: Hecho[]; propuestas: Propuesta[]; pausa: boolean; automaticasHoy: number
+  recientes: { plantilla: string; titulo: string; palabra: string; veces: number }[]
   reglas: { lista_usos: number; lista_pct: number; umbral: number }
 }
 
@@ -108,6 +110,12 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
     cargarInfo()
   }
 
+  const quitarAprendida = async (plantilla: string, palabra: string) => {
+    await fetch('/api/preguntas/respuestas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'quitar_palabra', plantilla, palabra }) })
+    cargarInfo()
+  }
+
   const est = (p: Plantilla) => info?.plantillas.find(x => x.id === p.id)
   const hayAuto = lista.some(p => p.auto)
   const nProp = info?.propuestas.length ?? 0
@@ -144,6 +152,18 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
             <button onClick={() => pausar(!info.pausa)} className="btn-secondary text-xs">{info.pausa ? 'Reanudar' : 'Pausar todas'}</button>
           </div>
         )}
+
+        {/* Lo que aprendió esta semana de tus respuestas (lib/palabrasAprendidas.ts), con Deshacer. */}
+        {info?.recientes?.length ? (
+          <div className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-900 space-y-1">
+            {info.recientes.map(r => (
+              <div key={r.plantilla + r.palabra} className="flex flex-wrap items-center gap-x-2">
+                <span>Aprendí de tus respuestas: cuando preguntan con <b>«{r.palabra}»</b> eliges <b>{r.titulo}</b> ({r.veces} veces). Ahora te la sugiero.</span>
+                <button onClick={() => quitarAprendida(r.plantilla, r.palabra)} className="text-sky-700 underline hover:text-sky-900">Deshacer</button>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {lista.length === 0 && <p className="text-sm text-neutral-400">Todavía no hay respuestas rápidas.</p>}
         <div className="divide-y divide-neutral-100 border border-neutral-200 rounded-lg">
@@ -182,19 +202,9 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
                     </div>
                     <textarea value={p.texto} onChange={ev => cambiar(i, { texto: ev.target.value })} rows={2} maxLength={2000}
                       placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
-                    <label className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                      Palabras propias que la activan
-                      <CampoPalabras palabras={p.palabras ?? []} onCambio={palabras => cambiar(i, { palabras })} />
-                    </label>
-                    {e && e.probadas.length > 0 && (
-                      <ul className="text-xs text-neutral-600 space-y-0.5">
-                        {e.probadas.map(x => (
-                          <li key={x.temas} className={x.activa ? '' : 'text-neutral-400'}>
-                            {x.activa ? '✓' : '✗'} Preguntas de {x.temas}: coincidió {x.pct}% en {x.n} respuestas anteriores{x.activa ? '' : ' (no alcanza, no se sugiere)'}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <Aprendizaje e={e} propias={p.palabras ?? []}
+                      onQuitarPropia={w => cambiar(i, { palabras: (p.palabras ?? []).filter(x => x !== w) })}
+                      onQuitarAprendida={w => p.id && quitarAprendida(p.id, w)} />
                     <div className="text-right">
                       <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar respuesta</button>
                     </div>
@@ -249,19 +259,6 @@ export function LoAprendido() {
 
 
 /** Lo que el sistema aprendió de cada producto (envío gratis sí / no), corregible. */
-/** Palabras separadas por coma. El texto se edita tal cual se escribe (antes se rearmaba con ", " en
- *  cada tecla y los espacios se iban acumulando); a la respuesta llegan limpias, sin espacios de más. */
-function CampoPalabras({ palabras, onCambio }: { palabras: string[]; onCambio: (p: string[]) => void }) {
-  const [texto, setTexto] = useState(() => palabras.map(w => w.trim()).filter(Boolean).join(', '))
-  return (
-    <input value={texto}
-      onChange={ev => { setTexto(ev.target.value); onCambio(ev.target.value.split(',').map(w => w.trim()).filter(Boolean)) }}
-      onBlur={() => setTexto(t => t.split(',').map(w => w.trim()).filter(Boolean).join(', '))}
-      placeholder="opcional, separadas por coma (ej. mrw, cobro destino)"
-      className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
-  )
-}
-
 function AprendidoProductos({ hechos, onCambio }: { hechos: Hecho[]; onCambio: () => void }) {
   const [filtro, setFiltro] = useState<'si' | 'no'>('no')
   const conEnvio = hechos.filter(h => h.envio_gratis === true), sinEnvio = hechos.filter(h => h.envio_gratis === false)
@@ -313,5 +310,41 @@ function AprendidoProductos({ hechos, onCambio }: { hechos: Hecho[]; onCambio: (
         </div>
       )}
     </section>
+  )
+}
+
+/** Qué aprendió el sistema de una respuesta rápida, en lenguaje simple (sin porcentajes): en qué
+ *  preguntas la escribe sola y con qué palabras se activa. Las palabras se quitan con la ✕. */
+function Aprendizaje({ e, propias, onQuitarPropia, onQuitarAprendida }: {
+  e: EstadoPl | undefined; propias: string[]
+  onQuitarPropia: (w: string) => void; onQuitarAprendida: (w: string) => void
+}) {
+  const sola = (e?.probadas ?? []).filter(x => x.activa && !x.temas.includes('sus palabras')).map(x => x.temas)
+  const palabras = [
+    ...propias.map(w => ({ w: w.trim(), aprendida: false, info: 'La agregaste tú' })),
+    ...(e?.aprendidas ?? []).map(a => ({ w: a.palabra, aprendida: true, info: `Aprendida: en ${a.veces} preguntas con esta palabra elegiste esta respuesta` })),
+  ].filter(x => x.w)
+  return (
+    <div className="space-y-1.5 text-xs text-neutral-600">
+      <p>
+        {sola.length
+          ? <>Te la deja escrita cuando preguntan por: <b className="font-medium text-neutral-800">{sola.join(' · ')}</b>.</>
+          : <span className="text-neutral-400">Todavía no te la deja escrita sola: aprende a medida que la usas.</span>}
+      </p>
+      {palabras.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-neutral-500">También cuando dicen:</span>
+          {palabras.map(x => (
+            <span key={x.w} title={x.info}
+              className={`inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 ring-1 ring-inset ${x.aprendida ? 'bg-sky-50 text-sky-800 ring-sky-200' : 'bg-neutral-100 text-neutral-700 ring-neutral-200'}`}>
+              {x.w}
+              <button type="button" onClick={() => (x.aprendida ? onQuitarAprendida(x.w) : onQuitarPropia(x.w))}
+                aria-label={`Quitar «${x.w}»`} title="Quitar esta palabra"
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-current opacity-60 hover:bg-white hover:text-red-600 hover:opacity-100">✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

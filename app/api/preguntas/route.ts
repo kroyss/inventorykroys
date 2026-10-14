@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sugeridasPara } from '@/lib/sugerenciasServidor'
+import { sugerenciasPara } from '@/lib/sugerenciasServidor'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlConfigurado } from '@/lib/ml'
@@ -61,8 +61,11 @@ export async function GET(req: NextRequest) {
       `SELECT id, nickname, estado, ultima_sync, ultimo_error FROM ml_conexiones ORDER BY nickname`)
     // Respuestas sugeridas (sin IA, probadas en el historial de la empresa): solo en pendientes.
     if (vista === 'pendientes') {
-      const sug = await sugeridasPara(s.db, rows).catch(e => { console.error('[sugeridas]', e); return new Map() })
-      for (const r of rows) r.sugerida = sug.get(r.id) ?? null
+      const sug = await sugerenciasPara(s.db, rows).catch(e => { console.error('[sugeridas]', e); return null })
+      for (const r of rows) {
+        r.sugerida = sug?.sugeridas.get(r.id) ?? null
+        r.probable = sug?.probables.get(r.id) ?? null      // botón a resaltar cuando no hay sugerida
+      }
     }
     return NextResponse.json({
       preguntas: rows, total: tot.n, page, tam: TAM, contadores: n, cuentas,

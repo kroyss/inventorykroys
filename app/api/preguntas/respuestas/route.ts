@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
-import { calibracionDe, plantillasDe } from '@/lib/sugerenciasServidor'
+import { calibracionDe, plantillasDe, plantillasBase, aprendidasDe, quitadasDe, invalidarCalibracion } from '@/lib/sugerenciasServidor'
+import { CLAVE_APRENDIDAS, CLAVE_QUITADAS } from '@/lib/palabrasAprendidas'
 import { UMBRAL_CAL, TEMAS, type Calibracion } from '@/lib/sugerenciasPreguntas'
 import { estadoPlantillas, automaticasPausadas, LISTA_USOS, LISTA_PCT } from '@/lib/automaticasPreguntas'
 import { proponer } from '@/lib/propuestasRespuestas'
@@ -17,9 +18,10 @@ export async function GET() {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   try {
+    // La calibración primero: al recalcular también aprende las palabras (lib/palabrasAprendidas.ts).
+    const cal = (await plantillasBase(s.db)).length ? await calibracionDe(s.db) : ({} as Calibracion)
     const plantillas = await plantillasDe(s.db)
-    const [estado, cal, pausa] = await Promise.all([
-      estadoPlantillas(s.db), plantillas.length ? calibracionDe(s.db, plantillas) : Promise.resolve({} as Calibracion), automaticasPausadas(s.db)])
+    const [estado, pausa, aprendidas] = await Promise.all([estadoPlantillas(s.db), automaticasPausadas(s.db), aprendidasDe(s.db)])
     // Por respuesta: en qué combinaciones de temas quedó probada (y con qué %).
     const probadas: Record<string, { temas: string; n: number; pct: number; activa: boolean }[]> = {}
     for (const [k, v] of Object.entries(cal)) {
@@ -51,7 +53,11 @@ export async function GET() {
     const { rows: [hoy] } = await s.db.query(
       `SELECT COUNT(*)::int AS n FROM respuestas_origen WHERE modulo = 'preguntas' AND fuente = 'automatica' AND fecha::date = CURRENT_DATE`)
     return NextResponse.json({
-      plantillas: estado.map(e => ({ ...e, probadas: probadas[e.id] ?? [] })),
+      plantillas: estado.map(e => ({ ...e, probadas: probadas[e.id] ?? [], aprendidas: aprendidas[e.id] ?? [] })),
+      // Lo aprendido en la última semana: aviso con "Deshacer".
+      recientes: Object.entries(aprendidas).flatMap(([id, l]) => l
+        .filter(a => Date.now() - new Date(a.at).getTime() < 7 * 86_400_000)
+        .map(a => ({ plantilla: id, titulo: plantillas.find(p => p.id === id)?.titulo ?? '', palabra: a.palabra, veces: a.veces }))).slice(0, 8),
       hechos, propuestas, pausa, automaticasHoy: hoy.n,
       reglas: { lista_usos: LISTA_USOS, lista_pct: LISTA_PCT * 100, umbral: UMBRAL_CAL.pct * 100 },
     })
@@ -62,6 +68,7 @@ const Accion = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('pausa'), pausa: z.boolean() }),
   z.object({ accion: z.literal('hecho'), item_id: z.string().regex(/^[A-Z]{3}\d+$/), envio_gratis: z.boolean().nullable() }),
   z.object({ accion: z.literal('descartar'), texto: z.string().min(1).max(4000) }),
+  z.object({ accion: z.literal('quitar_palabra'), plantilla: z.string().min(1).max(80), palabra: z.string().min(1).max(60) }),
 ])
 
 // POST /api/preguntas/respuestas { accion } → pausar las automáticas, corregir lo aprendido de un
@@ -81,6 +88,17 @@ export async function POST(req: NextRequest) {
         `INSERT INTO ml_item_hechos (item_id, envio_gratis, fuente) VALUES ($1, $2, 'manual')
          ON CONFLICT (empresa_id, item_id) DO UPDATE SET envio_gratis = EXCLUDED.envio_gratis, fuente = 'manual', actualizado_at = NOW()`,
         [b.item_id, b.envio_gratis])
+    } else if (b.accion === 'quitar_palabra') {
+      // Una palabra aprendida que no corresponde: se quita y no se vuelve a aprender para esa respuesta.
+      const [apr, quit] = await Promise.all([aprendidasDe(s.db), quitadasDe(s.db)])
+      apr[b.plantilla] = (apr[b.plantilla] ?? []).filter(a => a.palabra !== b.palabra)
+      quit[b.plantilla] = [...new Set([...(quit[b.plantilla] ?? []), b.palabra])].slice(-100)
+      for (const [k, v] of [[CLAVE_APRENDIDAS, apr], [CLAVE_QUITADAS, quit]] as const) {
+        await s.db.query(
+          `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+           ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [k, JSON.stringify(v)])
+      }
+      await invalidarCalibracion(s.db)
     } else {
       const { rows: [d] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_DESCARTADAS])
       let l: string[] = []

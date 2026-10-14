@@ -72,7 +72,8 @@ export async function responderAutomaticas(db: Pool) {
   let publicadas = 0, fallas = 0
   for (const [id, s] of sug) {
     if (publicadas + fallas >= MAX_POR_PASADA) break
-    if (!autos.has(s.plantilla) || s.sin_confirmar) continue
+    // Solo las probadas en el historial: una palabra recién aprendida se sugiere, pero no se publica sola.
+    if (!autos.has(s.plantilla) || s.sin_confirmar || s.por_palabras) continue
     try {
       const r = await publicarRespuesta(db, id, s.texto, { fuente: 'automatica', base: s.texto, plantilla: s.plantilla })
       if (r.ok && r.publicada) publicadas++; else fallas++

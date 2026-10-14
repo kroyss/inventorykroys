@@ -18,8 +18,8 @@ const MIN_VECES = 8
 const PARECIDO_GRUPO = 0.7
 const MAX_GRUPOS = 500
 // Palabras que no dicen nada del tema.
-const VACIAS = new Set(('hola buenas buenos buen buena dias dia tardes tarde noches noche saludos gracias por favor para con que los las del una uno unos unas este esta esto ese esa eso como cual cuando donde quien tiene tienen tienes hay seria sera puede pueden puedo tengo quiero quisiera favor amigo amiga senor senora usted ustedes ser son esta estan mas muy tambien pero sin sobre hasta desde cada todo todos ellos ella el la lo le les mi mis su sus tu tus nos me te se si no ya aun alguna algun algo producto articulo publicacion gracias saludo saber quisiera gustaria informacion info consulta pregunta preguntar tendran tendras tendra disculpe disculpa ayuda ayudar necesito').split(' '))
-const generica = (w: string) => Object.values(TEMAS).some(t => t.palabras.some(p => !['zoom', 'tealca', 'mrw'].includes(p) && w.startsWith(p)))
+export const VACIAS = new Set(('hola buenas buenos buen buena dias dia tardes tarde noches noche saludos gracias por favor para con que los las del una uno unos unas este esta esto ese esa eso como cual cuando donde quien tiene tienen tienes hay seria sera puede pueden puedo tengo quiero quisiera favor amigo amiga senor senora usted ustedes ser son esta estan mas muy tambien pero sin sobre hasta desde cada todo todos ellos ella el la lo le les mi mis su sus tu tus nos me te se si no ya aun alguna algun algo producto articulo publicacion gracias saludo saber quisiera gustaria informacion info consulta pregunta preguntar tendran tendras tendra disculpe disculpa ayuda ayudar necesito').split(' '))
+export const generica = (w: string) => Object.values(TEMAS).some(t => t.palabras.some(p => !['zoom', 'tealca', 'mrw'].includes(p) && w.startsWith(p)))
 
 /** El historial que se usa: solo lo reciente (las políticas cambian: el mínimo de envío gratis
  *  pasó de $5 a $3) — quien llama pasa las respuestas de los últimos ~90 días. */

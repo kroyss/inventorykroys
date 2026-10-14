@@ -161,3 +161,33 @@ export function respaldo(cal: Calibracion, plantillaId: string, temas: string[])
   if (!c || c.n < UMBRAL_CAL.minimo || c.ok / c.n < UMBRAL_CAL.pct) return null
   return Math.round((100 * c.ok) / c.n)
 }
+
+/** Las palabras de la respuesta (propias o aprendidas) que trae la pregunta. */
+export const palabrasQueActivan = (p: Plantilla, pregunta: string) => {
+  const t = normalizar(pregunta)
+  return (p.palabras ?? []).filter(w => w.trim() && tiene(t, normalizar(w))).map(w => normalizar(w))
+}
+
+/** Sin sugerencia segura: el botón MÁS PROBABLE para resaltarlo (no se escribe solo). Entre las que
+ *  cubren los temas de la pregunta y aplican al precio, la de mejor acierto en el historial (≥ 50%,
+ *  con al menos 3 casos) o la que activan sus palabras. Las palabras de riesgo no impiden resaltar. */
+export function probable(pregunta: string, item: ItemDatos,
+  plantillas: (Plantilla & { temas?: string[] | null; excluidos?: string[] | null })[], cal: Calibracion): string | null {
+  const tn = normalizar(pregunta)
+  const propias = plantillas.filter(p => activaPropia(p, tn))
+  const temas = [...temasDe(pregunta), ...propias.map(temaPropio)]
+  if (!temas.length) return null
+  let mejor: string | null = null, puntaje = 0
+  for (const p of plantillas) {
+    if (!plantillaAplica(p, item.precio) || (p.excluidos ?? []).includes(item.item_id ?? '')) continue
+    if (item.envioGratis === false && ofreceEnvioGratis(p)) continue
+    const cubre = temasDePlantilla(p)
+    if (!temas.every(t => cubre.includes(t))) continue
+    const id = p.id ?? p.titulo
+    const c = cal[claveCal(id, temas)]
+    let pts = c && c.n >= 3 ? c.ok / c.n : 0
+    if (propias.includes(p)) pts = Math.max(pts, 0.9)
+    if (pts > puntaje) { puntaje = pts; mejor = id }
+  }
+  return puntaje >= 0.5 ? mejor : null
+}
