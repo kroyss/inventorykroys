@@ -293,7 +293,7 @@ function AprendidoProductos({ hechos, onCambio }: { hechos: Hecho[]; onCambio: (
       {lista.length === 0 ? <p className="text-sm text-neutral-400">Nada todavía.</p> : (
         <div className="divide-y divide-neutral-100">
           {lista.map(h => (
-            <div key={h.item_id} className="flex items-center gap-3 py-2">
+            <div key={h.item_id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1.5 py-2">
               <div className="w-9 h-9 shrink-0 rounded-md border border-neutral-200 bg-white overflow-hidden flex items-center justify-center">
                 {h.imagen
                   // eslint-disable-next-line @next/next/no-img-element
@@ -306,10 +306,15 @@ function AprendidoProductos({ hechos, onCambio }: { hechos: Hecho[]; onCambio: (
                   : <span className="text-sm text-neutral-800 truncate block">{h.titulo ?? h.item_id}</span>}
                 <span className="text-xs text-neutral-400">{FUENTE[h.fuente ?? ''] ?? ''}{h.precio_ref ? ` · precio entonces $${h.precio_ref}` : ''}</span>
               </div>
-              <button onClick={() => cambiar(h.item_id, !h.envio_gratis)} className="btn-ghost text-xs">
-                {h.envio_gratis ? 'No tiene envío gratis' : 'Sí tiene envío gratis'}
-              </button>
-              <button onClick={() => cambiar(h.item_id, null)} className="btn-ghost text-xs text-neutral-400" title="Olvidar: se vuelve a confirmar con tu próximo clic">Olvidar</button>
+              {/* En celular los botones bajan a su propia línea (antes ensanchaban la página). */}
+              <div className="flex w-full sm:w-auto justify-end gap-1.5 pl-12 sm:pl-0">
+                <button onClick={() => cambiar(h.item_id, !h.envio_gratis)}
+                  className="inline-flex h-7 items-center rounded-full border border-neutral-300 bg-white px-2.5 text-xs text-neutral-700 hover:border-neutral-500 whitespace-nowrap">
+                  {h.envio_gratis ? 'No tiene envío gratis' : 'Sí tiene envío gratis'}
+                </button>
+                <button onClick={() => cambiar(h.item_id, null)} title="Olvidar: se vuelve a confirmar con tu próximo clic"
+                  className="inline-flex h-7 items-center rounded-full border border-neutral-200 bg-white px-2.5 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700">Olvidar</button>
+              </div>
             </div>
           ))}
         </div>

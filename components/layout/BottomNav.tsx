@@ -68,12 +68,12 @@ const PRIMARY_AUTO: NavItem[] = [
   { href: '/automatizaciones', label: 'Inicio',     icon: 'inicio',     countries: ['VE', 'CO'] },
   { href: '/preguntas',        label: 'Preguntas',  icon: 'preguntas',  countries: ['VE', 'CO'] },
   { href: '/mensajes',         label: 'Mensajes',   icon: 'mensajes',   countries: ['VE', 'CO'] },
-  { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  countries: ['VE'] },
+  { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      countries: ['VE', 'CO'] },
 ]
 const MORE_AUTO: NavItem[] = [
+  { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  countries: ['VE'] },
   { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
-  { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      countries: ['VE', 'CO'] },
   { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
   { href: '/aprendizaje',      label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
 ]

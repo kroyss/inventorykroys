@@ -37,19 +37,26 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Atendidas: de a 30 ("Ver 30 más") y buscador (busca en todas las conversaciones, no solo las cargadas).
+  const [limite, setLimite] = useState(30)
+  const [hayMas, setHayMas] = useState(false)
+  const [buscar, setBuscar] = useState('')
+  const [q, setQ] = useState('')
+  useEffect(() => { const t = setTimeout(() => { setQ(buscar.trim()); setLimite(30) }, 300); return () => clearTimeout(t) }, [buscar])
 
   const cargar = useCallback(async () => {
-    const r = await fetch(`/api/mensajes?vista=${vista === 'rapidas' || vista === 'recordatorios' ? 'sin_leer' : vista}`)
+    const v = vista === 'rapidas' || vista === 'recordatorios' ? 'sin_leer' : vista
+    const r = await fetch(`/api/mensajes?vista=${v}&limite=${limite}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
-    setLista(d.conversaciones); setCont(d.sin_leer)
+    setLista(d.conversaciones); setHayMas(!!d.hay_mas); setCont(d.sin_leer)
     setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
     setConRecordatorios(!!d.recordatorios)
-  }, [vista])
+  }, [vista, limite, q])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
   // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Calificaciones → "Escribirle"): abre
-  // Recientes con esa conversación (si no está en la lista, la pide sola) y la trae a la vista en el celular.
+  // Atendidas con esa conversación (si no está en la lista, la pide sola) y la trae a la vista en el celular.
   const pedidoHecho = useRef(false)
   const hiloRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -72,9 +79,10 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
       </>}
         actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
-      <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null) }} items={[
-        { value: 'sin_leer', label: 'Sin leer', count: cont?.conversaciones },
-        { value: 'todas', label: 'Recientes' },
+      {/* Cada conversación está en UNA: con mensajes sin responder → Por atender; si no → Atendidas. */}
+      <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null); setLimite(30) }} items={[
+        { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
+        { value: 'todas', label: 'Atendidas' },
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
       ]} />
@@ -84,9 +92,18 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
         // de la conversación estiraba la página y todo se corría de lado), y lista O conversación, no las dos.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
-          <div className={`bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden ${abierta ? 'hidden lg:block' : ''}`}>
+          <div className={`space-y-2 min-w-0 ${abierta ? 'hidden lg:block' : ''}`}>
+          {vista === 'todas' && (
+            <div className="relative">
+              <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
+              <input value={buscar} onChange={e => setBuscar(e.target.value)} type="search"
+                placeholder="Buscar comprador, nº de venta o producto…" aria-label="Buscar conversación"
+                className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm" />
+            </div>
+          )}
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
             {lista.length === 0 ? (
-              <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : 'Todavía no hay conversaciones.'} />
+              <EmptyState message={vista === 'sin_leer' ? 'Nada por atender. Todo al día.' : q ? `Nada encontrado con «${q}».` : 'Todavía no hay conversaciones atendidas.'} />
             ) : lista.map(c => (
               <button key={c.pack_id} onClick={() => { setAbierta(c); if (window.innerWidth < 1024) window.scrollTo({ top: 0 }) }}
                 className={`w-full text-left px-4 py-3 flex gap-3 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
@@ -113,6 +130,13 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
                 </div>
               </button>
             ))}
+          </div>
+          {vista === 'todas' && hayMas && (
+            <button type="button" onClick={() => setLimite(n => n + 30)}
+              className="w-full rounded-lg border border-dashed border-neutral-300 bg-white py-2 text-xs font-medium text-neutral-600 hover:border-neutral-500 hover:text-neutral-900">
+              Ver 30 más
+            </button>
+          )}
           </div>
           {abierta
             ? <div ref={hiloRef} className="scroll-mt-4 min-w-0 space-y-2">

@@ -6,13 +6,28 @@ import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 
-// GET /api/mensajes?vista=sin_leer|con_nota|todas → conversaciones post-venta de las cuentas de
-// la empresa (las sin leer primero) con su estado en Despachos (o cancelada en ML) y sus notas de ML.
+// GET /api/mensajes?vista=sin_leer|con_nota|todas&q=&limite= → conversaciones post-venta de las cuentas
+// de la empresa con su estado en Despachos (o cancelada en ML) y sus notas de ML.
+//   sin_leer ("Por atender") = las que tienen mensajes del comprador sin leer;
+//   todas ("Atendidas", 2026-10-14) = las demás, sin repetir las de arriba, de a `limite` (30 por página).
+//   q = buscar por comprador, nº de venta, producto o texto, en TODAS (atendidas o no).
 export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
-  const vista = new URL(req.url).searchParams.get('vista')
-  const filtro = `WHERE ${SQL_MENSAJE_VIGENTE}` + (vista === 'todas' ? '' : vista === 'con_nota' ? ' AND c.notas IS NOT NULL' : ' AND c.sin_leer > 0')
+  const sp = new URL(req.url).searchParams
+  const vista = sp.get('vista')
+  const q = (sp.get('q') ?? '').trim().slice(0, 60)
+  const limite = Math.min(Math.max(Number(sp.get('limite')) || 30, 1), 300)
+  const params: unknown[] = []
+  let filtro = `WHERE ${SQL_MENSAJE_VIGENTE}`
+  if (q) {
+    params.push(`%${q.replace(/[%_\\]/g, '')}%`)
+    filtro += ` AND (c.pack_id::text LIKE $2 OR c.comprador_nick ILIKE $2 OR c.comprador_nombre ILIKE $2 OR c.productos ILIKE $2 OR c.ultimo_texto ILIKE $2)`
+  } else {
+    filtro += vista === 'todas' ? ' AND c.sin_leer = 0' : vista === 'con_nota' ? ' AND c.notas IS NOT NULL' : ' AND c.sin_leer > 0'
+  }
+  // Por atender: todas (son pocas); atendidas y búsqueda: de a `limite` (+1 para saber si hay más).
+  const tope = vista === 'sin_leer' && !q ? 200 : limite + 1
   try {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
@@ -36,7 +51,9 @@ export async function GET(req: NextRequest) {
        ) img ON TRUE
        ${filtro}
        ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST
-       LIMIT 200`, [tieneModulo(s.session.user, 'despachos')])
+       LIMIT ${tope}`, [tieneModulo(s.session.user, 'despachos'), ...params])
+    const hayMas = tope === limite + 1 && rows.length > limite
+    if (hayMas) rows.pop()
     const { rows: [n] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE sin_leer > 0)::int AS conversaciones, COALESCE(SUM(sin_leer), 0)::int AS mensajes,
               COUNT(*) FILTER (WHERE notas IS NOT NULL)::int AS con_nota
@@ -45,7 +62,7 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
     return NextResponse.json({
-      conversaciones: rows, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
+      conversaciones: rows, hay_mas: hayMas, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
       // Pestaña Recordatorios (lib/recordatoriosPago.ts): solo con Pagos ME.
       recordatorios: tieneModulo(s.session.user, 'pagos_me') && s.session.user.country === 'VE',
