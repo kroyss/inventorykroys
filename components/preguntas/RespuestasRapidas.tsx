@@ -184,9 +184,7 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
                       placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
                     <label className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                       Palabras propias que la activan
-                      <input value={(p.palabras ?? []).join(', ')} onChange={ev => cambiar(i, { palabras: ev.target.value.split(',') })}
-                        placeholder="opcional, separadas por coma (ej. mrw, cobro destino)"
-                        className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
+                      <CampoPalabras palabras={p.palabras ?? []} onCambio={palabras => cambiar(i, { palabras })} />
                     </label>
                     {e && e.probadas.length > 0 && (
                       <ul className="text-xs text-neutral-600 space-y-0.5">
@@ -251,6 +249,19 @@ export function LoAprendido() {
 
 
 /** Lo que el sistema aprendió de cada producto (envío gratis sí / no), corregible. */
+/** Palabras separadas por coma. El texto se edita tal cual se escribe (antes se rearmaba con ", " en
+ *  cada tecla y los espacios se iban acumulando); a la respuesta llegan limpias, sin espacios de más. */
+function CampoPalabras({ palabras, onCambio }: { palabras: string[]; onCambio: (p: string[]) => void }) {
+  const [texto, setTexto] = useState(() => palabras.map(w => w.trim()).filter(Boolean).join(', '))
+  return (
+    <input value={texto}
+      onChange={ev => { setTexto(ev.target.value); onCambio(ev.target.value.split(',').map(w => w.trim()).filter(Boolean)) }}
+      onBlur={() => setTexto(t => t.split(',').map(w => w.trim()).filter(Boolean).join(', '))}
+      placeholder="opcional, separadas por coma (ej. mrw, cobro destino)"
+      className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-2 py-1 text-xs" />
+  )
+}
+
 function AprendidoProductos({ hechos, onCambio }: { hechos: Hecho[]; onCambio: () => void }) {
   const [filtro, setFiltro] = useState<'si' | 'no'>('no')
   const conEnvio = hechos.filter(h => h.envio_gratis === true), sinEnvio = hechos.filter(h => h.envio_gratis === false)
