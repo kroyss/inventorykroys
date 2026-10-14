@@ -35,7 +35,8 @@ export async function GET() {
        LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
        WHERE o.cal_recibida_at > NOW() - make_interval(days => $1)
          AND (o.cal_recibida IN ('neutral', 'negative') OR o.cal_recibida_antes IS NOT NULL OR (o.cal_contradictoria AND o.cal_recibida_concretada))
-       ORDER BY o.cal_recibida_at DESC`, [DIAS_AVISO])
+       -- La que menos días le quedan para pedir el cambio, primero (2026-10-13).
+       ORDER BY o.cal_recibida_at ASC`, [DIAS_AVISO])
     const { rows: [pend] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - INTERVAL '60 days')::int AS n
        FROM ml_ordenes`)
