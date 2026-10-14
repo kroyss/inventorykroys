@@ -411,7 +411,8 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
           </div>
         )}
         {error && <p className="text-xs text-red-600">{error}</p>}
-        <div className="flex items-center justify-between">
+        {/* flex-wrap: en celular "Proponer con IA" y "Responder" bajan de línea en vez de ensanchar la página. */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => elegir.current?.click()} disabled={archivos.length >= 5}
               className="btn-ghost text-xs px-2 py-1" title="Adjuntar fotos o PDF (también puedes pegarlas con Ctrl+V)">📎 Adjuntar</button>
@@ -419,7 +420,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
               onChange={e => { agregar([...(e.target.files ?? [])]); e.target.value = '' }} />
             <span className="text-xs text-neutral-400">{texto.length}/350</span>
           </div>
-          <button type="button" onClick={proponer} disabled={pensando || !mensajes?.length} className="btn-secondary text-sm ml-auto mr-2"
+          <button type="button" onClick={proponer} disabled={pensando || !mensajes?.length} className="btn-secondary text-sm ml-auto"
             title="La IA lee la conversación, la nota y la venta, y propone una respuesta (no envía nada)">
             {pensando ? 'Pensando…' : texto ? 'Proponer otra' : 'Proponer con IA'}
             {!pensando && <span className="ml-1.5 text-xs font-normal text-neutral-400">· {CREDITOS_TXT}</span>}
