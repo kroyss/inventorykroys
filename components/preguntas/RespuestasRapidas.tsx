@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, type Plantilla } from '@/lib/preguntasTexto'
 import type { Propuesta } from '@/lib/propuestasRespuestas'
+import { BotonEditar, BotonEliminar } from './BotonesEdicion'
 
 // Preguntas → Configuración: las respuestas rápidas con su camino a automática (2026-10-11).
 //   Con clic → Lista para automática (muchos usos sin cambios) → Automática (solo si el vendedor
@@ -182,7 +183,7 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
                     {p.auto
                       ? <button onClick={() => ponerAuto(i, false)} disabled={guardando} className="btn-secondary text-xs">Desactivar automática</button>
                       : e?.estado === 'lista' && <button onClick={() => ponerAuto(i, true)} disabled={guardando} className="btn-primary text-xs">Activar automática</button>}
-                    <button onClick={() => alternar(p.id ?? String(i))} className="btn-ghost text-xs">{abierta ? 'Cerrar' : 'Editar'}</button>
+                    <BotonEditar abierta={abierta} onClick={() => alternar(p.id ?? String(i))} />
                   </span>
                 </div>
 
@@ -200,13 +201,17 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
                           className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" placeholder="—" />
                       </label>
                     </div>
-                    <textarea value={p.texto} onChange={ev => cambiar(i, { texto: ev.target.value })} rows={2} maxLength={2000}
+                    <textarea value={p.texto} onChange={ev => cambiar(i, { texto: ev.target.value })} rows={4} maxLength={2000}
                       placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
                     <Aprendizaje e={e} propias={p.palabras ?? []}
                       onQuitarPropia={w => cambiar(i, { palabras: (p.palabras ?? []).filter(x => x !== w) })}
                       onQuitarAprendida={w => p.id && quitarAprendida(p.id, w)} />
-                    <div className="text-right">
-                      <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar respuesta</button>
+                    <div className="flex justify-end">
+                      {/* Se guarda al momento: con el aviso ya quedó claro que no hay vuelta atrás. */}
+                      <BotonEliminar nombre={p.titulo} onEliminar={() => {
+                        const nueva = lista.filter((_, j) => j !== i)
+                        if (p.titulo.trim() && p.texto.trim()) guardarLista(nueva); else setLista(nueva)
+                      }} />
                     </div>
                   </div>
                 )}
@@ -328,12 +333,12 @@ function Aprendizaje({ e, propias, onQuitarPropia, onQuitarAprendida }: {
     <div className="space-y-1.5 text-xs text-neutral-600">
       <p>
         {sola.length
-          ? <>Te la deja escrita cuando preguntan por: <b className="font-medium text-neutral-800">{sola.join(' · ')}</b>.</>
-          : <span className="text-neutral-400">Todavía no te la deja escrita sola: aprende a medida que la usas.</span>}
+          ? <>Aparece sugerida (ya escrita) cuando preguntan por: <b className="font-medium text-neutral-800">{sola.join(' · ')}</b>.</>
+          : <span className="text-neutral-400">Por ahora no aparece sugerida: la tienes como botón en cada pregunta, y se irá sugiriendo a medida que la uses.</span>}
       </p>
       {palabras.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-neutral-500">También cuando dicen:</span>
+          <span className="text-neutral-500">También se sugiere si la pregunta dice:</span>
           {palabras.map(x => (
             <span key={x.w} title={x.info}
               className={`inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 ring-1 ring-inset ${x.aprendida ? 'bg-sky-50 text-sky-800 ring-sky-200' : 'bg-neutral-100 text-neutral-700 ring-neutral-200'}`}>

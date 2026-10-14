@@ -1,5 +1,6 @@
 'use client'
 import TextoConPublicaciones from './TextoConPublicaciones'
+import { BotonEditar, BotonEliminar } from './BotonesEdicion'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
@@ -404,10 +405,13 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
   const [lista, setLista] = useState<MensajeRapido[]>(iniciales)
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+  // Como en Preguntas: cerradas se ve solo el nombre y el comienzo del texto; "Editar" abre una.
+  const [abiertas, setAbiertas] = useState<Set<number>>(new Set())
+  const alternar = (i: number) => setAbiertas(s => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n })
   const cambiar = (i: number, c: Partial<MensajeRapido>) => { setLista(l => l.map((p, j) => j === i ? { ...p, ...c } : p)); setMsg(null) }
 
-  const guardar = async () => {
-    const limpias = lista.map(p => ({ titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
+  const guardar = async (nueva: MensajeRapido[] = lista) => {
+    const limpias = nueva.map(p => ({ titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
     const malas = limpias.filter(p => problemasDelTexto(p.texto, 'mensaje').length)
     if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto, 'mensaje').join(', ')}` }); return }
     setGuardando(true)
@@ -417,17 +421,24 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
     })
     setGuardando(false)
     if (!r.ok) { setMsg({ ok: false, t: 'No se pudo guardar' }); return }
-    setLista(limpias); setMsg({ ok: true, t: 'Guardadas' }); onGuardado()
+    setLista(limpias); setAbiertas(new Set()); setMsg({ ok: true, t: 'Guardadas' }); onGuardado()
+  }
+  const agregar = () => { setAbiertas(s => new Set(s).add(lista.length)); setLista(l => [...l, { titulo: '', texto: '' }]) }
+  // Eliminar se guarda al momento (el aviso ya dijo que no hay vuelta atrás).
+  const eliminar = (i: number) => {
+    const nueva = lista.filter((_, j) => j !== i)
+    setAbiertas(new Set())
+    if (lista[i].titulo.trim() && lista[i].texto.trim()) guardar(nueva); else setLista(nueva)
   }
 
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-neutral-900">Respuestas rápidas de mensajes</h2>
           <p className="text-xs text-neutral-500">Salen como botones en cada conversación: un clic pone el texto y lo puedes retocar antes de enviar.</p>
         </div>
-        <button onClick={() => setLista(l => [...l, { titulo: '', texto: '' }])} className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
+        <button onClick={agregar} className="btn-secondary text-sm whitespace-nowrap">+ Agregar</button>
       </div>
       {lista.length === 0 && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 space-y-2">
@@ -436,31 +447,46 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
           <button onClick={() => setLista(sugeridas)} className="btn-primary text-xs px-3 py-1">Usar estos ejemplos</button>
         </div>
       )}
-      <div className="space-y-3">
-        {lista.map((p, i) => {
-          const n = p.texto.length
-          return (
-            <div key={i} className="border border-neutral-200 rounded-lg p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto del botón (ej. Ya salió)" maxLength={40}
-                  className="flex-1 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
-                <button onClick={() => setLista(l => l.filter((_, j) => j !== i))} className="btn-ghost text-xs text-red-600">Quitar</button>
+      {lista.length > 0 && (
+        <div className="divide-y divide-neutral-100 border border-neutral-200 rounded-lg">
+          {lista.map((p, i) => {
+            const n = p.texto.length
+            const abierta = abiertas.has(i)
+            return (
+              <div key={i} className="p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-neutral-900 truncate">{p.titulo || <span className="text-neutral-400">Nueva respuesta</span>}</p>
+                    {!abierta && p.texto && <p className="text-xs text-neutral-500 truncate">{p.texto}</p>}
+                  </div>
+                  <BotonEditar abierta={abierta} onClick={() => alternar(i)} />
+                </div>
+                {abierta && (
+                  <div className="space-y-2 pt-1">
+                    <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto del botón (ej. Ya salió)" maxLength={40}
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
+                    <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={6} maxLength={350}
+                      placeholder="Texto del mensaje (ej. ¡Hola! Gracias por tu compra, ya estamos preparando tu pedido)"
+                      className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm leading-relaxed resize-y" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[11px] ${n >= 350 ? 'text-red-600 font-medium' : 'text-neutral-400'}`}>{n}/350{n >= 350 ? ' · llegó al límite de MercadoLibre' : ''}</span>
+                      <BotonEliminar nombre={p.titulo} onEliminar={() => eliminar(i)} />
+                    </div>
+                  </div>
+                )}
               </div>
-              <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={2} maxLength={350}
-                placeholder="Texto del mensaje (ej. ¡Hola! Gracias por tu compra, ya estamos preparando tu pedido)"
-                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
-              <p className="text-[11px] text-neutral-400 text-right">{n}/350</p>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
       <div className="flex items-center justify-end gap-3">
         {msg && <span className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.t}</span>}
-        <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
+        <button onClick={() => guardar()} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar respuestas rápidas'}</button>
       </div>
     </section>
   )
 }
+
 
 // Adjuntos que se pueden mandar (ML acepta JPG, PNG, PDF y TXT; nginx corta en 20 MB).
 const MAX_MB = 15
