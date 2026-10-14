@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { VerME } from './FichaPublicacion'
 
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
@@ -223,7 +222,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                         </td>
                       )}
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5"><span className="font-mono text-xs text-neutral-700">{o.id}</span><VerME orden={o.id} /></div>
+                        <div className="font-mono text-xs text-neutral-700">{o.id}</div>
                         <div className="text-xs text-neutral-400">{o.cuenta} · {new Date(o.fecha).toLocaleDateString('es-VE')}</div>
                       </td>
                       <td className="px-3 py-2 text-neutral-700">{o.comprador ?? '—'}

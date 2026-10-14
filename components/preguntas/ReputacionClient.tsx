@@ -1,7 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { VerME } from './FichaPublicacion'
 import { Cargando, EmptyState, PageHeader } from '@/components/ui'
 import type { Reputacion } from '@/lib/reputacionML'
 
@@ -158,7 +157,7 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
           </div>
           {c.productos && <p className="mt-1 truncate text-xs text-neutral-600" title={c.productos}>{c.productos}</p>}
           {c.mensaje && <p className="mt-1.5 border-l-2 border-neutral-200 pl-2 text-xs italic text-neutral-600">“{c.mensaje}”</p>}
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-neutral-400">Calificó {hace(c.calificada_at)} · {c.cuenta} · venta {c.pack} {pais !== 'CO' && <VerME orden={c.pack} />}</p>
+          <p className="mt-1 text-[11px] text-neutral-400">Calificó {hace(c.calificada_at)} · {c.cuenta} · venta {c.pack}</p>
           {pedido && !cambio && (
             <p className="mt-1 text-[11px] text-sky-700">
               Cambio pedido {hace(c.cambio_at ?? c.calificada_at)}: {CAMBIO[c.cambio_estado!] ?? c.cambio_estado}
