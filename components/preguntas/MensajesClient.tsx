@@ -38,7 +38,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
   const [cont, setCont] = useState<{ conversaciones: number; mensajes: number; con_nota: number } | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Atendidas: por páginas de 20 (Anterior / Siguiente, "21–40 de 340") y buscador (busca en todas
+  // Atendidas: por páginas de 10 (Anterior / Siguiente, "11–20 de 340") y buscador (busca en todas
   // las conversaciones, no solo la página).
   const [pagina, setPagina] = useState(1)
   const [pag, setPag] = useState<{ total: number; por: number } | null>(null)

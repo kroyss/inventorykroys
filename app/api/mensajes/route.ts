@@ -9,7 +9,7 @@ import { puede } from '@/lib/permisos'
 // GET /api/mensajes?vista=sin_leer|con_nota|todas&q=&limite= → conversaciones post-venta de las cuentas
 // de la empresa con su estado en Despachos (o cancelada en ML) y sus notas de ML.
 //   sin_leer ("Por atender") = las que tienen mensajes del comprador sin leer;
-//   todas ("Atendidas", 2026-10-14) = las demás, sin repetir las de arriba, por páginas de 20
+//   todas ("Atendidas", 2026-10-14) = las demás, sin repetir las de arriba, por páginas de 10
 //   (`pagina`, con el total para "1–20 de 340"); `limite` sin `pagina` = el "Ver 30 más" anterior.
 //   q = buscar por comprador, nº de venta, producto o texto, en TODAS (atendidas o no).
 export async function GET(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const q = (sp.get('q') ?? '').trim().slice(0, 60)
   const limite = Math.min(Math.max(Number(sp.get('limite')) || 30, 1), 300)
   const pagina = sp.get('pagina') ? Math.min(Math.max(Math.floor(Number(sp.get('pagina'))) || 1, 1), 10_000) : null
-  const POR_PAGINA = 20
+  const POR_PAGINA = 10
   const params: unknown[] = []
   let filtro = `WHERE ${SQL_MENSAJE_VIGENTE}`
   if (q) {
