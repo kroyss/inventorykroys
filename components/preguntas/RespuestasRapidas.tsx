@@ -190,7 +190,7 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
                 {abierta && (
                   <div className="space-y-2 pt-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <input value={p.titulo} onChange={ev => cambiar(i, { titulo: ev.target.value })} placeholder="Nombre corto (ej. Disponible + envío gratis)" maxLength={40}
+                      <input value={p.titulo} onChange={ev => cambiar(i, { titulo: ev.target.value })} placeholder="Nombre corto (ej. Disponible + envío gratis)" maxLength={25}
                         className="flex-1 min-w-[14rem] border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
                       <label className="text-xs text-neutral-500 flex items-center gap-1">desde $
                         <input value={p.precio_desde ?? ''} onChange={ev => cambiar(i, { precio_desde: num(ev.target.value) })} inputMode="decimal"

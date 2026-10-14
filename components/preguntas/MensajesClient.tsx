@@ -424,7 +424,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
               {rapidas.map((rp, i) => (
                 <button key={i} type="button" title={rp.texto}
                   onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
-                  className="shrink-0 whitespace-nowrap max-w-[14rem] truncate text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
+                  className="shrink-0 whitespace-nowrap max-w-[12rem] truncate text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
                   {rp.titulo}
                 </button>
               ))}
@@ -537,7 +537,7 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
                 </div>
                 {abierta && (
                   <div className="space-y-2 pt-1">
-                    <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto del botón (ej. Ya salió)" maxLength={40}
+                    <input value={p.titulo} onChange={e => cambiar(i, { titulo: e.target.value })} placeholder="Nombre corto del botón (ej. Ya salió)" maxLength={25}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-1.5 text-sm font-medium" />
                     <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={6} maxLength={350}
                       placeholder="Texto del mensaje (ej. ¡Hola! Gracias por tu compra, ya estamos preparando tu pedido)"
