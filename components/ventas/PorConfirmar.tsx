@@ -3,6 +3,7 @@
 // (lib/porConfirmar.ts). Cada fila dice de un vistazo si se puede confirmar ya (productos, pago,
 // mensaje del comprador) y "Confirmar" abre Nueva venta con todo cargado.
 import { useCallback, useEffect, useState } from 'react'
+import { VerME } from '@/components/preguntas/FichaPublicacion'
 import type { PorConfirmar as Fila } from '@/lib/porConfirmar'
 
 interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null }
@@ -78,6 +79,7 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
           <span className="font-semibold text-neutral-900 truncate">{f.comprador ?? f.nick ?? 'Sin nombre'}</span>
           {f.comprador && f.nick && <span className="text-xs text-neutral-400">@{f.nick}</span>}
           <span className="font-mono text-[11px] text-neutral-400">{f.numero}</span>
+          <VerME orden={f.numero} className="self-center" />
         </div>
         <div className="text-sm text-neutral-700 space-y-0.5">
           {f.lineas.map((l, k) => (

@@ -1,6 +1,7 @@
 'use client'
 import TextoConPublicaciones from './TextoConPublicaciones'
 import { BotonEditar, BotonEliminar } from './BotonesEdicion'
+import { AbrirFicha, VerME } from './FichaPublicacion'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
@@ -268,6 +269,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
           <span className="font-semibold text-neutral-700 bg-neutral-100 rounded-full px-2 py-0.5">{c.cuenta}</span>
           <Comprador nick={comprador?.nick ?? c.comprador_nick} nombre={comprador?.nombre ?? c.comprador_nombre} grande />
           <span className="font-mono">{c.pack_id}</span>
+          <VerME orden={c.pack_id} />
           {/* Informativo (sin protagonismo): si su guía ya salió en Despachos. Pudo despacharse sin registrarlo aquí. */}
           {c.cancelada
             ? <span className="text-neutral-400">· cancelada en ML</span>
@@ -294,16 +296,17 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
         {items?.length ? (
           <div className="flex items-start gap-2.5">
           {items.filter(it => it.imagen).slice(0, 3).map((it, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={it.id + i} src={it.imagen!} alt="" className="h-12 w-12 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
+            <AbrirFicha key={it.id + i} item={it.id} className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-neutral-200 bg-white hover:border-neutral-400">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={it.imagen!} alt="" className="h-full w-full object-contain" />
+            </AbrirFicha>
           ))}
           <div className="min-w-0 space-y-1.5">
             {items.map((it, i) => (
               <div key={it.id + i}>
                 <p className="text-sm font-medium text-neutral-900">
-                  {it.link
-                    ? <a href={it.link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
-                        className="hover:underline underline-offset-2">{it.titulo} <span className="text-neutral-400">↗</span></a>
+                  {/^[A-Z]{3}\d+$/.test(it.id)
+                    ? <AbrirFicha item={it.id} className="hover:underline underline-offset-2">{it.titulo}</AbrirFicha>
                     : it.titulo}
                   {it.variante && (
                     <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>

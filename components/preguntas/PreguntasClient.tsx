@@ -1,5 +1,6 @@
 'use client'
 import TextoConPublicaciones from './TextoConPublicaciones'
+import { AbrirFicha } from './FichaPublicacion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DatosDeItem, DatosProductos } from './DatosProducto'
 import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
@@ -41,7 +42,7 @@ function linkPublicacion(p: Pregunta) {
   return `https://articulo.mercadolibre.${dominio}/${m[1]}-${m[2]}-_JM`
 }
 
-/** Miniatura de la publicación (como en ML): títulos parecidos se distinguen de un vistazo. Abre la publicación. */
+/** Miniatura de la publicación (como en ML): títulos parecidos se distinguen de un vistazo. Abre su ficha encima. */
 function Foto({ p, chica = false }: { p: Pregunta; chica?: boolean }) {
   const link = linkPublicacion(p)
   const tam = chica ? 'w-10 h-10' : 'w-12 h-12 sm:w-14 sm:h-14'
@@ -50,7 +51,7 @@ function Foto({ p, chica = false }: { p: Pregunta; chica?: boolean }) {
     ? <img src={p.item_imagen} alt="" loading="lazy" className="w-full h-full object-contain" />
     : <svg viewBox="0 0 24 24" className="w-5 h-5 text-neutral-300" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 17l-5-5-9 8" /></svg>
   return link
-    ? <a href={link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre" className={`${caja} hover:border-neutral-400`}>{img}</a>
+    ? <AbrirFicha item={p.item_id} className={`${caja} hover:border-neutral-400`}>{img}</AbrirFicha>
     : <div className={`${caja} bg-neutral-50`}>{img}</div>
 }
 
@@ -69,10 +70,10 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
       {link
-        ? <a href={link} target="_blank" rel="noreferrer" title="Ver la publicación en MercadoLibre"
+        ? <AbrirFicha item={p.item_id}
             className={`line-clamp-2 sm:truncate max-w-[30rem] hover:underline underline-offset-2 ${nombre ? 'font-medium text-neutral-800' : 'text-neutral-500'}`}>
-            {nombre ?? 'Publicación sin vincular a un producto'} <span className="text-neutral-400">↗</span>
-          </a>
+            {nombre ?? 'Publicación sin vincular a un producto'}
+          </AbrirFicha>
         : nombre
           ? <span className="font-medium text-neutral-800 line-clamp-2 sm:truncate max-w-[30rem]">{nombre}</span>
           : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
