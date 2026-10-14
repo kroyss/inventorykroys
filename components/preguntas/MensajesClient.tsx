@@ -81,12 +81,14 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
       {vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
-          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
+        // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
+        // de la conversación estiraba la página y todo se corría de lado), y lista O conversación, no las dos.
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
+          <div className={`bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden ${abierta ? 'hidden lg:block' : ''}`}>
             {lista.length === 0 ? (
               <EmptyState message={vista === 'sin_leer' ? 'No hay mensajes sin leer. Todo al día.' : 'Todavía no hay conversaciones.'} />
             ) : lista.map(c => (
-              <button key={c.pack_id} onClick={() => setAbierta(c)}
+              <button key={c.pack_id} onClick={() => { setAbierta(c); if (window.innerWidth < 1024) window.scrollTo({ top: 0 }) }}
                 className={`w-full text-left px-4 py-3 flex gap-3 transition-colors ${abierta?.pack_id === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
                 {c.imagen
                   // eslint-disable-next-line @next/next/no-img-element
@@ -113,7 +115,14 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
             ))}
           </div>
           {abierta
-            ? <div ref={hiloRef} className="scroll-mt-4"><Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={cargar} /></div>
+            ? <div ref={hiloRef} className="scroll-mt-4 min-w-0 space-y-2">
+                <button type="button" onClick={() => setAbierta(null)}
+                  className="lg:hidden inline-flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3 h-8 text-xs font-medium text-neutral-700">
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5" /></svg>
+                  Volver a la lista
+                </button>
+                <Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={cargar} />
+              </div>
             : <div className="hidden lg:block bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">Elige una conversación</div>}
         </div>
       )}
