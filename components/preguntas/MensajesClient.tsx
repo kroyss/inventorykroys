@@ -415,12 +415,12 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
         {ultimoEsComprador && !texto.trim() && (
           <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setOrigen({ fuente: 'parecida', base: t }); setMeta(null) }} />
         )}
-        {/* Una sola línea que se desliza de lado (antes en varias líneas tapaba la conversación) y solo con el
+        {/* En celular una sola línea que se desliza con el dedo (en computadora, varias: ahí la rueda no la mueve) y solo con el
             cuadro vacío: al elegir una o empezar a escribir, se esconde. */}
         {rapidas.length > 0 && mensajes && !texto.trim() && (
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-xs text-neutral-400 shrink-0">Rápidas:</span>
-            <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none]">
+            <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] md:flex-wrap md:overflow-visible">
               {rapidas.map((rp, i) => (
                 <button key={i} type="button" title={rp.texto}
                   onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}

@@ -56,7 +56,7 @@ export function Sugerencias({ lista, onUsar, etiqueta }: { lista: Sugerencia[]; 
   return (
     <div className="flex items-center gap-1.5 min-w-0">
       <span className="text-xs text-neutral-400 shrink-0" title="Respuestas tuyas a preguntas parecidas · gratis, sin IA">{etiqueta}</span>
-      <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none]">
+      <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] md:flex-wrap md:overflow-visible">
         {lista.map((s, i) => (
           <button key={i} type="button" onClick={() => onUsar(s.respuesta)}
             title={`${s.respuesta}\n\n— a “${s.pregunta}”${s.mismaPublicacion ? ' (misma publicación)' : s.titulo ? ` (${s.titulo})` : ''} · ${Math.round(s.parecido * 100)}% parecida`}

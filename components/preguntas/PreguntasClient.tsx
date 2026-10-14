@@ -541,9 +541,9 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
 
       {plantillas.length > 0 && (
         <div className="flex items-center gap-1.5 min-w-0">
-          {/* Una sola línea que se desliza de lado (antes en varias líneas ocupaba media pantalla en celular). */}
+          {/* En celular una sola línea que se desliza con el dedo (antes ocupaba media pantalla); en computadora, varias. */}
           <span className="text-xs text-neutral-400 shrink-0">Rápidas:</span>
-          <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none]">
+          <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] md:flex-wrap md:overflow-visible">
           {/* Sin sugerida segura: la más probable va primero y resaltada (un clic y listo). */}
           {[...plantillas].sort((a, b) => Number(!sug && b.id === p.probable) - Number(!sug && a.id === p.probable)).map((pl, i) => {
             const aplica = plantillaAplica(pl, precioUSD(p))
