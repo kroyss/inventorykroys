@@ -540,8 +540,10 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
         onUsar={t => { usar(t, 'parecida'); setMeta({ confianza: null, falta: null, web: false }) }} />
 
       {plantillas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-neutral-400 mr-1">Respuestas rápidas:</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* Una sola línea que se desliza de lado (antes en varias líneas ocupaba media pantalla en celular). */}
+          <span className="text-xs text-neutral-400 shrink-0">Rápidas:</span>
+          <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none]">
           {/* Sin sugerida segura: la más probable va primero y resaltada (un clic y listo). */}
           {[...plantillas].sort((a, b) => Number(!sug && b.id === p.probable) - Number(!sug && a.id === p.probable)).map((pl, i) => {
             const aplica = plantillaAplica(pl, precioUSD(p))
@@ -550,7 +552,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
             return (
               <button key={pl.id ?? i} type="button" onClick={() => { usar(pl.texto, 'rapida', pl.id); setMeta({ confianza: null, falta: null, web: false }) }}
                 title={`${probable ? 'La más probable para esta pregunta, según tus respuestas anteriores.\n\n' : ''}${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
-                className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   probable ? 'bg-sky-50 border-sky-400 text-sky-900 ring-2 ring-sky-100 font-medium hover:bg-sky-100'
                   : aplica && condicionada ? 'bg-lime-50 border-lime-300 text-lime-900 hover:bg-lime-100'
                   : aplica ? 'bg-white border-neutral-300 text-neutral-700 hover:border-neutral-500'
@@ -559,6 +561,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
               </button>
             )
           })}
+          </div>
         </div>
       )}
 
