@@ -284,7 +284,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }:
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['respuestas', 'Respuestas rápidas'], ['aprendido', 'Lo aprendido de cada producto'], ['ia', 'Políticas para la IA']] as const).map(([k, t]) => (
+              {([['respuestas', 'Respuestas rápidas'], ['ia', 'Políticas para la IA'], ['aprendido', 'Lo aprendido de cada producto']] as const).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
