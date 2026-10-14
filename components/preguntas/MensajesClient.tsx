@@ -286,8 +286,10 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
     } finally { setEnviando(false) }
   }
 
+  // Sin alto máximo del cuadro (antes 75vh): con cabecera y respuesta altas, el pie se salía del cuadro y se
+  // montaba sobre el "© derechos reservados". El que tiene tope y scroll propio es la lista de mensajes.
   return (
-    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col max-h-[75vh]">
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col">
       {ampliada && <VisorFoto {...ampliada} onCerrar={() => setAmpliada(null)} />}
       <header className="px-4 py-3 border-b border-neutral-100 space-y-1">
         <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
@@ -365,7 +367,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
         {!sinNotas && <NotasVenta pack={c.pack_id} onCambio={onCambio} />}
         {recordatorio && !soloLectura && <RecordatorioVenta pack={c.pack_id} r={recordatorio} onCambio={setRecordatorio} />}
       </header>
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[12rem]">
+      <div className="overflow-y-auto px-4 py-3 space-y-2 min-h-[10rem] max-h-[50vh] md:max-h-[55vh]">
         {!mensajes ? <p className="text-sm text-neutral-400">Cargando…</p> : mensajes.map((m, i) => {
           const ultimoPropio = m.propio && !mensajes.slice(i + 1).some(x => x.propio)
           const locales = ultimoPropio && m.adjuntos.length === 0 ? recienEnviados : []
@@ -413,16 +415,20 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
         {ultimoEsComprador && !texto.trim() && (
           <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setOrigen({ fuente: 'parecida', base: t }); setMeta(null) }} />
         )}
-        {rapidas.length > 0 && mensajes && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-neutral-400 mr-1">Respuestas rápidas:</span>
-            {rapidas.map((rp, i) => (
-              <button key={i} type="button" title={rp.texto}
-                onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
-                className="text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
-                {rp.titulo}
-              </button>
-            ))}
+        {/* Una sola línea que se desliza de lado (antes en varias líneas tapaba la conversación) y solo con el
+            cuadro vacío: al elegir una o empezar a escribir, se esconde. */}
+        {rapidas.length > 0 && mensajes && !texto.trim() && (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs text-neutral-400 shrink-0">Rápidas:</span>
+            <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none]">
+              {rapidas.map((rp, i) => (
+                <button key={i} type="button" title={rp.texto}
+                  onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
+                  className="shrink-0 whitespace-nowrap text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
+                  {rp.titulo}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         <TextoConPublicaciones value={texto} onTexto={setTexto} cuenta={c.cuenta} rows={2} maxLength={350}

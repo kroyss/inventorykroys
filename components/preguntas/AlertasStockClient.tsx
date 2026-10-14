@@ -130,19 +130,21 @@ export default function AlertasStockClient() {
     return !!d && Date.now() - new Date(d).getTime() < 7 * 86_400_000
   }
   const fila = (f: Fila) => (
-    <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex items-center gap-3">
+    // Celular: dos líneas (arriba foto, título y estado; abajo casilla, stock nuevo y botón); antes todo en una
+    // línea y el estado se salía del margen. Desde sm: una sola línea en el orden del código (sm:order-none).
+    <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2">
       {datos?.puedeStock && (
         <input type="checkbox" checked={marcadas.has(clave(f))} onChange={() => alternar(f)} disabled={(nuevo[clave(f)] ?? '') === ''}
           title={(nuevo[clave(f)] ?? '') === '' ? 'Escribe primero el stock nuevo' : 'Incluir en la actualización'}
-          className="w-4 h-4 accent-neutral-900 shrink-0" />
+          className="order-5 sm:order-none w-4 h-4 accent-neutral-900 shrink-0" />
       )}
       {f.imagen
-        ? <AbrirFicha item={f.item_id} className="w-11 h-11 shrink-0 overflow-hidden rounded bg-neutral-100 ring-1 ring-transparent hover:ring-neutral-400">
+        ? <AbrirFicha item={f.item_id} className="order-1 sm:order-none w-11 h-11 shrink-0 overflow-hidden rounded bg-neutral-100 ring-1 ring-transparent hover:ring-neutral-400">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="h-full w-full object-cover" />
           </AbrirFicha>
-        : <span className="w-11 h-11 rounded bg-neutral-100 shrink-0" />}
-      <div className="min-w-0 flex-1">
+        : <span className="order-1 sm:order-none w-11 h-11 rounded bg-neutral-100 shrink-0" />}
+      <div className="order-2 sm:order-none min-w-0 flex-1 basis-0 sm:basis-auto">
         <p className="text-sm text-neutral-900 truncate">
           {/* Abre la ficha de la publicación encima (como en Preguntas y Mensajes); desde ahí, a ML. */}
           <AbrirFicha item={f.item_id} className="max-w-full truncate align-bottom hover:underline underline-offset-2">{f.titulo}</AbrirFicha>
@@ -157,11 +159,11 @@ export default function AlertasStockClient() {
       {datos?.puedeStock && (
         <input inputMode="numeric" value={nuevo[clave(f)] ?? ''} onChange={e => escribir(f, e.target.value)} placeholder="Nuevo"
           aria-label={`Stock nuevo de ${f.titulo}`}
-          className="w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
+          className="order-6 sm:order-none w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
       )}
       {/* "Volver a avisar" solo si la quitaron a mano y todavía está dentro de los 7 días (si no, ya es vieja). */}
       {/* Columna de ancho fijo (con o sin botón) para que el stock y el estado queden alineados. */}
-      <div className="sm:w-32 shrink-0 flex justify-end">
+      <div className="order-7 sm:order-none ml-auto sm:ml-0 sm:w-32 shrink-0 flex justify-end">
         {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
           title={f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
@@ -173,7 +175,7 @@ export default function AlertasStockClient() {
           {f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
         </button>}
       </div>
-      <div className="sm:w-44 text-right shrink-0">
+      <div className="order-3 sm:order-none sm:w-44 text-right shrink-0">
         <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
           {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
@@ -181,6 +183,8 @@ export default function AlertasStockClient() {
           {vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
         </p>
       </div>
+      {/* Corte de línea solo en celular (con algo abajo que mostrar). */}
+      {(datos?.puedeStock || f.caliente || (f.descartada_at && reciente(f))) && <div className="order-4 basis-full h-0 sm:hidden" />}
     </li>
   )
 

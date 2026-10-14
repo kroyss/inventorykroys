@@ -125,10 +125,11 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
           : undefined}
       />
 
-      <div className="flex gap-1 border-b border-neutral-200">
+      {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
+      <div className="flex gap-1 border-b border-neutral-200 overflow-x-auto [scrollbar-width:none]">
         {(['resumen', 'empresas', 'cuentas', 'fundadores', 'aprendizaje', 'interno'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)}
-            className={`px-3 py-1.5 text-sm -mb-px border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
             {v === 'resumen' ? 'Resumen' : v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : v === 'aprendizaje' ? 'Aprendizaje' : 'Interno'}
           </button>
         ))}
