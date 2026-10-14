@@ -552,7 +552,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
             return (
               <button key={pl.id ?? i} type="button" onClick={() => { usar(pl.texto, 'rapida', pl.id); setMeta({ confianza: null, falta: null, web: false }) }}
                 title={`${probable ? 'La más probable para esta pregunta, según tus respuestas anteriores.\n\n' : ''}${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
-                className={`shrink-0 whitespace-nowrap px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                className={`shrink-0 whitespace-nowrap max-w-[14rem] truncate px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   probable ? 'bg-sky-50 border-sky-400 text-sky-900 ring-2 ring-sky-100 font-medium hover:bg-sky-100'
                   : aplica && condicionada ? 'bg-lime-50 border-lime-300 text-lime-900 hover:bg-lime-100'
                   : aplica ? 'bg-white border-neutral-300 text-neutral-700 hover:border-neutral-500'

@@ -424,7 +424,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
               {rapidas.map((rp, i) => (
                 <button key={i} type="button" title={rp.texto}
                   onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
-                  className="shrink-0 whitespace-nowrap text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
+                  className="shrink-0 whitespace-nowrap max-w-[14rem] truncate text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
                   {rp.titulo}
                 </button>
               ))}
