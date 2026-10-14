@@ -31,7 +31,7 @@ const linkCorto = (id: string) => {
 
 // GET /api/preguntas/publicacion?item=MLV… → la publicación como la ve el comprador (fotos, precio,
 // stock, variantes, características y descripción), leída de ML al abrir la ficha en Preguntas o
-// Mensajes ("ver la publicación sin salir de lo que estoy haciendo").
+// Mensajes y Stock ("ver la publicación sin salir de lo que estoy haciendo").
 export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
       `SELECT COALESCE(
          (SELECT conexion_id FROM ml_catalogo WHERE item_id = $1),
          (SELECT conexion_id FROM ml_preguntas WHERE item_id = $1 ORDER BY fecha DESC LIMIT 1),
+         (SELECT conexion_id FROM ml_stock_alertas WHERE item_id = $1 LIMIT 1),
          (SELECT conexion_id FROM ml_ordenes WHERE items[1] LIKE $1 || '%' ORDER BY fecha DESC LIMIT 1)) AS conexion_id,
          (SELECT titulo FROM ml_catalogo WHERE item_id = $1) AS titulo_cat,
          (SELECT precio::float FROM ml_catalogo WHERE item_id = $1) AS precio_cat,

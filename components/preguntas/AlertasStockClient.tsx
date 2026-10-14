@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { PageHeader, Tabs, Cargando } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { AbrirFicha } from './FichaPublicacion'
 
 interface Fila {
   item_id: string; variante_id: string; titulo: string; variante: string | null; disponible: number; estado: string
@@ -136,14 +137,15 @@ export default function AlertasStockClient() {
           className="w-4 h-4 accent-neutral-900 shrink-0" />
       )}
       {f.imagen
-        // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="w-11 h-11 rounded object-cover bg-neutral-100 shrink-0" />
+        ? <AbrirFicha item={f.item_id} className="w-11 h-11 shrink-0 overflow-hidden rounded bg-neutral-100 ring-1 ring-transparent hover:ring-neutral-400">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="h-full w-full object-cover" />
+          </AbrirFicha>
         : <span className="w-11 h-11 rounded bg-neutral-100 shrink-0" />}
       <div className="min-w-0 flex-1">
         <p className="text-sm text-neutral-900 truncate">
-          {f.permalink
-            ? <a href={f.permalink} target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">{f.titulo} <span className="text-neutral-400">↗</span></a>
-            : f.titulo}
+          {/* Abre la ficha de la publicación encima (como en Preguntas y Mensajes); desde ahí, a ML. */}
+          <AbrirFicha item={f.item_id} className="max-w-full truncate align-bottom hover:underline underline-offset-2">{f.titulo}</AbrirFicha>
         </p>
         <p className="text-xs text-neutral-500 truncate">
           {f.variante && <span className="text-neutral-700 font-medium">{f.variante} · </span>}
