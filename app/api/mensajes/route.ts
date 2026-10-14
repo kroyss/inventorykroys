@@ -11,7 +11,8 @@ import { puede } from '@/lib/permisos'
 //   sin_leer ("Por atender") = las que tienen mensajes del comprador sin leer;
 //   todas ("Atendidas", 2026-10-14) = las demás, sin repetir las de arriba, por páginas de 10
 //   (`pagina`, con el total para "1–20 de 340"); `limite` sin `pagina` = el "Ver 30 más" anterior.
-//   q = buscar por comprador, nº de venta, producto o texto, en TODAS (atendidas o no).
+//   q = buscar por comprador, nº de venta, producto, nota o lo que se habló (cualquier mensaje de la
+//   conversación, no solo el último), en TODAS (atendidas o no). `coincide` = el mensaje que coincidió.
 export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
@@ -25,7 +26,9 @@ export async function GET(req: NextRequest) {
   let filtro = `WHERE ${SQL_MENSAJE_VIGENTE}`
   if (q) {
     params.push(`%${q.replace(/[%_\\]/g, '')}%`)
-    filtro += ` AND (c.pack_id::text LIKE $2 OR c.comprador_nick ILIKE $2 OR c.comprador_nombre ILIKE $2 OR c.productos ILIKE $2 OR c.ultimo_texto ILIKE $2)`
+    filtro += ` AND (c.pack_id::text LIKE $2 OR c.comprador_nick ILIKE $2 OR c.comprador_nombre ILIKE $2 OR c.productos ILIKE $2
+                OR c.ultimo_texto ILIKE $2 OR c.notas ILIKE $2
+                OR EXISTS (SELECT 1 FROM ml_mensajes m WHERE m.pack_id = c.pack_id AND m.texto ILIKE $2))`
   } else {
     filtro += vista === 'todas' ? ' AND c.sin_leer = 0' : vista === 'con_nota' ? ' AND c.notas IS NOT NULL' : ' AND c.sin_leer > 0'
   }
@@ -36,7 +39,8 @@ export async function GET(req: NextRequest) {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
               NULLIF(c.comprador_nick, '') AS comprador_nick, c.comprador_nombre,
-              x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos
+              x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos,
+              ${q ? `(SELECT m.texto FROM ml_mensajes m WHERE m.pack_id = c.pack_id AND m.texto ILIKE $2 ORDER BY m.fecha DESC LIMIT 1)` : 'NULL'} AS coincide
        FROM ml_conversaciones c
        JOIN ml_conexiones x ON x.id = c.conexion_id
        -- Lo que sirve para responder "¿ya lo enviaste?": si su guía ya salió en Despachos (en

@@ -15,6 +15,7 @@ import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
 export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
   ultimo_at: string | null; productos: string | null; cuenta: string; despachada_at: string | null; cancelada: boolean | null; con_despachos: boolean; notas: string | null; imagen?: string | null
+  coincide?: string | null   // buscando: el mensaje de la conversación que coincidió
   comprador_nick: string | null; comprador_nombre: string | null
 }
 interface Adjunto { archivo: string; nombre: string; tipo: string | null }
@@ -105,7 +106,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
             <div className="relative">
               <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
               <input value={buscar} onChange={e => setBuscar(e.target.value)} type="search"
-                placeholder="Buscar comprador, nº de venta o producto…" aria-label="Buscar conversación"
+                placeholder="Buscar comprador, nº de venta, producto o algo que se habló…" aria-label="Buscar conversación"
                 className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm" />
             </div>
           )}
@@ -130,6 +131,11 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
                 <p className={`text-sm truncate ${c.sin_leer > 0 ? 'text-neutral-900' : 'text-neutral-500'}`}>
                   {c.ultimo_de_comprador === false && <span className="text-neutral-400">Tú: </span>}{c.ultimo_texto ? sinEtiquetas(c.ultimo_texto) : '—'}
                 </p>
+                {c.coincide && q && (
+                  <p className="text-xs text-neutral-600 line-clamp-2 rounded bg-yellow-50 px-1.5 py-1" title="Mensaje de la conversación que coincide con tu búsqueda">
+                    <span className="font-medium text-neutral-500">Se habló: </span><Resaltar texto={recorte(sinEtiquetas(c.coincide), q)} q={q} />
+                  </p>
+                )}
                 {c.notas && (
                   <p className="text-xs text-amber-800 truncate">
                     <span className="font-semibold bg-amber-100 rounded px-1.5 py-0.5 mr-1.5">Nota</span>{c.notas}
@@ -164,6 +170,18 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
 /** Monto de una venta de ML: USD con 2 decimales, pesos (COP) sin decimales. Formato de-DE (1.234,56). */
 const dinero = (n: number, moneda?: string | null) =>
   `${moneda === 'COP' ? '$' : moneda === 'VES' ? 'Bs' : 'US$'} ${n.toLocaleString('de-DE', moneda === 'COP' ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/** Un trozo del mensaje alrededor de lo buscado (mensajes largos: que se vea la parte que coincide). */
+function recorte(t: string, q: string) {
+  const i = t.toLowerCase().indexOf(q.toLowerCase())
+  if (i < 60) return t
+  return '…' + t.slice(i - 40)
+}
+function Resaltar({ texto, q }: { texto: string; q: string }) {
+  const i = texto.toLowerCase().indexOf(q.toLowerCase())
+  if (i < 0) return <>{texto}</>
+  return <>{texto.slice(0, i)}<mark className="bg-yellow-200 text-neutral-900 rounded-sm">{texto.slice(i, i + q.length)}</mark>{texto.slice(i + q.length)}</>
+}
 
 /** Venta en bolívares con su precio en dólares (si la moneda ya es USD no se repite). */
 const conUsd = (it: { usd?: number | null; moneda?: string | null }) => it.usd != null && it.moneda !== 'USD'
