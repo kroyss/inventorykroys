@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       // Staging: sus copias de cuentas de ML no tienen acceso (tokens vencidos). Para revisar cómo se
       // ve la ficha se arma una de EJEMPLO con lo guardado + datos ficticios (nunca en producción).
-      if (process.env.APP_ENV === 'staging' && (err instanceof ErrorML || err instanceof CuentaDesconectada)) {
+      if (process.env.APP_ENV === 'staging') {   // cualquier error: tokens vencidos o cifrados con otra clave
         return NextResponse.json(fichaEjemplo(item, g.titulo_cat ?? g.titulo_preg ?? 'Publicación', g.precio_cat, g.foto_cat ?? g.foto_preg))
       }
       throw err
