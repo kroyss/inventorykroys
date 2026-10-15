@@ -9,6 +9,7 @@ import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
 import { esDemoEmpresa } from '@/lib/demo'
+import { avisosHabilitados } from '@/lib/avisosTelegram'
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions)
@@ -25,6 +26,8 @@ export default async function Navbar() {
   const conRadar = !!cuenta?.productos?.includes('radar')
   // Empresa de demostración: el menú de la cuenta lleva a /demo (restaurar cada sección).
   const demo = session?.user.empresaId ? await esDemoEmpresa(session.user.empresaId, session.user.country) : false
+  // Mis avisos (Telegram): para la organización de la plataforma sin consultar; las demás, si Plataforma los abrió.
+  const avisos = session?.user ? await avisosHabilitados(session.user.organizacionId).catch(() => false) : false
 
   return (
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
@@ -43,7 +46,7 @@ export default async function Navbar() {
           {session?.user && (
             <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
               ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'}
-              pagosME={role === 'admin' && modulos.includes('pagos_me') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} />
+              pagosME={role === 'admin' && modulos.includes('pagos_me') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos} />
           )}
         </div>
 

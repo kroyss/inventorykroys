@@ -14,11 +14,12 @@ interface Props {
   plataforma: boolean
   demo?: boolean
   pagosME?: boolean
+  avisos?: boolean
 }
 
 // Menú de la cuenta (arriba a la derecha): lo que se toca poco (Ajustes, Usuarios,
 // Plataforma) y Cerrar sesión, para que la barra quede solo con el trabajo del día.
-export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false }: Props) {
+export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false, avisos = false }: Props) {
   const pathname = usePathname()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -34,6 +35,8 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
 
   const iniciales = nombre.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
   const links = [
+    // Mis avisos (2026-10-14): Telegram de cada persona; primero solo la organización de la plataforma.
+    avisos && { href: '/mis-avisos', label: 'Mis avisos' },
     // Ajustes es del inventario (tasa, exceso, categorías): en Automatizaciones cada herramienta tiene los suyos adentro.
     ajustes && espacioDe(pathname) === 'inventario' && { href: '/tasas', label: 'Ajustes' },
     // Pagos ME (2026-10-12): se verifica desde Ventas; aquí queda el vigilante, el horario y el historial.

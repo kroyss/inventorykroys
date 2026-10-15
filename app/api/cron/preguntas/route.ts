@@ -12,6 +12,7 @@ import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
 import { mlConfigurado } from '@/lib/ml'
 import { esDemoEmpresa } from '@/lib/demo'
+import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
 import type { Country } from '@/lib/types'
 
 // Cron de preguntas (crontab del VPS, cada minuto, con CRON_SECRET):
@@ -62,6 +63,14 @@ export async function GET(req: NextRequest) {
   // Alertas de stock: una cuenta por empresa y por pasada, si pasó la hora (lib/alertasStock.ts).
   // En segundo plano (después de responder) para no atrasar preguntas y mensajes.
   after(async () => {
+    // Avisos por Telegram (lib/avisosTelegram.ts): lo primero, con lo recién sincronizado y sin esperar
+    // al resto (stock, calificaciones, contexto de la IA).
+    try {
+      const r = await enviarAvisosTelegram()
+      if (r) console.log('[avisos telegram]', r)
+    } catch (err) {
+      console.error('[avisos telegram]', err instanceof Error ? err.message : err)
+    }
     for (const e of sincronizadas.filter(x => x.stock)) {
       try {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))

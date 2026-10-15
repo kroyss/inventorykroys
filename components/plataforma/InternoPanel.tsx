@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { FUNCIONES_INTERNAS } from '@/lib/funcionesInternas'
 import { MODULOS } from '@/lib/modulos'
+import AvisosTelegramCard from './AvisosTelegramCard'
 
 interface Fila {
   empresa_id: number; empresa: string; mes: string; modulo: string
@@ -67,6 +68,7 @@ export default function InternoPanel() {
 
   return (
     <div className="space-y-8">
+      <AvisosTelegramCard />
       {datos && empresas.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Numero titulo="Gasto de IA este mes" valor={usd(gastoMes)} detalle={`al ritmo actual cierra en ${usd(cierre)}`} />
