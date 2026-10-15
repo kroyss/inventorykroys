@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Navbar from '@/components/layout/Navbar'
 import BottomNav from '@/components/layout/BottomNav'
 import CommandPalette from '@/components/layout/CommandPalette'
@@ -16,7 +17,11 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   const session = await getServerSession(authOptions)
   // Sesión descartada (usuario desactivado / contraseña cambiada, ver lib/auth.ts):
   // la cookie todavía pasa el middleware, así que se corta aquí.
-  if (!session?.user) redirect('/login')
+  if (!session?.user) {
+    // Volver a la misma sección después de entrar (la ruta la pone proxy.ts en x-ruta).
+    const ruta = (await headers()).get('x-ruta')
+    redirect(ruta && ruta.startsWith('/') && !ruta.startsWith('//') && ruta !== '/' ? `/login?callbackUrl=${encodeURIComponent(ruta)}` : '/login')
+  }
   const role    = session?.user.role    ?? 'user'
   const country = session?.user.country ?? 'VE'
   const modulos = session?.user.modulos ?? []

@@ -29,9 +29,16 @@ async function api(req: NextRequest) {
   return NextResponse.json({ error: SOLO_LECTURA }, { status: 403 })
 }
 
-export default function proxy(req: NextRequest, ev: NextFetchEvent) {
+export default async function proxy(req: NextRequest, ev: NextFetchEvent) {
   if (req.nextUrl.pathname.startsWith('/api/')) return api(req)
-  return paginas(req as NextRequestWithAuth, ev)
+  const res = await paginas(req as NextRequestWithAuth, ev)
+  // Sin sesión: withAuth ya redirige al login con callbackUrl.
+  if (res && (res.headers.get('location') || res.status >= 300)) return res
+  // Con sesión: la ruta pedida viaja al layout (x-ruta). Si la sesión vence ahí (12 h sin uso, lib/auth.ts),
+  // el layout manda al login con callbackUrl y al volver a entrar se vuelve a esa sección (2026-10-15).
+  const headers = new Headers(req.headers)
+  headers.set('x-ruta', req.nextUrl.pathname + req.nextUrl.search)
+  return NextResponse.next({ request: { headers } })
 }
 
 export const config = {
