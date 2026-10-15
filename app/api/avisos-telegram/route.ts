@@ -49,6 +49,7 @@ const Prefs = z.object({
   pregunta: z.boolean(), pregunta_min: z.number().int().refine(v => (MINUTOS_OPCIONES as readonly number[]).includes(v)),
   mensaje: z.boolean(), mensaje_min: z.number().int().refine(v => (MINUTOS_OPCIONES as readonly number[]).includes(v)),
   negativa: z.boolean(), neutral: z.boolean(),
+  contradictoria: z.boolean(),
   resumen: z.boolean(), resumen_hora: hora,
   silencio: z.boolean(), silencio_desde: hora, silencio_hasta: hora,
 }).strict()

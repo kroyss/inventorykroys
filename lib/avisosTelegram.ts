@@ -2,7 +2,7 @@
 // Telegram de cada persona que lo conectó en "Mis avisos" y según lo que eligió en cada empresa:
 //   - cuenta de ML desconectada (sin ella no entra nada de esa cuenta);
 //   - pregunta sin responder pasados N minutos; mensaje de comprador sin responder pasados N minutos;
-//   - calificación negativa recibida (neutral, opcional);
+//   - calificación negativa recibida (neutral, opcional) y contradictoria (él dijo concretada, nosotros no);
 //   - resumen diario a la hora elegida (ayer + lo que hizo el sistema + lo pendiente).
 // Reglas: solo lo de SU empresa y SUS permisos; horario de silencio (lo que siga pendiente llega al
 // terminar); cada cosa se avisa UNA vez (avisos_enviados); varias juntas van en un solo mensaje.
@@ -30,6 +30,7 @@ export interface PrefsAvisos {
   pregunta: boolean; pregunta_min: number
   mensaje: boolean; mensaje_min: number
   negativa: boolean; neutral: boolean
+  contradictoria: boolean
   resumen: boolean; resumen_hora: number
   silencio: boolean; silencio_desde: number; silencio_hasta: number
 }
@@ -39,6 +40,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   pregunta: true, pregunta_min: 30,
   mensaje: true, mensaje_min: 60,
   negativa: true, neutral: false,
+  contradictoria: true,
   resumen: true, resumen_hora: 8,
   silencio: true, silencio_desde: 22, silencio_hasta: 7,
 }
@@ -274,6 +276,30 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
         + (r.cal_recibida_msg ? `\n💬 <i>“${esc(corto(r.cal_recibida_msg, 400))}”</i>\n` : '')
         + '\nPuedes responderla en ML para que los próximos compradores vean tu versión.',
         [[{ texto: 'Ver en Reputación', url: urlSistema('/reputacion') }]])) enviados++
+    }
+  }
+
+  // Contradictoria: el comprador dijo que la venta SÍ se concretó y nosotros que NO (se arregla con
+  // "Corregir" en Reputación). Las que el sistema detecta desde que conectó Telegram.
+  if (p.contradictoria && disp.negativa && !silencio) {
+    const { rows } = await db.query(
+      `SELECT o.id::text, o.cal_recibida, o.cal_recibida_msg, o.productos, COALESCE(o.comprador_nombre, o.comprador) AS comprador,
+              x.nickname AS cuenta
+       FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id
+       WHERE o.cal_contradictoria AND o.cal_recibida_concretada AND o.cal_recibida_at > NOW() - INTERVAL '30 days'
+         AND o.cal_recibida_revisada_at > $1::timestamptz
+       ORDER BY o.cal_recibida_at LIMIT 10`, [d.vinculado_at])
+    const nuevas = await pendientes(d, e, 'contradictoria', rows.map(r => r.id))
+    for (const r of rows.filter(x => nuevas.has(x.id))) {
+      const tipo = r.cal_recibida === 'negative' ? 'negativa' : r.cal_recibida === 'neutral' ? 'neutral' : 'positiva'
+      if (await mandar(d, e, 'contradictoria', [r.id],
+        `${cab}🟣 <b>Calificación contradictoria</b> · ${esc(r.cuenta)}\n`
+        + `👤 ${esc(r.comprador ?? 'Comprador')} · venta ${esc(r.id)}\n`
+        + (r.productos ? `📦 ${esc(corto(r.productos, 80))}\n` : '')
+        + `\nEl comprador dijo que la venta <b>SÍ se concretó</b> (te calificó ${tipo}) y tú la marcaste como <b>no concretada</b>.`
+        + (r.cal_recibida_msg ? `\n💬 <i>“${esc(corto(r.cal_recibida_msg, 300))}”</i>` : '')
+        + '\n\nSi de verdad se vendió, corrígela para que la venta cuente bien.',
+        [[{ texto: 'Corregir en Reputación', url: urlSistema('/reputacion') }]])) enviados++
     }
   }
 

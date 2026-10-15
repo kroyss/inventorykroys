@@ -11,6 +11,7 @@ interface Prefs {
   pregunta: boolean; pregunta_min: number
   mensaje: boolean; mensaje_min: number
   negativa: boolean; neutral: boolean
+  contradictoria: boolean
   resumen: boolean; resumen_hora: number
   silencio: boolean; silencio_desde: number; silencio_hasta: number
 }
@@ -233,6 +234,12 @@ export default function MisAvisosClient() {
                   <input type="checkbox" checked={p.neutral} onChange={ev => cambiar({ neutral: ev.target.checked })} className="h-4 w-4 accent-neutral-900" />
                   Avisarme también las neutrales
                 </label>
+              </Fila>
+            )}
+            {d.negativa && (
+              <Fila icono="🟣" titulo="Calificación contradictoria" on={p.contradictoria} onCambio={v => cambiar({ contradictoria: v })}
+                ejemplo={'🟣 Calificación contradictoria · PIKEKE\n👤 DOUGLAJSA · venta 2000018742658414\n📦 Termómetro Digital Lcd\n\nEl comprador dijo que la venta SÍ se concretó (te calificó positiva) y tú la marcaste como no concretada.\n\n[ Corregir en Reputación ]'}>
+                Cuando el comprador dice que la venta se concretó y tú la marcaste como no concretada. Se arregla con <b className="font-medium text-neutral-700">Corregir</b> en Reputación.
               </Fila>
             )}
             <Fila icono="☀️" titulo="Resumen diario" on={p.resumen} onCambio={v => cambiar({ resumen: v })}
