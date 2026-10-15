@@ -1,7 +1,6 @@
 'use client'
 import { signIn } from 'next-auth/react'
 import { CUENTA_VENCIDA } from '@/lib/cuenta'
-import { useRouter } from 'next/navigation'
 import { useState, FormEvent, KeyboardEvent } from 'react'
 
 import type { Marca } from '@/lib/marca'
@@ -10,7 +9,6 @@ import type { Marca } from '@/lib/marca'
 // No se pide país ni empresa: se entra a la primera empresa del usuario y, si tiene más
 // de una (VE / CO), se cambia arriba a la derecha.
 export default function LoginForm({ marca }: { marca: Marca }) {
-  const router                  = useRouter()
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
@@ -39,8 +37,9 @@ export default function LoginForm({ marca }: { marca: Marca }) {
         const u = new URL(destino, window.location.origin)
         if (u.origin === window.location.origin) ruta = u.pathname + u.search
       } catch { /* destino inválido: inicio */ }
-      router.push(ruta)
-      router.refresh()
+      // Navegación COMPLETA (no router.push): si la sesión venció estando en una página, el navegador
+      // guardó "esa página → /login" y router.push lo reusaba, volviendo al login hasta un F5.
+      window.location.assign(ruta)
     } else {
       setError(result?.error === CUENTA_VENCIDA
         ? 'Tu período de prueba terminó. Escríbenos por Telegram para seguir usando el sistema: tus datos siguen guardados.'

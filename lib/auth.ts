@@ -32,7 +32,10 @@ function datosEmpresa(e: EmpresaAcceso) {
   }
 }
 
+// Sesión (2026-10-14, antes 12 h fijas desde el login): se cierra tras SESION_HORAS SIN USO; usándola
+// sigue abierta, con un tope de SESION_MAX_DIAS desde el login (ahí se pide la contraseña igual).
 const SESION_HORAS = 12
+const SESION_MAX_DIAS = 7
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -76,9 +79,8 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  // Sesión de 12 h FIJAS desde el inicio de sesión (token.loginAt), se use o no: a las 12 h
-  // se pide la contraseña de nuevo. maxAge/updateAge solo mantienen viva la cookie hasta ahí.
-  session: { strategy: 'jwt', maxAge: SESION_HORAS * 60 * 60, updateAge: 60 * 60 },
+  // La cookie vive hasta el tope; el corte por falta de uso lo decide el callback jwt (users.ultima_actividad).
+  session: { strategy: 'jwt', maxAge: SESION_MAX_DIAS * 24 * 60 * 60, updateAge: 60 * 60 },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
@@ -94,11 +96,10 @@ export const authOptions: NextAuthOptions = {
         token.loginAt       = Date.now()
       }
 
-      // 12 h desde el login, sin importar el uso. Las sesiones de antes de esta regla
-      // (sin loginAt) cuentan desde ahora.
+      // Tope desde el login, se use o no (las sesiones sin loginAt cuentan desde ahora).
       token.loginAt ??= Date.now()
-      if (Date.now() - token.loginAt > SESION_HORAS * 60 * 60 * 1000) {
-        throw new Error('Sesión vencida: pasaron 12 horas desde que iniciaste sesión')
+      if (Date.now() - token.loginAt > SESION_MAX_DIAS * 24 * 60 * 60 * 1000) {
+        throw new Error(`Sesión vencida: pasaron ${SESION_MAX_DIAS} días desde que iniciaste sesión`)
       }
 
       // Una sesión de ANTES del cambio a multiempresa (sin empresa) no sirve: se descarta
@@ -110,9 +111,15 @@ export const authOptions: NextAuthOptions = {
       // permisos o de módulos se aplica sin volver a entrar.
       const empresas = await empresasDeUsuario(token.sub!)
       const { rows: [u] } = await dbGlobal().query(
-        `SELECT is_active, session_version AS sv FROM users WHERE id = $1`, [token.sub])
+        `SELECT is_active, session_version AS sv, ultima_actividad FROM users WHERE id = $1`, [token.sub])
       if (!u || !u.is_active || u.sv !== (token.sv ?? 0)) {
         throw new Error('Sesión cerrada: el usuario fue desactivado o cambió su contraseña')
+      }
+      // Sin uso en SESION_HORAS (última actividad del usuario, leída ANTES de anotar esta): se cierra.
+      // Recién entrado no cuenta: la última actividad puede ser de antes del login.
+      const ultimoUso = Math.max(token.loginAt, u.ultima_actividad ? new Date(u.ultima_actividad).getTime() : 0)
+      if (Date.now() - ultimoUso > SESION_HORAS * 60 * 60 * 1000) {
+        throw new Error(`Sesión vencida: ${SESION_HORAS} horas sin usar el sistema`)
       }
       // Última actividad (migración 069), como máximo cada 2 minutos (antes cada hora): la usa el cron
       // de ML para saber qué empresas están en uso, y Plataforma para mostrar quién está "en línea ahora"
