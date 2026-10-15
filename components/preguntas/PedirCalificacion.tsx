@@ -82,6 +82,11 @@ export default function PedirCalificacion({ onCambio }: { onCambio?: () => void 
           el comprador tiene unos {d.hasta} días desde la compra: aquí aparecen desde el día {d.desde}. No salen las que tienen un
           mensaje del comprador sin responder. <b>Nada se envía solo</b>: revisas el texto y lo envías, una vez por venta.
         </p>
+        <p className="mt-1 text-xs text-sky-800">
+          <b>💬</b> aparece solo si el comprador te escribió después de comprar: ábrelo para ver si hubo algún problema antes de pedirle
+          la calificación. Si nunca te escribió, no hay conversación que revisar y el saludo va sin nombre (MercadoLibre da el nombre
+          real solo cuando el comprador escribe).
+        </p>
         {d.puedeEditar && plantilla === null && (
           <button type="button" onClick={() => setPlantilla(d.plantilla)} className="mt-1.5 text-xs font-medium text-sky-800 hover:underline underline-offset-2">
             Cambiar el texto
