@@ -23,9 +23,9 @@ const CORTOS = { inventario: 'Inventario', automatizaciones: 'Automatiza' } as c
 
 // Selector de espacio junto al logo: muestra dónde estás y abre un menú con los demás.
 // Solo aparece si hay más de un espacio.
-export default function EspacioSwitcher({ automatizaciones, inventario, radarUrl }: { automatizaciones: boolean; inventario: boolean; radarUrl: string | null }) {
+export default function EspacioSwitcher({ automatizaciones, inventario, modulos, radarUrl }: { automatizaciones: boolean; inventario: boolean; modulos: string[]; radarUrl: string | null }) {
   const pathname = usePathname()
-  const actual = espacioActual(pathname, inventario ? ['inventario'] : [])
+  const actual = espacioActual(pathname, modulos)
   const [abierto, setAbierto] = useState(false)
   const avisos = useAvisos()
   const urgentesAuto = avisos.preguntas + avisos.mensajes + avisos.negativas

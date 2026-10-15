@@ -1,10 +1,14 @@
-// Pagos MercadoEnvíos (migración 076, módulo `pagos_me`, solo la empresa de la plataforma).
+// Pagos MercadoEnvíos (migración 076, módulo `pagos_me`; para clientes desde la 093).
 //
 // El vigilante (extensión de Chrome en la PC del antiguo Reportador, un perfil por cuenta) trae del
 // portal de MercadoEnvíos las órdenes pagadas de los últimos 7 días: datos del pago, comprobante y
 // guía. Aquí se guardan (me_pagos), se verifican por lote y, al registrar la venta, su guía entra
 // sola al lote pendiente de Despachos. Despachos no imprime una guía con el pago sin verificar
 // salvo "Despachar igual" (despacho_etiquetas.pago_forzado_*).
+//
+// Dos modos, según cómo trabaja la empresa (igual que Despachos, `ventasDesdeML`):
+//  - con ventas CARGADAS (SolucionesMC): la guía entra a Despachos al registrar la venta en Ventas;
+//  - con las ventas de MercadoLibre (sin inventario, Fundadores): la guía entra a Despachos apenas llega.
 import { SQL_RETIRO_EN_TIENDA } from '@/lib/pagosMEComun'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
@@ -13,7 +17,7 @@ import path from 'path'
 import type { Pool } from 'pg'
 import { dbEmpresa, dbGlobal } from '@/lib/db'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
-import { tieneModulo } from '@/lib/modulos'
+import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { leerEtiquetas, sha256 } from '@/lib/despachos'
 import { currentYearMonth } from '@/lib/tz'
 export type { PagoME } from '@/lib/pagosMEComun'
@@ -37,8 +41,11 @@ export const SELECT_PAGOS = `
          (p.comprobante_path IS NOT NULL) AS tiene_comprobante, (p.guia_path IS NOT NULL) AS tiene_guia,
          p.verificacion, u.username AS verificado_por, p.verificado_at, p.nota,
          s.id AS sale_id, s.status AS sale_status, s.total_amount::float AS sale_total,
-         EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta) AS en_despachos
+         EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta) AS en_despachos,
+         (SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num OR o.pack_id = v.num
+           ORDER BY (o.id = v.num) DESC LIMIT 1) AS ml_estado
   FROM me_pagos p
+  CROSS JOIN LATERAL (SELECT CASE WHEN p.venta ~ '^[0-9]{1,18}$' THEN p.venta::bigint END AS num) v
   LEFT JOIN users u ON u.id = p.verificado_por
   LEFT JOIN LATERAL (SELECT id, status, total_amount FROM sales WHERE ml_order_number = p.venta ORDER BY id DESC LIMIT 1) s ON TRUE`
 
@@ -47,16 +54,28 @@ export async function sesionPagosME() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: unauthorized() } as const
   if (session.user.country !== 'VE' || !tieneModulo(session.user, 'pagos_me')) return { error: forbidden() } as const
-  return { session, db, userId: parseInt(session.user.id, 10) } as const
+  return { session, db, userId: parseInt(session.user.id, 10), desdeML: ventasDesdeML(session.user) } as const
 }
 
 // ── Clave del vigilante ─────────────────────────────────────────────────────
 export const hashClave = (t: string) => createHash('sha256').update(t).digest('hex')
 export const nuevaClave = () => `me_${randomBytes(24).toString('hex')}`
 
+// ── Código de conexión (migración 093): corto, para escribirlo a mano; vale 60 min ──
+const LETRAS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'   // sin 0/O, 1/I/L: no se confunden al copiar
+export const CODIGO_VIGENTE_MIN = 60
+export function nuevoCodigo() {
+  const b = randomBytes(8)
+  const c = [...b].map(x => LETRAS[x % LETRAS.length]).join('')
+  return `${c.slice(0, 4)}-${c.slice(4)}`
+}
+/** Como lo escriba la persona (minúsculas, sin guion, con espacios) → la forma guardada. */
+export const normalizarCodigo = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '')
+export const hashCodigo = (c: string) => hashClave(`codigo:${normalizarCodigo(c)}`)
+
 /** El vigilante se autentica con `Authorization: Bearer me_…` y dice su perfil (`x-perfil`). */
 export async function autenticarVigilante(req: NextRequest):
-  Promise<{ db: Pool; perfil: string } | { error: NextResponse }> {
+  Promise<{ db: Pool; perfil: string; desdeML: boolean } | { error: NextResponse }> {
   // `x-vigilante-clave` además de Bearer: en staging el Authorization lo usa la clave de nginx.
   const clave = (req.headers.get('x-vigilante-clave') ?? (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')).trim()
   if (!/^me_[0-9a-f]{48}$/.test(clave)) return { error: NextResponse.json({ error: 'Clave del vigilante inválida' }, { status: 401 }) }
@@ -68,7 +87,7 @@ export async function autenticarVigilante(req: NextRequest):
   if (!emp || !emp.modulos?.includes('pagos_me')) {
     return { error: NextResponse.json({ error: 'Clave revocada o módulo apagado' }, { status: 401 }) }
   }
-  return { db: dbEmpresa(emp.empresa_id, emp.country), perfil }
+  return { db: dbEmpresa(emp.empresa_id, emp.country), perfil, desdeML: ventasDesdeML({ modulos: emp.modulos }) }
 }
 
 // ── Archivos ────────────────────────────────────────────────────────────────
@@ -88,11 +107,17 @@ export const leerArchivoME = (p: string) => readFile(p)
  *  - si el pago está VÁLIDO y la venta está en BORRADOR → pasa a PAGO_VERIFICADO (como el botón);
  *  - si la venta ya está registrada y la guía no está en Despachos → entra al lote pendiente
  *    (aunque el pago siga sin verificar: Despachos la marca "Pago sin verificar" y no la imprime).
+ * Con las ventas de MercadoLibre (`desdeML`) no hay venta que registrar: la guía entra directo.
  */
-export async function conectarVenta(db: Pool, venta: string, userId: number) {
+export async function conectarVenta(db: Pool, venta: string, userId: number | null, desdeML = false) {
   const { rows: [p] } = await db.query(
     `SELECT id, verificacion, guia_path, ${SQL_RETIRO_EN_TIENDA} AS retiro FROM me_pagos WHERE venta = $1`, [venta])
   if (!p) return { pago: false }
+  if (desdeML) {
+    const guia = p.retiro ? 'retiro' as const : p.guia_path ? await guiaALote(db, venta, p.guia_path, userId) : 'sin_guia' as const
+    return { pago: true, venta: true, verificada: false, guia }
+  }
+  if (userId == null) return { pago: true, venta: false }
   const { rows: [s] } = await db.query(
     `SELECT id, status FROM sales WHERE ml_order_number = $1 ORDER BY id DESC LIMIT 1`, [venta])
   if (!s) return { pago: true, venta: false }
@@ -111,7 +136,7 @@ export async function conectarVenta(db: Pool, venta: string, userId: number) {
 }
 
 /** La guía entra al lote PENDIENTE más reciente (o a uno nuevo), salvo que la venta ya esté en Despachos. */
-async function guiaALote(db: Pool, venta: string, guiaPath: string, userId: number) {
+async function guiaALote(db: Pool, venta: string, guiaPath: string, userId: number | null) {
   const { rows: [ya] } = await db.query(`SELECT 1 FROM despacho_etiquetas WHERE venta = $1 LIMIT 1`, [venta])
   if (ya) return 'ya_estaba' as const
   const data = await readFile(guiaPath)

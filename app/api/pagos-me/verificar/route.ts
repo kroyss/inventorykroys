@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest) {
     let verificadas = 0
     if (b.verificacion === 'valido') {
       for (const r of rows) {
-        const c = await conectarVenta(s.db, r.venta, s.userId)
+        const c = await conectarVenta(s.db, r.venta, s.userId, s.desdeML)
         if ('verificada' in c && c.verificada) verificadas++
       }
     }

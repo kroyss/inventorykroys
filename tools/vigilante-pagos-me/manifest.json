@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Vigilante Pagos MercadoEnvíos",
-  "version": "1.2.0",
-  "description": "Uso interno El Comerciante Digital: trae pagos y guías del portal de MercadoEnvíos cuando se pide desde el sistema.",
+  "name": "Pagos MercadoEnvíos · El Comerciante Digital",
+  "version": "1.3.0",
+  "description": "Trae a tu sistema los pagos y guías del portal de MercadoEnvíos con tu propia sesión. Solo lee, no cambia nada.",
   "permissions": ["alarms", "storage", "scripting", "tabs"],
   "host_permissions": [
     "https://www.mercadoenvios.com.ve/*",
@@ -11,5 +11,5 @@
   ],
   "background": { "service_worker": "background.js" },
   "options_page": "opciones.html",
-  "action": { "default_title": "Vigilante Pagos ME", "default_popup": "opciones.html" }
+  "action": { "default_title": "Pagos MercadoEnvíos", "default_popup": "opciones.html" }
 }

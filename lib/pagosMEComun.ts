@@ -35,6 +35,8 @@ export interface PagoME {
   sale_status: string | null
   sale_total: number | null
   en_despachos: boolean
+  /** Estado de la venta en MercadoLibre (empresas sin ventas cargadas). */
+  ml_estado?: string | null
 }
 
 // ── Pago vs. venta ──────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
-// Vigilante Pagos MercadoEnvíos (uso interno). Un perfil de Chrome por cuenta (PIKEKE, SOLUCION-MC).
+// Pagos MercadoEnvíos (el "vigilante"). Un perfil de Chrome por cuenta de MercadoEnvíos. Desde la 1.3.0
+// se conecta con el código corto de Pagos ME (opciones.js); antes, con la clave larga a mano.
 //
 // Cada minuto le pregunta SOLO al sistema si alguien tocó "Traer pagos y guías" (latido). Únicamente
 // entonces abre el portal de MercadoEnvíos (con la sesión de este perfil), lee las órdenes pagadas de

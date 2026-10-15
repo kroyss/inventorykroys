@@ -1,14 +1,16 @@
-; Instalador del Vigilante Pagos MercadoEnvios (Inno Setup 6). Compilar con construir.ps1.
+; Instalador de Pagos MercadoEnvios (el "vigilante", Inno Setup 6). Compilar con construir.ps1.
 ;
 ; Instala POR USUARIO (sin administrador) en %LOCALAPPDATA%\Programs\VigilantePagosME:
 ;   - el despertador (despertador.ps1): arranca con Windows, icono "ME" junto al reloj;
 ;   - la extension de Chrome (carpeta "extension", se carga con "Cargar descomprimida" en cada perfil:
 ;     Chrome no deja que un instalador la meta solo).
-; La clave y los perfiles se piden en una pantalla y quedan en %APPDATA%\VigilantePagosME\despertador.json
-; (y en el registro, para precargarlos al actualizar): instalar encima NO los borra.
+; Desde la 1.3.0 (clientes) se pide UN codigo corto (Pagos ME -> Conectar una PC): el despertador lo cambia
+; por su clave al arrancar y encuentra solo los perfiles de Chrome que tienen la extension. Al actualizar
+; una PC ya conectada (clave y perfiles de antes) se deja el codigo vacio y se conserva todo.
+; Todo queda en %APPDATA%\VigilantePagosME\despertador.json (y en el registro): instalar encima no lo borra.
 
-#define AppName    "Vigilante Pagos ME"
-#define AppVersion "1.2.1"
+#define AppName    "Pagos MercadoEnvios"
+#define AppVersion "1.3.0"
 #define Publisher  "El Comerciante Digital"
 
 [Setup]
@@ -22,10 +24,11 @@ DisableProgramGroupPage=yes
 DisableDirPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\..\vigilante-dist
-OutputBaseFilename=InstalarVigilantePagosME-{#AppVersion}
+OutputBaseFilename=InstalarPagosME-{#AppVersion}
 SetupIconFile=vigilante.ico
 UninstallDisplayIcon={app}\vigilante.ico
 UninstallDisplayName={#AppName}
+InfoAfterFile=despues.txt
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -54,9 +57,11 @@ Name: "{autoprograms}\{#AppName}\Carpeta de la extension de Chrome"; Filename: "
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\despertador.ps1"""; \
-  Description: "Arrancar el despertador ahora"; Flags: nowait postinstall runhidden 64bit; Check: IsWin64
-Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension (para cargarla en Chrome)"; \
-  Flags: nowait postinstall shellexec unchecked
+  Description: "Arrancar el programa ahora"; Flags: nowait postinstall runhidden 64bit; Check: IsWin64
+Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Start-Process chrome -ArgumentList 'chrome://extensions'"""; \
+  Description: "Abrir Chrome en Extensiones (para agregar la extension)"; Flags: nowait postinstall runhidden; Check: SinPerfilesFijos
+Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension"; \
+  Flags: nowait postinstall shellexec; Check: SinPerfilesFijos
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Get-CimInstance Win32_Process | Where-Object {{ $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*despertador.ps1*' } | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }"""; \
@@ -67,8 +72,9 @@ const
   CLAVE_REG = 'Software\VigilantePagosME';
 var
   Pagina: TInputQueryWizardPage;
+  ClaveVieja, Perfil1, Carpeta1, Perfil2, Carpeta2: String;
 
-// Valor de "campo": "valor" en un JSON simple (para precargar desde una instalacion a mano).
+// Valor de "campo": "valor" en un JSON simple (para leer lo que dejo una instalacion anterior).
 function ValorJson(const Texto, Campo: String; Desde: Integer): String;
 var
   P, Q: Integer;
@@ -87,62 +93,73 @@ begin
   Result := Copy(Resto, 1, Q - 1);
 end;
 
-procedure Precargar();
+// Lo que ya habia: clave y perfiles fijos (instalaciones 1.2 y la PC de SolucionesMC).
+procedure LeerAnterior();
 var
-  Json, Ruta: String;
+  Json, Ruta, V: String;
   JsonA: AnsiString;
   P2: Integer;
-  V: String;
 begin
-  // 1) Lo guardado por una instalacion anterior de este instalador.
-  if RegQueryStringValue(HKCU, CLAVE_REG, 'clave', V) then Pagina.Values[0] := V;
-  if RegQueryStringValue(HKCU, CLAVE_REG, 'perfil1', V) then Pagina.Values[1] := V;
-  if RegQueryStringValue(HKCU, CLAVE_REG, 'carpeta1', V) then Pagina.Values[2] := V;
-  if RegQueryStringValue(HKCU, CLAVE_REG, 'perfil2', V) then Pagina.Values[3] := V;
-  if RegQueryStringValue(HKCU, CLAVE_REG, 'carpeta2', V) then Pagina.Values[4] := V;
-  if Pagina.Values[0] <> '' then Exit;
-  // 2) Un despertador.json de la instalacion a mano.
+  if RegQueryStringValue(HKCU, CLAVE_REG, 'clave', V) then ClaveVieja := V;
+  if RegQueryStringValue(HKCU, CLAVE_REG, 'perfil1', V) then Perfil1 := V;
+  if RegQueryStringValue(HKCU, CLAVE_REG, 'carpeta1', V) then Carpeta1 := V;
+  if RegQueryStringValue(HKCU, CLAVE_REG, 'perfil2', V) then Perfil2 := V;
+  if RegQueryStringValue(HKCU, CLAVE_REG, 'carpeta2', V) then Carpeta2 := V;
   Ruta := ExpandConstant('{userappdata}\VigilantePagosME\despertador.json');
   if not FileExists(Ruta) then Ruta := 'C:\Automatizaciones\vigilante-pagos-me\despertador.json';
   if FileExists(Ruta) and LoadStringFromFile(Ruta, JsonA) then
   begin
     Json := String(JsonA);
+    // La clave que el despertador obtuvo con un codigo queda solo en el JSON.
     V := ValorJson(Json, 'clave', 1);
-    if Pos('me_', V) = 1 then Pagina.Values[0] := V;
-    P2 := Pos('"perfiles"', Json);
-    if P2 > 0 then
+    if (Pos('me_', V) = 1) and (Length(V) = 51) then ClaveVieja := V;
+    if Perfil1 = '' then
     begin
-      Pagina.Values[1] := ValorJson(Json, 'perfil', P2 + 10);
-      Pagina.Values[2] := ValorJson(Json, 'carpeta', P2 + 10);
-      P2 := Pos('},', Copy(Json, P2, Length(Json))) + P2;
+      P2 := Pos('"perfiles"', Json);
       if P2 > 0 then
       begin
-        Pagina.Values[3] := ValorJson(Json, 'perfil', P2);
-        Pagina.Values[4] := ValorJson(Json, 'carpeta', P2);
+        Perfil1 := ValorJson(Json, 'perfil', P2 + 10);
+        Carpeta1 := ValorJson(Json, 'carpeta', P2 + 10);
+        P2 := Pos('},', Copy(Json, P2, Length(Json))) + P2;
+        if P2 > 0 then
+        begin
+          Perfil2 := ValorJson(Json, 'perfil', P2);
+          Carpeta2 := ValorJson(Json, 'carpeta', P2);
+        end;
       end;
     end;
   end;
 end;
 
-procedure InitializeWizard();
+function SinPerfilesFijos(): Boolean;
 begin
-  Pagina := CreateInputQueryPage(wpWelcome,
-    'Clave y perfiles de Chrome',
-    'Lo que necesita el vigilante para trabajar',
-    'Clave: en el sistema, Pagos ME > Generar clave (la misma que va en la extension). ' +
-    'Perfiles: el nombre que pusiste en la extension y la carpeta de ese perfil de Chrome ' +
-    '(en esa ventana, chrome://version > "Ruta del perfil", lo ultimo: Profile 1, Profile 2...). ' +
-    'Si solo usas una cuenta, deja vacio el perfil 2.');
-  Pagina.Add('Clave del vigilante (me_...):', False);
-  Pagina.Add('Perfil 1 - nombre (como en la extension):', False);
-  Pagina.Add('Perfil 1 - carpeta de Chrome:', False);
-  Pagina.Add('Perfil 2 - nombre:', False);
-  Pagina.Add('Perfil 2 - carpeta de Chrome:', False);
-  Pagina.Values[1] := 'PIKEKE';
-  Pagina.Values[2] := 'Profile 1';
-  Pagina.Values[3] := 'SOLUCIONES_MC';
-  Pagina.Values[4] := 'Profile 2';
-  Precargar();
+  Result := (Trim(Perfil1) = '') or (Trim(Carpeta1) = '');
+end;
+
+procedure InitializeWizard();
+var
+  Texto: String;
+begin
+  LeerAnterior();
+  Texto := 'En el sistema, entra a Pagos ME y toca "Conectar una PC". Escribe aqui el codigo que aparece ' +
+    '(por ejemplo ABCD-2345). Vale por 60 minutos.';
+  if ClaveVieja <> '' then
+    Texto := Texto + #13#10#13#10 + 'Esta PC ya estaba conectada: si solo estas actualizando, deja el codigo vacio.';
+  Pagina := CreateInputQueryPage(wpWelcome, 'Conectar esta PC', 'Escribe tu codigo de conexion', Texto);
+  Pagina.Add('Codigo de conexion:', False);
+end;
+
+function SoloLetras(const S: String): String;
+var
+  I: Integer;
+  C: Char;
+begin
+  Result := '';
+  for I := 1 to Length(S) do
+  begin
+    C := Uppercase(S[I])[1];
+    if ((C >= 'A') and (C <= 'Z')) or ((C >= '0') and (C <= '9')) then Result := Result + C;
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -152,15 +169,11 @@ begin
   Result := True;
   if CurPageID = Pagina.ID then
   begin
-    C := Trim(Pagina.Values[0]);
-    if (Pos('me_', C) <> 1) or (Length(C) <> 51) then
+    C := SoloLetras(Pagina.Values[0]);
+    if (C = '') and (ClaveVieja <> '') then Exit;
+    if Length(C) <> 8 then
     begin
-      MsgBox('La clave debe empezar con "me_" y tener 51 caracteres. Copiala de Pagos ME > Generar clave.', mbError, MB_OK);
-      Result := False;
-    end
-    else if (Trim(Pagina.Values[1]) = '') or (Trim(Pagina.Values[2]) = '') then
-    begin
-      MsgBox('Falta el perfil 1 (nombre y carpeta).', mbError, MB_OK);
+      MsgBox('El codigo tiene 8 letras y numeros (por ejemplo ABCD-2345). Lo ves en el sistema: Pagos ME > Conectar una PC.', mbError, MB_OK);
       Result := False;
     end;
   end;
@@ -188,26 +201,33 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Dir, Json, Perfiles: String;
+  Dir, Json, Perfiles, Codigo, Clave: String;
 begin
   if CurStep = ssInstall then CerrarDespertador();   // al actualizar: se reemplaza el que corre
   if CurStep = ssPostInstall then
   begin
     Dir := ExpandConstant('{userappdata}\VigilantePagosME');
     ForceDirectories(Dir);
-    Perfiles := FilaPerfil(Pagina.Values[1], Pagina.Values[2]);
-    if (Trim(Pagina.Values[3]) <> '') and (Trim(Pagina.Values[4]) <> '') then
-      Perfiles := Perfiles + ',' + #13#10 + FilaPerfil(Pagina.Values[3], Pagina.Values[4]);
+    Codigo := SoloLetras(Pagina.Values[0]);
+    // Con codigo nuevo, la clave la pide el despertador al arrancar; sin codigo, se conserva la de antes.
+    if Codigo <> '' then Clave := '' else Clave := ClaveVieja;
+    // Perfiles fijos solo si ya los habia (la PC de antes); si no, el despertador los encuentra solo.
+    Perfiles := '';
+    if not SinPerfilesFijos() then
+    begin
+      Perfiles := FilaPerfil(Perfil1, Carpeta1);
+      if (Trim(Perfil2) <> '') and (Trim(Carpeta2) <> '') then
+        Perfiles := Perfiles + ',' + #13#10 + FilaPerfil(Perfil2, Carpeta2);
+      Perfiles := #13#10 + Perfiles + #13#10 + '  ';
+    end;
     Json := '{' + #13#10 +
       '  "servidor": "https://app.elcomerciantedigital.com",' + #13#10 +
-      '  "clave": "' + Escapar(Trim(Pagina.Values[0])) + '",' + #13#10 +
+      '  "clave": "' + Escapar(Clave) + '",' + #13#10 +
+      '  "codigo": "' + Codigo + '",' + #13#10 +
       '  "chrome": "",' + #13#10 +
-      '  "perfiles": [' + #13#10 + Perfiles + #13#10 + '  ]' + #13#10 + '}' + #13#10;
+      '  "perfiles": [' + Perfiles + ']' + #13#10 + '}' + #13#10;
     SaveStringToFile(Dir + '\despertador.json', Json, False);
-    RegWriteStringValue(HKCU, CLAVE_REG, 'clave', Trim(Pagina.Values[0]));
-    RegWriteStringValue(HKCU, CLAVE_REG, 'perfil1', Trim(Pagina.Values[1]));
-    RegWriteStringValue(HKCU, CLAVE_REG, 'carpeta1', Trim(Pagina.Values[2]));
-    RegWriteStringValue(HKCU, CLAVE_REG, 'perfil2', Trim(Pagina.Values[3]));
-    RegWriteStringValue(HKCU, CLAVE_REG, 'carpeta2', Trim(Pagina.Values[4]));
+    if Clave <> '' then RegWriteStringValue(HKCU, CLAVE_REG, 'clave', Clave)
+    else RegDeleteValue(HKCU, CLAVE_REG, 'clave');
   end;
 end;

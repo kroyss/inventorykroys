@@ -11,12 +11,17 @@ interface Datos {
   conteo: Partial<Record<'pendiente' | 'valido' | 'invalido', number>>
   vigilante: {
     clave: boolean
-    latidos: { perfil: string; visto_at: string; conectado: boolean }[]
+    latidos: { perfil: string; cuenta: string | null; visto_at: string; conectado: boolean }[]
     pedido: { id: number; pedido_at: string; vigente: boolean; automatico: boolean; resultados: Record<string, Resultado> } | null
   }
   horario: HorarioME
   ahora: { dia: number; hm: string }
+  /** Sin ventas cargadas: las guías van solas a Despachos con las ventas de MercadoLibre. */
+  desdeML: boolean
 }
+
+/** Programa para la PC (tools/vigilante-pagos-me/instalador → public/descargas). */
+const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe'
 
 const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -38,6 +43,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const [ver, setVer] = useState<PagoME | null>(null)
   const [clave, setClave] = useState<string | null>(null)
+  const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
 
   const cargar = useCallback(async () => {
     const r = await fetch(`/api/pagos-me?estado=${filtro}`)
@@ -97,6 +103,21 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
     if (r.ok) { setClave(d.clave); cargar() } else setError(d.error ?? 'Error')
   }
 
+  const conectar = async () => {
+    setError(null)
+    const r = await fetch('/api/pagos-me/conexion', { method: 'POST' })
+    const d = await r.json().catch(() => ({}))
+    if (r.ok) setCodigo(d); else setError(d.error ?? 'Error')
+  }
+  const desconectar = async () => {
+    if (!confirm('Se desconectan TODAS las PCs: dejan de traer pagos hasta que las conectes de nuevo con un código. ¿Seguir?')) return
+    const r = await fetch('/api/pagos-me/conexion', { method: 'DELETE' })
+    if (r.ok) { setAviso('PCs desconectadas.'); setCodigo(null); cargar() } else setError('No se pudo desconectar')
+  }
+  // Nombre a mostrar de cada perfil: la cuenta de MercadoEnvíos (si ya la dijo) o el nombre técnico.
+  const nombre = (perfil: string) => datos?.vigilante.latidos.find(l => l.perfil === perfil)?.cuenta ?? perfil
+  const sinConectar = !!datos && !datos.vigilante.clave && datos.vigilante.latidos.length === 0
+
   const pagos = datos?.pagos ?? []
   const todos = pagos.length > 0 && pagos.every(p => marcados.has(p.id))
   const toggle = (id: number) => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -110,6 +131,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           </button>
         } />
 
+      {sinConectar && <PrimerosPasos isAdmin={isAdmin} onConectar={conectar} />}
+
       {/* Vigilante */}
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -120,23 +143,33 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
               {despertador.conectado ? 'PC en espera' : `PC sin señal desde ${hora(despertador.visto_at)} (¿apagada?)`}
             </span>
             {perfiles.length > 0 && (
-              <span className="text-neutral-400">abre Chrome solo al traer: {perfiles.map(l => l.perfil).join(' · ')}</span>
+              <span className="text-neutral-400">abre Chrome solo al traer: {perfiles.map(l => l.cuenta ?? l.perfil).join(' · ')}</span>
             )}
           </> : <>
           {perfiles.length === 0 && <span className="text-amber-700">ningún perfil se ha conectado todavía</span>}
           {perfiles.map(l => (
             <span key={l.perfil} className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${l.conectado ? 'bg-green-500' : 'bg-red-400'}`} />
-              {l.perfil} <span className="text-neutral-400">{l.conectado ? 'conectado' : `sin señal desde ${hora(l.visto_at)}`}</span>
+              {l.cuenta ?? l.perfil} <span className="text-neutral-400">{l.conectado ? 'conectado' : `sin señal desde ${hora(l.visto_at)}`}</span>
             </span>
           ))}
           </>}
           {isAdmin && (
-            <button onClick={generarClave} className="ml-auto underline text-neutral-500 hover:text-neutral-800">
-              {datos?.vigilante.clave ? 'Generar clave nueva' : 'Generar clave del vigilante'}
-            </button>
+            <span className="ml-auto flex flex-wrap items-center gap-3">
+              <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
+              <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
+              {!datos?.desdeML && (
+                <button onClick={generarClave} className="underline text-neutral-400 hover:text-neutral-800" title="Para la instalación a mano (avanzado)">
+                  {datos?.vigilante.clave ? 'Clave larga' : 'Generar clave'}
+                </button>
+              )}
+              {datos?.vigilante.clave && (
+                <button onClick={desconectar} className="underline text-neutral-400 hover:text-red-700">Desconectar PCs</button>
+              )}
+            </span>
           )}
         </div>
+        {codigo && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
         {clave && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
             Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
@@ -146,7 +179,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
-      {pedido && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} trabajando={trabajando} />}
+      {pedido && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML} />}
 
       {datos && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
 
@@ -225,8 +258,14 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
                       {!p.tiene_guia && <div className="text-neutral-400">sin guía</div>}
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {p.sale_status ? <div>{p.sale_status}</div> : <div className="text-neutral-400">no registrada</div>}
-                      {p.en_despachos && <div className="text-neutral-500">en Despachos</div>}
+                      {datos?.desdeML ? <>
+                        {p.ml_estado === 'cancelled' && <div className="text-red-700 font-medium">cancelada en ML</div>}
+                        {p.en_despachos ? <div className="text-neutral-700">en Despachos</div>
+                          : <div className="text-neutral-400">{p.tiene_guia ? 'todavía no en Despachos' : 'sin guía todavía'}</div>}
+                      </> : <>
+                        {p.sale_status ? <div>{p.sale_status}</div> : <div className="text-neutral-400">no registrada</div>}
+                        {p.en_despachos && <div className="text-neutral-500">en Despachos</div>}
+                      </>}
                     </td>
                     <td className="px-3 py-2 text-xs" onClick={e => e.stopPropagation()}>
                       <span className={`inline-block px-2 py-0.5 rounded-full ${v.c}`}>{v.t}</span>
@@ -271,8 +310,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
 
 /** Pagos ME → Configuración: a qué horas y qué días el despertador trae solo (además del botón). */
 /** Cómo terminó la última traída, bien a la vista: trayendo / listo (ya puede despachar) / con problemas. */
-function EstadoTraida({ pedido, perfiles, trabajando }: {
-  pedido: NonNullable<Datos['vigilante']['pedido']>; perfiles: string[]; trabajando: boolean
+function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML }: {
+  pedido: NonNullable<Datos['vigilante']['pedido']>; perfiles: string[]; nombre: (perfil: string) => string
+  trabajando: boolean; desdeML: boolean
 }) {
   const res = Object.entries(pedido.resultados)
   const faltan = perfiles.filter(p => !pedido.resultados[p])
@@ -283,7 +323,7 @@ function EstadoTraida({ pedido, perfiles, trabajando }: {
     new Date(pedido.pedido_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })}`
   const detalle = res.map(([perfil, r]) => (
     <span key={perfil} className="mr-3 whitespace-nowrap">
-      <b>{perfil}</b>{' '}
+      <b>{r.cuenta ?? nombre(perfil)}</b>{' '}
       {r.ok ? `${r.nuevas} nuevas (${r.vistas} revisadas)` : <span className="text-red-700">{ERROR_PERFIL[r.error ?? ''] ?? r.error ?? 'error'}</span>}
     </span>
   ))
@@ -296,16 +336,16 @@ function EstadoTraida({ pedido, perfiles, trabajando }: {
   const origen = pedido.automatico ? 'automática' : 'pedida a mano'
 
   if (trabajando) return caja('bg-sky-50 border-sky-200 text-sky-900',
-    <>⏳ Trayendo pagos y guías ({origen}, {cuando})… no cierres la PC de Venezuela.</>,
-    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{p}</b> trabajando…</span>)}</>)
+    <>⏳ Trayendo pagos y guías ({origen}, {cuando})… no apagues la PC.</>,
+    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> trabajando…</span>)}</>)
   if (res.length === 0) return caja('bg-amber-50 border-amber-200 text-amber-900',
-    <>⚠️ La traída {origen} de {cuando} no se hizo: la PC de Venezuela no respondió (¿apagada?).</>,
-    'Enciéndela y dale a "Traer pagos y guías".')
+    <>⚠️ La traída {origen} de {cuando} no se hizo: la PC no respondió (¿apagada o sin luz?).</>,
+    'No se pierde nada: cuando la prendas, dale a "Traer pagos y guías" y trae todo lo que faltaba.')
   if (fallas.length || faltan.length) return caja('bg-red-50 border-red-200 text-red-900',
     <>❌ La traída de {cuando} quedó incompleta: revisa antes de despachar.</>,
-    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{p}</b> no respondió</span>)}</>)
+    <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> no respondió</span>)}</>)
   return caja('bg-green-50 border-green-200 text-green-900',
-    <>✅ Listo: traída {origen} de {cuando} completa · {nuevas === 0 ? 'no había pagos nuevos' : `${nuevas} pago${nuevas === 1 ? '' : 's'} nuevo${nuevas === 1 ? '' : 's'}`}. Ya está todo al día: puedes cargar las ventas y despachar.</>,
+    <>✅ Listo: traída {origen} de {cuando} completa · {nuevas === 0 ? 'no había pagos nuevos' : `${nuevas} pago${nuevas === 1 ? '' : 's'} nuevo${nuevas === 1 ? '' : 's'}`}.{desdeML ? ' Las guías ya están en Despachos: verifica los pagos y despacha.' : ' Ya está todo al día: puedes cargar las ventas y despachar.'}</>,
     detalle)
 }
 
@@ -384,6 +424,57 @@ function TraerAutomatico({ horario, ahora, isAdmin, onGuardado }: {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Primera vez: qué es y cómo se conecta, en tres pasos. */
+function PrimerosPasos({ isAdmin, onConectar }: { isAdmin: boolean; onConectar: () => void }) {
+  const paso = 'flex gap-3 items-start'
+  const num = 'shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center'
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 space-y-3 text-sm text-neutral-700">
+      <div>
+        <p className="font-semibold text-neutral-900">Tus pagos y guías de MercadoEnvíos, solos</p>
+        <p className="text-xs text-neutral-500 mt-0.5">
+          Un programa en tu PC lee el portal de MercadoEnvíos con <b>tu</b> sesión y trae los pagos con su comprobante y las
+          guías. Tu contraseña nunca sale de tu PC. Si se va la luz no se pierde nada: al prenderla trae lo que faltaba.
+        </p>
+      </div>
+      {isAdmin ? (
+        <ol className="space-y-2">
+          <li className={paso}><span className={num}>1</span>
+            <span><a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">Descarga el programa</a> en la PC donde imprimes las guías e instálalo (Siguiente → Instalar).</span></li>
+          <li className={paso}><span className={num}>2</span>
+            <span><button onClick={onConectar} className="font-medium text-emerald-700 underline">Genera tu código</button> y escríbelo cuando el programa lo pida, y en la extensión de Chrome de cada cuenta.</span></li>
+          <li className={paso}><span className={num}>3</span>
+            <span>Listo: toca <b>Traer pagos y guías</b> y espera el aviso verde.</span></li>
+        </ol>
+      ) : (
+        <p className="text-xs">Pídele a un administrador de tu empresa que conecte la PC.</p>
+      )}
+    </div>
+  )
+}
+
+/** El código para conectar la PC: grande, para copiarlo o dictarlo. */
+function CodigoConexion({ codigo, vence, onCerrar }: { codigo: string; vence: string; onCerrar: () => void }) {
+  const [copiado, setCopiado] = useState(false)
+  const hasta = new Date(vence).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })
+  return (
+    <div className="mt-2 rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-emerald-900 flex flex-wrap items-center gap-3">
+      <div>
+        <div className="text-[11px] uppercase tracking-wide text-emerald-700">Código de conexión</div>
+        <code className="select-all font-mono text-2xl font-semibold tracking-widest">{codigo}</code>
+      </div>
+      <button onClick={() => { navigator.clipboard.writeText(codigo); setCopiado(true) }} className="btn-secondary text-xs">
+        {copiado ? 'Copiado ✓' : 'Copiar'}
+      </button>
+      <p className="text-xs text-emerald-800 flex-1 min-w-[200px]">
+        Escríbelo en el programa al instalarlo y en la extensión de cada cuenta de Chrome. Vale hasta las {hasta}.
+        Las PCs que ya estaban conectadas siguen funcionando.
+      </p>
+      <button onClick={onCerrar} className="text-emerald-700 text-xs">Cerrar ✕</button>
     </div>
   )
 }

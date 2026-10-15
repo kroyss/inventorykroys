@@ -16,7 +16,11 @@ export function espacioDe(pathname: string): Espacio {
 /** El espacio en que se está: la empresa sin el módulo inventario vive siempre en
  *  Automatizaciones (también en Usuarios, Aprendizaje…, que no son de ningún espacio). */
 export function espacioActual(pathname: string, modulos: string[]): Espacio {
-  return modulos.includes('inventario') ? espacioDe(pathname) : 'automatizaciones'
+  if (!modulos.includes('inventario')) return 'automatizaciones'
+  // Pagos ME es de Automatizaciones donde Despachos trabaja con las ventas de ML (inventario simple);
+  // con ventas cargadas (SolucionesMC) sigue en Inventario, al lado de Ventas.
+  if ((pathname === '/pagos-me' || pathname.startsWith('/pagos-me/')) && !modulos.includes('despachos_ventas')) return 'automatizaciones'
+  return espacioDe(pathname)
 }
 
 // Módulos que forman el espacio Automatizaciones (si la empresa no tiene ninguno, el

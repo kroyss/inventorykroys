@@ -1,4 +1,11 @@
-# Vigilante Pagos MercadoEnvíos (uso interno)
+# Pagos MercadoEnvíos — programa de la PC ("vigilante")
+
+**Desde la 1.3.0 (clientes):** instalador `public/descargas/InstalarPagosME.exe` (se arma con
+`instalador/construir.ps1` y se copia ahí). Pide solo el **código** de Pagos ME → *Conectar una PC*;
+el despertador lo cambia por su clave y encuentra solo los perfiles de Chrome que tienen la extensión.
+En cada perfil: extensión cargada + el mismo código en su ventanita → *Conectar*. Lo de abajo es la
+instalación a mano de antes (sigue funcionando: clave larga y perfiles fijos).
+
 
 Extensión de Chrome para el módulo **Pagos ME** (solo la empresa de la plataforma). Va en la PC del
 antiguo Reportador, **un perfil de Chrome por cuenta** (PIKEKE y SOLUCION-MC).

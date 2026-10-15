@@ -21,9 +21,10 @@ export const MODULOS = {
   descuento_ml:   'Descuento ML: descuento global sobre el exceso, tope por MercadoEnvíos y Márgenes < $5 (VE)',
   importaciones:  'Importaciones: compras al exterior (pagos 50/100, fotos, aduana, contenedores)',
   analisis_stock: 'Análisis de stock y conteos: reposición, declive, remate y conteos físicos (Reportes)',
-  // Solo la empresa de la plataforma (migración 076): el vigilante trae pagos y guías del portal de
+  // Migración 076 (SolucionesMC) y 093 (clientes): el programa de la PC trae pagos y guías del portal de
   // MercadoEnvíos; se verifican por lote y Despachos no imprime guías con el pago sin verificar.
-  pagos_me:       'Pagos MercadoEnvíos: traer pagos y guías del portal, verificarlos por lote (uso interno)',
+  // Sin inventario (o sin "despachos_ventas") las guías entran solas a Despachos con las ventas de ML.
+  pagos_me:       'Pagos MercadoEnvíos: el programa de la PC trae pagos y guías del portal; verificarlos por lote y guías solas a Despachos (VE)',
   // Inventario completo vs simple (2026-10-12, decidido con el dueño): UNA sola base; estas opciones
   // prendidas = como trabaja SolucionesMC (migración 083 las prende a las empresas que ya llevaban
   // inventario). Apagadas = el Inventario simple de los Fundadores. Lo de siempre, sin pantallas aparte.

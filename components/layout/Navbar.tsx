@@ -33,7 +33,7 @@ export default async function Navbar() {
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2 xl:gap-4">
 
-        <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} radarUrl={conRadar ? radarUrl() : null} />
+        <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} modulos={modulos} radarUrl={conRadar ? radarUrl() : null} />
 
         <NavLinks role={role} permisos={session?.user.permisos ?? []} country={country} modulos={session?.user.modulos ?? []} />
 
@@ -46,7 +46,7 @@ export default async function Navbar() {
           {session?.user && (
             <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
               ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'}
-              pagosME={role === 'admin' && modulos.includes('pagos_me') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos} />
+              pagosME={role === 'admin' && modulos.includes('pagos_me') && modulos.includes('despachos_ventas') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos} />
           )}
         </div>
 

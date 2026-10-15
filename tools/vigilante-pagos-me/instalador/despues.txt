@@ -1,0 +1,14 @@
+﻿¡Listo! El programa quedó instalado (ícono verde "ME" junto a la hora).
+
+Falta UN paso, una sola vez en cada cuenta de Chrome donde abres MercadoEnvíos:
+
+1. Chrome se abre en "Extensiones". Arriba a la derecha, activa "Modo de desarrollador".
+2. Toca "Cargar descomprimida" y elige la carpeta "extension" que se abrió.
+3. Toca el ícono de la extensión (la pieza de rompecabezas) → "Pagos MercadoEnvíos".
+4. Escribe el MISMO código y toca "Conectar".
+
+Si tienes otra cuenta de MercadoEnvíos en otro perfil de Chrome, repite los pasos 1 a 4 en ese perfil.
+
+Para usarlo: en el sistema, Pagos ME → "Traer pagos y guías" y espera el aviso verde.
+
+Tu contraseña nunca sale de esta PC: el programa usa la sesión que ya tienes abierta en tu Chrome.

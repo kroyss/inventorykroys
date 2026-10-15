@@ -40,6 +40,7 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
     // Ajustes es del inventario (tasa, exceso, categorías): en Automatizaciones cada herramienta tiene los suyos adentro.
     ajustes && espacioDe(pathname) === 'inventario' && { href: '/tasas', label: 'Ajustes' },
     // Pagos ME (2026-10-12): se verifica desde Ventas; aquí queda el vigilante, el horario y el historial.
+    // Sin "despachos_ventas" (ventas de ML) va en la barra de Automatizaciones, junto a Despachos.
     pagosME && espacioDe(pathname) === 'inventario' && { href: '/pagos-me', label: 'Pagos MercadoEnvíos' },
     usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },

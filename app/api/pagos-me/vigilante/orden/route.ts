@@ -56,6 +56,13 @@ export async function POST(req: NextRequest) {
        o.banco_emisor, o.banco_receptor, o.referencia, o.fecha_pago, o.monto_pagado, o.envio_metodo,
        o.envio_opcion, o.carrier, o.guia, guiaPath, compPath])
 
+    // Con las ventas de MercadoLibre (sin inventario, 2026-10-15): no hay venta que registrar, la guía
+    // entra sola al lote pendiente de Despachos (el pago se verifica igual en Pagos ME antes de imprimir).
+    if (a.desdeML) {
+      await conectarVenta(a.db, o.venta, null, true)
+      return NextResponse.json({ ok: true })
+    }
+
     // Venta ya registrada (2026-10-11): la que se verificó a mano en Ventas deja el pago VÁLIDO (si nadie
     // lo marcó antes), y su guía entra sola al lote pendiente de Despachos si todavía no está.
     const { rows: [s] } = await a.db.query(

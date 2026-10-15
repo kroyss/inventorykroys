@@ -3,12 +3,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
-import { rutaHabilitada } from '@/lib/modulos'
+import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
-const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio }[] = [
+const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio; soloDesdeML?: boolean }[] = [
   { href: '/dashboard',  label: 'Inicio',    countries: ['VE', 'CO'] as Country[] },
   { href: '/ventas',     label: 'Ventas',    countries: ['VE', 'CO'] as Country[] },
   { href: '/facturas',   label: 'Facturas',  countries: ['VE']       as Country[] },
@@ -21,6 +21,8 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/despachos',        label: 'Despachos',  countries: ['VE'],       espacio: 'automatizaciones' },
+  // Pagos ME junto a Despachos solo con las ventas de ML; con ventas cargadas va en el menú de la cuenta.
+  { href: '/pagos-me',         label: 'Pagos ME',   countries: ['VE'],       espacio: 'automatizaciones', soloDesdeML: true },
   { href: '/reportador',       label: 'Reportador', countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/preguntas',        label: 'Preguntas',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },
@@ -56,6 +58,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
   const links = allLinks.filter(
     l => rutaPermitida(l.href, u) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
       && (l.espacio ?? 'inventario') === espacioActual(pathname, modulos)
+      && (!l.soloDesdeML || ventasDesdeML({ modulos }))
   )
   const activo = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))

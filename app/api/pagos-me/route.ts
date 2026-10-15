@@ -49,12 +49,12 @@ export async function GET(req: NextRequest) {
          ORDER BY p.fecha_orden DESC NULLS LAST, p.id DESC LIMIT 300`, [filtro]),
       s.db.query(`SELECT verificacion, COUNT(*)::int AS n FROM me_pagos
                   WHERE fecha_orden > NOW() - INTERVAL '30 days' GROUP BY 1`),
-      s.db.query(`SELECT perfil, visto_at, visto_at > NOW() - make_interval(mins => $1) AS conectado
+      s.db.query(`SELECT perfil, cuenta, visto_at, visto_at > NOW() - make_interval(mins => $1) AS conectado
                   FROM me_latidos ORDER BY perfil`, [LATIDO_MIN]),
       // vigente (para la pantalla) = todavía "trayendo"; pasado TRAIDA_EN_CURSO_MIN se muestra incompleta.
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                   FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
-      s.db.query(`SELECT creado_at FROM me_vigilante`),
+      s.db.query(`SELECT (SELECT creado_at FROM me_vigilante) AS creado_at, EXISTS (SELECT 1 FROM me_claves) AS con_codigo`),
       s.db.query(`SELECT value FROM app_settings WHERE key = 'pagos_me_horario'`),
       // Día (1 = lunes) y hora de Venezuela (la conexión tiene el TimeZone de la empresa), para "Próximo automático".
       s.db.query(`SELECT EXTRACT(ISODOW FROM NOW())::int AS dia, to_char(NOW(), 'HH24:MI') AS hm`),
@@ -62,7 +62,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       pagos,
       conteo: Object.fromEntries(conteo.map(c => [c.verificacion, c.n])),
-      vigilante: { clave: !!clave, latidos, pedido: pedido ?? null },
+      vigilante: { clave: !!clave?.creado_at || !!clave?.con_codigo, latidos, pedido: pedido ?? null },
+      desdeML: s.desdeML,
       horario: leerHorario(hor?.value), ahora,
     })
   } catch (err) {
