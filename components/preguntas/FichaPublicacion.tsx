@@ -34,21 +34,22 @@ export function FichaPublicacion({ item, onCerrar }: { item: string; onCerrar: (
 
   const n = f && !('error' in f) ? f.fotos.length : 0
   useEffect(() => {
-    // En captura y sin propagar: Esc cierra solo la ficha, no el formulario de atrás (Nueva venta).
+    // En captura en window (antes que los de document) y sin propagar: Esc cierra solo la ficha, no la
+    // ventana de atrás (Nueva venta, "Lo que se habló" de Por confirmar, que escuchan en document).
     const tecla = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onCerrar() }
       else if (e.key === 'ArrowRight' && n > 1) setFoto(i => (i + 1) % n)
       else if (e.key === 'ArrowLeft' && n > 1) setFoto(i => (i - 1 + n) % n)
     }
-    document.addEventListener('keydown', tecla, true)
+    window.addEventListener('keydown', tecla, true)
     const antes = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', tecla, true); document.body.style.overflow = antes }
+    return () => { window.removeEventListener('keydown', tecla, true); document.body.style.overflow = antes }
   }, [n, onCerrar])
 
   // Portal al body: encima de cualquier ventana (p. ej. Nueva venta), sin heredar su posición.
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={e => { e.stopPropagation(); onCerrar() }} role="dialog" aria-modal="true" aria-label="Publicación">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={e => { e.stopPropagation(); onCerrar() }} role="dialog" aria-modal="true" aria-label="Publicación">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2.5">
           <span className="font-mono text-xs text-neutral-400">{item}</span>
