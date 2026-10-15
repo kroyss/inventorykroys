@@ -257,7 +257,7 @@ export default function MisAvisosClient() {
               </Fila>
             )}
             <Fila icono="☀️" titulo="Resumen diario" on={p.resumen} onCambio={v => cambiar({ resumen: v })}
-              ejemplo={'☀️ Buenos días, Marcos. Tu resumen:\n\nAyer\n🛒 42 ventas en MercadoLibre\n❓ 61 preguntas, 59 respondidas · la mitad en menos de 18 min\n\nLo que hizo el sistema por ti\n✅ Calificó 31 ventas concretadas\n\nPendiente hoy\n⭐ 8 ventas por calificar\n📦 Agotadas (2):\n   • Bolsa Seguridad 25×35 · Blanco · PIKEKE · 5 vendidas\n   • Hub Usb C + 3.0 · PIKEKE · 3 vendidas'}>
+              ejemplo={'☀️ Buenos días, Marcos. Tu resumen:\n\nAyer\n🛒 42 ventas en MercadoLibre\n❓ 61 preguntas, 59 respondidas · la mitad en menos de 18 min\n\nLo que hizo el sistema por ti\n✅ Calificó 31 ventas concretadas\n\nPendiente hoy\n🚚 3 guías sin reportar al comprador\n⭐ 8 ventas por calificar\n📦 Agotadas (2):\n   • Bolsa Seguridad 25×35 · Blanco · PIKEKE · 5 vendidas\n   • Hub Usb C + 3.0 · PIKEKE · 3 vendidas'}>
               Todos los días a las <Selector valor={p.resumen_hora} opciones={HORAS.filter(h => h >= 5 && h <= 21)} texto={horaTxt} onCambio={v => cambiar({ resumen_hora: v })} disabled={!p.resumen} />:
               cómo te fue ayer, lo que hizo el sistema solo y lo que queda pendiente.
               {e.conectado && (

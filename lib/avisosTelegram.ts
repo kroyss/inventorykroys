@@ -3,7 +3,8 @@
 //   - cuenta de ML desconectada (sin ella no entra nada de esa cuenta);
 //   - pregunta sin responder pasados N minutos; mensaje de comprador sin responder pasados N minutos;
 //   - calificación negativa recibida (neutral, opcional) y contradictoria (él dijo concretada, nosotros no);
-//   - resumen diario a la hora elegida (ayer + lo que hizo el sistema + lo pendiente).
+//   - resumen diario a la hora elegida (ayer + lo que hizo el sistema + lo pendiente, con las guías sin
+//     reportar al comprador y, a los administradores, el fin de la prueba gratis los últimos días).
 // Reglas: solo lo de SU empresa y SUS permisos; horario de silencio (lo que siga pendiente llega al
 // terminar); cada cosa se avisa UNA vez (avisos_enviados); varias juntas van en un solo mensaje.
 // Primero solo la organización de la plataforma; a los demás cuando se prenda en Plataforma.
@@ -17,6 +18,7 @@ import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
 import { sqlCaliente, SQL_VENDIDA, umbralStock, DIAS_VENDIDAS } from '@/lib/alertasStock'
 import { ventasDesdeML } from '@/lib/modulos'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
+import { SQL_PENDIENTE as SQL_SIN_REPORTAR, SQL_REPORTABLE } from '@/lib/reportador'
 import {
   ENTORNO, TelegramBloqueado, corto, enviarTelegram, esc, leerActualizaciones, telegramConfigurado, urlSistema,
   type Boton,
@@ -70,6 +72,7 @@ export function avisosDisponibles(u: { role: UserRole; permisos: string[] | null
     mensaje: ve('ver_mensajes'),
     negativa: ve('ver_calificaciones'),
     stock: u.modulos.includes('alertas_stock') && puede(user, 'ver_stock'),
+    reportador: u.modulos.includes('despachos') && u.modulos.includes('reportador') && puede(user, 'ver_reportador'),
     resumen: true,
   }
 }
@@ -420,10 +423,30 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
   if (solo.length) lineas.push('', '<b>Lo que hizo el sistema por ti</b>', ...solo)
 
   const pend = await pendienteAhora(db, e, d, disp)
+  const prueba = d.role === 'admin' ? await finDePrueba(e.id) : null
+  if (prueba) pend.unshift(prueba)
   lineas.push('', '<b>Pendiente hoy</b>', ...(pend.length ? pend : ['Nada pendiente. Todo al día 👌']))
 
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
   return `${cab}☀️ <b>${saludo}, ${esc(d.nombre.split(/\s+/)[0])}.</b> Tu resumen:\n\n${lineas.join('\n')}`
+}
+
+/** Los últimos días de la prueba gratis (2026-10-15): la franja del sistema solo la ve quien entra; esto le
+ *  llega aunque no entre. Mismas cuentas que components/layout/AvisoCuenta.tsx (hora Caracas); mientras
+ *  la prueba espera la conexión de ML no se avisa. */
+const AVISAR_FIN_PRUEBA_DIAS = 3
+async function finDePrueba(empresaId: number) {
+  const { rows: [o] } = await dbGlobal().query(
+    `SELECT o.fundador, o.prueba_dias, to_char(o.prueba_hasta, 'DD/MM') AS hasta,
+            o.prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan
+     FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
+     WHERE e.id = $1 AND o.estado = 'prueba' AND o.prueba_hasta IS NOT NULL`, [empresaId])
+  if (!o) return null
+  const quedan = Number(o.quedan)
+  if (quedan < 0 || quedan > AVISAR_FIN_PRUEBA_DIAS) return null
+  if (o.prueba_dias != null && quedan >= o.prueba_dias) return null
+  const que = o.fundador ? 'Tu mes gratis de Fundador' : 'Tu prueba gratis'
+  return `⏳ <b>${que} termina ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: escríbenos para seguir sin cortes`
 }
 
 /** Lo que queda pendiente AHORA (resumen de la mañana y cierre del día), según sus permisos. Las agotadas
@@ -436,6 +459,16 @@ async function pendienteAhora(db: Pool, e: EmpresaAvisos, d: Destinatario, disp:
             (SELECT string_agg(nickname, ', ') FROM ml_conexiones WHERE estado = 'desconectada'
                AND COALESCE(ultimo_error, '') <> 'Desconectada desde el sistema') AS desconectadas`)
   if (c.desconectadas) pend.push(`⚠️ <b>Cuenta desconectada: ${esc(c.desconectadas)}</b>`)
+  // Guías de jornadas cerradas que el comprador todavía no recibió (2026-10-15): lo mismo que el numerito
+  // del Reportador en el menú (app/api/avisos).
+  if (disp.reportador && e.country === 'VE') {
+    const { rows: [r] } = await db.query(
+      `SELECT COUNT(*)::int AS n FROM despacho_etiquetas e
+       JOIN despacho_lotes l ON l.id = e.lote_id
+       JOIN despacho_jornadas j ON j.id = l.jornada_id
+       WHERE ${SQL_REPORTABLE} AND ${SQL_SIN_REPORTAR}`)
+    if (r.n) pend.push(`🚚 ${n(r.n)} guía${r.n === 1 ? '' : 's'} sin reportar al comprador`)
+  }
   if (disp.pregunta && c.preguntas) pend.push(`❓ ${n(c.preguntas)} pregunta${c.preguntas === 1 ? '' : 's'} sin responder`)
   if (disp.mensaje && c.mensajes) pend.push(`✉️ ${n(c.mensajes)} conversaci${c.mensajes === 1 ? 'ón' : 'ones'} con mensajes sin leer`)
   if (disp.negativa) {
