@@ -61,7 +61,7 @@ export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'n
   }
 }
 
-/** Hora (del país de la empresa) desde la que corre la calificación automática del día. */
+/** Hora (del país de la empresa) por defecto de la calificación automática; cada empresa elige la suya (plantillas.hora). */
 export const HORA_AUTO = 10
 const MAX_POR_DIA = 300
 export const CLAVE_ULTIMO = 'calificaciones_auto_ultimo'
@@ -71,13 +71,14 @@ export async function calificarAutomatico(db: Pool, conInventario: boolean) {
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
   const p = leerPlantillasCal(pl?.value)
   if (!p.auto) return null
-  // Una vez al día, desde HORA_AUTO: se "toma" el día antes de calificar (dos pasadas del cron no lo
-  // repiten). La conexión tiene el TimeZone de la empresa: CURRENT_DATE y la hora son las del país.
+  // Una vez al día, desde la hora elegida en Configuración (p.hora; antes fija HORA_AUTO): se "toma" el
+  // día antes de calificar (dos pasadas del cron no lo repiten). Si se elige una hora que ya pasó y hoy
+  // no corrió, corre en la próxima pasada. La conexión tiene el TimeZone de la empresa (hora del país).
   const { rowCount } = await db.query(
     `INSERT INTO app_settings (key, value) SELECT $1, json_build_object('fecha', CURRENT_DATE::text, 'estado', 'corriendo')::text
      WHERE EXTRACT(HOUR FROM LOCALTIME) >= $2
      ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-     WHERE (app_settings.value::json->>'fecha') IS DISTINCT FROM CURRENT_DATE::text`, [CLAVE_ULTIMO, HORA_AUTO])
+     WHERE (app_settings.value::json->>'fecha') IS DISTINCT FROM CURRENT_DATE::text`, [CLAVE_ULTIMO, p.hora])
   if (!rowCount) return null
   const { rows } = await db.query(
     `SELECT b.id FROM (${sqlBandeja(!conInventario)}) b

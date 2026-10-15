@@ -15,7 +15,9 @@ interface Plantillas {
   noConcretada: { rating: string; motivo: string; mensaje: string; dias: number }
   esperaDias: number
   auto: boolean
+  hora?: number
 }
+const horaTxt = (h: number | undefined) => `${String(h ?? 10).padStart(2, '0')}:00`
 interface Datos {
   ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; proximas: number; esperando: number }
   plantillas: Plantillas; cuentas: { nickname: string; ordenes_sync_at: string | null }[]
@@ -137,7 +139,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
         <>
           {datos.plantillas.auto && vista === 'listas' && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-              <b>Calificación automática activa:</b> todos los días desde las 10:00 se califican solas las <b>concretadas</b>; las no concretadas siguen esperando que las revises.
+              <b>Calificación automática activa:</b> todos los días desde las {horaTxt(datos.plantillas.hora)} se califican solas las <b>concretadas</b>; las no concretadas siguen esperando que las revises.
               {datos.autoUltimo?.estado === 'listo' && (
                 <> Última: {new Date(datos.autoUltimo.at ?? datos.autoUltimo.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {datos.autoUltimo.calificadas ?? 0} calificadas
                   {datos.autoUltimo.quitadas ? ` · ${datos.autoUltimo.quitadas} que ML ya no permitía` : ''}
@@ -291,14 +293,25 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
           <span>
             <span className="font-semibold text-neutral-900">Calificar automáticamente las concretadas</span>
             <span className="block text-sm text-neutral-600">
-              Una vez al día (desde las 10:00) el sistema califica solo, con el texto de &quot;Venta concretada&quot;, las ventas que ya
+              Una vez al día el sistema califica solo, con el texto de &quot;Venta concretada&quot;, las ventas que ya
               {' '}están en el sistema o despachadas y pasaron los días de espera. Las <b>no concretadas nunca</b> se califican solas.
-            </span>
-            <span className="block text-xs text-neutral-500 mt-1">
-              Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prenderlo aceptas que se publiquen sin revisarlas una por una.
             </span>
           </span>
         </label>
+        {/* Desde qué hora (del país). Fuera del label: tocar la hora no prende/apaga el automático. */}
+        <div className="flex flex-wrap items-center gap-2 pl-7 text-sm text-neutral-700">
+          Calificar todos los días desde las
+          <select value={p.hora ?? 10} onChange={e => setP({ ...p, hora: Number(e.target.value) })}
+            className="border border-neutral-300 rounded-lg bg-white px-2 py-1 text-sm font-medium">
+            {Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)}
+          </select>
+          <span className="text-xs text-neutral-500">
+            Si eliges una hora que ya pasó y hoy todavía no corrió, califica en el próximo minuto; si ya corrió hoy, la nueva hora vale desde mañana.
+          </span>
+        </div>
+        <p className="pl-7 text-xs text-neutral-500">
+          Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prenderlo aceptas que se publiquen sin revisarlas una por una.
+        </p>
       </section>
       <section className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-1">
         <h2 className="font-semibold text-neutral-900">Días de espera</h2>
