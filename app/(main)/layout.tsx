@@ -11,6 +11,7 @@ import AvisoCuenta from '@/components/layout/AvisoCuenta'
 import BienvenidaVideo from '@/components/aprendizaje/BienvenidaVideo'
 import AvisoDisco from '@/components/layout/AvisoDisco'
 import VerComoBarra from '@/components/layout/VerComoBarra'
+import ActividadReal from '@/components/layout/ActividadReal'
 import { esDuenoPlataforma } from '@/lib/empresa'
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       {/* El primer video de Aprendizaje se abre solo hasta completarlo (no a la organización de la plataforma: lo decide la API). */}
       <BienvenidaVideo />
       <BottomNav role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
+      <ActividadReal />
       <CommandPalette role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
     </div>
     </AvisosProvider>

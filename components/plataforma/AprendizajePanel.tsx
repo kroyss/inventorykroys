@@ -9,7 +9,7 @@ interface Alumno {
   completados: number; completados_inv: number; inventario: boolean
   ingreso: string | null; en_linea: boolean; viendo: { serie: Serie; numero: number; pct: number | null } | null
 }
-interface EnLinea { id: number; nombre: string; username: string; ultima_actividad: string; empresas: string | null }
+interface EnLinea { id: number; nombre: string; username: string; ultima_actividad: string; empresas: string | null; usando: boolean; ultimo_uso: string | null }
 const PUNTO_VERDE = <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 align-middle" title="En línea ahora" />
 const haceMin = (f: string) => { const m = Math.max(0, Math.round((Date.now() - new Date(f).getTime()) / 60000)); return m === 0 ? 'ahora' : `hace ${m} min` }
 
@@ -212,23 +212,37 @@ export default function AprendizajePanel() {
       </>}
 
       {sub === 'clientes' && <>
-      <section className={`rounded-xl border p-4 ${datos.enLinea.length ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
-        <h2 className="text-sm font-semibold text-neutral-900">
-          {datos.enLinea.length ? <>{PUNTO_VERDE}En línea ahora ({datos.enLinea.length})</> : 'En línea ahora'}
-        </h2>
-        {datos.enLinea.length ? (
-          <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-            {datos.enLinea.map(u => (
-              <li key={u.id}>
-                <b className="text-neutral-900">{u.nombre}</b>
-                <span className="text-neutral-500"> · {u.empresas ?? u.username} · {haceMin(u.ultima_actividad)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-1 text-sm text-neutral-500">Nadie usando el sistema en los últimos {datos.enLineaMinutos} minutos: buen momento para actualizar.</p>
-        )}
-      </section>
+      {/* En línea = hizo algo en los últimos minutos; Abierto = solo tiene la pestaña abierta (migración 092). */}
+      {(() => {
+        const usando = datos.enLinea.filter(u => u.usando)
+        const abiertos = datos.enLinea.filter(u => !u.usando)
+        return (
+          <section className={`rounded-xl border p-4 ${usando.length ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
+            <h2 className="text-sm font-semibold text-neutral-900">
+              {usando.length ? <>{PUNTO_VERDE}En línea ahora ({usando.length})</> : 'En línea ahora'}
+            </h2>
+            {usando.length ? (
+              <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                {usando.map(u => (
+                  <li key={u.id}>
+                    <b className="text-neutral-900">{u.nombre}</b>
+                    <span className="text-neutral-500"> · {u.empresas ?? u.username} · {haceMin(u.ultimo_uso ?? u.ultima_actividad)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-neutral-500">Nadie usando el sistema en los últimos {datos.enLineaMinutos} minutos: buen momento para actualizar.</p>
+            )}
+            {abiertos.length > 0 && (
+              <p className="mt-2 text-xs text-neutral-500">
+                <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-neutral-300 align-middle" />
+                <b className="font-medium text-neutral-600">Abierto, sin usar ({abiertos.length}):</b>{' '}
+                {abiertos.map(u => u.nombre).join(', ')} · tienen la pestaña abierta pero no tocaron nada.
+              </p>
+            )}
+          </section>
+        )
+      })()}
 
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-neutral-900">Avance de los clientes</h2>

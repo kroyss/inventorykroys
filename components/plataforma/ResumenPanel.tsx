@@ -10,7 +10,7 @@ interface Uso {
   preguntas_7d: number; mensajes_7d: number; etiquetas_7d: number; reportadas_7d: number; calificadas_7d: number; stock_7d: number
 }
 interface Alumno { empresas: string; completados: number; en_linea: boolean; viendo: { numero: number; pct: number | null } | null }
-interface EnLinea { id: number; nombre: string; empresas: string | null; ultima_actividad: string }
+interface EnLinea { id: number; nombre: string; empresas: string | null; ultima_actividad: string; usando: boolean }
 interface Video { activo: boolean; serie: string }
 interface Datos { uso: Uso[]; alumnos: Alumno[]; enLinea: EnLinea[]; videos: Video[] }
 type Vista = 'empresas' | 'fundadores' | 'aprendizaje'
@@ -88,7 +88,13 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
         <Numero titulo="Clientes" valor={datos.uso.length} detalle={`${enPrueba} en prueba`} />
         <Numero titulo="Conectados a ML" valor={conectados} detalle={`de ${datos.uso.length}`} />
         <Numero titulo="Usaron el sistema (7 días)" valor={activos7} detalle={`de ${conectados} conectados`} />
-        <Numero titulo="En línea ahora" valor={datos.enLinea.length} detalle={datos.enLinea.length ? datos.enLinea.map(e => e.nombre.split(' ')[0]).join(', ') : 'nadie'} vivo={datos.enLinea.length > 0} />
+        {(() => {
+          // Solo los que están usando de verdad; los de pestaña abierta van aparte (migración 092).
+          const usando = datos.enLinea.filter(e => e.usando)
+          const abiertos = datos.enLinea.length - usando.length
+          return <Numero titulo="En línea ahora" valor={usando.length} vivo={usando.length > 0}
+            detalle={(usando.length ? usando.map(e => e.nombre.split(' ')[0]).join(', ') : 'nadie usando') + (abiertos ? ` · ${abiertos} con la pestaña abierta` : '')} />
+        })()}
       </div>
 
       {/* Requiere atención */}

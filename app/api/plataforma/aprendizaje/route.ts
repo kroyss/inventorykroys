@@ -27,7 +27,10 @@ export async function GET() {
                 bool_or('inventario' = ANY(e.modulos)) AS inventario,
                 MAX(p.updated_at) AS ultima,
                 GREATEST(u.ultima_actividad, u.last_login) AS ingreso,
-                COALESCE(u.ultima_actividad > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS}), FALSE) AS en_linea,
+                -- En línea = usó de verdad (ultimo_uso, migración 092); abierto = solo la pestaña abierta.
+                COALESCE(u.ultimo_uso > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS}), FALSE) AS en_linea,
+                COALESCE(u.ultima_actividad > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS}), FALSE)
+                  AND NOT COALESCE(u.ultimo_uso > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS}), FALSE) AS abierto,
                 -- Video empezado y sin terminar (el último que tocó): "viendo el 1º, 57%".
                 (SELECT json_build_object('serie', w.serie, 'pct', LEAST(99, ROUND(100.0 * q.visto_seg / NULLIF(q.duracion_seg, 0))),
                           'numero', (SELECT COUNT(*) FROM aprendizaje_videos z WHERE z.activo AND z.serie = w.serie AND z.orden <= w.orden))
@@ -51,7 +54,9 @@ export async function GET() {
                 (SELECT MAX(GREATEST(x.ultima_actividad, x.last_login)) FROM usuario_empresas ue JOIN users x ON x.id = ue.user_id
                  WHERE ue.empresa_id = e.id) AS ingreso,
                 EXISTS (SELECT 1 FROM usuario_empresas ue JOIN users x ON x.id = ue.user_id
-                        WHERE ue.empresa_id = e.id AND x.ultima_actividad > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS})) AS en_linea
+                        WHERE ue.empresa_id = e.id AND x.ultimo_uso > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS})) AS en_linea,
+                EXISTS (SELECT 1 FROM usuario_empresas ue JOIN users x ON x.id = ue.user_id
+                        WHERE ue.empresa_id = e.id AND x.ultima_actividad > NOW() - make_interval(mins => ${EN_LINEA_MINUTOS})) AS abierto
          FROM plataforma_uso_clientes() u
          JOIN empresas e ON e.id = u.empresa_id
          JOIN organizaciones o ON o.id = e.organizacion_id
@@ -59,12 +64,14 @@ export async function GET() {
          ORDER BY u.conectada_at IS NULL, u.ultima_actividad DESC NULLS LAST, e.nombre`, [ORGANIZACION_PLATAFORMA]),
       // En línea ahora: cualquier usuario (también los de la plataforma) que usó el sistema hace poco.
       db.query(
-        `SELECT u.id, COALESCE(u.full_name, u.username) AS nombre, u.username, u.ultima_actividad,
+        // usando = hizo algo en los últimos minutos (ultimo_uso); si no, solo tiene la pestaña abierta.
+        `SELECT u.id, COALESCE(u.full_name, u.username) AS nombre, u.username, GREATEST(u.ultimo_uso, u.ultima_actividad) AS ultima_actividad,
+                COALESCE(u.ultimo_uso > NOW() - make_interval(mins => $1), FALSE) AS usando, u.ultimo_uso,
                 (SELECT string_agg(e.nombre, ', ' ORDER BY e.nombre) FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
                  WHERE ue.user_id = u.id) AS empresas
          FROM users u
-         WHERE u.is_active AND u.ultima_actividad > NOW() - make_interval(mins => $1)
-         ORDER BY u.ultima_actividad DESC`, [EN_LINEA_MINUTOS]),
+         WHERE u.is_active AND (u.ultima_actividad > NOW() - make_interval(mins => $1) OR u.ultimo_uso > NOW() - make_interval(mins => $1))
+         ORDER BY COALESCE(u.ultimo_uso > NOW() - make_interval(mins => $1), FALSE) DESC, u.ultimo_uso DESC NULLS LAST`, [EN_LINEA_MINUTOS]),
     ])
     return NextResponse.json({ videos, alumnos, agendar, uso, enLinea, enLineaMinutos: EN_LINEA_MINUTOS })
   } catch (err) {
