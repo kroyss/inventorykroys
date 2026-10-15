@@ -138,7 +138,22 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
                         cal?.cambio?.estado ?? null, cal?.cambio?.fecha ?? null, resultado,
                         nuestra?.rating ?? null, nuestra?.concretada ?? null, nuestra?.mensaje ?? null])
   }
-  return rows.length
+  // Pedir calificación (lib/pedirCalificacion.ts): de las ventas de los últimos días que ya calificamos y
+  // el comprador todavía no, cómo las calificamos (la búsqueda de ML solo dice "calificada"). De a pocas;
+  // solo las columnas nuestras (cal_recibida queda como está: la del comprador se lee arriba cuando llegue).
+  const { rows: nuestras } = await db.query(
+    `SELECT id::text FROM ml_ordenes
+     WHERE conexion_id = $1 AND cal_vendedor = 'calificada' AND cal_comprador IS NULL
+       AND fecha > NOW() - INTERVAL '7 days' AND COALESCE(estado, '') <> 'cancelled'
+     ORDER BY fecha LIMIT 8`, [conexionId])
+  for (const o of nuestras) {
+    const { nuestra } = await leerCalificaciones(db, conexionId, o.id)
+    await db.query(
+      `UPDATE ml_ordenes SET cal_vendedor = COALESCE($2, 'sin_detalle'), cal_concretada = COALESCE($3, cal_concretada),
+              cal_vendedor_msg = COALESCE($4, cal_vendedor_msg) WHERE id = $1`,
+      [o.id, nuestra?.rating ?? null, nuestra?.concretada ?? null, nuestra?.mensaje ?? null])
+  }
+  return rows.length + nuestras.length
 }
 
 /** Lo que cuenta en el menú: neutrales y negativas de los últimos DIAS_AVISO días que nadie marcó como vistas

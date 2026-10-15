@@ -4,6 +4,7 @@
 // mensaje del comprador) y "Confirmar" abre Nueva venta con todo cargado.
 import { useCallback, useEffect, useState } from 'react'
 import type { PorConfirmar as Fila } from '@/lib/porConfirmar'
+import { BotonGuia } from './VerGuia'
 
 interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null }
 
@@ -97,6 +98,7 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
           <span className="text-[11px] text-neutral-400">
             compró {hace(f.fecha)}{f.pago?.at ? ` · pago traído ${hace(f.pago.at)}` : ''} · {f.cuenta}
           </span>
+          {f.pago?.guia && <BotonGuia pagoId={f.pago.id} venta={f.numero} />}
         </div>
         {f.mensaje && (
           <div className="mt-1 flex items-start gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs text-violet-900 ring-1 ring-inset ring-violet-200">

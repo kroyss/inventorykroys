@@ -5,6 +5,7 @@ import { leerMensajesRapidos, MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
 import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
+import { contarPedibles } from '@/lib/pedirCalificacion'
 
 // GET /api/mensajes?vista=sin_leer|con_nota|todas&q=&limite= → conversaciones post-venta de las cuentas
 // de la empresa con su estado en Despachos (o cancelada en ML) y sus notas de ML.
@@ -78,6 +79,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       conversaciones: rows, hay_mas: hayMas, total, por_pagina: POR_PAGINA, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
+      // Pestaña "Pedir calificación" (lib/pedirCalificacion.ts): cuántas hay para pedir hoy.
+      pedir: await contarPedibles(s.db).catch(() => 0),
       // Pestaña Recordatorios (lib/recordatoriosPago.ts): solo con Pagos ME.
       recordatorios: tieneModulo(s.session.user, 'pagos_me') && s.session.user.country === 'VE',
     })

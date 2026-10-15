@@ -29,7 +29,9 @@ export interface PorConfirmar {
   moneda: string | null
   lineas: LineaML[]
   productos: EstadoProductos
-  pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null; retiro: boolean; at: string | null } | null
+  pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null; retiro: boolean; at: string | null
+          // La guía que trajo Pagos ME (para verla desde la fila: components/ventas/VerGuia.tsx).
+          id: number; guia: boolean; guiaNum: string | null } | null
   mensaje: { texto: string; at: string } | null    // lo último que escribió el comprador (después de comprar)
   vencida: boolean
 }
@@ -45,7 +47,7 @@ export async function ventasPorConfirmar(db: Pool) {
             (p.envio_metodo ILIKE 'retiro en tienda%' OR p.carrier ILIKE 'retiro en tienda%') AS retiro,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_texto END AS msg_texto,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_at END AS msg_at,
-            p.creado_at AS pago_at,
+            p.creado_at AS pago_at, p.id AS pago_id, p.guia_path IS NOT NULL AS tiene_guia, p.guia AS guia_num,
             (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
@@ -98,7 +100,8 @@ export async function ventasPorConfirmar(db: Pool) {
     return {
       numero: r.numero, fecha: r.fecha, cuenta: r.cuenta, comprador: r.comprador, nick: r.nick,
       total: r.total, moneda: r.moneda, lineas, productos,
-      pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto, retiro: !!r.retiro, at: r.pago_at } : null,
+      pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto, retiro: !!r.retiro, at: r.pago_at,
+                               id: Number(r.pago_id), guia: !!r.tiene_guia, guiaNum: r.guia_num ?? null } : null,
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       vencida: r.vencida,
     }

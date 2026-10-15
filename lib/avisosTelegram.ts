@@ -44,7 +44,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   resumen: true, resumen_hora: 8,
   silencio: true, silencio_desde: 22, silencio_hasta: 7,
 }
-export const MINUTOS_OPCIONES = [15, 30, 60, 120, 240] as const
+export const MINUTOS_OPCIONES = [0, 15, 30, 60, 120, 240] as const   // 0 = al instante
 
 export function leerPrefs(v: unknown): PrefsAvisos {
   const o = (v && typeof v === 'object' ? v : {}) as Partial<PrefsAvisos>
@@ -220,9 +220,9 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     const lista = rows.filter(r => nuevas.has(r.id))
     if (lista.length) {
       const html = lista.length === 1
-        ? `${cab}❓ <b>Pregunta sin responder</b> · ${esc(lista[0].cuenta)} · ${hace(lista[0].fecha)}\n`
+        ? `${cab}❓ <b>${p.pregunta_min ? 'Pregunta sin responder' : 'Pregunta nueva'}</b> · ${esc(lista[0].cuenta)} · ${hace(lista[0].fecha)}\n`
           + `📦 ${esc(corto(lista[0].item_titulo, 80))}\n\n💬 <i>“${esc(corto(lista[0].texto, 400))}”</i>`
-        : `${cab}❓ <b>${lista.length} preguntas sin responder</b> (más de ${p.pregunta_min} min)\n\n`
+        : `${cab}❓ <b>${lista.length} preguntas ${p.pregunta_min ? 'sin responder' : 'nuevas'}</b>${p.pregunta_min ? ` (más de ${p.pregunta_min} min)` : ''}\n\n`
           + lista.slice(0, 6).map(r => `• <b>${esc(r.cuenta)}</b> · ${hace(r.fecha)}\n   <i>“${esc(corto(r.texto, 110))}”</i>`).join('\n')
           + (lista.length > 6 ? `\n… y ${lista.length - 6} más` : '')
       if (await mandar(d, e, 'pregunta', lista.map(r => r.id), html,
@@ -245,10 +245,10 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     if (lista.length) {
       const r0 = lista[0]
       const html = lista.length === 1
-        ? `${cab}✉️ <b>Mensaje sin responder</b> · ${esc(r0.cuenta)} · ${hace(r0.ultimo_at)}\n`
+        ? `${cab}✉️ <b>${p.mensaje_min ? 'Mensaje sin responder' : 'Mensaje nuevo'}</b> · ${esc(r0.cuenta)} · ${hace(r0.ultimo_at)}\n`
           + `👤 ${esc(r0.comprador ?? 'Comprador')}${r0.productos ? ` · 📦 ${esc(corto(r0.productos, 70))}` : ''}\n\n`
           + `💬 <i>“${esc(corto(r0.ultimo_texto || '(adjunto)', 400))}”</i>`
-        : `${cab}✉️ <b>${lista.length} mensajes de compradores sin responder</b> (más de ${p.mensaje_min} min)\n\n`
+        : `${cab}✉️ <b>${lista.length} mensajes de compradores ${p.mensaje_min ? 'sin responder' : 'nuevos'}</b>${p.mensaje_min ? ` (más de ${p.mensaje_min} min)` : ''}\n\n`
           + lista.slice(0, 6).map(r => `• <b>${esc(r.comprador ?? 'Comprador')}</b> · ${esc(r.cuenta)} · ${hace(r.ultimo_at)}\n   <i>“${esc(corto(r.ultimo_texto || '(adjunto)', 110))}”</i>`).join('\n')
           + (lista.length > 6 ? `\n… y ${lista.length - 6} más` : '')
       if (await mandar(d, e, 'mensaje', lista.map(r => r.ref), html,

@@ -25,8 +25,8 @@ interface Estado {
   staging: boolean
 }
 
-const MINUTOS = [15, 30, 60, 120, 240]
-const minTxt = (m: number) => m < 60 ? `${m} minutos` : m === 60 ? '1 hora' : `${m / 60} horas`
+const MINUTOS = [0, 15, 30, 60, 120, 240]
+const minTxt = (m: number) => m === 0 ? 'al instante (cada una que entre)' : m < 60 ? `${m} minutos` : m === 60 ? '1 hora' : `${m / 60} horas`
 const horaTxt = (h: number) => `${String(h).padStart(2, '0')}:00`
 const HORAS = Array.from({ length: 24 }, (_, h) => h)
 
@@ -216,14 +216,15 @@ export default function MisAvisosClient() {
             {d.pregunta && (
               <Fila icono="❓" titulo="Pregunta sin responder" on={p.pregunta} onCambio={v => cambiar({ pregunta: v })}
                 ejemplo={'❓ Pregunta sin responder · SOLUCIONES_MC · hace 35 min\n📦 Cable USB C 120w Carga Rápida 1m\n\n💬 “Buenas, ¿tendrás 2 disponibles?”\n\n[ Responder en el sistema ]'}>
-                Si una pregunta lleva más de <Selector valor={p.pregunta_min} opciones={MINUTOS} texto={minTxt} onCambio={v => cambiar({ pregunta_min: v })} disabled={!p.pregunta} /> sin respuesta.
-                Si entran varias, llegan juntas en un solo aviso.
+                Avisarme <Selector valor={p.pregunta_min} opciones={MINUTOS} texto={v => v ? `si lleva ${minTxt(v)} sin respuesta` : minTxt(v)} onCambio={v => cambiar({ pregunta_min: v })} disabled={!p.pregunta} />.{' '}
+                {p.pregunta_min ? 'Si el equipo responde antes, no te llega nada.' : 'Te llega cada pregunta apenas entra (en menos de un minuto).'} Si entran varias juntas, llegan en un solo aviso.
               </Fila>
             )}
             {d.mensaje && (
               <Fila icono="✉️" titulo="Mensaje de comprador sin responder" on={p.mensaje} onCambio={v => cambiar({ mensaje: v })}
                 ejemplo={'✉️ Mensaje sin responder · PIKEKE · hace 1 h\n👤 Juan Pérez · 📦 Audífonos Bluetooth\n\n💬 “Buenas, ya hice el pago móvil”\n\n[ Abrir conversación ]'}>
-                Si un comprador lleva más de <Selector valor={p.mensaje_min} opciones={MINUTOS} texto={minTxt} onCambio={v => cambiar({ mensaje_min: v })} disabled={!p.mensaje} /> esperando respuesta después de la venta.
+                Avisarme <Selector valor={p.mensaje_min} opciones={MINUTOS} texto={v => v ? `si lleva ${minTxt(v)} sin respuesta` : minTxt(v)} onCambio={v => cambiar({ mensaje_min: v })} disabled={!p.mensaje} />{' '}
+                cuando un comprador escribe después de la venta. {p.mensaje_min ? 'Si alguien le responde o lo lee antes, no te llega nada.' : 'Te llega cada mensaje apenas entra.'}
               </Fila>
             )}
             {d.negativa && (

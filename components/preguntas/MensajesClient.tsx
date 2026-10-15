@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
+import PedirCalificacion from '@/components/preguntas/PedirCalificacion'
 
 export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -32,7 +33,8 @@ function hace(fecha: string | null) {
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
 export default function MensajesClient({ pack: packPedido = null }: { pack?: string | null }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'rapidas' | 'recordatorios'>(packPedido ? 'todas' : 'sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios'>(packPedido ? 'todas' : 'sin_leer')
+  const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [conRecordatorios, setConRecordatorios] = useState(false)
   const [lista, setLista] = useState<Conversacion[] | null>(null)
@@ -54,13 +56,14 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
   }
 
   const cargar = useCallback(async () => {
-    const v = vista === 'rapidas' || vista === 'recordatorios' ? 'sin_leer' : vista
+    const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' ? 'sin_leer' : vista
     const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setLista(d.conversaciones); setPag(d.total != null ? { total: d.total, por: d.por_pagina } : null); setCont(d.sin_leer)
     setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
     setConRecordatorios(!!d.recordatorios)
+    setPedir(typeof d.pedir === 'number' ? d.pedir : undefined)
   }, [vista, pagina, q])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
@@ -92,10 +95,11 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
       <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null); setPagina(1) }} items={[
         { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
         { value: 'todas', label: 'Atendidas' },
+        { value: 'pedir', label: 'Pedir calificación', count: pedir },
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
       ]} />
-      {vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'rapidas' ? (
+      {vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo

@@ -71,7 +71,12 @@ export async function guardarOrden(db: Pool, conexionId: number, o: OrdenBusqued
      ON CONFLICT (empresa_id, id) DO UPDATE SET items = EXCLUDED.items, detalle = EXCLUDED.detalle,
        estado = EXCLUDED.estado, comprador_nombre = COALESCE(EXCLUDED.comprador_nombre, ml_ordenes.comprador_nombre),
        -- 'cerrada_ml': ML ya no deja calificarla (la marca calificar/route.ts); la sync no la revive.
-       cal_vendedor = COALESCE(EXCLUDED.cal_vendedor, CASE WHEN ml_ordenes.cal_vendedor = 'cerrada_ml' THEN 'cerrada_ml' END), cal_concretada = EXCLUDED.cal_concretada,
+       -- La búsqueda casi siempre trae solo "calificada" (sin tipo ni concretada): no pisa lo que ya se
+       -- sabe con detalle (al calificar desde el sistema o leído de /orders/{id}/feedback). 2026-10-15.
+       cal_vendedor = CASE WHEN EXCLUDED.cal_vendedor = 'calificada' AND ml_ordenes.cal_vendedor IN ('positive', 'neutral', 'negative', 'sin_detalle')
+                           THEN ml_ordenes.cal_vendedor
+                           ELSE COALESCE(EXCLUDED.cal_vendedor, CASE WHEN ml_ordenes.cal_vendedor = 'cerrada_ml' THEN 'cerrada_ml' END) END,
+       cal_concretada = COALESCE(EXCLUDED.cal_concretada, CASE WHEN EXCLUDED.cal_vendedor IS NOT NULL THEN ml_ordenes.cal_concretada END),
        cal_comprador = EXCLUDED.cal_comprador, actualizada_at = NOW()`,
     [o.id, conexionId, o.pack_id, o.date_created, o.buyer?.nickname ?? null,
      o.order_items.map(i => `${i.quantity} × ${i.item.title}`).join(' · '),
