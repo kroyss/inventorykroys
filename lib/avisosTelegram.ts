@@ -14,7 +14,7 @@ import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { puede, type Permiso } from '@/lib/permisos'
 import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
-import { contarAlertas, sqlCaliente, SQL_VENDIDA, umbralStock, DIAS_VENDIDAS } from '@/lib/alertasStock'
+import { sqlCaliente, SQL_VENDIDA, umbralStock, DIAS_VENDIDAS } from '@/lib/alertasStock'
 import { ventasDesdeML } from '@/lib/modulos'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import {
@@ -32,6 +32,7 @@ export interface PrefsAvisos {
   negativa: boolean; neutral: boolean
   contradictoria: boolean
   agotada: boolean; bajo: boolean
+  cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
   silencio: boolean; silencio_desde: number; silencio_hasta: number
 }
@@ -43,6 +44,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   negativa: true, neutral: false,
   contradictoria: true,
   agotada: true, bajo: false,
+  cierre: false, cierre_hora: 18,
   resumen: true, resumen_hora: 8,
   silencio: true, silencio_desde: 22, silencio_hasta: 7,
 }
@@ -348,6 +350,19 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     const html = await resumenDiario(db, e, d, disp, cab, hora)
     if (await mandar(d, e, 'resumen', [h.hoy], html, [[{ texto: 'Abrir el sistema', url: urlSistema('/automatizaciones') }]])) enviados++
   }
+
+  // Cierre del día (opcional, 2026-10-15): una vez por día a la hora elegida, SOLO lo que quedó pendiente.
+  // Si no queda nada, no se manda (pero se da por hecho el día, para no volver a mirar).
+  if (p.cierre && !silencio && hora >= p.cierre_hora && hora < p.cierre_hora + 3) {
+    const { rows: [h] } = await db.query(`SELECT CURRENT_DATE::text AS hoy`)
+    if ((await pendientes(d, e, 'cierre', [h.hoy])).size) {
+      const pend = await pendienteAhora(db, e, d, disp)
+      if (!pend.length) await reservar(d.user_id, e.id, 'cierre', [h.hoy])
+      else if (await mandar(d, e, 'cierre', [h.hoy],
+        `${cab}🌙 <b>Cierre del día, ${esc(d.nombre.split(/\s+/)[0])}.</b> Quedó pendiente:\n\n${pend.join('\n')}`,
+        [[{ texto: 'Abrir el sistema', url: urlSistema('/automatizaciones') }]])) enviados++
+    }
+  }
   return enviados
 }
 
@@ -404,7 +419,16 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
   if (s.recordatorios) solo.push(`🔔 Mandó ${n(s.recordatorios)} recordatorio${s.recordatorios === 1 ? '' : 's'} de pago`)
   if (solo.length) lineas.push('', '<b>Lo que hizo el sistema por ti</b>', ...solo)
 
-  // Pendiente ahora.
+  const pend = await pendienteAhora(db, e, d, disp)
+  lineas.push('', '<b>Pendiente hoy</b>', ...(pend.length ? pend : ['Nada pendiente. Todo al día 👌']))
+
+  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+  return `${cab}☀️ <b>${saludo}, ${esc(d.nombre.split(/\s+/)[0])}.</b> Tu resumen:\n\n${lineas.join('\n')}`
+}
+
+/** Lo que queda pendiente AHORA (resumen de la mañana y cierre del día), según sus permisos. Las agotadas
+ *  van con nombre (2026-10-15): las que más venden primero, hasta 8. */
+async function pendienteAhora(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: ReturnType<typeof avisosDisponibles>) {
   const pend: string[] = []
   const { rows: [c] } = await db.query(
     `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS preguntas,
@@ -422,14 +446,22 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
        WHERE sugerencia <> 'esperar' AND ${sqlLista(plc.esperaDias)}`, [plc.noConcretada.dias])
     if (k.n) pend.push(`⭐ ${n(k.n)} venta${k.n === 1 ? '' : 's'} por calificar`)
   }
-  if (e.modulos.includes('alertas_stock') && puede({ role: d.role, permisos: d.permisos ?? undefined }, 'ver_stock')) {
-    const a = await contarAlertas(db)
-    if (a.agotadas) pend.push(`📦 ${n(a.agotadas)} publicaci${a.agotadas === 1 ? 'ón' : 'ones'} o variante${a.agotadas === 1 ? '' : 's'} agotada${a.agotadas === 1 ? '' : 's'}`)
+  if (disp.stock) {
+    // Las mismas que cuenta la pantalla Stock → Agotadas (lib/alertasStock.ts → contarAlertas).
+    const { rows: ag } = await db.query(
+      `SELECT a.titulo, a.variante, x.nickname AS cuenta,
+              (SELECT COUNT(*) FROM ml_ordenes o WHERE o.fecha > NOW() - INTERVAL '${DIAS_VENDIDAS} days'
+                AND (CASE WHEN a.variante_id = 0 THEN a.item_id ELSE a.item_id || ':' || a.variante_id END) = ANY(o.items))::int AS ventas
+       FROM ml_stock_alertas a JOIN ml_conexiones x ON x.id = a.conexion_id
+       WHERE a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')} AND a.actualizado_at > NOW() - INTERVAL '1 day' AND ${SQL_VENDIDA}
+       ORDER BY 4 DESC, a.titulo`)
+    if (ag.length) {
+      pend.push(`📦 <b>Agotadas (${n(ag.length)}):</b>`, ...ag.slice(0, 8).map(r =>
+        `   • ${esc(corto(r.titulo, 55))}${r.variante ? ` · ${esc(r.variante)}` : ''} · ${esc(r.cuenta)} · ${r.ventas} vendida${r.ventas === 1 ? '' : 's'}`),
+        ...(ag.length > 8 ? [`   … y ${ag.length - 8} más`] : []))
+    }
   }
-  lineas.push('', '<b>Pendiente hoy</b>', ...(pend.length ? pend : ['Nada pendiente. Todo al día 👌']))
-
-  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
-  return `${cab}☀️ <b>${saludo}, ${esc(d.nombre.split(/\s+/)[0])}.</b> Tu resumen:\n\n${lineas.join('\n')}`
+  return pend
 }
 
 /** Lo llama el cron de preguntas cada minuto: conecta a quien tocó "Iniciar" y manda los avisos. */
