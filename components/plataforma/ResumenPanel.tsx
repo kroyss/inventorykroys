@@ -13,7 +13,7 @@ interface Alumno { empresas: string; completados: number; en_linea: boolean; vie
 interface EnLinea { id: number; nombre: string; empresas: string | null; ultima_actividad: string; usando: boolean }
 interface Video { activo: boolean; serie: string }
 interface Datos { uso: Uso[]; alumnos: Alumno[]; enLinea: EnLinea[]; videos: Video[] }
-type Vista = 'empresas' | 'fundadores' | 'aprendizaje'
+type Vista = 'clientes' | 'fundadores' | 'aprendizaje'
 
 const DIA = 864e5
 const hoyCaracas = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
@@ -62,14 +62,14 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
   for (const u of datos.uso) {
     const restan = u.prueba_hasta ? dias(hoy, u.prueba_hasta) : null
     if (u.estado === 'prueba' && restan != null && restan < 0) {
-      avisos.push({ nivel: 2, texto: `${u.nombre}: la prueba venció el ${ddmm(u.prueba_hasta!)}. ¿Sigue o se cierra?`, ir: 'empresas', boton: 'Ver empresa' })
+      avisos.push({ nivel: 2, texto: `${u.nombre}: la prueba venció el ${ddmm(u.prueba_hasta!)}. ¿Sigue o se cierra?`, ir: 'clientes', boton: 'Ver cliente' })
     } else if (u.estado === 'prueba' && restan != null && restan <= 3) {
-      avisos.push({ nivel: 2, texto: `${u.nombre}: la prueba vence ${restan === 0 ? 'hoy' : `en ${restan} día${restan === 1 ? '' : 's'}`} (${ddmm(u.prueba_hasta!)}).`, ir: 'empresas', boton: 'Ver empresa' })
+      avisos.push({ nivel: 2, texto: `${u.nombre}: la prueba vence ${restan === 0 ? 'hoy' : `en ${restan} día${restan === 1 ? '' : 's'}`} (${ddmm(u.prueba_hasta!)}).`, ir: 'clientes', boton: 'Ver cliente' })
     }
     if (!u.conectada_at) {
-      avisos.push({ nivel: 1, texto: `${u.nombre}: todavía no conectó MercadoLibre${u.ingreso ? ` (entró ${hace(u.ingreso)})` : ' y nunca entró al sistema'}.`, ir: 'aprendizaje', boton: 'Ver avance' })
+      avisos.push({ nivel: 1, texto: `${u.nombre}: todavía no conectó MercadoLibre${u.ingreso ? ` (entró ${hace(u.ingreso)})` : ' y nunca entró al sistema'}.`, ir: 'clientes', boton: 'Ver cliente' })
     } else if (usos7(u) === 0) {
-      avisos.push({ nivel: 1, texto: `${u.nombre}: conectó MercadoLibre pero no usó las herramientas en 7 días (último uso: ${hace(u.ultima_actividad)}).`, ir: 'aprendizaje', boton: 'Ver uso' })
+      avisos.push({ nivel: 1, texto: `${u.nombre}: conectó MercadoLibre pero no usó las herramientas en 7 días (último uso: ${hace(u.ultima_actividad)}).`, ir: 'clientes', boton: 'Ver uso' })
     }
   }
   if (porRevisar > 0) {

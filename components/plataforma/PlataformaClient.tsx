@@ -63,7 +63,10 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [nueva, setNueva]       = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
-  const [vista, setVista]       = useState<'resumen' | 'uso' | 'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('resumen')
+  // 5 pestañas (2026-10-15, antes 7): Hoy · Clientes (empresas + su uso, ficha al tocar) · Fundadores ·
+  // Aprendizaje (solo el curso) · Interno (IA, Telegram, cuentas de personas).
+  const [vista, setVista]       = useState<'hoy' | 'clientes' | 'fundadores' | 'aprendizaje' | 'interno'>('hoy')
+  const [interno, setInterno]   = useState<'ia' | 'personas'>('ia')
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
@@ -120,23 +123,33 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     <div className="space-y-4">
       <PageHeader
         title="Plataforma"
-        subtitle="Empresas, módulos y cuentas de El Comerciante Digital. Solo lo ves tú."
-        actions={vista === 'empresas'
+        subtitle="Tus clientes, cómo usan el sistema y lo interno de El Comerciante Digital. Solo lo ves tú."
+        actions={vista === 'clientes'
           ? <button onClick={() => { setNueva(true); setError(null) }} className="btn-primary text-sm">+ Nueva empresa</button>
           : undefined}
       />
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {(['resumen', 'uso', 'empresas', 'cuentas', 'fundadores', 'aprendizaje', 'interno'] as const).map(v => (
+        {([['hoy', 'Hoy'], ['clientes', `Clientes${empresas.length ? ` (${empresas.filter(e => e.is_active).length})` : ''}`], ['fundadores', 'Fundadores'],
+           ['aprendizaje', 'Aprendizaje'], ['interno', 'Interno']] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
-            {v === 'resumen' ? 'Resumen' : v === 'uso' ? 'Uso' : v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : v === 'aprendizaje' ? 'Aprendizaje' : 'Interno'}
+            {t}
           </button>
         ))}
       </div>
 
-      {vista === 'resumen' ? <ResumenPanel onIr={setVista} /> : vista === 'uso' ? <AdopcionPanel /> : vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'interno' ? <InternoPanel /> : vista === 'aprendizaje' ? <AprendizajePanel /> : <>
+      {vista === 'hoy' ? <ResumenPanel onIr={setVista} /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'aprendizaje' ? <AprendizajePanel />
+        : vista === 'interno' ? <>
+          <div className="flex gap-1.5">
+            {([['ia', 'Consumo de IA y avisos'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
+              <button key={k} onClick={() => setInterno(k)}
+                className={`px-3 py-1 rounded-full text-sm border ${interno === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
+            ))}
+          </div>
+          {interno === 'ia' ? <InternoPanel /> : <CuentasPanel />}
+        </> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
@@ -166,51 +179,20 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
           className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-64" />
       </div>
 
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-xs text-neutral-500">
-            <tr>
-              <th className="px-4 py-2 text-left">Empresa</th>
-              <th className="px-4 py-2 text-left">Cuenta</th>
-              <th className="px-4 py-2 text-left hidden md:table-cell">Admins</th>
-              <th className="px-4 py-2 text-right hidden sm:table-cell">Módulos</th>
-              <th className="px-4 py-2 text-left">Estado</th>
-              <th className="px-2 py-2 w-6" />
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-400">Ninguna empresa con ese filtro.</td></tr>
-            )}
-            {visibles.map(e => {
-              const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
-              return (
-                <tr key={e.id} onClick={() => { setError(null); setAviso(null); setAbierta(e.id) }}
-                  className={`border-t border-neutral-100 cursor-pointer hover:bg-neutral-50 ${abierta === e.id ? 'bg-lime-50/60' : ''} ${!e.is_active ? 'opacity-50' : ''}`}>
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium text-neutral-900">{e.nombre}</div>
-                    <div className="text-xs text-neutral-400">
-                      {e.country}{e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}{e.fundador ? ' · Fundador' : ''}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${TONO_ESTADO[est]}`}>{ETIQUETA_ESTADO[est]}</span>
-                    {est === 'prueba' && e.prueba_hasta && (
-                      <div className="text-xs text-neutral-400 mt-0.5">hasta {e.prueba_hasta.slice(8, 10)}/{e.prueba_hasta.slice(5, 7)}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-xs hidden md:table-cell">{e.admins ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-right text-xs text-neutral-500 hidden sm:table-cell">{e.modulos.length}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`text-xs ${e.is_active ? 'text-green-700' : 'text-neutral-500'}`}>{e.is_active ? 'Activa' : 'Desactivada'}</span>
-                  </td>
-                  <td className="px-2 py-2.5 text-neutral-300">›</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* Una sola lista (2026-10-15): cada empresa con su estado de cuenta y su uso del sistema; la ficha
+          (módulos, IA, acciones) se abre al tocarla, como antes. */}
+      <AdopcionPanel abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
+        base={visibles.map(e => {
+          const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
+          return {
+            id: e.id, nombre: e.nombre, activa: e.is_active,
+            detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.fundador ? ' · Fundador' : ''}${e.admins ? ` · ${e.admins}` : ''}`,
+            cuenta: <>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${TONO_ESTADO[est]}`}>{ETIQUETA_ESTADO[est]}</span>
+              {est === 'prueba' && e.prueba_hasta && <div className="text-[11px] text-neutral-400 mt-0.5">hasta {e.prueba_hasta.slice(8, 10)}/{e.prueba_hasta.slice(5, 7)}</div>}
+            </>,
+          }
+        })} />
 
       {/* Panel lateral con todo el detalle de la empresa */}
       {sel && (

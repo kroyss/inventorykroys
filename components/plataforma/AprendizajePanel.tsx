@@ -11,21 +11,15 @@ interface Alumno {
 }
 interface EnLinea { id: number; nombre: string; username: string; ultima_actividad: string; empresas: string | null; usando: boolean; ultimo_uso: string | null }
 const PUNTO_VERDE = <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 align-middle" title="En línea ahora" />
-const haceMin = (f: string) => { const m = Math.max(0, Math.round((Date.now() - new Date(f).getTime()) / 60000)); return m === 0 ? 'ahora' : `hace ${m} min` }
 
+// El uso de cada cliente y "En línea" se movieron a Plataforma → Clientes y → Hoy (2026-10-15); la API
+// todavía los manda (los lee Hoy).
 interface Uso {
   id: number; nombre: string; estado: string; fundador: boolean; prueba_dias: number | null; prueba_hasta: string | null
   cuentas: string | null; conectada_at: string | null; ultima_actividad: string | null; ingreso: string | null; en_linea: boolean
   preguntas: number; preguntas_7d: number; mensajes: number; mensajes_7d: number; etiquetas: number; etiquetas_7d: number
   reportadas: number; reportadas_7d: number; calificadas: number; calificadas_7d: number; stock: number; stock_7d: number
 }
-// Columnas de uso: [campo total, campo de los últimos 7 días, título]
-const USOS: [keyof Uso, keyof Uso, string][] = [
-  ['preguntas', 'preguntas_7d', 'Preguntas'], ['mensajes', 'mensajes_7d', 'Mensajes'], ['etiquetas', 'etiquetas_7d', 'Etiquetas'],
-  ['reportadas', 'reportadas_7d', 'Reportadas'], ['calificadas', 'calificadas_7d', 'Calificadas'], ['stock', 'stock_7d', 'Stock'],
-]
-const fechaHora = (f: string) => new Date(f).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
 
 const SERIES: Record<Serie, { nombre: string; quien: string }> = {
   automatizaciones: { nombre: 'Automatizaciones', quien: 'todas las empresas' },
@@ -89,7 +83,7 @@ export default function AprendizajePanel() {
   return (
     <div className="space-y-6">
       <div className="flex gap-1.5">
-        {([['clientes', 'Clientes'], ['videos', `Curso (${activos} videos)`]] as const).map(([k, t]) => (
+        {([['clientes', 'Avance en los cursos'], ['videos', `Curso (${activos} videos)`]] as const).map(([k, t]) => (
           <button key={k} onClick={() => setSub(k)}
             className={`px-3 py-1 rounded-full text-sm border ${sub === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
         ))}
@@ -212,40 +206,8 @@ export default function AprendizajePanel() {
       </>}
 
       {sub === 'clientes' && <>
-      {/* En línea = hizo algo en los últimos minutos; Abierto = solo tiene la pestaña abierta (migración 092). */}
-      {(() => {
-        const usando = datos.enLinea.filter(u => u.usando)
-        const abiertos = datos.enLinea.filter(u => !u.usando)
-        return (
-          <section className={`rounded-xl border p-4 ${usando.length ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
-            <h2 className="text-sm font-semibold text-neutral-900">
-              {usando.length ? <>{PUNTO_VERDE}En línea ahora ({usando.length})</> : 'En línea ahora'}
-            </h2>
-            {usando.length ? (
-              <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                {usando.map(u => (
-                  <li key={u.id}>
-                    <b className="text-neutral-900">{u.nombre}</b>
-                    <span className="text-neutral-500"> · {u.empresas ?? u.username} · {haceMin(u.ultimo_uso ?? u.ultima_actividad)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-sm text-neutral-500">Nadie usando el sistema en los últimos {datos.enLineaMinutos} minutos: buen momento para actualizar.</p>
-            )}
-            {abiertos.length > 0 && (
-              <p className="mt-2 text-xs text-neutral-500">
-                <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-neutral-300 align-middle" />
-                <b className="font-medium text-neutral-600">Abierto, sin usar ({abiertos.length}):</b>{' '}
-                {abiertos.map(u => u.nombre).join(', ')} · tienen la pestaña abierta pero no tocaron nada.
-              </p>
-            )}
-          </section>
-        )
-      })()}
-
       <section className="space-y-2">
-        <h2 className="text-base font-semibold text-neutral-900">Avance de los clientes</h2>
+        <h2 className="text-base font-semibold text-neutral-900">Avance en los cursos</h2>
         {datos.alumnos.length === 0 ? (
           <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-6 text-center">Todavía no hay usuarios de empresas clientes.</p>
         ) : (
@@ -292,73 +254,6 @@ export default function AprendizajePanel() {
         )}
       </section>
 
-      <section className="space-y-2">
-        <div>
-          <h2 className="text-base font-semibold text-neutral-900">Uso de cada cliente</h2>
-          <p className="text-sm text-neutral-500">
-            Lo que hicieron <b>desde el sistema</b>: preguntas respondidas, mensajes enviados, etiquetas impresas, guías reportadas,
-            ventas calificadas y stock cambiado en MercadoLibre. El número chico es lo de los últimos 7 días.
-          </p>
-        </div>
-        {datos.uso.length === 0 ? (
-          <p className="text-sm text-neutral-400 bg-white rounded-xl border border-neutral-200 p-6 text-center">Todavía no hay empresas clientes.</p>
-        ) : (
-          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-neutral-50 text-xs text-neutral-500">
-                <tr>
-                  <th className="px-4 py-2 text-left">Empresa</th>
-                  <th className="px-4 py-2 text-left">MercadoLibre</th>
-                  {USOS.map(([k, , t]) => <th key={k} className="px-3 py-2 text-right">{t}</th>)}
-                  <th className="px-4 py-2 text-left">Último ingreso</th>
-                  <th className="px-4 py-2 text-left" title="Última vez que respondió, mandó, imprimió, reportó, calificó o cambió stock">Último uso de herramientas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {datos.uso.map(u => {
-                  const esperando = u.prueba_dias != null
-                  return (
-                    <tr key={u.id} className="border-t border-neutral-100 align-top">
-                      <td className="px-4 py-2">
-                        <div className="font-medium">{u.nombre}</div>
-                        <div className="text-xs text-neutral-400">{u.fundador ? 'Fundador' : u.estado === 'prueba' ? 'Prueba' : u.estado}</div>
-                      </td>
-                      <td className="px-4 py-2 min-w-[11rem]">
-                        {u.cuentas ? (
-                          <>
-                            <div className="text-emerald-700 font-medium">✓ {u.cuentas}</div>
-                            <div className="text-xs text-neutral-500">
-                              desde {u.conectada_at ? fechaHora(u.conectada_at) : '—'}
-                              {u.estado === 'prueba' && u.prueba_hasta && <> · prueba hasta {ddmm(u.prueba_hasta)}</>}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="text-amber-700 font-medium">Sin conectar</div>
-                            {esperando && u.prueba_hasta && <div className="text-xs text-neutral-500">sus días corren solos desde el {ddmm(
-                              new Date(new Date(`${u.prueba_hasta}T12:00:00Z`).getTime() - u.prueba_dias! * 86400000).toISOString().slice(0, 10))}</div>}
-                          </>
-                        )}
-                      </td>
-                      {USOS.map(([k, k7]) => {
-                        const total = u[k] as number, semana = u[k7] as number
-                        return (
-                          <td key={k} className="px-3 py-2 text-right num">
-                            <span className={total ? 'text-neutral-900 font-medium' : 'text-neutral-300'}>{total}</span>
-                            {semana > 0 && <div className="text-[11px] text-lime-700">+{semana} en 7 d</div>}
-                          </td>
-                        )
-                      })}
-                      <td className="px-4 py-2 text-xs text-neutral-500">{u.en_linea ? <span className="text-emerald-700 font-medium">{PUNTO_VERDE}en línea</span> : u.ingreso ? fechaHora(u.ingreso) : 'nunca'}</td>
-                      <td className="px-4 py-2 text-xs text-neutral-500">{u.ultima_actividad ? fechaHora(u.ultima_actividad) : 'todavía no'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
       </>}
     </div>
   )
