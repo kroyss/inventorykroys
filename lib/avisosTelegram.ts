@@ -14,7 +14,7 @@ import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { puede, type Permiso } from '@/lib/permisos'
 import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
-import { contarAlertas } from '@/lib/alertasStock'
+import { contarAlertas, sqlCaliente, SQL_VENDIDA, umbralStock, DIAS_VENDIDAS } from '@/lib/alertasStock'
 import { ventasDesdeML } from '@/lib/modulos'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import {
@@ -31,6 +31,7 @@ export interface PrefsAvisos {
   mensaje: boolean; mensaje_min: number
   negativa: boolean; neutral: boolean
   contradictoria: boolean
+  agotada: boolean; bajo: boolean
   resumen: boolean; resumen_hora: number
   silencio: boolean; silencio_desde: number; silencio_hasta: number
 }
@@ -41,6 +42,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   mensaje: true, mensaje_min: 60,
   negativa: true, neutral: false,
   contradictoria: true,
+  agotada: true, bajo: false,
   resumen: true, resumen_hora: 8,
   silencio: true, silencio_desde: 22, silencio_hasta: 7,
 }
@@ -65,6 +67,7 @@ export function avisosDisponibles(u: { role: UserRole; permisos: string[] | null
     pregunta: ve('ver_preguntas'),
     mensaje: ve('ver_mensajes'),
     negativa: ve('ver_calificaciones'),
+    stock: u.modulos.includes('alertas_stock') && puede(user, 'ver_stock'),
     resumen: true,
   }
 }
@@ -276,6 +279,41 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
         + (r.cal_recibida_msg ? `\n💬 <i>“${esc(corto(r.cal_recibida_msg, 400))}”</i>\n` : '')
         + '\nPuedes responderla en ML para que los próximos compradores vean tu versión.',
         [[{ texto: 'Ver en Reputación', url: urlSistema('/reputacion') }]])) enviados++
+    }
+  }
+
+  // Stock (2026-10-15): publicación o variante QUE VENDE (últimos DIAS_VENDIDAS días) que se agotó, y si lo pidió,
+  // que bajó del límite "por agotarse". Una vez por cada vez que se agota (la ref lleva desde cuándo); las que
+  // marcaron "No hay, quitar" no avisan (sqlCaliente). El stock se revisa en ML cada 2 h (lib/alertasStock.ts).
+  if ((p.agotada || p.bajo) && disp.stock && !silencio) {
+    const umbral = await umbralStock(db)
+    const vendidas = `(SELECT COUNT(*) FROM ml_ordenes o WHERE o.fecha > NOW() - INTERVAL '${DIAS_VENDIDAS} days'
+                       AND (CASE WHEN a.variante_id = 0 THEN a.item_id ELSE a.item_id || ':' || a.variante_id END) = ANY(o.items))::int`
+    const tipos: { tipo: 'agotada' | 'bajo'; desde: 'a.agotada_desde' | 'a.bajo_desde'; donde: string }[] = [
+      ...(p.agotada ? [{ tipo: 'agotada' as const, desde: 'a.agotada_desde' as const, donde: 'a.disponible <= 0' }] : []),
+      ...(p.bajo ? [{ tipo: 'bajo' as const, desde: 'a.bajo_desde' as const, donde: `a.disponible > 0 AND a.disponible < ${umbral}` }] : []),
+    ]
+    for (const t of tipos) {
+      const { rows } = await db.query(
+        `SELECT a.item_id || ':' || a.variante_id || ':' || extract(epoch FROM ${t.desde})::bigint AS ref,
+                a.titulo, a.variante, a.disponible, a.estado, x.nickname AS cuenta, ${vendidas} AS ventas
+         FROM ml_stock_alertas a JOIN ml_conexiones x ON x.id = a.conexion_id
+         WHERE ${t.donde} AND ${sqlCaliente(t.desde)} AND ${t.desde} > GREATEST(NOW() - INTERVAL '1 day', $1::timestamptz)
+           AND ${SQL_VENDIDA}
+         ORDER BY ${vendidas} DESC LIMIT 30`, [d.vinculado_at])
+      const nuevas = await pendientes(d, e, t.tipo, rows.map(r => r.ref))
+      const lista = rows.filter(r => nuevas.has(r.ref))
+      if (!lista.length) continue
+      const linea = (r: typeof lista[number]) => `${esc(corto(r.titulo, 70))}${r.variante ? ` · <b>${esc(r.variante)}</b>` : ''}`
+      const agot = t.tipo === 'agotada'
+      const html = lista.length === 1
+        ? `${cab}📦 <b>${agot ? 'Se agotó' : `Por agotarse: quedan ${lista[0].disponible}`}</b> · ${esc(lista[0].cuenta)}\n${linea(lista[0])}\n`
+          + `Vendiste ${lista[0].ventas} en los últimos ${DIAS_VENDIDAS} días${agot && lista[0].estado === 'paused' ? ' · ML la pausó' : ''}`
+        : `${cab}📦 <b>${lista.length} ${agot ? 'publicaciones se agotaron' : 'publicaciones por agotarse'}</b>\n\n`
+          + lista.slice(0, 8).map(r => `• ${linea(r)} · ${esc(r.cuenta)}${agot ? '' : ` · quedan ${r.disponible}`} · ${r.ventas} vendidas`).join('\n')
+          + (lista.length > 8 ? `\n… y ${lista.length - 8} más` : '')
+      if (await mandar(d, e, t.tipo, lista.map(r => r.ref), html,
+        [[{ texto: 'Reponer en Stock', url: urlSistema('/alertas-stock') }]])) enviados++
     }
   }
 
