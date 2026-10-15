@@ -336,7 +336,7 @@ function DetallePago({ p, onCerrar, puedeMarcar, onMarcar }: {
 type ConversacionVenta = { conversacion: Conversacion; rapidas: MensajeRapido[]; puedeEscribir: boolean }
 
 /** `compacto` (2026-10-15): botón chico "Ver conversación" para listas (Mensajes → Pedir calificación). */
-export function LoQueSeHablo({ numero, compacto, className = '' }: { numero: string; compacto?: boolean; className?: string }) {
+export function LoQueSeHablo({ numero, compacto, className = '', etiqueta }: { numero: string; compacto?: boolean; className?: string; etiqueta?: ReactNode }) {
   const [abierto, setAbierto] = useState(false)
   const [conv, setConv] = useState<ConversacionVenta | string | undefined>(undefined)   // string = error; undefined = sin pedir
 
@@ -353,8 +353,9 @@ export function LoQueSeHablo({ numero, compacto, className = '' }: { numero: str
     <>
       {compacto ? (
         <button type="button" onClick={abrir} className={`btn-secondary !px-2.5 !py-1 text-xs ${className}`}
-          title="Ver lo que se habló con el comprador (mensajes, notas y preguntas) antes de escribirle">
-          💬 Ver conversación
+          title="Ver lo que se habló con el comprador (mensajes, notas y preguntas) antes de escribirle"
+          aria-label="Ver conversación">
+          {etiqueta ?? '💬 Ver conversación'}
         </button>
       ) : (
         <button type="button" onClick={abrir}
