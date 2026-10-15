@@ -410,6 +410,26 @@ export async function enviarAvisosTelegram() {
   return enviados ? { enviados } : null
 }
 
+/** "Mandar mi resumen ahora" (Mis avisos): el resumen de hoy de la empresa actual, sin esperar la hora
+ *  (no cuenta como el del día: el automático igual llega). */
+export async function resumenAhora(userId: number, empresaId: number) {
+  const { rows: [r] } = await dbGlobal().query(
+    `SELECT t.user_id, t.chat_id::text, COALESCE(u.full_name, u.username) AS nombre, ue.role, ue.permisos, ue.avisos,
+            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos
+     FROM telegram_usuarios t JOIN users u ON u.id = t.user_id
+     JOIN usuario_empresas ue ON ue.user_id = t.user_id AND ue.empresa_id = $2
+     JOIN empresas e ON e.id = ue.empresa_id
+     WHERE t.user_id = $1 AND t.chat_id IS NOT NULL AND t.entorno = $3`, [userId, empresaId, ENTORNO])
+  if (!r) return false
+  const e: EmpresaAvisos = { id: r.empresa_id, nombre: r.empresa, country: r.country, modulos: r.modulos }
+  await conEmpresa(e.id, e.country, async db => {
+    const { rows: [h] } = await db.query(`SELECT EXTRACT(HOUR FROM NOW())::int AS hora`)
+    const html = await resumenDiario(db, e, r, avisosDisponibles({ role: r.role, permisos: r.permisos, modulos: e.modulos }), '', h.hora)
+    await enviarTelegram(r.chat_id, html, [[{ texto: 'Abrir el sistema', url: urlSistema('/automatizaciones') }]])
+  })
+  return true
+}
+
 /** Aviso de prueba desde "Mis avisos" (así se ve uno de verdad). */
 export async function avisoDePrueba(chatId: string, nombre: string) {
   await enviarTelegram(chatId,

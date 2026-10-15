@@ -79,9 +79,9 @@ export default function MisAvisosClient() {
     await cargar(); setOcupado(false); setPrueba(null)
   }
 
-  const mandarPrueba = async () => {
+  const mandarPrueba = async (tipo: 'prueba' | 'resumen' = 'prueba') => {
     setPrueba('enviando')
-    const r = await fetch('/api/avisos-telegram/prueba', { method: 'POST' })
+    const r = await fetch('/api/avisos-telegram/prueba', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo }) })
     const d = await r.json().catch(() => ({}))
     setPrueba(r.ok ? 'ok' : d.error ?? 'No se pudo enviar')
     if (!r.ok) cargar()
@@ -141,7 +141,7 @@ export default function MisAvisosClient() {
                 )}
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button onClick={mandarPrueba} disabled={prueba === 'enviando'} className="btn-secondary text-sm flex-1 sm:flex-none">
+                <button onClick={() => mandarPrueba()} disabled={prueba === 'enviando'} className="btn-secondary text-sm flex-1 sm:flex-none">
                   {prueba === 'enviando' ? 'Enviando…' : 'Mandar aviso de prueba'}
                 </button>
                 <button onClick={desconectar} disabled={ocupado} className="btn-ghost text-sm text-neutral-500 hover:text-red-700 hover:bg-red-50">Desconectar</button>
@@ -239,6 +239,12 @@ export default function MisAvisosClient() {
               ejemplo={'☀️ Buenos días, Marcos. Tu resumen:\n\nAyer\n🛒 42 ventas en MercadoLibre\n❓ 61 preguntas, 59 respondidas · la mitad en menos de 18 min\n\nLo que hizo el sistema por ti\n✅ Calificó 31 ventas concretadas\n\nPendiente hoy\n⭐ 8 ventas por calificar\n📦 2 variantes agotadas'}>
               Todos los días a las <Selector valor={p.resumen_hora} opciones={HORAS.filter(h => h >= 5 && h <= 21)} texto={horaTxt} onCambio={v => cambiar({ resumen_hora: v })} disabled={!p.resumen} />:
               cómo te fue ayer, lo que hizo el sistema solo y lo que queda pendiente.
+              {e.conectado && (
+                <button type="button" onClick={() => mandarPrueba('resumen')} disabled={prueba === 'enviando'}
+                  className="block mt-1.5 text-xs text-sky-700 hover:underline underline-offset-2 disabled:opacity-50">
+                  Mandarme el resumen ahora
+                </button>
+              )}
             </Fila>
           </ul>
           {ocultos && (
