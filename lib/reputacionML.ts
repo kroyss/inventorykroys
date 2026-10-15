@@ -106,6 +106,9 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
     `SELECT id::text, cal_recibida, cal_cambio_estado, cal_cambio_resultado FROM ml_ordenes
      WHERE conexion_id = $1 AND (
        (cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - make_interval(days => $2))
+       -- Contradictorias sin nuestra calificación leída (para mostrarla y poder corregirla), una vez al día.
+       OR (cal_contradictoria AND cal_vendedor_msg IS NULL AND cal_recibida_at > NOW() - make_interval(days => $3)
+           AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - INTERVAL '24 hours'))
        -- Pedido de cambio sin resultado: se sigue mirando aunque la calificación pase los 30 días (2026-10-15).
        OR (cal_cambio_estado IS NOT NULL AND cal_cambio_resultado IS NULL AND cal_cambio_at > NOW() - INTERVAL '20 days'
            AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - make_interval(hours => $5)))

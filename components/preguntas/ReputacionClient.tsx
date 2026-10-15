@@ -178,7 +178,7 @@ function FilaCalificacion({ c, pais, onVista, onPedido, onCorregir, ocupado }: {
             <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-md bg-violet-50/60 px-2 py-1 text-xs text-neutral-600">
               <span className="font-medium text-violet-800">Tú lo calificaste:</span>
               <span className={c.mi_concretada === false ? 'font-medium text-violet-800' : ''}>
-                {c.mi_concretada === false ? 'No concretada' : c.mi_concretada ? 'Concretada' : 'sin dato'}
+                {c.mi_concretada === false ? 'No concretada' : c.mi_concretada ? 'Concretada' : 'leyéndola en MercadoLibre…'}
               </span>
               {c.mi_rating && NOMBRE_RATING[c.mi_rating] && (
                 <span className="inline-flex items-center gap-1">· <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_RATING[c.mi_rating]}`} />{NOMBRE_RATING[c.mi_rating]}</span>
