@@ -7,6 +7,7 @@ import FundadoresPanel from './FundadoresPanel'
 import InternoPanel from './InternoPanel'
 import AprendizajePanel from './AprendizajePanel'
 import ResumenPanel from './ResumenPanel'
+import AdopcionPanel from './AdopcionPanel'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 
 interface Empresa {
@@ -62,7 +63,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [nueva, setNueva]       = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [aviso, setAviso]       = useState<string | null>(null)
-  const [vista, setVista]       = useState<'resumen' | 'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('resumen')
+  const [vista, setVista]       = useState<'resumen' | 'uso' | 'empresas' | 'cuentas' | 'fundadores' | 'aprendizaje' | 'interno'>('resumen')
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
@@ -127,15 +128,15 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {(['resumen', 'empresas', 'cuentas', 'fundadores', 'aprendizaje', 'interno'] as const).map(v => (
+        {(['resumen', 'uso', 'empresas', 'cuentas', 'fundadores', 'aprendizaje', 'interno'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
-            {v === 'resumen' ? 'Resumen' : v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : v === 'aprendizaje' ? 'Aprendizaje' : 'Interno'}
+            {v === 'resumen' ? 'Resumen' : v === 'uso' ? 'Uso' : v === 'empresas' ? 'Empresas' : v === 'cuentas' ? 'Cuentas' : v === 'fundadores' ? 'Fundadores' : v === 'aprendizaje' ? 'Aprendizaje' : 'Interno'}
           </button>
         ))}
       </div>
 
-      {vista === 'resumen' ? <ResumenPanel onIr={setVista} /> : vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'interno' ? <InternoPanel /> : vista === 'aprendizaje' ? <AprendizajePanel /> : <>
+      {vista === 'resumen' ? <ResumenPanel onIr={setVista} /> : vista === 'uso' ? <AdopcionPanel /> : vista === 'cuentas' ? <CuentasPanel /> : vista === 'fundadores' ? <FundadoresPanel /> : vista === 'interno' ? <InternoPanel /> : vista === 'aprendizaje' ? <AprendizajePanel /> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
