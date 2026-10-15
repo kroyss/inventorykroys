@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
        WHERE id = $1`,
       [b.pedido, a.perfil, b.ok, b.cuenta ?? null, b.vistas, b.nuevas, b.error ?? null])
     // Nombre de la cuenta de MercadoEnvíos (093): la pantalla lo muestra en vez del nombre técnico del perfil.
-    if (b.cuenta) await a.db.query(`UPDATE me_latidos SET cuenta = $2 WHERE perfil = $1`, [a.perfil, b.cuenta])
+    if (b.cuenta) await a.db.query(
+      `INSERT INTO me_latidos (perfil, cuenta, visto_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (empresa_id, perfil) DO UPDATE SET cuenta = EXCLUDED.cuenta, visto_at = NOW()`, [a.perfil, b.cuenta])
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
