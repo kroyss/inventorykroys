@@ -47,7 +47,8 @@ export const config = {
   // la página interna de administración que sí requiere login), assets de
   // Next y CUALQUIER archivo estático (con extensión: logo.jpg, favicon*.png,
   // .ico, .webmanifest, etc.) para que el auth no los redirija. "fundadores$": la página
-  // pública del Programa Fundadores (solicitudes de vendedores sin cuenta).
+  // pública del Programa Fundadores (solicitudes de vendedores sin cuenta). "privacidad$" y "extension$":
+  // política de privacidad y link de la extensión de Chrome (públicas: las pide la Chrome Web Store).
   // /api pasa aparte solo por el candado de "Ver como" (no pide sesión: cada ruta la chequea).
-  matcher: ['/((?!login|fundadores$|api|tasa(?:/.*)?$|_next/static|_next/image|.*\\.).*)', '/api/:path*'],
+  matcher: ['/((?!login|fundadores$|privacidad$|extension$|api|tasa(?:/.*)?$|_next/static|_next/image|.*\\.).*)', '/api/:path*'],
 }

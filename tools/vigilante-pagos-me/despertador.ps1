@@ -72,15 +72,25 @@ function DetectarPerfiles {
     $carpetas = @($estado.profile.info_cache.PSObject.Properties.Name)
   } catch { }
   foreach ($c in $carpetas) {
-    foreach ($f in 'Secure Preferences', 'Preferences') {
-      $ruta = Join-Path (Join-Path $userData $c) $f
-      if (-not (Test-Path $ruta)) { continue }
-      $txt = Get-Content $ruta -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-      if ($txt -and ($txt.Contains('VigilantePagosME') -or $txt.Contains('vigilante-pagos-me'))) {
-        $res += [pscustomobject]@{ perfil = $null; carpeta = $c }
-        break
+    $hay = $false
+    # Instalada desde la Chrome Web Store: Extensions\<id>\<version>\manifest.json con nuestro nombre.
+    $exts = Join-Path (Join-Path $userData $c) 'Extensions'
+    if (Test-Path $exts) {
+      foreach ($m in Get-ChildItem $exts -Filter manifest.json -Recurse -Depth 2 -ErrorAction SilentlyContinue) {
+        $txt = Get-Content $m.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+        if ($txt -and $txt.Contains('Asistente de env') -and $txt.Contains('mercadoenvios.com.ve')) { $hay = $true; break }
       }
     }
+    # Cargada a mano ("Cargar descomprimida"): su carpeta aparece en las preferencias del perfil.
+    if (-not $hay) {
+      foreach ($f in 'Secure Preferences', 'Preferences') {
+        $ruta = Join-Path (Join-Path $userData $c) $f
+        if (-not (Test-Path $ruta)) { continue }
+        $txt = Get-Content $ruta -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+        if ($txt -and ($txt.Contains('VigilantePagosME') -or $txt.Contains('vigilante-pagos-me'))) { $hay = $true; break }
+      }
+    }
+    if ($hay) { $res += [pscustomobject]@{ perfil = $null; carpeta = $c } }
   }
   return $res
 }

@@ -10,7 +10,7 @@
 ; Todo queda en %APPDATA%\VigilantePagosME\despertador.json (y en el registro): instalar encima no lo borra.
 
 #define AppName    "Pagos MercadoEnvios"
-#define AppVersion "1.3.0"
+#define AppVersion "1.3.1"
 #define Publisher  "El Comerciante Digital"
 
 [Setup]
@@ -43,6 +43,7 @@ Source: "..\manifest.json"; DestDir: "{app}\extension"; Flags: ignoreversion
 Source: "..\background.js"; DestDir: "{app}\extension"; Flags: ignoreversion
 Source: "..\opciones.html"; DestDir: "{app}\extension"; Flags: ignoreversion
 Source: "..\opciones.js"; DestDir: "{app}\extension"; Flags: ignoreversion
+Source: "..\iconos\*.png"; DestDir: "{app}\extension\iconos"; Flags: ignoreversion
 
 [Icons]
 ; Mismo nombre que el acceso de la instalacion a mano (instalar-despertador.cmd): lo reemplaza.
@@ -58,10 +59,11 @@ Name: "{autoprograms}\{#AppName}\Carpeta de la extension de Chrome"; Filename: "
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\despertador.ps1"""; \
   Description: "Arrancar el programa ahora"; Flags: nowait postinstall runhidden 64bit; Check: IsWin64
-Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -Command ""Start-Process chrome -ArgumentList 'chrome://extensions'"""; \
-  Description: "Abrir Chrome en Extensiones (para agregar la extension)"; Flags: nowait postinstall runhidden; Check: SinPerfilesFijos
-Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension"; \
+; La pagina /extension lleva a la Chrome Web Store (o, mientras no este publicada, explica la carga a mano).
+Filename: "https://app.elcomerciantedigital.com/extension"; Description: "Agregar el Asistente de envios a Chrome"; \
   Flags: nowait postinstall shellexec; Check: SinPerfilesFijos
+Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension (carga a mano)"; \
+  Flags: nowait postinstall shellexec unchecked; Check: SinPerfilesFijos
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Get-CimInstance Win32_Process | Where-Object {{ $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*despertador.ps1*' } | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }"""; \

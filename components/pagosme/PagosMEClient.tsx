@@ -157,6 +157,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           {isAdmin && (
             <span className="ml-auto flex flex-wrap items-center gap-3">
               <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
+              <a href="/extension" target="_blank" className="underline text-neutral-500 hover:text-neutral-800">Extensión de Chrome</a>
               <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
               {!datos?.desdeML && (
                 <button onClick={generarClave} className="underline text-neutral-400 hover:text-neutral-800" title="Para la instalación a mano (avanzado)">
@@ -446,8 +447,11 @@ function PrimerosPasos({ isAdmin, onConectar }: { isAdmin: boolean; onConectar: 
           <li className={paso}><span className={num}>1</span>
             <span><a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">Descarga el programa</a> en la PC donde imprimes las guías e instálalo (Siguiente → Instalar).</span></li>
           <li className={paso}><span className={num}>2</span>
-            <span><button onClick={onConectar} className="font-medium text-emerald-700 underline">Genera tu código</button> y escríbelo cuando el programa lo pida, y en la extensión de Chrome de cada cuenta.</span></li>
+            <span><button onClick={onConectar} className="font-medium text-emerald-700 underline">Genera tu código</button> y escríbelo cuando el programa lo pida.</span></li>
           <li className={paso}><span className={num}>3</span>
+            <span><a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">Agrega el Asistente de envíos</a> a Chrome
+              en cada cuenta donde abres MercadoEnvíos, y escribe el mismo código.</span></li>
+          <li className={paso}><span className={num}>4</span>
             <span>Listo: toca <b>Traer pagos y guías</b> y espera el aviso verde.</span></li>
         </ol>
       ) : (
@@ -471,7 +475,7 @@ function CodigoConexion({ codigo, vence, onCerrar }: { codigo: string; vence: st
         {copiado ? 'Copiado ✓' : 'Copiar'}
       </button>
       <p className="text-xs text-emerald-800 flex-1 min-w-[200px]">
-        Escríbelo en el programa al instalarlo y en la extensión de cada cuenta de Chrome. Vale hasta las {hasta}.
+        Escríbelo en el programa al instalarlo y en el Asistente de envíos de cada cuenta de Chrome. Vale hasta las {hasta}.
         Las PCs que ya estaban conectadas siguen funcionando.
       </p>
       <button onClick={onCerrar} className="text-emerald-700 text-xs">Cerrar ✕</button>
