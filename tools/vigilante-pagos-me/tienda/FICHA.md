@@ -89,7 +89,7 @@ Traer los pagos y las guías del portal de vendedor de MercadoEnvíos del propio
 - ☑ No uso ni transfiero datos de usuarios con fines no relacionados con el propósito único del elemento.
 - ☑ No uso ni transfiero datos de usuarios para determinar la solvencia crediticia ni para otorgar préstamos.
 
-**Política de privacidad:** https://app.elcomerciantedigital.com/privacidad
+**Política de privacidad:** https://app.elcomerciantedigital.com/extension/privacidad
 
 ---
 

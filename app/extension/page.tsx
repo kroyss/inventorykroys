@@ -19,7 +19,8 @@ export default function Extension() {
             (está en <code className="bg-neutral-100 px-1 rounded">%LOCALAPPDATA%\Programs\VigilantePagosME\extension</code>).</li>
           <li>Toca el ícono de la pieza de rompecabezas → <b>Asistente de envíos</b>, escribe tu código y toca <b>Conectar</b>.</li>
         </ol>
-        <p className="text-sm text-neutral-500">Tu contraseña nunca sale de tu PC: la extensión usa la sesión que ya tienes abierta.</p>
+        <p className="text-sm text-neutral-500">Tu contraseña nunca sale de tu PC: la extensión usa la sesión que ya tienes abierta.{' '}
+          <a href="/extension/privacidad" className="underline">Política de privacidad</a></p>
       </div>
     </main>
   )

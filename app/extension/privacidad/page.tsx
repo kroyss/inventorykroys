@@ -1,5 +1,6 @@
-// Política de privacidad (pública, sin sesión). La exige la Chrome Web Store para publicar la extensión
-// "Asistente de envíos" (tools/vigilante-pagos-me); sirve también para el sistema en general.
+// Política de privacidad: app.elcomerciantedigital.com/extension/privacidad (pública, sin sesión). La exige la
+// Chrome Web Store para publicar la extensión "Asistente de envíos" (tools/vigilante-pagos-me); todo lo de la
+// extensión vive bajo /extension. Cubre también el sistema en general.
 export const metadata = {
   title: 'Política de privacidad · El Comerciante Digital',
   description: 'Qué datos usa El Comerciante Digital y su Asistente de envíos para Chrome, para qué y cómo se protegen.',
