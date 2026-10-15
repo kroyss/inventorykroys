@@ -8,7 +8,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
-import { leerPlantillasCal, sqlBandeja, type PlantillasCalificacion } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion } from '@/lib/calificacionesML'
 import { registrarUso } from '@/lib/usoAcciones'
 
 export interface ResultadoCal { id: string; ok: boolean; detalle?: string; quitada?: boolean }
@@ -82,8 +82,8 @@ export async function calificarAutomatico(db: Pool, conInventario: boolean) {
   if (!rowCount) return null
   const { rows } = await db.query(
     `SELECT b.id FROM (${sqlBandeja(!conInventario)}) b
-     WHERE b.sugerencia = 'concretada' AND b.fecha::date <= CURRENT_DATE - $2::int
-     ORDER BY b.fecha LIMIT ${MAX_POR_DIA}`, [p.noConcretada.dias, p.esperaDias])
+     WHERE b.sugerencia = 'concretada' AND ${sqlLista(p.esperaDias)}
+     ORDER BY b.fecha LIMIT ${MAX_POR_DIA}`, [p.noConcretada.dias])
   const demo = await esDemo(db)
   let calificadas = 0, errores = 0, quitadas = 0
   for (const { id } of rows) {

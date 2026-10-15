@@ -149,16 +149,42 @@ export async function sincronizarOrdenes(db: Pool, conexionId: number, forzar = 
   return n
 }
 
-export type Sugerencia = 'concretada' | 'no_concretada' | 'esperar'
+// 'revisar' (2026-10-15): el sistema no puede saberlo y lo decide una persona (nunca se califica sola):
+//   - la guía se imprimió pero a los TOPE_DIAS de la compra nunca se reportó (¿salió o no?);
+//   - la empresa no usa Despachos y pasaron los días de "no concretada": la venta pudo despacharse por
+//     fuera (antes salía "no concretada" y se podía calificar mal a un comprador real).
+export type Sugerencia = 'concretada' | 'no_concretada' | 'esperar' | 'revisar'
+
+/** VENTA CONCRETADA (decisión del dueño, 2026-10-15): con Reportador, la que tiene la guía REPORTADA (salió
+ *  de verdad; impresa no alcanza: oficina cerrada, envío al día siguiente…) y los días de espera cuentan
+ *  DESDE EL REPORTE (columna `base`). Sin Reportador: la guía impresa y los días desde la compra. Tope: a
+ *  los TOPE_DIAS de la compra una reportada se califica aunque no cumplió la espera (el plazo de ML no espera)
+ *  y una impresa sin reportar pasa a 'revisar'. */
+export const TOPE_DIAS = 10
+const SQL_GUIA = `
+  LEFT JOIN LATERAL (
+    SELECT bool_or(e.impresa) AS impresa, max(e.reportado_at) AS reportada_at FROM despacho_etiquetas e
+    WHERE e.venta IN (o.id::text, o.pack_id::text)) g ON TRUE
+  CROSS JOIN (SELECT
+    COALESCE((SELECT 'reportador' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS con_reportador,
+    EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos) m`
+// La guía cuenta como despachada: impresa y, si la empresa tiene Reportador, también reportada.
+const GUIA_OK = `(g.impresa AND (NOT m.con_reportador OR g.reportada_at IS NOT NULL))`
+const BASE = `CASE WHEN m.con_reportador AND g.reportada_at IS NOT NULL THEN g.reportada_at ELSE o.fecha END AS base,
+         COALESCE(g.impresa, FALSE) AS guia_impresa, g.reportada_at, m.usa_despachos`
+const PAGO_ME = `EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')`
 
 /** SQL de la bandeja: ventas sin calificar + su estado en el sistema + sugerencia. */
 export const SQL_BANDEJA = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
-         x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada,
+         x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE},
          CASE
-           WHEN f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL') THEN 'concretada'
-           WHEN EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
-             THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
+           -- En el sistema (procesada/descargada o facturada) y, si lleva guía en Despachos, despachada.
+           WHEN (f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'))
+                AND (g.impresa IS NOT TRUE OR ${GUIA_OK}) THEN 'concretada'
+           WHEN (f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'))
+                AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
+           WHEN ${PAGO_ME} THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
            WHEN s.id IS NULL AND o.fecha < NOW() - make_interval(days => $1) THEN 'no_concretada'
            ELSE 'esperar'
          END AS sugerencia
@@ -167,28 +193,37 @@ export const SQL_BANDEJA = `
   -- LATERAL: busca la venta por índice orden a orden (un JOIN con IN comparaba contra todas las ventas).
   LEFT JOIN LATERAL (SELECT s.id, s.status FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text) LIMIT 1) s ON TRUE
   LEFT JOIN LATERAL (SELECT i.id FROM invoices i WHERE i.sale_id = s.id AND i.status <> 'ANULADA' LIMIT 1) f ON TRUE
+  ${SQL_GUIA}
   WHERE o.cal_vendedor IS NULL`
 
 /** La misma bandeja para la empresa sin inventario (todo desde MercadoLibre): no hay ventas
- *  cargadas, así que "en el sistema" = su etiqueta ya salió impresa en Despachos (DESPACHADA).
- *  Misma regla que con inventario: despachada → concretada; sin despachar a los N días (o
- *  cancelada en ML) → no concretada; antes → esperar. Cada una se puede cambiar antes de calificar. */
+ *  cargadas, así que "en el sistema" = su guía salió por Despachos (y se reportó, con Reportador).
+ *  Cancelada en ML → no concretada. Sin guía a los N días → no concretada si la empresa usa Despachos;
+ *  si no lo usa, 'revisar' (no se sabe). Cada una se puede cambiar antes de calificar. */
 export const SQL_BANDEJA_ML = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
-         x.nickname AS cuenta, CASE WHEN d.impresa THEN 'DESPACHADA' END AS sistema_estado, FALSE AS facturada,
+         x.nickname AS cuenta,
+         CASE WHEN g.reportada_at IS NOT NULL THEN 'REPORTADA' WHEN g.impresa THEN 'DESPACHADA' END AS sistema_estado,
+         FALSE AS facturada, ${BASE},
          CASE
-           WHEN d.impresa THEN 'concretada'
-           WHEN EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
-             THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
-           WHEN o.estado = 'cancelled' OR o.fecha < NOW() - make_interval(days => $1) THEN 'no_concretada'
+           WHEN ${GUIA_OK} THEN 'concretada'
+           WHEN g.impresa AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
+           WHEN g.impresa THEN 'esperar'                                                         -- impresa, falta reportarla
+           WHEN ${PAGO_ME} THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
+           WHEN o.estado = 'cancelled' THEN 'no_concretada'
+           WHEN o.fecha < NOW() - make_interval(days => $1) THEN CASE WHEN m.usa_despachos THEN 'no_concretada' ELSE 'revisar' END
            ELSE 'esperar'
          END AS sugerencia
   FROM ml_ordenes o
   JOIN ml_conexiones x ON x.id = o.conexion_id
-  LEFT JOIN LATERAL (
-    SELECT TRUE AS impresa FROM despacho_etiquetas e
-    WHERE e.impresa AND e.venta IN (o.id::text, o.pack_id::text) LIMIT 1
-  ) d ON TRUE
+  ${SQL_GUIA}
   WHERE o.cal_vendedor IS NULL`
 
 export const sqlBandeja = (desdeML: boolean) => desdeML ? SQL_BANDEJA_ML : SQL_BANDEJA
+
+/** ¿Ya se puede calificar? (sobre la bandeja `b`): pasaron los días de espera desde `base` (el reporte o la
+ *  compra) o el tope desde la compra. `listaEl` = el día en que pasa a calificable. */
+export const sqlLista = (esperaDias: number, b = 'b') =>
+  `(${b}.base::date <= CURRENT_DATE - ${esperaDias} OR ${b}.fecha::date <= CURRENT_DATE - ${TOPE_DIAS})`
+export const sqlListaEl = (esperaDias: number, b = 'b') =>
+  `to_char(LEAST(${b}.base::date + ${esperaDias}, ${b}.fecha::date + ${TOPE_DIAS}), 'YYYY-MM-DD')`

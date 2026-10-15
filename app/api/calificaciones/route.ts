@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
-import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja, sqlLista, sqlListaEl, TOPE_DIAS } from '@/lib/calificacionesML'
 import { ventasDesdeML } from '@/lib/modulos'
 
 // GET /api/calificaciones?vista=listas|proximas|esperando
@@ -20,11 +20,12 @@ export async function GET(req: NextRequest) {
     // Sin inventario: "en el sistema" = despachada (etiqueta impresa), ver SQL_BANDEJA_ML.
     const desdeML = ventasDesdeML(s.session.user)
     const SQL_BANDEJA = sqlBandeja(desdeML)
-    // en_espera: más nueva que los días de espera de la empresa (fecha del país de la empresa: la
-    // conexión tiene su TimeZone). Desde 2026-10-14 va aparte ("Próximas") y no cuenta en el aviso.
-    const espera = `(b.fecha::date > CURRENT_DATE - ${plantillas.esperaDias})`
+    // en_espera: todavía en los días de espera de la empresa, contados desde `base` (el reporte de la guía
+    // con Reportador; si no, la compra) con el tope de TOPE_DIAS (lib/calificacionesML.ts). Fecha del país
+    // (la conexión tiene su TimeZone). Desde 2026-10-14 va aparte ("Próximas") y no cuenta en el aviso.
+    const espera = `(NOT ${sqlLista(plantillas.esperaDias)})`
     const { rows } = await s.db.query(
-      `SELECT b.*, ${espera} AS en_espera, to_char(b.fecha::date + ${plantillas.esperaDias}, 'YYYY-MM-DD') AS lista_el
+      `SELECT b.*, ${espera} AS en_espera, ${sqlListaEl(plantillas.esperaDias)} AS lista_el
        FROM (${SQL_BANDEJA}) b
        WHERE ${vista === 'esperando' ? `sugerencia = 'esperar'` : vista === 'proximas' ? `sugerencia <> 'esperar' AND ${espera}` : `sugerencia <> 'esperar' AND NOT ${espera}`}
        -- La más vieja primero (2026-10-13): es la que menos plazo le queda para calificar en ML.
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
     const { rows: [n] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE sugerencia = 'concretada' AND NOT ${espera})::int AS concretadas,
               COUNT(*) FILTER (WHERE sugerencia = 'no_concretada' AND NOT ${espera})::int AS no_concretadas,
+              COUNT(*) FILTER (WHERE sugerencia = 'revisar' AND NOT ${espera})::int AS revisar,
               COUNT(*) FILTER (WHERE sugerencia <> 'esperar' AND ${espera})::int AS proximas,
               COUNT(*) FILTER (WHERE sugerencia = 'esperar')::int AS esperando
        FROM (${SQL_BANDEJA}) b`, [dias])
@@ -40,7 +42,12 @@ export async function GET(req: NextRequest) {
     try { autoUltimo = ua ? JSON.parse(ua.value) : null } catch { /* ignorado */ }
     const { rows: cuentas } = await s.db.query(
       `SELECT nickname, ordenes_sync_at FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
-    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML, autoUltimo })
+    // Cómo decide "concretada" esta empresa (para el aviso de la pantalla).
+    const { rows: [modo] } = await s.db.query(
+      `SELECT COALESCE((SELECT 'reportador' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS con_reportador,
+              EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos`)
+    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML, autoUltimo,
+      conReportador: !!modo?.con_reportador, usaDespachos: !!modo?.usa_despachos, topeDias: TOPE_DIAS })
   } catch (err) {
     return apiError(err)
   }

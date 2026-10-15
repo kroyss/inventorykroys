@@ -3,7 +3,7 @@ import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
-import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
 import { contarAlertas } from '@/lib/alertasStock'
 import { SQL_AVISO_REPUTACION } from '@/lib/reputacionML'
 import { puede } from '@/lib/permisos'
@@ -36,7 +36,7 @@ export async function GET() {
         const plc = leerPlantillasCal(pl?.value)
         const { rows: [c] } = await db.query(
           `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(ventasDesdeML(u))}) b
-           WHERE sugerencia <> 'esperar' AND b.fecha::date <= CURRENT_DATE - ${plc.esperaDias}`,
+           WHERE sugerencia <> 'esperar' AND ${sqlLista(plc.esperaDias)}`,
           [plc.noConcretada.dias])
         out.calificaciones = c.n
       }

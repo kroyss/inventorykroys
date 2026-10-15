@@ -13,7 +13,7 @@ import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { puede, type Permiso } from '@/lib/permisos'
 import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
-import { leerPlantillasCal, sqlBandeja } from '@/lib/calificacionesML'
+import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
 import { contarAlertas } from '@/lib/alertasStock'
 import { ventasDesdeML } from '@/lib/modulos'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
@@ -381,7 +381,7 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
     const plc = leerPlantillasCal(pl?.value)
     const { rows: [k] } = await db.query(
       `SELECT COUNT(*)::int AS n FROM (${sqlBandeja(ventasDesdeML({ modulos: e.modulos }))}) b
-       WHERE sugerencia <> 'esperar' AND b.fecha::date <= CURRENT_DATE - ${plc.esperaDias}`, [plc.noConcretada.dias])
+       WHERE sugerencia <> 'esperar' AND ${sqlLista(plc.esperaDias)}`, [plc.noConcretada.dias])
     if (k.n) pend.push(`⭐ ${n(k.n)} venta${k.n === 1 ? '' : 's'} por calificar`)
   }
   if (e.modulos.includes('alertas_stock') && puede({ role: d.role, permisos: d.permisos ?? undefined }, 'ver_stock')) {

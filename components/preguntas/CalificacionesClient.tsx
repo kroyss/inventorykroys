@@ -6,9 +6,11 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
   cal_comprador: string | null; cuenta: string; sistema_estado: string | null; facturada: boolean
-  sugerencia: 'concretada' | 'no_concretada' | 'esperar'
-  en_espera: boolean            // más nueva que los días de espera: todavía no se califica (pestaña Próximas)
+  // 'revisar': el sistema no puede saberlo (impresa y nunca reportada, o empresa sin Despachos): decide una persona.
+  sugerencia: 'concretada' | 'no_concretada' | 'esperar' | 'revisar'
+  en_espera: boolean            // todavía en los días de espera (desde el reporte o la compra): pestaña Próximas
   lista_el: string              // YYYY-MM-DD: el día en que sale de la espera
+  guia_impresa: boolean; reportada_at: string | null
 }
 interface Plantillas {
   concretada: { rating: string; mensaje: string }
@@ -19,7 +21,9 @@ interface Plantillas {
 }
 const horaTxt = (h: number | undefined) => `${String(h ?? 10).padStart(2, '0')}:00`
 interface Datos {
-  ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; proximas: number; esperando: number }
+  ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; revisar: number; proximas: number; esperando: number }
+  /** Cómo decide "concretada" (lib/calificacionesML.ts): con Reportador = guía reportada; usa Despachos = imprimió guías en 30 días. */
+  conReportador?: boolean; usaDespachos?: boolean; topeDias?: number
   plantillas: Plantillas; cuentas: { nickname: string; ordenes_sync_at: string | null }[]
   /** Empresa sin inventario: "en el sistema" = despachada (etiqueta impresa en Despachos). */
   desdeML?: boolean
@@ -45,7 +49,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   const [vista, setVista] = useState<'listas' | 'proximas' | 'esperando' | 'config'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [elegidas, setElegidas] = useState<Record<string, Tipo | null>>({})
-  const [filtro, setFiltro] = useState<'todas' | Tipo>('todas')
+  const [filtro, setFiltro] = useState<'todas' | Tipo | 'revisar'>('todas')
   const [corriendo, setCorriendo] = useState(false)
   const [progreso, setProgreso] = useState<{ hechas: number; total: number; errores: string[]; quitadas: string[] } | null>(null)
   const [actualizando, setActualizando] = useState(false)
@@ -57,8 +61,9 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setAviso(d.error ?? 'No se pudo cargar'); return }
     setDatos(d)
-    // Por defecto, cada una con su sugerencia marcada (salvo las que siguen en días de espera).
-    setElegidas(Object.fromEntries((d.ordenes as Orden[]).filter(o => o.sugerencia !== 'esperar' && !o.en_espera).map(o => [o.id, o.sugerencia as Tipo])))
+    // Por defecto, cada una con su sugerencia marcada (salvo las que siguen en días de espera y las de
+    // "Revisar": esas las decide una persona, venta por venta).
+    setElegidas(Object.fromEntries((d.ordenes as Orden[]).filter(o => o.sugerencia !== 'esperar' && o.sugerencia !== 'revisar' && !o.en_espera).map(o => [o.id, o.sugerencia as Tipo])))
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
 
@@ -78,7 +83,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   // Marcar / desmarcar del lote (casilla): al marcar vuelve la sugerencia de esa venta.
   const marcables = visibles.filter(o => !o.en_espera)
   const todas = marcables.length > 0 && marcables.every(o => elegidas[o.id])
-  const sugerida = (o: Orden): Tipo => (o.sugerencia === 'esperar' ? 'concretada' : o.sugerencia)
+  const sugerida = (o: Orden): Tipo => (o.sugerencia === 'esperar' || o.sugerencia === 'revisar' ? 'concretada' : o.sugerencia)
   const marcar = (o: Orden, si: boolean) => setElegidas(x => ({ ...x, [o.id]: si ? sugerida(o) : null }))
   const marcarTodas = (si: boolean) =>
     setElegidas(x => ({ ...x, ...Object.fromEntries(marcables.map(o => [o.id, si ? (x[o.id] ?? sugerida(o)) : null])) }))
@@ -127,7 +132,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
       {aviso && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{aviso}</div>}
 
       <Tabs value={vista} onChange={setVista} items={[
-        { value: 'listas', label: 'Por calificar', count: datos ? datos.contadores.concretadas + datos.contadores.no_concretadas : undefined },
+        { value: 'listas', label: 'Por calificar', count: datos ? datos.contadores.concretadas + datos.contadores.no_concretadas + (datos.contadores.revisar ?? 0) : undefined },
         // Próximas: ya se sabe el resultado y salen solas al cumplir los días de espera.
         // Por definir: todavía no se sabe si se concretó (antes "Esperando", que se confundía con la espera).
         ...(datos?.plantillas.esperaDias ? [{ value: 'proximas' as const, label: 'Próximas', count: datos.contadores.proximas }] : []),
@@ -147,26 +152,38 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
               )}
             </div>
           )}
+          {/* Sin Despachos el sistema no puede saber qué se concretó (2026-10-15): se dice claro y las ventas
+              pasan a "Revisar" (antes salían como no concretadas y se podía calificar mal a compradores reales). */}
+          {datos.desdeML && datos.usaDespachos === false && vista !== 'proximas' && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+              <b>No estás despachando con Despachos</b>, así que el sistema no puede saber qué ventas se concretaron.
+              Para que te sugiera bien y pueda <b>calificar solo</b>, imprime las guías en <b>Despachos</b> y repórtalas con <b>Reportador</b>.
+              Mientras tanto, tus ventas quedan para <b>Revisar</b>: decide tú cada una (solo las canceladas en MercadoLibre salen como no concretadas).
+            </div>
+          )}
           <p className="text-xs text-neutral-500">
-            {datos.desdeML ? (vista === 'listas'
-              ? <>Despachada (su etiqueta salió en Despachos) → <b>concretada</b>. Sin despachar después de {datos.plantillas.noConcretada.dias} días, o cancelada en MercadoLibre → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
-              : vista === 'proximas' ? null
-              : <>Todavía no se sabe si se concretaron: no se han despachado. Al imprimir su etiqueta pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no salieron, a no concretadas.</>)
-            : vista === 'listas'
-              ? <>En el sistema (cargada o facturada) → <b>concretada</b>. Sin cargar después de {datos.plantillas.noConcretada.dias} días → <b>no concretada</b>. Puedes cambiar cada una antes de calificar.</>
-              : vista === 'proximas' ? null
-              : <>Todavía no se sabe si se concretaron: no están en el sistema o están en borrador. Si se cargan, pasan a concretadas; si a los {datos.plantillas.noConcretada.dias} días no aparecen, a no concretadas.</>}
-            {vista === 'proximas' && <>Ya se sabe cómo calificarlas, pero son de los últimos <b>{datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}</b> (tu espera).
-              {datos.plantillas.auto ? ' Las concretadas se califican solas ese día; las no concretadas pasan a Por calificar.' : ' Ese día pasan a Por calificar.'} No tienes que hacer nada.</>}
+            {vista === 'proximas'
+              ? <>Ya se sabe cómo calificarlas, pero están en tu espera de <b>{datos.plantillas.esperaDias} día{datos.plantillas.esperaDias === 1 ? '' : 's'}</b>
+                  {datos.conReportador ? ' desde que se reportó la guía' : ' desde la compra'}.
+                  {datos.plantillas.auto ? ' Las concretadas se califican solas ese día; las demás pasan a Por calificar.' : ' Ese día pasan a Por calificar.'} No tienes que hacer nada.</>
+              : <>
+                <b>Concretada</b>: {datos.desdeML ? 'su guía salió en Despachos' : 'está en el sistema (procesada o facturada)'}
+                {datos.conReportador ? <>{datos.desdeML ? ' y ya la reportaste' : ' y, si lleva guía, ya la reportaste'} (Reportador); la espera cuenta desde el reporte</> : ''}.
+                {' '}<b>No concretada</b>: {datos.desdeML ? 'cancelada en MercadoLibre, o' : ''} sin {datos.desdeML ? 'guía' : 'cargar'} después de {datos.plantillas.noConcretada.dias} días.
+                {' '}<b>Revisar</b>: el sistema no puede saberlo{datos.conReportador ? ` (la guía se imprimió pero a los ${datos.topeDias ?? 10} días no se reportó)` : ''}: decides tú.
+                {vista === 'listas' && ' Puedes cambiar cada una antes de calificar.'}
+              </>}
             {sinc && <> · Ventas actualizadas {new Date(sinc).toLocaleString('es-VE')}</>}
           </p>
 
           {vista === 'listas' && datos.ordenes.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
-              {(['todas', 'concretada', 'no_concretada'] as const).map(f => (
+              {(['todas', 'concretada', 'no_concretada', 'revisar'] as const).filter(f => f !== 'revisar' || datos.contadores.revisar > 0).map(f => (
                 <button key={f} onClick={() => setFiltro(f)}
                   className={`px-3 py-1 text-xs font-medium rounded-full border ${filtro === f ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200'}`}>
-                  {f === 'todas' ? `Todas ${datos.contadores.concretadas + datos.contadores.no_concretadas}` : f === 'concretada' ? `Concretadas ${datos.contadores.concretadas}` : `No concretadas ${datos.contadores.no_concretadas}`}
+                  {f === 'todas' ? `Todas ${datos.contadores.concretadas + datos.contadores.no_concretadas + (datos.contadores.revisar ?? 0)}`
+                    : f === 'concretada' ? `Concretadas ${datos.contadores.concretadas}`
+                    : f === 'no_concretada' ? `No concretadas ${datos.contadores.no_concretadas}` : `Revisar ${datos.contadores.revisar}`}
                 </button>
               ))}
               <span className="ml-auto text-sm text-neutral-600">{aCalificar.length} marcadas</span>
@@ -239,10 +256,21 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       </td>
                       <td className="px-3 py-2 text-neutral-700 max-w-[28rem]"><span className="line-clamp-2">{o.productos}</span></td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        {o.sistema_estado === 'DESPACHADA' ? <span className="text-xs font-medium text-emerald-700">Despachada</span>
+                        {o.sistema_estado === 'REPORTADA' ? <span className="text-xs font-medium text-emerald-700">Guía reportada</span>
+                          : o.sistema_estado === 'DESPACHADA' ? <span className={`text-xs font-medium ${datos.conReportador ? 'text-sky-700' : 'text-emerald-700'}`}>Guía impresa</span>
                           : o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={STATUS_LABELS[o.sistema_estado]} />
                           : <span className="text-xs text-amber-700">{datos.desdeML ? 'Sin despachar' : 'No cargada'}</span>}
                         {o.facturada && <div className="text-xs text-emerald-700 mt-0.5">Facturada</div>}
+                        {/* Con inventario: la guía en Despachos va aparte del estado de la venta. */}
+                        {!datos.desdeML && o.guia_impresa && (
+                          <div className={`text-xs mt-0.5 ${o.reportada_at ? 'text-emerald-700' : 'text-sky-700'}`}>{o.reportada_at ? 'Guía reportada' : 'Guía sin reportar'}</div>
+                        )}
+                        {o.sugerencia === 'revisar' && (
+                          <div className="mt-0.5 text-xs font-medium text-violet-700"
+                            title="El sistema no puede saber si se concretó: decide tú">
+                            Revisar · {o.guia_impresa ? `impresa, sin reportar en ${datos.topeDias ?? 10} días` : 'sin guía en el sistema'}
+                          </div>
+                        )}
                       </td>
                       {vista === 'listas' && (
                         <td className="px-3 py-2">
@@ -258,7 +286,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       {vista === 'proximas' && (
                         <td className="px-3 py-2 whitespace-nowrap text-xs">
                           <span className={`font-medium ${o.sugerencia === 'concretada' ? 'text-emerald-700' : 'text-amber-800'}`}>
-                            {o.sugerencia === 'concretada' ? 'Concretada' : 'No concretada'}
+                            {o.sugerencia === 'concretada' ? 'Concretada' : o.sugerencia === 'revisar' ? 'Revisar' : 'No concretada'}
                           </span>
                           <span className="text-neutral-500"> · {o.sugerencia === 'concretada' && datos.plantillas.auto ? 'se califica sola el' : 'pasa a Por calificar el'} {diaMes(o.lista_el)}</span>
                         </td>
@@ -293,8 +321,10 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
           <span>
             <span className="font-semibold text-neutral-900">Calificar automáticamente las concretadas</span>
             <span className="block text-sm text-neutral-600">
-              Una vez al día el sistema califica solo, con el texto de &quot;Venta concretada&quot;, las ventas que ya
-              {' '}están en el sistema o despachadas y pasaron los días de espera. Las <b>no concretadas nunca</b> se califican solas.
+              Una vez al día el sistema califica solo, con el texto de &quot;Venta concretada&quot;, las ventas <b>concretadas</b> que
+              {' '}pasaron los días de espera: las que despachaste con <b>Despachos</b> y reportaste con <b>Reportador</b> (la espera
+              {' '}cuenta desde el reporte){desdeML ? '' : ', o que están en el sistema sin guía'}. Las <b>no concretadas</b> y las de <b>revisar nunca</b> se califican solas.
+              {' '}<span className="text-neutral-500">Sin Despachos y Reportador el sistema no puede saber qué ventas se concretaron y no califica nada solo.</span>
             </span>
           </span>
         </label>
@@ -320,9 +350,13 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
           <input type="number" min={0} max={60} value={p.esperaDias}
             onChange={e => setP({ ...p, esperaDias: Math.max(0, Math.min(60, Math.round(Number(e.target.value) || 0))) })}
             className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
-          días desde la compra antes de calificar
+          días desde que <b>reportas la guía</b> (Reportador) antes de calificar
         </label>
-        <p className="text-xs text-neutral-500">Ej.: con 3, una venta del lunes se califica desde el jueves. 0 = sin esperar.</p>
+        <p className="text-xs text-neutral-500">
+          Ej.: con 2, una guía reportada el lunes se califica desde el miércoles (cuando ya le llegó al comprador). 0 = el mismo día del reporte.
+          Las ventas sin guía (retiro en tienda, locales) cuentan desde la compra. A los 10 días de la compra se califica igual, para no
+          pasarse del plazo de MercadoLibre.
+        </p>
       </section>
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-2">
         <h2 className="font-semibold text-neutral-900">Venta concretada</h2>
