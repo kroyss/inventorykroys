@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import CorregirCalificacion from './CorregirCalificacion'
 import Link from 'next/link'
 import { Cargando, EmptyState, PageHeader } from '@/components/ui'
 import type { Reputacion } from '@/lib/reputacionML'
@@ -14,8 +15,22 @@ interface Calificacion {
   vista_at: string | null; dias_restantes: number; con_mensajes: boolean
   contradictoria: boolean; concretada: boolean | null
   cambio_estado: string | null; cambio_at: string | null
+  resultado: 'cambiada' | 'quitada' | 'sin_cambio' | null; resuelto_at: string | null
+  mi_rating: string | null; mi_concretada: boolean | null; mi_mensaje: string | null
 }
-interface Datos { cuentas: Cuenta[]; calificaciones: Calificacion[]; dias: number; pais: 'VE' | 'CO'; por_revisar: number }
+interface Efectividad { pedidos: number; cambiadas: number; quitadas: number; sin_cambio: number; esperando: number }
+interface Datos { cuentas: Cuenta[]; calificaciones: Calificacion[]; dias: number; pais: 'VE' | 'CO'; por_revisar: number; cambios?: Efectividad }
+
+// Botones chicos (2026-10-15): en las filas los de siempre se veían muy grandes.
+const BTN = '!px-2.5 !py-1 text-xs'
+const NOMBRE_RATING: Record<string, string> = { positive: 'Positiva', neutral: 'Neutral', negative: 'Negativa' }
+const PUNTO_RATING: Record<string, string> = { positive: 'bg-emerald-500', neutral: 'bg-orange-500', negative: 'bg-red-500' }
+// Cómo terminó un pedido de cambio (lib/reputacionML.ts → resultadoCambio).
+const RESULTADO: Record<string, { txt: string; cls: string }> = {
+  cambiada:   { txt: '✓ La cambió', cls: 'bg-emerald-50 text-emerald-700' },
+  quitada:    { txt: '✓ ML la quitó', cls: 'bg-emerald-50 text-emerald-700' },
+  sin_cambio: { txt: '✗ No la cambió', cls: 'bg-neutral-100 text-neutral-600' },
+}
 
 const NIVELES = [
   { id: '1_red', color: 'bg-red-500', nombre: 'Roja' },
@@ -108,12 +123,14 @@ function TarjetaCuenta({ c }: { c: Cuenta }) {
 const CAMBIO: Record<string, string> = { pending: 'esperando respuesta del comprador', rejected: 'el comprador no la cambió',
   accepted: 'el comprador aceptó', expired: 'el comprador no respondió' }
 
-function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
-  c: Calificacion; pais: 'VE' | 'CO'; onVista: (c: Calificacion, v: boolean) => void; onPedido: (c: Calificacion) => void; ocupado: boolean
+function FilaCalificacion({ c, pais, onVista, onPedido, onCorregir, ocupado }: {
+  c: Calificacion; pais: 'VE' | 'CO'; onVista: (c: Calificacion, v: boolean) => void; onPedido: (c: Calificacion) => void
+  onCorregir: (c: Calificacion) => void; ocupado: boolean
 }) {
   const cambio = !!c.antes && c.rating !== c.antes
   // Neutral o negativa sin cambiar: se puede pedir el cambio (una positiva solo aparece si es contradictoria).
   const pedido = !!c.cambio_estado
+  const resultado = c.resultado ? RESULTADO[c.resultado] : null
   // ML le da 5 días al comprador para responder el pedido de cambio.
   const diasRespuesta = c.cambio_at ? Math.max(0, 5 - Math.floor((Date.now() - new Date(c.cambio_at).getTime()) / 86_400_000)) : 0
   const pedible = !cambio && !pedido && (c.rating === 'neutral' || c.rating === 'negative')
@@ -157,8 +174,28 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
           </div>
           {c.productos && <p className="mt-1 truncate text-xs text-neutral-600" title={c.productos}>{c.productos}</p>}
           {c.mensaje && <p className="mt-1.5 border-l-2 border-neutral-200 pl-2 text-xs italic text-neutral-600">“{c.mensaje}”</p>}
+          {c.contradictoria && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-md bg-violet-50/60 px-2 py-1 text-xs text-neutral-600">
+              <span className="font-medium text-violet-800">Tú lo calificaste:</span>
+              <span className={c.mi_concretada === false ? 'font-medium text-violet-800' : ''}>
+                {c.mi_concretada === false ? 'No concretada' : c.mi_concretada ? 'Concretada' : 'sin dato'}
+              </span>
+              {c.mi_rating && NOMBRE_RATING[c.mi_rating] && (
+                <span className="inline-flex items-center gap-1">· <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_RATING[c.mi_rating]}`} />{NOMBRE_RATING[c.mi_rating]}</span>
+              )}
+              {c.mi_mensaje && <span className="italic">· “{c.mi_mensaje}”</span>}
+              <span className="text-neutral-400">· el comprador dijo que sí se concretó</span>
+            </p>
+          )}
           <p className="mt-1 text-[11px] text-neutral-400">Calificó {hace(c.calificada_at)} · {c.cuenta} · venta {c.pack}</p>
-          {pedido && !cambio && (
+          {resultado && (
+            <p className="mt-1 text-[11px] text-neutral-500">
+              Cambio pedido {hace(c.cambio_at)} · {c.resultado === 'cambiada' ? `el comprador la cambió${c.rating ? ` a ${NOMBRE_RATING[c.rating]?.toLowerCase() ?? c.rating}` : ''}`
+                : c.resultado === 'quitada' ? 'ML la quitó: ya no cuenta en tu reputación' : 'el comprador respondió y la dejó igual'}
+              {c.resuelto_at && <> · nos enteramos {hace(c.resuelto_at)}</>}
+            </p>
+          )}
+          {pedido && !cambio && !resultado && (
             <p className="mt-1 text-[11px] text-sky-700">
               Cambio pedido {hace(c.cambio_at ?? c.calificada_at)}: {CAMBIO[c.cambio_estado!] ?? c.cambio_estado}
               {c.cambio_estado === 'pending' && (diasRespuesta > 0
@@ -168,9 +205,9 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-          {pedido && !cambio && (
-            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Cambio pedido</span>
-          )}
+          {resultado
+            ? <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${resultado.cls}`}>{resultado.txt}</span>
+            : pedido && !cambio && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Cambio pedido</span>}
           {pedible && (
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${urgente ? 'bg-red-50 text-red-700' : 'bg-neutral-100 text-neutral-600'}`}
               title="ML deja pedir el cambio hasta 30 días después de recibirla">
@@ -179,12 +216,16 @@ function FilaCalificacion({ c, pais, onVista, onPedido, ocupado }: {
           )}
           <div className="flex flex-wrap gap-1.5 sm:justify-end">
             {pedible && c.dias_restantes > 0 && (
-              <a href={urlCambio} target="_blank" rel="noreferrer" onClick={confirmarCambio} className="btn-primary text-xs"
+              <a href={urlCambio} target="_blank" rel="noreferrer" onClick={confirmarCambio} className={`btn-primary ${BTN}`}
                 title="Abre en MercadoLibre la solicitud de cambio de calificación (se pide una sola vez)">Pedir cambio</a>
             )}
-            <Link href={`/mensajes?pack=${c.pack}`} className="btn-secondary text-xs">Escribirle</Link>
+            {c.contradictoria && (
+              <button type="button" onClick={() => onCorregir(c)} className={`btn-primary ${BTN}`}
+                title="Cambia en MercadoLibre la calificación que le diste (concretada, tipo y comentario)">Corregir</button>
+            )}
+            <Link href={`/mensajes?pack=${c.pack}`} className={`btn-secondary ${BTN}`}>Escribirle</Link>
             {!cambio && !pedido && (
-              <button type="button" onClick={() => onVista(c, !c.vista_at)} disabled={ocupado} className="btn-secondary text-xs">
+              <button type="button" onClick={() => onVista(c, !c.vista_at)} disabled={ocupado} className={`btn-secondary ${BTN}`}>
                 {c.vista_at ? 'Volver a avisar' : 'Ya la vi'}
               </button>
             )}
@@ -199,6 +240,7 @@ export default function ReputacionClient() {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState<Calificacion | null>(null)
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/reputacion', { cache: 'no-store' })
@@ -223,8 +265,8 @@ export default function ReputacionClient() {
   }
 
   const lista = datos?.calificaciones ?? []
-  const cambiadas = lista.filter(c => c.antes && c.rating !== c.antes)
-  // Atendidas: cambiadas, con el cambio pedido o marcadas "Ya la vi".
+  const cambiadas = lista.filter(c => (c.antes && c.rating !== c.antes) || c.resultado)
+  // Atendidas: cambiadas (o con el pedido de cambio resuelto), con el cambio pedido o marcadas "Ya la vi".
   const pedidas = lista.filter(c => !cambiadas.includes(c) && c.cambio_estado)
   const pendientes = lista.filter(c => !cambiadas.includes(c) && !pedidas.includes(c) && !c.vista_at)
   const vistas = lista.filter(c => !cambiadas.includes(c) && !pedidas.includes(c) && c.vista_at)
@@ -256,7 +298,7 @@ export default function ReputacionClient() {
             </div>
             {pendientes.length ? (
               <ul className="divide-y divide-neutral-100">
-                {pendientes.map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} ocupado={ocupado === c.id} />)}
+                {pendientes.map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} onCorregir={setCorrigiendo} ocupado={ocupado === c.id} />)}
               </ul>
             ) : (
               <EmptyState message={`Ninguna neutral ni negativa por atender en los últimos ${datos.dias} días.`} />
@@ -265,18 +307,31 @@ export default function ReputacionClient() {
 
           {(cambiadas.length > 0 || pedidas.length > 0 || vistas.length > 0) && (
             <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-              <div className="border-b border-neutral-100 bg-neutral-50 px-4 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-neutral-100 bg-neutral-50 px-4 py-2">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Atendidas: cambio pedido, cambiadas o vistas</h2>
+                {datos.cambios && datos.cambios.pedidos > 0 && (
+                  <span className="text-xs text-neutral-500" title="Cómo terminaron los pedidos de cambio de calificación de los últimos 90 días">
+                    Pedidos de cambio (90 días): <b className="text-neutral-700">{datos.cambios.pedidos}</b>
+                    {' · '}<span className="text-emerald-700">{datos.cambios.cambiadas} cambiada{datos.cambios.cambiadas === 1 ? '' : 's'}</span>
+                    {' · '}<span className="text-emerald-700">{datos.cambios.quitadas} quitada{datos.cambios.quitadas === 1 ? '' : 's'} por ML</span>
+                    {' · '}{datos.cambios.sin_cambio} sin cambio
+                    {datos.cambios.esperando > 0 && <> · <span className="text-sky-700">{datos.cambios.esperando} esperando</span></>}
+                  </span>
+                )}
               </div>
               <ul className="divide-y divide-neutral-100">
-                {[...pedidas, ...cambiadas, ...vistas].map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} ocupado={ocupado === c.id} />)}
+                {[...pedidas, ...cambiadas, ...vistas].map(c => <FilaCalificacion key={c.id} c={c} pais={datos.pais} onVista={marcar} onPedido={pedir} onCorregir={setCorrigiendo} ocupado={ocupado === c.id} />)}
               </ul>
             </div>
           )}
           <p className="text-[11px] text-neutral-400">
             Cada calificación avisa {datos.dias} días desde que la dieron (lo que da ML para pedir el cambio) y después sale sola.
-            Si el comprador la cambia, aparece como cambiada.
+            Si pediste el cambio, sigue aquí hasta saber cómo terminó (y 15 días más, con el resultado).
           </p>
+          {corrigiendo && (
+            <CorregirCalificacion c={corrigiendo} onCerrar={() => setCorrigiendo(null)}
+              onListo={() => { setCorrigiendo(null); cargar() }} />
+          )}
         </>
       )}
     </div>

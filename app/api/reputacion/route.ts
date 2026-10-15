@@ -28,19 +28,33 @@ export async function GET() {
               o.cal_recibida_msg AS mensaje, o.cal_recibida_vista_at AS vista_at,
               COALESCE(o.cal_contradictoria AND o.cal_recibida_concretada, false) AS contradictoria, o.cal_recibida_concretada AS concretada,
               o.cal_cambio_estado AS cambio_estado, o.cal_cambio_at AS cambio_at,
+              o.cal_cambio_resultado AS resultado, o.cal_cambio_resuelto_at AS resuelto_at,
+              -- La que le dimos nosotros (para las contradictorias y "Corregir").
+              NULLIF(o.cal_vendedor, 'calificada') AS mi_rating, o.cal_concretada AS mi_concretada, o.cal_vendedor_msg AS mi_mensaje,
               GREATEST(0, CEIL(EXTRACT(EPOCH FROM (o.cal_recibida_at + make_interval(days => $1) - NOW())) / 86400))::int AS dias_restantes,
               c.pack_id IS NOT NULL AS con_mensajes
        FROM ml_ordenes o
        JOIN ml_conexiones x ON x.id = o.conexion_id
        LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
-       WHERE o.cal_recibida_at > NOW() - make_interval(days => $1)
-         AND (o.cal_recibida IN ('neutral', 'negative') OR o.cal_recibida_antes IS NOT NULL OR (o.cal_contradictoria AND o.cal_recibida_concretada))
+       WHERE (o.cal_recibida_at > NOW() - make_interval(days => $1)
+              AND (o.cal_recibida IN ('neutral', 'negative') OR o.cal_recibida_antes IS NOT NULL OR (o.cal_contradictoria AND o.cal_recibida_concretada)))
+          -- Pedidos de cambio: mientras se espera la respuesta y 15 días después de saber cómo terminó (2026-10-15).
+          OR (o.cal_cambio_estado IS NOT NULL AND ((o.cal_cambio_resultado IS NULL AND o.cal_cambio_at > NOW() - INTERVAL '20 days')
+                                                 OR o.cal_cambio_resuelto_at > NOW() - INTERVAL '15 days'))
        -- La que menos días le quedan para pedir el cambio, primero (2026-10-13).
        ORDER BY o.cal_recibida_at ASC`, [DIAS_AVISO])
     const { rows: [pend] } = await s.db.query(
       `SELECT COUNT(*) FILTER (WHERE cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - INTERVAL '60 days')::int AS n
        FROM ml_ordenes`)
-    return NextResponse.json({ cuentas, calificaciones, dias: DIAS_AVISO, pais: s.session.user.country, por_revisar: pend?.n ?? 0 })
+    // Cuánto sirven los pedidos de cambio (últimos 90 días).
+    const { rows: [efect] } = await s.db.query(
+      `SELECT COUNT(*)::int AS pedidos,
+              COUNT(*) FILTER (WHERE cal_cambio_resultado = 'cambiada')::int AS cambiadas,
+              COUNT(*) FILTER (WHERE cal_cambio_resultado = 'quitada')::int AS quitadas,
+              COUNT(*) FILTER (WHERE cal_cambio_resultado = 'sin_cambio')::int AS sin_cambio,
+              COUNT(*) FILTER (WHERE cal_cambio_resultado IS NULL)::int AS esperando
+       FROM ml_ordenes WHERE cal_cambio_estado IS NOT NULL AND cal_cambio_at > NOW() - INTERVAL '90 days'`)
+    return NextResponse.json({ cuentas, calificaciones, dias: DIAS_AVISO, pais: s.session.user.country, por_revisar: pend?.n ?? 0, cambios: efect })
   } catch (err) {
     return apiError(err)
   }
