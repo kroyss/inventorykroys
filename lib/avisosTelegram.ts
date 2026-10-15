@@ -193,7 +193,10 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
   // Cuenta desconectada (una vez por desconexión).
   if (p.desconectada && disp.desconectada && !silencio) {
     const { rows } = await db.query(
-      `SELECT id, nickname, extract(epoch FROM updated_at)::bigint AS t FROM ml_conexiones WHERE estado = 'desconectada'`)
+      // La que alguien desconectó a propósito desde el sistema no se avisa (app/api/ml/conexiones/[id]).
+      `SELECT id, nickname, extract(epoch FROM updated_at)::bigint AS t FROM ml_conexiones
+       WHERE estado = 'desconectada' AND COALESCE(ultimo_error, '') <> 'Desconectada desde el sistema'
+         AND updated_at > NOW() - INTERVAL '7 days'`)
     for (const c of rows) {
       const reconecta = puede({ role: d.role, permisos: d.permisos ?? undefined }, 'ml_cuentas')
       if (await mandar(d, e, 'desconectada', [`${c.id}:${c.t}`],
@@ -225,13 +228,14 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     }
   }
 
-  // Mensajes de compradores sin responder pasados N minutos (un nuevo mensaje del comprador vuelve a avisar).
+  // Mensajes de compradores sin responder pasados N minutos: lo último es del comprador y sigue sin leer (como
+  // "Por atender" en Mensajes; un "gracias" que alguien ya leyó no avisa). Un mensaje nuevo vuelve a avisar.
   if (p.mensaje && disp.mensaje && !silencio) {
     const { rows } = await db.query(
       `SELECT c.pack_id::text AS pack, c.pack_id::text || ':' || extract(epoch FROM c.ultimo_at)::bigint AS ref,
               x.nickname AS cuenta, COALESCE(c.comprador_nombre, c.comprador_nick) AS comprador, c.productos, c.ultimo_texto, c.ultimo_at
        FROM ml_conversaciones c JOIN ml_conexiones x ON x.id = c.conexion_id
-       WHERE c.ultimo_de_comprador AND c.ultimo_at < NOW() - make_interval(mins => $1) AND c.ultimo_at > NOW() - INTERVAL '24 hours'
+       WHERE c.ultimo_de_comprador AND c.sin_leer > 0 AND c.ultimo_at < NOW() - make_interval(mins => $1) AND c.ultimo_at > NOW() - INTERVAL '24 hours'
          AND ${SQL_MENSAJE_VIGENTE.replace(/ultimo_at/g, 'c.ultimo_at')}
        ORDER BY c.ultimo_at LIMIT 30`, [p.mensaje_min])
     const nuevas = await pendientes(d, e, 'mensaje', rows.map(r => r.ref))
@@ -341,7 +345,8 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
   const { rows: [c] } = await db.query(
     `SELECT (SELECT COUNT(*) FROM ml_preguntas WHERE estado = 'UNANSWERED')::int AS preguntas,
             (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0 AND ${SQL_MENSAJE_VIGENTE})::int AS mensajes,
-            (SELECT string_agg(nickname, ', ') FROM ml_conexiones WHERE estado = 'desconectada') AS desconectadas`)
+            (SELECT string_agg(nickname, ', ') FROM ml_conexiones WHERE estado = 'desconectada'
+               AND COALESCE(ultimo_error, '') <> 'Desconectada desde el sistema') AS desconectadas`)
   if (c.desconectadas) pend.push(`⚠️ <b>Cuenta desconectada: ${esc(c.desconectadas)}</b>`)
   if (disp.pregunta && c.preguntas) pend.push(`❓ ${n(c.preguntas)} pregunta${c.preguntas === 1 ? '' : 's'} sin responder`)
   if (disp.mensaje && c.mensajes) pend.push(`✉️ ${n(c.mensajes)} conversaci${c.mensajes === 1 ? 'ón' : 'ones'} con mensajes sin leer`)
