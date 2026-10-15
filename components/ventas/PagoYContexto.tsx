@@ -335,7 +335,8 @@ function DetallePago({ p, onCerrar, puedeMarcar, onMarcar }: {
 // con fotos, responder y adjuntar, notas editables, producto con su variante y lo que preguntó antes.
 type ConversacionVenta = { conversacion: Conversacion; rapidas: MensajeRapido[]; puedeEscribir: boolean }
 
-export function LoQueSeHablo({ numero }: { numero: string }) {
+/** `compacto` (2026-10-15): botón chico "Ver conversación" para listas (Mensajes → Pedir calificación). */
+export function LoQueSeHablo({ numero, compacto, className = '' }: { numero: string; compacto?: boolean; className?: string }) {
   const [abierto, setAbierto] = useState(false)
   const [conv, setConv] = useState<ConversacionVenta | string | undefined>(undefined)   // string = error; undefined = sin pedir
 
@@ -350,11 +351,18 @@ export function LoQueSeHablo({ numero }: { numero: string }) {
 
   return (
     <>
-      <button type="button" onClick={abrir}
-        className="w-full flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-left hover:border-sky-300 hover:bg-sky-50/40 transition-colors">
-        <span className="text-sm font-medium text-neutral-800">💬 Lo que se habló en MercadoLibre</span>
-        <span className="text-xs text-sky-700">Mensajes, notas, variante y preguntas →</span>
-      </button>
+      {compacto ? (
+        <button type="button" onClick={abrir} className={`btn-secondary !px-2.5 !py-1 text-xs ${className}`}
+          title="Ver lo que se habló con el comprador (mensajes, notas y preguntas) antes de escribirle">
+          💬 Ver conversación
+        </button>
+      ) : (
+        <button type="button" onClick={abrir}
+          className="w-full flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-left hover:border-sky-300 hover:bg-sky-50/40 transition-colors">
+          <span className="text-sm font-medium text-neutral-800">💬 Lo que se habló en MercadoLibre</span>
+          <span className="text-xs text-sky-700">Mensajes, notas, variante y preguntas →</span>
+        </button>
+      )}
       {abierto && (
         <Ventana titulo="Lo que se habló en MercadoLibre" ancho="max-w-3xl" onCerrar={() => setAbierto(false)}
           subtitulo={<>Venta <span className="font-mono">{numero}</span></>}>

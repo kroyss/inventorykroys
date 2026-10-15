@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
+import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 import { Cargando, EmptyState } from '@/components/ui'
 
 // Mensajes → "Pedir calificación" (lib/pedirCalificacion.ts): A MANO. Ventas que calificamos concretada
@@ -143,18 +143,23 @@ export default function PedirCalificacion({ onCambio }: { onCambio?: () => void 
                         <p className="mt-1.5 rounded-lg bg-neutral-50 px-2.5 py-1.5 text-xs text-neutral-700 ring-1 ring-inset ring-neutral-200 break-words">{texto}</p>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-1.5 sm:flex-col sm:items-end">
-                      <button type="button" onClick={() => enviar(p)} disabled={enviando === p.orden || !texto.trim()} className={`btn-primary ${BTN}`}>
+                    {/* Columna de acciones (2026-10-15): todas del mismo ancho y en orden; en celular, en fila. */}
+                    <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:w-40 sm:grid-cols-1">
+                      <button type="button" onClick={() => enviar(p)} disabled={enviando === p.orden || !texto.trim()} className={`btn-primary ${BTN} w-full`}>
                         {enviando === p.orden ? 'Enviando…' : 'Enviar'}
                       </button>
-                      <div className="flex gap-1.5">
-                        <button type="button" onClick={() => setEditando(abierto ? null : p.orden)} className={`btn-secondary ${BTN}`}>
-                          {abierto ? 'Listo' : 'Editar'}
-                        </button>
-                        {p.con_mensajes && <Link href={`/mensajes?pack=${p.pack}`} className={`btn-secondary ${BTN}`}>Conversación</Link>}
-                        <button type="button" onClick={() => noPedir(p)} disabled={enviando === p.orden} className={`btn-ghost ${BTN} text-neutral-500`}
-                          title="Sacarla de la lista sin mandar nada">No pedir</button>
-                      </div>
+                      {/* La conversación en una ventana, como en Ventas → "Lo que se habló": ver si hubo un problema antes de pedir. */}
+                      {p.con_mensajes
+                        ? <LoQueSeHablo numero={p.pack} compacto className="w-full" />
+                        : <span className="inline-flex items-center justify-center rounded-lg border border-dashed border-neutral-200 px-2.5 py-1 text-xs text-neutral-400"
+                            title="El comprador no escribió nada después de comprar">Sin mensajes</span>}
+                      <button type="button" onClick={() => setEditando(abierto ? null : p.orden)} className={`btn-secondary ${BTN} w-full`}>
+                        {abierto ? '✓ Listo' : '✎ Editar texto'}
+                      </button>
+                      <button type="button" onClick={() => noPedir(p)} disabled={enviando === p.orden} title="Sacarla de la lista sin mandar nada"
+                        className={`btn-secondary ${BTN} w-full !text-neutral-500 hover:!border-red-300 hover:!bg-red-50 hover:!text-red-700`}>
+                        ✕ No pedir
+                      </button>
                     </div>
                   </div>
                 </li>
