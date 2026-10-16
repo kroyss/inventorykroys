@@ -10,6 +10,8 @@ const Schema = z.object({
   product_id: z.number().int().positive(),
   cuenta: z.string().min(1).max(50),
   item_id: z.string().regex(/^[A-Z]{3}\d+$/),
+  unidades: z.number().int().min(1).max(500).default(1),     // combos (migración 098): cuántas trae
+  titulo: z.string().max(300).nullish(),
 })
 
 export async function POST(req: NextRequest) {
@@ -23,10 +25,12 @@ export async function POST(req: NextRequest) {
     const { rows: [ya] } = await s.db.query(
       `SELECT id, is_active FROM product_ml_codes WHERE product_id = $1 AND ml_code = $2 ORDER BY is_active DESC LIMIT 1`,
       [b.product_id, codigo])
-    if (ya && !ya.is_active) await s.db.query(`UPDATE product_ml_codes SET is_active = TRUE WHERE id = $1`, [ya.id])
-    if (!ya) {
-      await s.db.query(`INSERT INTO product_ml_codes (product_id, ml_account, ml_code, is_active) VALUES ($1, $2, $3, TRUE)`,
-        [b.product_id, b.cuenta, codigo])
+    if (ya) {
+      await s.db.query(`UPDATE product_ml_codes SET is_active = TRUE, unidades = $2, titulo = COALESCE($3, titulo), combo_revisado = TRUE, updated_at = NOW() WHERE id = $1`,
+        [ya.id, b.unidades, b.titulo ?? null])
+    } else {
+      await s.db.query(`INSERT INTO product_ml_codes (product_id, ml_account, ml_code, is_active, unidades, titulo, combo_revisado) VALUES ($1, $2, $3, TRUE, $4, $5, TRUE)`,
+        [b.product_id, b.cuenta, codigo, b.unidades, b.titulo ?? null])
     }
     return NextResponse.json({ ok: true })
   } catch (err) {

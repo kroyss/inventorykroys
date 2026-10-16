@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
        -- Producto del sistema por su código ML (se guarda sin el prefijo: MLV768007052 → 768007052).
        -- Con un producto por variante ("768007052:180012345") y ninguno de la publicación: la suma de todas.
        LEFT JOIN LATERAL (
-         SELECT pd.code, pd.name, (CASE WHEN m.ml_code LIKE '%:%' THEN SUM(COALESCE(i.quantity, 0)) OVER () ELSE COALESCE(i.quantity, 0) END)::int AS stock, pp.final_price_usd::float AS precio
+         SELECT pd.code, pd.name, (CASE WHEN m.ml_code LIKE '%:%' THEN SUM(COALESCE(i.quantity, 0) / m.unidades) OVER () ELSE COALESCE(i.quantity, 0) / m.unidades END)::int AS stock, pp.final_price_usd::float AS precio
          FROM product_ml_codes m
          JOIN products pd ON pd.id = m.product_id
          LEFT JOIN inventory i ON i.product_id = pd.id

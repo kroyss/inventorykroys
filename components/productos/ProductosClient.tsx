@@ -10,6 +10,8 @@ import { matchTokens } from '@/lib/search'
 import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import { liveBaseVE, liveFinalVE, livePublishedVE, recDiscountVE, mlNetFor, storedPricesVE, type VeRate } from '@/lib/pricingVE'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { PublicacionesML, RevisarCombos } from './CombosML'
 import MlBreakdown from './MlBreakdown'
 import { etiquetaCategoria } from '@/lib/categoriasGanancia'
 
@@ -131,6 +133,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
   const [search,    setSearch]    = useState('')
+  const [soloCombos, setSoloCombos] = useState(false)
+  const router = useRouter()
   const [selected,  setSelected]  = useState<number[]>([])
   const [batchCat,  setBatchCat]  = useState<number | null>(null)
   const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
@@ -469,8 +473,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     sortKey === k ? <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span> : null
 
   const filtered = useMemo(() => products.filter(p =>
-    matchTokens(search, p.code, p.name, p.category_name ?? '')
-  ), [products, search])
+    matchTokens(search, p.code, p.name, p.category_name ?? '') && (!soloCombos || (p.combos?.length ?? 0) > 0)
+  ), [products, search, soloCombos])
+  const conCombos = products.filter(p => (p.combos?.length ?? 0) > 0).length
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
@@ -579,7 +584,16 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           onChange={e => setSearch(e.target.value)}
           className="border border-neutral-300 rounded-lg px-3 py-2 text-sm w-full md:w-72 order-first"
         />
+        {conCombos > 0 && (
+          <button onClick={() => setSoloCombos(v => !v)}
+            className={`px-3 py-1.5 rounded-full text-sm border ${soloCombos ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-700'}`}
+            title="Productos con alguna publicación de MercadoLibre que trae más de una unidad">
+            Con combos <span className="opacity-60">{conCombos}</span>
+          </button>
+        )}
       </div>
+
+      <RevisarCombos onCambio={() => router.refresh()} />
 
       {/* ── table (desktop) ── */}
       <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
@@ -661,7 +675,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     />
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{p.code}</td>
-                  <td className="px-3 py-2 font-medium text-neutral-900">{p.name}</td>
+                  <td className="px-3 py-2 font-medium text-neutral-900">{p.name}
+                    {(p.combos?.length ?? 0) > 0 && <span className="ml-1.5 align-middle rounded bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200 px-1.5 py-px text-[11px] font-normal" title="Se vende también en combos en MercadoLibre">combos {p.combos!.map(n => `×${n}`).join(' ')}</span>}
+                  </td>
                   {!simple && (
                     <td className="px-3 py-2">
                       {p.category_name ? (
@@ -1231,19 +1247,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Códigos ML ({country})</p>
-                  {v.ml_codes.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {v.ml_codes.map(ml => (
-                        <div key={ml.account} className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
-                          <p className="text-[11px] font-mono text-neutral-500">{ml.account}</p>
-                          <p className="text-sm font-mono text-neutral-800">{ml.code || '—'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-neutral-400 text-xs">Sin códigos ML registrados</p>
-                  )}
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Publicaciones en MercadoLibre ({country})</p>
+                  {/* Todas las vinculadas, por cuenta, con cuántas unidades trae cada una (combos, migración 098). */}
+                  <PublicacionesML key={v.id} productoId={v.id} />
                 </div>
               </div>
 

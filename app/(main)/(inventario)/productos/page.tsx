@@ -32,7 +32,10 @@ export default async function ProductosPage() {
         pp.profit_category_id,
         p.weight_kg::float                             AS weight_kg,
         COALESCE(inv.sale_price,            0)::float AS sale_price,
-        COALESCE(inv.quantity,              0)::int   AS quantity
+        COALESCE(inv.quantity,              0)::int   AS quantity,
+        -- Combos (migración 098): las unidades de sus publicaciones de más de 1 (combo de 4 → 4)
+        COALESCE((SELECT array_agg(DISTINCT m.unidades ORDER BY m.unidades) FROM product_ml_codes m
+                  WHERE m.product_id = p.id AND m.is_active AND m.unidades > 1), '{}') AS combos
       FROM products p
       LEFT JOIN product_pricing   pp  ON p.id = pp.product_id
       LEFT JOIN profit_categories pc  ON pp.profit_category_id = pc.id

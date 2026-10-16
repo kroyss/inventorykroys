@@ -26,6 +26,8 @@ export interface Product {
   code: string
   name: string
   is_active: boolean
+  /** Combos (migración 098): unidades de sus publicaciones de ML de más de 1 (combo de 4 → 4) */
+  combos?: number[]
   base_cost: number
   shipping_cost: number
   total_cost: number

@@ -37,8 +37,10 @@ interface MlVenta {
   fecha?: string | null
   items: {
     itemId: string; titulo: string; cantidad: number; variante?: string | null; imagen?: string | null
-    producto: { id: number; code: string; name: string } | null   // solo si el código ML está en UN producto
-    opciones?: { id: number; code: string; name: string }[]        // todos los productos con ese código
+    // unidades (combos, migración 098): cuántas del producto trae esa publicación (combo de 4 → 4)
+    producto: { id: number; code: string; name: string; unidades?: number } | null   // solo si el código ML está en UN producto
+    opciones?: { id: number; code: string; name: string; unidades?: number }[]        // todos los productos con ese código
+    sugeridas?: number | null                                                          // lo que dice el título ("Combo 4")
   }[]
 }
 
@@ -191,13 +193,16 @@ export default function VentasForm({ editing, products, country, onClose, onSave
 
   // Agrega los productos de la venta de ML que tienen su código cargado (con la cantidad comprada).
   // Si el código está en varios productos, se agrega el que la persona elige (`elegido`).
+  // Combo: la cantidad del producto = lo comprado × las unidades que trae la publicación.
+  const unidadesDe = (i: MlVenta['items'][number], id?: number) =>
+    (id != null ? i.opciones?.find(o => o.id === id)?.unidades : i.producto?.unidades) ?? 1
   const agregarDeMl = (lista: MlVenta['items'], elegido?: number) => {
     const nuevos: FormItem[] = []
     for (const i of lista) {
       const id = elegido ?? i.producto?.id
       const p = id != null && products.find(x => x.product_id === id)
       if (!p || items.some(x => x.product_id === p.product_id) || nuevos.some(x => x.product_id === p.product_id)) continue
-      nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad, unit_price: defaultPrice(p) })
+      nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad * unidadesDe(i, id ?? undefined), unit_price: defaultPrice(p) })
     }
     if (nuevos.length) setItems([...items, ...nuevos])
   }
@@ -212,18 +217,24 @@ export default function VentasForm({ editing, products, country, onClose, onSave
 
   // "Esta publicación siempre es este producto" (2026-10-12): queda vinculada para las próximas ventas.
   const [vinculando, setVinculando] = useState<string | null>(null)
-  const vincularMl = async (itemId: string, it: FormItem) => {
+  // Cuántas unidades trae la publicación que se vincula (combos): lo que propone el título o 1.
+  const [traeVinc, setTraeVinc] = useState<Record<string, number>>({})
+  const vincularMl = async (ml_: MlVenta['items'][number], it: FormItem) => {
     if (!mlVenta) return
+    const itemId = ml_.itemId
+    const unidades = traeVinc[itemId] ?? ml_.sugeridas ?? 1
     setVinculando(itemId)
     try {
       const r = await fetch('/api/sales/vincular-ml', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: it.product_id, cuenta: mlVenta.cuenta, item_id: itemId }),
+        body: JSON.stringify({ product_id: it.product_id, cuenta: mlVenta.cuenta, item_id: itemId, unidades, titulo: ml_.titulo }),
       })
       if (!r.ok) { alert((await r.json().catch(() => null))?.error ?? 'No se pudo vincular'); return }
-      const producto = { id: it.product_id, code: it.product_code, name: it.product_name }
+      const producto = { id: it.product_id, code: it.product_code, name: it.product_name, unidades }
       setMl(m => m?.venta ? { ...m, venta: { ...m.venta, items: m.venta.items.map(i =>
         i.itemId === itemId ? { ...i, producto, opciones: [producto] } : i) } } : m)
+      // Combo: la línea de ese producto pasa a lo comprado × unidades.
+      if (unidades > 1) setItems(prev => prev.map(x => x.product_id === it.product_id ? { ...x, quantity: ml_.cantidad * unidades } : x))
     } finally { setVinculando(null) }
   }
 
@@ -464,8 +475,8 @@ Revísala en el detalle que se abre ahora.`)
                           {i.titulo}
                         </span>
                         {i.producto ? (ya
-                          ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
-                          : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)
+                          ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}{(i.producto.unidades ?? 1) > 1 && <span className="ml-1 rounded bg-emerald-100 px-1 text-[11px]">combo ×{i.producto.unidades} = {i.cantidad * (i.producto.unidades ?? 1)} u.</span>}</span>
+                          : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}{(i.producto.unidades ?? 1) > 1 ? ` ×${i.producto.unidades}` : ''}</button>)
                           : varios ? (elegido
                             ? <span className="shrink-0 text-emerald-700">✓ {elegido.code}</span>
                             : <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Elige el producto</span>)
@@ -478,10 +489,15 @@ Revísala en el detalle que se abre ahora.`)
                         if (!libres.length) return null
                         return (
                           <div className="flex flex-wrap items-center gap-1 pl-3 text-[11px] text-neutral-500">
-                            <span>¿Esta publicación siempre es</span>
+                            <span>Trae</span>
+                            <input type="number" min={1} max={500} value={traeVinc[i.itemId] ?? i.sugeridas ?? 1}
+                              onChange={e => setTraeVinc({ ...traeVinc, [i.itemId]: Math.max(1, Math.min(500, Number(e.target.value) || 1)) })}
+                              title="Cuántas unidades del producto trae esta publicación (combo de 4 → 4)"
+                              className={`w-12 rounded border px-1 py-0.5 text-right ${(traeVinc[i.itemId] ?? i.sugeridas ?? 1) > 1 ? 'border-emerald-400 bg-emerald-50 text-emerald-900' : 'border-neutral-300'}`} />
+                            <span>u.{i.sugeridas && traeVinc[i.itemId] == null ? ' (lo dice el título)' : ''} · ¿Esta publicación siempre es</span>
                             {libres.map(it => (
                               <button key={it.product_id} type="button" disabled={vinculando === i.itemId}
-                                onClick={() => vincularMl(i.itemId, it)} title={`Vincular ${i.itemId} a ${it.product_name}`}
+                                onClick={() => vincularMl(i, it)} title={`Vincular ${i.itemId} a ${it.product_name}`}
                                 className="rounded-md border border-sky-300 bg-white px-1.5 py-0.5 text-sky-800 hover:bg-sky-100 disabled:opacity-50">
                                 <span className="font-mono">{it.product_code}</span>?
                               </button>
