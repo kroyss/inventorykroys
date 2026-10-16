@@ -49,7 +49,7 @@ async function latido() {
   if (!cfg.perfil || !cfg.servidor || !cfg.clave) return { texto: 'Falta configurar perfil, sistema y clave.' }
   try {
     const d = await api(cfg, 'latido')
-    if (d.pedido && !trabajando) procesar(cfg, d.pedido)
+    if (d.pedido && !trabajando) procesar(cfg, d.pedido, !!d.pesos)
     // Abierto por el despertador pero ya no hay nada que hacer aquí (otro lo hizo, venció): se cierra.
     if (!d.pedido && !trabajando) for (const t of await tabsDelDespertador()) cerrarVentana(t)
     const texto = d.pedido ? `Conectado: trayendo pagos y guías (pedido ${d.pedido})…` : 'Conectado ✓ (esperando pedidos)'
@@ -61,7 +61,7 @@ async function latido() {
   }
 }
 
-async function procesar(cfg, pedido) {
+async function procesar(cfg, pedido, pesos = false) {
   trabajando = true
   let tabId = null
   let creada = false
@@ -116,6 +116,14 @@ async function procesar(cfg, pedido) {
         comprobante_ext: archivos?.comprobante_ext ?? null,
       })
       nuevas++
+    }
+    // Pesos de las publicaciones (1.3.2, Promociones): la primera traída del día o al pedirlos. Si falla,
+    // la traída de pagos igual se da por buena.
+    if (pesos) {
+      try {
+        const [{ result: prod }] = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', func: leerProductos })
+        if (prod?.ok) await api(cfg, 'productos', { cuenta: leido.cuenta || cfg.perfil, completo: prod.completo, items: prod.items })
+      } catch (e) { await anotar(`No se pudieron leer los pesos: ${e.message}`) }
     }
     await api(cfg, 'fin', { pedido, ok: true, cuenta: leido.cuenta || cfg.perfil, vistas, nuevas })
     await anotar(`Listo: ${vistas} órdenes pagadas vistas, ${nuevas} subidas.`)
@@ -266,6 +274,35 @@ async function leerOrdenes(dias) {
       if (new Date(rs[rs.length - 1].date_created).getTime() < desde) break
     }
     return { ok: true, cuenta, ordenes }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+}
+
+// Publicaciones activas del portal con su peso y transportistas (pantalla Productos del portal).
+async function leerProductos() {
+  try {
+    const items = []
+    let total = 0
+    for (let off = 0; off < 5000; off += 50) {
+      const r = await fetch(`/api/v1/seller/products/search/?limit=50&offset=${off}&order_by=date_created&direction=desc&status=active`, { credentials: 'include' })
+      if (!r.ok) throw new Error(`El portal respondió ${r.status}`)
+      const d = (await r.json())?.data ?? {}
+      const rs = d.items ?? []
+      total = Number(d.paging?.total ?? 0)
+      for (const p of rs) {
+        if (!/^MLV\d+$/.test(String(p._id))) continue
+        items.push({
+          publicacion: String(p._id),
+          titulo: p.title ? String(p.title).slice(0, 300) : null,
+          peso: Number.isFinite(Number(p.weight)) ? Number(p.weight) : null,
+          estado: p.status ? String(p.status).slice(0, 30) : null,
+          agencias: (p.shipping_agencies || []).map(a => String(a.name ?? a._id).slice(0, 40)).slice(0, 10),
+        })
+      }
+      if (rs.length < 50 || items.length >= total) break
+    }
+    return { ok: true, items, completo: total > 0 && items.length >= total }
   } catch (e) {
     return { ok: false, error: e.message }
   }

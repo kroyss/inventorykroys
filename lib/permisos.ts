@@ -54,6 +54,8 @@ export const PERMISOS = {
                              detalle: 'Reponer una publicación agotada desde Preguntas y actualizar cantidades desde Stock' },
   importar_ml:             { tipo: 'accion', nombre: 'Importar productos desde MercadoLibre', usuario: false, modulo: 'inventario',
                              detalle: 'Primeros pasos en Productos: crear y vincular productos a partir de las publicaciones (necesita ver Productos)' },
+  promociones:             { tipo: 'accion', nombre: 'Promociones de MercadoLibre', usuario: false, modulo: 'promociones', soloVE: true,
+                             detalle: 'Ver las campañas de ML, en cuáles está cada publicación y hasta dónde puede bajar el precio sin perder el envío gratis (necesita ver Productos)' },
   pagos_me_config:         { tipo: 'accion', nombre: 'Configurar Pagos ME', usuario: false, modulo: 'pagos_me', soloVE: true,
                              detalle: 'Clave de MercadoEnvíos y horario automático' },
 } as const satisfies Record<string, DefPermiso>

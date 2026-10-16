@@ -123,9 +123,10 @@ interface Props {
   descuento: boolean     // módulo Descuento ML: sin él el descuento vale 0 (/api/settings) y no se muestra
   importarML?: boolean   // permiso "Importar productos desde MercadoLibre" + cuentas de ML (Primeros pasos)
   categorias?: boolean   // módulo precios_categorias. Apagado (Inventario simple): precio = lo publicado, sin categoría ni exceso
+  promociones?: boolean  // módulo promociones + permiso (migración 094): link a Promociones
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false }: Props) {
   // Inventario simple: el precio de venta es el que se guardó (lo publicado en ML), no costo × categoría × exceso.
   const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
@@ -525,6 +526,12 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           <Link href="/productos/margenes" className="btn-secondary text-sm whitespace-nowrap"
             title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría">
             Márgenes &lt; $5
+          </Link>
+        )}
+        {country === 'VE' && promociones && (
+          <Link href="/productos/promociones" className="btn-secondary text-sm whitespace-nowrap"
+            title="Campañas de MercadoLibre y envío gratis por transportista (ZOOM / TEALCA)">
+            Promociones
           </Link>
         )}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nuevo producto</button>

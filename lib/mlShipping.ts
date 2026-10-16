@@ -168,3 +168,35 @@ export function shipInfo(
     unitsForFree: units, status: units ? 'aggregate' : 'impossible',
   }
 }
+
+// ── Envío gratis POR TRANSPORTISTA (2026-10-16, Promociones) ─────────────────
+// Cada transportista tiene su propio mínimo por peso (aviso del portal de MercadoEnvíos, oct-2026).
+// Una publicación tiene envío gratis por los que llega: ZOOM pide igual o más que TEALCA, así que
+// queda en uno de tres estados: ZOOM y TEALCA · solo TEALCA · cobro a destino. La tabla de arriba
+// (DEFAULT_SHIPPING_TABLE = la de TEALCA) sigue siendo la de Productos (tope y costo de envío).
+export const TABLA_ZOOM: ShipTier[] = [
+  { maxKg: 0.5, minPrice: 3 }, { maxKg: 1, minPrice: 10 }, { maxKg: 1.5, minPrice: 20 }, { maxKg: 2, minPrice: 20 },
+  { maxKg: 3, minPrice: 30 }, { maxKg: 4, minPrice: 40 }, { maxKg: 5, minPrice: 50 }, { maxKg: 10, minPrice: 60 },
+  { maxKg: 80, minPrice: 80 }, { maxKg: 100, minPrice: 200 },
+]
+export const TABLA_TEALCA: ShipTier[] = [
+  { maxKg: 0.5, minPrice: 3 }, { maxKg: 1, minPrice: 7 }, { maxKg: 1.5, minPrice: 15 }, { maxKg: 2, minPrice: 20 },
+  { maxKg: 3, minPrice: 30 }, { maxKg: 4, minPrice: 40 }, { maxKg: 5, minPrice: 50 }, { maxKg: 10, minPrice: 60 },
+  { maxKg: 80, minPrice: 80 }, { maxKg: 100, minPrice: 200 },
+]
+
+export type EstadoEnvio = 'ambas' | 'tealca' | 'destino' | 'sin_peso'
+
+/** Envío gratis a un precio dado: por qué transportistas, y los mínimos de cada uno para ese peso. */
+export function envioPorTransportista(pesoKg: number | null | undefined, precio: number) {
+  const z = tierFor(pesoKg, TABLA_ZOOM), t = tierFor(pesoKg, TABLA_TEALCA)
+  if (!z || !t) return { estado: 'sin_peso' as EstadoEnvio, minZoom: null, minTealca: null }
+  const estado: EstadoEnvio = precio >= z.minPrice ? 'ambas' : precio >= t.minPrice ? 'tealca' : 'destino'
+  return { estado, minZoom: z.minPrice, minTealca: t.minPrice }
+}
+
+/** Descuento máximo (%) sobre `precio` que mantiene el envío gratis con ese mínimo (null = ya no llega). */
+export function topeDescuento(precio: number, minimo: number | null) {
+  if (minimo == null || !(precio > 0) || precio < minimo) return null
+  return Math.floor((1 - minimo / precio) * 1000) / 10
+}

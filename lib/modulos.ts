@@ -28,6 +28,9 @@ export const MODULOS = {
   // Inventario completo vs simple (2026-10-12, decidido con el dueño): UNA sola base; estas opciones
   // prendidas = como trabaja SolucionesMC (migración 083 las prende a las empresas que ya llevaban
   // inventario). Apagadas = el Inventario simple de los Fundadores. Lo de siempre, sin pantallas aparte.
+  // Promociones de ML (2026-10-16, migración 094): Fase 1 solo lectura. Campañas de ML, en cuáles está
+  // cada publicación y hasta dónde puede bajar el precio sin perder el envío gratis (ZOOM / TEALCA).
+  promociones:    'Promociones de MercadoLibre: campañas, publicaciones adentro o candidatas y envío gratis por transportista (VE, con inventario)',
   verificar_pagos:    'Ventas: verificar el pago antes de procesar (Borrador → Pago verificado → Procesada). Apagado: se procesa directo (VE; CO ya trabaja así)',
   despachos_ventas:   'Despachos y Calificaciones con las ventas CARGADAS en Ventas. Apagado: con las ventas de MercadoLibre, aunque lleve inventario',
   compras_etapas:     'Compras por etapas (pago, en camino, recepción, finalizar). Apagado: "Entró mercancía", en un paso',
@@ -56,6 +59,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/pagos-me':       'pagos_me',
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
+  '/productos/promociones':   'promociones',
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {

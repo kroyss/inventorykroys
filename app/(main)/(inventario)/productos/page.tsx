@@ -54,6 +54,7 @@ export default async function ProductosPage() {
       descuento={tieneModulo(session.user, 'descuento_ml')}
       importarML={puede(session.user, 'importar_ml') && tieneModulo(session.user, 'preguntas')}
       categorias={tieneModulo(session.user, 'precios_categorias')}
+      promociones={tieneModulo(session.user, 'promociones') && puede(session.user, 'promociones')}
     />
   )
 }

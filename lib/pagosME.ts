@@ -75,7 +75,7 @@ export const hashCodigo = (c: string) => hashClave(`codigo:${normalizarCodigo(c)
 
 /** El vigilante se autentica con `Authorization: Bearer me_…` y dice su perfil (`x-perfil`). */
 export async function autenticarVigilante(req: NextRequest):
-  Promise<{ db: Pool; perfil: string; desdeML: boolean } | { error: NextResponse }> {
+  Promise<{ db: Pool; perfil: string; desdeML: boolean; modulos: string[] } | { error: NextResponse }> {
   // `x-vigilante-clave` además de Bearer: en staging el Authorization lo usa la clave de nginx.
   const clave = (req.headers.get('x-vigilante-clave') ?? (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')).trim()
   if (!/^me_[0-9a-f]{48}$/.test(clave)) return { error: NextResponse.json({ error: 'Clave del vigilante inválida' }, { status: 401 }) }
@@ -87,7 +87,7 @@ export async function autenticarVigilante(req: NextRequest):
   if (!emp || !emp.modulos?.includes('pagos_me')) {
     return { error: NextResponse.json({ error: 'Clave revocada o módulo apagado' }, { status: 401 }) }
   }
-  return { db: dbEmpresa(emp.empresa_id, emp.country), perfil, desdeML: ventasDesdeML({ modulos: emp.modulos }) }
+  return { db: dbEmpresa(emp.empresa_id, emp.country), perfil, desdeML: ventasDesdeML({ modulos: emp.modulos }), modulos: emp.modulos ?? [] }
 }
 
 // ── Archivos ────────────────────────────────────────────────────────────────

@@ -15,10 +15,23 @@ export async function POST(req: NextRequest) {
       `INSERT INTO me_latidos (perfil, visto_at) VALUES ($1, NOW())
        ON CONFLICT (empresa_id, perfil) DO UPDATE SET visto_at = NOW()`, [a.perfil])
     const { rows: [p] } = await a.db.query(
-      `SELECT id FROM me_pedidos
+      `SELECT id, pesos FROM me_pedidos
        WHERE pedido_at > NOW() - make_interval(mins => $1) AND NOT (resultados ? $2)
        ORDER BY id DESC LIMIT 1`, [PEDIDO_VIGENTE_MIN, a.perfil])
-    return NextResponse.json({ pedido: p ? Number(p.id) : null })
+    // Pesos del portal (Promociones, migración 094): la primera traída del día de cada cuenta, o la
+    // pedida con "Actualizar pesos". La extensión 1.3.2+ los lee; las anteriores ignoran el dato.
+    let pesos = false
+    if (p && a.modulos.includes('promociones')) {
+      if (p.pesos) pesos = true
+      else {
+        const { rows: [f] } = await a.db.query(
+          `SELECT MAX(m.actualizado_at) > NOW() - INTERVAL '20 hours' AS fresco
+           FROM me_latidos l LEFT JOIN me_productos m ON m.cuenta = l.cuenta
+           WHERE l.perfil = $1`, [a.perfil])
+        pesos = !f?.fresco
+      }
+    }
+    return NextResponse.json({ pedido: p ? Number(p.id) : null, pesos })
   } catch (err) {
     return apiError(err)
   }
