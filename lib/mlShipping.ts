@@ -200,3 +200,19 @@ export function topeDescuento(precio: number, minimo: number | null) {
   if (minimo == null || !(precio > 0) || precio < minimo) return null
   return Math.floor((1 - minimo / precio) * 1000) / 10
 }
+
+/**
+ * Cuántas unidades tiene que comprar el cliente para llegar al envío gratis con ese transportista (2026-10-16):
+ * n × precio ≥ mínimo del rango de n × peso (al sumar unidades el paquete pesa más y puede cambiar de rango).
+ * null = con 1 ya llega, o no se llega ni con MAX_UNIDADES.
+ */
+const MAX_UNIDADES = 10
+export function unidadesParaGratis(pesoKg: number | null | undefined, precio: number, tabla: ShipTier[]) {
+  if (pesoKg == null || !(pesoKg > 0) || !(precio > 0)) return null
+  for (let n = 1; n <= MAX_UNIDADES; n++) {
+    const t = tierFor(pesoKg * n, tabla)
+    if (!t) return null
+    if (precio * n >= t.minPrice) return n === 1 ? null : { unidades: n, total: Math.round(precio * n * 100) / 100 }
+  }
+  return null
+}

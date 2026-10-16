@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
-import { envioPorTransportista, topeDescuento, type EstadoEnvio } from '@/lib/mlShipping'
+import { envioPorTransportista, topeDescuento, unidadesParaGratis, TABLA_TEALCA, TABLA_ZOOM, type EstadoEnvio } from '@/lib/mlShipping'
 import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
 
 // Promociones de MercadoLibre, Fase 1: SOLO LECTURA (migración 094). Por publicación: en qué campañas
@@ -17,7 +17,7 @@ export interface FilaPromo {
   promos: (PromoDeItem & { nombre: string })[]
 }
 
-type Filtro = 'todas' | 'adentro' | 'candidatas' | 'tealca' | 'destino' | 'sin_peso'
+type Filtro = 'todas' | 'adentro' | 'candidatas' | 'quita' | 'tealca' | 'destino' | 'sin_peso'
 const POR_PAGINA = 50
 
 const usd = (n: number | null | undefined) => n == null ? '—' : `$${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -54,8 +54,15 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     const enPromo = adentro.length ? adentro.reduce((a, b) => (b.precio! < a.precio! ? b : a)) : null
     const actual = enPromo?.precio ?? f.precio
     const envio = envioPorTransportista(f.peso, actual)
+    // Sin la promoción, ¿tenía más envío gratis? (la promo lo baja de ZOOM a TEALCA, o a cobro a destino)
+    const sinPromo = envioPorTransportista(f.peso, f.precio)
+    const rango = { ambas: 2, tealca: 1, destino: 0, sin_peso: -1 } as const
     return {
       ...f, enPromo, actual,
+      quitaEnvio: !!enPromo && rango[sinPromo.estado] > rango[envio.estado],
+      // Cuántas unidades hacen falta para el envío gratis al precio actual.
+      uTealca: envio.estado === 'destino' ? unidadesParaGratis(f.peso, actual, TABLA_TEALCA) : null,
+      uZoom: envio.estado === 'destino' || envio.estado === 'tealca' ? unidadesParaGratis(f.peso, actual, TABLA_ZOOM) : null,
       descuento: enPromo && f.precio > 0 ? (1 - actual / f.precio) * 100 : 0,
       candidatas: f.promos.filter(p => p.estado === 'candidate'),
       envio,
@@ -70,6 +77,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     todas: () => true,
     adentro: v => !!v.enPromo,
     candidatas: v => v.candidatas.length > 0,
+    quita: v => v.quitaEnvio,
     tealca: v => v.envio.estado === 'tealca',
     destino: v => v.envio.estado === 'destino',
     sin_peso: v => v.envio.estado === 'sin_peso',
@@ -153,6 +161,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
             { value: 'todas', label: 'Todas', count: base.length },
             { value: 'adentro', label: 'En promoción', count: cuenta_(filtros.adentro) },
             { value: 'candidatas', label: 'Pueden entrar', count: cuenta_(filtros.candidatas) },
+            { value: 'quita', label: 'La promo quita el envío', count: cuenta_(filtros.quita) },
             { value: 'tealca', label: 'Pierden ZOOM', count: cuenta_(filtros.tealca) },
             { value: 'destino', label: 'Cobro a destino', count: cuenta_(filtros.destino) },
             { value: 'sin_peso', label: 'Sin peso', count: cuenta_(filtros.sin_peso) },
@@ -196,6 +205,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                       {v.enPromo ? <>
                         <div className="font-medium text-neutral-900">{usd(v.actual)} <span className="text-emerald-700">−{pct(v.descuento)}</span></div>
                         <div className="text-neutral-500">{v.enPromo.nombre}</div>
+                        {v.quitaEnvio && <div className="mt-0.5 text-red-700 font-medium">⚠ La promo le quita el envío gratis</div>}
                       </> : <span className="text-neutral-400">—</span>}
                     </td>
                     <td className="px-3 py-2 text-xs">
@@ -206,6 +216,10 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                     <td className="px-3 py-2 text-xs">
                       <span className={`inline-block px-2 py-0.5 rounded-full border ${ENVIO[v.envio.estado].c}`}>{ENVIO[v.envio.estado].t}</span>
                       {v.envio.minZoom != null && <div className="text-[11px] text-neutral-400 mt-0.5">mín. ZOOM {usd(v.envio.minZoom)} · TEALCA {usd(v.envio.minTealca)}</div>}
+                      {v.uTealca && <div className="text-[11px] text-emerald-700 mt-0.5">Gratis desde <b>{v.uTealca.unidades} u.</b> ({usd(v.uTealca.total)})</div>}
+                      {v.uZoom && (!v.uTealca || v.uZoom.unidades !== v.uTealca.unidades) && (
+                        <div className="text-[11px] text-emerald-700">ZOOM desde <b>{v.uZoom.unidades} u.</b> ({usd(v.uZoom.total)})</div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap">
                       {v.envio.estado === 'sin_peso' ? <span className="text-neutral-400">falta el peso</span> : <>
@@ -222,6 +236,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
         )}
         <p className="text-xs text-neutral-400">
           El descuento máximo se calcula sobre el precio publicado y la tabla de MercadoEnvíos (oct-2026) de cada transportista.
+          «Desde N u.»: el cliente que compra esa cantidad llega al envío gratis (contando que el paquete pesa más).
           Esta versión no ve los descuentos individuales que hayas puesto a mano en una publicación; solo las campañas.
         </p>
       </>}
