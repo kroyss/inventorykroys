@@ -119,17 +119,17 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   type Vista = typeof vistas[number]
   const porClave = useMemo(() => new Map(vistas.map(v => [clave(v), v])), [vistas])
 
-  // Sugerencias (Fase 3): candidatas que, con el % propuesto, respetan el mínimo de ML, no pierden envío
-  // gratis y quedan con margen ≥ el mínimo.
+  // Sugerencias: las que pueden entrar y que, con el % propuesto, NO pierden el envío gratis (y no quedan
+  // bajo el mínimo que acepta ML). De ML: las que ML invita. Propia: las de la cuenta que todavía no están.
+  // El margen no filtra (muchas publicaciones no tienen costo): se ve como aviso en la vista previa.
   const sugeridas = (c: CampanaVista) => vistas.filter(v => {
     if (v.conexionId !== c.conexionId) return false
-    const cand = v.promos.find(p => p.campana === c.id && p.estado === 'candidate')
-    if (!cand) return false
+    const p = v.promos.find(x => x.campana === c.id)
+    if (p?.estado === 'started') return false
+    if (c.tipo !== 'SELLER_CAMPAIGN' && p?.estado !== 'candidate') return false
     const precio = redondear(v.precio * (1 - pctSug / 100))
-    if (cand.minimo != null && precio < cand.minimo) return false
-    if (RANGO[envioPorTransportista(v.peso, precio).estado] < RANGO[v.envio.estado]) return false
-    const m = margenA(v, precio)
-    return m != null && m >= margenMin
+    if (p?.minimo != null && precio < p.minimo) return false
+    return RANGO[envioPorTransportista(v.peso, precio).estado] >= RANGO[v.envio.estado]
   })
 
   const [campCon, campId] = campana ? campana.split('|') : ['', '']
@@ -261,13 +261,13 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
               <span>Sugerencias con</span>
               <input type="number" min={1} max={80} value={pctSug} onChange={e => setPctSug(Math.max(1, Math.min(80, Number(e.target.value) || 10)))}
                 className="w-14 border border-neutral-300 rounded px-1.5 py-0.5 text-right" />
-              <span>% de descuento: sin perder envío gratis y con margen ≥ {margenMin}%.</span>
+              <span>% de descuento: las que con ese descuento no pierden el envío gratis.</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {campanas.map(c => {
                 const k = `${c.conexionId}|${c.id}`
                 const propia = c.tipo === 'SELLER_CAMPAIGN'
-                const sug = propia ? [] : sugeridas(c)
+                const sug = sugeridas(c)
                 return (
                   <div key={k} className={`rounded-xl border px-4 py-3 bg-white ${campana === k ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-neutral-200'}`}>
                     <button onClick={() => { setCampana(campana === k ? '' : k); setPagina(1); setSel(new Set()) }} className="w-full text-left">
@@ -515,10 +515,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const confirmar = async () => {
     const pierden = validas.filter(x => x.pierde).length
     const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
-    const enOtra = validas.filter(x => x.otra).length
     const avisos = [pierden && `• ${pierden} pierde${pierden === 1 ? '' : 'n'} el envío gratis con este precio.`,
-      bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con margen menor a ${margenMin}%.`,
-      enOtra && `• ${enOtra} ya está${enOtra === 1 ? '' : 'n'} en otra promoción: ML cobra la más baja.`].filter(Boolean).join('\n')
+      bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con margen menor a ${margenMin}%.`].filter(Boolean).join('\n')
     if (avisos && !await confirmarAviso({
       title: `Revisa antes de agregar a «${camp!.nombre}»`,
       message: `${avisos}\n\n¿Agregar las ${validas.length} igual?`,
@@ -578,6 +576,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                   <th className="px-2 py-1.5 text-left">Publicación</th><th className="px-2 py-1.5 text-right">Publicado</th>
                   <th className="px-2 py-1.5 text-right">Nuevo</th><th className="px-2 py-1.5 text-left">Envío gratis</th>
                   <th className="px-2 py-1.5 text-right">Margen</th><th className="px-2 py-1.5 text-left">Nota</th>
+                  <th className="px-2 py-1.5 w-6"></th>
                 </tr>
               </thead>
               <tbody>
@@ -607,7 +606,13 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                               <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
                             </span>
                           )}</span>
-                        : x.motivo ?? (x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)}): ML cobra la más baja` : '')}
+                        : x.motivo ?? (x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {!resultados[x.f.id] && (
+                        <button onClick={() => setModal({ ...modal, claves: modal.claves.filter(k => k !== `${x.f.conexionId}|${x.f.id}`) })}
+                          className="text-neutral-400 hover:text-red-700" title="Quitar de esta lista">✕</button>
+                      )}
                     </td>
                   </tr>
                 ))}
