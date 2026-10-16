@@ -343,6 +343,11 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                         {v.enPromo ? <>
                           <div className="font-medium text-neutral-900">{usd(v.actual)} <span className="text-emerald-700">−{pct(v.descuento)}</span></div>
                           <div className="text-neutral-500">{v.enPromo.nombre}</div>
+                          {v.promos.filter(p => p.estado === 'started' && p.campana !== v.enPromo!.campana).map(p => (
+                            <div key={p.campana} className="text-neutral-400" title="Guardada: se aplica cuando termine la más baja">
+                              también: {p.nombre} {usd(p.precio)} (en espera)
+                            </div>
+                          ))}
                           {v.quitaEnvio && <div className="mt-0.5 text-red-700 font-medium">⚠ La promo le quita el envío gratis</div>}
                           <button onClick={() => sacar(v, v.enPromo!)} disabled={!!busy} className="mt-0.5 underline text-neutral-400 hover:text-red-700">
                             {busy === `sacar-${k}` ? 'Sacando…' : 'Sacar'}
@@ -415,7 +420,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
 }) {
   const [enviando, setEnviando] = useState(false)
   // Lo que respondió ML por publicación. Si dijo "no es una rebaja real", se puede reintentar A MANO con otro %.
-  const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; error?: string; noCreible?: boolean }>>({})
+  const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }>>({})
   const [reintento, setReintento] = useState<Record<string, number>>({})
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
@@ -453,12 +458,12 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
     if (!r.ok) return onHecho('', d.error ?? 'No se pudo agregar')
-    const res = d.resultados as { id: string; ok: boolean; precio?: number; error?: string; noCreible?: boolean }[]
+    const res = d.resultados as { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }[]
     const nuevos = { ...resultados }
     for (const x of res) nuevos[x.id] = x
     setResultados(nuevos)
     // Todo bien: se cierra. Con errores queda abierto para ver el motivo y reintentar a mano.
-    if (res.every(x => x.ok)) onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${d.ok === 1 ? '' : 's'} en MercadoLibre.`)
+    if (res.every(x => x.ok) && !res.some(x => x.manda)) onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${d.ok === 1 ? '' : 's'} en MercadoLibre.`)
   }
   const confirmar = async () => {
     const pierden = validas.filter(x => x.pierde).length
@@ -529,7 +534,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                       {x.margen == null ? '—' : pct(x.margen)}
                     </td>
                     <td className="px-2 py-1.5 text-neutral-500">
-                      {resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}</span>
+                      {resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}
+                          {resultados[x.f.id].manda != null && <span className="block text-amber-700">Hoy manda otra promoción más baja ({usd(resultados[x.f.id].manda)}): esta se aplica cuando aquella termine.</span>}</span>
                         : resultados[x.f.id] ? <span className="text-red-700">{resultados[x.f.id].error}
                           {resultados[x.f.id].noCreible && (
                             <span className="mt-1 flex items-center gap-1 text-neutral-700">

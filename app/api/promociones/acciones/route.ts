@@ -32,11 +32,11 @@ export async function POST(req: NextRequest) {
     if (b.accion === 'agregar' && b.campana.estado && b.campana.estado !== 'started') {
       return NextResponse.json({ error: 'Esta campaña todavía no empezó: MercadoLibre no guarda publicaciones antes del inicio. Agrégalas el día que empiece.' }, { status: 400 })
     }
-    const resultados: { id: string; ok: boolean; precio?: number; error?: string; noCreible?: boolean }[] = []
+    const resultados: { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }[] = []
     for (const it of b.items) {
       if (b.accion === 'agregar') {
         const r = await agregarACampana(s.db, b.conexionId, s.userId, it as { id: string; precio: number; precioAntes: number }, b.campana)
-        resultados.push(r.ok ? { id: it.id, ok: true, precio: r.datos } : { id: it.id, ok: false, error: r.error, noCreible: /rebaja real/.test(r.error) })
+        resultados.push(r.ok ? { id: it.id, ok: true, precio: r.datos.precio, manda: r.datos.manda } : { id: it.id, ok: false, error: r.error, noCreible: /rebaja real/.test(r.error) })
       } else {
         const r = await quitarDeCampana(s.db, b.conexionId, s.userId, it.id, b.campana)
         resultados.push(r.ok ? { id: it.id, ok: true } : { id: it.id, ok: false, error: r.error })

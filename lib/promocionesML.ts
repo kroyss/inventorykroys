@@ -102,7 +102,6 @@ export async function actualizarPromociones(db: Pool, conexionId: number): Promi
     await Promise.all(lista.slice(i, i + 8).map(async it => {
       const v = await precioVigente(db, conexionId, it.id)
       if (!v) return
-      for (const p of it.promos) if (p.estado === 'started' && p.campana !== v.campana) { p.estado = 'candidate'; p.precio = null }
       if (v.campana) {
         const p = it.promos.find(x => x.campana === v.campana)
         if (p) { p.estado = 'started'; p.precio = v.amount }
@@ -213,19 +212,32 @@ async function precioVigente(db: Pool, conexionId: number, itemId: string): Prom
 }
 const esperar = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-/** Deja en la foto guardada el estado REAL de una publicación: en esa campaña a ese precio, o sin promo. */
-async function marcarEnFoto(db: Pool, conexionId: number, itemId: string, v: PrecioVigente | null) {
+/** Precios de promoción guardados (activos o por empezar). Una publicación puede estar en VARIAS a la vez
+ *  (probado 16-10: 15% a $5,33 y Ofertas top Q4 a $5,64): ML cobra la más baja y, cuando esa termina, la otra. */
+async function preciosPromo(db: Pool, conexionId: number, itemId: string): Promise<number[]> {
+  const r = await mlFetch<{ prices?: { type: string; amount: number; conditions?: { end_time?: string | null } }[] }>(
+    db, conexionId, `/items/${encodeURIComponent(itemId)}/prices`).catch(() => null)
+  const ahora = Date.now()
+  return (r?.prices ?? []).filter(p => p.type === 'promotion' && (!p.conditions?.end_time || Date.parse(p.conditions.end_time) > ahora))
+    .map(p => Number(p.amount))
+}
+
+/** Anota en la foto guardada una publicación en esa campaña a ese precio (precio null = salió de ella).
+ *  Las demás promociones de la publicación no se tocan: puede estar en varias a la vez. */
+async function marcarEnFoto(db: Pool, conexionId: number, itemId: string, campanaId: string, precio: number | null) {
   await db.query(
     `UPDATE ml_promociones_cache SET datos = jsonb_set(datos, '{items}', (
-       SELECT COALESCE(jsonb_agg(CASE WHEN i->>'id' = $2 THEN jsonb_set(i, '{promos}', (
-         SELECT COALESCE(jsonb_agg(CASE
-           WHEN p->>'campana' = $3 THEN jsonb_set(jsonb_set(p, '{estado}', '"started"'), '{precio}', to_jsonb($4::numeric))
-           WHEN p->>'estado' = 'started' THEN jsonb_set(jsonb_set(p, '{estado}', '"candidate"'), '{precio}', 'null')
-           ELSE p END), '[]'::jsonb)
-         FROM jsonb_array_elements(i->'promos') p)) ELSE i END), '[]'::jsonb)
+       SELECT COALESCE(jsonb_agg(CASE WHEN i->>'id' = $2 THEN jsonb_set(i, '{promos}',
+         CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(i->'promos') p WHERE p->>'campana' = $3)
+           THEN (SELECT jsonb_agg(CASE WHEN p->>'campana' = $3
+                   THEN jsonb_set(jsonb_set(p, '{estado}', to_jsonb(CASE WHEN $4::numeric IS NULL THEN 'candidate' ELSE 'started' END)), '{precio}', COALESCE(to_jsonb($4::numeric), 'null'))
+                   ELSE p END) FROM jsonb_array_elements(i->'promos') p)
+           ELSE COALESCE(i->'promos', '[]'::jsonb) || CASE WHEN $4::numeric IS NULL THEN '[]'::jsonb
+                ELSE jsonb_build_array(jsonb_build_object('campana', $3, 'estado', 'started', 'precio', $4::numeric, 'minimo', NULL)) END
+         END) ELSE i END), '[]'::jsonb)
        FROM jsonb_array_elements(datos->'items') i))
      WHERE conexion_id = $1`,
-    [conexionId, itemId, v?.campana ?? '', v?.campana ? v.amount : null])
+    [conexionId, itemId, campanaId, precio])
 }
 
 /** ¿Qué publicaciones tiene esta campaña? Las que ML lista como adentro + las agregadas desde el sistema. */
@@ -285,16 +297,16 @@ export async function agregarACampana(db: Pool, conexionId: number, usuarioId: n
         method: 'POST', body: { promotion_id: campana.id, promotion_type: campana.tipo, deal_price: precio },
       })
       let v: PrecioVigente | null = null
-      for (let i = 0; i < 4; i++) {
+      let guardado = false
+      for (let i = 0; i < 4 && !guardado; i++) {
         await esperar(1500)
         v = await precioVigente(db, conexionId, item.id)
-        if (v?.campana === campana.id) break
+        guardado = v?.campana === campana.id || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
       }
-      if (v?.campana !== campana.id) {
-        throw new Error('MercadoLibre respondió que sí, pero el precio de la publicación no cambió: no quedó en la campaña')
-      }
-      await marcarEnFoto(db, conexionId, item.id, v)
-      return v.amount
+      if (!guardado) throw new Error('MercadoLibre respondió que sí, pero el precio no quedó guardado en la publicación: no entró a la campaña')
+      await marcarEnFoto(db, conexionId, item.id, campana.id, precio)
+      // Hoy manda otra promoción más baja: esta queda guardada y se aplica cuando aquella termine.
+      return { precio, manda: v && v.campana !== campana.id && v.amount < precio ? v.amount : null }
     })
 }
 
@@ -311,7 +323,7 @@ export async function quitarDeCampana(db: Pool, conexionId: number, usuarioId: n
         if (v?.campana !== campana.id) break
       }
       if (v?.campana === campana.id) throw new Error('MercadoLibre respondió que sí, pero la publicación sigue con el precio de la campaña')
-      await marcarEnFoto(db, conexionId, itemId, v)
+      await marcarEnFoto(db, conexionId, itemId, campana.id, null)
       return true
     })
 }
