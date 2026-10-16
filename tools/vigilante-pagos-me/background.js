@@ -21,6 +21,7 @@ chrome.runtime.onInstalled.addListener(() => chrome.alarms.create('latido', { pe
 chrome.runtime.onStartup.addListener(() => { chrome.alarms.create('latido', { periodInMinutes: 1 }); latido() })
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'latido') latido() })
 chrome.runtime.onMessage.addListener((m, _s, responder) => {
+  if (m?.tipo === 'verificar') { verificarCuenta().then(responder); return true }
   if (m?.tipo === 'latido') { latido().then(responder); return true }
 })
 
@@ -40,7 +41,10 @@ async function api(cfg, ruta, body) {
     method: 'POST', headers, body: JSON.stringify(body ?? {}),
   })
   const d = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`)
+  if (!r.ok) {
+    if (d.verificacion) await chrome.storage.local.set({ verificacion: { ...d.verificacion, at: new Date().toLocaleString('es-VE') } })
+    throw new Error(d.error || `HTTP ${r.status}`)
+  }
   return d
 }
 
@@ -98,9 +102,13 @@ async function procesar(cfg, pedido, pesos = false) {
     if (!leido?.ok) throw new Error(leido?.error || 'No se pudo leer el portal')
     vistas = leido.ordenes.length
 
-    const { faltan } = await api(cfg, 'faltan', {
+    // 1.3.4: el sistema verifica que la cuenta del portal sea de una cuenta de ML conectada; si es otra,
+    // responde 409 'cuenta_no_conectada' y no se sube nada.
+    const { faltan, verificacion } = await api(cfg, 'faltan', {
+      cuenta: leido.cuenta || null,
       ordenes: leido.ordenes.map(o => ({ venta: o.venta, guia: !!o.guia_url, comprobante: !!o.comprobante_url })),
     })
+    if (verificacion) await chrome.storage.local.set({ verificacion: { ...verificacion, at: new Date().toLocaleString('es-VE') } })
     const porVenta = new Map(leido.ordenes.map(o => [o.venta, o]))
     for (const venta of faltan) {
       const o = porVenta.get(venta)
@@ -133,12 +141,40 @@ async function procesar(cfg, pedido, pesos = false) {
     await api(cfg, 'fin', { pedido, ok: false, vistas, nuevas, error }).catch(() => {})
     await anotar(error === 'sin_sesion'
       ? 'La sesión de MercadoEnvíos de este perfil se cerró: inicia sesión en el portal.'
-      : `Error: ${error}`)
+      : error === 'cuenta_no_conectada'
+        ? 'La cuenta de MercadoEnvíos abierta en este Chrome no es de ninguna cuenta conectada en el sistema: no se trajo nada.'
+        : `Error: ${error}`)
   } finally {
     if (creada && tabId != null) chrome.tabs.remove(tabId).catch(() => {})
     // Sin sesión la ventana queda abierta: quien entre a la PC inicia sesión ahí mismo.
     if (despertada && !sinSesion) cerrarVentana(despertada)
     trabajando = false
+  }
+}
+
+/** ¿Qué cuenta de MercadoEnvíos está abierta en este Chrome y a qué cuenta del sistema corresponde? (1.3.4)
+ *  Lee el portal en una pestaña de fondo (o la que ya esté abierta) y le pregunta al sistema. */
+async function verificarCuenta() {
+  const cfg = await config()
+  if (!cfg.clave || !cfg.perfil) return { estado: 'sin_conectar' }
+  let [tab] = await chrome.tabs.query({ url: `${PORTAL}/*` })
+  let creada = false
+  try {
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: `${PORTAL}/vendedor/orden`, active: false })
+      creada = true
+      await esperarCarga(tab.id)
+    }
+    const [{ result: leido }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: 'MAIN', func: leerOrdenes, args: [DIAS] })
+    if (!leido?.ok) return { estado: leido?.error === 'sin_sesion' ? 'sin_sesion' : 'error', error: leido?.error }
+    const v = await api(cfg, 'verificar', { cuenta: leido.cuenta || null, ventas: leido.ordenes.map(o => o.venta) })
+    const res = { ...v, at: new Date().toLocaleString('es-VE') }
+    await chrome.storage.local.set({ verificacion: res })
+    return res
+  } catch (e) {
+    return { estado: 'error', error: String(e.message || e) }
+  } finally {
+    if (creada && tab) chrome.tabs.remove(tab.id).catch(() => {})
   }
 }
 

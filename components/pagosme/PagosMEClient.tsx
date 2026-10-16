@@ -11,7 +11,7 @@ interface Datos {
   conteo: Partial<Record<'pendiente' | 'valido' | 'invalido', number>>
   vigilante: {
     clave: boolean
-    latidos: { perfil: string; cuenta: string | null; visto_at: string; conectado: boolean }[]
+    latidos: { perfil: string; cuenta: string | null; cuenta_portal?: string | null; verificacion?: string | null; visto_at: string; conectado: boolean }[]
     pedido: { id: number; pedido_at: string; vigente: boolean; automatico: boolean; resultados: Record<string, Resultado> } | null
   }
   horario: HorarioME
@@ -31,6 +31,7 @@ const FILTROS: { k: Filtro; t: string }[] = [
   { k: 'invalido', t: 'Inválidos' }, { k: 'todos', t: 'Todos' },
 ]
 const ERROR_PERFIL: Record<string, string> = {
+  cuenta_no_conectada: 'tiene abierta en Chrome una cuenta de MercadoEnvíos que NO es de ninguna cuenta de MercadoLibre conectada: no se trajo nada. Entra al portal con la cuenta correcta',
   sin_sesion: 'no tiene la sesión de MercadoEnvíos iniciada: en la PC quedó abierta esa ventana; inicia sesión ahí y vuelve a traer',
 }
 
@@ -170,6 +171,12 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
             </span>
           )}
         </div>
+        {datos?.vigilante.latidos.filter(l => l.verificacion === 'distinta').map(l => (
+          <div key={l.perfil} className="mt-2 rounded-lg bg-red-50 border border-red-200 p-2 text-red-800">
+            ⚠ Un Chrome de la PC tiene abierta la cuenta de MercadoEnvíos <b>{l.cuenta_portal ?? l.perfil}</b>, que no corresponde a ninguna
+            cuenta de MercadoLibre conectada. No se trae nada de ella: entra al portal con la cuenta correcta en ese Chrome.
+          </div>
+        ))}
         {codigo && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
         {clave && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
@@ -324,7 +331,7 @@ function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML }: {
     new Date(pedido.pedido_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })}`
   const detalle = res.map(([perfil, r]) => (
     <span key={perfil} className="mr-3 whitespace-nowrap">
-      <b>{r.cuenta ?? nombre(perfil)}</b>{' '}
+      <b>{nombre(perfil) !== perfil ? nombre(perfil) : (r.cuenta ?? perfil)}</b>{' '}
       {r.ok ? `${r.nuevas} nuevas (${r.vistas} revisadas)` : <span className="text-red-700">{ERROR_PERFIL[r.error ?? ''] ?? r.error ?? 'error'}</span>}
     </span>
   ))

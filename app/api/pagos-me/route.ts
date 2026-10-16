@@ -52,8 +52,11 @@ export async function GET(req: NextRequest) {
                   WHERE fecha_orden > NOW() - INTERVAL '30 days' GROUP BY 1`),
       // Perfiles con señal en los últimos 3 días: uno que ya no se usa (extensión quitada, perfil viejo) no
       // queda para siempre como "no respondió".
-      s.db.query(`SELECT perfil, cuenta, visto_at, visto_at > NOW() - make_interval(mins => $1) AS conectado
-                  FROM me_latidos WHERE visto_at > NOW() - INTERVAL '3 days' ORDER BY perfil`, [LATIDO_MIN]),
+      // Nombre a mostrar: la cuenta de ML a la que quedó unido (PIKEKE) o, si no, el del portal (migración 096).
+      s.db.query(`SELECT l.perfil, COALESCE(x.nickname, l.cuenta) AS cuenta, l.cuenta AS cuenta_portal, l.verificacion,
+                         l.visto_at, l.visto_at > NOW() - make_interval(mins => $1) AS conectado
+                  FROM me_latidos l LEFT JOIN ml_conexiones x ON x.id = l.conexion_id
+                  WHERE l.visto_at > NOW() - INTERVAL '3 days' ORDER BY l.perfil`, [LATIDO_MIN]),
       // vigente (para la pantalla) = todavía "trayendo"; pasado TRAIDA_EN_CURSO_MIN se muestra incompleta.
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                   FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),

@@ -169,3 +169,44 @@ async function guiaALote(db: Pool, venta: string, guiaPath: string, userId: numb
     client.release()
   }
 }
+
+// ── ¿De qué cuenta de MercadoLibre es este perfil? (migración 096) ──────────
+export type VerificacionCuenta = {
+  estado: 'ok' | 'distinta' | 'sin_datos'
+  nickname: string | null           // la cuenta de ML conectada en el sistema (PIKEKE…)
+  cuenta: string | null             // el nombre que da el portal de MercadoEnvíos
+  coincidencias: number
+  revisadas: number
+}
+
+/**
+ * Cruza las ventas que el perfil ve en el portal de MercadoEnvíos con las ventas de ML de las cuentas
+ * conectadas en la empresa. Si coinciden, el perfil queda unido a esa cuenta; si ninguna coincide (y hay
+ * con qué comparar), es OTRA cuenta de MercadoEnvíos: no se guarda nada de ella. Sin ventas propias
+ * recientes en el sistema (cuenta recién conectada) no se puede saber: no se bloquea.
+ */
+export async function verificarCuenta(db: Pool, perfil: string, cuentaPortal: string | null, ventas: string[]): Promise<VerificacionCuenta> {
+  const nums = [...new Set(ventas.filter(v => /^\d{1,18}$/.test(v)))].slice(0, 500)
+  let estado: VerificacionCuenta['estado'] = 'sin_datos', nickname: string | null = null, conexion: number | null = null, coincidencias = 0
+  if (nums.length) {
+    const { rows } = await db.query(
+      `SELECT o.conexion_id, x.nickname, COUNT(DISTINCT v.n)::int AS n
+       FROM unnest($1::bigint[]) AS v(n)
+       JOIN ml_ordenes o ON o.id = v.n OR o.pack_id = v.n
+       JOIN ml_conexiones x ON x.id = o.conexion_id
+       GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 1`, [nums])
+    if (rows[0]) {
+      estado = 'ok'; nickname = rows[0].nickname; conexion = rows[0].conexion_id; coincidencias = rows[0].n
+    } else if (nums.length >= 3) {
+      // Solo si la empresa tiene ventas sincronizadas recientes: si no, no hay con qué comparar.
+      const { rows: [h] } = await db.query(`SELECT EXISTS (SELECT 1 FROM ml_ordenes WHERE fecha > NOW() - INTERVAL '10 days') AS hay`)
+      if (h.hay) estado = 'distinta'
+    }
+  }
+  await db.query(
+    `INSERT INTO me_latidos (perfil, cuenta, conexion_id, verificacion, verificado_at, visto_at) VALUES ($1, $2, $3, $4, NOW(), NOW())
+     ON CONFLICT (empresa_id, perfil) DO UPDATE SET cuenta = COALESCE(EXCLUDED.cuenta, me_latidos.cuenta),
+       conexion_id = EXCLUDED.conexion_id, verificacion = EXCLUDED.verificacion, verificado_at = NOW()`,
+    [perfil, cuentaPortal, conexion, estado])
+  return { estado, nickname, cuenta: cuentaPortal, coincidencias, revisadas: nums.length }
+}

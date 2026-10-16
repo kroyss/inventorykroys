@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { autenticarVigilante } from '@/lib/pagosME'
+import { autenticarVigilante, verificarCuenta } from '@/lib/pagosME'
 
 const Body = z.object({
+  cuenta: z.string().trim().max(80).nullish(),        // nombre en el portal (extensión 1.3.4+)
   ordenes: z.array(z.object({
     venta: z.string().regex(/^\d{6,20}$/),
     guia: z.boolean(),
@@ -25,8 +26,13 @@ export async function POST(req: NextRequest) {
   const a = await autenticarVigilante(req)
   if ('error' in a) return a.error
   try {
-    const { ordenes } = Body.parse(await req.json())
+    const { ordenes, cuenta } = Body.parse(await req.json())
     if (ordenes.length === 0) return NextResponse.json({ faltan: [] })
+    // ¿Es una cuenta de ML conectada? (migración 096). Si es OTRA cuenta de MercadoEnvíos, no se guarda nada.
+    const verificacion = await verificarCuenta(a.db, a.perfil, cuenta ?? null, ordenes.map(o => o.venta))
+    if (verificacion.estado === 'distinta') {
+      return NextResponse.json({ error: 'cuenta_no_conectada', verificacion }, { status: 409 })
+    }
     const { rows } = await a.db.query(
       `SELECT venta, guia_path IS NOT NULL AS g, comprobante_path IS NOT NULL AS c
        FROM me_pagos WHERE venta = ANY($1::text[])`, [ordenes.map(o => o.venta)])
@@ -46,7 +52,7 @@ export async function POST(req: NextRequest) {
       if (!r) return !resuelta.has(o.venta)
       return (o.guia && !r.g) || (o.comprobante && !r.c)
     }).map(o => o.venta)
-    return NextResponse.json({ faltan })
+    return NextResponse.json({ faltan, verificacion })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return apiError(err)
