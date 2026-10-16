@@ -21,8 +21,10 @@ export async function GET(req: NextRequest) {
       const [{ rows: [pedido] }, { rows: latidos }] = await Promise.all([
         s.db.query(`SELECT pedido_at, resultados, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                     FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
-        s.db.query(`SELECT perfil, visto_at > NOW() - make_interval(mins => $1) AS conectado FROM me_latidos
-                    WHERE visto_at > NOW() - INTERVAL '3 days'`, [LATIDO_MIN]),
+        s.db.query(`SELECT DISTINCT ON (COALESCE(conexion_id::text, cuenta, perfil)) perfil,
+                           visto_at > NOW() - make_interval(mins => $1) AS conectado
+                    FROM me_latidos WHERE visto_at > NOW() - INTERVAL '3 days'
+                    ORDER BY COALESCE(conexion_id::text, cuenta, perfil), visto_at DESC`, [LATIDO_MIN]),
       ])
       const resultados = (pedido?.resultados ?? {}) as Record<string, { ok: boolean; at: string }>
       const perfiles = latidos.filter(l => l.perfil !== 'DESPERTADOR').map(l => l.perfil as string)
@@ -53,10 +55,15 @@ export async function GET(req: NextRequest) {
       // Perfiles con señal en los últimos 3 días: uno que ya no se usa (extensión quitada, perfil viejo) no
       // queda para siempre como "no respondió".
       // Nombre a mostrar: la cuenta de ML a la que quedó unido (PIKEKE) o, si no, el del portal (migración 096).
-      s.db.query(`SELECT l.perfil, COALESCE(x.nickname, l.cuenta) AS cuenta, l.cuenta AS cuenta_portal, l.verificacion,
-                         l.visto_at, l.visto_at > NOW() - make_interval(mins => $1) AS conectado
-                  FROM me_latidos l LEFT JOIN ml_conexiones x ON x.id = l.conexion_id
-                  WHERE l.visto_at > NOW() - INTERVAL '3 days' ORDER BY l.perfil`, [LATIDO_MIN]),
+      // Un perfil por cuenta: el más reciente (al reconectar una extensión queda un perfil nuevo para la misma cuenta).
+      s.db.query(`SELECT * FROM (
+                    SELECT DISTINCT ON (COALESCE(l.conexion_id::text, l.cuenta, l.perfil)) l.perfil,
+                           COALESCE(x.nickname, l.cuenta) AS cuenta, l.cuenta AS cuenta_portal, l.verificacion,
+                           l.visto_at, l.visto_at > NOW() - make_interval(mins => $1) AS conectado
+                    FROM me_latidos l LEFT JOIN ml_conexiones x ON x.id = l.conexion_id
+                    WHERE l.visto_at > NOW() - INTERVAL '3 days'
+                    ORDER BY COALESCE(l.conexion_id::text, l.cuenta, l.perfil), l.visto_at DESC) t
+                  ORDER BY cuenta NULLS LAST, perfil`, [LATIDO_MIN]),
       // vigente (para la pantalla) = todavía "trayendo"; pasado TRAIDA_EN_CURSO_MIN se muestra incompleta.
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                   FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
