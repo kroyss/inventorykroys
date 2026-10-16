@@ -170,7 +170,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     return d
   }
 
-  const actualizarML = async () => {
+  const actualizarML = async (notaME?: string) => {
     setBusy('ml'); setError(null); setAviso('Leyendo campañas y precios de MercadoLibre… puede tardar un minuto.')
     const r = await fetch('/api/promociones/actualizar', { method: 'POST' })
     const d = await r.json().catch(() => ({}))
@@ -178,15 +178,35 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     if (!r.ok) { setAviso(null); setError(d.error ?? 'No se pudo leer MercadoLibre. Revisa que las cuentas sigan conectadas y prueba de nuevo.'); return }
     const res = (d.resultado ?? []) as { cuenta: string; ok: boolean; publicaciones?: number; campanas?: number; error?: string }[]
     setAviso(res.map(x => x.ok ? `${x.cuenta}: ${x.publicaciones} publicaciones, ${x.campanas} campañas` : `${x.cuenta}: error (${x.error})`).join(' · ') || 'Sin cuentas activas')
+    if (notaME) setError(notaME)
     router.refresh()
   }
-  const actualizarPesos = async () => {
-    setBusy('pesos')
-    await llamar('/api/promociones/pesos', { method: 'POST' },
-      () => 'Pedido enviado a la PC de Pagos ME: trae los pesos del portal en 1–2 minutos (la PC tiene que estar prendida). Recarga la página después.',
-      'No se pudo pedir los pesos a la PC de Pagos ME.')
-    setBusy(null)
+  // "Traer ME y ML" (como Traer ME en Por confirmar): la PC de Pagos ME lee los pesos del portal (1-3 min);
+  // cuando terminan todos sus perfiles, se lee MercadoLibre. Si la PC no responde en 5 min, solo ML.
+  const [pedidoME, setPedidoME] = useState<{ id: number; desde: number } | null>(null)
+  const traerTodo = async () => {
+    if (!conPagosME) return actualizarML()
+    setError(null)
+    const r = await fetch('/api/promociones/pesos', { method: 'POST' }).catch(() => null)
+    const d = await r?.json().catch(() => null)
+    if (!r?.ok || !d?.pedido) return actualizarML('No se pudo pedir los pesos a la PC de Pagos ME: se trajo solo lo de MercadoLibre.')
+    setBusy('pesos'); setAviso('Trayendo pesos del portal de MercadoEnvíos con la PC de Pagos ME (1 a 3 min). Después se lee MercadoLibre.')
+    setPedidoME({ id: d.pedido, desde: Date.now() })
   }
+  useEffect(() => {
+    if (!pedidoME) return
+    const t = setInterval(async () => {
+      const r = await fetch(`/api/promociones/pesos?pedido=${pedidoME.id}`, { cache: 'no-store' }).catch(() => null)
+      const d = await r?.json().catch(() => null) as { hechos: number; perfiles: number; errores: string[] } | null
+      const vencido = Date.now() - pedidoME.desde > 5 * 60_000
+      if (d && d.hechos < d.perfiles && !vencido) { setAviso(`Trayendo pesos de MercadoEnvíos… ${d.hechos} de ${d.perfiles} cuentas listas.`); return }
+      clearInterval(t)
+      setPedidoME(null); setBusy(null)
+      await actualizarML(vencido && (!d || d.hechos < d.perfiles) ? 'La PC de Pagos ME no terminó en 5 minutos (¿está prendida?): los pesos quedan como estaban.'
+        : d?.errores.length ? `Pesos: ${d.errores.join(' · ')}` : undefined)
+    }, 10_000)
+    return () => clearInterval(t)
+  }, [pedidoME])   // eslint-disable-line react-hooks/exhaustive-deps
   const sacar = async (v: Vista, p: PromoDeItem & { nombre: string }) => {
     const camp = campanas.find(c => c.conexionId === v.conexionId && c.id === p.campana)
     if (!await confirmar({
@@ -225,15 +245,10 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       <PageHeader title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y margen al precio de la promo"
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm whitespace-nowrap">← Productos</Link>
-          {conPagosME && (
-            <button onClick={actualizarPesos} disabled={!!busy} className="btn-secondary text-sm whitespace-nowrap"
-              title="Lee los pesos del portal de MercadoEnvíos con el programa de la PC (Pagos ME)">
-              {busy === 'pesos' ? 'Pidiendo…' : 'Actualizar pesos'}
-            </button>
-          )}
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>
-          <button onClick={actualizarML} disabled={!!busy} className="btn-primary text-sm whitespace-nowrap">
-            {busy === 'ml' ? 'Actualizando…' : 'Actualizar desde MercadoLibre'}
+          <button onClick={traerTodo} disabled={!!busy} className="btn-primary text-sm whitespace-nowrap"
+            title={conPagosME ? 'Primero los pesos del portal de MercadoEnvíos (PC de Pagos ME) y después campañas y precios de MercadoLibre' : 'Campañas y precios de MercadoLibre'}>
+            {busy === 'pesos' ? 'Trayendo ME…' : busy === 'ml' ? 'Trayendo ML…' : conPagosME ? 'Traer ME y ML' : 'Actualizar desde MercadoLibre'}
           </button>
         </>} />
 
@@ -256,7 +271,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
 
       {sinFoto ? (
-        <EmptyState message='Todavía no se leyó nada de MercadoLibre. Toca "Actualizar desde MercadoLibre".' />
+        <EmptyState message={`Todavía no se leyó nada de MercadoLibre. Toca "${conPagosME ? 'Traer ME y ML' : 'Actualizar desde MercadoLibre'}".`} />
       ) : <>
         {campanas.length > 0 && (
           <div className="space-y-2">

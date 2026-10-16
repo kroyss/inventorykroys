@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { tieneModulo } from '@/lib/modulos'
 import { sesionPromociones } from '@/lib/promocionesSesion'
@@ -21,6 +21,24 @@ export async function POST() {
     const { rows: [p] } = await s.db.query(
       `INSERT INTO me_pedidos (pedido_por, pesos) VALUES ($1, TRUE) RETURNING id`, [s.userId])
     return NextResponse.json({ ok: true, pedido: p.id })
+  } catch (err) {
+    return apiError(err)
+  }
+}
+
+/** GET /api/promociones/pesos?pedido=ID → cuántos perfiles de la PC ya terminaron ese pedido y cuántos hay
+ *  (los vistos en el último día). "Traer ME y ML" espera a todos antes de leer MercadoLibre. */
+export async function GET(req: NextRequest) {
+  const s = await sesionPromociones()
+  if ('error' in s) return s.error
+  try {
+    const pedido = Number(req.nextUrl.searchParams.get('pedido'))
+    if (!Number.isInteger(pedido) || pedido <= 0) return NextResponse.json({ error: 'Pedido inválido' }, { status: 400 })
+    const { rows: [p] } = await s.db.query(`SELECT resultados FROM me_pedidos WHERE id = $1`, [pedido])
+    const { rows: [l] } = await s.db.query(`SELECT COUNT(*)::int AS n FROM me_latidos WHERE visto_at > NOW() - INTERVAL '1 day'`)
+    const res = Object.values((p?.resultados ?? {}) as Record<string, { ok?: boolean; cuenta?: string | null; error?: string | null }>)
+    return NextResponse.json({ hechos: res.length, perfiles: Math.max(1, l?.n ?? 1),
+      errores: res.filter(r => !r.ok).map(r => `${r.cuenta ?? 'un perfil'}: ${r.error ?? 'error'}`) })
   } catch (err) {
     return apiError(err)
   }
