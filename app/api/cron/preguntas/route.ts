@@ -13,6 +13,7 @@ import { iaConfigurada } from '@/lib/ia'
 import { mlConfigurado } from '@/lib/ml'
 import { esDemoEmpresa } from '@/lib/demo'
 import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
+import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
 import type { Country } from '@/lib/types'
 
@@ -72,6 +73,13 @@ export async function GET(req: NextRequest) {
       if (r) console.log('[avisos telegram]', r)
     } catch (err) {
       console.error('[avisos telegram]', err instanceof Error ? err.message : err)
+    }
+    // Corte de Fundadores sin MercadoLibre conectado (lib/fundadoresCorte.ts): una sola vez, el lunes 19/10.
+    try {
+      const r = await corteFundadores()
+      if (r) console.log('[corte fundadores]', r)
+    } catch (err) {
+      console.error('[corte fundadores]', err instanceof Error ? err.message : err)
     }
     for (const e of sincronizadas.filter(x => x.stock)) {
       try {
