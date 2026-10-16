@@ -3,6 +3,8 @@
 //   - cuenta de ML desconectada (sin ella no entra nada de esa cuenta);
 //   - pregunta sin responder pasados N minutos; mensaje de comprador sin responder pasados N minutos;
 //   - calificación negativa recibida (neutral, opcional) y contradictoria (él dijo concretada, nosotros no);
+//   - promociones de ML (2026-10-16): campaña nueva y campaña que cierra pronto, SOLO empresas con
+//     Inventario + Promociones y personas con el permiso de Promociones (los Fundadores no las tienen);
 //   - resumen diario a la hora elegida (ayer + lo que hizo el sistema + lo pendiente, con las guías sin
 //     reportar al comprador y, a los administradores, el fin de la prueba gratis los últimos días).
 // Reglas: solo lo de SU empresa y SUS permisos; horario de silencio (lo que siga pendiente llega al
@@ -34,6 +36,7 @@ export interface PrefsAvisos {
   negativa: boolean; neutral: boolean
   contradictoria: boolean
   agotada: boolean; bajo: boolean
+  promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
   silencio: boolean; silencio_desde: number; silencio_hasta: number
@@ -46,6 +49,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   negativa: true, neutral: false,
   contradictoria: true,
   agotada: true, bajo: false,
+  promos: true,
   cierre: false, cierre_hora: 18,
   resumen: true, resumen_hora: 8,
   silencio: true, silencio_desde: 22, silencio_hasta: 7,
@@ -72,6 +76,8 @@ export function avisosDisponibles(u: { role: UserRole; permisos: string[] | null
     mensaje: ve('ver_mensajes'),
     negativa: ve('ver_calificaciones'),
     stock: u.modulos.includes('alertas_stock') && puede(user, 'ver_stock'),
+    // Promociones: solo con Inventario + Promociones y el permiso (nunca los Fundadores, que no tienen inventario).
+    promos: u.modulos.includes('promociones') && u.modulos.includes('inventario') && puede(user, 'promociones'),
     reportador: u.modulos.includes('despachos') && u.modulos.includes('reportador') && puede(user, 'ver_reportador'),
     resumen: true,
   }
@@ -84,6 +90,9 @@ export async function avisosHabilitados(organizacionId: number | undefined) {
   const { rows: [r] } = await dbGlobal().query(`SELECT value FROM plataforma_ajustes WHERE key = 'avisos_telegram_abierto'`)
   return r?.value === 'true'
 }
+
+/** "26/10 a las 11 p. m." en hora del país de la conexión (la de la empresa). */
+const fechaCorta = (f: string | Date) => new Date(f).toLocaleString('es-VE', { timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: 'numeric' })
 
 const enSilencio = (p: PrefsAvisos, hora: number) =>
   p.silencio && (p.silencio_desde > p.silencio_hasta
@@ -214,6 +223,40 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
         + 'Mientras no la reconectes no entran preguntas, mensajes ni ventas de esa cuenta, y no corre ninguna automatización.'
         + (reconecta ? '' : '\n\nAvísale a quien administra las cuentas para que la reconecte.'),
         reconecta ? [[{ texto: '🔌 Reconectar ahora', url: urlSistema('/cuentas-ml') }]] : [])) enviados++
+    }
+  }
+
+  // Promociones de ML (migración 097): campaña nueva (desde que conectó Telegram) y campaña que cierra en
+  // menos de 2 días con publicaciones que todavía pueden entrar. Cada una se avisa una vez.
+  if (p.promos && disp.promos && !silencio && e.country === 'VE') {
+    const boton = [[{ texto: '🏷️ Ver en Promociones', url: urlSistema('/productos/promociones') }]]
+    const { rows: nuevas } = await db.query(
+      `SELECT v.conexion_id || ':' || v.campana_id AS ref, v.nombre, v.fin, v.limite, v.candidatas, x.nickname AS cuenta
+       FROM ml_campanas_vistas v JOIN ml_conexiones x ON x.id = v.conexion_id
+       WHERE v.tipo <> 'SELLER_CAMPAIGN' AND v.primera_vez_at > NOW() - INTERVAL '3 days' AND v.primera_vez_at > $1
+         AND (v.limite IS NULL OR v.limite > NOW())
+       ORDER BY v.primera_vez_at`, [d.vinculado_at])
+    const nn = await pendientes(d, e, 'promo_nueva', nuevas.map(r => r.ref))
+    const listaN = nuevas.filter(r => nn.has(r.ref))
+    if (listaN.length) {
+      const html = `${cab}🏷️ <b>${listaN.length === 1 ? 'Campaña nueva de MercadoLibre' : `${listaN.length} campañas nuevas de MercadoLibre`}</b>\n\n`
+        + listaN.map(r => `• <b>${esc(r.nombre)}</b> · ${esc(r.cuenta)}`
+          + (r.limite ? ` · entrar hasta el ${fechaCorta(r.limite)}` : '')
+          + (r.candidatas ? `\n   ${n(r.candidatas)} publicaci${r.candidatas === 1 ? 'ón puede' : 'ones pueden'} entrar` : '')).join('\n')
+      if (await mandar(d, e, 'promo_nueva', listaN.map(r => r.ref), html, boton)) enviados++
+    }
+    const { rows: cierran } = await db.query(
+      `SELECT v.conexion_id || ':' || v.campana_id AS ref, v.nombre, v.limite, v.candidatas, x.nickname AS cuenta
+       FROM ml_campanas_vistas v JOIN ml_conexiones x ON x.id = v.conexion_id
+       WHERE v.tipo <> 'SELLER_CAMPAIGN' AND v.limite BETWEEN NOW() AND NOW() + INTERVAL '48 hours' AND COALESCE(v.candidatas, 0) > 0
+       ORDER BY v.limite`)
+    const nc = await pendientes(d, e, 'promo_cierra', cierran.map(r => r.ref))
+    const listaC = cierran.filter(r => nc.has(r.ref))
+    if (listaC.length) {
+      const html = `${cab}⏳ <b>${listaC.length === 1 ? 'Una campaña de MercadoLibre cierra pronto' : `${listaC.length} campañas de MercadoLibre cierran pronto`}</b>\n\n`
+        + listaC.map(r => `• <b>${esc(r.nombre)}</b> · ${esc(r.cuenta)} · entrar hasta el ${fechaCorta(r.limite)}`
+          + `\n   ${n(r.candidatas)} publicaci${r.candidatas === 1 ? 'ón puede' : 'ones pueden'} entrar todavía`).join('\n')
+      if (await mandar(d, e, 'promo_cierra', listaC.map(r => r.ref), html, boton)) enviados++
     }
   }
 

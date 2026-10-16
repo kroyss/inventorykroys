@@ -13,6 +13,7 @@ interface Prefs {
   negativa: boolean; neutral: boolean
   contradictoria: boolean
   agotada: boolean; bajo: boolean
+  promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
   silencio: boolean; silencio_desde: number; silencio_hasta: number
@@ -22,7 +23,7 @@ interface Estado {
   conectado: { usuario: string | null; nombre: string | null; desde: string } | null
   error: string | null
   prefs: Prefs
-  disponibles: { desconectada: boolean; pregunta: boolean; mensaje: boolean; negativa: boolean; stock: boolean; resumen: boolean }
+  disponibles: { desconectada: boolean; pregunta: boolean; mensaje: boolean; negativa: boolean; stock: boolean; promos: boolean; resumen: boolean }
   empresa: string | null
   staging: boolean
 }
@@ -254,6 +255,13 @@ export default function MisAvisosClient() {
                   <input type="checkbox" checked={p.bajo} onChange={ev => cambiar({ bajo: ev.target.checked })} className="h-4 w-4 accent-neutral-900" />
                   Avisarme también cuando esté <b className="font-medium">por agotarse</b> (el límite que pusiste en Stock)
                 </label>
+              </Fila>
+            )}
+            {d.promos && (
+              <Fila icono="🏷️" titulo="Promociones de MercadoLibre" on={p.promos} onCambio={v => cambiar({ promos: v })}
+                ejemplo={'🏷️ Campaña nueva de MercadoLibre\n\n• Autoweek · PIKEKE · entrar hasta el 26/10\n   24 publicaciones pueden entrar\n\n[ Ver en Promociones ]'}>
+                Cuando MercadoLibre abre una campaña nueva para tus cuentas, y cuando a una le quedan menos de 2 días para entrar
+                y todavía tienes publicaciones que pueden sumarse.
               </Fila>
             )}
             <Fila icono="☀️" titulo="Resumen diario" on={p.resumen} onCambio={v => cambiar({ resumen: v })}

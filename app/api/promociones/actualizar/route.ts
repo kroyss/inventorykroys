@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { actualizarPromociones, anotarErrorPromociones } from '@/lib/promocionesML'
+import { actualizarCampanas, actualizarPromociones, anotarErrorPromociones } from '@/lib/promocionesML'
 import { sesionPromociones } from '@/lib/promocionesSesion'
 
 export const maxDuration = 120
@@ -15,6 +15,12 @@ export async function POST() {
     for (const c of cuentas) {
       try {
         const f = await actualizarPromociones(s.db, c.id)
+        // Campañas conocidas (avisos de campaña nueva) y cuántas publicaciones pueden entrar en cada una.
+        await actualizarCampanas(s.db, c.id)
+        for (const k of f.campanas) {
+          const n = f.items.filter(i => i.promos.some(p => p.campana === k.id && p.estado === 'candidate')).length
+          await s.db.query(`UPDATE ml_campanas_vistas SET candidatas = $3 WHERE conexion_id = $1 AND campana_id = $2`, [c.id, k.id, n])
+        }
         resultado.push({ cuenta: c.nickname, ok: true, publicaciones: f.items.length, campanas: f.campanas.length })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
