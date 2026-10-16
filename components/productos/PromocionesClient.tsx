@@ -372,7 +372,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
                         {v.envio.estado === 'sin_peso' ? <span className="text-neutral-400">falta el peso</span> : <>
                           <div>{v.topeAmbas != null ? <>ambas hasta <b>{pct(v.topeAmbas)}</b></> : <span className="text-neutral-400">ZOOM no llega</span>}</div>
-                          <div>{v.topeTealca != null ? <>TEALCA hasta <b>{pct(v.topeTealca)}</b></> : <span className="text-red-600">TEALCA no llega</span>}</div>
+                          <div>{v.topeTealca != null ? <>TEALCA hasta <b>{pct(v.topeTealca)}</b></> : <span className="text-neutral-400">TEALCA no llega</span>}</div>
                         </>}
                       </td>
                     </tr>

@@ -164,6 +164,13 @@ export async function crearCampana(db: Pool, conexionId: number, usuarioId: numb
         method: 'POST',
         body: { promotion_type: 'SELLER_CAMPAIGN', name: nombre, sub_type: 'FLEXIBLE_PERCENTAGE', start_date: fechaML(desde), finish_date: fechaML(hasta, true) },
       })
+      // El listado de ML tarda unos segundos en mostrar la campaña nueva: se anota ya en las conocidas y
+      // actualizarCampanas la suma mientras ML no la liste (ver abajo).
+      await db.query(
+        `INSERT INTO ml_campanas_vistas (conexion_id, campana_id, tipo, nombre, inicio, fin)
+         VALUES ($1, $2, 'SELLER_CAMPAIGN', $3, $4::timestamptz, $5::timestamptz)
+         ON CONFLICT (empresa_id, conexion_id, campana_id) DO NOTHING`,
+        [conexionId, String(r.id), nombre, (r.start_date as string) ?? null, (r.finish_date as string) ?? null])
       await actualizarCampanas(db, conexionId)
       return { id: String(r.id), nombre }
     })
@@ -173,6 +180,7 @@ export async function borrarCampana(db: Pool, conexionId: number, usuarioId: num
   return hacer(db, { conexionId, usuarioId, accion: 'borrar_campana', campanaId, campanaTipo: 'SELLER_CAMPAIGN', campanaNombre: nombre },
     async () => {
       await mlFetch(db, conexionId, `/seller-promotions/promotions/${encodeURIComponent(campanaId)}?promotion_type=SELLER_CAMPAIGN&app_version=v2`, { method: 'DELETE' })
+      await db.query(`DELETE FROM ml_campanas_vistas WHERE conexion_id = $1 AND campana_id = $2`, [conexionId, campanaId])
       await actualizarCampanas(db, conexionId)
       return true
     })
@@ -254,6 +262,16 @@ export async function actualizarCampanas(db: Pool, conexionId: number): Promise<
     id: String(p.id), tipo: String(p.type ?? ''), estado: String(p.status ?? ''), nombre: String(p.name ?? p.type ?? ''),
     inicio: (p.start_date as string) ?? null, fin: (p.finish_date as string) ?? null, limite: (p.deadline_date as string) ?? null,
   }))
+  // Propias recién creadas que ML todavía no lista (tarda unos segundos): se suman igual.
+  const { rows: recientes } = await db.query(
+    `SELECT campana_id, nombre, inicio, fin FROM ml_campanas_vistas
+     WHERE conexion_id = $1 AND tipo = 'SELLER_CAMPAIGN' AND primera_vez_at > NOW() - INTERVAL '30 minutes'`, [conexionId])
+  for (const k of recientes) {
+    if (!campanas.some(c => c.id === k.campana_id)) {
+      campanas.push({ id: k.campana_id, tipo: 'SELLER_CAMPAIGN', estado: 'pending', nombre: k.nombre,
+        inicio: k.inicio ? new Date(k.inicio).toISOString() : null, fin: k.fin ? new Date(k.fin).toISOString() : null, limite: null })
+    }
+  }
   await db.query(
     `UPDATE ml_promociones_cache SET datos = jsonb_set(datos, '{campanas}', $2::jsonb) WHERE conexion_id = $1`,
     [conexionId, JSON.stringify(campanas)])
