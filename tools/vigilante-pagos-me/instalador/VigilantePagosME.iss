@@ -18,6 +18,16 @@ AppId={{4C1B7E2A-93D5-4F0B-8C6E-2A7D51E9B3F4}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#Publisher}
+AppPublisherURL=https://app.elcomerciantedigital.com
+AppSupportURL=https://t.me/elcomerciantedigital
+; Datos del archivo (Propiedades > Detalles). Sin certificado de firma, Windows SmartScreen igual muestra
+; "Windows protegio su PC" (Mas informacion > Ejecutar de todas formas): lo explican Pagos ME y /extension.
+VersionInfoVersion={#AppVersion}
+VersionInfoCompany={#Publisher}
+VersionInfoDescription=Instalador de Pagos MercadoEnvios (El Comerciante Digital)
+VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoCopyright=(c) 2026 {#Publisher}
 DefaultDirName={localappdata}\Programs\VigilantePagosME
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes

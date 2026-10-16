@@ -445,7 +445,11 @@ function PrimerosPasos({ isAdmin, onConectar }: { isAdmin: boolean; onConectar: 
       {isAdmin ? (
         <ol className="space-y-2">
           <li className={paso}><span className={num}>1</span>
-            <span><a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">Descarga el programa</a> en la PC donde imprimes las guías e instálalo (Siguiente → Instalar).</span></li>
+            <span><a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">Descarga el programa</a> en la PC donde imprimes las guías e instálalo (Siguiente → Instalar).
+              <span className="block text-xs text-neutral-500 mt-0.5">
+                Si Windows muestra «Windows protegió su PC», toca <b>Más información</b> → <b>Ejecutar de todas formas</b>. Sale porque el
+                programa es nuevo y no tiene firma comprada; es el nuestro.
+              </span></span></li>
           <li className={paso}><span className={num}>2</span>
             <span><button onClick={onConectar} className="font-medium text-emerald-700 underline">Genera tu código</button> y escríbelo cuando el programa lo pida.</span></li>
           <li className={paso}><span className={num}>3</span>

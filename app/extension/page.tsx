@@ -12,6 +12,10 @@ export default function Extension() {
     <main className="min-h-screen bg-white">
       <div className="max-w-xl mx-auto px-4 py-10 space-y-5 text-[15px] text-neutral-700">
         <h1 className="text-2xl font-bold text-neutral-900">Asistente de envíos para Chrome</h1>
+        <p className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-sm text-sky-900">
+          ¿Al abrir el instalador Windows dijo «Windows protegió su PC»? Toca <b>Más información</b> → <b>Ejecutar de todas formas</b>.
+          Sale porque el programa es nuevo y no tiene firma comprada; es el de El Comerciante Digital.
+        </p>
         <p>Hazlo una vez en cada cuenta de Chrome donde abres MercadoEnvíos:</p>
         <ol className="list-decimal pl-5 space-y-2">
           <li>Escribe <code className="bg-neutral-100 px-1 rounded">chrome://extensions</code> en la barra de direcciones y activa <b>Modo de desarrollador</b> (arriba a la derecha).</li>
