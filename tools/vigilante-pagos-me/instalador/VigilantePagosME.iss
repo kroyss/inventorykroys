@@ -12,7 +12,7 @@
 ; Todo queda en %APPDATA%\VigilantePagosME\despertador.json (y en el registro): instalar encima no lo borra.
 
 #define AppName    "Pagos MercadoEnvios"
-#define AppVersion "1.3.4"
+#define AppVersion "1.3.5"
 #define Publisher  "El Comerciante Digital"
 
 [Setup]

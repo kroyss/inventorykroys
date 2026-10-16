@@ -41,11 +41,19 @@ async function mostrarEstado() {
     : clave ? 'Conectado. Espera el primer "Traer pagos y guías".' : 'Todavía no está conectado.'
 }
 
+// Ya conectada (1.3.5): "✓ Conectado" arriba y el código escondido en "Conectar con otro código".
+function modoConectado(si) {
+  $('conectado').hidden = !si
+  $('formulario').hidden = si
+}
+$('otroCodigo').onclick = e => { e.preventDefault(); modoConectado(false); $('codigo').focus() }
+
 chrome.storage.local.get([...campos, 'verificacion']).then(v => {
   for (const c of campos) if (v[c]) $(c).value = v[c]
   mostrarEstado()
+  modoConectado(!!v.clave)
   // Conectada: muestra la última verificación y la renueva en el momento.
-  if (v.clave) { mostrarCuenta(v.verificacion); verificar() }
+  if (v.clave) { mostrarCuenta(v.verificacion ?? { estado: 'verificando' }); verificar() }
 })
 
 // Conectar con el código corto de Pagos ME (1.3.0): el sistema devuelve la clave de este perfil.
@@ -71,6 +79,7 @@ $('conectar').onclick = async () => {
     const r2 = await chrome.runtime.sendMessage({ tipo: 'latido' })
     $('estado').textContent = `✓ Conectado. ${r2?.texto ?? ''}`
     $('codigo').value = ''
+    modoConectado(true)
     await verificar()
   } catch (e) {
     $('estado').textContent = `No se pudo conectar: ${e.message}`
