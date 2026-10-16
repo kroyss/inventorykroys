@@ -414,16 +414,17 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   onHecho: (msg: string, err?: string) => void
 }) {
   const [enviando, setEnviando] = useState(false)
-  // Si ML dice que el precio "no es creíble", probar con más descuento (de 3 en 3) hasta este %, sin perder
-  // el envío gratis, sin bajar del mínimo de ML y sin bajar del margen mínimo.
-  const [probar, setProbar] = useState(true)
-  const [hasta, setHasta] = useState(Math.min(80, modal.pct + 15))
+  // Lo que respondió ML por publicación. Si dijo "no es una rebaja real", se puede reintentar A MANO con otro %.
+  const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; error?: string; noCreible?: boolean }>>({})
+  const [reintento, setReintento] = useState<Record<string, number>>({})
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
   const conexionId = conexiones[0]
   const opciones = campanas.filter(c => c.conexionId === conexionId && c.estado !== 'finished')
   const camp = campanas.find(c => `${c.conexionId}|${c.id}` === modal.campana) ?? null
   const propia = camp?.tipo === 'SELLER_CAMPAIGN'
+  // ML no guarda publicaciones en una campaña que todavía no empezó (responde "ok" pero no queda).
+  const sinEmpezar = !!camp && camp.estado !== 'started'
 
   const filasPrev = filas.map(f => {
     const precio = redondear(f.precio * (1 - modal.pct / 100))
@@ -436,46 +437,46 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, TABLA_TEALCA) : null
     const margen = margenA(f, precio)
     const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación' : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}` : null
-    // Precios a probar: el pedido y, si "probar", los de más descuento que siguen cumpliendo las reglas.
-    const precios = [precio]
-    if (probar) {
-      for (let p = modal.pct + 3; p <= hasta; p += 3) {
-        const pr = redondear(f.precio * (1 - p / 100))
-        if (cand?.minimo != null && pr < cand.minimo) break
-        if (RANGO[envioPorTransportista(f.peso, pr).estado] < RANGO[f.envio.estado]) break
-        const m = margenA(f, pr)
-        if (m != null && m < margenMin) break
-        precios.push(pr)
-      }
-    }
-    const pctMax = precios.length > 1 ? Math.round((1 - precios[precios.length - 1] / f.precio) * 100) : null
-    return { f, precio, precios, pctMax, despues, pierde, unidades, margen, motivo }
+    // Ya está en OTRA promoción: entrar a esta la reemplaza (ML deja una sola a la vez).
+    const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
+    return { f, precio, despues, pierde, unidades, margen, motivo, otra }
   })
-  const validas = camp ? filasPrev.filter(x => !x.motivo) : []
+  const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
-  const confirmar = async () => {
-    if (!camp || !validas.length) return
-    const pierden = validas.filter(x => x.pierde).length
-    const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
-    if ((pierden || bajos) && !confirm(`${pierden ? `${pierden} pierden envío gratis. ` : ''}${bajos ? `${bajos} quedan con margen menor a ${margenMin}%. ` : ''}¿Agregar igual?`)) return
+  const enviar = async (items: { id: string; precio: number; precioAntes: number }[]) => {
+    if (!camp || !items.length) return
     setEnviando(true)
     const r = await fetch('/api/promociones/acciones', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accion: 'agregar', conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre },
-        items: validas.map(x => ({ id: x.f.id, precios: x.precios, precioAntes: x.f.precio })) }),
+      body: JSON.stringify({ accion: 'agregar', conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre, estado: camp.estado }, items }),
     })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
     if (!r.ok) return onHecho('', d.error ?? 'No se pudo agregar')
-    const res = d.resultados as { id: string; ok: boolean; precio?: number; error?: string }[]
-    const errores = res.filter(x => !x.ok)
-    const conMas = res.filter(x => x.ok && x.precio != null && validas.find(v => v.f.id === x.id)?.precio !== x.precio).length
-    onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}".${conMas ? ` ${conMas} entraron con más descuento porque ML no aceptó el primero.` : ''}`,
-      errores.length ? `${d.ok} agregadas · ${errores.length} con error: ${errores.slice(0, 3).map(e => `${e.id} (${e.error})`).join(' · ')}` : undefined)
+    const res = d.resultados as { id: string; ok: boolean; precio?: number; error?: string; noCreible?: boolean }[]
+    const nuevos = { ...resultados }
+    for (const x of res) nuevos[x.id] = x
+    setResultados(nuevos)
+    // Todo bien: se cierra. Con errores queda abierto para ver el motivo y reintentar a mano.
+    if (res.every(x => x.ok)) onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${d.ok === 1 ? '' : 's'} en MercadoLibre.`)
   }
+  const confirmar = async () => {
+    const pierden = validas.filter(x => x.pierde).length
+    const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
+    const reemplazan = validas.filter(x => x.otra).length
+    const avisos = [pierden && `${pierden} pierden envío gratis.`, bajos && `${bajos} quedan con margen menor a ${margenMin}%.`,
+      reemplazan && `${reemplazan} salen de otra promoción en la que ya están.`].filter(Boolean).join(' ')
+    if (avisos && !confirm(`${avisos} ¿Agregar igual?`)) return
+    await enviar(validas.map(x => ({ id: x.f.id, precio: x.precio, precioAntes: x.f.precio })))
+  }
+  const reintentar = async (f: VistaModal) => {
+    const p = reintento[f.id] ?? Math.min(80, modal.pct + 5)
+    await enviar([{ id: f.id, precio: redondear(f.precio * (1 - p / 100)), precioAntes: f.precio }])
+  }
+  const hayResultados = Object.keys(resultados).length > 0
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setModal(null)}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => hayResultados ? onHecho('Listo.') : setModal(null)}>
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-4 space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Agregar a una campaña · vista previa</h2>
@@ -499,14 +500,12 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
             </label>
             <span className="text-xs text-neutral-500 pb-2">{camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}</span>
           </div>
-          <label className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
-            <input type="checkbox" checked={probar} onChange={e => setProbar(e.target.checked)} />
-            Si ML no acepta el precio («no es una rebaja real»), probar con más descuento hasta
-            <input type="number" min={modal.pct} max={80} value={hasta} disabled={!probar}
-              onChange={e => setHasta(Math.max(modal.pct, Math.min(80, Number(e.target.value) || modal.pct)))}
-              className="w-14 border border-neutral-300 rounded px-1.5 py-0.5 text-right" />%
-            <span className="text-neutral-400">(de 3 en 3, sin perder envío gratis ni bajar de tu margen mínimo)</span>
-          </label>
+          {sinEmpezar && (
+            <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+              Esta campaña empieza el {fecha(camp!.inicio)}. MercadoLibre no guarda publicaciones antes del inicio
+              (dice que sí, pero no quedan): agrégalas ese día.
+            </p>
+          )}
           <div className="overflow-x-auto border border-neutral-200 rounded-lg">
             <table className="w-full text-xs">
               <thead className="bg-neutral-50 text-neutral-500">
@@ -529,7 +528,21 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                     <td className={`px-2 py-1.5 text-right ${x.margen == null ? 'text-neutral-400' : x.margen < 0 ? 'text-red-700 font-medium' : x.margen < margenMin ? 'text-amber-700' : ''}`}>
                       {x.margen == null ? '—' : pct(x.margen)}
                     </td>
-                    <td className="px-2 py-1.5 text-neutral-500">{x.motivo ?? (x.pctMax ? `si no, prueba hasta ${x.pctMax}%` : '')}</td>
+                    <td className="px-2 py-1.5 text-neutral-500">
+                      {resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}</span>
+                        : resultados[x.f.id] ? <span className="text-red-700">{resultados[x.f.id].error}
+                          {resultados[x.f.id].noCreible && (
+                            <span className="mt-1 flex items-center gap-1 text-neutral-700">
+                              Reintentar con
+                              <input type="number" min={1} max={80} value={reintento[x.f.id] ?? Math.min(80, modal.pct + 5)}
+                                onChange={e => setReintento({ ...reintento, [x.f.id]: Math.max(1, Math.min(80, Number(e.target.value) || 1)) })}
+                                className="w-12 border border-neutral-300 rounded px-1 py-0.5 text-right" />%
+                              <span className="text-neutral-500">({usd(redondear(x.f.precio * (1 - (reintento[x.f.id] ?? Math.min(80, modal.pct + 5)) / 100)))})</span>
+                              <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
+                            </span>
+                          )}</span>
+                        : x.motivo ?? (x.otra ? `sale de «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -537,8 +550,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
           </div>
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setModal(null)} className="btn-ghost text-sm">Cancelar</button>
-            <button onClick={confirmar} disabled={!camp || !validas.length || enviando} className="btn-primary text-sm">
-              {enviando ? 'Agregando…' : `Agregar ${validas.length} a la campaña`}
+            {hayResultados && <button onClick={() => onHecho('Listo.')} className="btn-secondary text-sm">Terminar</button>}
+            <button onClick={confirmar} disabled={!camp || sinEmpezar || !validas.length || enviando} className="btn-primary text-sm">
+              {enviando ? 'Agregando y comprobando…' : `Agregar ${validas.length} a la campaña`}
             </button>
           </div>
         </>}
@@ -553,7 +567,7 @@ const sumarDias = (f: string, n: number) => { const d = new Date(`${f}T12:00:00`
 function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
   cuentas: { id: number; nombre: string }[]; conexionInicial?: number; onCerrar: () => void; onCreada: (nombre: string) => void
 }) {
-  const [f, setF] = useState({ conexionIds: [conexionInicial ?? cuentas[0]?.id].filter(Boolean) as number[], nombre: '', desde: hoyMas(1), hasta: hoyMas(7) })
+  const [f, setF] = useState({ conexionIds: [conexionInicial ?? cuentas[0]?.id].filter(Boolean) as number[], nombre: '', desde: hoyMas(0), hasta: hoyMas(7) })
   const maxHasta = sumarDias(f.desde, MAX_DIAS_CAMPANA - 1)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -571,7 +585,8 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onCerrar}>
       <div className="bg-white rounded-xl w-full max-w-md p-4 space-y-3 text-sm" onClick={e => e.stopPropagation()}>
         <h2 className="text-base font-semibold">Nueva campaña propia</h2>
-        <p className="text-xs text-neutral-500">Se crea en MercadoLibre con % flexible: después le agregas publicaciones, cada una con su precio.</p>
+        <p className="text-xs text-neutral-500">Se crea en MercadoLibre con % flexible: después le agregas publicaciones, cada una con su precio.
+          Las publicaciones se pueden agregar <b>cuando la campaña ya empezó</b> (antes ML no las guarda): si empieza hoy, las agregas enseguida.</p>
         <div className="space-y-1"><span className="text-xs text-neutral-500">Cuentas (se crea la misma en cada una)</span>
           <div className="flex flex-wrap gap-3">
             {cuentas.map(c => (

@@ -158,7 +158,12 @@ async function hacer<T>(db: Pool, a: Accion, fn: () => Promise<T>): Promise<{ ok
 }
 
 /** Fechas de ML para campañas: "YYYY-MM-DDTHH:MM:SS" en hora local de Venezuela. */
-const fechaML = (fecha: string, fin = false) => `${fecha}T${fin ? '23:59:59' : '00:00:00'}`
+const fechaML = (fecha: string, fin = false) => {
+  if (fin) return `${fecha}T23:59:59`
+  // Empieza HOY: desde ya (la hora de ahora en Venezuela), para no mandar un inicio en el pasado.
+  const ahora = new Date().toLocaleString('sv-SE', { timeZone: 'America/Caracas' }).replace(' ', 'T')
+  return fecha === ahora.slice(0, 10) ? ahora.slice(0, 19) : `${fecha}T00:00:00`
+}
 
 export async function crearCampana(db: Pool, conexionId: number, usuarioId: number, nombre: string, desde: string, hasta: string) {
   return hacer(db, { conexionId, usuarioId, accion: 'crear_campana', campanaTipo: 'SELLER_CAMPAIGN', campanaNombre: nombre },
@@ -179,80 +184,120 @@ export async function crearCampana(db: Pool, conexionId: number, usuarioId: numb
     })
 }
 
+// ── Precio REAL de la publicación (2026-10-16) ─────────────────────────────
+// La API que lista "en qué promoción está" una publicación (seller-promotions/items) tarda en enterarse, y
+// al agregar a una campaña propia que todavía no empezó ML responde 201 pero NO guarda la oferta. Por eso
+// cada cambio se comprueba con el precio vigente (/items/{id}/sale_price): dice a qué campaña pertenece.
+interface PrecioVigente { amount: number; regular: number | null; campana: string | null }
+async function precioVigente(db: Pool, conexionId: number, itemId: string): Promise<PrecioVigente | null> {
+  const r = await mlFetch<{ amount?: number; regular_amount?: number | null; metadata?: { campaign_id?: string } }>(
+    db, conexionId, `/items/${encodeURIComponent(itemId)}/sale_price`).catch(() => null)
+  if (!r || r.amount == null) return null
+  return { amount: Number(r.amount), regular: r.regular_amount != null ? Number(r.regular_amount) : null, campana: r.metadata?.campaign_id ?? null }
+}
+const esperar = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/** Deja en la foto guardada el estado REAL de una publicación: en esa campaña a ese precio, o sin promo. */
+async function marcarEnFoto(db: Pool, conexionId: number, itemId: string, v: PrecioVigente | null) {
+  await db.query(
+    `UPDATE ml_promociones_cache SET datos = jsonb_set(datos, '{items}', (
+       SELECT COALESCE(jsonb_agg(CASE WHEN i->>'id' = $2 THEN jsonb_set(i, '{promos}', (
+         SELECT COALESCE(jsonb_agg(CASE
+           WHEN p->>'campana' = $3 THEN jsonb_set(jsonb_set(p, '{estado}', '"started"'), '{precio}', to_jsonb($4::numeric))
+           WHEN p->>'estado' = 'started' THEN jsonb_set(jsonb_set(p, '{estado}', '"candidate"'), '{precio}', 'null')
+           ELSE p END), '[]'::jsonb)
+         FROM jsonb_array_elements(i->'promos') p)) ELSE i END), '[]'::jsonb)
+       FROM jsonb_array_elements(datos->'items') i))
+     WHERE conexion_id = $1`,
+    [conexionId, itemId, v?.campana ?? '', v?.campana ? v.amount : null])
+}
+
+/** ¿Qué publicaciones tiene esta campaña? Las que ML lista como adentro + las agregadas desde el sistema. */
+async function publicacionesDeCampana(db: Pool, conexionId: number, campanaId: string, tipo: string) {
+  const ids = new Set<string>()
+  let despues: string | null = null
+  for (let vuelta = 0; vuelta < 20; vuelta++) {
+    const q: string = `/seller-promotions/promotions/${encodeURIComponent(campanaId)}/items?promotion_type=${encodeURIComponent(tipo)}`
+      + `&app_version=v2&limit=${POR_PAGINA_CAMPANA}${despues ? `&search_after=${encodeURIComponent(despues)}` : ''}`
+    let p: { results: Record<string, unknown>[] | null; paging?: { searchAfter?: string } }
+    try { p = await mlFetch(db, conexionId, q) } catch { break }
+    for (const x of p.results ?? []) if (x.status === 'started' || x.status === 'pending') ids.add(String(x.id))
+    despues = p.paging?.searchAfter ?? null
+    if (!despues || (p.results ?? []).length < POR_PAGINA_CAMPANA) break
+  }
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (item_id) item_id, accion FROM ml_promociones_acciones
+     WHERE conexion_id = $1 AND campana_id = $2 AND resultado = 'ok' AND item_id IS NOT NULL
+     ORDER BY item_id, creado_at DESC`, [conexionId, campanaId])
+  for (const r of rows) if (r.accion === 'agregar') ids.add(r.item_id)
+  return [...ids]
+}
+
+/**
+ * Borrar una campaña propia. ML NO quita el descuento de sus publicaciones al borrar la campaña (probado el
+ * 16-10: quedó "deleted" y la publicación seguía con el precio rebajado), así que primero se saca cada una
+ * y se comprueba que volvió a su precio; recién ahí se borra la campaña.
+ */
 export async function borrarCampana(db: Pool, conexionId: number, usuarioId: number, campanaId: string, nombre: string | null) {
   return hacer(db, { conexionId, usuarioId, accion: 'borrar_campana', campanaId, campanaTipo: 'SELLER_CAMPAIGN', campanaNombre: nombre },
     async () => {
+      const items = await publicacionesDeCampana(db, conexionId, campanaId, 'SELLER_CAMPAIGN')
+      const fallaron: string[] = []
+      for (const id of items) {
+        const r = await quitarDeCampana(db, conexionId, usuarioId, id, { id: campanaId, tipo: 'SELLER_CAMPAIGN', nombre })
+        if (!r.ok && !/ya no está/.test(r.error)) fallaron.push(id)
+      }
+      if (fallaron.length) throw new Error(`No se pudo sacar de la campaña: ${fallaron.join(', ')}. La campaña no se borró para no dejarlas con descuento.`)
       await mlFetch(db, conexionId, `/seller-promotions/promotions/${encodeURIComponent(campanaId)}?promotion_type=SELLER_CAMPAIGN&app_version=v2`, { method: 'DELETE' })
       await db.query(`DELETE FROM ml_campanas_vistas WHERE conexion_id = $1 AND campana_id = $2`, [conexionId, campanaId])
       await actualizarCampanas(db, conexionId)
-      return true
-    })
-}
-
-export async function agregarACampana(db: Pool, conexionId: number, usuarioId: number,
-  item: { id: string; precio: number; precioAntes: number }, campana: { id: string; tipo: string; nombre: string | null }) {
-  return hacer(db, { conexionId, usuarioId, accion: 'agregar', campanaId: campana.id, campanaTipo: campana.tipo, campanaNombre: campana.nombre,
-    itemId: item.id, precio: item.precio, precioAntes: item.precioAntes },
-    async () => {
-      await mlFetch(db, conexionId, `/seller-promotions/items/${encodeURIComponent(item.id)}?app_version=v2`, {
-        method: 'POST', body: { promotion_id: campana.id, promotion_type: campana.tipo, deal_price: Math.round(item.precio * 100) / 100 },
-      })
-      await refrescarItem(db, conexionId, item.id)
-      return true
+      return { sacadas: items.length }
     })
 }
 
 /**
- * Agregar probando: intenta los precios en orden (de menos a más descuento) y se queda con el primero que
- * ML acepta. Solo sigue probando si ML dice que el precio "no es creíble"; ante otro error se detiene.
- * Queda UNA línea en el registro: el precio con el que entró, o el error y hasta dónde probó.
+ * Agregar una publicación a una campaña YA INICIADA (de ML o propia) a un precio, y comprobarlo con el precio
+ * real. Si ML dice "ok" pero el precio vigente no es de esa campaña, se toma como error.
  */
-export async function agregarProbando(db: Pool, conexionId: number, usuarioId: number,
-  item: { id: string; precios: number[]; precioAntes: number }, campana: { id: string; tipo: string; nombre: string | null }) {
-  const base: Accion = { conexionId, usuarioId, accion: 'agregar', campanaId: campana.id, campanaTipo: campana.tipo, campanaNombre: campana.nombre,
-    itemId: item.id, precioAntes: item.precioAntes }
-  let ultimo = ''
-  for (const p of item.precios) {
-    const precio = Math.round(p * 100) / 100
-    try {
+export async function agregarACampana(db: Pool, conexionId: number, usuarioId: number,
+  item: { id: string; precio: number; precioAntes: number }, campana: { id: string; tipo: string; nombre: string | null }) {
+  const precio = Math.round(item.precio * 100) / 100
+  return hacer(db, { conexionId, usuarioId, accion: 'agregar', campanaId: campana.id, campanaTipo: campana.tipo, campanaNombre: campana.nombre,
+    itemId: item.id, precio, precioAntes: item.precioAntes },
+    async () => {
       await mlFetch(db, conexionId, `/seller-promotions/items/${encodeURIComponent(item.id)}?app_version=v2`, {
         method: 'POST', body: { promotion_id: campana.id, promotion_type: campana.tipo, deal_price: precio },
       })
-      await registrar(db, { ...base, precio }, true, item.precios.length > 1 && precio !== item.precios[0] ? `entró con más descuento (probó ${item.precios.indexOf(p) + 1} precios)` : null)
-      await refrescarItem(db, conexionId, item.id).catch(() => {})
-      return { ok: true as const, precio }
-    } catch (e) {
-      ultimo = e instanceof Error ? e.message : String(e)
-      if (!esNoCreible(ultimo)) break
-    }
-  }
-  const probo = item.precios.length > 1 ? ` (probó hasta ${Math.round(item.precios[item.precios.length - 1] * 100) / 100})` : ''
-  await registrar(db, { ...base, precio: item.precios[0] }, false, ultimo + probo)
-  return { ok: false as const, error: errorClaro(ultimo) + probo }
+      let v: PrecioVigente | null = null
+      for (let i = 0; i < 4; i++) {
+        await esperar(1500)
+        v = await precioVigente(db, conexionId, item.id)
+        if (v?.campana === campana.id) break
+      }
+      if (v?.campana !== campana.id) {
+        throw new Error('MercadoLibre respondió que sí, pero el precio de la publicación no cambió: no quedó en la campaña')
+      }
+      await marcarEnFoto(db, conexionId, item.id, v)
+      return v.amount
+    })
 }
 
+/** Sacar una publicación de una campaña y comprobar que dejó de tener ese precio. */
 export async function quitarDeCampana(db: Pool, conexionId: number, usuarioId: number, itemId: string, campana: { id: string; tipo: string; nombre: string | null }) {
   return hacer(db, { conexionId, usuarioId, accion: 'quitar', campanaId: campana.id, campanaTipo: campana.tipo, campanaNombre: campana.nombre, itemId },
     async () => {
       await mlFetch(db, conexionId, `/seller-promotions/items/${encodeURIComponent(itemId)}?promotion_type=${encodeURIComponent(campana.tipo)}`
         + `&promotion_id=${encodeURIComponent(campana.id)}&app_version=v2`, { method: 'DELETE' })
-      await refrescarItem(db, conexionId, itemId)
+      let v: PrecioVigente | null = null
+      for (let i = 0; i < 4; i++) {
+        await esperar(1500)
+        v = await precioVigente(db, conexionId, itemId)
+        if (v?.campana !== campana.id) break
+      }
+      if (v?.campana === campana.id) throw new Error('MercadoLibre respondió que sí, pero la publicación sigue con el precio de la campaña')
+      await marcarEnFoto(db, conexionId, itemId, v)
       return true
     })
-}
-
-/** Relee de ML las promociones de UNA publicación y las pone en la foto guardada (después de actuar). */
-export async function refrescarItem(db: Pool, conexionId: number, itemId: string) {
-  const lista = await mlFetch<Record<string, unknown>[]>(db, conexionId, `/seller-promotions/items/${encodeURIComponent(itemId)}?app_version=v2`)
-  const promos: PromoDeItem[] = (lista ?? []).filter(x => x.id).map(x => ({
-    campana: String(x.id), estado: String(x.status ?? ''),
-    precio: num(x.price) || null, minimo: num(x.min_discounted_price) || null,
-  }))
-  await db.query(
-    `UPDATE ml_promociones_cache SET datos = jsonb_set(datos, '{items}', (
-       SELECT COALESCE(jsonb_agg(CASE WHEN i->>'id' = $2 THEN jsonb_set(i, '{promos}', $3::jsonb) ELSE i END), '[]'::jsonb)
-       FROM jsonb_array_elements(datos->'items') i))
-     WHERE conexion_id = $1`, [conexionId, itemId, JSON.stringify(promos)])
 }
 
 /** Relee solo la lista de campañas de la cuenta (1 consulta) y anota las nuevas en ml_campanas_vistas.
