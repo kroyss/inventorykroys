@@ -79,7 +79,10 @@ export async function actualizarPromociones(db: Pool, conexionId: number): Promi
     for (let vuelta = 0; vuelta < Math.ceil(MAX_ITEMS / POR_PAGINA_CAMPANA); vuelta++) {
       const q: string = `/seller-promotions/promotions/${encodeURIComponent(camp.id)}/items?promotion_type=${encodeURIComponent(camp.tipo)}`
         + `&app_version=v2&limit=${POR_PAGINA_CAMPANA}${despues ? `&search_after=${encodeURIComponent(despues)}` : ''}`
-      const p: { results: Record<string, unknown>[]; paging?: { searchAfter?: string } } = await mlFetch(db, conexionId, q)
+      // Una campaña propia que todavía no empieza (o recién borrada) puede no listar sus publicaciones:
+      // se sigue con las demás en vez de fallar toda la cuenta.
+      let p: { results: Record<string, unknown>[]; paging?: { searchAfter?: string } }
+      try { p = await mlFetch(db, conexionId, q) } catch { break }
       for (const x of p.results ?? []) {
         const id = String(x.id)
         const it = items.get(id)

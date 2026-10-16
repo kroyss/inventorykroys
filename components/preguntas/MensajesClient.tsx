@@ -55,11 +55,19 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
     if (top !== undefined && top < 0) listaRef.current?.scrollIntoView({ block: 'start' })
   }
 
+  // Solo vale la respuesta del ÚLTIMO pedido (2026-10-16): al cambiar rápido de pestaña, la respuesta lenta
+  // de la anterior llegaba después y pisaba la lista (en el celular la pestaña "se quedaba pegada").
+  const ultimoPedido = useRef(0)
   const cargar = useCallback(async () => {
+    const id = ++ultimoPedido.current
     const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' ? 'sin_leer' : vista
-    const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`)
+    const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`).catch(() => null)
+    if (id !== ultimoPedido.current) return
+    if (!r) { setError('Sin conexión: no se pudo cargar'); return }
     const d = await r.json().catch(() => ({}))
+    if (id !== ultimoPedido.current) return
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    setError(null)
     setLista(d.conversaciones); setPag(d.total != null ? { total: d.total, por: d.por_pagina } : null); setCont(d.sin_leer)
     setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
     setConRecordatorios(!!d.recordatorios)
@@ -92,7 +100,12 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         actions={<UsoIA />} />
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm">{error}</div>}
       {/* Cada conversación está en UNA: con mensajes sin responder → Por atender; si no → Atendidas. */}
-      <Tabs value={vista} onChange={v => { setVista(v); setAbierta(null); setPagina(1) }} items={[
+      <Tabs value={vista} onChange={v => {
+        // Pestaña de lista nueva: "cargando" en vez de la lista de la anterior mientras llega.
+        const lista_ = (x: string) => x === 'todas' ? 'todas' : 'sin_leer'
+        if (lista_(v) !== lista_(vista)) setLista(null)
+        setVista(v); setAbierta(null); setPagina(1)
+      }} items={[
         { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
         { value: 'todas', label: 'Atendidas' },
         { value: 'pedir', label: 'Pedir calificación', count: pedir },
