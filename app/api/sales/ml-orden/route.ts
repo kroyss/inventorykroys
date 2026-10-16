@@ -3,7 +3,6 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import { ventaParaFormulario } from '@/lib/ventasML'
-import { unidadesDelTitulo } from '@/lib/combos'
 
 // GET /api/sales/ml-orden?numero=2000018737735322 → comprador y productos de esa venta en
 // MercadoLibre, para llenar el formulario de Ventas (nombre del cliente; productos sugeridos por
@@ -28,7 +27,7 @@ export async function GET(req: NextRequest) {
     const deVariante = (i: { itemId: string; variacionId: number | null }) => i.variacionId ? `${sinPrefijo(i.itemId)}:${i.variacionId}` : null
     const publicaciones = v.items.map(i => sinPrefijo(i.itemId))
     const { rows } = await db.query(
-      `SELECT DISTINCT m.ml_code, split_part(m.ml_code, ':', 1) AS publicacion, p.id AS product_id, p.code, p.name, m.unidades
+      `SELECT DISTINCT m.ml_code, split_part(m.ml_code, ':', 1) AS publicacion, p.id AS product_id, p.code, p.name
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id
        WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[])
        ORDER BY m.ml_code, p.code`, [publicaciones])
@@ -37,12 +36,10 @@ export async function GET(req: NextRequest) {
       const dePublicacion = rows.filter(x => x.ml_code === sinPrefijo(i.itemId))
       const otrasVariantes = rows.filter(x => x.publicacion === sinPrefijo(i.itemId) && x.ml_code.includes(':'))
       const opciones = (exactas.length ? exactas : dePublicacion.length ? dePublicacion : otrasVariantes)
-        .map(r => ({ id: r.product_id as number, code: r.code as string, name: r.name as string, unidades: (r.unidades as number) ?? 1 }))
+        .map(r => ({ id: r.product_id as number, code: r.code as string, name: r.name as string }))
       // De otra variante nunca se elige solo (aunque sea una): sería el color o la talla equivocada.
       const segura = exactas.length > 0 || dePublicacion.length > 0
-      // Combos (migración 098): la cantidad del producto = lo comprado × unidades de la publicación.
-      // `sugeridas`: lo que dice el título, para proponerlo al vincular una publicación nueva.
-      return { ...i, producto: segura && opciones.length === 1 ? opciones[0] : null, opciones, sugeridas: unidadesDelTitulo(i.titulo) }
+      return { ...i, producto: segura && opciones.length === 1 ? opciones[0] : null, opciones }
     })
     return NextResponse.json({ cuenta: v.cuenta, comprador: v.comprador, fecha: v.fecha, items })
   } catch (err) {
