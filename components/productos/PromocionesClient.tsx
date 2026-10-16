@@ -31,6 +31,7 @@ type Filtro = 'todas' | 'adentro' | 'candidatas' | 'quita' | 'margen' | 'tealca'
 type Modal =
   | { tipo: 'agregar'; claves: string[]; campana: string; pct: number }
   | { tipo: 'nueva' }
+  | { tipo: 'editar'; campana: CampanaVista }
   | null
 const POR_PAGINA = 50
 const RANGO: Record<EstadoEnvio, number> = { ambas: 2, tealca: 1, destino: 0, sin_peso: -1 }
@@ -262,6 +263,11 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                           className="btn-secondary text-xs px-2.5 py-1">Ver {sug.length} sugerida{sug.length === 1 ? '' : 's'}</button>
                       )}
                       {propia && (
+                        <button onClick={() => setModal({ tipo: 'editar', campana: c })} disabled={!!busy} className="underline text-neutral-500 hover:text-neutral-800">
+                          Editar
+                        </button>
+                      )}
+                      {propia && (
                         <button onClick={() => borrarCampana(c)} disabled={!!busy} className="underline text-neutral-400 hover:text-red-700">
                           {busy === `borrar-${c.id}` ? 'Borrando…' : 'Borrar campaña'}
                         </button>
@@ -405,6 +411,10 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
         <NuevaCampanaModal cuentas={cuentas} conexionInicial={selVistas[0]?.conexionId ?? cuentas[0]?.id}
           onCerrar={() => setModal(null)}
           onCreada={nombre => { setModal(null); setAviso(`Campaña "${nombre}" creada. Selecciona publicaciones y usa "Agregar a una campaña…".`); router.refresh() }} />
+      )}
+      {modal?.tipo === 'editar' && (
+        <EditarCampanaModal campana={modal.campana} onCerrar={() => setModal(null)}
+          onHecho={msg => { setModal(null); setError(null); setAviso(msg); router.refresh() }} />
       )}
     </div>
   )
@@ -633,7 +643,67 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
   )
 }
 
-const ACCION_TXT: Record<string, string> = { crear_campana: 'Creó la campaña', borrar_campana: 'Borró la campaña', agregar: 'Agregó a', quitar: 'Sacó de' }
+/** Fecha YYYY-MM-DD en hora de Venezuela de un instante de ML. */
+const diaVE = (s: string | null) => s ? new Date(s).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }) : hoyMas(0)
+
+/** Campaña propia: cambiar nombre y fechas. Ya empezada, ML solo deja cambiar nombre y fin. */
+function EditarCampanaModal({ campana, onCerrar, onHecho }: { campana: CampanaVista; onCerrar: () => void; onHecho: (msg: string) => void }) {
+  const empezada = campana.estado === 'started'
+  const [f, setF] = useState({ nombre: campana.nombre, desde: diaVE(campana.inicio), hasta: diaVE(campana.fin) })
+  const minDesde = hoyMas(0)
+  const maxHasta = sumarDias(f.desde, MAX_DIAS_CAMPANA - 1)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const guardar = async () => {
+    setEnviando(true); setError(null)
+    const r = await fetch('/api/promociones/campanas', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conexionId: campana.conexionId, id: campana.id, nombre: f.nombre, desde: empezada ? null : f.desde, hasta: f.hasta }),
+    })
+    const d = await r.json().catch(() => ({}))
+    setEnviando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    onHecho(d.estado === 'started' && !empezada
+      ? `Campaña "${f.nombre}" guardada: ya empezó, puedes agregarle publicaciones.`
+      : `Campaña "${f.nombre}" guardada en MercadoLibre.`)
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onCerrar}>
+      <div className="bg-white rounded-xl w-full max-w-md p-4 space-y-3 text-sm" onClick={e => e.stopPropagation()}>
+        <h2 className="text-base font-semibold">Editar campaña · {campana.cuentas.join(', ')}</h2>
+        <p className="text-xs text-neutral-500">{empezada
+          ? 'Ya empezó: MercadoLibre solo deja cambiar el nombre y hasta cuándo dura.'
+          : 'Todavía no empezó: si la pones a empezar hoy, arranca ya y puedes agregarle publicaciones.'}</p>
+        <label className="block space-y-1"><span className="text-xs text-neutral-500">Nombre</span>
+          <input value={f.nombre} maxLength={60} onChange={e => setF({ ...f, nombre: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1"><span className="text-xs text-neutral-500">Desde</span>
+            <input type="date" value={f.desde} min={empezada ? undefined : minDesde} disabled={empezada} onChange={e => {
+              const desde = e.target.value
+              const tope = sumarDias(desde, MAX_DIAS_CAMPANA - 1)
+              setF({ ...f, desde, hasta: f.hasta < desde ? desde : f.hasta > tope ? tope : f.hasta })
+            }} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5 disabled:bg-neutral-100 disabled:text-neutral-500" />
+          </label>
+          <label className="space-y-1"><span className="text-xs text-neutral-500">Hasta</span>
+            <input type="date" value={f.hasta} min={empezada ? minDesde : f.desde} max={maxHasta} onChange={e => setF({ ...f, hasta: e.target.value })}
+              className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+          </label>
+        </div>
+        <p className="text-xs text-neutral-400">Como máximo {MAX_DIAS_CAMPANA} días desde el inicio (hasta el {maxHasta.split('-').reverse().slice(0, 2).join('/')}).</p>
+        {error && <p className="text-red-700 text-xs">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
+          <button onClick={guardar} disabled={enviando || f.nombre.trim().length < 3 || f.hasta > maxHasta || f.hasta < f.desde || (!empezada && f.desde < minDesde)} className="btn-primary text-sm">
+            {enviando ? 'Guardando…' : 'Guardar en MercadoLibre'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ACCION_TXT: Record<string, string> = { crear_campana: 'Creó la campaña', editar_campana: 'Editó la campaña', borrar_campana: 'Borró la campaña', agregar: 'Agregó a', quitar: 'Sacó de' }
 
 /** Lo hecho desde el sistema en ML (quién, cuándo, a qué precio y cómo terminó), plegado. */
 function Historial({ historial }: { historial: AccionHecha[] }) {

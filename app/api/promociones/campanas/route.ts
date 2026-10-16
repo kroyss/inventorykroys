@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { borrarCampana, crearCampana, MAX_DIAS_CAMPANA } from '@/lib/promocionesML'
+import { borrarCampana, crearCampana, editarCampana, MAX_DIAS_CAMPANA } from '@/lib/promocionesML'
 import { sesionPromociones } from '@/lib/promocionesSesion'
 
 const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -28,6 +28,28 @@ export async function POST(req: NextRequest) {
     const ok = resultados.filter(r => r.ok).length
     return ok ? NextResponse.json({ ok: true, resultados })
       : NextResponse.json({ error: resultados.map(r => `${r.cuenta}: ${r.error}`).join(' · ') || 'Sin cuentas' }, { status: 502 })
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
+    return apiError(err)
+  }
+}
+
+const Edicion = z.object({
+  conexionId: z.number().int().positive(),
+  id: z.string().regex(/^C-MLV\d+$/, 'Solo se editan campañas propias'),
+  nombre: z.string().trim().min(3).max(60),
+  desde: fecha.nullable(), hasta: fecha,
+}).refine(b => !b.desde || b.hasta >= b.desde, 'La fecha de fin no puede ser antes del inicio')
+  .refine(b => !b.desde || dias(b.desde, b.hasta) <= MAX_DIAS_CAMPANA, `La campaña puede durar como máximo ${MAX_DIAS_CAMPANA} días`)
+
+/** PUT /api/promociones/campanas → cambia nombre y fechas de una campaña PROPIA (ya empezada: solo nombre y fin). */
+export async function PUT(req: NextRequest) {
+  const s = await sesionPromociones()
+  if ('error' in s) return s.error
+  try {
+    const b = Edicion.parse(await req.json())
+    const r = await editarCampana(s.db, b.conexionId, s.userId, b.id, b.nombre, b.desde, b.hasta)
+    return r.ok ? NextResponse.json({ ok: true, ...r.datos }) : NextResponse.json({ error: r.error }, { status: 502 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return apiError(err)

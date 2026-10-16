@@ -131,7 +131,7 @@ export async function anotarErrorPromociones(db: Pool, conexionId: number, error
 
 export interface Accion {
   conexionId: number; usuarioId: number
-  accion: 'crear_campana' | 'borrar_campana' | 'agregar' | 'quitar'
+  accion: 'crear_campana' | 'editar_campana' | 'borrar_campana' | 'agregar' | 'quitar'
   campanaId?: string | null; campanaTipo?: string | null; campanaNombre?: string | null
   itemId?: string | null; precio?: number | null; precioAntes?: number | null
 }
@@ -197,6 +197,36 @@ export async function crearCampana(db: Pool, conexionId: number, usuarioId: numb
       await actualizarCampanas(db, conexionId)
       return { id: String(r.id), nombre }
     })
+}
+
+/**
+ * Editar una campaña propia (probado el 16-10). Antes de empezar se cambian nombre, inicio y fin; ya empezada
+ * solo nombre y fin (si se manda el inicio ML responde "start_date cannot be modified for the current status").
+ */
+export async function editarCampana(db: Pool, conexionId: number, usuarioId: number, campanaId: string,
+  nombre: string, desde: string | null, hasta: string) {
+  return hacer(db, { conexionId, usuarioId, accion: 'editar_campana', campanaId, campanaTipo: 'SELLER_CAMPAIGN', campanaNombre: nombre },
+    async () => {
+      const estado = await estadoCampana(db, conexionId, campanaId, 'SELLER_CAMPAIGN')
+      const conInicio = estado !== 'started' && desde != null
+      const r = await mlFetch<Record<string, unknown>>(db, conexionId, `/seller-promotions/promotions/${encodeURIComponent(campanaId)}?app_version=v2`, {
+        method: 'PUT',
+        body: { promotion_type: 'SELLER_CAMPAIGN', name: nombre, ...(conInicio ? { start_date: fechaML(desde!) } : {}), finish_date: fechaML(hasta, true) },
+      })
+      await db.query(
+        `UPDATE ml_campanas_vistas SET nombre = $3, inicio = COALESCE($4::timestamptz, inicio), fin = $5::timestamptz
+         WHERE conexion_id = $1 AND campana_id = $2`,
+        [conexionId, campanaId, nombre, conInicio ? (r.start_date as string) ?? null : null, (r.finish_date as string) ?? null])
+      await actualizarCampanas(db, conexionId)
+      return { estado: String(r.status ?? estado ?? ''), inicioCambiado: conInicio }
+    })
+}
+
+/** Estado actual de una campaña según ML (started, pending, finished…); null si no se pudo leer. */
+export async function estadoCampana(db: Pool, conexionId: number, campanaId: string, tipo: string): Promise<string | null> {
+  const r = await mlFetch<{ status?: string }>(db, conexionId,
+    `/seller-promotions/promotions/${encodeURIComponent(campanaId)}?promotion_type=${encodeURIComponent(tipo)}&app_version=v2`).catch(() => null)
+  return r?.status ?? null
 }
 
 // ── Precio REAL de la publicación (2026-10-16) ─────────────────────────────
