@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
       const [{ rows: [pedido] }, { rows: latidos }] = await Promise.all([
         s.db.query(`SELECT pedido_at, resultados, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                     FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
-        s.db.query(`SELECT perfil, visto_at > NOW() - make_interval(mins => $1) AS conectado FROM me_latidos`, [LATIDO_MIN]),
+        s.db.query(`SELECT perfil, visto_at > NOW() - make_interval(mins => $1) AS conectado FROM me_latidos
+                    WHERE visto_at > NOW() - INTERVAL '3 days'`, [LATIDO_MIN]),
       ])
       const resultados = (pedido?.resultados ?? {}) as Record<string, { ok: boolean; at: string }>
       const perfiles = latidos.filter(l => l.perfil !== 'DESPERTADOR').map(l => l.perfil as string)
@@ -49,8 +50,10 @@ export async function GET(req: NextRequest) {
          ORDER BY p.fecha_orden DESC NULLS LAST, p.id DESC LIMIT 300`, [filtro]),
       s.db.query(`SELECT verificacion, COUNT(*)::int AS n FROM me_pagos
                   WHERE fecha_orden > NOW() - INTERVAL '30 days' GROUP BY 1`),
+      // Perfiles con señal en los últimos 3 días: uno que ya no se usa (extensión quitada, perfil viejo) no
+      // queda para siempre como "no respondió".
       s.db.query(`SELECT perfil, cuenta, visto_at, visto_at > NOW() - make_interval(mins => $1) AS conectado
-                  FROM me_latidos ORDER BY perfil`, [LATIDO_MIN]),
+                  FROM me_latidos WHERE visto_at > NOW() - INTERVAL '3 days' ORDER BY perfil`, [LATIDO_MIN]),
       // vigente (para la pantalla) = todavía "trayendo"; pasado TRAIDA_EN_CURSO_MIN se muestra incompleta.
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                   FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),

@@ -2,12 +2,12 @@
 
 Falta UN paso, una sola vez en cada cuenta de Chrome donde abres MercadoEnvíos:
 
-1. Se abre la página del "Asistente de envíos": toca "Agregar a Chrome".
+1. Se abre una página con los pasos para agregar el "Asistente de envíos" a Chrome. Síguelos.
 2. Toca el ícono de la pieza de rompecabezas → "Asistente de envíos".
-3. Escribe el MISMO código y toca "Conectar".
+3. Escribe el MISMO código y toca "Conectar". No hace falta tocar nada más.
 
 ¿Tienes otra cuenta de MercadoEnvíos en otro perfil de Chrome? Abre ese perfil, entra a
-app.elcomerciantedigital.com/extension y repite los pasos 1 a 3.
+app.elcomerciantedigital.com/extension y repite los pasos 1 a 3 (sirve el mismo código mientras no venza).
 
 Para usarlo: en el sistema, Pagos ME → "Traer pagos y guías" y espera el aviso verde.
 

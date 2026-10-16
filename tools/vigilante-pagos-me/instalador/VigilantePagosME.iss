@@ -6,11 +6,13 @@
 ;     Chrome no deja que un instalador la meta solo).
 ; Desde la 1.3.0 (clientes) se pide UN codigo corto (Pagos ME -> Conectar una PC): el despertador lo cambia
 ; por su clave al arrancar y encuentra solo los perfiles de Chrome que tienen la extension. Al actualizar
-; una PC ya conectada (clave y perfiles de antes) se deja el codigo vacio y se conserva todo.
+; una PC ya conectada se deja el codigo vacio y se conserva su clave. Desde la 1.3.3 SIEMPRE en modo
+; automatico: ya no se guardan nombres de perfiles (los de las instalaciones 1.2 se descartan), asi el
+; nombre interno de la extension nunca tiene que coincidir con nada.
 ; Todo queda en %APPDATA%\VigilantePagosME\despertador.json (y en el registro): instalar encima no lo borra.
 
 #define AppName    "Pagos MercadoEnvios"
-#define AppVersion "1.3.2"
+#define AppVersion "1.3.3"
 #define Publisher  "El Comerciante Digital"
 
 [Setup]
@@ -70,10 +72,10 @@ Name: "{autoprograms}\{#AppName}\Carpeta de la extension de Chrome"; Filename: "
 Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\despertador.ps1"""; \
   Description: "Arrancar el programa ahora"; Flags: nowait postinstall runhidden 64bit; Check: IsWin64
 ; La pagina /extension lleva a la Chrome Web Store (o, mientras no este publicada, explica la carga a mano).
-Filename: "https://app.elcomerciantedigital.com/extension"; Description: "Agregar el Asistente de envios a Chrome"; \
-  Flags: nowait postinstall shellexec; Check: SinPerfilesFijos
-Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension (carga a mano)"; \
-  Flags: nowait postinstall shellexec unchecked; Check: SinPerfilesFijos
+Filename: "https://app.elcomerciantedigital.com/extension"; Description: "Ver como agregar el Asistente de envios a Chrome"; \
+  Flags: nowait postinstall shellexec
+Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension (para cargarla en Chrome)"; \
+  Flags: nowait postinstall shellexec
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -Command ""Get-CimInstance Win32_Process | Where-Object {{ $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*despertador.ps1*' } | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }"""; \
@@ -223,15 +225,8 @@ begin
     Codigo := SoloLetras(Pagina.Values[0]);
     // Con codigo nuevo, la clave la pide el despertador al arrancar; sin codigo, se conserva la de antes.
     if Codigo <> '' then Clave := '' else Clave := ClaveVieja;
-    // Perfiles fijos solo si ya los habia (la PC de antes); si no, el despertador los encuentra solo.
+    // Siempre automatico (1.3.3): el despertador encuentra solo los perfiles de Chrome con la extension.
     Perfiles := '';
-    if not SinPerfilesFijos() then
-    begin
-      Perfiles := FilaPerfil(Perfil1, Carpeta1);
-      if (Trim(Perfil2) <> '') and (Trim(Carpeta2) <> '') then
-        Perfiles := Perfiles + ',' + #13#10 + FilaPerfil(Perfil2, Carpeta2);
-      Perfiles := #13#10 + Perfiles + #13#10 + '  ';
-    end;
     Json := '{' + #13#10 +
       '  "servidor": "https://app.elcomerciantedigital.com",' + #13#10 +
       '  "clave": "' + Escapar(Clave) + '",' + #13#10 +
