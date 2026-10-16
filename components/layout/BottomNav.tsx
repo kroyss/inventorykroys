@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
@@ -17,6 +17,7 @@ const ICONOS: Record<string, React.ReactNode> = {
   despachos: <><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /><path d="M15 18H9" /><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" /><circle cx="17" cy="18" r="2" /><circle cx="7" cy="18" r="2" /></>,
   calificaciones: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
   reportador: <><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>,
+  novedades: <><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z" /><path d="M17 9a4 4 0 0 1 0 6" /><path d="M19.5 6.5a8 8 0 0 1 0 11" /></>,
   reputacion: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>,
   stock: <><path d="M22 17 13.5 8.5l-5 5L2 7" /><path d="M16 17h6v-6" /></>,
   inventario: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><path d="M3.27 6.96 12 12.01l8.73-5.05" /><path d="M12 22.08V12" /></>,
@@ -61,6 +62,7 @@ const MORE: NavItem[] = [
   { href: '/tasas',      label: 'Ajustes',    icon: 'ajustes',    countries: ['VE', 'CO'] },
   { href: '/usuarios',   label: 'Usuarios',   icon: 'usuarios',   countries: ['VE', 'CO'] },
   { href: '/aprendizaje', label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
+  { href: '/novedades',   label: 'Novedades',   icon: 'novedades',   countries: ['VE', 'CO'] },
 ]
 
 // Espacio Automatizaciones (móvil): lo del día a día abajo; el resto en "Más".
@@ -76,6 +78,7 @@ const MORE_AUTO: NavItem[] = [
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
   { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
   { href: '/aprendizaje',      label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
+  { href: '/novedades',        label: 'Novedades',   icon: 'novedades',   countries: ['VE', 'CO'] },
 ]
 
 export default function BottomNav({ role, permisos, country, modulos }: { role: UserRole; permisos: string[]; country: Country; modulos: string[] }) {
@@ -83,6 +86,13 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const pathname = usePathname()
   const avisos = useAvisos()
   const [showMore, setShowMore] = useState(false)
+  // Novedades sin ver (migración 095): punto verde en "Más" y en su botón.
+  const [novedades, setNovedades] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    fetch('/api/novedades', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setNovedades(d.nuevas ?? 0) }).catch(() => {})
+    return () => { vivo = false }
+  }, [pathname])
 
   const visible = (items: NavItem[]) =>
     items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
@@ -131,6 +141,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
                   <span className="text-xs font-medium leading-tight">{etiqueta(i)}</span>
                   <span className="absolute top-1.5 right-2 flex gap-0.5">
                     {i.href === '/calificaciones' ? <NumerosCalificaciones avisos={avisos} />
+                      : i.href === '/novedades' ? (novedades > 0 && <span className="w-2 h-2 rounded-full bg-lime-500" />)
                       : aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} />}
                   </span>
                 </Link>
@@ -151,6 +162,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
                 <Icono nombre="mas" />
                 {avisosMas > 0 && !showMore && <span className={`absolute top-0.5 right-3 w-2 h-2 rounded-full ${
                   hayAlerta(avisos, more.map(i => i.href)) ? 'bg-red-500' : 'bg-neutral-400'}`} />}
+                {avisosMas === 0 && novedades > 0 && !showMore && <span className="absolute top-0.5 right-3 w-2 h-2 rounded-full bg-lime-500" />}
               </span>
               <span className={`text-[11px] leading-none ${showMore || enMas ? 'font-semibold' : 'font-medium'}`}>Más</span>
             </button>
