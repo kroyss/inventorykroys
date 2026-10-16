@@ -435,7 +435,14 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
   const conexionId = conexiones[0]
+  // Solo las campañas donde alguna de las elegidas puede entrar: no está ya adentro y, si es de ML, ML se la ofrece.
+  const puedenEntrar = (c: CampanaVista) => filas.filter(f => {
+    const p = f.promos.find(x => x.campana === c.id)
+    return p?.estado !== 'started' && (c.tipo === 'SELLER_CAMPAIGN' || p?.estado === 'candidate')
+  }).length
   const opciones = campanas.filter(c => c.conexionId === conexionId && c.estado !== 'finished')
+    .map(c => ({ c, n: puedenEntrar(c) }))
+    .filter(o => o.n > 0 || `${o.c.conexionId}|${o.c.id}` === modal.campana)
   const camp = campanas.find(c => `${c.conexionId}|${c.id}` === modal.campana) ?? null
   const propia = camp?.tipo === 'SELLER_CAMPAIGN'
   // ML no guarda publicaciones en una campaña que todavía no empezó (responde "ok" pero no queda).
@@ -504,9 +511,12 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
             <label className="space-y-1"><span className="block text-xs text-neutral-500">Campaña</span>
               <select value={modal.campana} onChange={e => setModal({ ...modal, campana: e.target.value })} className="border border-neutral-300 rounded-lg px-2 py-1.5 min-w-[240px]">
                 <option value="">Elegir…</option>
-                {opciones.map(c => <option key={c.id} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'}</option>)}
+                {opciones.map(({ c, n }) => <option key={c.id} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'} · {n} de {filas.length}</option>)}
               </select>
             </label>
+            {!opciones.length && (
+              <span className="text-xs text-amber-800 pb-2">Ya están en todas las campañas disponibles, o MercadoLibre no les ofrece ninguna.</span>
+            )}
             <label className="space-y-1"><span className="block text-xs text-neutral-500">Descuento</span>
               <span className="flex items-center gap-1">
                 <input type="number" min={1} max={80} value={modal.pct} onChange={e => setModal({ ...modal, pct: Math.max(1, Math.min(80, Number(e.target.value) || 1)) })}
