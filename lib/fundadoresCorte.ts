@@ -1,17 +1,18 @@
 // Corte de Fundadores (2026-10-16, decidido con el dueño): el lunes FECHA_CORTE los Fundadores que siguen
 // sin conectar ninguna cuenta de MercadoLibre pasan a "vencido" (no pueden entrar; su cupo queda para la
 // lista de espera) y al dueño le llega por Telegram la lista de quiénes salieron. Una sola vez.
-// Solo cuentas creadas hasta CREADAS_HASTA (Ronda 1 y Ronda 2): a quien se dé de alta después (p. ej.
-// de la lista de espera) no le aplica. Se reactiva a mano en Plataforma → Clientes.
+// Cuentas creadas hasta CREADAS_HASTA (Ronda 1, Ronda 2 y las altas de la lista de espera hasta el domingo,
+// p. ej. Maikel el 16-10, que tienen el mismo plazo): las posteriores no se tocan. Se reactiva a mano en
+// Plataforma → Clientes.
 // Lo llama el cron de preguntas (cada minuto); no hace nada antes de la fecha ni después de hecho.
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
-import { FECHA_INICIO_ACTIVACION } from '@/lib/fundadores'
+import { FECHA_LIMITE_ACTIVACION } from '@/lib/fundadores'
 import { ENTORNO, enviarTelegram, esc, telegramConfigurado, urlSistema } from '@/lib/telegram'
 import type { Country } from '@/lib/types'
 
 export const FECHA_CORTE = '2026-10-19'
-const CREADAS_HASTA = FECHA_INICIO_ACTIVACION     // 13/10: altas de la Ronda 1 y la Ronda 2
+const CREADAS_HASTA = FECHA_LIMITE_ACTIVACION     // 18/10: todo lo creado hasta el domingo tiene el mismo plazo
 const HORA_CORTE = 7                              // hora de Venezuela
 const CLAVE = `fundadores_corte_${FECHA_CORTE}`
 
