@@ -150,7 +150,11 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   const lista = base.filter(filtros[filtro]).filter(v => !q || v.titulo.toLowerCase().includes(q) || v.id.toLowerCase().includes(q) || (v.producto ?? '').toLowerCase().includes(q))
   const visibles = lista.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
   const toggle = (k: string) => setSel(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
-  const todasVisibles = visibles.length > 0 && visibles.every(v => sel.has(clave(v)))
+  // Con una campaña elegida, las que YA están en ella no se seleccionan (no hay nada que agregar).
+  const campElegida = campana ? campanas.find(c => `${c.conexionId}|${c.id}` === campana) ?? null : null
+  const enCampElegida = (v: Vista) => campElegida ? v.promos.find(p => p.campana === campElegida.id && p.estado === 'started') ?? null : null
+  const seleccionables = visibles.filter(v => !enCampElegida(v))
+  const todasVisibles = seleccionables.length > 0 && seleccionables.every(v => sel.has(clave(v)))
 
   const llamar = async (url: string, init: RequestInit, ok: (d: Record<string, unknown>) => string | { error: string }, falla: string) => {
     setError(null); setAviso(null)
@@ -266,7 +270,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                 const sug = propia ? [] : sugeridas(c)
                 return (
                   <div key={k} className={`rounded-xl border px-4 py-3 bg-white ${campana === k ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-neutral-200'}`}>
-                    <button onClick={() => { setCampana(campana === k ? '' : k); setPagina(1) }} className="w-full text-left">
+                    <button onClick={() => { setCampana(campana === k ? '' : k); setPagina(1); setSel(new Set()) }} className="w-full text-left">
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-medium text-neutral-900">{c.nombre}</div>
                         <span className="text-[11px] text-neutral-400 whitespace-nowrap">{propia ? 'propia' : c.tipo}{c.estado !== 'started' ? ` · ${c.estado}` : ''}</span>
@@ -334,7 +338,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                   <th className="px-3 py-2 w-8">
                     <input type="checkbox" checked={todasVisibles} onChange={() => setSel(s => {
                       const n = new Set(s)
-                      for (const v of visibles) { if (todasVisibles) n.delete(clave(v)); else n.add(clave(v)) }
+                      for (const v of seleccionables) { if (todasVisibles) n.delete(clave(v)); else n.add(clave(v)) }
                       return n
                     })} />
                   </th>
@@ -351,11 +355,19 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
               <tbody>
                 {visibles.map(v => {
                   const k = clave(v)
+                  const yaEn = enCampElegida(v)
                   return (
                     <tr key={k} className={`border-t border-neutral-100 align-top ${sel.has(k) ? 'bg-emerald-50/60' : ''}`}>
-                      <td className="px-3 py-2 text-center"><input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} /></td>
+                      <td className="px-3 py-2 text-center">
+                        {yaEn
+                          ? <span className="text-emerald-600" title={`Ya está en «${campElegida!.nombre}»`}>✓</span>
+                          : <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} />}
+                      </td>
                       <td className="px-3 py-2 max-w-[300px]">
                         <a href={urlML(v.id)} target="_blank" rel="noreferrer" className="text-neutral-900 hover:underline line-clamp-2">{v.titulo}</a>
+                        {campElegida && (yaEn
+                          ? <div className="text-[11px] font-medium text-emerald-700">✓ Ya en {campElegida.nombre}{yaEn.precio != null ? ` a ${usd(yaEn.precio)}` : ''}</div>
+                          : <div className="text-[11px] font-medium text-sky-700">Puede entrar a {campElegida.nombre}</div>)}
                         <div className="text-[11px] text-neutral-400">{v.id} · {v.cuenta}{v.producto ? ` · ${v.producto}` : ''}</div>
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
