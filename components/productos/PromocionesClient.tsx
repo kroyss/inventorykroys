@@ -462,6 +462,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   // Lo que respondió ML por publicación. Si dijo "no es una rebaja real", se puede reintentar A MANO con otro %.
   const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }>>({})
   const [reintento, setReintento] = useState<Record<string, number>>({})
+  // Las que con este % pierden el envío gratis quedan fuera, salvo que se pida agregarlas igual.
+  const [conPierden, setConPierden] = useState(false)
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
   const conexionId = conexiones[0]
@@ -488,10 +490,14 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const pierde = RANGO[despues.estado] < RANGO[f.envio.estado]
     const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, TABLA_TEALCA) : null
     const margen = margenA(f, precio)
-    const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación' : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}` : null
+    // Hasta qué % aguanta sin bajar de nivel de envío (ZOOM y TEALCA → mínimo de ZOOM; solo TEALCA → el de TEALCA).
+    const tope = f.envio.estado === 'ambas' ? topeDescuento(f.precio, f.envio.minZoom)
+      : f.envio.estado === 'tealca' ? topeDescuento(f.precio, f.envio.minTealca) : null
+    const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación' : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
+      : pierde && !conPierden ? `con ${modal.pct}% pierde el envío gratis${tope != null ? ` · aguanta hasta ${String(tope).replace('.', ',')}%` : ''}` : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
-    return { f, precio, despues, pierde, unidades, margen, motivo, otra }
+    return { f, precio, despues, pierde, unidades, margen, motivo, otra, tope }
   })
   const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
@@ -563,6 +569,16 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
             </label>
             <span className="text-xs text-neutral-500 pb-2">{camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}</span>
           </div>
+          {camp && filasPrev.some(x => x.pierde && !resultados[x.f.id]) && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Con <b>{modal.pct}%</b>, <b>{filasPrev.filter(x => x.pierde && !resultados[x.f.id]).length}</b> quedarían sin envío gratis
+                (bajan del mínimo de ZOOM o TEALCA para su peso){conPierden ? ' y se agregan igual.' : ': no se agregan.'}</span>
+              <label className="flex items-center gap-1.5 ml-auto">
+                <input type="checkbox" checked={conPierden} onChange={e => setConPierden(e.target.checked)} />
+                Agregarlas igual
+              </label>
+            </div>
+          )}
           {sinEmpezar && (
             <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
               Esta campaña empieza el {fecha(camp!.inicio)}. MercadoLibre no guarda publicaciones antes del inicio
