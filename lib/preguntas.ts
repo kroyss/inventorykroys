@@ -7,6 +7,7 @@
 //   - ML descarta textos con links externos o datos de contacto: se revisan antes;
 //   - las preguntas de publicaciones pausadas no salen en el panel de ML pero la API sí
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
+import { envioGratisAhora } from '@/lib/mlShipping'
 import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
@@ -196,6 +197,7 @@ export interface Contexto {
   item: ItemML | null
   titulo: string | null            // guardado en la bandeja (si ML no deja leer la publicación)
   precioML: { precio: number; original: number | null; moneda: string } | null   // con la promoción vigente
+  envio: string | null             // envío gratis al precio de ahora (ZOOM y TEALCA / solo TEALCA / cobro a destino)
   descripcion: string | null
   producto: { code: string; name: string; stock: number; precio_usd: number | null } | null
   tasa: number | null
@@ -238,6 +240,8 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
      LIMIT 1`, [codigo])
   const { rows: [tasa] } = await db.query(
     `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)
+  const { rows: [peso] } = await db.query(`SELECT peso_kg::float AS kg FROM me_productos WHERE publicacion = $1`, [q.item_id]).catch(() => ({ rows: [] }))
+  const envio = (q.item_moneda ?? 'USD') === 'USD' ? envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original) : null
   const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
   const { rows: notas } = await db.query(
@@ -272,6 +276,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     pregunta: { id: Number(q.id), texto: q.texto, item_id: q.item_id, fecha: q.fecha },
     item, titulo: q.item_titulo ?? prod?.name ?? null, descripcion,
     precioML: q.item_precio ? { precio: q.item_precio, original: q.item_precio_original, moneda: q.item_moneda ?? 'USD' } : null,
+    envio: envio ? `${envio.texto}${envio.porPromo ? ' (es por la promoción vigente; al terminar vuelve a su envío normal)' : ''}` : null,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol?.value ?? '',
@@ -335,6 +340,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
     const bs = pml.moneda === 'USD' && c.tasa ? ` ≈ Bs ${(pml.precio * c.tasa).toFixed(2)} a tasa BCV ${c.tasa}` : ''
     L.push(`PRECIO EN MERCADOLIBRE AHORA: ${pml.precio} ${pml.moneda}${bs}` + (pml.original ? ` (en promoción; antes ${pml.original})` : ''))
   }
+  if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM o TEALCA, responde según esto.`)
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, 4000)}`)
   if (c.producto) {
     L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)

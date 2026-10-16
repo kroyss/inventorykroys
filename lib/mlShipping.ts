@@ -216,3 +216,23 @@ export function unidadesParaGratis(pesoKg: number | null | undefined, precio: nu
   }
   return null
 }
+
+/** Orden de los estados (más alto = mejor envío gratis). */
+export const RANGO_ENVIO: Record<EstadoEnvio, number> = { ambas: 2, tealca: 1, destino: 0, sin_peso: -1 }
+
+/**
+ * Envío gratis de una publicación A ESTE PRECIO (Preguntas, Mensajes y la IA, 2026-10-16): por ZOOM y TEALCA,
+ * solo por TEALCA o cobro a destino. Con `precioSinPromo` dice si es la promoción la que le quitó ZOOM o el envío
+ * gratis (cuando la promo termina, el precio vuelve y el estado cambia solo). null = sin peso o sin precio.
+ */
+export function envioGratisAhora(pesoKg: number | null | undefined, precio: number | null | undefined, precioSinPromo?: number | null) {
+  if (pesoKg == null || !(pesoKg > 0) || precio == null || !(precio > 0)) return null
+  const e = envioPorTransportista(pesoKg, precio)
+  if (e.estado === 'sin_peso') return null
+  const base = precioSinPromo && precioSinPromo > precio ? envioPorTransportista(pesoKg, precioSinPromo).estado : null
+  const porPromo = base != null && RANGO_ENVIO[base] > RANGO_ENVIO[e.estado]
+  const texto = e.estado === 'ambas' ? 'Envío gratis por ZOOM y TEALCA'
+    : e.estado === 'tealca' ? 'Envío gratis SOLO por TEALCA (ZOOM no llega a este precio)'
+    : 'Sin envío gratis a 1 unidad: cobro a destino'
+  return { estado: e.estado, texto, porPromo, minZoom: e.minZoom, minTealca: e.minTealca }
+}

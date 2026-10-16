@@ -10,6 +10,7 @@ import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type S
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
+import { envioGratisAhora } from '@/lib/mlShipping'
 
 interface Pregunta {
   id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null; datos_guardados?: number
@@ -25,6 +26,7 @@ interface Pregunta {
   producto_precio: number | null
   comprador_id: string | null; previas: number
   item_precio: number | null; item_precio_original: number | null; item_moneda: string | null
+  item_peso?: number | null    // peso del portal de MercadoEnvíos (para el envío gratis por transportista)
 }
 
 // Precio para decidir (regla de los $3, respuesta rápida en verde): SOLO el de MercadoLibre
@@ -155,6 +157,23 @@ function Precio({ p, umbral }: { p: Pregunta; umbral: number | null }) {
         {simbolo}{usd(p.item_precio)}{bajo && ` · menos de $${umbral}`}
       </span>
       {p.item_precio_original && <span className="text-xs text-neutral-400 line-through num">{simbolo}{usd(p.item_precio_original)}</span>}
+      <EnvioGratis p={p} />
+    </span>
+  )
+}
+
+/** Envío gratis AL PRECIO DE AHORA (con la promo, si hay): por ZOOM y TEALCA, solo TEALCA o cobro a destino.
+ *  Cuando la promoción termina el precio vuelve (se relee cada 30 min) y esto cambia solo. */
+function EnvioGratis({ p }: { p: Pregunta }) {
+  const e = envioGratisAhora(p.item_peso, precioUSD(p), p.item_precio_original)
+  if (!e) return null
+  const estilo = e.estado === 'ambas' ? 'text-emerald-800 bg-emerald-50 ring-emerald-200'
+    : e.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'
+  const txt = e.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : e.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA' : '⚠ Sin envío gratis'
+  return (
+    <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${estilo}`}
+      title={`${e.texto}${e.porPromo ? ' — por la promoción: al terminar vuelve a su envío normal' : ''} · mínimos para su peso: ZOOM $${e.minZoom} · TEALCA $${e.minTealca}`}>
+      {txt}{e.porPromo ? ' · por la promo' : ''}
     </span>
   )
 }

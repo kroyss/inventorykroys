@@ -23,7 +23,7 @@ export default async function PromocionesPage() {
               FROM ml_promociones_cache c JOIN ml_conexiones x ON x.id = c.conexion_id
               WHERE x.estado = 'activa' ORDER BY x.id`),
     db.query(`SELECT publicacion, peso_kg::float AS peso, actualizado_at FROM me_productos`),
-    db.query(`SELECT 'MLV' || m.ml_code AS publicacion, p.code, p.weight_kg::float AS peso,
+    db.query(`SELECT 'MLV' || m.ml_code AS publicacion, p.code, p.weight_kg::float AS peso, m.unidades,
                      COALESCE(pp.total_cost, 0)::float AS costo
               FROM product_ml_codes m JOIN products p ON p.id = m.product_id
               LEFT JOIN product_pricing pp ON pp.product_id = p.id
@@ -35,7 +35,7 @@ export default async function PromocionesPage() {
               WHERE a.creado_at > NOW() - INTERVAL '60 days' ORDER BY a.creado_at DESC LIMIT 300`),
   ])
   const pesoPortal = new Map(portal.map(r => [r.publicacion as string, r.peso as number | null]))
-  const producto = new Map(vinculados.map(r => [r.publicacion as string, r as { code: string; peso: number | null; costo: number }]))
+  const producto = new Map(vinculados.map(r => [r.publicacion as string, r as { code: string; peso: number | null; costo: number; unidades: number }]))
   const pesosAl = portal.reduce<string | null>((m, r) => (!m || r.actualizado_at > m ? r.actualizado_at : m), null)
 
   // Agregadas a campañas que todavía no empiezan: ML no las lista, salen del registro de acciones.
@@ -65,7 +65,10 @@ export default async function PromocionesPage() {
     for (const it of foto.items) {
       const pp = pesoPortal.get(it.id)
       const prod = producto.get(it.id)
-      const peso = pp != null && pp > 0 ? pp : prod?.peso != null && prod.peso > 0 ? prod.peso : null
+      // El peso del portal es el de la publicación (un combo trae el suyo). El del producto es de 1 unidad:
+      // solo sirve para publicaciones de 1 unidad; un combo sin peso del portal queda "sin peso".
+      const pesoProducto = prod?.peso != null && prod.peso > 0 && (prod.unidades ?? 1) === 1 ? prod.peso : null
+      const peso = pp != null && pp > 0 ? pp : pesoProducto
       for (const p of it.promos) {
         const v = campanas.get(`${f.conexion_id}|${p.campana}`)
         if (v && p.estado === 'started') v.adentro++

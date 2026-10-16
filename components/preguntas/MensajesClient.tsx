@@ -206,7 +206,8 @@ const conUsd = (it: { usd?: number | null; moneda?: string | null }) => it.usd !
 export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean; sinNotas?: boolean }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
-  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null }[] | null>(null)
+  const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null
+    envio?: { estado: 'ambas' | 'tealca' | 'destino'; texto: string } | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
@@ -364,6 +365,14 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
                     {dinero(it.precio, it.moneda)}
                     {' = '}<b className="font-semibold text-neutral-900">{conUsd(it) && <>{dinero(it.usd! * it.cantidad, 'USD')} · </>}{dinero(it.precio * it.cantidad, it.moneda)}</b>
                   </>}
+                  {/* Envío gratis de esta compra (precio pagado y peso del portal): para responder por ZOOM o TEALCA. */}
+                  {it.envio && (
+                    <span title={it.envio.texto} className={`ml-2 text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${
+                      it.envio.estado === 'ambas' ? 'text-emerald-800 bg-emerald-50 ring-emerald-200'
+                        : it.envio.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'}`}>
+                      {it.envio.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : it.envio.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA' : '⚠ Sin envío gratis'}
+                    </span>
+                  )}
                 </p>
               </div>
             ))}

@@ -4,6 +4,7 @@
 // [{ resource: '/packs/{pack}/sellers/{seller}', count }]. Leer una conversación con
 // mark_as_read=false NO la marca como leída (así ML sigue avisando en su app); se marca
 // al responder o con el botón "Marcar como leída".
+import { envioGratisAhora } from '@/lib/mlShipping'
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
@@ -251,7 +252,9 @@ export async function subirAdjunto(db: Pool, conexionId: number, archivo: File) 
 export interface ItemVenta { id: string; titulo: string; variante: string | null; cantidad: number; precio: number | null; moneda: string | null; link: string | null; imagen: string | null
   /** Precio unitario en dólares al que se vendió (con el descuento): la conversión de ML o, si no la
    *  trae, Bs ÷ tasa BCV del día de la venta (usd_aprox). */
-  usd?: number | null; usd_aprox?: boolean }
+  usd?: number | null; usd_aprox?: boolean
+  /** Envío gratis de esta compra según el precio pagado y el peso del portal (ZOOM y TEALCA / solo TEALCA / destino). */
+  envio?: { estado: 'ambas' | 'tealca' | 'destino'; texto: string } | null }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
@@ -276,6 +279,14 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
     if (t?.r) for (const it of items) if (it.usd == null && it.moneda === 'VES' && it.precio) { it.usd = it.precio / t.r; it.usd_aprox = true }
   }
   await Promise.all(items.map(async it => { it.imagen = await imagenDeItem(db, conexionId, it.id, it.varId).catch(() => null) }))
+  // Peso del portal de MercadoEnvíos (el de la publicación; un combo trae el suyo): con lo que pagó por todas las unidades.
+  const { rows: pesos } = await db.query(`SELECT publicacion, peso_kg::float AS kg FROM me_productos WHERE publicacion = ANY($1)`,
+    [items.map(it => it.id)]).catch(() => ({ rows: [] as { publicacion: string; kg: number }[] }))
+  for (const it of items) {
+    const kg = pesos.find(p => p.publicacion === it.id)?.kg
+    const e = kg && it.usd ? envioGratisAhora(kg * it.cantidad, it.usd * it.cantidad) : null
+    it.envio = e ? { estado: e.estado, texto: e.texto } : null
+  }
   return { items: items.map(({ varId: _v, ...it }) => it), comprador }
 }
 
