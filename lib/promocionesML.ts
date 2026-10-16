@@ -95,7 +95,23 @@ export async function actualizarPromociones(db: Pool, conexionId: number): Promi
     }
   }
 
-  const foto: FotoPromociones = { campanas, items: [...items.values()] }
+  // 4) La verdad la da el precio vigente de cada publicación (2026-10-16): el listado de cada campaña tarda en
+  //    enterarse de quién entró o salió. De a 8 en paralelo.
+  const lista = [...items.values()]
+  for (let i = 0; i < lista.length; i += 8) {
+    await Promise.all(lista.slice(i, i + 8).map(async it => {
+      const v = await precioVigente(db, conexionId, it.id)
+      if (!v) return
+      for (const p of it.promos) if (p.estado === 'started' && p.campana !== v.campana) { p.estado = 'candidate'; p.precio = null }
+      if (v.campana) {
+        const p = it.promos.find(x => x.campana === v.campana)
+        if (p) { p.estado = 'started'; p.precio = v.amount }
+        else it.promos.push({ campana: v.campana, estado: 'started', precio: v.amount, minimo: null })
+      }
+    }))
+  }
+
+  const foto: FotoPromociones = { campanas, items: lista }
   await db.query(
     `INSERT INTO ml_promociones_cache (conexion_id, datos, error, actualizado_at) VALUES ($1, $2, NULL, NOW())
      ON CONFLICT (empresa_id, conexion_id) DO UPDATE SET datos = EXCLUDED.datos, error = NULL, actualizado_at = NOW()`,
