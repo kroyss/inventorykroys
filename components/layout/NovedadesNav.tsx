@@ -23,9 +23,30 @@ const fechaCorta = (f: string) => {
   return new Date(y, m - 1, d).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })
 }
 
-/** La lista (la usan el panel y la página del celular). */
+/** La lista (la usan el panel y la página del celular). Si hay nuevas, las ya vistas quedan plegadas en
+ *  "Ver anteriores"; si no hay nuevas, se ven todas. */
 export function ListaNovedades({ items, onIr }: { items: Novedad[]; onIr?: () => void }) {
+  const [anteriores, setAnteriores] = useState(false)
   if (!items.length) return <p className="px-4 py-6 text-sm text-neutral-500 text-center">Todavía no hay novedades.</p>
+  const nuevas = items.filter(n => n.nueva)
+  const vistas = items.filter(n => !n.nueva)
+  const plegar = nuevas.length > 0 && vistas.length > 0
+  return <>
+    <Filas items={plegar ? nuevas : items} onIr={onIr} />
+    {plegar && (
+      <>
+        <button type="button" onClick={() => setAnteriores(a => !a)}
+          className="w-full flex items-center gap-1.5 px-4 py-2 border-t border-neutral-100 text-xs text-neutral-500 hover:bg-neutral-50">
+          <span className={`transition-transform ${anteriores ? 'rotate-90' : ''}`}>▶</span>
+          {anteriores ? 'Ocultar anteriores' : `Ver anteriores (${vistas.length})`}
+        </button>
+        {anteriores && <div className="border-t border-neutral-100"><Filas items={vistas} onIr={onIr} /></div>}
+      </>
+    )}
+  </>
+}
+
+function Filas({ items, onIr }: { items: Novedad[]; onIr?: () => void }) {
   return (
     <ul className="divide-y divide-neutral-100">
       {items.map(n => (

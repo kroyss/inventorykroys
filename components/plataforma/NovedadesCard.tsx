@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { MODULOS } from '@/lib/modulos'
 
 // Plataforma → Interno → Novedades (migración 095): lo que ven los clientes en el megáfono de la barra.
@@ -29,7 +29,14 @@ export default function NovedadesCard() {
     const d = await r.json().catch(() => ({}))
     if (r.ok) setLista(d.novedades); else setError(d.error ?? 'No se pudo cargar')
   }, [])
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => {
+    let vivo = true
+    fetch('/api/plataforma/novedades').then(r => r.json().then(d => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+      if (!vivo) return
+      if (ok) setLista(d.novedades); else setError(d.error ?? 'No se pudo cargar')
+    }).catch(() => { if (vivo) setError('No se pudo cargar') })
+    return () => { vivo = false }
+  }, [])
 
   const llamar = async (metodo: string, body?: unknown, query = '') => {
     setBusy(true); setError(null)
@@ -47,6 +54,40 @@ export default function NovedadesCard() {
     const body = { ...form, enlace: form.enlace?.trim() || null }
     if (await llamar(form.id ? 'PUT' : 'POST', body)) setForm(null)
   }
+
+  const publicarTodas = async () => {
+    const ids = (lista ?? []).filter(n => !n.publicada_at).map(n => n.id)
+    if (!ids.length || !confirm(`¿Publicar los ${ids.length} borradores? Los clientes los verán en el megáfono.`)) return
+    setBusy(true); setError(null)
+    for (const id of ids) {
+      const r = await fetch('/api/plataforma/novedades', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, publicar: true }) })
+      if (!r.ok) { setError('No se pudieron publicar todas'); break }
+    }
+    setBusy(false)
+    await cargar()
+  }
+
+  const Fila = ({ n }: { n: Novedad }) => (
+    <li className="px-4 py-3 flex flex-wrap items-start gap-x-4 gap-y-2">
+      <div className="min-w-0 flex-1 basis-72">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-neutral-400">{fecha(n.fecha)}</span>
+          <span className="font-medium text-neutral-800">{n.titulo}</span>
+          <span className="text-neutral-400">{n.modulo ? `con ${MODULO_CORTO[n.modulo] ?? n.modulo}` : 'todas las empresas'}{n.enlace ? ` · ${n.enlace}` : ''}</span>
+        </div>
+        <p className="mt-1 text-sm text-neutral-700">{n.texto}</p>
+      </div>
+      <div className="flex items-center gap-3 text-xs">
+        {n.publicada_at
+          ? <button onClick={() => llamar('PUT', { id: n.id, publicar: false })} disabled={busy} className="underline text-neutral-500 hover:text-neutral-800">Despublicar</button>
+          : <button onClick={() => llamar('PUT', { id: n.id, publicar: true })} disabled={busy} className="btn-secondary text-xs px-2.5 py-1">Publicar</button>}
+        <button onClick={() => setForm({ id: n.id, fecha: n.fecha, titulo: n.titulo, texto: n.texto, modulo: n.modulo, enlace: n.enlace ?? '' })}
+          className="underline text-neutral-500 hover:text-neutral-800">Editar</button>
+        <button onClick={() => { if (confirm('¿Borrar esta novedad?')) llamar('DELETE', undefined, `?id=${n.id}`) }}
+          className="underline text-neutral-400 hover:text-red-700">Borrar</button>
+      </div>
+    </li>
+  )
 
   const borradores = (lista ?? []).filter(n => !n.publicada_at).length
   const fecha = (f: string) => f.split('-').reverse().slice(0, 2).join('/')
@@ -102,34 +143,47 @@ export default function NovedadesCard() {
       {!lista ? !error && <p className="text-sm text-neutral-400">Cargando…</p> : lista.length === 0 ? (
         <p className="text-sm text-neutral-400 py-6 text-center bg-white rounded-xl border border-neutral-200">Todavía no hay novedades.</p>
       ) : (
-        <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
-          {lista.map(n => (
-            <li key={n.id} className="px-4 py-3 flex flex-wrap items-start gap-x-4 gap-y-2">
-              <div className="min-w-0 flex-1 basis-72">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-neutral-400">{fecha(n.fecha)}</span>
-                  <span className="font-medium text-neutral-800">{n.titulo}</span>
-                  <span className={`rounded-full px-1.5 py-px ${n.publicada_at ? 'bg-lime-100 text-lime-800' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
-                    {n.publicada_at ? 'Publicada' : 'Borrador'}
-                  </span>
-                  <span className="text-neutral-400">{n.modulo ? `con ${MODULO_CORTO[n.modulo] ?? n.modulo}` : 'todas'}{n.enlace ? ` · ${n.enlace}` : ''}</span>
-                </div>
-                <p className="mt-1 text-sm text-neutral-700">{n.texto}</p>
-              </div>
-              <div className="flex items-center gap-3 text-xs">
-                <button onClick={() => llamar('PUT', { id: n.id, publicar: !n.publicada_at })} disabled={busy}
-                  className={n.publicada_at ? 'underline text-neutral-500 hover:text-neutral-800' : 'btn-primary text-xs px-2.5 py-1'}>
-                  {n.publicada_at ? 'Volver a borrador' : 'Publicar'}
-                </button>
-                <button onClick={() => setForm({ id: n.id, fecha: n.fecha, titulo: n.titulo, texto: n.texto, modulo: n.modulo, enlace: n.enlace ?? '' })}
-                  className="underline text-neutral-500 hover:text-neutral-800">Editar</button>
-                <button onClick={() => { if (confirm('¿Borrar esta novedad?')) llamar('DELETE', undefined, `?id=${n.id}`) }}
-                  className="underline text-neutral-400 hover:text-red-700">Borrar</button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-5">
+          <Grupo titulo="Borradores" detalle="Nadie los ve todavía. Publícalos cuando estén bien."
+            vacio="No hay borradores." items={lista.filter(n => !n.publicada_at)}
+            accion={lista.some(n => !n.publicada_at) ? (
+              <button onClick={publicarTodas} disabled={busy} className="btn-secondary text-xs px-2.5 py-1">Publicar todas</button>
+            ) : null}
+            fila={n => <Fila n={n} />} />
+          <Grupo titulo="Publicadas" detalle="Las ven los clientes en el megáfono (cada una, las empresas con su módulo)."
+            vacio="Ninguna publicada: el megáfono no aparece hasta que publiques al menos una."
+            items={lista.filter(n => n.publicada_at)} fila={n => <Fila n={n} />} plegado />
+        </div>
       )}
     </section>
+  )
+}
+
+/** Un grupo (Borradores / Publicadas) con su título, cuántas hay y la lista. */
+function Grupo({ titulo, detalle, vacio, items, fila, accion, plegado = false }: {
+  titulo: string; detalle: string; vacio: string; items: Novedad[]; fila: (n: Novedad) => React.ReactNode; accion?: React.ReactNode
+  /** Publicadas: plegadas (solo el título y cuántas); se despliegan al tocar. */
+  plegado?: boolean
+}) {
+  const borrador = titulo === 'Borradores'
+  const [abierto, setAbierto] = useState(!plegado)
+  return (
+    <div className="space-y-2">
+      <div className={`flex flex-wrap items-center gap-2 ${plegado ? 'cursor-pointer select-none' : ''}`} onClick={plegado ? () => setAbierto(a => !a) : undefined}>
+        {plegado && <span className={`text-neutral-400 text-xs transition-transform ${abierto ? 'rotate-90' : ''}`}>▶</span>}
+        <span className={`inline-flex items-center gap-1.5 text-sm font-semibold ${borrador ? 'text-amber-800' : 'text-lime-800'}`}>
+          <span className={`w-2 h-2 rounded-full ${borrador ? 'bg-amber-400' : 'bg-lime-500'}`} />{titulo} ({items.length})
+        </span>
+        <span className="text-xs text-neutral-500">{detalle}</span>
+        {accion && <span className="ml-auto">{accion}</span>}
+      </div>
+      {!abierto ? null : items.length === 0 ? (
+        <p className="text-sm text-neutral-400 py-3 px-4 bg-white rounded-xl border border-dashed border-neutral-200">{vacio}</p>
+      ) : (
+        <ul className={`bg-white rounded-xl border shadow-sm divide-y divide-neutral-100 ${borrador ? 'border-amber-200' : 'border-lime-200'}`}>
+          {items.map(n => <Fragment key={n.id}>{fila(n)}</Fragment>)}
+        </ul>
+      )}
+    </div>
   )
 }
