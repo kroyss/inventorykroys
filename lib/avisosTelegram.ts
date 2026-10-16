@@ -161,7 +161,7 @@ interface Destinatario {
   user_id: number; chat_id: string; nombre: string; role: UserRole; permisos: string[] | null
   avisos: unknown; vinculado_at: string
 }
-interface EmpresaAvisos { id: number; nombre: string; country: Country; modulos: string[] }
+interface EmpresaAvisos { id: number; nombre: string; country: Country; modulos: string[]; organizacion_id?: number }
 
 /** Marca el aviso como mandado ANTES de mandarlo (dos pasadas a la vez no lo repiten); si Telegram
  *  falla se desmarca para reintentar en la próxima. Devuelve las referencias nuevas. */
@@ -469,6 +469,12 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
   const prueba = d.role === 'admin' ? await finDePrueba(e.id) : null
   if (prueba) pend.unshift(prueba)
   lineas.push('', '<b>Pendiente hoy</b>', ...(pend.length ? pend : ['Nada pendiente. Todo al día 👌']))
+  // Dueño de la plataforma (2026-10-16): los clientes cuya prueba vence en 3 días o venció hace poco, y si a
+  // ellos les llega el aviso (admin con Telegram y resumen prendido). Una sola vez: en la empresa VE.
+  if (d.role === 'admin' && e.organizacion_id === ORGANIZACION_PLATAFORMA && e.country === 'VE') {
+    const vencen = await clientesPorVencer()
+    if (vencen.length) lineas.push('', '<b>👥 Clientes por vencer</b>', ...vencen)
+  }
 
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
   return `${cab}☀️ <b>${saludo}, ${esc(d.nombre.split(/\s+/)[0])}.</b> Tu resumen:\n\n${lineas.join('\n')}`
@@ -490,6 +496,29 @@ async function finDePrueba(empresaId: number) {
   if (o.prueba_dias != null && quedan >= o.prueba_dias) return null
   const que = o.fundador ? 'Tu mes gratis de Fundador' : 'Tu prueba gratis'
   return `⏳ <b>${que} termina ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: escríbenos para seguir sin cortes`
+}
+
+/** Para el dueño de la plataforma: pruebas que vencen en 3 días o vencieron hace 3 días o menos (hora Caracas). */
+async function clientesPorVencer() {
+  const { rows } = await dbGlobal().query(
+    `SELECT o.nombre, o.fundador, to_char(o.prueba_hasta, 'DD/MM') AS hasta,
+            o.prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan,
+            EXISTS (SELECT 1 FROM telegram_usuarios t
+                    JOIN usuario_empresas ue ON ue.user_id = t.user_id AND ue.role = 'admin'
+                    JOIN empresas e ON e.id = ue.empresa_id AND e.organizacion_id = o.id
+                    WHERE t.chat_id IS NOT NULL AND t.entorno = $2
+                      AND COALESCE((ue.avisos->>'resumen')::boolean, TRUE)) AS con_telegram
+     FROM organizaciones o
+     WHERE o.id <> $1 AND o.estado = 'prueba' AND o.prueba_hasta IS NOT NULL
+       AND o.prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date BETWEEN -3 AND $3
+     ORDER BY o.prueba_hasta, o.nombre`, [ORGANIZACION_PLATAFORMA, ENTORNO, AVISAR_FIN_PRUEBA_DIAS])
+  return rows.map(r => {
+    const q = Number(r.quedan)
+    const cuando = q < 0 ? `<b>venció ${q === -1 ? 'ayer' : `hace ${-q} días`}</b> (${r.hasta}) · ¿sigue o se cierra?`
+      : q === 0 ? `<b>vence hoy</b> (${r.hasta})` : q === 1 ? `vence mañana (${r.hasta})` : `vence en ${q} días (${r.hasta})`
+    const aviso = q < 0 ? '' : r.con_telegram ? ' · ✅ le llega el aviso por Telegram' : ' · ⚠️ sin Telegram: escríbele tú'
+    return `• ${esc(r.nombre)}${r.fundador ? ' (Fundador)' : ''} · ${cuando}${aviso}`
+  })
 }
 
 /** Lo que queda pendiente AHORA (resumen de la mañana y cierre del día), según sus permisos. Las agotadas
@@ -548,7 +577,7 @@ export async function enviarAvisosTelegram() {
   const { rows: abierto } = await dbGlobal().query(`SELECT 1 FROM plataforma_ajustes WHERE key = 'avisos_telegram_abierto' AND value = 'true'`)
   const { rows } = await dbGlobal().query(
     `SELECT t.user_id, t.chat_id::text, COALESCE(u.full_name, u.username) AS nombre, ue.role, ue.permisos, ue.avisos,
-            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos
+            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos, e.organizacion_id
      FROM telegram_usuarios t
      JOIN users u ON u.id = t.user_id AND u.is_active
      JOIN usuario_empresas ue ON ue.user_id = t.user_id
@@ -567,7 +596,7 @@ export async function enviarAvisosTelegram() {
 
   let enviados = 0
   for (const [, lista] of porEmpresa) {
-    const e: EmpresaAvisos = { id: lista[0].empresa_id, nombre: lista[0].empresa, country: lista[0].country, modulos: lista[0].modulos }
+    const e: EmpresaAvisos = { id: lista[0].empresa_id, nombre: lista[0].empresa, country: lista[0].country, modulos: lista[0].modulos, organizacion_id: lista[0].organizacion_id }
     try {
       enviados += await conEmpresa(e.id, e.country, async db => {
         const { rows: [h] } = await db.query(`SELECT EXTRACT(HOUR FROM NOW())::int AS hora`)
@@ -592,13 +621,13 @@ export async function enviarAvisosTelegram() {
 export async function resumenAhora(userId: number, empresaId: number) {
   const { rows: [r] } = await dbGlobal().query(
     `SELECT t.user_id, t.chat_id::text, COALESCE(u.full_name, u.username) AS nombre, ue.role, ue.permisos, ue.avisos,
-            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos
+            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos, e.organizacion_id
      FROM telegram_usuarios t JOIN users u ON u.id = t.user_id
      JOIN usuario_empresas ue ON ue.user_id = t.user_id AND ue.empresa_id = $2
      JOIN empresas e ON e.id = ue.empresa_id
      WHERE t.user_id = $1 AND t.chat_id IS NOT NULL AND t.entorno = $3`, [userId, empresaId, ENTORNO])
   if (!r) return false
-  const e: EmpresaAvisos = { id: r.empresa_id, nombre: r.empresa, country: r.country, modulos: r.modulos }
+  const e: EmpresaAvisos = { id: r.empresa_id, nombre: r.empresa, country: r.country, modulos: r.modulos, organizacion_id: r.organizacion_id }
   await conEmpresa(e.id, e.country, async db => {
     const { rows: [h] } = await db.query(`SELECT EXTRACT(HOUR FROM NOW())::int AS hora`)
     const html = await resumenDiario(db, e, r, avisosDisponibles({ role: r.role, permisos: r.permisos, modulos: e.modulos }), '', h.hora)
