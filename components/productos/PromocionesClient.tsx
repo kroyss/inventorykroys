@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import {
   envioPorTransportista, topeDescuento, unidadesParaGratis, parseShippingTable, TABLA_TEALCA, TABLA_ZOOM, type EstadoEnvio,
 } from '@/lib/mlShipping'
@@ -59,6 +60,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   pesosAl: string | null; conPagosME: boolean; historial: AccionHecha[]
 }) {
   const router = useRouter()
+  const confirmar = useConfirm()
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [cuenta, setCuenta] = useState('')
   const [campana, setCampana] = useState('')        // conexión|id de la campaña elegida (filtro)
@@ -150,12 +152,14 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   const toggle = (k: string) => setSel(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
   const todasVisibles = visibles.length > 0 && visibles.every(v => sel.has(clave(v)))
 
-  const llamar = async (url: string, init: RequestInit, ok: (d: Record<string, unknown>) => string) => {
+  const llamar = async (url: string, init: RequestInit, ok: (d: Record<string, unknown>) => string | { error: string }, falla: string) => {
     setError(null); setAviso(null)
     const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init })
     const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'No se pudo hacer'); return null }
-    setAviso(ok(d)); router.refresh()
+    if (!r.ok) { setError(d.error ?? falla); return null }
+    const m = ok(d)
+    if (typeof m === 'string') setAviso(m); else setError(m.error)
+    router.refresh()
     return d
   }
 
@@ -164,7 +168,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     const r = await fetch('/api/promociones/actualizar', { method: 'POST' })
     const d = await r.json().catch(() => ({}))
     setBusy(null)
-    if (!r.ok) { setAviso(null); setError(d.error ?? 'No se pudo actualizar'); return }
+    if (!r.ok) { setAviso(null); setError(d.error ?? 'No se pudo leer MercadoLibre. Revisa que las cuentas sigan conectadas y prueba de nuevo.'); return }
     const res = (d.resultado ?? []) as { cuenta: string; ok: boolean; publicaciones?: number; campanas?: number; error?: string }[]
     setAviso(res.map(x => x.ok ? `${x.cuenta}: ${x.publicaciones} publicaciones, ${x.campanas} campañas` : `${x.cuenta}: error (${x.error})`).join(' · ') || 'Sin cuentas activas')
     router.refresh()
@@ -172,23 +176,36 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   const actualizarPesos = async () => {
     setBusy('pesos')
     await llamar('/api/promociones/pesos', { method: 'POST' },
-      () => 'Pedido enviado a la PC de Pagos ME: trae los pesos del portal en 1–2 minutos (la PC tiene que estar prendida). Recarga la página después.')
+      () => 'Pedido enviado a la PC de Pagos ME: trae los pesos del portal en 1–2 minutos (la PC tiene que estar prendida). Recarga la página después.',
+      'No se pudo pedir los pesos a la PC de Pagos ME.')
     setBusy(null)
   }
   const sacar = async (v: Vista, p: PromoDeItem & { nombre: string }) => {
     const camp = campanas.find(c => c.conexionId === v.conexionId && c.id === p.campana)
-    if (!confirm(`¿Sacar "${v.titulo}" de "${p.nombre}"? Vuelve a su precio publicado (${usd(v.precio)}).`)) return
+    if (!await confirmar({
+      title: 'Sacar de la promoción',
+      message: `"${v.titulo}" sale de «${p.nombre}» en MercadoLibre.\n\nVuelve a su precio publicado (${usd(v.precio)}), salvo que esté en otra promoción.`,
+      confirmText: 'Sacar de la promoción', danger: true,
+    })) return
     setBusy(`sacar-${clave(v)}`)
     await llamar('/api/promociones/acciones', {
       method: 'POST', body: JSON.stringify({ accion: 'quitar', conexionId: v.conexionId, campana: { id: p.campana, tipo: camp?.tipo ?? 'DEAL', nombre: p.nombre }, items: [{ id: v.id }] }),
-    }, d => d.error ? `No se pudo sacar: ${((d.resultados as { error?: string }[])?.[0]?.error) ?? ''}` : 'Listo: salió de la promoción.')
+    }, d => d.error
+      ? { error: `"${v.titulo}" no salió de «${p.nombre}»: ${((d.resultados as { error?: string }[])?.[0]?.error) ?? 'MercadoLibre no lo aceptó'}` }
+      : `"${v.titulo}" salió de «${p.nombre}» y se comprobó en MercadoLibre.`,
+      `No se pudo sacar "${v.titulo}" de «${p.nombre}».`)
     setBusy(null)
   }
   const borrarCampana = async (c: CampanaVista) => {
-    if (!confirm(`¿Borrar la campaña "${c.nombre}"? Las publicaciones que tiene vuelven a su precio.`)) return
+    if (!await confirmar({
+      title: 'Borrar campaña',
+      message: `Se borra «${c.nombre}» de MercadoLibre (${c.cuentas.join(', ')}).\n\nAntes se saca cada publicación que tiene (${c.adentro}) para que vuelva a su precio. No se puede deshacer.`,
+      confirmText: 'Borrar campaña', danger: true,
+    })) return
     setBusy(`borrar-${c.id}`)
     await llamar(`/api/promociones/campanas?conexion=${c.conexionId}&id=${encodeURIComponent(c.id)}&nombre=${encodeURIComponent(c.nombre)}`,
-      { method: 'DELETE' }, () => `Campaña "${c.nombre}" borrada.`)
+      { method: 'DELETE' }, () => `Campaña «${c.nombre}» borrada en MercadoLibre; sus publicaciones volvieron a su precio.`,
+      `No se pudo borrar la campaña «${c.nombre}».`)
     setBusy(null)
   }
   const guardarMargen = (v: number) => { setMargenMin(v); try { localStorage.setItem('promo_margen_min', String(v)) } catch { /* sin storage */ } }
@@ -428,6 +445,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   campanas: CampanaVista[]; margenA: (f: FilaPromo, precio: number) => number | null; margenMin: number
   onHecho: (msg: string, err?: string) => void
 }) {
+  const confirmarAviso = useConfirm()
   const [enviando, setEnviando] = useState(false)
   // Lo que respondió ML por publicación. Si dijo "no es una rebaja real", se puede reintentar A MANO con otro %.
   const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }>>({})
@@ -459,7 +477,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, TABLA_TEALCA) : null
     const margen = margenA(f, precio)
     const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación' : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}` : null
-    // Ya está en OTRA promoción: entrar a esta la reemplaza (ML deja una sola a la vez).
+    // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
     return { f, precio, despues, pierde, unidades, margen, motivo, otra }
   })
@@ -474,7 +492,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
-    if (!r.ok) return onHecho('', d.error ?? 'No se pudo agregar')
+    if (!r.ok) return onHecho('', d.error ?? `MercadoLibre no respondió al agregar a «${camp.nombre}». Prueba de nuevo en un momento.`)
     const res = d.resultados as { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }[]
     const nuevos = { ...resultados }
     for (const x of res) nuevos[x.id] = x
@@ -485,10 +503,15 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const confirmar = async () => {
     const pierden = validas.filter(x => x.pierde).length
     const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
-    const reemplazan = validas.filter(x => x.otra).length
-    const avisos = [pierden && `${pierden} pierden envío gratis.`, bajos && `${bajos} quedan con margen menor a ${margenMin}%.`,
-      reemplazan && `${reemplazan} salen de otra promoción en la que ya están.`].filter(Boolean).join(' ')
-    if (avisos && !confirm(`${avisos} ¿Agregar igual?`)) return
+    const enOtra = validas.filter(x => x.otra).length
+    const avisos = [pierden && `• ${pierden} pierde${pierden === 1 ? '' : 'n'} el envío gratis con este precio.`,
+      bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con margen menor a ${margenMin}%.`,
+      enOtra && `• ${enOtra} ya está${enOtra === 1 ? '' : 'n'} en otra promoción: ML cobra la más baja.`].filter(Boolean).join('\n')
+    if (avisos && !await confirmarAviso({
+      title: `Revisa antes de agregar a «${camp!.nombre}»`,
+      message: `${avisos}\n\n¿Agregar las ${validas.length} igual?`,
+      confirmText: `Agregar ${validas.length}`, cancelText: 'Volver a revisar',
+    })) return
     await enviar(validas.map(x => ({ id: x.f.id, precio: x.precio, precioAntes: x.f.precio })))
   }
   const reintentar = async (f: VistaModal) => {
@@ -496,9 +519,14 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     await enviar([{ id: f.id, precio: redondear(f.precio * (1 - p / 100)), precioAntes: f.precio }])
   }
   const hayResultados = Object.keys(resultados).length > 0
+  const resumen = () => {
+    const r = Object.values(resultados)
+    const bien = r.filter(x => x.ok).length, mal = r.length - bien
+    return `«${camp?.nombre ?? ''}»: ${bien} agregada${bien === 1 ? '' : 's'}${mal ? ` · ${mal} no entr${mal === 1 ? 'ó' : 'aron'} (el motivo queda en "Cambios hechos desde el sistema")` : ''}.`
+  }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => hayResultados ? onHecho('Listo.') : setModal(null)}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => hayResultados ? onHecho(resumen()) : setModal(null)}>
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-4 space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Agregar a una campaña · vista previa</h2>
@@ -567,7 +595,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                               <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
                             </span>
                           )}</span>
-                        : x.motivo ?? (x.otra ? `sale de «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
+                        : x.motivo ?? (x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)}): ML cobra la más baja` : '')}
                     </td>
                   </tr>
                 ))}
@@ -576,7 +604,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
           </div>
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setModal(null)} className="btn-ghost text-sm">Cancelar</button>
-            {hayResultados && <button onClick={() => onHecho('Listo.')} className="btn-secondary text-sm">Terminar</button>}
+            {hayResultados && <button onClick={() => onHecho(resumen())} className="btn-secondary text-sm">Terminar</button>}
             <button onClick={confirmar} disabled={!camp || sinEmpezar || !validas.length || enviando} className="btn-primary text-sm">
               {enviando ? 'Agregando y comprobando…' : `Agregar ${validas.length} a la campaña`}
             </button>
@@ -602,7 +630,7 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
     const r = await fetch('/api/promociones/campanas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f) })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
-    if (!r.ok) { setError(d.error ?? 'No se pudo crear'); return }
+    if (!r.ok) { setError(d.error ?? 'MercadoLibre no creó la campaña. Prueba de nuevo en un momento.'); return }
     const malos = (d.resultados as { cuenta: string; ok: boolean; error?: string }[]).filter(x => !x.ok)
     if (malos.length) { setError(`Se creó en algunas cuentas; falló en: ${malos.map(x => `${x.cuenta} (${x.error})`).join(' · ')}`); return }
     onCreada(f.nombre)
@@ -672,7 +700,7 @@ function EditarCampanaModal({ campana, onCerrar, onHecho }: { campana: CampanaVi
     })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
-    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    if (!r.ok) { setError(d.error ?? 'MercadoLibre no guardó los cambios de la campaña. Prueba de nuevo en un momento.'); return }
     onHecho(d.estado === 'started' && !empezada
       ? `Campaña "${f.nombre}" guardada: ya empezó, puedes agregarle publicaciones.`
       : `Campaña "${f.nombre}" guardada en MercadoLibre.`)

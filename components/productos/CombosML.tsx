@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 // Combos (migración 098): cuántas unidades del producto trae cada publicación de MercadoLibre.
 //  - PublicacionesML: en la ficha del producto, sus publicaciones por cuenta con su "trae N u.", editable.
@@ -23,6 +24,7 @@ export function PublicacionesML({ productoId }: { productoId: number }) {
   const [lista, setLista] = useState<Publicacion[] | null>(null)
   const [editando, setEditando] = useState<Record<number, number>>({})
   const [msg, setMsg] = useState<string | null>(null)
+  const confirmar = useConfirm()
   const cargar = useCallback(async () => {
     const r = await fetch(`/api/products/${productoId}/publicaciones`)
     const d = await r.json().catch(() => null)
@@ -42,7 +44,11 @@ export function PublicacionesML({ productoId }: { productoId: number }) {
     else setMsg('No se pudo guardar')
   }
   const quitar = async (p: Publicacion) => {
-    if (!confirm(`¿Quitar el vínculo con ${p.codigo}? Las próximas ventas de esa publicación ya no traerán este producto.`)) return
+    if (!await confirmar({
+      title: 'Quitar vínculo con MercadoLibre',
+      message: `${p.titulo ?? p.codigo} (${p.cuenta}) deja de estar vinculada a este producto.\n\nLas próximas ventas de esa publicación ya no descontarán este producto del stock.`,
+      confirmText: 'Quitar vínculo', danger: true,
+    })) return
     const r = await fetch(`/api/products/${productoId}/publicaciones?vinculo=${p.id}`, { method: 'DELETE' })
     if (r.ok) cargar(); else setMsg('No se pudo quitar')
   }
