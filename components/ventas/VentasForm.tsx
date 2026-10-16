@@ -212,15 +212,13 @@ export default function VentasForm({ editing, products, country, onClose, onSave
 
   // "Esta publicación siempre es este producto" (2026-10-12): queda vinculada para las próximas ventas.
   const [vinculando, setVinculando] = useState<string | null>(null)
-  // La cantidad la pone la persona (un combo se carga con las unidades que trae, a mano).
-  const vincularMl = async (ml_: MlVenta['items'][number], it: FormItem) => {
+  const vincularMl = async (itemId: string, it: FormItem) => {
     if (!mlVenta) return
-    const itemId = ml_.itemId
     setVinculando(itemId)
     try {
       const r = await fetch('/api/sales/vincular-ml', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: it.product_id, cuenta: mlVenta.cuenta, item_id: itemId, titulo: ml_.titulo }),
+        body: JSON.stringify({ product_id: it.product_id, cuenta: mlVenta.cuenta, item_id: itemId }),
       })
       if (!r.ok) { alert((await r.json().catch(() => null))?.error ?? 'No se pudo vincular'); return }
       const producto = { id: it.product_id, code: it.product_code, name: it.product_name }
@@ -483,7 +481,7 @@ Revísala en el detalle que se abre ahora.`)
                             <span>¿Esta publicación siempre es</span>
                             {libres.map(it => (
                               <button key={it.product_id} type="button" disabled={vinculando === i.itemId}
-                                onClick={() => vincularMl(i, it)} title={`Vincular ${i.itemId} a ${it.product_name}`}
+                                onClick={() => vincularMl(i.itemId, it)} title={`Vincular ${i.itemId} a ${it.product_name}`}
                                 className="rounded-md border border-sky-300 bg-white px-1.5 py-0.5 text-sky-800 hover:bg-sky-100 disabled:opacity-50">
                                 <span className="font-mono">{it.product_code}</span>?
                               </button>

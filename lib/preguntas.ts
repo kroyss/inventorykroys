@@ -231,7 +231,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Producto propio: el código ML se guarda sin el prefijo del sitio (MLV768007052 → 768007052).
   const codigo = String(q.item_id).replace(/^[A-Z]{3}/, '')
   const { rows: [prod] } = await db.query(
-    `SELECT p.code, p.name, (CASE WHEN m.ml_code LIKE '%:%' THEN SUM(COALESCE(i.quantity, 0) / m.unidades) OVER () ELSE COALESCE(i.quantity, 0) / m.unidades END)::int AS stock, pp.final_price_usd::float AS precio_usd
+    `SELECT p.code, p.name, (CASE WHEN m.ml_code LIKE '%:%' THEN SUM(COALESCE(i.quantity, 0)) OVER () ELSE COALESCE(i.quantity, 0) END)::int AS stock, pp.final_price_usd::float AS precio_usd
      FROM product_ml_codes m
      JOIN products p ON p.id = m.product_id
      LEFT JOIN inventory i ON i.product_id = p.id
