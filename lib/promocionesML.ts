@@ -127,6 +127,20 @@ async function registrar(db: Pool, a: Accion, ok: boolean, detalle: string | nul
      a.precio ?? null, a.precioAntes ?? null, ok ? 'ok' : 'error', detalle?.slice(0, 500) ?? null, a.usuarioId]).catch(() => {})
 }
 
+/** Campaña propia: ML no deja que dure más de esto (probado el 16-10: 31 días sí, 45 no). */
+export const MAX_DIAS_CAMPANA = 31
+
+/** Los errores de ML que se ven en pantalla, en español y con qué hacer. */
+export function errorClaro(msg: string) {
+  if (/CREDIBILITY_DISCOUNTED_PRICE|not credible/i.test(msg)) {
+    return 'ML no lo acepta: ese precio no es una rebaja real comparado con lo que costó la publicación en las últimas semanas. Prueba con más descuento.'
+  }
+  if (/maximum period cannot exceed/i.test(msg)) return `La campaña puede durar como máximo ${MAX_DIAS_CAMPANA} días.`
+  if (/No offers found/i.test(msg)) return 'Esa publicación ya no está en la campaña.'
+  return msg
+}
+export const esNoCreible = (msg: string) => /CREDIBILITY_DISCOUNTED_PRICE|not credible/i.test(msg)
+
 /** Hace la acción en ML y la registra. Devuelve { ok, error?, datos? } (nunca lanza por un error de ML). */
 async function hacer<T>(db: Pool, a: Accion, fn: () => Promise<T>): Promise<{ ok: true; datos: T } | { ok: false; error: string }> {
   try {
@@ -136,7 +150,7 @@ async function hacer<T>(db: Pool, a: Accion, fn: () => Promise<T>): Promise<{ ok
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e)
     await registrar(db, a, false, error)
-    return { ok: false, error }
+    return { ok: false, error: errorClaro(error) }
   }
 }
 
@@ -175,6 +189,35 @@ export async function agregarACampana(db: Pool, conexionId: number, usuarioId: n
       await refrescarItem(db, conexionId, item.id)
       return true
     })
+}
+
+/**
+ * Agregar probando: intenta los precios en orden (de menos a más descuento) y se queda con el primero que
+ * ML acepta. Solo sigue probando si ML dice que el precio "no es creíble"; ante otro error se detiene.
+ * Queda UNA línea en el registro: el precio con el que entró, o el error y hasta dónde probó.
+ */
+export async function agregarProbando(db: Pool, conexionId: number, usuarioId: number,
+  item: { id: string; precios: number[]; precioAntes: number }, campana: { id: string; tipo: string; nombre: string | null }) {
+  const base: Accion = { conexionId, usuarioId, accion: 'agregar', campanaId: campana.id, campanaTipo: campana.tipo, campanaNombre: campana.nombre,
+    itemId: item.id, precioAntes: item.precioAntes }
+  let ultimo = ''
+  for (const p of item.precios) {
+    const precio = Math.round(p * 100) / 100
+    try {
+      await mlFetch(db, conexionId, `/seller-promotions/items/${encodeURIComponent(item.id)}?app_version=v2`, {
+        method: 'POST', body: { promotion_id: campana.id, promotion_type: campana.tipo, deal_price: precio },
+      })
+      await registrar(db, { ...base, precio }, true, item.precios.length > 1 && precio !== item.precios[0] ? `entró con más descuento (probó ${item.precios.indexOf(p) + 1} precios)` : null)
+      await refrescarItem(db, conexionId, item.id).catch(() => {})
+      return { ok: true as const, precio }
+    } catch (e) {
+      ultimo = e instanceof Error ? e.message : String(e)
+      if (!esNoCreible(ultimo)) break
+    }
+  }
+  const probo = item.precios.length > 1 ? ` (probó hasta ${Math.round(item.precios[item.precios.length - 1] * 100) / 100})` : ''
+  await registrar(db, { ...base, precio: item.precios[0] }, false, ultimo + probo)
+  return { ok: false as const, error: errorClaro(ultimo) + probo }
 }
 
 export async function quitarDeCampana(db: Pool, conexionId: number, usuarioId: number, itemId: string, campana: { id: string; tipo: string; nombre: string | null }) {

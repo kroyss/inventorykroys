@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { agregarACampana, quitarDeCampana } from '@/lib/promocionesML'
+import { agregarProbando, quitarDeCampana } from '@/lib/promocionesML'
 import { sesionPromociones } from '@/lib/promocionesSesion'
 
 export const maxDuration = 120
@@ -10,7 +10,8 @@ const Campana = z.object({ id: z.string().min(3).max(40), tipo: z.string().min(3
 const Body = z.discriminatedUnion('accion', [
   z.object({
     accion: z.literal('agregar'), conexionId: z.number().int().positive(), campana: Campana,
-    items: z.array(z.object({ id: z.string().regex(/^MLV\d+$/), precio: z.number().positive(), precioAntes: z.number().positive() })).min(1).max(100),
+    // precios: el pedido y, si se eligió "probar con más descuento", los siguientes (de menos a más descuento).
+    items: z.array(z.object({ id: z.string().regex(/^MLV\d+$/), precios: z.array(z.number().positive()).min(1).max(20), precioAntes: z.number().positive() })).min(1).max(100),
   }),
   z.object({
     accion: z.literal('quitar'), conexionId: z.number().int().positive(), campana: Campana,
@@ -27,12 +28,15 @@ export async function POST(req: NextRequest) {
   if ('error' in s) return s.error
   try {
     const b = Body.parse(await req.json())
-    const resultados: { id: string; ok: boolean; error?: string }[] = []
+    const resultados: { id: string; ok: boolean; precio?: number; error?: string }[] = []
     for (const it of b.items) {
-      const r = b.accion === 'agregar'
-        ? await agregarACampana(s.db, b.conexionId, s.userId, it as { id: string; precio: number; precioAntes: number }, b.campana)
-        : await quitarDeCampana(s.db, b.conexionId, s.userId, it.id, b.campana)
-      resultados.push(r.ok ? { id: it.id, ok: true } : { id: it.id, ok: false, error: r.error })
+      if (b.accion === 'agregar') {
+        const r = await agregarProbando(s.db, b.conexionId, s.userId, it as { id: string; precios: number[]; precioAntes: number }, b.campana)
+        resultados.push(r.ok ? { id: it.id, ok: true, precio: r.precio } : { id: it.id, ok: false, error: r.error })
+      } else {
+        const r = await quitarDeCampana(s.db, b.conexionId, s.userId, it.id, b.campana)
+        resultados.push(r.ok ? { id: it.id, ok: true } : { id: it.id, ok: false, error: r.error })
+      }
     }
     return NextResponse.json({ resultados, ok: resultados.filter(r => r.ok).length, error: resultados.filter(r => !r.ok).length })
   } catch (err) {

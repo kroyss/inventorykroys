@@ -1,24 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { borrarCampana, crearCampana } from '@/lib/promocionesML'
+import { borrarCampana, crearCampana, MAX_DIAS_CAMPANA } from '@/lib/promocionesML'
 import { sesionPromociones } from '@/lib/promocionesSesion'
 
 const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+const dias = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5) + 1
 const Nueva = z.object({
-  conexionId: z.number().int().positive(),
+  conexionIds: z.array(z.number().int().positive()).min(1, 'Elige al menos una cuenta').max(10),
   nombre: z.string().trim().min(3).max(60),
   desde: fecha, hasta: fecha,
 }).refine(b => b.hasta >= b.desde, 'La fecha de fin no puede ser antes del inicio')
+  .refine(b => dias(b.desde, b.hasta) <= MAX_DIAS_CAMPANA, `La campaña puede durar como máximo ${MAX_DIAS_CAMPANA} días`)
 
-/** POST /api/promociones/campanas → crea una campaña propia en ML (SELLER_CAMPAIGN, % flexible). */
+/** POST /api/promociones/campanas → crea la misma campaña propia (SELLER_CAMPAIGN, % flexible) en cada cuenta elegida. */
 export async function POST(req: NextRequest) {
   const s = await sesionPromociones()
   if ('error' in s) return s.error
   try {
     const b = Nueva.parse(await req.json())
-    const r = await crearCampana(s.db, b.conexionId, s.userId, b.nombre, b.desde, b.hasta)
-    return r.ok ? NextResponse.json({ ok: true, campana: r.datos }) : NextResponse.json({ error: r.error }, { status: 502 })
+    const { rows: cuentas } = await s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE id = ANY($1::int[]) AND estado = 'activa'`, [b.conexionIds])
+    const resultados: { cuenta: string; ok: boolean; error?: string }[] = []
+    for (const c of cuentas) {
+      const r = await crearCampana(s.db, c.id, s.userId, b.nombre, b.desde, b.hasta)
+      resultados.push(r.ok ? { cuenta: c.nickname, ok: true } : { cuenta: c.nickname, ok: false, error: r.error })
+    }
+    const ok = resultados.filter(r => r.ok).length
+    return ok ? NextResponse.json({ ok: true, resultados })
+      : NextResponse.json({ error: resultados.map(r => `${r.cuenta}: ${r.error}`).join(' · ') || 'Sin cuentas' }, { status: 502 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return apiError(err)

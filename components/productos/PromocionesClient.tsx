@@ -414,6 +414,10 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   onHecho: (msg: string, err?: string) => void
 }) {
   const [enviando, setEnviando] = useState(false)
+  // Si ML dice que el precio "no es creíble", probar con más descuento (de 3 en 3) hasta este %, sin perder
+  // el envío gratis, sin bajar del mínimo de ML y sin bajar del margen mínimo.
+  const [probar, setProbar] = useState(true)
+  const [hasta, setHasta] = useState(Math.min(80, modal.pct + 15))
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
   const conexionId = conexiones[0]
@@ -432,7 +436,20 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, TABLA_TEALCA) : null
     const margen = margenA(f, precio)
     const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación' : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}` : null
-    return { f, precio, despues, pierde, unidades, margen, motivo }
+    // Precios a probar: el pedido y, si "probar", los de más descuento que siguen cumpliendo las reglas.
+    const precios = [precio]
+    if (probar) {
+      for (let p = modal.pct + 3; p <= hasta; p += 3) {
+        const pr = redondear(f.precio * (1 - p / 100))
+        if (cand?.minimo != null && pr < cand.minimo) break
+        if (RANGO[envioPorTransportista(f.peso, pr).estado] < RANGO[f.envio.estado]) break
+        const m = margenA(f, pr)
+        if (m != null && m < margenMin) break
+        precios.push(pr)
+      }
+    }
+    const pctMax = precios.length > 1 ? Math.round((1 - precios[precios.length - 1] / f.precio) * 100) : null
+    return { f, precio, precios, pctMax, despues, pierde, unidades, margen, motivo }
   })
   const validas = camp ? filasPrev.filter(x => !x.motivo) : []
 
@@ -445,13 +462,15 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const r = await fetch('/api/promociones/acciones', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ accion: 'agregar', conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre },
-        items: validas.map(x => ({ id: x.f.id, precio: x.precio, precioAntes: x.f.precio })) }),
+        items: validas.map(x => ({ id: x.f.id, precios: x.precios, precioAntes: x.f.precio })) }),
     })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
     if (!r.ok) return onHecho('', d.error ?? 'No se pudo agregar')
-    const errores = (d.resultados as { id: string; ok: boolean; error?: string }[]).filter(x => !x.ok)
-    onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}".`,
+    const res = d.resultados as { id: string; ok: boolean; precio?: number; error?: string }[]
+    const errores = res.filter(x => !x.ok)
+    const conMas = res.filter(x => x.ok && x.precio != null && validas.find(v => v.f.id === x.id)?.precio !== x.precio).length
+    onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}".${conMas ? ` ${conMas} entraron con más descuento porque ML no aceptó el primero.` : ''}`,
       errores.length ? `${d.ok} agregadas · ${errores.length} con error: ${errores.slice(0, 3).map(e => `${e.id} (${e.error})`).join(' · ')}` : undefined)
   }
 
@@ -480,6 +499,14 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
             </label>
             <span className="text-xs text-neutral-500 pb-2">{camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}</span>
           </div>
+          <label className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+            <input type="checkbox" checked={probar} onChange={e => setProbar(e.target.checked)} />
+            Si ML no acepta el precio («no es una rebaja real»), probar con más descuento hasta
+            <input type="number" min={modal.pct} max={80} value={hasta} disabled={!probar}
+              onChange={e => setHasta(Math.max(modal.pct, Math.min(80, Number(e.target.value) || modal.pct)))}
+              className="w-14 border border-neutral-300 rounded px-1.5 py-0.5 text-right" />%
+            <span className="text-neutral-400">(de 3 en 3, sin perder envío gratis ni bajar de tu margen mínimo)</span>
+          </label>
           <div className="overflow-x-auto border border-neutral-200 rounded-lg">
             <table className="w-full text-xs">
               <thead className="bg-neutral-50 text-neutral-500">
@@ -502,7 +529,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                     <td className={`px-2 py-1.5 text-right ${x.margen == null ? 'text-neutral-400' : x.margen < 0 ? 'text-red-700 font-medium' : x.margen < margenMin ? 'text-amber-700' : ''}`}>
                       {x.margen == null ? '—' : pct(x.margen)}
                     </td>
-                    <td className="px-2 py-1.5 text-neutral-500">{x.motivo ?? ''}</td>
+                    <td className="px-2 py-1.5 text-neutral-500">{x.motivo ?? (x.pctMax ? `si no, prueba hasta ${x.pctMax}%` : '')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -520,10 +547,14 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   )
 }
 
+const MAX_DIAS_CAMPANA = 31   // lib/promocionesML.ts (ML no deja más)
+const sumarDias = (f: string, n: number) => { const d = new Date(`${f}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+
 function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
   cuentas: { id: number; nombre: string }[]; conexionInicial?: number; onCerrar: () => void; onCreada: (nombre: string) => void
 }) {
-  const [f, setF] = useState({ conexionId: conexionInicial ?? cuentas[0]?.id, nombre: '', desde: hoyMas(1), hasta: hoyMas(7) })
+  const [f, setF] = useState({ conexionIds: [conexionInicial ?? cuentas[0]?.id].filter(Boolean) as number[], nombre: '', desde: hoyMas(1), hasta: hoyMas(7) })
+  const maxHasta = sumarDias(f.desde, MAX_DIAS_CAMPANA - 1)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const crear = async () => {
@@ -532,6 +563,8 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
     if (!r.ok) { setError(d.error ?? 'No se pudo crear'); return }
+    const malos = (d.resultados as { cuenta: string; ok: boolean; error?: string }[]).filter(x => !x.ok)
+    if (malos.length) { setError(`Se creó en algunas cuentas; falló en: ${malos.map(x => `${x.cuenta} (${x.error})`).join(' · ')}`); return }
     onCreada(f.nombre)
   }
   return (
@@ -539,27 +572,40 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
       <div className="bg-white rounded-xl w-full max-w-md p-4 space-y-3 text-sm" onClick={e => e.stopPropagation()}>
         <h2 className="text-base font-semibold">Nueva campaña propia</h2>
         <p className="text-xs text-neutral-500">Se crea en MercadoLibre con % flexible: después le agregas publicaciones, cada una con su precio.</p>
-        <label className="block space-y-1"><span className="text-xs text-neutral-500">Cuenta</span>
-          <select value={f.conexionId} onChange={e => setF({ ...f, conexionId: Number(e.target.value) })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5">
-            {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-        </label>
+        <div className="space-y-1"><span className="text-xs text-neutral-500">Cuentas (se crea la misma en cada una)</span>
+          <div className="flex flex-wrap gap-3">
+            {cuentas.map(c => (
+              <label key={c.id} className="flex items-center gap-1.5">
+                <input type="checkbox" checked={f.conexionIds.includes(c.id)}
+                  onChange={e => setF({ ...f, conexionIds: e.target.checked ? [...f.conexionIds, c.id] : f.conexionIds.filter(x => x !== c.id) })} />
+                {c.nombre}
+              </label>
+            ))}
+          </div>
+        </div>
         <label className="block space-y-1"><span className="text-xs text-neutral-500">Nombre (lo ves tú)</span>
           <input value={f.nombre} maxLength={60} onChange={e => setF({ ...f, nombre: e.target.value })} placeholder="Quincena noviembre"
             className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1"><span className="text-xs text-neutral-500">Desde</span>
-            <input type="date" value={f.desde} onChange={e => setF({ ...f, desde: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+            <input type="date" value={f.desde} onChange={e => {
+              const desde = e.target.value
+              const tope = sumarDias(desde, MAX_DIAS_CAMPANA - 1)
+              setF({ ...f, desde, hasta: f.hasta < desde ? desde : f.hasta > tope ? tope : f.hasta })
+            }} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
           </label>
           <label className="space-y-1"><span className="text-xs text-neutral-500">Hasta</span>
-            <input type="date" value={f.hasta} onChange={e => setF({ ...f, hasta: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+            <input type="date" value={f.hasta} min={f.desde} max={maxHasta} onChange={e => setF({ ...f, hasta: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
           </label>
         </div>
+        <p className="text-xs text-neutral-400">MercadoLibre deja que dure como máximo {MAX_DIAS_CAMPANA} días (hasta el {maxHasta.split('-').reverse().slice(0, 2).join('/')}).</p>
         {error && <p className="text-red-700 text-xs">{error}</p>}
         <div className="flex justify-end gap-2">
           <button onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
-          <button onClick={crear} disabled={enviando || f.nombre.trim().length < 3} className="btn-primary text-sm">{enviando ? 'Creando…' : 'Crear en MercadoLibre'}</button>
+          <button onClick={crear} disabled={enviando || f.nombre.trim().length < 3 || !f.conexionIds.length || f.hasta > maxHasta} className="btn-primary text-sm">
+            {enviando ? 'Creando…' : f.conexionIds.length > 1 ? `Crear en ${f.conexionIds.length} cuentas` : 'Crear en MercadoLibre'}
+          </button>
         </div>
       </div>
     </div>
