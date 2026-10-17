@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
@@ -11,6 +12,7 @@ interface Orden {
   en_espera: boolean            // todavía en los días de espera (desde el reporte o la compra): pestaña Próximas
   lista_el: string              // YYYY-MM-DD: el día en que sale de la espera
   guia_impresa: boolean; reportada_at: string | null
+  chat?: { at: string; comprador: boolean | null } | null   // último mensaje de la venta (y si fue del comprador)
 }
 interface Plantillas {
   concretada: { rating: string; mensaje: string }
@@ -253,6 +255,16 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       </td>
                       <td className="px-3 py-2 text-neutral-700">{o.comprador ?? '—'}
                         {o.cal_comprador && <div className="text-xs text-neutral-400">te calificó {RATING[o.cal_comprador] ?? o.cal_comprador}</div>}
+                        {/* Antes de calificar: ¿el comprador escribió? Se abre la conversación sin salir a ML. */}
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          {o.chat && (
+                            <span className={`text-xs ${o.chat.comprador ? 'font-medium text-sky-800' : 'text-neutral-500'}`}
+                              title={o.chat.comprador ? 'El último mensaje de esta venta es del comprador' : 'El último mensaje de esta venta es tuyo'}>
+                              {o.chat.comprador ? '💬 Escribió' : '💬 Hay mensajes'} · {new Date(o.chat.at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                          <LoQueSeHablo numero={o.id} compacto etiqueta="Ver mensajes" />
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-neutral-700 max-w-[28rem]"><span className="line-clamp-2">{o.productos}</span></td>
                       <td className="px-3 py-2 whitespace-nowrap">

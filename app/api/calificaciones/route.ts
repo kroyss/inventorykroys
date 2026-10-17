@@ -25,7 +25,12 @@ export async function GET(req: NextRequest) {
     // (la conexión tiene su TimeZone). Desde 2026-10-14 va aparte ("Próximas") y no cuenta en el aviso.
     const espera = `(NOT ${sqlLista(plantillas.esperaDias)})`
     const { rows } = await s.db.query(
-      `SELECT b.*, ${espera} AS en_espera, ${sqlListaEl(plantillas.esperaDias)} AS lista_el
+      `SELECT b.*, ${espera} AS en_espera, ${sqlListaEl(plantillas.esperaDias)} AS lista_el,
+              -- Si hubo mensajes en la venta (2026-10-17, pedido de un usuario): antes de calificar una no
+              -- concretada se ve si el comprador dio señales de vida, sin salir a MercadoLibre.
+              (SELECT json_build_object('at', c.ultimo_at, 'comprador', c.ultimo_de_comprador)
+               FROM ml_ordenes oo JOIN ml_conversaciones c ON c.pack_id = COALESCE(oo.pack_id, oo.id)
+               WHERE oo.id = b.id::bigint AND c.ultimo_at IS NOT NULL LIMIT 1) AS chat
        FROM (${SQL_BANDEJA}) b
        WHERE ${vista === 'esperando' ? `sugerencia = 'esperar'` : vista === 'proximas' ? `sugerencia <> 'esperar' AND ${espera}` : `sugerencia <> 'esperar' AND NOT ${espera}`}
        -- La más vieja primero (2026-10-13): es la que menos plazo le queda para calificar en ML.
