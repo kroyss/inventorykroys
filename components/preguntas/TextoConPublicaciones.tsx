@@ -93,7 +93,10 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
       const alto = vv ? vv.height : window.innerHeight
       const abajo = top + alto - r.bottom - 12
       const arriba = r.top - top - 12
-      const usarArriba = abajo < 220 && arriba > abajo
+      // Celular/tablet (táctil): el teclado SIEMPRE está abajo y en el iPhone no achica la página (el cálculo
+      // de "abajo" daba lugar y la lista quedaba detrás del teclado, 17-10): arriba, salvo que no haya espacio.
+      const tactil = window.matchMedia('(pointer: coarse)').matches
+      const usarArriba = tactil ? arriba >= 140 || arriba > abajo : abajo < 220 && arriba > abajo
       setLugar({ arriba: usarArriba, alto: Math.max(120, Math.min(320, usarArriba ? arriba : abajo)) })
     }
     medir()
