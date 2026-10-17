@@ -95,7 +95,8 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
       const arriba = r.top - top - 12
       // Celular/tablet (táctil): el teclado SIEMPRE está abajo y en el iPhone no achica la página (el cálculo
       // de "abajo" daba lugar y la lista quedaba detrás del teclado, 17-10): arriba, salvo que no haya espacio.
-      const tactil = window.matchMedia('(pointer: coarse)').matches
+      // También pantallas angostas (celular, o la vista de celular en la PC), aunque tengan mouse.
+      const tactil = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 640
       const usarArriba = tactil ? arriba >= 140 || arriba > abajo : abajo < 220 && arriba > abajo
       setLugar({ arriba: usarArriba, alto: Math.max(120, Math.min(320, usarArriba ? arriba : abajo)) })
     }
