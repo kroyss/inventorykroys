@@ -11,19 +11,21 @@ export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   const cuenta = req.nextUrl.searchParams.get('cuenta') ?? ''
+  // Por código (17-10): "#747862977" o "#MLV747862977" busca esa publicación (y las que empiezan con esos números).
+  const codigo = /^(?:ml[a-z])?-?(\d{5,15})$/i.exec((req.nextUrl.searchParams.get('q') ?? '').trim())?.[1] ?? null
   const palabras = SIN_ACENTOS(req.nextUrl.searchParams.get('q') ?? '')
     .split(/\s+/).map(p => p.replace(/[%_\\]/g, '')).filter(p => p.length >= 2).slice(0, 5)
-  if (!cuenta || !palabras.length) return NextResponse.json([])
+  if (!cuenta || (!palabras.length && !codigo)) return NextResponse.json([])
   try {
     const titulo = `translate(lower(m.titulo), 'áéíóúüñ', 'aeiouun')`
     const { rows } = await s.db.query(
       `SELECT m.item_id, m.titulo, m.precio::float, m.moneda, m.disponible, m.permalink, m.thumbnail
        FROM ml_catalogo m JOIN ml_conexiones x ON x.id = m.conexion_id
        WHERE x.nickname = $1 AND m.estado = 'active' AND COALESCE(m.disponible, 0) > 0 AND m.permalink IS NOT NULL
-         AND ${titulo} LIKE ALL ($2::text[])
-       ORDER BY (${titulo} LIKE $3) DESC, m.disponible DESC, m.titulo
+         AND (${codigo ? `regexp_replace(m.item_id, '^[A-Z]{3}', '') LIKE $4 OR ` : ''}${titulo} LIKE ALL ($2::text[]))
+       ORDER BY ${codigo ? `(regexp_replace(m.item_id, '^[A-Z]{3}', '') = $5) DESC, ` : ''}(${titulo} LIKE $3) DESC, m.disponible DESC, m.titulo
        LIMIT 8`,
-      [cuenta, palabras.map(p => `%${p}%`), `${palabras[0]}%`])
+      [cuenta, palabras.map(p => `%${p}%`), `${palabras[0] ?? ''}%`, ...(codigo ? [`${codigo}%`, codigo] : [])])
     // Link corto (MLV-123-_JM, el mismo de Mensajes): sin el título, ML lleva a la misma publicación.
     // Ahorra ~70 caracteres (los mensajes tienen tope de 350).
     return NextResponse.json(rows.map(r => {

@@ -1,9 +1,11 @@
 'use client'
-import { useEffect, useRef, useState, type KeyboardEvent, type TextareaHTMLAttributes } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type TextareaHTMLAttributes } from 'react'
 
-// Cuadro de respuesta con "#" (2026-10-13): escribir "#bolsa" (o "#bolsa grande") busca entre las
-// publicaciones activas de la MISMA cuenta y, al elegir una, el "#bolsa" se cambia por su link.
+// Cuadro de respuesta con "#" (2026-10-13): escribir "#bolsa" (o "#bolsa grande", o el código "#747862977")
+// busca entre las publicaciones activas de la MISMA cuenta y, al elegir una, el "#bolsa" se cambia por su link.
 // Flechas + Enter o clic para elegir; Esc lo cierra y deja el texto como está.
+// 17-10: el título va en una línea que se desliza (con el dedo en el celular; sola en la fila marcada en la PC),
+// la lista se abre arriba del cuadro si abajo no hay lugar (celular con teclado) y tiene el alto del espacio libre.
 
 interface Publicacion {
   item_id: string; titulo: string; precio: number | null; moneda: string | null
@@ -19,12 +21,43 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
   cuenta: string
 }
 
+/** Título en una línea que se puede leer completo: se desliza con el dedo, o solo (ida y vuelta) si `animar`. */
+function TituloDeslizable({ texto, animar }: { texto: string; animar: boolean }) {
+  const caja = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const el = caja.current
+    if (!el) return
+    el.scrollLeft = 0
+    if (!animar || el.scrollWidth <= el.clientWidth + 2) return
+    let pos = 0, dir = 1, pausa = 40          // ~0,7 s quieto en cada punta
+    const t = setInterval(() => {
+      if (pausa > 0) { pausa--; return }
+      pos += dir * 1.5
+      const max = el.scrollWidth - el.clientWidth
+      if (pos >= max) { pos = max; dir = -1; pausa = 50 }
+      if (pos <= 0) { pos = 0; dir = 1; pausa = 50 }
+      el.scrollLeft = pos
+    }, 16)
+    return () => clearInterval(t)
+  }, [animar, texto])
+  return (
+    <span ref={caja} title={texto}
+      className="block overflow-x-auto whitespace-nowrap text-sm text-neutral-800 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {texto}
+    </span>
+  )
+}
+
 export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDown, ...resto }: Props) {
   const area = useRef<HTMLTextAreaElement>(null)
   const [busqueda, setBusqueda] = useState<{ q: string; desde: number; hasta: number } | null>(null)
   const [lista, setLista] = useState<Publicacion[]>([])
   const [activa, setActiva] = useState(0)
   const [cerradoEn, setCerradoEn] = useState<number | null>(null)   // Esc: no volver a abrir en ese "#"
+  // Dónde abrir la lista y cuánto alto tiene (según el espacio libre en pantalla, con o sin teclado).
+  const [lugar, setLugar] = useState<{ arriba: boolean; alto: number }>({ arriba: false, alto: 320 })
+  const [conMouse, setConMouse] = useState(false)   // PC: el título de la fila marcada se desliza solo
+  useEffect(() => { setConMouse(window.matchMedia('(hover: hover) and (pointer: fine)').matches) }, [])
 
   const leerCursor = (texto: string) => {
     const el = area.current
@@ -48,6 +81,28 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
 
   const abierta = !!busqueda && lista.length > 0
 
+  // Abajo si entra; si no (lo normal en el celular con el teclado abierto), arriba del cuadro.
+  useLayoutEffect(() => {
+    if (!abierta) return
+    const medir = () => {
+      const el = area.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const vv = window.visualViewport
+      const top = vv ? vv.offsetTop : 0
+      const alto = vv ? vv.height : window.innerHeight
+      const abajo = top + alto - r.bottom - 12
+      const arriba = r.top - top - 12
+      const usarArriba = abajo < 220 && arriba > abajo
+      setLugar({ arriba: usarArriba, alto: Math.max(120, Math.min(320, usarArriba ? arriba : abajo)) })
+    }
+    medir()
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', medir)
+    window.addEventListener('scroll', medir, true)
+    return () => { vv?.removeEventListener('resize', medir); window.removeEventListener('scroll', medir, true) }
+  }, [abierta])
+
   const elegir = (p: Publicacion) => {
     if (!busqueda) return
     const antes = value.slice(0, busqueda.desde)
@@ -69,6 +124,12 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
     onKeyDown?.(e)
   }
 
+  // Con las flechas, la fila marcada siempre a la vista.
+  const listaRef = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    listaRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [activa])
+
   return (
     <div className="relative">
       <textarea ref={area} {...resto} value={value}
@@ -83,17 +144,20 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
         </p>
       )}
       {abierta && (
-        <ul role="listbox" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-80 overflow-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
-          <li className="px-3 pb-1 pt-0.5 text-[11px] text-neutral-400">Publicaciones de {cuenta} · Enter pone el link · Esc cierra</li>
+        <ul ref={listaRef} role="listbox" style={{ maxHeight: lugar.alto }}
+          className={`absolute left-0 right-0 z-20 overflow-y-auto overscroll-contain touch-pan-y rounded-lg border border-neutral-200 bg-white py-1 shadow-lg ${
+            lugar.arriba ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+          <li className="px-3 pb-1 pt-0.5 text-[11px] text-neutral-400">Publicaciones de {cuenta} · desliza el título para leerlo · toca para poner el link</li>
           {lista.map((p, i) => (
+            // El clic elige (no el "mousedown"): así deslizar el título o la lista con el dedo no elige sin querer.
             <li key={p.item_id} role="option" aria-selected={i === activa}
-              onMouseDown={e => { e.preventDefault(); elegir(p) }} onMouseEnter={() => setActiva(i)}
+              onMouseDown={e => e.preventDefault()} onClick={() => elegir(p)} onMouseEnter={() => setActiva(i)}
               className={`flex cursor-pointer items-center gap-2.5 px-3 py-1.5 ${i === activa ? 'bg-lime-50' : ''}`}>
               {p.thumbnail
                 ? <img src={p.thumbnail} alt="" className="h-9 w-9 shrink-0 rounded border border-neutral-100 object-contain bg-white" /> // eslint-disable-line @next/next/no-img-element
                 : <span className="h-9 w-9 shrink-0 rounded bg-neutral-100" />}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-neutral-800">{p.titulo}</span>
+                <TituloDeslizable texto={p.titulo} animar={conMouse && i === activa} />
                 <span className="block text-[11px] text-neutral-500">
                   {p.precio != null && <>{p.moneda === 'VES' ? 'Bs' : '$'} {p.precio.toLocaleString('de-DE', { maximumFractionDigits: 2 })} · </>}
                   {p.disponible} disponibles
