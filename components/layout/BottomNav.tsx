@@ -86,6 +86,18 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const pathname = usePathname()
   const avisos = useAvisos()
   const [showMore, setShowMore] = useState(false)
+  // Escribiendo (teclado abierto): la barra se esconde. En el iPhone sube con el teclado y tapaba el cuadro (17-10).
+  const [escribiendo, setEscribiendo] = useState(false)
+  useEffect(() => {
+    const esCampo = (t: EventTarget | null) => t instanceof HTMLElement &&
+      (t.tagName === 'TEXTAREA' || t.isContentEditable || (t.tagName === 'INPUT' &&
+        !['checkbox', 'radio', 'button', 'submit', 'range', 'color', 'file'].includes((t as HTMLInputElement).type)))
+    const entra = (e: FocusEvent) => { if (esCampo(e.target)) setEscribiendo(true) }
+    const sale = () => setTimeout(() => setEscribiendo(esCampo(document.activeElement)), 50)
+    document.addEventListener('focusin', entra)
+    document.addEventListener('focusout', sale)
+    return () => { document.removeEventListener('focusin', entra); document.removeEventListener('focusout', sale) }
+  }, [])
   // Novedades sin ver (migración 095): punto verde en "Más" y en su botón.
   const [novedades, setNovedades] = useState(0)
   useEffect(() => {
@@ -152,7 +164,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
       )}
 
       {/* Barra inferior — solo en el celular (respeta la zona del gesto de inicio del iPhone) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-neutral-200 pb-[env(safe-area-inset-bottom)]">
+      <nav className={`md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-neutral-200 pb-[env(safe-area-inset-bottom)] ${escribiendo ? 'hidden' : ''}`}>
         <div className="flex items-stretch h-16">
           {primary.map(boton)}
           {more.length > 0 && (
