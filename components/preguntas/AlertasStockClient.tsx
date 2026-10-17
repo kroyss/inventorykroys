@@ -169,21 +169,21 @@ export default function AlertasStockClient() {
         {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
           title={vista === 'pausadas' ? (f.caliente ? 'Ya la revisaste: sale de la lista (vuelve si la reactivas y la pausas de nuevo)' : 'Vuelve a la lista')
             : f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
+          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
             f.caliente ? 'border-neutral-300 text-neutral-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700'
                        : 'border-neutral-300 text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'}`}>
           {f.caliente
             ? <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             : <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>}
-          {vista === 'pausadas' ? (f.caliente ? 'Quitar de la lista' : 'Volver a la lista') : f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
+          {vista === 'pausadas' ? (f.caliente ? 'Quitar' : 'Volver') : f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
         </button>}
       </div>
       <div className="order-3 sm:order-none sm:w-44 text-right shrink-0">
         <p className={`text-sm font-semibold num ${vista === 'pausadas' ? 'text-amber-700' : f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
           {vista === 'pausadas' ? `⏸ Pausada · ${f.disponible} u.` : f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
-        <p className="text-[11px] text-neutral-400">
-          {vista === 'pausadas' ? `pausada desde ${hace(f.pausada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
+        <p className="text-[11px] text-neutral-400 whitespace-nowrap">
+          {vista === 'pausadas' ? `pausada ${hace(f.pausada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
         </p>
       </div>
       {/* Corte de línea solo en celular (con algo abajo que mostrar). */}
