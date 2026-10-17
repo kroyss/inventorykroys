@@ -151,7 +151,7 @@ export const MAX_DIAS_CAMPANA = 31
 /** Los errores de ML que se ven en pantalla, en español y con qué hacer. */
 export function errorClaro(msg: string) {
   if (/CREDIBILITY_DISCOUNTED_PRICE|not credible/i.test(msg)) {
-    return 'ML no lo acepta: ese precio no es una rebaja real comparado con lo que costó la publicación en las últimas semanas. Prueba con más descuento.'
+    return 'ML: no es rebaja real (comparado con su precio de las últimas semanas). Prueba con más descuento.'
   }
   if (/maximum period cannot exceed/i.test(msg)) return `La campaña puede durar como máximo ${MAX_DIAS_CAMPANA} días.`
   if (/No offers found/i.test(msg)) return 'Esa publicación ya no está en la campaña.'

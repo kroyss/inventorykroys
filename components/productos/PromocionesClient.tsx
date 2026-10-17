@@ -557,14 +557,14 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     // Hasta qué % aguanta: con ZOOM (mínimo de ZOOM) y con algún envío gratis (mínimo de TEALCA).
     const topeZoom = base.estado === 'ambas' ? topeDescuento(f.precio, base.minZoom) : null
     const tope = base.estado === 'ambas' || base.estado === 'tealca' ? topeDescuento(f.precio, base.minTealca) : null
-    const motivo = !camp ? null : yaAdentro && !cambio ? `ya está en esta campaña${cand?.precio != null ? ` a ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la ofrece para esta publicación'
-      : bajoPiso ? `publicada en ${usd(f.precio)}: ML no acepta promociones por debajo de $${PISO_ML}` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
-      : seguro.sinMargen ? 'ya está en el mínimo del envío gratis: no aguanta descuento sin perderlo' : null
+    const motivo = !camp ? null : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
+      : bajoPiso ? `Bajo $${PISO_ML}: ML no la acepta` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
+      : seguro.sinMargen ? 'Sin margen: perdería el envío gratis' : null
     const advertencia = motivo ? null
-      : ajustada ? `ajustada a −${pct(pctReal(f.precio, precio))}: es lo máximo que aguanta sin perder el envío gratis (con ${modal.pct}% lo perdía)`
-      : pierdeZoom ? `⚠ pierde ZOOM: queda solo TEALCA${topeZoom != null ? ` (con ZOOM aguanta hasta ${String(topeZoom).replace('.', ',')}%)` : ''}`
-      : sinGratis ? '⚠ queda sin envío gratis (cobro a destino)'
-      : base.estado === 'sin_peso' ? 'sin peso: no se sabe si mantiene el envío gratis' : null
+      : ajustada ? `Ajustada a −${pct(pctReal(f.precio, precio))} (envío gratis)`
+      : pierdeZoom ? `⚠ Solo TEALCA${topeZoom ? ` · ZOOM hasta ${pct(topeZoom)}` : ''}`
+      : sinGratis ? '⚠ Sin envío gratis'
+      : base.estado === 'sin_peso' ? 'Sin peso: envío sin verificar' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
     return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
@@ -757,7 +757,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                               <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
                             </span>
                           )}</span>
-                        : <>{x.motivo ?? (x.cambio ? `ya está a ${usd(x.antes)} → pasa a ${usd(x.precio)}` : x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
+                        : <>{x.motivo ?? (x.cambio ? `${usd(x.antes)} → ${usd(x.precio)}` : x.otra ? <span title={`También en «${x.otra.nombre}»`}>+ otra promo: {usd(x.otra.precio)}</span> : '')}
                           {x.advertencia && <span className={`block font-medium ${x.ajustada ? 'text-emerald-700' : x.sinGratis ? 'text-red-700' : x.pierdeZoom ? 'text-amber-800' : 'text-neutral-500'}`}>{x.advertencia}</span>}</>}
                     </td>
                     <td className="px-2 py-1.5 text-center">
