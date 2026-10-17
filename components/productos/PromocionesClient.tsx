@@ -230,9 +230,9 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   const sacar = async (v: Vista, p: PromoDeItem & { nombre: string }) => {
     const camp = campanas.find(c => c.conexionId === v.conexionId && c.id === p.campana)
     if (!await confirmar({
-      title: 'Sacar de la promoción',
+      title: 'Quitar promo',
       message: `"${v.titulo}" sale de «${p.nombre}» en MercadoLibre.\n\nVuelve a su precio publicado (${usd(v.precio)}), salvo que esté en otra promoción.`,
-      confirmText: 'Sacar de la promoción', danger: true,
+      confirmText: 'Quitar promo', danger: true,
     })) return
     setBusy(`sacar-${clave(v)}`)
     await llamar('/api/promociones/acciones', {
