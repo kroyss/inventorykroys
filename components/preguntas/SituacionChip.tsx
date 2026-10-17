@@ -5,7 +5,7 @@ export type Situacion = 'activa' | 'agotada' | 'pausada' | 'pausada_ml' | null |
 const ESTILO: Record<string, { t: string; c: string; title: string }> = {
   activa: { t: '● Activa', c: 'text-emerald-700 ring-emerald-200 bg-emerald-50', title: 'Publicada y a la venta en MercadoLibre' },
   agotada: { t: '● Agotada', c: 'text-red-700 ring-red-200 bg-red-50', title: 'Pausada por MercadoLibre porque se quedó sin stock' },
-  pausada: { t: '⏸ Pausada a mano', c: 'text-amber-800 ring-amber-300 bg-amber-50', title: 'Pausada por el vendedor (tiene stock): no está a la venta' },
+  pausada: { t: '⏸ Pausada', c: 'text-amber-800 ring-amber-300 bg-amber-50', title: 'Pausada por el vendedor (tiene stock): no está a la venta' },
   pausada_ml: { t: '⏸ Pausada', c: 'text-amber-800 ring-amber-300 bg-amber-50', title: 'Pausada en MercadoLibre' },
 }
 

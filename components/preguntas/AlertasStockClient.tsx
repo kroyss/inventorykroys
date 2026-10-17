@@ -219,7 +219,7 @@ export default function AlertasStockClient() {
         <Tabs value={vista} onChange={setVista} items={[
           { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
           { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
-          { value: 'pausadas', label: 'Pausadas a mano', count: datos?.contadores.pausadas },
+          { value: 'pausadas', label: 'Pausadas', count: datos?.contadores.pausadas },
         ]} />
         <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar publicación, variante o cuenta…"
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
