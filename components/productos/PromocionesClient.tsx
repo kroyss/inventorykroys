@@ -43,6 +43,11 @@ const fecha = (s: string | null) => s ? new Date(s).toLocaleDateString('es-VE', 
 const cuando = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', { timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' }) : 'nunca'
 const urlML = (id: string) => `https://articulo.mercadolibre.com.ve/${id.replace(/^MLV/, 'MLV-')}`
 const redondear = (n: number) => Math.round(n * 100) / 100
+// Piso de MercadoLibre (VE, oct-2026): no se publica ni se promociona por debajo de $2. Con un % que lo
+// cruzaría, el precio queda en $2 (el descuento real es menor); publicada en $2 o menos no puede entrar.
+const PISO_ML = 2
+const precioConPiso = (publicado: number, pct: number) => Math.max(PISO_ML, redondear(publicado * (1 - pct / 100)))
+const pctReal = (publicado: number, precio: number) => publicado > 0 ? (1 - precio / publicado) * 100 : 0
 const hoyMas = (dias: number) => { const d = new Date(); d.setDate(d.getDate() + dias); return d.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }) }
 const clave = (f: { conexionId: number; id: string }) => `${f.conexionId}|${f.id}`
 
@@ -114,6 +119,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       candidatas: f.promos.filter(p => p.estado === 'candidate'),
       topeAmbas: topeDescuento(f.precio, envio.minZoom),
       topeTealca: topeDescuento(f.precio, envio.minTealca),
+      topePiso: topeDescuento(f.precio, PISO_ML),   // hasta cuánto se puede bajar sin cruzar los $2 de ML
       margen: margenA(f, actual),
     }
   }), [filas, margenA])
@@ -128,7 +134,8 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     const p = v.promos.find(x => x.campana === c.id)
     if (p?.estado === 'started') return false
     if (c.tipo !== 'SELLER_CAMPAIGN' && p?.estado !== 'candidate') return false
-    const precio = redondear(v.precio * (1 - pctSug / 100))
+    if (v.precio <= PISO_ML) return false
+    const precio = precioConPiso(v.precio, pctSug)
     if (p?.minimo != null && precio < p.minimo) return false
     if (v.envioBase.estado === 'sin_peso') return false
     const despues = envioPorTransportista(v.peso, precio).estado
@@ -428,6 +435,10 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                         {v.margen == null ? '—' : pct(v.margen)}
                       </td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
+                        {/* Piso de $2 de ML: se muestra cuando limita más que el envío gratis. */}
+                        {(v.topePiso == null || v.topePiso < (v.topeTealca ?? 100)) && (
+                          <div className="text-sky-700">{v.topePiso == null || v.topePiso <= 0 ? 'no entra a promos (≤ $2)' : <>piso $2: hasta <b>{pct(v.topePiso)}</b></>}</div>
+                        )}
                         {v.envio.estado === 'sin_peso' ? <span className="text-neutral-400">falta el peso</span> : <>
                           <div>{v.topeAmbas != null ? <>ambas hasta <b>{pct(v.topeAmbas)}</b></> : <span className="text-neutral-400">ZOOM no llega</span>}</div>
                           <div>{v.topeTealca != null ? <>TEALCA hasta <b>{pct(v.topeTealca)}</b></> : <span className="text-neutral-400">TEALCA no llega</span>}</div>
@@ -500,7 +511,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const sinEmpezar = !!camp && camp.estado !== 'started'
 
   const filasPrev = filas.map(f => {
-    const precio = redondear(f.precio * (1 - modal.pct / 100))
+    const precio = precioConPiso(f.precio, modal.pct)
+    const enPiso = f.precio > PISO_ML && precio === PISO_ML && redondear(f.precio * (1 - modal.pct / 100)) < PISO_ML
+    const bajoPiso = f.precio <= PISO_ML
     const cand = camp ? f.promos.find(p => p.campana === camp.id) : undefined
     const yaAdentro = cand?.estado === 'started'
     const puede = !!camp && !yaAdentro && (propia || cand?.estado === 'candidate')
@@ -516,7 +529,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     // Hasta qué % aguanta: con ZOOM (mínimo de ZOOM) y con algún envío gratis (mínimo de TEALCA).
     const topeZoom = base.estado === 'ambas' ? topeDescuento(f.precio, base.minZoom) : null
     const tope = base.estado === 'ambas' || base.estado === 'tealca' ? topeDescuento(f.precio, base.minTealca) : null
-    const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación' : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
+    const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación'
+      : bajoPiso ? `publicada en ${usd(f.precio)}: ML no acepta promociones por debajo de $${PISO_ML}` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
       : sinGratis && !conPierden ? `con ${modal.pct}% queda sin envío gratis${tope != null ? ` · aguanta hasta ${String(tope).replace('.', ',')}%` : ''}` : null
     const advertencia = motivo ? null
       : pierdeZoom ? `⚠ pierde ZOOM: queda solo TEALCA${topeZoom != null ? ` (con ZOOM aguanta hasta ${String(topeZoom).replace('.', ',')}%)` : ''}`
@@ -524,7 +538,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       : base.estado === 'sin_peso' ? 'sin peso: no se sabe si mantiene el envío gratis' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
-    return { f, precio, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope }
+    return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope }
   })
   const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
@@ -561,7 +575,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   }
   const reintentar = async (f: VistaModal) => {
     const p = reintento[f.id] ?? Math.min(80, modal.pct + 5)
-    const precio = redondear(f.precio * (1 - p / 100))
+    const precio = precioConPiso(f.precio, p)
     const e = envioPorTransportista(f.peso, precio).estado
     const aviso = e === 'destino' && f.envioBase.estado !== 'destino' && f.envioBase.estado !== 'sin_peso'
       ? `Con ${p}% (${usd(precio)}) queda SIN envío gratis: cobro a destino.`
@@ -642,7 +656,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                   <tr key={x.f.id} className={`border-t border-neutral-100 ${x.motivo ? 'opacity-50' : ''}`}>
                     <td className="px-2 py-1.5 max-w-[260px] truncate" title={x.f.titulo}>{x.f.titulo}</td>
                     <td className="px-2 py-1.5 text-right">{usd(x.f.precio)}</td>
-                    <td className="px-2 py-1.5 text-right font-medium">{usd(x.precio)}</td>
+                    <td className="px-2 py-1.5 text-right font-medium">{usd(x.precio)}
+                      {x.enPiso && <span className="block text-[11px] font-normal text-sky-700" title={`ML no deja bajar de $${PISO_ML}: queda en el piso`}>piso $2 · −{pct(pctReal(x.f.precio, x.precio))}</span>}
+                    </td>
                     <td className="px-2 py-1.5">
                       {x.pierde ? <span className={x.sinGratis ? 'text-red-700' : 'text-amber-800'}>{ENVIO[x.f.envioBase.estado].t} → <b>{ENVIO[x.despues.estado].t}</b></span> : <Chip e={x.despues.estado} />}
                       {x.unidades && <span className="text-emerald-700"> · gratis desde {x.unidades.unidades} u.</span>}
@@ -660,7 +676,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                               <input type="number" min={1} max={80} value={reintento[x.f.id] ?? Math.min(80, modal.pct + 5)}
                                 onChange={e => setReintento({ ...reintento, [x.f.id]: Math.max(1, Math.min(80, Number(e.target.value) || 1)) })}
                                 className="w-12 border border-neutral-300 rounded px-1 py-0.5 text-right" />%
-                              <span className="text-neutral-500">({usd(redondear(x.f.precio * (1 - (reintento[x.f.id] ?? Math.min(80, modal.pct + 5)) / 100)))})</span>
+                              <span className="text-neutral-500">({usd(precioConPiso(x.f.precio, reintento[x.f.id] ?? Math.min(80, modal.pct + 5)))})</span>
                               <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
                             </span>
                           )}</span>
