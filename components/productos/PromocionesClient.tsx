@@ -226,7 +226,9 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       method: 'POST', body: JSON.stringify({ accion: 'quitar', conexionId: v.conexionId, campana: { id: p.campana, tipo: camp?.tipo ?? 'DEAL', nombre: p.nombre }, items: [{ id: v.id }] }),
     }, d => d.error
       ? { error: `"${v.titulo}" no salió de «${p.nombre}»: ${((d.resultados as { error?: string }[])?.[0]?.error) ?? 'MercadoLibre no lo aceptó'}` }
-      : `"${v.titulo}" salió de «${p.nombre}» y se comprobó en MercadoLibre.`,
+      : (d.resultados as { precioTarda?: boolean }[])?.[0]?.precioTarda
+        ? `"${v.titulo}" salió de «${p.nombre}». MercadoLibre tarda unos minutos en volver a mostrar su precio normal.`
+        : `"${v.titulo}" salió de «${p.nombre}» y se comprobó en MercadoLibre.`,
       `No se pudo sacar "${v.titulo}" de «${p.nombre}».`)
     setBusy(null)
   }

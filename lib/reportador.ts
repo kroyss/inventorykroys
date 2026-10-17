@@ -144,11 +144,13 @@ export const cuentaPorVenta = (c: ConfigReportador) => c.cuentas.length === 0
 
 /** SQL (alias `e` = despacho_etiquetas): la cuenta de ML (nickname) de la venta de la etiqueta, según
  *  las ventas sincronizadas de las cuentas conectadas. NULL si no se encuentra. */
-export const SQL_CUENTA_VENTA = `(
-  SELECT x.nickname FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id
-  WHERE o.id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)
-     OR o.pack_id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)
-  ORDER BY (o.id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END)) DESC LIMIT 1)`
+// Primero por número de venta (índice de la clave) y, si no está, por paquete. Antes era un solo OR entre
+// las dos columnas: recorría todas las ventas por cada envío (Historial: 26 s con 783 envíos → 0,02 s, 17-10).
+export const SQL_CUENTA_VENTA = `COALESCE(
+  (SELECT x.nickname FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id
+   WHERE o.id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END) LIMIT 1),
+  (SELECT x.nickname FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id
+   WHERE o.pack_id = (CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END) LIMIT 1))`
 
 /** Mensajes listos para quien todavía no configuró los suyos (se revisan antes de usarlos). */
 // Un solo mensaje y sin página de ML (13-10: "enreda, hay gente que ni la usa"); quien quiera la escribe

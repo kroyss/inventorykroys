@@ -222,6 +222,15 @@ export async function editarCampana(db: Pool, conexionId: number, usuarioId: num
     })
 }
 
+/** En qué estado figura la publicación en esa campaña según ML (started, pending, candidate…);
+ *  'fuera' si ya no aparece; null si no se pudo leer. */
+async function estadoEnCampana(db: Pool, conexionId: number, itemId: string, campanaId: string): Promise<string | null> {
+  const r = await mlFetch<{ id?: string; status?: string }[]>(db, conexionId,
+    `/seller-promotions/items/${encodeURIComponent(itemId)}?app_version=v2`).catch(() => null)
+  if (!Array.isArray(r)) return null
+  return r.find(p => p.id === campanaId)?.status ?? 'fuera'
+}
+
 /** Estado actual de una campaña según ML (started, pending, finished…); null si no se pudo leer. */
 export async function estadoCampana(db: Pool, conexionId: number, campanaId: string, tipo: string): Promise<string | null> {
   const r = await mlFetch<{ status?: string }>(db, conexionId,
@@ -346,15 +355,21 @@ export async function quitarDeCampana(db: Pool, conexionId: number, usuarioId: n
     async () => {
       await mlFetch(db, conexionId, `/seller-promotions/items/${encodeURIComponent(itemId)}?promotion_type=${encodeURIComponent(campana.tipo)}`
         + `&promotion_id=${encodeURIComponent(campana.id)}&app_version=v2`, { method: 'DELETE' })
+      // Al SACAR, lo que tarda es el precio (probado 17-10: la publicación ya figuraba "candidate" en la
+      // campaña y /sale_price seguía con el precio de la promo unos minutos). Salió si el precio ya no es de
+      // la campaña O si ML ya no la lista adentro; en ese caso el precio vuelve solo en unos minutos.
       let v: PrecioVigente | null = null
+      let fuera = false
       for (let i = 0; i < 4; i++) {
         await esperar(1500)
         v = await precioVigente(db, conexionId, itemId)
         if (v?.campana !== campana.id) break
+        const estado = await estadoEnCampana(db, conexionId, itemId, campana.id)
+        if (estado != null && estado !== 'started' && estado !== 'pending') { fuera = true; break }
       }
-      if (v?.campana === campana.id) throw new Error('MercadoLibre respondió que sí, pero la publicación sigue con el precio de la campaña')
+      if (v?.campana === campana.id && !fuera) throw new Error('MercadoLibre respondió que sí, pero la publicación sigue en la campaña')
       await marcarEnFoto(db, conexionId, itemId, campana.id, null)
-      return true
+      return { precioTarda: v?.campana === campana.id }
     })
 }
 
