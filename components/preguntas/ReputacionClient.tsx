@@ -40,7 +40,6 @@ const NIVELES = [
   { id: '5_green', color: 'bg-emerald-500', nombre: 'Verde' },
 ]
 const LIDER: Record<string, string> = { platinum: 'MercadoLíder Platinum', gold: 'MercadoLíder Gold', silver: 'MercadoLíder' }
-const pct = (n: number | undefined) => n == null ? '—' : `${(n * 100).toLocaleString('es-VE', { maximumFractionDigits: n * 100 < 10 ? 1 : 0 })}%`
 const miles = (n: number | undefined) => n == null ? '—' : n.toLocaleString('de-DE')
 function hace(fecha: string | null) {
   if (!fecha) return ''
@@ -61,20 +60,9 @@ function Termometro({ nivel }: { nivel: string | null }) {
   )
 }
 
-function Metrica({ titulo, valor, ayuda, alerta }: { titulo: string; valor: string; ayuda?: string; alerta?: boolean }) {
-  return (
-    <div className="rounded-lg bg-neutral-50 px-3 py-2" title={ayuda}>
-      <p className="text-[11px] text-neutral-500">{titulo}</p>
-      <p className={`text-sm font-semibold num ${alerta ? 'text-red-600' : 'text-neutral-900'}`}>{valor}</p>
-    </div>
-  )
-}
-
 function TarjetaCuenta({ c }: { c: Cuenta }) {
   const r = c.reputacion
   const i = NIVELES.findIndex(n => n.id === r?.level_id)
-  const ratings = r?.transactions?.ratings
-  const m = r?.metrics ?? {}
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -89,29 +77,12 @@ function TarjetaCuenta({ c }: { c: Cuenta }) {
       </div>
       {r && (
         <>
-          {ratings && (
-            <div className="mt-3">
-              <div className="flex h-1.5 overflow-hidden rounded-full bg-neutral-100">
-                <span className="bg-emerald-500" style={{ width: `${(ratings.positive ?? 0) * 100}%` }} />
-                <span className="bg-orange-400" style={{ width: `${(ratings.neutral ?? 0) * 100}%` }} />
-                <span className="bg-red-500" style={{ width: `${(ratings.negative ?? 0) * 100}%` }} />
-              </div>
-              <p className="mt-1 text-[11px] text-neutral-500">
-                <span className="text-emerald-700">{pct(ratings.positive)} positivas</span> ·{' '}
-                <span className="text-orange-700">{pct(ratings.neutral)} neutrales</span> ·{' '}
-                <span className="text-red-700">{pct(ratings.negative)} negativas</span>
-                {r.transactions?.completed != null && <> · {miles(r.transactions.completed)} ventas concretadas</>}
-              </p>
-            </div>
+          {/* 17-10: por API ML entrega los % de calificaciones y las métricas (reclamos, demoras, cancelaciones)
+              REDONDEADOS (1 / 0 / 0): mostraban "0% neutrales" con 69 neutrales en el perfil. Hasta tener números
+              exactos solo se muestra lo exacto: nivel, medalla y ventas concretadas. */}
+          {r.transactions?.completed != null && (
+            <p className="mt-2 text-sm text-neutral-700"><b className="num">{miles(r.transactions.completed)}</b> ventas concretadas</p>
           )}
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <Metrica titulo="Reclamos" valor={pct(m.claims?.rate)} alerta={(m.claims?.rate ?? 0) > 0.02}
-              ayuda={`${miles(m.claims?.value)} en ${m.claims?.period ?? 'el período'}`} />
-            <Metrica titulo="Despachos con demora" valor={pct(m.delayed_handling_time?.rate)} alerta={(m.delayed_handling_time?.rate ?? 0) > 0.15}
-              ayuda={`${miles(m.delayed_handling_time?.value)} en ${m.delayed_handling_time?.period ?? 'el período'}`} />
-            <Metrica titulo="Cancelaciones" valor={pct(m.cancellations?.rate)} alerta={(m.cancellations?.rate ?? 0) > 0.02}
-              ayuda={`${miles(m.cancellations?.value)} en ${m.cancellations?.period ?? 'el período'}`} />
-          </div>
         </>
       )}
       <p className="mt-2 text-[10px] text-neutral-400">Actualizado {hace(c.reputacion_at)} · se trae cada 6 horas</p>
