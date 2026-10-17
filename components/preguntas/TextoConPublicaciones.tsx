@@ -4,8 +4,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type 
 // Cuadro de respuesta con "#" (2026-10-13): escribir "#bolsa" (o "#bolsa grande", o el código "#747862977")
 // busca entre las publicaciones activas de la MISMA cuenta y, al elegir una, el "#bolsa" se cambia por su link.
 // Flechas + Enter o clic para elegir; Esc lo cierra y deja el texto como está.
-// 17-10: el título va en una línea que se desliza (con el dedo en el celular; sola en la fila marcada en la PC),
-// la lista se abre arriba del cuadro si abajo no hay lugar (celular con teclado) y tiene el alto del espacio libre.
+// 17-10: el título va en una línea que se desliza (con el dedo en el celular; sola en la fila marcada en la PC).
+// Celular (táctil o pantalla angosta): la lista NO flota; es un bloque fijo justo ENCIMA del cuadro (como las
+// sugerencias de un chat) y el cuadro se queda donde estaba, sobre el teclado. Calcular el teclado falló (el
+// iPhone no lo informa). PC: flota abajo del cuadro, o arriba si abajo no entra.
 
 interface Publicacion {
   item_id: string; titulo: string; precio: number | null; moneda: string | null
@@ -57,7 +59,17 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
   // Dónde abrir la lista y cuánto alto tiene (según el espacio libre en pantalla, con o sin teclado).
   const [lugar, setLugar] = useState<{ arriba: boolean; alto: number }>({ arriba: false, alto: 320 })
   const [conMouse, setConMouse] = useState(false)   // PC: el título de la fila marcada se desliza solo
-  useEffect(() => { setConMouse(window.matchMedia('(hover: hover) and (pointer: fine)').matches) }, [])
+  const [enCelular, setEnCelular] = useState(false)  // táctil o angosta: lista en bloque encima del cuadro
+  useEffect(() => {
+    const ver = () => {
+      setConMouse(window.matchMedia('(hover: hover) and (pointer: fine)').matches)
+      setEnCelular(window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 640)
+    }
+    ver()
+    window.addEventListener('resize', ver)
+    return () => window.removeEventListener('resize', ver)
+  }, [])
+  const topAntes = useRef<number | null>(null)   // dónde estaba el cuadro en pantalla antes de abrir el bloque
 
   const leerCursor = (texto: string) => {
     const el = area.current
@@ -81,9 +93,18 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
 
   const abierta = !!busqueda && lista.length > 0
 
-  // Abajo si entra; si no (lo normal en el celular con el teclado abierto), arriba del cuadro.
+  // Celular: al aparecer (o cambiar de alto) el bloque, la página se corre lo mismo para que el cuadro no se mueva.
   useLayoutEffect(() => {
-    if (!abierta) return
+    const el = area.current
+    if (!enCelular || !el) return
+    const top = el.getBoundingClientRect().top
+    if (topAntes.current != null && Math.abs(top - topAntes.current) > 1) window.scrollBy(0, top - topAntes.current)
+    topAntes.current = el.getBoundingClientRect().top
+  }, [abierta, lista.length, enCelular])
+
+  // PC: abajo si entra; si no, arriba del cuadro.
+  useLayoutEffect(() => {
+    if (!abierta || enCelular) return
     const medir = () => {
       const el = area.current
       if (!el) return
@@ -105,7 +126,7 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
     vv?.addEventListener('resize', medir)
     window.addEventListener('scroll', medir, true)
     return () => { vv?.removeEventListener('resize', medir); window.removeEventListener('scroll', medir, true) }
-  }, [abierta])
+  }, [abierta, enCelular])
 
   const elegir = (p: Publicacion) => {
     if (!busqueda) return
@@ -134,23 +155,10 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
     listaRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
   }, [activa])
 
-  return (
-    <div className="relative">
-      <textarea ref={area} {...resto} value={value}
-        onChange={e => { onTexto(e.target.value); leerCursor(e.target.value) }}
-        onKeyDown={teclas}
-        onKeyUp={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') leerCursor(value) }}
-        onClick={() => leerCursor(value)}
-        onBlur={() => setTimeout(() => setBusqueda(null), 150)} />
-      {!abierta && !value.includes('#') && (
-        <p className="mt-0.5 text-[11px] text-neutral-400">
-          Tip: escribe <b className="font-medium text-neutral-500">#</b> y una palabra (p.ej. <i>#bolsa</i>) para poner el link de otra publicación tuya.
-        </p>
-      )}
-      {abierta && (
-        <ul ref={listaRef} role="listbox" style={{ maxHeight: lugar.alto }}
-          className={`absolute left-0 right-0 z-20 overflow-y-auto overscroll-contain touch-pan-y rounded-lg border border-neutral-200 bg-white py-1 shadow-lg ${
-            lugar.arriba ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+  const listaPublicaciones = abierta ? (
+        <ul ref={listaRef} role="listbox" style={enCelular ? undefined : { maxHeight: lugar.alto }}
+          className={`overflow-y-auto overscroll-contain touch-pan-y rounded-lg border border-neutral-200 bg-white py-1 ${
+            enCelular ? 'mb-1 max-h-52' : `absolute left-0 right-0 z-20 shadow-lg ${lugar.arriba ? 'bottom-full mb-1' : 'top-full mt-1'}`}`}>
           <li className="px-3 pb-1 pt-0.5 text-[11px] text-neutral-400">Publicaciones de {cuenta} · desliza el título para leerlo · toca para poner el link</li>
           {lista.map((p, i) => (
             // El clic elige (no el "mousedown"): así deslizar el título o la lista con el dedo no elige sin querer.
@@ -170,6 +178,23 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
             </li>
           ))}
         </ul>
+  ) : null
+
+  return (
+    <div className="relative">
+      {/* Celular: el bloque va ANTES del cuadro (encima), en el flujo normal de la página. */}
+      {enCelular && listaPublicaciones}
+      <textarea ref={area} {...resto} value={value}
+        onChange={e => { if (!abierta) topAntes.current = area.current?.getBoundingClientRect().top ?? null; onTexto(e.target.value); leerCursor(e.target.value) }}
+        onKeyDown={teclas}
+        onKeyUp={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') leerCursor(value) }}
+        onClick={() => leerCursor(value)}
+        onBlur={() => setTimeout(() => setBusqueda(null), 150)} />
+      {!enCelular && listaPublicaciones}
+      {!abierta && !value.includes('#') && (
+        <p className="mt-0.5 text-[11px] text-neutral-400">
+          Tip: escribe <b className="font-medium text-neutral-500">#</b> y una palabra (p.ej. <i>#bolsa</i>) para poner el link de otra publicación tuya.
+        </p>
       )}
     </div>
   )
