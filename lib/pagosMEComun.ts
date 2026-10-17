@@ -1,8 +1,8 @@
 // Pagos MercadoEnvíos: tipos y reglas que usan el servidor y las pantallas (sin dependencias de servidor).
 
-/** Extensión "Asistente de envíos" en la Chrome Web Store (no listada). Vacío mientras no esté aprobada:
- *  /extension muestra entonces cómo cargarla a mano. Al aprobarse, pegar aquí el link de la tienda. */
-export const TIENDA_EXTENSION_URL = ''
+/** Extensión "Asistente de envíos" en la Chrome Web Store (no listada: solo entra quien tiene el link).
+ *  Aprobada el 17-10-2026 (v1.3.1). /extension redirige aquí; vacío = muestra cómo cargarla a mano. */
+export const TIENDA_EXTENSION_URL = 'https://chromewebstore.google.com/detail/iehjhdgelfpaijlpfcobjbaioakcgodo'
 
 /** Retiro en tienda (2026-10-12): el comprador pasa a buscarlo. No hay guía de envío: no entra a Despachos,
  *  el Reportador no le escribe y la venta queda cerrada (DESCARGADA) al procesarla. */
