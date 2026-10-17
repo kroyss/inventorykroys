@@ -8,13 +8,14 @@ interface Fila {
   item_id: string; variante_id: string; titulo: string; variante: string | null; disponible: number; estado: string
   permalink: string | null; imagen: string | null; agotada_desde: string | null; bajo_desde: string | null
   ultima_agotada_at: string | null; cuenta: string
+  pausada_desde?: string | null   // migración 101: pausada a mano (con stock)
   caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
 }
 interface Datos {
-  filas: Fila[]; contadores: { agotadas: number; bajas: number }; umbral: number
+  filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
   revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean; puedeStock: boolean
 }
-type Vista = 'agotadas' | 'bajas'
+type Vista = 'agotadas' | 'bajas' | 'pausadas'
 
 const hace = (s: string | null) => {
   if (!s) return '—'
@@ -126,6 +127,7 @@ export default function AlertasStockClient() {
 
 
   const reciente = (f: Fila) => {
+    if (vista === 'pausadas') return true   // pausadas: "Volver a la lista" siempre (no vencen a los 7 días)
     const d = vista === 'agotadas' ? f.agotada_desde : f.bajo_desde
     return !!d && Date.now() - new Date(d).getTime() < 7 * 86_400_000
   }
@@ -133,7 +135,7 @@ export default function AlertasStockClient() {
     // Celular: dos líneas (arriba foto, título y estado; abajo casilla, stock nuevo y botón); antes todo en una
     // línea y el estado se salía del margen. Desde sm: una sola línea en el orden del código (sm:order-none).
     <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2">
-      {datos?.puedeStock && (
+      {datos?.puedeStock && vista !== 'pausadas' && (
         <input type="checkbox" checked={marcadas.has(clave(f))} onChange={() => alternar(f)} disabled={(nuevo[clave(f)] ?? '') === ''}
           title={(nuevo[clave(f)] ?? '') === '' ? 'Escribe primero el stock nuevo' : 'Incluir en la actualización'}
           className="order-5 sm:order-none w-4 h-4 accent-neutral-900 shrink-0" />
@@ -156,7 +158,7 @@ export default function AlertasStockClient() {
         </p>
         {resultado[clave(f)] && !resultado[clave(f)].ok && <p className="text-xs text-red-600">{resultado[clave(f)].error}</p>}
       </div>
-      {datos?.puedeStock && (
+      {datos?.puedeStock && vista !== 'pausadas' && (
         <input inputMode="numeric" value={nuevo[clave(f)] ?? ''} onChange={e => escribir(f, e.target.value)} placeholder="Nuevo"
           aria-label={`Stock nuevo de ${f.titulo}`}
           className="order-6 sm:order-none w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
@@ -165,22 +167,23 @@ export default function AlertasStockClient() {
       {/* Columna de ancho fijo (con o sin botón) para que el stock y el estado queden alineados. */}
       <div className="order-7 sm:order-none ml-auto sm:ml-0 sm:w-32 shrink-0 flex justify-end">
         {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
-          title={f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
+          title={vista === 'pausadas' ? (f.caliente ? 'Ya la revisaste: sale de la lista (vuelve si la reactivas y la pausas de nuevo)' : 'Vuelve a la lista')
+            : f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
             f.caliente ? 'border-neutral-300 text-neutral-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700'
                        : 'border-neutral-300 text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'}`}>
           {f.caliente
             ? <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             : <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>}
-          {f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
+          {vista === 'pausadas' ? (f.caliente ? 'Quitar de la lista' : 'Volver a la lista') : f.caliente ? 'No hay, quitar' : 'Volver a avisar'}
         </button>}
       </div>
       <div className="order-3 sm:order-none sm:w-44 text-right shrink-0">
-        <p className={`text-sm font-semibold num ${f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
-          {f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
+        <p className={`text-sm font-semibold num ${vista === 'pausadas' ? 'text-amber-700' : f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
+          {vista === 'pausadas' ? `⏸ Pausada · ${f.disponible} u.` : f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
         <p className="text-[11px] text-neutral-400">
-          {vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
+          {vista === 'pausadas' ? `pausada desde ${hace(f.pausada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
         </p>
       </div>
       {/* Corte de línea solo en celular (con algo abajo que mostrar). */}
@@ -216,12 +219,13 @@ export default function AlertasStockClient() {
         <Tabs value={vista} onChange={setVista} items={[
           { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
           { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
+          { value: 'pausadas', label: 'Pausadas a mano', count: datos?.contadores.pausadas },
         ]} />
         <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar publicación, variante o cuenta…"
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
       </div>
 
-      {datos?.puedeStock && (datos.filas.length > 0 || aviso) && (
+      {datos?.puedeStock && vista !== 'pausadas' && (datos.filas.length > 0 || aviso) && (
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-2.5">
           <p className="text-sm text-neutral-600">
             {aviso ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
@@ -236,7 +240,8 @@ export default function AlertasStockClient() {
       {/* Al cambiar de pestaña no se muestra la lista anterior mientras llega la nueva. */}
       {!datos || datosDe !== vista ? <Cargando /> : calientes.length === 0 ? (
         <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 p-6 text-center">
-          {vista === 'agotadas' ? 'Nada nuevo agotado en los últimos 7 días. Todo al día. 👌' : 'Nada nuevo por agotarse en los últimos 7 días.'}
+          {vista === 'pausadas' ? 'No hay publicaciones pausadas a mano pendientes. 👌'
+            : vista === 'agotadas' ? 'Nada nuevo agotado en los últimos 7 días. Todo al día. 👌' : 'Nada nuevo por agotarse en los últimos 7 días.'}
         </p>
       ) : (
         <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100">
@@ -249,7 +254,9 @@ export default function AlertasStockClient() {
         <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
           <button type="button" onClick={() => setVerOlvido(v => !v)}
             className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-50 rounded-xl">
-            <span><b className="text-neutral-800">{vista === 'agotadas' ? 'Agotadas' : 'Por agotarse'} con más de 7 días</b> sin reponer o quitadas a mano · {olvido.length}. No suman al aviso.</span>
+            <span>{vista === 'pausadas'
+              ? <><b className="text-neutral-800">Pausadas ya revisadas</b> (quitadas de la lista) · {olvido.length}. Siguen pausadas en MercadoLibre.</>
+              : <><b className="text-neutral-800">{vista === 'agotadas' ? 'Agotadas' : 'Por agotarse'} con más de 7 días</b> sin reponer o quitadas a mano · {olvido.length}. No suman al aviso.</>}</span>
             <span className="text-neutral-400">{verOlvido ? '▴' : '▾'}</span>
           </button>
           {verOlvido && <ul className="divide-y divide-neutral-100 border-t border-neutral-100">{olvido.map(fila)}</ul>}

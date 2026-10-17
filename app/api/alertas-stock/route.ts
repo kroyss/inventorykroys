@@ -9,7 +9,11 @@ import { puede } from '@/lib/permisos'
 // últimos 30 días que están agotadas o por agotarse (menos del límite). `caliente`: de los últimos 7 días y
 // sin quitar (lo único que cuentan los contadores y el aviso); el resto va a "En el olvido".
 // PUT { umbral } (admin) → el límite de "por agotarse" de la empresa.
-const FRESCA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND ${SQL_VENDIDA}`
+const FRESCA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND a.estado <> 'pausada' AND ${SQL_VENDIDA}`
+// Pausadas a mano (migración 101): todas las que el sistema ve pausadas con stock, vendidas o no. "En la lista"
+// = sin quitar con "Quitar de la lista" después de pausarse; al reactivarla en ML sale sola.
+const PAUSADA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND a.estado = 'pausada'`
+const PAUSADA_EN_LISTA = `(a.descartada_at IS NULL OR a.descartada_at < a.pausada_desde)`
 
 export async function GET(req: NextRequest) {
   const s = await sesionStock()
@@ -17,19 +21,21 @@ export async function GET(req: NextRequest) {
   const vista = new URL(req.url).searchParams.get('vista') ?? 'agotadas'
   try {
     const umbral = await umbralStock(s.db)
-    const filtro = vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
-    const orden = vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
-    const caliente = vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
+    const filtro = vista === 'pausadas' ? PAUSADA
+      : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
+    const orden = vista === 'pausadas' ? 'a.pausada_desde DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
+    const caliente = vista === 'pausadas' ? PAUSADA_EN_LISTA : vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
     const [{ rows }, { rows: [n] }, { rows: [rev] }] = await Promise.all([
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
-                a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, c.nickname AS cuenta,
+                a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, c.nickname AS cuenta,
                 ${caliente} AS caliente, a.descartada_at
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
         `SELECT COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible <= 0 AND ${sqlCaliente('a.agotada_desde')})::int AS agotadas,
-                COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas
+                COUNT(*) FILTER (WHERE ${FRESCA} AND a.disponible > 0 AND a.disponible < $1 AND ${sqlCaliente('a.bajo_desde')})::int AS bajas,
+                COUNT(*) FILTER (WHERE ${PAUSADA} AND ${PAUSADA_EN_LISTA})::int AS pausadas
          FROM ml_stock_alertas a`, [umbral]),
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),

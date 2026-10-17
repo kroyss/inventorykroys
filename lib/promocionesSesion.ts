@@ -30,3 +30,12 @@ export const sqlPesoPublicacion = (col: string) => `COALESCE(
   (SELECT MAX(pd.weight_kg)::float FROM product_ml_codes pm JOIN products pd ON pd.id = pm.product_id
    WHERE pm.is_active AND pm.unidades = 1 AND pd.weight_kg > 0
      AND split_part(pm.ml_code, ':', 1) = regexp_replace(${col}, '^[A-Z]{3}', '')))`
+
+/** SQL de la situación de una publicación (17-10): 'activa', 'agotada' (pausada sin stock) o 'pausada' (a mano, con
+ *  stock), del catálogo que ya se trae de ML; si no está en el catálogo, la del estado guardado (`estadoCol`). */
+export const sqlSituacion = (col: string, estadoCol = 'NULL::text') => `COALESCE(
+  (SELECT CASE WHEN k.estado = 'active' THEN 'activa'
+               WHEN k.estado = 'paused' AND COALESCE(k.disponible, 0) <= 0 THEN 'agotada'
+               WHEN k.estado = 'paused' THEN 'pausada' END
+   FROM ml_catalogo k WHERE k.item_id = ${col} LIMIT 1),
+  CASE ${estadoCol} WHEN 'active' THEN 'activa' WHEN 'paused' THEN 'pausada_ml' END)`
