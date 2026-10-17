@@ -12,8 +12,13 @@ export async function POST() {
     return NextResponse.json({ error: 'Los pesos los trae el programa de Pagos ME, que no está activo en esta empresa' }, { status: 400 })
   }
   try {
+    // El último pedido de los últimos 15 min que todavía no terminaron todas las cuentas: se suma a ese.
     const { rows: [ya] } = await s.db.query(
-      `SELECT id FROM me_pedidos WHERE pedido_at > NOW() - INTERVAL '2 minutes' ORDER BY id DESC LIMIT 1`)
+      `SELECT p.id FROM me_pedidos p
+       WHERE p.pedido_at > NOW() - INTERVAL '15 minutes'
+         AND (SELECT COUNT(*) FROM jsonb_object_keys(p.resultados)) <
+             GREATEST(1, (SELECT COUNT(*) FROM me_latidos WHERE perfil <> 'DESPERTADOR' AND visto_at > NOW() - INTERVAL '1 day'))
+       ORDER BY p.id DESC LIMIT 1`)
     if (ya) {
       await s.db.query(`UPDATE me_pedidos SET pesos = TRUE WHERE id = $1`, [ya.id])
       return NextResponse.json({ ok: true, pedido: ya.id })

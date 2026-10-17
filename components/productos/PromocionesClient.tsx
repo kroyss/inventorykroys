@@ -206,27 +206,32 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   }
   // "Traer ME y ML" (como Traer ME en Por confirmar): la PC de Pagos ME lee los pesos del portal (1-3 min);
   // cuando terminan todos sus perfiles, se lee MercadoLibre. Si la PC no responde en 5 min, solo ML.
+  // 17-10: ML se lee ENSEGUIDA (publicaciones nuevas, campañas y precios); los pesos los trae la PC de Pagos ME
+  // por su lado (puede tardar varios minutos) y, al llegar, la página se actualiza sola. Antes ML esperaba a la PC
+  // y, si la PC tardaba, nunca se leía.
   const [pedidoME, setPedidoME] = useState<{ id: number; desde: number } | null>(null)
+  const [estadoPesos, setEstadoPesos] = useState<string | null>(null)
   const traerTodo = async () => {
-    if (!conPagosME) return actualizarML()
-    setError(null)
-    const r = await fetch('/api/promociones/pesos', { method: 'POST' }).catch(() => null)
-    const d = await r?.json().catch(() => null)
-    if (!r?.ok || !d?.pedido) return actualizarML('No se pudo pedir los pesos a la PC de Pagos ME: se trajo solo lo de MercadoLibre.')
-    setBusy('pesos'); setAviso('Trayendo pesos del portal de MercadoEnvíos con la PC de Pagos ME (1 a 3 min). Después se lee MercadoLibre.')
-    setPedidoME({ id: d.pedido, desde: Date.now() })
+    if (conPagosME && !pedidoME) {
+      const r = await fetch('/api/promociones/pesos', { method: 'POST' }).catch(() => null)
+      const d = await r?.json().catch(() => null)
+      if (r?.ok && d?.pedido) { setPedidoME({ id: d.pedido, desde: Date.now() }); setEstadoPesos('trayendo con la PC de Pagos ME…') }
+      else setEstadoPesos('no se pudo pedir a la PC de Pagos ME')
+    }
+    await actualizarML()
   }
   useEffect(() => {
     if (!pedidoME) return
     const t = setInterval(async () => {
       const r = await fetch(`/api/promociones/pesos?pedido=${pedidoME.id}`, { cache: 'no-store' }).catch(() => null)
       const d = await r?.json().catch(() => null) as { hechos: number; perfiles: number; errores: string[] } | null
-      const vencido = Date.now() - pedidoME.desde > 5 * 60_000
-      if (d && d.hechos < d.perfiles && !vencido) { setAviso(`Trayendo pesos de MercadoEnvíos… ${d.hechos} de ${d.perfiles} cuentas listas.`); return }
+      const vencido = Date.now() - pedidoME.desde > 15 * 60_000
+      if (d && d.hechos < d.perfiles && !vencido) { setEstadoPesos(`trayendo con la PC de Pagos ME… ${d.hechos} de ${d.perfiles} cuentas`); return }
       clearInterval(t)
-      setPedidoME(null); setBusy(null)
-      await actualizarML(vencido && (!d || d.hechos < d.perfiles) ? 'La PC de Pagos ME no terminó en 5 minutos (¿está prendida?): los pesos quedan como estaban.'
-        : d?.errores.length ? `Pesos: ${d.errores.join(' · ')}` : undefined)
+      setPedidoME(null)
+      setEstadoPesos(vencido && (!d || d.hechos < d.perfiles) ? 'la PC de Pagos ME no terminó en 15 min (¿está prendida?)'
+        : d?.errores.length ? `con errores: ${d.errores.join(' · ')}` : null)
+      router.refresh()
     }, 10_000)
     return () => clearInterval(t)
   }, [pedidoME])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -273,7 +278,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>
           <button onClick={traerTodo} disabled={!!busy} className="btn-primary text-sm whitespace-nowrap"
             title={conPagosME ? 'Primero los pesos del portal de MercadoEnvíos (PC de Pagos ME) y después campañas y precios de MercadoLibre' : 'Campañas y precios de MercadoLibre'}>
-            {busy === 'pesos' ? 'Trayendo ME…' : busy === 'ml' ? 'Trayendo ML…' : conPagosME ? 'Traer ME y ML' : 'Actualizar desde MercadoLibre'}
+            {busy === 'ml' ? 'Trayendo ML…' : conPagosME ? 'Traer ME y ML' : 'Actualizar desde MercadoLibre'}
           </button>
         </>} />
 
@@ -284,7 +289,9 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
             {c.error && <span className="text-red-700"> · error: {c.error}</span>}
           </span>
         ))}
-        <span>Pesos del portal: {cuando(pesosAl)}{conPagosME ? ' (se traen solos 1 vez al día)' : ''}</span>
+        <span>Pesos del portal: {estadoPesos
+          ? <span className={pedidoME ? 'text-sky-700' : 'text-amber-700'}>{estadoPesos}</span>
+          : <>{cuando(pesosAl)}{conPagosME ? ' (se traen solos 1 vez al día)' : ''}</>}</span>
         <label className="ml-auto flex items-center gap-1.5" title="Para las sugerencias y el filtro de margen bajo">
           Margen mínimo
           <input type="number" min={0} max={90} value={margenMin} onChange={e => guardarMargen(Math.max(0, Math.min(90, Number(e.target.value) || 0)))}
