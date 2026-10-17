@@ -124,7 +124,10 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     return {
       ...f, enPromo, actual, envio,
       envioBase: sinPromo,   // al precio publicado: contra esto se mide lo que hace un descuento nuevo
-      quitaEnvio: !!enPromo && RANGO[sinPromo.estado] > RANGO[envio.estado],
+      // Lo que le hace la promo al envío (17-10): sin promo tenía envío gratis y con la promo queda a cobro a
+      // destino (quitaEnvio), o tenía ZOOM y queda solo TEALCA (quitaZoom: sigue gratis, es advertencia).
+      quitaEnvio: !!enPromo && envio.estado === 'destino' && (sinPromo.estado === 'ambas' || sinPromo.estado === 'tealca'),
+      quitaZoom: !!enPromo && sinPromo.estado === 'ambas' && envio.estado === 'tealca',
       uTealca: envio.estado === 'destino' ? unidadesParaGratis(f.peso, actual, TABLA_TEALCA) : null,
       uZoom: envio.estado === 'destino' || envio.estado === 'tealca' ? unidadesParaGratis(f.peso, actual, TABLA_ZOOM) : null,
       descuento: enPromo && f.precio > 0 ? (1 - actual / f.precio) * 100 : 0,
@@ -165,7 +168,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     candidatas: v => v.candidatas.length > 0,
     quita: v => v.quitaEnvio,
     margen: v => v.margen != null && v.margen < margenMin,
-    tealca: v => v.envio.estado === 'tealca',
+    tealca: v => v.quitaZoom,
     destino: v => v.envio.estado === 'destino',
     sin_peso: v => v.envio.estado === 'sin_peso',
   }
@@ -354,7 +357,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
             { value: 'candidatas', label: 'Pueden entrar', count: cuenta_(filtros.candidatas) },
             { value: 'quita', label: 'La promo quita el envío', count: cuenta_(filtros.quita) },
             { value: 'margen', label: `Margen < ${margenMin}%`, count: cuenta_(filtros.margen) },
-            { value: 'tealca', label: 'Pierden ZOOM', count: cuenta_(filtros.tealca) },
+            { value: 'tealca', label: 'La promo quita ZOOM', count: cuenta_(filtros.tealca) },
             { value: 'destino', label: 'Cobro a destino', count: cuenta_(filtros.destino) },
             { value: 'sin_peso', label: 'Sin peso', count: cuenta_(filtros.sin_peso) },
           ]} />
@@ -430,6 +433,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                             </div>
                           ))}
                           {v.quitaEnvio && <div className="mt-0.5 text-red-700 font-medium">⚠ La promo le quita el envío gratis</div>}
+                          {v.quitaZoom && <div className="mt-0.5 text-amber-800 font-medium">⚠ La promo le quita ZOOM (sigue gratis por TEALCA)</div>}
                           {/* Botón chico con borde (antes un enlace gris que se confundía con texto, 2026-10-17). */}
                           <button onClick={() => sacar(v, v.enPromo!)} disabled={!!busy}
                             className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
