@@ -158,6 +158,16 @@ export default function FundadoresPanel() {
 
   return (
     <div className="space-y-4">
+      {/* 17-10: el programa cerró. Arriba, los Fundadores y cómo van; el programa (rondas, postulaciones y
+          visitas) queda plegado abajo. */}
+      <ListaFundadores />
+
+      <details className="group rounded-xl border border-neutral-200 bg-white px-4 py-3" open={cuenta('calificado') > 0}>
+        <summary className="cursor-pointer select-none text-sm font-semibold text-neutral-800">
+          Programa Fundadores: rondas, postulaciones y visitas
+          {cuenta('calificado') > 0 && <span className="ml-2 text-xs font-medium text-sky-700">{cuenta('calificado')} por revisar</span>}
+        </summary>
+        <div className="mt-3 space-y-4">
       {/* Estado de la ronda abierta (o la última) en una línea */}
       {(() => {
         const t = datos.tandas.find(x => x.abierta) ?? datos.tandas[datos.tandas.length - 1]
@@ -372,6 +382,8 @@ export default function FundadoresPanel() {
       <p className="text-xs text-neutral-400">
         Toca el puntaje o la línea gris para ver sus respuestas. Aprobar asigna a la ronda en cuyos días se postuló (si ya está llena, a la siguiente con cupo). Al aprobar, escríbele por Telegram y crea su empresa en “Empresas” con la cuenta “⭐ Fundador” (30 días gratis desde ese día).
       </p>
+        </div>
+      </details>
     </div>
   )
 }
@@ -403,5 +415,77 @@ function FotosNota({ fotos, onSubir, onBorrar, ocupado }: {
         </label>
       )}
     </div>
+  )
+}
+
+/** Los Fundadores (empresas marcadas Fundador) y cómo van: cuenta, MercadoLibre, último uso y actividad (7 días). */
+function ListaFundadores() {
+  type Emp = { id: number; nombre: string; estado: string; prueba_hasta: string | null; fundador: boolean; is_active: boolean; admins: string | null }
+  type Uso = { id: number; cuentas: string | null; ultimo_uso: string | null; abierta_at: string | null; en_linea: boolean
+    preguntas_sistema: number; mensajes_sistema: number; guias: number; reportadas: number; calificadas_sistema: number; stock: number; ia: number }
+  const [datos, setDatos] = useState<{ emp: Emp[]; uso: Map<number, Uso>; hoy: string } | null>(null)
+  const [ver, setVer] = useState<'todos' | 'sin_ml' | 'con_ml'>('todos')
+  useEffect(() => {
+    let vivo = true
+    Promise.all([
+      fetch('/api/plataforma/empresas').then(r => r.json()),
+      fetch('/api/plataforma/adopcion?dias=7').then(r => r.json()),
+    ]).then(([e, a]) => {
+      if (!vivo) return
+      setDatos({ emp: (e.empresas ?? []).filter((x: Emp) => x.fundador && x.is_active), uso: new Map((a.empresas ?? []).map((u: Uso) => [u.id, u])), hoy: e.hoy })
+    }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
+  if (!datos) return <div className="h-32 animate-pulse rounded-xl bg-neutral-100" />
+  const act = (u?: Uso) => u ? u.preguntas_sistema + u.mensajes_sistema + u.guias + u.reportadas + u.calificadas_sistema + u.stock + u.ia : 0
+  const hace = (f: string | null) => {
+    if (!f) return 'nunca'
+    const h = (Date.now() - new Date(f).getTime()) / 3_600_000
+    return h < 1 ? 'hace menos de 1 h' : h < 48 ? `hace ${Math.round(h)} h` : `hace ${Math.round(h / 24)} días`
+  }
+  const filas = datos.emp.map(e => ({ e, u: datos.uso.get(e.id) }))
+  const conMl = filas.filter(x => x.u?.cuentas).length
+  const vistas = filas.filter(x => ver === 'todos' || (ver === 'sin_ml' ? !x.u?.cuentas : !!x.u?.cuentas))
+    .sort((x, y) => act(y.u) - act(x.u) || x.e.nombre.localeCompare(y.e.nombre))
+  const dd = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
+  return (
+    <section className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-100 px-4 py-3">
+        <h2 className="mr-auto text-sm font-semibold text-neutral-900">Fundadores <span className="font-normal text-neutral-400">{filas.length}</span></h2>
+        {([['todos', 'Todos', filas.length], ['con_ml', 'Con MercadoLibre', conMl], ['sin_ml', 'Sin conectar ML', filas.length - conMl]] as const).map(([k, t, n]) => (
+          <button key={k} onClick={() => setVer(k)}
+            className={`rounded-full border px-3 py-1 text-xs ${ver === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
+            {t} <span className="opacity-60">{n}</span>
+          </button>
+        ))}
+      </div>
+      {vistas.length === 0 ? <p className="px-4 py-6 text-center text-sm text-neutral-400">Nadie en esta vista.</p> : (
+        <ul className="divide-y divide-neutral-100">
+          {vistas.map(({ e, u }) => {
+            const a = act(u)
+            const vencida = e.estado === 'vencido' || (e.estado === 'prueba' && !!e.prueba_hasta && e.prueba_hasta < datos.hoy)
+            return (
+              <li key={e.id} className="grid gap-1 px-4 py-2.5 text-sm sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_6rem] sm:items-center">
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    {u?.en_linea && <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" title="En línea ahora" />}
+                    <span className="truncate font-medium text-neutral-900">{e.nombre}</span>
+                  </span>
+                  <span className="block truncate text-[11px] text-neutral-400">{e.admins ?? ''}</span>
+                </span>
+                <span className="text-xs">
+                  {u?.cuentas ? <span className="text-emerald-700">ML: {u.cuentas}</span> : <span className="font-medium text-amber-700">Sin conectar ML</span>}
+                  <span className="block text-[11px] text-neutral-400">
+                    {vencida ? <span className="text-red-600">cuenta vencida</span> : e.estado === 'prueba' && e.prueba_hasta ? `prueba hasta ${dd(e.prueba_hasta)}` : e.estado}
+                  </span>
+                </span>
+                <span className="text-xs text-neutral-600">último uso {hace(u?.ultimo_uso ?? u?.abierta_at ?? null)}</span>
+                <span className="text-xs sm:text-right"><b className="tabular-nums">{a}</b> <span className="text-neutral-400">acciones 7 d</span></span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }

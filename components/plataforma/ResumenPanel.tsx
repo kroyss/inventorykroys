@@ -1,6 +1,6 @@
 'use client'
-// Plataforma → Resumen: lo que hay que mirar hoy. Pocos números arriba, "Requiere atención" como
-// protagonista y el avance de cada cliente por etapas (entró → conectó ML → vio videos → usa).
+// Plataforma → Hoy: lo que hay que mirar hoy. Pocos números arriba, "Requiere atención" como protagonista
+// y los 5 clientes más activos de la semana (17-10; el avance por etapas repetía lo de Clientes).
 // Lee los mismos datos que Aprendizaje y Fundadores (no hay consultas nuevas).
 import { useEffect, useState } from 'react'
 
@@ -13,7 +13,7 @@ interface Alumno { empresas: string; completados: number; en_linea: boolean; vie
 interface EnLinea { id: number; nombre: string; empresas: string | null; ultima_actividad: string; usando: boolean }
 interface Video { activo: boolean; serie: string }
 interface Datos { uso: Uso[]; alumnos: Alumno[]; enLinea: EnLinea[]; videos: Video[] }
-type Vista = 'clientes' | 'fundadores' | 'aprendizaje'
+type Vista = 'clientes' | 'fundadores' | 'contenido'
 
 const DIA = 864e5
 const hoyCaracas = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
@@ -54,8 +54,6 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
   if (!datos) return <p className="text-sm text-neutral-400 py-8 text-center">Cargando…</p>
 
   const hoy = hoyCaracas()
-  const totalVideos = datos.videos.filter(v => v.activo && v.serie === 'automatizaciones').length
-  const videosDe = (nombre: string) => Math.max(0, ...datos.alumnos.filter(a => a.empresas.split(', ').includes(nombre)).map(a => a.completados))
 
   // ── Requiere atención (más urgente primero) ──
   const avisos: Aviso[] = []
@@ -115,67 +113,41 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
         )}
       </section>
 
-      {/* Avance de cada cliente por etapas */}
+      {/* Los más activos de la semana (17-10): el detalle completo, en Clientes. */}
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
         <div className="px-4 py-3 border-b border-neutral-100 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-neutral-900">Avance de los clientes</h2>
-          <span className="text-xs text-neutral-400">Entró → Conectó ML → Vio los videos → Usa las herramientas</span>
+          <h2 className="text-sm font-semibold text-neutral-900">Los más activos de la semana</h2>
+          <button onClick={() => onIr('clientes')} className="text-xs text-sky-700 hover:underline">Ver todos en Clientes →</button>
         </div>
-        {datos.uso.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-neutral-400 text-center">Todavía no hay clientes.</p>
-        ) : (
-          <ul className="divide-y divide-neutral-100">
-            {datos.uso.map(u => {
-              const vistos = videosDe(u.nombre)
-              const usa = usos7(u) > 0
-              const etapas = [
-                { ok: !!u.ingreso, t: 'Entró' },
-                { ok: !!u.conectada_at, t: 'Conectó ML' },
-                { ok: totalVideos > 0 && vistos >= totalVideos, parcial: vistos > 0, t: totalVideos ? `Videos ${vistos}/${totalVideos}` : 'Videos' },
-                { ok: usa, t: 'Usa' },
-              ]
-              const falta = etapas.find(e => !e.ok)
-              const restan = u.estado === 'prueba' && u.prueba_hasta ? dias(hoy, u.prueba_hasta) : null
-              return (
-                <li key={u.id} className="px-4 py-3 grid gap-2 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_minmax(0,1fr)] sm:items-center">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      {u.en_linea && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="En línea ahora" />}
-                      <span className="font-medium text-neutral-900 truncate">{u.nombre}</span>
-                      {u.fundador && <span className="text-[10px] px-1.5 py-0.5 rounded bg-lime-100 text-lime-800">Fundador</span>}
-                    </div>
-                    <div className="text-xs text-neutral-400">
-                      {restan == null ? u.estado : restan < 0 ? 'prueba vencida' : `prueba: quedan ${restan} día${restan === 1 ? '' : 's'}`}
-                      {' · '}entró {hace(u.ingreso)}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {etapas.map((e, i) => (
-                      <div key={i} className="flex-1 min-w-0">
-                        <div className={`h-1.5 rounded-full ${e.ok ? 'bg-lime-500' : e.parcial ? 'bg-lime-200' : 'bg-neutral-200'}`} />
-                        <div className={`mt-1 text-[10px] truncate ${e.ok ? 'text-neutral-700' : 'text-neutral-400'}`}>{e.t}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-xs text-neutral-500 sm:text-right">
-                    {falta
-                      ? <>Falta: <b className="text-neutral-700">{falta.t.replace(/ \d+\/\d+$/, '')}</b></>
-                      : <span className="text-green-700">Usando el sistema ✓</span>}
-                    {usa && (
-                      <div className="text-neutral-400">
-                        7 días: {[
-                          u.preguntas_7d && `${u.preguntas_7d} preg.`, u.mensajes_7d && `${u.mensajes_7d} msj.`,
-                          u.etiquetas_7d && `${u.etiquetas_7d} etiq.`, u.reportadas_7d && `${u.reportadas_7d} guías`,
-                          u.calificadas_7d && `${u.calificadas_7d} calif.`,
-                        ].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                  </div>
+        {(() => {
+          const top = [...datos.uso].filter(u => usos7(u) > 0).sort((a, b) => usos7(b) - usos7(a)).slice(0, 5)
+          if (!top.length) return <p className="px-4 py-6 text-sm text-neutral-400 text-center">Nadie usó las herramientas en los últimos 7 días.</p>
+          const max = usos7(top[0])
+          return (
+            <ol className="divide-y divide-neutral-100">
+              {top.map((u, i) => (
+                <li key={u.id} className="px-4 py-2.5 grid gap-1.5 sm:grid-cols-[1.5rem_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.6fr)] sm:items-center text-sm">
+                  <span className="text-neutral-400 tabular-nums">{i + 1}</span>
+                  <span className="min-w-0 flex items-center gap-2">
+                    {u.en_linea && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="En línea ahora" />}
+                    <span className="font-medium text-neutral-900 truncate">{u.nombre}</span>
+                    {u.fundador && <span className="text-[10px] px-1.5 py-0.5 rounded bg-lime-100 text-lime-800">Fundador</span>}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-1.5 flex-1 rounded-full bg-neutral-100 overflow-hidden"><span className="block h-full bg-lime-500" style={{ width: `${Math.round(usos7(u) / max * 100)}%` }} /></span>
+                    <b className="tabular-nums text-xs">{usos7(u)}</b>
+                  </span>
+                  <span className="text-[11px] text-neutral-500">
+                    {[u.preguntas_7d && `${u.preguntas_7d} preguntas`, u.mensajes_7d && `${u.mensajes_7d} mensajes`,
+                      u.etiquetas_7d && `${u.etiquetas_7d} etiquetas`, u.reportadas_7d && `${u.reportadas_7d} guías reportadas`,
+                      u.calificadas_7d && `${u.calificadas_7d} calificaciones`, u.stock_7d && `${u.stock_7d} stock`].filter(Boolean).join(' · ')}
+                    {' · '}último uso {hace(u.ultima_actividad)}
+                  </span>
                 </li>
-              )
-            })}
-          </ul>
-        )}
+              ))}
+            </ol>
+          )
+        })()}
       </section>
     </div>
   )
