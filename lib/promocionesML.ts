@@ -323,6 +323,44 @@ export async function borrarCampana(db: Pool, conexionId: number, usuarioId: num
 }
 
 /**
+ * Cambiar el precio de una publicación que YA está en una campaña (probado 17-10 en una propia): volver a
+ * agregarla (POST) responde 201 pero deja el precio viejo; con PUT sí cambia. Se comprueba con los precios
+ * guardados de la publicación. Se registra como 'agregar' (el último precio de esa campaña es el que vale).
+ */
+export async function cambiarPrecioEnCampana(db: Pool, conexionId: number, usuarioId: number,
+  item: { id: string; precio: number; precioAntes: number }, campana: { id: string; tipo: string; nombre: string | null }) {
+  const precio = Math.round(item.precio * 100) / 100
+  return hacer(db, { conexionId, usuarioId, accion: 'agregar', campanaId: campana.id, campanaTipo: campana.tipo, campanaNombre: campana.nombre,
+    itemId: item.id, precio, precioAntes: item.precioAntes },
+    async () => {
+      await mlFetch(db, conexionId, `/seller-promotions/items/${encodeURIComponent(item.id)}?app_version=v2`, {
+        method: 'PUT', body: { promotion_id: campana.id, promotion_type: campana.tipo, deal_price: precio },
+      })
+      let guardado = false
+      for (let i = 0; i < 4 && !guardado; i++) {
+        await esperar(1500)
+        guardado = (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
+      }
+      if (!guardado) throw new Error('MercadoLibre respondió que sí, pero el precio nuevo no quedó guardado en la publicación')
+      await marcarEnFoto(db, conexionId, item.id, campana.id, precio)
+      return { precio, manda: null as number | null }
+    })
+}
+
+/** % por defecto de las campañas propias ({ "C-MLV…": 15 }): el que se propone al agregar publicaciones. */
+export async function leerPctCampanas(db: Pool): Promise<Record<string, number>> {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = 'promo_pct_campanas'`)
+  try { return r?.value ? JSON.parse(r.value) : {} } catch { return {} }
+}
+export async function guardarPctCampana(db: Pool, campanaId: string, pct: number) {
+  const actual = await leerPctCampanas(db)
+  actual[campanaId] = pct
+  await db.query(
+    `INSERT INTO app_settings (key, value) VALUES ('promo_pct_campanas', $1)
+     ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [JSON.stringify(actual)])
+}
+
+/**
  * Agregar una publicación a una campaña YA INICIADA (de ML o propia) a un precio, y comprobarlo con el precio
  * real. Si ML dice "ok" pero el precio vigente no es de esa campaña, se toma como error.
  */

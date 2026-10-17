@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth'
+import { leerPctCampanas } from '@/lib/promocionesML'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
@@ -34,6 +35,7 @@ export default async function PromocionesPage() {
               FROM ml_promociones_acciones a LEFT JOIN users u ON u.id = a.usuario_id
               WHERE a.creado_at > NOW() - INTERVAL '60 days' ORDER BY a.creado_at DESC LIMIT 300`),
   ])
+  const pctCampanas = await leerPctCampanas(db)
   const pesoPortal = new Map(portal.map(r => [r.publicacion as string, r.peso as number | null]))
   const producto = new Map(vinculados.map(r => [r.publicacion as string, r as { code: string; peso: number | null; costo: number; unidades: number }]))
   const pesosAl = portal.reduce<string | null>((m, r) => (!m || r.actualizado_at > m ? r.actualizado_at : m), null)
@@ -60,7 +62,7 @@ export default async function PromocionesPage() {
     const nombres = new Map(foto.campanas.map(c => [c.id, c.nombre]))
     for (const c of foto.campanas) {
       const k = `${f.conexion_id}|${c.id}`
-      if (!campanas.has(k)) campanas.set(k, { ...c, conexionId: f.conexion_id, cuentas: [f.nickname], adentro: 0, candidatas: 0 })
+      if (!campanas.has(k)) campanas.set(k, { ...c, conexionId: f.conexion_id, cuentas: [f.nickname], adentro: 0, candidatas: 0, pctDefecto: pctCampanas[c.id] ?? null })
     }
     for (const it of foto.items) {
       const pp = pesoPortal.get(it.id)

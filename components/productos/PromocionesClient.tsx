@@ -16,7 +16,9 @@ import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
 //          siempre con vista previa (precio, envío, unidades, margen) y registro de quién hizo qué.
 //  Fase 3: margen neto al precio de la promoción y sugerencias por campaña.
 
-export interface CampanaVista extends CampanaML { conexionId: number; cuentas: string[]; adentro: number; candidatas: number }
+export interface CampanaVista extends CampanaML { conexionId: number; cuentas: string[]; adentro: number; candidatas: number
+  pctDefecto?: number | null   // campañas propias: el % que se propone al agregar (se elige al crearla)
+}
 export interface FilaPromo {
   id: string; conexionId: number; cuenta: string; titulo: string; precio: number; producto: string | null; costo: number | null
   peso: number | null; pesoFuente: 'portal' | 'producto' | null
@@ -129,13 +131,14 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   // Sugerencias: las que pueden entrar y que, con el % propuesto, NO pierden el envío gratis (y no quedan
   // bajo el mínimo que acepta ML). De ML: las que ML invita. Propia: las de la cuenta que todavía no están.
   // El margen no filtra (muchas publicaciones no tienen costo): se ve como aviso en la vista previa.
+  const pctDe = (c: CampanaVista) => c.pctDefecto ?? pctSug
   const sugeridas = (c: CampanaVista) => vistas.filter(v => {
     if (v.conexionId !== c.conexionId) return false
     const p = v.promos.find(x => x.campana === c.id)
     if (p?.estado === 'started') return false
     if (c.tipo !== 'SELLER_CAMPAIGN' && p?.estado !== 'candidate') return false
     if (v.precio <= PISO_ML) return false
-    const precio = precioConPiso(v.precio, pctSug)
+    const precio = precioConPiso(v.precio, pctDe(c))
     if (p?.minimo != null && precio < p.minimo) return false
     if (v.envioBase.estado === 'sin_peso') return false
     const despues = envioPorTransportista(v.peso, precio).estado
@@ -302,13 +305,19 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                         <div className="font-medium text-neutral-900">{c.nombre}</div>
                         <span className="text-[11px] text-neutral-400 whitespace-nowrap">{propia ? 'propia' : c.tipo}{c.estado !== 'started' ? ` · ${c.estado}` : ''}</span>
                       </div>
-                      <div className="text-xs text-neutral-500 mt-0.5">{fecha(c.inicio)} → {fecha(c.fin)}{!propia && <> · entrar hasta {fecha(c.limite)}</>} · {c.cuentas.join(', ')}</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">{propia && c.pctDefecto ? <><b className="text-neutral-700">{c.pctDefecto}%</b> · </> : null}{fecha(c.inicio)} → {fecha(c.fin)}{!propia && <> · entrar hasta {fecha(c.limite)}</>} · {c.cuentas.join(', ')}</div>
                       <div className="text-sm mt-2"><b>{c.adentro}</b> adentro{!propia && <> · <b>{c.candidatas}</b> pueden entrar</>}</div>
                     </button>
                     <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
                       {sug.length > 0 && (
-                        <button onClick={() => setModal({ tipo: 'agregar', claves: sug.map(clave), campana: k, pct: pctSug })}
+                        <button onClick={() => setModal({ tipo: 'agregar', claves: sug.map(clave), campana: k, pct: pctDe(c) })}
                           className="btn-secondary text-xs px-2.5 py-1">Ver {sug.length} sugerida{sug.length === 1 ? '' : 's'}</button>
+                      )}
+                      {propia && c.adentro > 0 && (
+                        <button onClick={() => setModal({ tipo: 'agregar', campana: k, pct: pctDe(c),
+                          claves: vistas.filter(v => v.conexionId === c.conexionId && v.promos.some(p => p.campana === c.id && p.estado === 'started')).map(clave) })}
+                          disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1"
+                          title="Cambiar el precio de las que ya están en esta campaña (por ejemplo, de 10% a 15%)">Cambiar % de las {c.adentro}</button>
                       )}
                       {propia && (
                         <button onClick={() => setModal({ tipo: 'editar', campana: c })} disabled={!!busy} className="underline text-neutral-500 hover:text-neutral-800">
@@ -520,7 +529,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const bajoPiso = f.precio <= PISO_ML
     const cand = camp ? f.promos.find(p => p.campana === camp.id) : undefined
     const yaAdentro = cand?.estado === 'started'
-    const puede = !!camp && !yaAdentro && (propia || cand?.estado === 'candidate')
+    // Ya en una campaña PROPIA a otro precio: se le cambia el precio (de 10% a 15%, 17-10).
+    const cambio = yaAdentro && propia && cand?.precio != null && Math.abs(cand.precio - precio) >= 0.011
+    const puede = !!camp && (cambio || (!yaAdentro && (propia || cand?.estado === 'candidate')))
     const bajoMin = cand?.minimo != null && precio < cand.minimo
     // Siempre contra el envío AL PRECIO PUBLICADO (no contra el de otra promo que ya le haya bajado el precio).
     const base = f.envioBase
@@ -533,7 +544,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     // Hasta qué % aguanta: con ZOOM (mínimo de ZOOM) y con algún envío gratis (mínimo de TEALCA).
     const topeZoom = base.estado === 'ambas' ? topeDescuento(f.precio, base.minZoom) : null
     const tope = base.estado === 'ambas' || base.estado === 'tealca' ? topeDescuento(f.precio, base.minTealca) : null
-    const motivo = !camp ? null : yaAdentro ? 'ya está en esta campaña' : !puede ? 'ML no la ofrece para esta publicación'
+    const motivo = !camp ? null : yaAdentro && !cambio ? `ya está en esta campaña${cand?.precio != null ? ` a ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la ofrece para esta publicación'
       : bajoPiso ? `publicada en ${usd(f.precio)}: ML no acepta promociones por debajo de $${PISO_ML}` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
       : sinGratis && !conPierden ? `con ${modal.pct}% queda sin envío gratis${tope != null ? ` · aguanta hasta ${String(tope).replace('.', ',')}%` : ''}` : null
     const advertencia = motivo ? null
@@ -542,7 +553,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       : base.estado === 'sin_peso' ? 'sin peso: no se sabe si mantiene el envío gratis' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
-    return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope }
+    return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
+      cambio, antes: cambio ? cand!.precio! : null }
   })
   const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
@@ -558,7 +570,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     window.addEventListener('beforeunload', avisar)
     return () => window.removeEventListener('beforeunload', avisar)
   }, [enviando])
-  const enviar = async (items: { id: string; precio: number; precioAntes: number }[]) => {
+  const enviar = async (items: { id: string; precio: number; precioAntes: number; cambio?: boolean }[]) => {
     if (!camp || !items.length) return
     setEnviando(true); setEnCola(new Set(items.map(x => x.id)))
     type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }
@@ -567,18 +579,23 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     for (let i = 0; i < items.length; i += TANDA) {
       const tanda = items.slice(i, i + TANDA)
       setAvance({ hechas: i, total: items.length })
-      const r = await fetch('/api/promociones/acciones', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'agregar', conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre, estado: camp.estado }, items: tanda }),
-      }).catch(() => null)
-      const d = r ? await r.json().catch(() => ({})) : {}
-      if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: no sigue
-        setEnviando(false); setAvance(null); setEnCola(new Set())
-        return onHecho('', d.error ?? `No se pudo agregar a «${camp.nombre}».`)
+      const res: Res[] = []
+      for (const accion of ['agregar', 'cambiar'] as const) {
+        const parte = tanda.filter(x => !!x.cambio === (accion === 'cambiar')).map(({ cambio: _c, ...x }) => x)
+        if (!parte.length) continue
+        const r = await fetch('/api/promociones/acciones', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion, conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre, estado: camp.estado }, items: parte }),
+        }).catch(() => null)
+        const d = r ? await r.json().catch(() => ({})) : {}
+        if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: no sigue
+          setEnviando(false); setAvance(null); setEnCola(new Set())
+          return onHecho('', d.error ?? `No se pudo agregar a «${camp.nombre}».`)
+        }
+        res.push(...(r?.ok ? d.resultados as Res[]
+          // Sin respuesta (se cortó la espera o la conexión): pudieron haber entrado; no se reintenta solo.
+          : parte.map(x => ({ id: x.id, ok: false, error: 'No llegó la respuesta: puede que haya entrado. Toca «Traer ME y ML» para confirmarlo antes de reintentar.' }))))
       }
-      const res: Res[] = r?.ok ? d.resultados
-        // Sin respuesta (se cortó la espera o la conexión): pudieron haber entrado; no se reintenta solo.
-        : tanda.map(x => ({ id: x.id, ok: false, error: 'No llegó la respuesta: puede que haya entrado. Toca «Traer ME y ML» para confirmarlo antes de reintentar.' }))
       for (const x of res) nuevos[x.id] = x
       todos.push(...res)
       setResultados({ ...nuevos })
@@ -601,7 +618,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       message: `${avisos}\n\n¿Agregar las ${validas.length} igual?`,
       confirmText: `Agregar ${validas.length}`, cancelText: 'Volver a revisar',
     })) return
-    await enviar(validas.map(x => ({ id: x.f.id, precio: x.precio, precioAntes: x.f.precio })))
+    await enviar(validas.map(x => ({ id: x.f.id, precio: x.precio, precioAntes: x.f.precio, cambio: x.cambio })))
   }
   const reintentar = async (f: VistaModal) => {
     const p = reintento[f.id] ?? Math.min(80, modal.pct + 5)
@@ -612,7 +629,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       : e === 'tealca' && f.envioBase.estado === 'ambas' ? `Con ${p}% (${usd(precio)}) pierde ZOOM: queda solo TEALCA.` : null
     if (aviso && !await confirmarAviso({ title: 'Revisa el envío antes de reintentar', message: `${aviso}\n\n¿Reintentar igual?`,
       confirmText: `Reintentar con ${p}%`, cancelText: 'Volver' })) return
-    await enviar([{ id: f.id, precio, precioAntes: f.precio }])
+    await enviar([{ id: f.id, precio, precioAntes: f.precio, cambio: filasPrev.find(x => x.f.id === f.id)?.cambio }])
   }
   const hayResultados = Object.keys(resultados).length > 0
   const resumen = () => {
@@ -634,7 +651,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
         ) : <>
           <div className="flex flex-wrap items-end gap-3 text-sm">
             <label className="space-y-1"><span className="block text-xs text-neutral-500">Campaña</span>
-              <select value={modal.campana} onChange={e => setModal({ ...modal, campana: e.target.value })} className="border border-neutral-300 rounded-lg px-2 py-1.5 min-w-[240px]">
+              <select value={modal.campana} onChange={e => { const c = campanas.find(x => `${x.conexionId}|${x.id}` === e.target.value); setModal({ ...modal, campana: e.target.value, pct: c?.pctDefecto ?? modal.pct }) }} className="border border-neutral-300 rounded-lg px-2 py-1.5 min-w-[240px]">
                 <option value="">Elegir…</option>
                 {opciones.map(({ c, n }) => <option key={c.id} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'} · {n} de {filas.length}</option>)}
               </select>
@@ -723,7 +740,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                               <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
                             </span>
                           )}</span>
-                        : <>{x.motivo ?? (x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
+                        : <>{x.motivo ?? (x.cambio ? `ya está a ${usd(x.antes)} → pasa a ${usd(x.precio)}` : x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
                           {x.advertencia && <span className={`block font-medium ${x.sinGratis ? 'text-red-700' : x.pierdeZoom ? 'text-amber-800' : 'text-neutral-500'}`}>{x.advertencia}</span>}</>}
                     </td>
                     <td className="px-2 py-1.5 text-center">
@@ -756,7 +773,7 @@ const sumarDias = (f: string, n: number) => { const d = new Date(`${f}T12:00:00`
 function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
   cuentas: { id: number; nombre: string }[]; conexionInicial?: number; onCerrar: () => void; onCreada: (nombre: string) => void
 }) {
-  const [f, setF] = useState({ conexionIds: [conexionInicial ?? cuentas[0]?.id].filter(Boolean) as number[], nombre: '', desde: hoyMas(0), hasta: hoyMas(7) })
+  const [f, setF] = useState({ conexionIds: [conexionInicial ?? cuentas[0]?.id].filter(Boolean) as number[], nombre: '', pct: 0, desde: hoyMas(0), hasta: hoyMas(7) })
   const maxHasta = sumarDias(f.desde, MAX_DIAS_CAMPANA - 1)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -791,6 +808,12 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
           <input value={f.nombre} maxLength={60} onChange={e => setF({ ...f, nombre: e.target.value })} placeholder="Quincena noviembre"
             className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
         </label>
+        <label className="block space-y-1"><span className="text-xs text-neutral-500">Descuento que vas a ofrecer (se propone solo al agregar publicaciones; lo puedes cambiar en cada una)</span>
+          <span className="flex items-center gap-1">
+            <input type="number" min={1} max={80} value={f.pct || ''} placeholder="15" onChange={e => setF({ ...f, pct: Math.max(0, Math.min(80, Number(e.target.value) || 0)) })}
+              className="w-20 border border-neutral-300 rounded-lg px-2 py-1.5 text-right" />%
+          </span>
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1"><span className="text-xs text-neutral-500">Desde</span>
             <input type="date" value={f.desde} onChange={e => {
@@ -807,7 +830,7 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
         {error && <p className="text-red-700 text-xs">{error}</p>}
         <div className="flex justify-end gap-2">
           <button onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
-          <button onClick={crear} disabled={enviando || f.nombre.trim().length < 3 || !f.conexionIds.length || f.hasta > maxHasta} className="btn-primary text-sm">
+          <button onClick={crear} disabled={enviando || f.nombre.trim().length < 3 || !f.pct || !f.conexionIds.length || f.hasta > maxHasta} className="btn-primary text-sm">
             {enviando ? 'Creando…' : f.conexionIds.length > 1 ? `Crear en ${f.conexionIds.length} cuentas` : 'Crear en MercadoLibre'}
           </button>
         </div>
@@ -822,7 +845,7 @@ const diaVE = (s: string | null) => s ? new Date(s).toLocaleDateString('en-CA', 
 /** Campaña propia: cambiar nombre y fechas. Ya empezada, ML solo deja cambiar nombre y fin. */
 function EditarCampanaModal({ campana, onCerrar, onHecho }: { campana: CampanaVista; onCerrar: () => void; onHecho: (msg: string) => void }) {
   const empezada = campana.estado === 'started'
-  const [f, setF] = useState({ nombre: campana.nombre, desde: diaVE(campana.inicio), hasta: diaVE(campana.fin) })
+  const [f, setF] = useState({ nombre: campana.nombre, pct: campana.pctDefecto ?? 0, desde: diaVE(campana.inicio), hasta: diaVE(campana.fin) })
   const minDesde = hoyMas(0)
   const maxHasta = sumarDias(f.desde, MAX_DIAS_CAMPANA - 1)
   const [enviando, setEnviando] = useState(false)
@@ -831,7 +854,7 @@ function EditarCampanaModal({ campana, onCerrar, onHecho }: { campana: CampanaVi
     setEnviando(true); setError(null)
     const r = await fetch('/api/promociones/campanas', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conexionId: campana.conexionId, id: campana.id, nombre: f.nombre, desde: empezada ? null : f.desde, hasta: f.hasta }),
+      body: JSON.stringify({ conexionId: campana.conexionId, id: campana.id, nombre: f.nombre, pct: f.pct || null, desde: empezada ? null : f.desde, hasta: f.hasta }),
     })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
@@ -849,6 +872,12 @@ function EditarCampanaModal({ campana, onCerrar, onHecho }: { campana: CampanaVi
           : 'Todavía no empezó: si la pones a empezar hoy, arranca ya y puedes agregarle publicaciones.'}</p>
         <label className="block space-y-1"><span className="text-xs text-neutral-500">Nombre</span>
           <input value={f.nombre} maxLength={60} onChange={e => setF({ ...f, nombre: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+        </label>
+        <label className="block space-y-1"><span className="text-xs text-neutral-500">Descuento por defecto (el que se propone al agregar; para cambiar las que ya están, usa «Cambiar %»)</span>
+          <span className="flex items-center gap-1">
+            <input type="number" min={1} max={80} value={f.pct || ''} placeholder="15" onChange={e => setF({ ...f, pct: Math.max(0, Math.min(80, Number(e.target.value) || 0)) })}
+              className="w-20 border border-neutral-300 rounded-lg px-2 py-1.5 text-right" />%
+          </span>
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1"><span className="text-xs text-neutral-500">Desde</span>
