@@ -50,6 +50,16 @@ const redondear = (n: number) => Math.round(n * 100) / 100
 const PISO_ML = 2
 const precioConPiso = (publicado: number, pct: number) => Math.max(PISO_ML, redondear(publicado * (1 - pct / 100)))
 const pctReal = (publicado: number, precio: number) => publicado > 0 ? (1 - precio / publicado) * 100 : 0
+// Precio de promo que NO le quita el envío gratis (pedido del dueño 17-10): si con el % pedido bajaría del
+// mínimo de TEALCA para su peso, queda justo en ese mínimo = el máximo descuento seguro. Solo para las que
+// hoy tienen envío gratis; perder solo ZOOM no se ajusta (es advertencia). `sinMargen`: ya está en el mínimo.
+const precioSeguro = (publicado: number, pct: number, base: { estado: EstadoEnvio; minTealca: number | null }) => {
+  const pedido = precioConPiso(publicado, pct)
+  const min = base.estado === 'ambas' || base.estado === 'tealca' ? base.minTealca : null
+  if (min == null || pedido >= min) return { precio: pedido, ajustada: false, sinMargen: false }
+  if (publicado <= min) return { precio: publicado, ajustada: false, sinMargen: true }
+  return { precio: Math.max(PISO_ML, redondear(min)), ajustada: true, sinMargen: false }
+}
 const hoyMas = (dias: number) => { const d = new Date(); d.setDate(d.getDate() + dias); return d.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }) }
 const clave = (f: { conexionId: number; id: string }) => `${f.conexionId}|${f.id}`
 
@@ -138,11 +148,11 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     if (p?.estado === 'started') return false
     if (c.tipo !== 'SELLER_CAMPAIGN' && p?.estado !== 'candidate') return false
     if (v.precio <= PISO_ML) return false
-    const precio = precioConPiso(v.precio, pctDe(c))
-    if (p?.minimo != null && precio < p.minimo) return false
     if (v.envioBase.estado === 'sin_peso') return false
-    const despues = envioPorTransportista(v.peso, precio).estado
-    return !(despues === 'destino' && v.envioBase.estado !== 'destino')
+    // Con el máximo seguro: las que no aguantarían el % se proponen ajustadas (si aguantan al menos 1%).
+    const s = precioSeguro(v.precio, pctDe(c), v.envioBase)
+    if (s.sinMargen || pctReal(v.precio, s.precio) < 1) return false
+    return !(p?.minimo != null && s.precio < p.minimo)
   })
 
   const [campCon, campId] = campana ? campana.split('|') : ['', '']
@@ -524,8 +534,11 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const sinEmpezar = !!camp && camp.estado !== 'started'
 
   const filasPrev = filas.map(f => {
-    const precio = precioConPiso(f.precio, modal.pct)
-    const enPiso = f.precio > PISO_ML && precio === PISO_ML && redondear(f.precio * (1 - modal.pct / 100)) < PISO_ML
+    const seguro = conPierden ? { precio: precioConPiso(f.precio, modal.pct), ajustada: false, sinMargen: false }
+      : precioSeguro(f.precio, modal.pct, f.envioBase)
+    const precio = seguro.precio
+    const ajustada = seguro.ajustada
+    const enPiso = !ajustada && f.precio > PISO_ML && precio === PISO_ML && redondear(f.precio * (1 - modal.pct / 100)) < PISO_ML
     const bajoPiso = f.precio <= PISO_ML
     const cand = camp ? f.promos.find(p => p.campana === camp.id) : undefined
     const yaAdentro = cand?.estado === 'started'
@@ -546,15 +559,16 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const tope = base.estado === 'ambas' || base.estado === 'tealca' ? topeDescuento(f.precio, base.minTealca) : null
     const motivo = !camp ? null : yaAdentro && !cambio ? `ya está en esta campaña${cand?.precio != null ? ` a ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la ofrece para esta publicación'
       : bajoPiso ? `publicada en ${usd(f.precio)}: ML no acepta promociones por debajo de $${PISO_ML}` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
-      : sinGratis && !conPierden ? `con ${modal.pct}% queda sin envío gratis${tope != null ? ` · aguanta hasta ${String(tope).replace('.', ',')}%` : ''}` : null
+      : seguro.sinMargen ? 'ya está en el mínimo del envío gratis: no aguanta descuento sin perderlo' : null
     const advertencia = motivo ? null
+      : ajustada ? `ajustada a −${pct(pctReal(f.precio, precio))}: es lo máximo que aguanta sin perder el envío gratis (con ${modal.pct}% lo perdía)`
       : pierdeZoom ? `⚠ pierde ZOOM: queda solo TEALCA${topeZoom != null ? ` (con ZOOM aguanta hasta ${String(topeZoom).replace('.', ',')}%)` : ''}`
       : sinGratis ? '⚠ queda sin envío gratis (cobro a destino)'
       : base.estado === 'sin_peso' ? 'sin peso: no se sabe si mantiene el envío gratis' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
     return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
-      cambio, antes: cambio ? cand!.precio! : null }
+      cambio, antes: cambio ? cand!.precio! : null, ajustada }
   })
   const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
@@ -678,13 +692,15 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
               </div>
             </div>
           )}
-          {camp && filasPrev.some(x => x.sinGratis && !resultados[x.f.id]) && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>Con <b>{modal.pct}%</b>, <b>{filasPrev.filter(x => x.sinGratis && !resultados[x.f.id]).length}</b> quedarían SIN envío gratis
-                (bajan del mínimo de TEALCA para su peso){conPierden ? ' y se agregan igual.' : ': no se agregan.'}</span>
+          {camp && filasPrev.some(x => (x.ajustada || x.sinGratis) && !resultados[x.f.id]) && (
+            <div className={`rounded-lg border px-3 py-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1 ${conPierden ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+              {conPierden
+                ? <span>Con <b>{modal.pct}%</b>, <b>{filasPrev.filter(x => x.sinGratis && !resultados[x.f.id]).length}</b> quedan SIN envío gratis (cobro a destino).</span>
+                : <span><b>{filasPrev.filter(x => x.ajustada && !resultados[x.f.id]).length}</b> se ajustan solas al máximo descuento que aguantan sin perder el envío gratis
+                    (con {modal.pct}% lo perdían). Lo ves en la columna «Nuevo».</span>}
               <label className="flex items-center gap-1.5 ml-auto">
                 <input type="checkbox" checked={conPierden} onChange={e => setConPierden(e.target.checked)} />
-                Agregarlas igual
+                Aplicar el {modal.pct}% completo igual
               </label>
             </div>
           )}
@@ -716,6 +732,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                     <td className="px-2 py-1.5 max-w-[260px] truncate" title={x.f.titulo}>{x.f.titulo}</td>
                     <td className="px-2 py-1.5 text-right">{usd(x.f.precio)}</td>
                     <td className="px-2 py-1.5 text-right font-medium">{usd(x.precio)}
+                      {x.ajustada && <span className="block text-[11px] font-normal text-emerald-700" title="Máximo descuento sin perder el envío gratis">máx. seguro · −{pct(pctReal(x.f.precio, x.precio))}</span>}
                       {x.enPiso && <span className="block text-[11px] font-normal text-sky-700" title={`ML no deja bajar de $${PISO_ML}: queda en el piso`}>piso $2 · −{pct(pctReal(x.f.precio, x.precio))}</span>}
                     </td>
                     <td className="px-2 py-1.5">
@@ -741,7 +758,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                             </span>
                           )}</span>
                         : <>{x.motivo ?? (x.cambio ? `ya está a ${usd(x.antes)} → pasa a ${usd(x.precio)}` : x.otra ? `también en «${x.otra.nombre}» (${usd(x.otra.precio)})` : '')}
-                          {x.advertencia && <span className={`block font-medium ${x.sinGratis ? 'text-red-700' : x.pierdeZoom ? 'text-amber-800' : 'text-neutral-500'}`}>{x.advertencia}</span>}</>}
+                          {x.advertencia && <span className={`block font-medium ${x.ajustada ? 'text-emerald-700' : x.sinGratis ? 'text-red-700' : x.pierdeZoom ? 'text-amber-800' : 'text-neutral-500'}`}>{x.advertencia}</span>}</>}
                     </td>
                     <td className="px-2 py-1.5 text-center">
                       {!resultados[x.f.id] && (
