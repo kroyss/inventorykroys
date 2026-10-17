@@ -26,7 +26,8 @@ interface Pregunta {
   producto_precio: number | null
   comprador_id: string | null; previas: number
   item_precio: number | null; item_precio_original: number | null; item_moneda: string | null
-  item_peso?: number | null    // peso del portal de MercadoEnvíos (para el envío gratis por transportista)
+  item_peso?: number | null    // peso del portal de MercadoEnvíos o del producto (para el envío gratis por transportista)
+  envio_activo?: boolean       // la empresa tiene Promociones: se muestra el envío gratis (o que falta el peso)
 }
 
 // Precio para decidir (regla de los $3, respuesta rápida en verde): SOLO el de MercadoLibre
@@ -166,7 +167,11 @@ function Precio({ p, umbral }: { p: Pregunta; umbral: number | null }) {
  *  Cuando la promoción termina el precio vuelve (se relee cada 30 min) y esto cambia solo. */
 function EnvioGratis({ p }: { p: Pregunta }) {
   const e = envioGratisAhora(p.item_peso, precioUSD(p), p.item_precio_original)
-  if (!e) return null
+  if (!e) return p.envio_activo && precioUSD(p) ? (
+    <span className="text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ring-neutral-200 text-neutral-400 whitespace-nowrap"
+      title="Esta publicación no tiene peso: no está en el portal de MercadoEnvíos (pausada o sin envío configurado) ni vinculada a un producto con peso">
+      Envío: sin peso
+    </span>) : null
   const estilo = e.estado === 'ambas' ? 'text-emerald-800 bg-emerald-50 ring-emerald-200'
     : e.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'
   const txt = e.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : e.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA' : '⚠ Sin envío gratis'

@@ -7,7 +7,7 @@
 //   - ML descarta textos con links externos o datos de contacto: se revisan antes;
 //   - las preguntas de publicaciones pausadas no salen en el panel de ML pero la API sí
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
-import { empresaConPromociones } from '@/lib/promocionesSesion'
+import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { envioGratisAhora } from '@/lib/mlShipping'
 import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
@@ -244,7 +244,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Envío gratis por transportista: solo empresas con Promociones (las demás, como antes).
   let envio: ReturnType<typeof envioGratisAhora> = null
   if ((q.item_moneda ?? 'USD') === 'USD' && await empresaConPromociones(db)) {
-    const { rows: [peso] } = await db.query(`SELECT peso_kg::float AS kg FROM me_productos WHERE publicacion = $1`, [q.item_id]).catch(() => ({ rows: [] }))
+    const { rows: [peso] } = await db.query(`SELECT ${sqlPesoPublicacion('$1::text')} AS kg`, [q.item_id]).catch(() => ({ rows: [] }))
     envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original)
   }
   const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)

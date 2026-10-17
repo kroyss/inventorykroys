@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
     // La venta: primero de lo sincronizado (sin llamar a ML); si no está, se busca en las cuentas.
     let { rows: [v] } = await s.db.query(
       `SELECT conexion_id, COALESCE(pack_id, id)::text AS pack, comprador, comprador_nombre, productos
-       FROM ml_ordenes WHERE id = $1::bigint OR pack_id = $1::bigint ORDER BY (id = $1::bigint) DESC LIMIT 1`, [numero])
+       FROM ((SELECT *, 0 AS orden FROM ml_ordenes WHERE id = $1::bigint LIMIT 1)
+             UNION ALL (SELECT *, 1 FROM ml_ordenes WHERE pack_id = $1::bigint LIMIT 1)) o ORDER BY orden LIMIT 1`, [numero])
     if (!v) {
       const conexionId = await conexionDeVenta(s.db, numero)
       if (!conexionId) return NextResponse.json({ error: 'No se encontró en tus cuentas de MercadoLibre' }, { status: 404 })
@@ -42,7 +43,8 @@ export async function GET(req: NextRequest) {
          SELECT l.generated_at AS despachada_at FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
          WHERE e.venta = c.pack_id::text AND e.impresa AND l.status = 'GENERADO' ORDER BY l.generated_at DESC LIMIT 1
        ) d ON TRUE
-       LEFT JOIN LATERAL (SELECT estado FROM ml_ordenes WHERE id = c.pack_id OR pack_id = c.pack_id LIMIT 1) o ON TRUE
+       LEFT JOIN LATERAL (SELECT * FROM ((SELECT estado FROM ml_ordenes WHERE id = c.pack_id LIMIT 1)
+         UNION ALL (SELECT estado FROM ml_ordenes WHERE pack_id = c.pack_id LIMIT 1)) u LIMIT 1) o ON TRUE
        WHERE c.pack_id = $1::bigint`, [v.pack, tieneModulo(s.session.user, 'despachos')])
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     return NextResponse.json({ conversacion, rapidas: leerMensajesRapidos(pl?.value), puedeEscribir: puede(s.session.user, 'ver_mensajes') })

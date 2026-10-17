@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { sugerenciasPara } from '@/lib/sugerenciasServidor'
 import { apiError } from '@/lib/apiError'
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
     const { rows } = await s.db.query(
       `SELECT p.id::text, p.item_id, p.item_titulo, p.item_permalink, p.item_estado, p.item_imagen, p.item_variantes, p.texto, p.estado,
               p.item_precio::float, p.item_precio_original::float, p.item_moneda,
-              ${conEnvio ? '(SELECT mp.peso_kg::float FROM me_productos mp WHERE mp.publicacion = p.item_id)' : 'NULL::float'} AS item_peso,
+              ${conEnvio ? sqlPesoPublicacion('p.item_id') : 'NULL::float'} AS item_peso, ${conEnvio ? 'TRUE' : 'FALSE'} AS envio_activo,
               p.fecha, p.respuesta, p.respuesta_estado, p.respuesta_fecha, p.comprador_id::text,
               (SELECT COUNT(*)::int FROM ml_preguntas q WHERE q.comprador_id = p.comprador_id AND q.id <> p.id) AS previas,
               (SELECT COUNT(*)::int FROM ml_item_notas n WHERE n.item_id = p.item_id) AS datos_guardados,

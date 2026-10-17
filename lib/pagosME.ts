@@ -42,8 +42,8 @@ export const SELECT_PAGOS = `
          p.verificacion, u.username AS verificado_por, p.verificado_at, p.nota,
          s.id AS sale_id, s.status AS sale_status, s.total_amount::float AS sale_total,
          EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta) AS en_despachos,
-         (SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num OR o.pack_id = v.num
-           ORDER BY (o.id = v.num) DESC LIMIT 1) AS ml_estado
+         (SELECT u.estado FROM ((SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num LIMIT 1)
+           UNION ALL (SELECT o.estado FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) u LIMIT 1) AS ml_estado
   FROM me_pagos p
   CROSS JOIN LATERAL (SELECT CASE WHEN p.venta ~ '^[0-9]{1,18}$' THEN p.venta::bigint END AS num) v
   LEFT JOIN users u ON u.id = p.verificado_por
@@ -192,7 +192,8 @@ export async function verificarCuenta(db: Pool, perfil: string, cuentaPortal: st
     const { rows } = await db.query(
       `SELECT o.conexion_id, x.nickname, COUNT(DISTINCT v.n)::int AS n
        FROM unnest($1::bigint[]) AS v(n)
-       JOIN ml_ordenes o ON o.id = v.n OR o.pack_id = v.n
+       JOIN LATERAL (SELECT * FROM ((SELECT conexion_id FROM ml_ordenes WHERE id = v.n LIMIT 1)
+         UNION ALL (SELECT conexion_id FROM ml_ordenes WHERE pack_id = v.n LIMIT 1)) u LIMIT 1) o ON TRUE
        JOIN ml_conexiones x ON x.id = o.conexion_id
        GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 1`, [nums])
     if (rows[0]) {

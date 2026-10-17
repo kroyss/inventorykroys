@@ -50,8 +50,12 @@ export async function GET(req: NextRequest) {
          SELECT l.generated_at AS despachada_at FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
          WHERE e.venta = c.pack_id::text AND e.impresa AND l.status = 'GENERADO' ORDER BY l.generated_at DESC LIMIT 1
        ) d ON TRUE
-       LEFT JOIN LATERAL (
-         SELECT estado, split_part(items[1], ':', 1) AS item FROM ml_ordenes WHERE id = c.pack_id OR pack_id = c.pack_id LIMIT 1
+       -- La venta: por número y, si no, por paquete (un OR entre las dos columnas recorría todas las ventas
+       -- por cada conversación: Atendidas 1,8 s por página → 0,1 s, 17-10).
+       LEFT JOIN LATERAL (SELECT * FROM (
+         (SELECT estado, split_part(items[1], ':', 1) AS item FROM ml_ordenes WHERE id = c.pack_id LIMIT 1)
+         UNION ALL
+         (SELECT estado, split_part(items[1], ':', 1) AS item FROM ml_ordenes WHERE pack_id = c.pack_id LIMIT 1)) u LIMIT 1
        ) o ON TRUE
        -- Foto del primer producto, de lo ya guardado (catálogo o preguntas): la lista no consulta a ML.
        LEFT JOIN LATERAL (

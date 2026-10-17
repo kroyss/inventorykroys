@@ -21,3 +21,12 @@ export async function empresaConPromociones(db: Pool) {
      WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int`).catch(() => ({ rows: [] as { si: boolean }[] }))
   return !!e?.si
 }
+
+/** SQL del peso (kg) de una publicación para el envío gratis por transportista: el del portal de MercadoEnvíos
+ *  (el de la publicación) o, si no está ahí (pausadas o sin envío configurado, 17-10), el del producto vinculado
+ *  (solo publicaciones de 1 unidad). `col` = la columna o expresión con el id "MLV…". */
+export const sqlPesoPublicacion = (col: string) => `COALESCE(
+  (SELECT mp.peso_kg::float FROM me_productos mp WHERE mp.publicacion = ${col} AND mp.peso_kg > 0),
+  (SELECT MAX(pd.weight_kg)::float FROM product_ml_codes pm JOIN products pd ON pd.id = pm.product_id
+   WHERE pm.is_active AND pm.unidades = 1 AND pd.weight_kg > 0
+     AND split_part(pm.ml_code, ':', 1) = regexp_replace(${col}, '^[A-Z]{3}', '')))`

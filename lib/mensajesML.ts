@@ -4,7 +4,7 @@
 // [{ resource: '/packs/{pack}/sellers/{seller}', count }]. Leer una conversación con
 // mark_as_read=false NO la marca como leída (así ML sigue avisando en su app); se marca
 // al responder o con el botón "Marcar como leída".
-import { empresaConPromociones } from '@/lib/promocionesSesion'
+import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { envioGratisAhora } from '@/lib/mlShipping'
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
@@ -255,7 +255,7 @@ export interface ItemVenta { id: string; titulo: string; variante: string | null
    *  trae, Bs ÷ tasa BCV del día de la venta (usd_aprox). */
   usd?: number | null; usd_aprox?: boolean
   /** Envío gratis de esta compra según el precio pagado y el peso del portal (ZOOM y TEALCA / solo TEALCA / destino). */
-  envio?: { estado: 'ambas' | 'tealca' | 'destino'; texto: string } | null }
+  envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
@@ -282,12 +282,17 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
   await Promise.all(items.map(async it => { it.imagen = await imagenDeItem(db, conexionId, it.id, it.varId).catch(() => null) }))
   // Peso del portal de MercadoEnvíos (el de la publicación; un combo trae el suyo): con lo que pagó por todas las unidades.
   // Solo empresas con Promociones (las demás, como antes).
-  const { rows: pesos } = !(await empresaConPromociones(db)) ? { rows: [] as { publicacion: string; kg: number }[] } : await db.query(`SELECT publicacion, peso_kg::float AS kg FROM me_productos WHERE publicacion = ANY($1)`,
-    [items.map(it => it.id)]).catch(() => ({ rows: [] as { publicacion: string; kg: number }[] }))
+  // Sin peso en el portal (pausada o sin envío configurado): el del producto vinculado; si tampoco hay, se avisa.
+  const conEnvio = await empresaConPromociones(db)
+  const { rows: pesos } = !conEnvio ? { rows: [] as { publicacion: string; kg: number | null }[] } : await db.query(
+    `SELECT x AS publicacion, ${sqlPesoPublicacion('x')} AS kg FROM unnest($1::text[]) x`,
+    [[...new Set(items.map(it => it.id))]]).catch(() => ({ rows: [] as { publicacion: string; kg: number | null }[] }))
   for (const it of items) {
+    if (!conEnvio || !it.usd) { it.envio = null; continue }
     const kg = pesos.find(p => p.publicacion === it.id)?.kg
-    const e = kg && it.usd ? envioGratisAhora(kg * it.cantidad, it.usd * it.cantidad) : null
-    it.envio = e ? { estado: e.estado, texto: e.texto } : null
+    const e = kg ? envioGratisAhora(kg * it.cantidad, it.usd * it.cantidad) : null
+    it.envio = e ? { estado: e.estado, texto: e.texto }
+      : { estado: 'sin_peso', texto: 'Sin peso: no está en el portal de MercadoEnvíos ni vinculada a un producto con peso' }
   }
   return { items: items.map(({ varId: _v, ...it }) => it), comprador }
 }

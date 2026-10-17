@@ -207,7 +207,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null
-    envio?: { estado: 'ambas' | 'tealca' | 'destino'; texto: string } | null }[] | null>(null)
+    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
@@ -372,8 +372,10 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
                   {it.envio && (
                     <span title={it.envio.texto} className={`ml-2 text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${
                       it.envio.estado === 'ambas' ? 'text-emerald-800 bg-emerald-50 ring-emerald-200'
-                        : it.envio.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'}`}>
-                      {it.envio.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : it.envio.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA' : '⚠ Sin envío gratis'}
+                        : it.envio.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold'
+                        : it.envio.estado === 'sin_peso' ? 'text-neutral-400 ring-neutral-200' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'}`}>
+                      {it.envio.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : it.envio.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA'
+                        : it.envio.estado === 'sin_peso' ? 'Envío: sin peso' : '⚠ Sin envío gratis'}
                     </span>
                   )}
                 </p>
