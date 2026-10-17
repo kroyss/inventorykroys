@@ -542,22 +542,39 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   })
   const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
+  // De a TANDA por pedido (2026-10-17): cada publicación tarda ~2 s (se agrega y se comprueba con el precio
+  // real) y el servidor corta la espera al minuto; con 28 de una vez la pantalla perdía la respuesta.
+  const TANDA = 10
+  const [avance, setAvance] = useState<{ hechas: number; total: number } | null>(null)
   const enviar = async (items: { id: string; precio: number; precioAntes: number }[]) => {
     if (!camp || !items.length) return
     setEnviando(true)
-    const r = await fetch('/api/promociones/acciones', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accion: 'agregar', conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre, estado: camp.estado }, items }),
-    })
-    const d = await r.json().catch(() => ({}))
-    setEnviando(false)
-    if (!r.ok) return onHecho('', d.error ?? `MercadoLibre no respondió al agregar a «${camp.nombre}». Prueba de nuevo en un momento.`)
-    const res = d.resultados as { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }[]
+    type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }
+    const todos: Res[] = []
     const nuevos = { ...resultados }
-    for (const x of res) nuevos[x.id] = x
-    setResultados(nuevos)
+    for (let i = 0; i < items.length; i += TANDA) {
+      const tanda = items.slice(i, i + TANDA)
+      setAvance({ hechas: i, total: items.length })
+      const r = await fetch('/api/promociones/acciones', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'agregar', conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre, estado: camp.estado }, items: tanda }),
+      }).catch(() => null)
+      const d = r ? await r.json().catch(() => ({})) : {}
+      if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: no sigue
+        setEnviando(false); setAvance(null)
+        return onHecho('', d.error ?? `No se pudo agregar a «${camp.nombre}».`)
+      }
+      const res: Res[] = r?.ok ? d.resultados
+        // Sin respuesta (se cortó la espera o la conexión): pudieron haber entrado; no se reintenta solo.
+        : tanda.map(x => ({ id: x.id, ok: false, error: 'No llegó la respuesta: puede que haya entrado. Toca «Traer ME y ML» para confirmarlo antes de reintentar.' }))
+      for (const x of res) nuevos[x.id] = x
+      todos.push(...res)
+      setResultados({ ...nuevos })
+    }
+    setEnviando(false); setAvance(null)
     // Todo bien: se cierra. Con errores queda abierto para ver el motivo y reintentar a mano.
-    if (res.every(x => x.ok) && !res.some(x => x.manda)) onHecho(`${d.ok} agregada${d.ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${d.ok === 1 ? '' : 's'} en MercadoLibre.`)
+    const ok = todos.filter(x => x.ok).length
+    if (todos.every(x => x.ok) && !todos.some(x => x.manda)) onHecho(`${ok} agregada${ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${ok === 1 ? '' : 's'} en MercadoLibre.`)
   }
   const confirmar = async () => {
     const sinGratis = validas.filter(x => x.sinGratis).length
@@ -698,7 +715,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
             <button onClick={() => setModal(null)} className="btn-ghost text-sm">Cancelar</button>
             {hayResultados && <button onClick={() => onHecho(resumen())} className="btn-secondary text-sm">Terminar</button>}
             <button onClick={confirmar} disabled={!camp || sinEmpezar || !validas.length || enviando} className="btn-primary text-sm">
-              {enviando ? 'Agregando y comprobando…' : `Agregar ${validas.length} a la campaña`}
+              {enviando ? (avance && avance.total > TANDA ? `Agregando… ${avance.hechas} de ${avance.total}` : 'Agregando y comprobando…') : `Agregar ${validas.length} a la campaña`}
             </button>
           </div>
         </>}
