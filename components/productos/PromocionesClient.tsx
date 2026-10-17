@@ -432,8 +432,8 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                           {v.quitaEnvio && <div className="mt-0.5 text-red-700 font-medium">⚠ La promo le quita el envío gratis</div>}
                           {/* Botón chico con borde (antes un enlace gris que se confundía con texto, 2026-10-17). */}
                           <button onClick={() => sacar(v, v.enPromo!)} disabled={!!busy}
-                            className="mt-1 inline-flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
-                            {busy === `sacar-${k}` ? 'Sacando…' : '✕ Sacar de la promo'}
+                            className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
+                            {busy === `sacar-${k}` ? 'Quitando…' : '✕ Quitar promo'}
                           </button>
                         </> : (!v.programadas.length && <span className="text-neutral-400">—</span>)}
                         {v.programadas.map(p => (
