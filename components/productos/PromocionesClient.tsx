@@ -546,9 +546,17 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   // real) y el servidor corta la espera al minuto; con 28 de una vez la pantalla perdía la respuesta.
   const TANDA = 10
   const [avance, setAvance] = useState<{ hechas: number; total: number } | null>(null)
+  const [enCola, setEnCola] = useState<Set<string>>(new Set())
+  // Mientras agrega no se cierra (cerrar o recargar cortaba las tandas que faltaban, 2026-10-17).
+  useEffect(() => {
+    if (!enviando) return
+    const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [enviando])
   const enviar = async (items: { id: string; precio: number; precioAntes: number }[]) => {
     if (!camp || !items.length) return
-    setEnviando(true)
+    setEnviando(true); setEnCola(new Set(items.map(x => x.id)))
     type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }
     const todos: Res[] = []
     const nuevos = { ...resultados }
@@ -561,7 +569,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       }).catch(() => null)
       const d = r ? await r.json().catch(() => ({})) : {}
       if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: no sigue
-        setEnviando(false); setAvance(null)
+        setEnviando(false); setAvance(null); setEnCola(new Set())
         return onHecho('', d.error ?? `No se pudo agregar a «${camp.nombre}».`)
       }
       const res: Res[] = r?.ok ? d.resultados
@@ -570,8 +578,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       for (const x of res) nuevos[x.id] = x
       todos.push(...res)
       setResultados({ ...nuevos })
+      setAvance({ hechas: Math.min(i + TANDA, items.length), total: items.length })
     }
-    setEnviando(false); setAvance(null)
+    setEnviando(false); setAvance(null); setEnCola(new Set())
     // Todo bien: se cierra. Con errores queda abierto para ver el motivo y reintentar a mano.
     const ok = todos.filter(x => x.ok).length
     if (todos.every(x => x.ok) && !todos.some(x => x.manda)) onHecho(`${ok} agregada${ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${ok === 1 ? '' : 's'} en MercadoLibre.`)
@@ -609,11 +618,12 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => hayResultados ? onHecho(resumen()) : setModal(null)}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { if (!enviando) { if (hayResultados) onHecho(resumen()); else setModal(null) } }}>
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-4 space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Agregar a una campaña · vista previa</h2>
-          <button onClick={() => setModal(null)} className="text-neutral-500 text-sm">Cerrar ✕</button>
+          <button onClick={() => { if (hayResultados) onHecho(resumen()); else setModal(null) }} disabled={enviando}
+            title={enviando ? 'Espera a que termine de agregar' : undefined} className="text-neutral-500 text-sm disabled:opacity-40">Cerrar ✕</button>
         </div>
         {mezcla ? (
           <p className="text-sm text-red-700">Elegiste publicaciones de más de una cuenta. Las campañas son de cada cuenta: filtra por una cuenta y vuelve a seleccionar.</p>
@@ -636,6 +646,17 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
             </label>
             <span className="text-xs text-neutral-500 pb-2">{camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}</span>
           </div>
+          {enviando && avance && (
+            <div className="sticky top-0 z-10 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>Agregando a «{camp?.nombre}»: <b>{avance.hechas} de {avance.total}</b> listas. <b>No cierres esta ventana</b> hasta que termine.</span>
+                <span className="text-xs text-sky-700">≈ {Math.max(1, Math.ceil((avance.total - avance.hechas) * 2.3 / 60))} min</span>
+              </div>
+              <div className="mt-1.5 h-1.5 rounded-full bg-sky-100 overflow-hidden">
+                <div className="h-full bg-sky-600 transition-all" style={{ width: `${Math.round(avance.hechas / avance.total * 100)}%` }} />
+              </div>
+            </div>
+          )}
           {camp && filasPrev.some(x => x.sinGratis && !resultados[x.f.id]) && (
             <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>Con <b>{modal.pct}%</b>, <b>{filasPrev.filter(x => x.sinGratis && !resultados[x.f.id]).length}</b> quedarían SIN envío gratis
@@ -684,7 +705,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                       {x.margen == null ? '—' : pct(x.margen)}
                     </td>
                     <td className="px-2 py-1.5 text-neutral-500">
-                      {resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}
+                      {enviando && enCola.has(x.f.id) && !resultados[x.f.id] ? <span className="text-sky-700">⏳ en cola…</span>
+                        : resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}
                           {resultados[x.f.id].manda != null && <span className="block text-amber-700">Hoy manda otra promoción más baja ({usd(resultados[x.f.id].manda)}): esta se aplica cuando aquella termine.</span>}</span>
                         : resultados[x.f.id] ? <span className="text-red-700">{resultados[x.f.id].error}
                           {resultados[x.f.id].noCreible && (
@@ -713,7 +735,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
           </div>
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setModal(null)} className="btn-ghost text-sm">Cancelar</button>
-            {hayResultados && <button onClick={() => onHecho(resumen())} className="btn-secondary text-sm">Terminar</button>}
+            {hayResultados && <button onClick={() => onHecho(resumen())} disabled={enviando} className="btn-secondary text-sm">Terminar</button>}
             <button onClick={confirmar} disabled={!camp || sinEmpezar || !validas.length || enviando} className="btn-primary text-sm">
               {enviando ? (avance && avance.total > TANDA ? `Agregando… ${avance.hechas} de ${avance.total}` : 'Agregando y comprobando…') : `Agregar ${validas.length} a la campaña`}
             </button>
