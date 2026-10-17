@@ -30,6 +30,9 @@ export default function EspacioSwitcher({ automatizaciones, inventario, modulos,
   const avisos = useAvisos()
   const urgentesAuto = avisos.preguntas + avisos.mensajes + avisos.negativas
   const totalAuto = urgentesAuto + avisos.reportador + avisos.calificaciones + avisos.despachos
+  // El número del espacio (17-10): en rojo solo lo urgente (preguntas, mensajes, negativas); lo que puede esperar
+  // (calificaciones, guías, despachos) solo cuenta, en gris, cuando no hay nada urgente. Antes sumaba todo en rojo.
+  const numeroAuto = urgentesAuto > 0 ? urgentesAuto : totalAuto
   const caja = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -80,7 +83,7 @@ export default function EspacioSwitcher({ automatizaciones, inventario, modulos,
               <span className="flex-1 min-w-0">
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-neutral-800">
                   {NOMBRES[o.id]}
-                  {o.id === 'automatizaciones' && <Numerito n={totalAuto} urgente={urgentesAuto > 0} />}
+                  {o.id === 'automatizaciones' && <Numerito n={numeroAuto} urgente={urgentesAuto > 0} />}
                 </span>
                 <span className="block text-xs text-neutral-500">{o.desc}</span>
               </span>
