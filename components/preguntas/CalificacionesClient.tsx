@@ -255,15 +255,15 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       </td>
                       <td className="px-3 py-2 text-neutral-700">{o.comprador ?? '—'}
                         {o.cal_comprador && <div className="text-xs text-neutral-400">te calificó {RATING[o.cal_comprador] ?? o.cal_comprador}</div>}
-                        {/* Antes de calificar: ¿el comprador escribió? Se abre la conversación sin salir a ML. */}
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          {o.chat && (
-                            <span className={`text-xs ${o.chat.comprador ? 'font-medium text-sky-800' : 'text-neutral-500'}`}
-                              title={o.chat.comprador ? 'El último mensaje de esta venta es del comprador' : 'El último mensaje de esta venta es tuyo'}>
-                              {o.chat.comprador ? '💬 Escribió' : '💬 Hay mensajes'} · {new Date(o.chat.at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}
-                            </span>
-                          )}
-                          <LoQueSeHablo numero={o.id} compacto etiqueta="Ver mensajes" />
+                        {/* Antes de calificar: ¿el comprador escribió? Un chip que abre la conversación sin salir a ML
+                            (azul = el último mensaje es del comprador; gris = tuyo; clarito = sin mensajes). */}
+                        <div className="mt-1">
+                          <LoQueSeHablo numero={o.id} chip
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors ${
+                              o.chat?.comprador ? 'bg-sky-50 text-sky-800 ring-sky-200 font-medium hover:bg-sky-100'
+                                : o.chat ? 'bg-neutral-50 text-neutral-600 ring-neutral-200 hover:bg-neutral-100'
+                                : 'text-neutral-400 ring-neutral-200 hover:text-neutral-600 hover:bg-neutral-50'}`}
+                            etiqueta={<>💬 {o.chat ? <>{o.chat.comprador ? 'Escribió' : 'Mensajes'} · {new Date(o.chat.at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</> : 'Ver chat'} ›</>} />
                         </div>
                       </td>
                       <td className="px-3 py-2 text-neutral-700 max-w-[28rem]"><span className="line-clamp-2">{o.productos}</span></td>
