@@ -293,7 +293,10 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
       }
       const r = await fetch(`/api/mensajes/${c.pack_id}`, init)
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) { setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ')); return }
+      if (!r.ok) {
+        setError([d.error, ...(d.problemas ?? [])].filter(Boolean).join(' · ') + (d.detalleML ? `\n(Detalle de MercadoLibre: ${d.detalleML})` : ''))
+        return
+      }
       if (archivos.length) {
         setRecienEnviados(archivos.map(f => ({ url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null, nombre: f.name })))
         for (const ms of [4000, 12000]) setTimeout(() => { leer() }, ms)
@@ -476,7 +479,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             {meta.falta && <span className="text-neutral-600">No encontré: <b>{meta.falta}</b></span>}
           </div>
         )}
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-red-600 whitespace-pre-line">{error}</p>}
         {/* flex-wrap: en celular "Proponer con IA" y "Responder" bajan de línea en vez de ensanchar la página. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { OrigenRespuesta, registrarOrigen } from '@/lib/respuestasOrigen'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
-import { ErrorML } from '@/lib/ml'
+import { CuentaDesconectada, ErrorML } from '@/lib/ml'
 import { itemsDeVenta, leerHilo, responderHilo, subirAdjunto } from '@/lib/mensajesML'
 import { preguntasDeComprador } from '@/lib/preguntasComprador'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
@@ -85,12 +85,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
       if (texto) await registrarOrigen(s.db, { modulo: 'mensajes', ref: pack, fuente, base, texto, usuarioId: s.session.user.id })
       return NextResponse.json({ cuenta: c.nickname, ...h })
     } catch (e) {
+      // Que nunca parezca que "se cayó el sistema" (2026-10-17, caso de un comprador que bloqueó el chat):
+      // ML no avisa el bloqueo en el estado de la conversación (sigue "active"); solo rechaza el envío.
+      if (e instanceof CuentaDesconectada) {
+        return NextResponse.json({ error: `La cuenta ${c.nickname} se desconectó de MercadoLibre: vuelve a conectarla en Cuentas de MercadoLibre.` }, { status: 502 })
+      }
       if (e instanceof ErrorML) {
-        // Por si MercadoLibre exige texto junto al archivo: se dice claro en vez del error crudo.
+        // Registro interno con la respuesta exacta de ML (sin el texto del mensaje): para conocer el código
+        // del bloqueo por el comprador y poder decirlo tal cual.
+        console.warn('[ML mensaje rechazado]', JSON.stringify({ pack, cuenta: c.nickname, status: e.status, datos: e.datos }).slice(0, 800))
         const error = !texto && archivos.length && e.status === 400
+          // Por si MercadoLibre exige texto junto al archivo: se dice claro en vez del error crudo.
           ? 'MercadoLibre no aceptó el archivo sin texto: escribe al menos una palabra y vuelve a enviar'
-          : e.message
-        return NextResponse.json({ error, detalle: e.datos }, { status: 502 })
+          : e.status === 401
+          ? `La cuenta ${c.nickname} se desconectó de MercadoLibre: vuelve a conectarla en Cuentas de MercadoLibre.`
+          : e.status === 429 || e.status >= 500
+          ? 'MercadoLibre está con fallas en este momento (no es el sistema): intenta de nuevo en unos minutos.'
+          : 'MercadoLibre no dejó enviar este mensaje. Suele pasar cuando el comprador bloqueó el chat o cuando ML cerró '
+            + 'la conversación (por un reclamo o porque pasó el plazo). El sistema sigue conectado: revisa esta conversación en la app de MercadoLibre.'
+        return NextResponse.json({ error, detalleML: e.message, detalle: e.datos }, { status: 502 })
       }
       throw e
     }
