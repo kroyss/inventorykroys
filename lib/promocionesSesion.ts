@@ -39,3 +39,6 @@ export const sqlSituacion = (col: string, estadoCol = 'NULL::text') => `COALESCE
                WHEN k.estado = 'paused' THEN 'pausada' END
    FROM ml_catalogo k WHERE k.item_id = ${col} LIMIT 1),
   CASE ${estadoCol} WHEN 'active' THEN 'activa' WHEN 'paused' THEN 'pausada_ml' END)`
+
+/** SQL de las unidades disponibles de la publicación en ML (suma de variantes), del catálogo; null si no está. */
+export const sqlDisponible = (col: string) => `(SELECT k.disponible::int FROM ml_catalogo k WHERE k.item_id = ${col} LIMIT 1)`

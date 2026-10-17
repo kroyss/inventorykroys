@@ -1,7 +1,8 @@
-// Chip de la situación de la publicación en MercadoLibre (17-10): activa, agotada o pausada a mano.
-// Sale del catálogo que ya se trae de ML (lib/promocionesSesion.ts → sqlSituacion).
+// Chip de la situación de la publicación en MercadoLibre (17-10): activa, agotada o pausada, con las unidades
+// disponibles en ML (suma de variantes). Sale del catálogo que ya se trae de ML (lib/promocionesSesion.ts).
 export type Situacion = 'activa' | 'agotada' | 'pausada' | 'pausada_ml' | null | undefined
 
+const POCAS = 3   // como "Por agotarse" en Stock (UMBRAL_DEFAULT)
 const ESTILO: Record<string, { t: string; c: string; title: string }> = {
   activa: { t: '● Activa', c: 'text-emerald-700 ring-emerald-200 bg-emerald-50', title: 'Publicada y a la venta en MercadoLibre' },
   agotada: { t: '● Agotada', c: 'text-red-700 ring-red-200 bg-red-50', title: 'Pausada por MercadoLibre porque se quedó sin stock' },
@@ -9,8 +10,15 @@ const ESTILO: Record<string, { t: string; c: string; title: string }> = {
   pausada_ml: { t: '⏸ Pausada', c: 'text-amber-800 ring-amber-300 bg-amber-50', title: 'Pausada en MercadoLibre' },
 }
 
-export default function SituacionChip({ s }: { s: Situacion }) {
+export default function SituacionChip({ s, disp }: { s: Situacion; disp?: number | null }) {
   const e = s ? ESTILO[s] : null
   if (!e) return null
-  return <span title={e.title} className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${e.c}`}>{e.t}</span>
+  const conNumero = s !== 'agotada' && disp != null
+  return (
+    <span title={`${e.title}${conNumero ? ` · ${disp} disponible${disp === 1 ? '' : 's'} en MercadoLibre (todas las variantes)` : ''}`}
+      className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${e.c}`}>
+      {e.t}
+      {conNumero && <span className={disp! < POCAS ? 'font-semibold text-amber-700' : 'opacity-70'}> · {disp} disp.</span>}
+    </span>
+  )
 }

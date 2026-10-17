@@ -29,7 +29,8 @@ interface Pregunta {
   item_precio: number | null; item_precio_original: number | null; item_moneda: string | null
   item_peso?: number | null    // peso del portal de MercadoEnvíos o del producto (para el envío gratis por transportista)
   envio_activo?: boolean       // la empresa tiene Promociones: se muestra el envío gratis (o que falta el peso)
-  item_situacion?: Situacion   // activa / agotada / pausada a mano (catálogo de ML)
+  item_situacion?: Situacion   // activa / agotada / pausada (catálogo de ML)
+  item_disponible?: number | null   // unidades disponibles en ML (suma de variantes)
 }
 
 // Precio para decidir (regla de los $3, respuesta rápida en verde): SOLO el de MercadoLibre
@@ -83,10 +84,10 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
           ? <span className="font-medium text-neutral-800 line-clamp-2 sm:truncate max-w-[30rem]">{nombre}</span>
           : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
       {p.producto_code && <span className="hidden sm:inline font-mono text-neutral-400">{p.producto_code}</span>}
-      <SituacionChip s={p.item_situacion} />
+      <SituacionChip s={p.item_situacion} disp={p.item_disponible} />
       <Precio p={p} umbral={umbral} />
       {p.producto_stock !== null && (
-        <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'}>
+        <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'} title="Stock del sistema (tu inventario), no el de la publicación">
           {p.producto_stock > 0 ? `${p.producto_stock} en stock` : 'Sin stock'}
         </span>
       )}

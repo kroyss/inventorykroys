@@ -4,7 +4,7 @@
 // [{ resource: '/packs/{pack}/sellers/{seller}', count }]. Leer una conversación con
 // mark_as_read=false NO la marca como leída (así ML sigue avisando en su app); se marca
 // al responder o con el botón "Marcar como leída".
-import { empresaConPromociones, sqlPesoPublicacion, sqlSituacion } from '@/lib/promocionesSesion'
+import { empresaConPromociones, sqlDisponible, sqlPesoPublicacion, sqlSituacion } from '@/lib/promocionesSesion'
 import { envioGratisAhora } from '@/lib/mlShipping'
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
@@ -256,6 +256,7 @@ export interface ItemVenta { id: string; titulo: string; variante: string | null
   usd?: number | null; usd_aprox?: boolean
   /** Situación de la publicación hoy en ML: activa / agotada / pausada a mano (catálogo). */
   situacion?: 'activa' | 'agotada' | 'pausada' | 'pausada_ml' | null
+  disponible?: number | null   // unidades disponibles hoy en ML (catálogo)
   /** Envío gratis de esta compra según el precio pagado y el peso del portal (ZOOM y TEALCA / solo TEALCA / destino). */
   envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null }
 
@@ -284,9 +285,13 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
   await Promise.all(items.map(async it => { it.imagen = await imagenDeItem(db, conexionId, it.id, it.varId).catch(() => null) }))
   // Peso del portal de MercadoEnvíos (el de la publicación; un combo trae el suyo): con lo que pagó por todas las unidades.
   // Solo empresas con Promociones (las demás, como antes).
-  const { rows: sits } = await db.query(`SELECT x AS item, ${sqlSituacion('x')} AS s FROM unnest($1::text[]) x`,
-    [[...new Set(items.map(it => it.id))]]).catch(() => ({ rows: [] as { item: string; s: ItemVenta['situacion'] }[] }))
-  for (const it of items) it.situacion = sits.find(r => r.item === it.id)?.s ?? null
+  const { rows: sits } = await db.query(`SELECT x AS item, ${sqlSituacion('x')} AS s, ${sqlDisponible('x')} AS d FROM unnest($1::text[]) x`,
+    [[...new Set(items.map(it => it.id))]]).catch(() => ({ rows: [] as { item: string; s: ItemVenta['situacion']; d: number | null }[] }))
+  for (const it of items) {
+    const r = sits.find(x => x.item === it.id)
+    it.situacion = r?.s ?? null
+    it.disponible = r?.d ?? null
+  }
   // Sin peso en el portal (pausada o sin envío configurado): el del producto vinculado; si tampoco hay, se avisa.
   const conEnvio = await empresaConPromociones(db)
   const { rows: pesos } = !conEnvio ? { rows: [] as { publicacion: string; kg: number | null }[] } : await db.query(

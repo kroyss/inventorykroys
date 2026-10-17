@@ -208,7 +208,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null
-    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null; situacion?: Situacion }[] | null>(null)
+    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null; situacion?: Situacion; disponible?: number | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
@@ -360,7 +360,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
                   {it.variante && (
                     <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>
                   )}
-                  {it.situacion && <span className="ml-1.5 inline-block align-middle"><SituacionChip s={it.situacion} /></span>}
+                  {it.situacion && <span className="ml-1.5 inline-block align-middle"><SituacionChip s={it.situacion} disp={it.disponible} /></span>}
                 </p>
                 {/* Cantidad × precio = total (ML muestra "6 x precio" sin el total). En bolívares, también
                     el dólar al que se vendió (con el descuento): "2 × US$ 12,50 · Bs 2.300,00 = US$ 25,00 · Bs 4.600,00". */}
