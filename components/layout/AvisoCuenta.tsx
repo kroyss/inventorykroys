@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { dbGlobal } from '@/lib/db'
 import { DIAS_PRUEBA } from '@/lib/cuenta'
+import { CORTE_ISO, saleEnElCorte } from '@/lib/fundadoresCorte'
+import AvisoCorte from './AvisoCorte'
 
 // Aviso arriba de todas las pantallas sobre la cuenta de la organización (lib/cuenta.ts):
 //  - prueba esperando conexión (migración 067): "tus días empiezan al conectar ML" (el número solo a
@@ -13,6 +15,8 @@ const AVISAR_DESDE = 7
 function ddmm(f: string) { return `${f.slice(8, 10)}/${f.slice(5, 7)}` }
 
 export default async function AvisoCuenta({ organizacionId, esAdmin }: { organizacionId: number; esAdmin: boolean }) {
+  // Último plazo del corte de Fundadores sin MercadoLibre (18-10, solo este tránsito): reemplaza al aviso de abajo.
+  if (await saleEnElCorte(organizacionId).catch(() => false)) return <AvisoCorte hasta={CORTE_ISO} esAdmin={esAdmin} />
   const { rows: [o] } = await dbGlobal().query(
     `SELECT estado, fundador, prueba_dias, to_char(prueba_hasta, 'YYYY-MM-DD') AS hasta,
             prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan

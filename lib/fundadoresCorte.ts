@@ -61,3 +61,27 @@ export async function corteFundadores() {
   }
   return { salen }
 }
+
+/** Instante del corte (ISO con hora de Venezuela, UTC−4). */
+export const CORTE_ISO = `${FECHA_CORTE}T${String(HORA_CORTE).padStart(2, '0')}:00:00-04:00`
+
+/**
+ * Aviso del último plazo (18-10, solo para este tránsito): ¿esta organización saldría en el corte?
+ * Fundador en prueba, creado hasta CREADAS_HASTA, sin ninguna cuenta de ML y antes de la hora del corte.
+ * Después del corte devuelve null sola (y el corte la deja 'vencido'). Borrar junto con el corte.
+ */
+export async function saleEnElCorte(organizacionId: number): Promise<boolean> {
+  if (Date.now() >= Date.parse(CORTE_ISO)) return false
+  const { rows: [o] } = await dbGlobal().query(
+    `SELECT COALESCE(json_agg(json_build_object('id', e.id, 'country', e.country)) FILTER (WHERE e.id IS NOT NULL), '[]') AS empresas
+     FROM organizaciones o LEFT JOIN empresas e ON e.organizacion_id = o.id
+     WHERE o.id = $1 AND o.id <> $2 AND o.fundador AND o.estado = 'prueba'
+       AND (o.created_at AT TIME ZONE 'America/Caracas')::date <= $3::date
+     GROUP BY o.id`, [organizacionId, ORGANIZACION_PLATAFORMA, CREADAS_HASTA])
+  if (!o) return false
+  for (const e of o.empresas as { id: number; country: Country }[]) {
+    const { rows: [c] } = await conEmpresa(e.id, e.country, db => db.query(`SELECT COUNT(*)::int AS n FROM ml_conexiones`))
+    if (c.n > 0) return false
+  }
+  return true
+}
