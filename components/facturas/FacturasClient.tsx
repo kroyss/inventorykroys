@@ -522,6 +522,13 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
               {!voiding && <button onClick={() => setVoiding(true)} className="btn-secondary text-sm">Anular</button>}
             </>
           )}
+          {/* Salir (18-10): a la vista, a la derecha; la × de arriba se perdía. */}
+          <button onClick={onClose} className="btn-primary text-sm ml-auto inline-flex items-center gap-1.5">
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" />
+            </svg>
+            Salir
+          </button>
         </div>
       </div>
     </div>
