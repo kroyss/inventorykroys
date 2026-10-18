@@ -2,7 +2,7 @@
 // Ficha de la publicación (2026-10-14): al tocar el producto en Preguntas o Mensajes se abre encima,
 // sin salir de la pantalla, como se ve en MercadoLibre: fotos, precio, stock, variantes,
 // características y descripción. Se lee de ML al abrirla (/api/preguntas/publicacion).
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
 import { createPortal } from 'react-dom'
 import type { Ficha } from '@/app/api/preguntas/publicacion/route'
@@ -25,7 +25,13 @@ export function AbrirFicha({ item, children, className = '', title = 'Ver la pub
 export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onCerrar: () => void; marcar?: MarcaVariante | null }) {
   const [f, setF] = useState<Ficha | { error: string } | null>(null)
   const [foto, setFoto] = useState(0)
-  // Variante que se tocó para ver su foto (marco azul). Antes se marcaba la de la foto mostrada y, al abrir,
+  // Con muchas fotos (hasta 60), la miniatura de la foto mostrada se trae a la vista en la tira.
+  const tira = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const t = tira.current, b = t?.children[foto] as HTMLElement | undefined
+    if (t && b) t.scrollTo({ left: b.offsetLeft - (t.clientWidth - b.clientWidth) / 2, behavior: 'smooth' })
+  }, [foto])
+  // Variante que se tocó para ver su foto (marco gris). Antes se marcaba la de la foto mostrada y, al abrir,
   // parecía "elegida" la de la primera foto (17-10: se confundía con la agotada).
   const [tocada, setTocada] = useState<number | null>(null)
   const [desc, setDesc] = useState(false)
@@ -102,7 +108,7 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
                   </>}
                 </div>
                 {n > 1 && (
-                  <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  <div ref={tira} className="relative mt-2 flex gap-1.5 overflow-x-auto pb-1">
                     {f.fotos.map((u, i) => (
                       <button key={i} type="button" onClick={() => setFoto(i)} aria-label={`Foto ${i + 1}`}
                         className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-white ${i === foto ? 'border-sky-500 ring-2 ring-sky-200' : 'border-neutral-200 hover:border-neutral-400'}`}>
@@ -150,7 +156,7 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
                       {f.variantes.map((v, i) => {
                         const marcada = !!marcar && v.id === String(marcar.id)
                         const tono = marcada ? (marcar!.tono === 'rojo' ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200')
-                          : tocada === i ? 'border-sky-500 bg-sky-50' : 'border-neutral-200'
+                          : tocada === i ? 'border-neutral-400 bg-neutral-100' : 'border-neutral-200'   // gris suave (18-10): no compite con la roja ni la verde
                         return (
                           <button key={i} type="button" disabled={v.foto == null} onClick={() => { if (v.foto != null) { setFoto(v.foto); setTocada(i) } }}
                             title={v.foto != null ? 'Ver la foto de esta variante' : 'Esta variante no tiene foto propia'}

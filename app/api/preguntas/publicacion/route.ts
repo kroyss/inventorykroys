@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
         it.original_price = lista && lista > sp.amount ? lista : null
         if (sp.currency_id) it.currency_id = sp.currency_id
       }
-      const fotos = (it.pictures ?? []).map(p => p.secure_url ?? p.url ?? '').filter(Boolean).slice(0, 15)
+      const fotos = (it.pictures ?? []).map(p => p.secure_url ?? p.url ?? '').filter(Boolean).slice(0, 60)   // todas (18-10: con 15, las variantes con fotos más atrás no se podían ver)
       const ids = (it.pictures ?? []).map(p => p.id)
       const ficha: Ficha = {
         id: it.id, titulo: it.title, precio: it.price ?? null, precio_original: it.original_price ?? null,
