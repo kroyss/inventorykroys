@@ -160,10 +160,15 @@ export function errorClaro(msg: string) {
 export const esNoCreible = (msg: string) => /CREDIBILITY_DISCOUNTED_PRICE|not credible/i.test(msg)
 
 /** Hace la acción en ML y la registra. Devuelve { ok, error?, datos? } (nunca lanza por un error de ML). */
+/** Detalle de una acción que ML aceptó pero todavía no reflejaba en el precio (18-10: a veces tarda más de
+ *  6 s y se daba como error lo que sí había entrado). La pantalla la vuelve a comprobar (verificarEnCampana). */
+const POR_CONFIRMAR = 'Por confirmar: MercadoLibre lo estaba procesando'
+
 async function hacer<T>(db: Pool, a: Accion, fn: () => Promise<T>): Promise<{ ok: true; datos: T } | { ok: false; error: string }> {
   try {
     const datos = await fn()
-    await registrar(db, a, true, null)
+    const pendiente = !!(datos && typeof datos === 'object' && (datos as { porConfirmar?: boolean }).porConfirmar)
+    await registrar(db, a, true, pendiente ? POR_CONFIRMAR : null)
     return { ok: true, datos }
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e)
@@ -341,9 +346,10 @@ export async function cambiarPrecioEnCampana(db: Pool, conexionId: number, usuar
         await esperar(1500)
         guardado = (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
       }
-      if (!guardado) throw new Error('MercadoLibre respondió que sí, pero el precio nuevo no quedó guardado en la publicación')
+      // ML dijo que sí pero todavía no se ve: no es error; la pantalla lo vuelve a comprobar en unos segundos.
+      if (!guardado) return { precio, manda: null as number | null, porConfirmar: true }
       await marcarEnFoto(db, conexionId, item.id, campana.id, precio)
-      return { precio, manda: null as number | null }
+      return { precio, manda: null as number | null, porConfirmar: false }
     })
 }
 
@@ -380,11 +386,36 @@ export async function agregarACampana(db: Pool, conexionId: number, usuarioId: n
         v = await precioVigente(db, conexionId, item.id)
         guardado = v?.campana === campana.id || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
       }
-      if (!guardado) throw new Error('MercadoLibre respondió que sí, pero el precio no quedó guardado en la publicación: no entró a la campaña')
+      // ML dijo que sí pero todavía no se ve (18-10: a veces tarda más): no es error; la pantalla lo vuelve a
+      // comprobar en unos segundos (verificarEnCampana).
+      if (!guardado) return { precio, manda: null as number | null, porConfirmar: true }
       await marcarEnFoto(db, conexionId, item.id, campana.id, precio)
       // Hoy manda otra promoción más baja: esta queda guardada y se aplica cuando aquella termine.
-      return { precio, manda: v && v.campana !== campana.id && v.amount < precio ? v.amount : null }
+      return { precio, manda: v && v.campana !== campana.id && v.amount < precio ? v.amount : null, porConfirmar: false }
     })
+}
+
+/**
+ * Segunda comprobación de lo que quedó "por confirmar" (18-10). Una sola lectura por publicación: si el precio
+ * ya es de la campaña, se confirma (y el registro pierde el "por confirmar"); si no, y es la última vuelta
+ * (`final`), el registro pasa a error.
+ */
+export async function verificarEnCampana(db: Pool, conexionId: number, item: { id: string; precio: number },
+  campana: { id: string }, final: boolean): Promise<'ok' | 'pendiente' | 'no'> {
+  const precio = Math.round(item.precio * 100) / 100
+  const v = await precioVigente(db, conexionId, item.id)
+  const ok = v?.campana === campana.id || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
+  if (!ok && !final) return 'pendiente'
+  if (ok) await marcarEnFoto(db, conexionId, item.id, campana.id, precio)
+  await db.query(
+    `UPDATE ml_promociones_acciones SET resultado = $4, detalle = $5
+     WHERE id = (SELECT id FROM ml_promociones_acciones
+                 WHERE conexion_id = $1 AND item_id = $2 AND campana_id = $3 AND accion = 'agregar' AND detalle = $6
+                 ORDER BY id DESC LIMIT 1)`,
+    [conexionId, item.id, campana.id, ok ? 'ok' : 'error',
+     ok ? null : 'MercadoLibre respondió que sí, pero el precio no apareció en la publicación (comprobado ~30 s después): no entró a la campaña',
+     POR_CONFIRMAR]).catch(() => {})
+  return ok ? 'ok' : 'no'
 }
 
 /** Sacar una publicación de una campaña y comprobar que dejó de tener ese precio. */

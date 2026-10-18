@@ -523,7 +523,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const confirmarAviso = useConfirm()
   const [enviando, setEnviando] = useState(false)
   // Lo que respondió ML por publicación. Si dijo "no es una rebaja real", se puede reintentar A MANO con otro %.
-  const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }>>({})
+  const [resultados, setResultados] = useState<Record<string, { ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean; porConfirmar?: boolean }>>({})
   const [reintento, setReintento] = useState<Record<string, number>>({})
   // Las que con este % quedan SIN envío gratis quedan fuera, salvo que se pida agregarlas igual.
   // Perder solo ZOOM (sigue gratis por TEALCA) no bloquea: es una advertencia fuerte.
@@ -586,7 +586,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   // De a TANDA por pedido (2026-10-17): cada publicación tarda ~2 s (se agrega y se comprueba con el precio
   // real) y el servidor corta la espera al minuto; con 28 de una vez la pantalla perdía la respuesta.
   const TANDA = 10
-  const [avance, setAvance] = useState<{ hechas: number; total: number } | null>(null)
+  const [avance, setAvance] = useState<{ hechas: number; total: number; comprobando?: number } | null>(null)
   const [enCola, setEnCola] = useState<Set<string>>(new Set())
   // Mientras agrega no se cierra (cerrar o recargar cortaba las tandas que faltaban, 2026-10-17).
   useEffect(() => {
@@ -598,7 +598,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const enviar = async (items: { id: string; precio: number; precioAntes: number; cambio?: boolean }[]) => {
     if (!camp || !items.length) return
     setEnviando(true); setEnCola(new Set(items.map(x => x.id)))
-    type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean }
+    type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean; porConfirmar?: boolean }
     const todos: Res[] = []
     const nuevos = { ...resultados }
     for (let i = 0; i < items.length; i += TANDA) {
@@ -626,10 +626,32 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
       setResultados({ ...nuevos })
       setAvance({ hechas: Math.min(i + TANDA, items.length), total: items.length })
     }
+    // Las que ML aceptó pero todavía no reflejaba: se vuelven a mirar a los ~10 s y a los ~30 s (18-10).
+    for (const [espera, final] of [[10_000, false], [20_000, true]] as const) {
+      const pend = todos.filter(x => x.ok && x.porConfirmar)
+      if (!pend.length) break
+      setAvance({ hechas: items.length, total: items.length, comprobando: pend.length })
+      await new Promise(r => setTimeout(r, espera))
+      const r = await fetch('/api/promociones/acciones', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'verificar', conexionId, final, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre },
+          items: pend.map(x => ({ id: x.id, precio: x.precio ?? items.find(i => i.id === x.id)!.precio })) }),
+      }).catch(() => null)
+      const d = r?.ok ? await r.json().catch(() => null) : null
+      for (const v of (d?.resultados ?? []) as { id: string; estado: 'ok' | 'pendiente' | 'no' }[]) {
+        const x = todos.find(t => t.id === v.id)
+        if (!x) continue
+        if (v.estado === 'ok') x.porConfirmar = false
+        else if (v.estado === 'no') Object.assign(x, { ok: false, porConfirmar: false, error: 'MercadoLibre respondió que sí, pero el precio no apareció en la publicación: no entró a la campaña. Reintenta.' })
+        nuevos[x.id] = { ...x }
+      }
+      // Sin respuesta de la comprobación: quedan "por confirmar" (Traer de ML lo aclara).
+      setResultados({ ...nuevos })
+    }
     setEnviando(false); setAvance(null); setEnCola(new Set())
-    // Todo bien: se cierra. Con errores queda abierto para ver el motivo y reintentar a mano.
+    // Todo bien: se cierra. Con errores (o sin confirmar) queda abierto para ver el motivo y reintentar a mano.
     const ok = todos.filter(x => x.ok).length
-    if (todos.every(x => x.ok) && !todos.some(x => x.manda)) onHecho(`${ok} agregada${ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${ok === 1 ? '' : 's'} en MercadoLibre.`)
+    if (todos.every(x => x.ok && !x.porConfirmar) && !todos.some(x => x.manda)) onHecho(`${ok} agregada${ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${ok === 1 ? '' : 's'} en MercadoLibre.`)
   }
   const confirmar = async () => {
     const sinGratis = validas.filter(x => x.sinGratis).length
@@ -695,8 +717,10 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
           {enviando && avance && (
             <div className="sticky top-0 z-10 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>Agregando a «{camp?.nombre}»: <b>{avance.hechas} de {avance.total}</b> listas. <b>No cierres esta ventana</b> hasta que termine.</span>
-                <span className="text-xs text-sky-700">≈ {Math.max(1, Math.ceil((avance.total - avance.hechas) * 2.3 / 60))} min</span>
+                <span>{avance.comprobando
+                  ? <>Comprobando en MercadoLibre {avance.comprobando === 1 ? '1 que todavía no se veía' : `${avance.comprobando} que todavía no se veían`}. <b>No cierres esta ventana.</b></>
+                  : <>Agregando a «{camp?.nombre}»: <b>{avance.hechas} de {avance.total}</b> listas. <b>No cierres esta ventana</b> hasta que termine.</>}</span>
+                {!avance.comprobando && <span className="text-xs text-sky-700">≈ {Math.max(1, Math.ceil((avance.total - avance.hechas) * 2.3 / 60))} min</span>}
               </div>
               <div className="mt-1.5 h-1.5 rounded-full bg-sky-100 overflow-hidden">
                 <div className="h-full bg-sky-600 transition-all" style={{ width: `${Math.round(avance.hechas / avance.total * 100)}%` }} />
@@ -755,6 +779,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
                     </td>
                     <td className="px-2 py-1.5 text-neutral-500">
                       {enviando && enCola.has(x.f.id) && !resultados[x.f.id] ? <span className="text-sky-700">⏳ en cola…</span>
+                        : resultados[x.f.id]?.ok && resultados[x.f.id].porConfirmar ? <span className="text-amber-700">{enviando ? '⏳ ML lo está procesando, comprobando…' : 'ML lo aceptó pero todavía no lo muestra. Revisa en unos minutos con «Traer ME y ML» antes de reintentar.'}</span>
                         : resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}
                           {resultados[x.f.id].manda != null && <span className="block text-amber-700">Hoy manda otra promoción más baja ({usd(resultados[x.f.id].manda)}): esta se aplica cuando aquella termine.</span>}</span>
                         : resultados[x.f.id] ? <span className="text-red-700">{resultados[x.f.id].error}
