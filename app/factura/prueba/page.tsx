@@ -38,6 +38,7 @@ export default async function Page() {
       offsetY={config.offset_y}
       copyOffsetX={config.copy_offset_x}
       copyOffsetY={config.copy_offset_y}
+      membrete={config.membrete}
       toolbar={
         <span className="text-sm text-neutral-600">
           <b>Hoja de prueba</b> (datos de la factura 1347 del Excel) · hoja X {config.offset_x} / Y {config.offset_y} mm · copia X {config.copy_offset_x} / Y {config.copy_offset_y} mm

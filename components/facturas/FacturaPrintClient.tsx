@@ -1,14 +1,15 @@
 'use client'
 import FacturaPrint from './FacturaPrint'
-import type { Invoice } from '@/lib/invoices'
+import type { Invoice, Membrete } from '@/lib/invoices'
 
-export default function FacturaPrintClient({ invoice, offsetX, offsetY, copyOffsetX, copyOffsetY, autoPrint }: {
+export default function FacturaPrintClient({ invoice, offsetX, offsetY, copyOffsetX, copyOffsetY, autoPrint, membrete }: {
   invoice: Invoice
   offsetX: number
   offsetY: number
   copyOffsetX: number
   copyOffsetY: number
   autoPrint: boolean
+  membrete?: Membrete | null
 }) {
   const voided = invoice.status === 'ANULADA'
 
@@ -20,6 +21,7 @@ export default function FacturaPrintClient({ invoice, offsetX, offsetY, copyOffs
       copyOffsetX={copyOffsetX}
       copyOffsetY={copyOffsetY}
       autoPrint={autoPrint && !voided}
+      membrete={membrete}
       onPrint={() => { fetch(`/api/invoices/${invoice.id}/printed`, { method: 'POST' }).catch(() => {}) }}
       toolbar={
         <div className="flex items-center gap-3 text-sm">

@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
       )
       if (dup) {
         await client.query('ROLLBACK')
-        return NextResponse.json({ error: `Esta venta ya tiene la factura #${dup.invoice_number}. Si salió con un error, no hagas otra venta: abre la venta y toca "¿Salió mal? Corregir factura".` }, { status: 409 })
+        return NextResponse.json({ error: `Esta venta ya tiene la factura #${dup.invoice_number}. Si salió con un error, no hagas otra venta: abre la venta y toca "¿Salió mal?".` }, { status: 409 })
       }
     }
 

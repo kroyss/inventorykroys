@@ -4,6 +4,8 @@ import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } fro
 import VentasForm from './VentasForm'
 import PorConfirmar, { usePorConfirmar, pendientesPorConfirmar, NumeroBoton } from './PorConfirmar'
 import FacturaForm from '@/components/facturas/FacturaForm'
+import SalioMal from '@/components/facturas/SalioMal'
+import { useImprimirFactura } from '@/components/facturas/ImprimirAqui'
 import { bs, type Invoice } from '@/lib/invoices'
 import { Pagination, PageHeader, StatusBadge, chipCls } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -126,6 +128,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   // 18-10: corregir la factura desde la misma venta (antes solo en Facturas; un usuario no lo encontró e hizo
   // una venta LOCAL repetida para poder facturar de nuevo → factura doble y stock descontado dos veces).
   const [corrigiendo, setCorrigiendo] = useState<Invoice | null>(null)
+  const [salioMal, setSalioMal] = useState<Invoice | null>(null)            // pregunta qué pasó
+  const [editandoFactura, setEditandoFactura] = useState<Invoice | null>(null)   // mismo número
+  const { imprimir: verFactura, marco: marcoFactura } = useImprimirFactura()
   // Borrador autoguardado de "Facturar venta" (se llenó a medias y se sigue después)
   const [invoiceDraftAt, setInvoiceDraftAt] = useState<string | null>(null)
 
@@ -165,14 +170,16 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (corrigiendo)   { setCorrigiendo(null) }
+      if (salioMal)      { setSalioMal(null) }
+      else if (corrigiendo) { setCorrigiendo(null) }
+      else if (editandoFactura) { setEditandoFactura(null) }
       else if (invoicing) { setInvoicing(false) }
       else if (showForm) { setShowForm(false); setEditing(null); setNumeroNuevo(null) }
       else if (selected) { setSelected(null) }
     }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [showForm, selected, invoicing, corrigiendo])
+  }, [showForm, selected, invoicing, corrigiendo, salioMal, editandoFactura])
 
   const selectedId = selected?.id
   const loadSaleInvoices = useCallback(async (saleId: number) => {
@@ -637,13 +644,13 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                           </div>
                         </div>
                         <div className="flex gap-2 shrink-0">
-                          <a href={`/factura/${activeInvoice.id}?print=1`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">Imprimir</a>
+                          <button onClick={() => verFactura(activeInvoice.id)} className="btn-secondary text-xs">Imprimir</button>
                           <a href={`/facturas?id=${activeInvoice.id}`} className="btn-secondary text-xs">Ver</a>
                         </div>
                       </div>
                       <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-[11px] text-neutral-500">¿Nombre, RIF, monto o producto mal? No hagas otra venta:</span>
-                        <button onClick={() => setCorrigiendo(activeInvoice)} className="btn-warning text-xs">¿Salió mal? Corregir factura</button>
+                        <span className="text-[11px] text-neutral-500">¿Un dato mal, no salió o se dañó la hoja? No hagas otra venta:</span>
+                        <button onClick={() => setSalioMal(activeInvoice)} className="btn-warning text-xs">¿Salió mal?</button>
                       </div>
                     </>
                   ) : (
@@ -736,6 +743,29 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           onClose={() => {
             setInvoicing(false)
             // el form manda lo pendiente al cerrarse; se relee un instante después
+            const id = selected.id
+            setTimeout(() => loadSaleInvoices(id), 600)
+          }}
+          onSaved={() => loadSaleInvoices(selected.id)}
+        />
+      )}
+
+      {salioMal && (
+        <SalioMal invoice={salioMal} onCerrar={() => setSalioMal(null)} onElegir={a => {
+          const inv = salioMal
+          setSalioMal(null)
+          if (a === 'mismo') setEditandoFactura(inv)
+          else if (a === 'nueva') setCorrigiendo(inv)
+          else verFactura(inv.id)
+        }} />
+      )}
+      {marcoFactura}
+
+      {editandoFactura && selected && (
+        <FacturaForm
+          edita={editandoFactura}
+          onClose={() => {
+            setEditandoFactura(null)
             const id = selected.id
             setTimeout(() => loadSaleInvoices(id), 600)
           }}

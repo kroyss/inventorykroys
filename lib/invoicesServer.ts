@@ -1,6 +1,6 @@
 // Facturación: acceso a DB (solo servidor).
 import type { Pool, PoolClient } from 'pg'
-import type { Invoice, InvoiceConfig } from '@/lib/invoices'
+import type { Invoice, InvoiceConfig, Membrete } from '@/lib/invoices'
 
 type Q = Pool | PoolClient
 
@@ -24,7 +24,21 @@ export async function readInvoiceConfig(db: Q): Promise<InvoiceConfig> {
     offset_y: num(s.factura_offset_y, 0),
     copy_offset_x: num(s.factura_copia_offset_x, 0),
     copy_offset_y: num(s.factura_copia_offset_y, 0),
+    membrete: leerMembrete(s.factura_membrete),
   }
+}
+
+/** Ajustes del membrete (app_settings.factura_membrete); la imagen va aparte en membrete_factura_img. */
+function leerMembrete(raw: string | undefined): Membrete | null {
+  if (!raw) return null
+  try {
+    const m = JSON.parse(raw)
+    if (!m?.v) return null
+    return {
+      url: `/api/invoices/membrete?v=${encodeURIComponent(String(m.v))}`,
+      opacidad: num(m.opacidad, 0.45), x: num(m.x, 0), y: num(m.y, 0), escala: num(m.escala, 100),
+    }
+  } catch { return null }
 }
 
 /**
@@ -68,6 +82,10 @@ const INVOICE_SELECT = `
     i.replaced_by, rb.invoice_number AS replaced_by_number,
     (SELECT o.invoice_number FROM invoices o WHERE o.replaced_by = i.id LIMIT 1) AS replaces_number,
     i.print_count, i.last_printed_at, i.notes,
+    COALESCE((
+      SELECT JSON_AGG(JSON_BUILD_OBJECT('fecha', c->>'fecha', 'usuario', c->>'usuario', 'motivo', c->>'motivo'))
+      FROM jsonb_array_elements(i.correcciones) c
+    ), '[]'::json) AS correcciones,
     uc.username AS created_by, i.created_at,
     COALESCE((
       SELECT JSON_AGG(JSON_BUILD_OBJECT(

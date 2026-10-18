@@ -63,6 +63,8 @@ export interface Invoice {
   notes: string | null
   created_by: string | null
   created_at: string
+  /** Correcciones con el mismo número (hoja todavía en blanco), la más vieja primero. */
+  correcciones?: { fecha: string; usuario: string | null; motivo: string }[]
   items: InvoiceItem[]
   files?: InvoiceFile[]
 }
@@ -86,6 +88,17 @@ export interface InvoiceConfig {
   copy_offset_x: number
   copy_offset_y: number
   start_number: number
+  /** Membrete de la hoja preimpresa: solo se ve en pantalla (vista previa), nunca se imprime. */
+  membrete: Membrete | null
+}
+
+/** Escaneo de la hoja en blanco, por empresa. x/y en mm, escala en % del ancho A4, opacidad 0–1. */
+export interface Membrete {
+  url: string
+  opacidad: number
+  x: number
+  y: number
+  escala: number
 }
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100

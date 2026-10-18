@@ -1,17 +1,30 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 /**
- * Imprimir una factura SIN abrir otra pestaña: la hoja (/factura/[id]?print=1) se carga en un marco
- * fuera de la vista y ella misma abre el diálogo de impresión (y cuenta la impresión). Al cerrar el
- * diálogo se sigue en la misma pantalla.
+ * Imprimir una factura SIN salir de la pantalla. Desde el 18-10 primero se ve la hoja en una vista previa
+ * propia (con zoom y el membrete de fondo) y desde ahí "Imprimir" abre el diálogo de Chrome; antes saltaba
+ * directo al diálogo, que no deja agrandar y los datos se leían lejos. Al cerrar se sigue en la misma pantalla.
  */
 export function useImprimirFactura() {
   const [src, setSrc] = useState<string | null>(null)
-  const imprimir = (id: number) => setSrc(`/factura/${id}?print=1&t=${Date.now()}`)
+  const imprimir = (id: number) => setSrc(`/factura/${id}?t=${Date.now()}`)
+  useEffect(() => {
+    if (!src) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setSrc(null) } }
+    document.addEventListener('keydown', h, true)
+    return () => document.removeEventListener('keydown', h, true)
+  }, [src])
   const marco = src ? (
-    <iframe key={src} src={src} title="Imprimir factura" aria-hidden="true"
-      style={{ position: 'fixed', left: '-10000px', top: 0, width: '210mm', height: '297mm', border: 0 }} />
+    <div className="fixed inset-0 z-[80] flex flex-col bg-black/50 sm:p-4">
+      <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-xl">
+        <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
+          <span className="text-sm font-semibold">Vista previa de la factura</span>
+          <button onClick={() => setSrc(null)} className="btn-secondary text-sm">Cerrar</button>
+        </div>
+        <iframe key={src} src={src} title="Vista previa de la factura" className="w-full flex-1 border-0" />
+      </div>
+    </div>
   ) : null
   return { imprimir, marco }
 }

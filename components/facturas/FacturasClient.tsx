@@ -1,11 +1,12 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Sale, UserRole } from '@/lib/types'
-import { bs, fmtDate, type Invoice } from '@/lib/invoices'
+import { bs, fmtDate, type Invoice, type Membrete } from '@/lib/invoices'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import NumberInput from '@/components/ui/NumberInput'
 import FacturaForm from './FacturaForm'
 import { useImprimirFactura } from './ImprimirAqui'
+import SalioMal from './SalioMal'
 import { PageHeader, chipCls } from '@/components/ui'
 import { DateField } from '@/components/ui/DateField'
 
@@ -27,6 +28,10 @@ export default function FacturasClient(_: { userRole: UserRole }) {
   const [search, setSearch]     = useState('')
   const [selected, setSelected] = useState<Invoice | null>(null)
   const [reemit, setReemit]     = useState<Invoice | null>(null)
+  // "¿Salió mal?" (18-10): primero pregunta qué pasó; "mismo número" edita la misma factura.
+  const [salioMal, setSalioMal] = useState<Invoice | null>(null)
+  const [editar, setEditar]     = useState<Invoice | null>(null)
+  const { imprimir: verHoja, marco: marcoHoja } = useImprimirFactura()
   // Facturas a medio llenar (autoguardadas): por si se fue la luz o se cerró la ventana.
   const [borradores, setBorradores] = useState<{ sale_id: number; ml_order_number: string; cliente: string | null; updated_at: string; updated_by: string | null }[]>([])
   const [retomar, setRetomar] = useState<Sale | null>(null)
@@ -73,13 +78,15 @@ export default function FacturasClient(_: { userRole: UserRole }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (reemit) setReemit(null)
+      if (salioMal) setSalioMal(null)
+      else if (editar) setEditar(null)
+      else if (reemit) setReemit(null)
       else if (showConfig) setShowConfig(false)
       else if (selected) setSelected(null)
     }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [reemit, showConfig, selected])
+  }, [reemit, showConfig, selected, salioMal, editar])
 
   const pendingRet = rows.filter(r => r.status === 'EMITIDA' && r.retention_status === 'PENDIENTE')
 
@@ -191,8 +198,27 @@ export default function FacturasClient(_: { userRole: UserRole }) {
           invoice={selected}
           onClose={() => setSelected(null)}
           onChanged={inv => { setSelected(inv); setDetailVersion(v => v + 1); load() }}
-          onReemit={() => setReemit(selected)}
+          onReemit={() => setSalioMal(selected)}
           onOpen={openDetail}
+        />
+      )}
+
+      {salioMal && (
+        <SalioMal invoice={salioMal} onCerrar={() => setSalioMal(null)} onElegir={a => {
+          const inv = salioMal
+          setSalioMal(null)
+          if (a === 'mismo') setEditar(inv)
+          else if (a === 'nueva') setReemit(inv)
+          else verHoja(inv.id)
+        }} />
+      )}
+      {marcoHoja}
+
+      {editar && (
+        <FacturaForm
+          edita={editar}
+          onClose={() => setEditar(null)}
+          onSaved={inv => { load(); openDetail(inv.id) }}
         />
       )}
 
@@ -337,6 +363,17 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
           {inv.replaces_number && (
             <div className="mt-2 text-xs text-neutral-500">Reemplaza a la #{inv.replaces_number} (anulada).</div>
           )}
+          {!!inv.correcciones?.length && (
+            <div className="mt-2 text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded px-2 py-1.5 space-y-0.5">
+              <div className="font-medium">Corregida con el mismo número ({inv.correcciones.length}):</div>
+              {inv.correcciones.map((c, i) => (
+                <div key={i}>
+                  {new Date(c.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  {c.usuario ? ` · ${c.usuario}` : ''} · {c.motivo}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
@@ -455,7 +492,7 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
               <p className="text-xs text-red-800">
                 Anular sin reemplazo: usalo si la factura no debía emitirse (venta equivocada, datos del cliente mal).
-                Si te equivocaste en algún dato o se dañó la hoja, usa “¿Salió mal? Corregir factura”.
+                Si te equivocaste en algún dato o se dañó la hoja, usa “¿Salió mal?”.
               </p>
               <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="Motivo de la anulación"
                 className="w-full border border-neutral-300 rounded px-3 py-1.5 text-sm" />
@@ -479,8 +516,8 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
           {!voided && (
             <>
               <button onClick={onReemit} className="btn-warning text-sm"
-                title="Salió con un error o se dañó la hoja: anula esta (queda registrada) y emite otra con el siguiente número, con los datos cargados para corregir">
-                ¿Salió mal? Corregir factura
+                title="Un dato mal, no salió impresa o se dañó la hoja: te pregunta qué pasó y te lleva al arreglo correcto">
+                ¿Salió mal?
               </button>
               {!voiding && <button onClick={() => setVoiding(true)} className="btn-secondary text-sm">Anular</button>}
             </>
@@ -504,10 +541,22 @@ function ConfigPanel({ onClose }: { onClose: () => void }) {
   const [cy, setCy]       = useState(0)
   const [msg, setMsg]     = useState<string | null>(null)
   const [busy, setBusy]   = useState(false)
+  // Membrete (18-10): escaneo de la hoja en blanco, solo para la vista previa.
+  const [membrete, setMembrete] = useState<Membrete | null>(null)
+  const [mOp, setMOp] = useState(0.45)
+  const [mX, setMX]   = useState(0)
+  const [mY, setMY]   = useState(0)
+  const [mEsc, setMEsc] = useState(100)
+  const [subiendo, setSubiendo] = useState(false)
+  const aplicarMembrete = (m: Membrete | null) => {
+    setMembrete(m)
+    if (m) { setMOp(m.opacidad); setMX(m.x); setMY(m.y); setMEsc(m.escala) }
+  }
 
   useEffect(() => {
     fetch('/api/invoices/config').then(r => r.json()).then(c => {
       setStart(c.start_number); setNext(c.next_number); setIva(c.iva); setOx(c.offset_x); setOy(c.offset_y); setCx(c.copy_offset_x); setCy(c.copy_offset_y)
+      aplicarMembrete(c.membrete ?? null)
       setLoaded(true)
     })
   }, [])
@@ -518,18 +567,61 @@ function ConfigPanel({ onClose }: { onClose: () => void }) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ start_number: start, iva, offset_x: ox, offset_y: oy, copy_offset_x: cx, copy_offset_y: cy }),
     })
-    setBusy(false)
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) { setMsg(data.error ?? 'Error'); return }
+    if (!res.ok) { setBusy(false); setMsg(data.error ?? 'Error'); return }
     setNext(data.next_number)
+    if (membrete) {
+      const r = await fetch('/api/invoices/membrete', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opacidad: mOp, x: mX, y: mY, escala: mEsc }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setBusy(false); setMsg(d.error ?? 'No se pudo guardar el membrete'); return }
+      aplicarMembrete(d.membrete ?? null)
+    }
+    setBusy(false)
     setMsg('Guardado')
+  }
+
+  // La imagen se achica en el navegador (máx. 1800 px de ancho, JPG) antes de subirla.
+  const subirMembrete = async (file: File) => {
+    setSubiendo(true); setMsg(null)
+    try {
+      const url = URL.createObjectURL(file)
+      const img = await new Promise<HTMLImageElement>((ok, mal) => {
+        const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error('No se pudo leer la imagen')); i.src = url
+      })
+      const k = Math.min(1, 1800 / img.naturalWidth)
+      const cv = document.createElement('canvas')
+      cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k)
+      const ctx = cv.getContext('2d')!
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height)
+      ctx.drawImage(img, 0, 0, cv.width, cv.height)
+      URL.revokeObjectURL(url)
+      const r = await fetch('/api/invoices/membrete', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagen: cv.toDataURL('image/jpeg', 0.85), opacidad: mOp, x: mX, y: mY, escala: mEsc }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setMsg(d.error ?? 'No se pudo subir'); return }
+      aplicarMembrete(d.membrete ?? null)
+      setMsg('Membrete subido. Míralo en la hoja de prueba.')
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'No se pudo subir')
+    } finally {
+      setSubiendo(false)
+    }
+  }
+  const quitarMembrete = async () => {
+    const r = await fetch('/api/invoices/membrete', { method: 'DELETE' })
+    if (r.ok) { aplicarMembrete(null); setMsg('Membrete quitado') }
   }
 
   const field = 'mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-5 space-y-4">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-5 space-y-4 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-lg">Configuración de facturación</h2>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">×</button>
@@ -579,6 +671,48 @@ function ConfigPanel({ onClose }: { onClose: () => void }) {
                 Imprimí la <a href="/factura/prueba" target="_blank" rel="noreferrer" className="underline">hoja de prueba</a> en
                 papel blanco y ponela al trasluz sobre una impresa desde Excel. Si está corrida, medí la diferencia en mm y cargala acá.
               </p>
+            </div>
+            <div className="border-t pt-3">
+              <div className="text-xs text-neutral-500">Membrete de la hoja (solo se ve en pantalla, nunca se imprime)</div>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Sube un escaneo de una hoja preimpresa <b>en blanco</b> (completa: original y copia, derecha, JPG o PNG).
+                La vista previa la muestra de fondo para ver cómo va a quedar la factura. Si cambia el formato, sube la nueva.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label className={`btn-secondary text-xs cursor-pointer ${subiendo ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {subiendo ? 'Subiendo…' : membrete ? 'Cambiar imagen' : 'Subir imagen'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) subirMembrete(f) }} />
+                </label>
+                {membrete && <>
+                  <a href="/factura/prueba" target="_blank" rel="noreferrer" className="btn-secondary text-xs">Ver en la hoja de prueba</a>
+                  <button onClick={quitarMembrete} className="text-xs text-neutral-500 hover:text-red-600 underline">Quitar</button>
+                </>}
+              </div>
+              {membrete && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-neutral-400">Transparencia ({Math.round(mOp * 100)} %)</label>
+                    <input type="range" min={0.1} max={1} step={0.05} value={mOp} onChange={e => setMOp(Number(e.target.value))} className="w-full" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-neutral-400">Tamaño (% del ancho A4)</label>
+                    <NumberInput value={mEsc} onValueChange={setMEsc} emptyValue={100} className={field} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-neutral-400">Mover horizontal mm (+ = derecha)</label>
+                    <NumberInput value={mX} onValueChange={setMX} emptyValue={0} signed className={field} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-neutral-400">Mover vertical mm (+ = abajo)</label>
+                    <NumberInput value={mY} onValueChange={setMY} emptyValue={0} signed className={field} />
+                  </div>
+                  <p className="col-span-2 text-[11px] text-neutral-400">
+                    Si el membrete no calza con las casillas, ajústalo aquí y toca Guardar. Esto no mueve lo que se imprime
+                    (eso es la calibración de arriba).
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-end gap-2">
               {msg && <span className="text-xs text-neutral-500 mr-auto">{msg}</span>}

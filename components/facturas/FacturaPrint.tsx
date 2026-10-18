@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
-import { bs, MAX_INVOICE_LINES } from '@/lib/invoices'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { bs, MAX_INVOICE_LINES, type Membrete } from '@/lib/invoices'
 
 /**
  * Hoja de factura en forma libre: réplica 1:1 de la plantilla de Excel "FACTURA NNNN.xls".
@@ -73,8 +73,8 @@ interface CellProps {
   children?: ReactNode
 }
 
-function Sheet({ inv, offX, offY, copyOffX, copyOffY }: {
-  inv: PrintableInvoice; offX: number; offY: number; copyOffX: number; copyOffY: number
+function Sheet({ inv, offX, offY, copyOffX, copyOffY, membrete }: {
+  inv: PrintableInvoice; offX: number; offY: number; copyOffX: number; copyOffY: number; membrete?: Membrete | null
 }) {
   // c = 0 original, 1 copia. La copia suma su propio ajuste encima del de la hoja.
   const x = (pt: number, c: number) => MARGIN_LEFT_PT + pt * ZOOM + (offX + c * copyOffX) * PT_PER_MM
@@ -176,6 +176,15 @@ function Sheet({ inv, offX, offY, copyOffX, copyOffY }: {
     }}>
       {copy(0)}
       {copy(1)}
+      {/* Membrete (18-10): la hoja preimpresa escaneada, ENCIMA y en "multiplicar" (el blanco no tapa nada).
+          Muestra el papel real; el texto conserva su calibración → se ve tal cual saldrá. No se imprime. */}
+      {membrete && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={membrete.url} alt="" aria-hidden="true" className="no-print" style={{
+          position: 'absolute', left: `${membrete.x}mm`, top: `${membrete.y}mm`, width: `${210 * membrete.escala / 100}mm`,
+          opacity: membrete.opacidad, mixBlendMode: 'multiply', pointerEvents: 'none', maxWidth: 'none',
+        }} />
+      )}
     </div>
   )
 }
@@ -190,9 +199,21 @@ interface Props {
   onPrint?: () => void
   toolbar?: ReactNode
   autoPrint?: boolean
+  membrete?: Membrete | null
 }
 
-export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 0, copyOffsetY = 0, onPrint, toolbar, autoPrint }: Props) {
+const A4_PX = 210 * 96 / 25.4   // ancho de la hoja en px CSS
+/** Zoom que hace entrar la hoja a lo ancho de la ventana (tope 150 %). */
+const zoomAjustado = () => typeof window === 'undefined' ? 1
+  : Math.min(1.5, Math.max(0.4, Math.floor((window.innerWidth - 32) / A4_PX * 100) / 100))
+
+export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 0, copyOffsetY = 0, onPrint, toolbar, autoPrint, membrete }: Props) {
+  // Zoom solo en pantalla (18-10: el diálogo de Chrome no deja agrandar bien); al imprimir vuelve a 100 %.
+  const [zoom, setZoom] = useState(1)
+  useEffect(() => { if (!autoPrint) setZoom(zoomAjustado()) }, [autoPrint])
+  const zoomCon = (d: number) => setZoom(z => Math.min(2.5, Math.max(0.4, Math.round((z + d) * 100) / 100)))
+  const [verMembrete, setVerMembrete] = useState(true)
+
   const onPrintRef = useRef(onPrint)
   useEffect(() => { onPrintRef.current = onPrint }, [onPrint])
 
@@ -217,11 +238,24 @@ export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 
           .no-print { display: none !important; }
           .factura-wrap { padding: 0 !important; background: #fff !important; }
           .factura-page-shadow { box-shadow: none !important; }
+          .factura-zoom { zoom: 1 !important; }
         }
       `}</style>
       <div className="no-print sticky top-0 z-10 bg-white border-b border-neutral-200 px-4 py-3">
         <div className="max-w-[210mm] mx-auto flex flex-wrap items-center gap-3">
           <button onClick={() => window.print()} className="btn-primary text-sm">Imprimir</button>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => zoomCon(-0.15)} className="btn-secondary text-sm px-3" title="Alejar">−</button>
+            <span className="w-12 text-center text-xs tabular-nums text-neutral-600">{Math.round(zoom * 100)} %</span>
+            <button type="button" onClick={() => zoomCon(0.15)} className="btn-secondary text-sm px-3" title="Acercar">+</button>
+            <button type="button" onClick={() => setZoom(zoomAjustado())} className="btn-secondary text-xs">Ajustar</button>
+          </div>
+          {membrete && (
+            <label className="flex items-center gap-1.5 text-xs text-neutral-600 cursor-pointer">
+              <input type="checkbox" checked={verMembrete} onChange={e => setVerMembrete(e.target.checked)} />
+              Ver membrete <span className="text-neutral-400">(no se imprime)</span>
+            </label>
+          )}
           {toolbar}
           <p className="text-xs text-neutral-500 w-full">
             En el diálogo de impresión: <b>Márgenes: Ninguno</b> · <b>Escala: 100 %</b> (no “Ajustar”) ·
@@ -230,8 +264,9 @@ export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 
         </div>
       </div>
       <div className="factura-wrap bg-neutral-100 py-6 min-h-screen">
-        <div className="mx-auto w-fit shadow-lg factura-page-shadow">
-          <Sheet inv={invoice} offX={offsetX} offY={offsetY} copyOffX={copyOffsetX} copyOffY={copyOffsetY} />
+        <div className="mx-auto w-fit shadow-lg factura-page-shadow factura-zoom" style={{ zoom }}>
+          <Sheet inv={invoice} offX={offsetX} offY={offsetY} copyOffX={copyOffsetX} copyOffY={copyOffsetY}
+            membrete={verMembrete ? membrete : null} />
         </div>
       </div>
     </>
@@ -239,6 +274,6 @@ export default function FacturaPrint({ invoice, offsetX, offsetY, copyOffsetX = 
 }
 
 /** Vista previa de la hoja (sin barra ni impresión): "Revisar" antes de emitir. */
-export function FacturaVista({ invoice }: { invoice: PrintableInvoice }) {
-  return <Sheet inv={invoice} offX={0} offY={0} copyOffX={0} copyOffY={0} />
+export function FacturaVista({ invoice, membrete }: { invoice: PrintableInvoice; membrete?: Membrete | null }) {
+  return <Sheet inv={invoice} offX={0} offY={0} copyOffX={0} copyOffY={0} membrete={membrete} />
 }

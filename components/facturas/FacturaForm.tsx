@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Sale } from '@/lib/types'
 import {
   bs, calcInvoice, normalizeDoc, round2, MAX_INVOICE_LINES,
-  type Invoice, type InvoiceCustomer,
+  type Invoice, type InvoiceCustomer, type Membrete,
 } from '@/lib/invoices'
 import { Combobox } from '@/components/ui/Combobox'
 import NumberInput from '@/components/ui/NumberInput'
@@ -23,6 +23,8 @@ interface Props {
   sale?: Sale
   /** Reimprimir en hoja nueva: anula esta factura y emite otra con el siguiente número. */
   replaces?: Invoice
+  /** Corregir con el MISMO número (la hoja preimpresa todavía está en blanco). */
+  edita?: Invoice
   onClose: () => void
   onSaved: (inv: Invoice) => void
 }
@@ -69,11 +71,14 @@ interface ConfigResp {
   today: string
   rate: number | null
   rate_date: string | null
+  membrete: Membrete | null
 }
 
 const inputCls = 'mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800'
 
-export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props) {
+export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }: Props) {
+  // De dónde salen los datos al corregir: la factura que se anula (número nuevo) o la que se edita (mismo número).
+  const fuente = replaces ?? edita
   const [config, setConfig]   = useState<ConfigResp | null>(null)
   const [customers, setCustomers] = useState<InvoiceCustomer[]>([])
   const [error, setError]     = useState<string | null>(null)
@@ -86,46 +91,47 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
   const [date, setDate]       = useState('')
   const [rate, setRate]       = useState(0)
   const [rateDate, setRateDate] = useState<string | null>(null)
-  const [rateTouched, setRateTouched] = useState(!!replaces)
+  const [rateTouched, setRateTouched] = useState(!!fuente)
 
   // Cliente: borrador desde la venta (nombre de ML) o desde la factura que se reemplaza
-  const draftName = replaces?.customer_name ?? sale?.customer_name ?? ''
+  const draftName = fuente?.customer_name ?? sale?.customer_name ?? ''
   const [name, setName]       = useState(draftName)
-  const [doc, setDoc]         = useState(replaces?.customer_doc ?? '')
-  const [address, setAddress] = useState(replaces?.customer_address ?? '')
-  const [phone, setPhone]     = useState(replaces?.customer_phone ?? '')
-  const [isSpecial, setIsSpecial] = useState(replaces?.is_special ?? false)
-  const [retPct, setRetPct]   = useState(replaces?.retention_percent || 75)
+  const [doc, setDoc]         = useState(fuente?.customer_doc ?? '')
+  const [address, setAddress] = useState(fuente?.customer_address ?? '')
+  const [phone, setPhone]     = useState(fuente?.customer_phone ?? '')
+  const [isSpecial, setIsSpecial] = useState(fuente?.is_special ?? false)
+  const [retPct, setRetPct]   = useState(fuente?.retention_percent || 75)
   const [search, setSearch]   = useState('')
   // Datos del comprador leídos de su guía ZOOM/TEALCA en Despachos (precargan cédula, teléfono y ciudad).
   const [guia, setGuia] = useState<DatosGuia | null>(null)
 
   // IVA
-  const [withIva, setWithIva] = useState(replaces ? replaces.with_iva : true)
-  const [ivaRate, setIvaRate] = useState(replaces?.with_iva ? replaces.iva_rate : 16)
+  const [withIva, setWithIva] = useState(fuente ? fuente.with_iva : true)
+  const [ivaRate, setIvaRate] = useState(fuente?.with_iva ? fuente.iva_rate : 16)
 
   // Líneas: de la venta, con el descuento de la venta ya aplicado al precio unitario
   const [lines, setLines] = useState<Line[]>(() => {
-    if (replaces) {
-      return replaces.items.map(it => ({
+    if (fuente) {
+      return fuente.items.map(it => ({
         product_id: it.product_id, description: it.description, quantity: it.quantity,
-        unit_price_usd: it.unit_price_usd ?? round2(it.unit_price_bs / replaces.exchange_rate),
+        unit_price_usd: it.unit_price_usd ?? round2(it.unit_price_bs / fuente.exchange_rate),
       }))
     }
     return saleLines(sale)
   })
 
   const [voidReason, setVoidReason] = useState('')
+  const [hojaEnBlanco, setHojaEnBlanco] = useState(false)   // corregir con el mismo número: lo confirma el usuario
   // Zoom de la vista "Revisar" (18-10: al 72 % fijo los datos se leían lejos).
   const [zoomVista, setZoomVista] = useState(0.72)
   const zoomCon = (d: number) => setZoomVista(z => Math.min(2, Math.max(0.5, Math.round((z + d) * 100) / 100)))
   // Revisar antes de emitir: el número correlativo se gasta recién en "Emitir e imprimir".
   const [revisando, setRevisando] = useState(false)
   const { imprimir, marco } = useImprimirFactura()
-  const saleId = replaces ? replaces.sale_id : sale?.id ?? null
+  const saleId = fuente ? fuente.sale_id : sale?.id ?? null
 
   // Borrador autoguardado (solo al facturar una venta; no al reemitir)
-  const draftSaleId = !replaces && sale ? sale.id : null
+  const draftSaleId = !fuente && sale ? sale.id : null
   const [hydrated, setHydrated] = useState(false)
   const [draftInfo, setDraftInfo] = useState<{ updated_at: string; updated_by: string | null } | null>(null)
   const [draftState, setDraftState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -157,10 +163,11 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
       draftReq,
     ]).then(([c, draft]) => {
       setConfig(c)
-      setNumber(c.next_number)
-      setDate(c.today)
-      if (replaces) {
-        setRate(replaces.exchange_rate)
+      setNumber(edita ? edita.invoice_number : c.next_number)
+      setDate(edita ? edita.invoice_date : c.today)
+      if (edita) setControl(edita.control_number ?? '')
+      if (fuente) {
+        setRate(fuente.exchange_rate)
       } else {
         setRate(c.rate ?? 0)
         setRateDate(c.rate_date)
@@ -185,7 +192,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
     fetch('/api/invoices/customers').then(r => r.json()).then(rows => {
       if (Array.isArray(rows)) setCustomers(rows)
     }).catch(() => {})
-  }, [replaces, draftSaleId])
+  }, [fuente, edita, draftSaleId])
 
   // Al cambiar la fecha, la tasa sigue a la BCV de esa fecha (salvo que se haya editado a mano)
   useEffect(() => {
@@ -233,7 +240,8 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
     ...(lines.some(l => !(l.unit_price_usd > 0)) ? ['monto (precio) en cada línea'] : []),
     ...(!(rate > 0) ? ['tasa BCV'] : []),
     ...(!(number > 0) ? ['número de factura'] : []),
-    ...(replaces && !voidReason.trim() ? ['motivo de la anulación'] : []),
+    ...(fuente && !voidReason.trim() ? ['qué salió mal'] : []),
+    ...(edita && !hojaEnBlanco ? ['confirmar que la hoja está en blanco'] : []),
   ]
 
   // ── Autoguardado ──────────────────────────────────────────────────────────
@@ -293,7 +301,24 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
   const submit = async () => {
     if (problems.length) { setError(`Falta: ${problems.join(', ')}`); return }
     setBusy(true); setError(null)
-    const res = await fetch('/api/invoices', {
+    const res = edita
+      ? await fetch(`/api/invoices/${edita.id}/corregir`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            motivo: voidReason.trim(),
+            control_number: control || undefined,
+            invoice_date: date,
+            exchange_rate: rate,
+            customer: {
+              name: name.trim(), doc: doc.trim(), address: address.trim(),
+              phone: phone.trim(), is_special: hasDoc && isSpecial, retention_percent: retPct,
+            },
+            with_iva: withIva,
+            iva_rate: withIva ? ivaRate : 0,
+            items: lines.map(l => ({ ...l, description: l.description.trim() })),
+          }),
+        })
+      : await fetch('/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -315,7 +340,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
     })
     setBusy(false)
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) { setError(data.error ?? 'Error al emitir la factura'); return }
+    if (!res.ok) { setError(data.error ?? (edita ? 'Error al guardar la corrección' : 'Error al emitir la factura')); return }
     pendingRef.current = null   // el servidor ya borró el borrador al emitir
     setSaved(data)
     onSaved(data)
@@ -335,11 +360,12 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
         <div className="px-5 py-4 border-b flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-semibold text-lg">
-              {replaces ? `Corregir factura #${replaces.invoice_number}` : 'Facturar venta'}
+              {edita ? `Corregir factura #${edita.invoice_number} (mismo número)`
+                : replaces ? `Corregir factura #${replaces.invoice_number} (número nuevo)` : 'Facturar venta'}
             </h2>
-            {(sale || replaces?.sale_order_number) && (
+            {(sale || fuente?.sale_order_number) && (
               <div className="text-xs text-neutral-500 font-mono">
-                Venta {sale?.ml_order_number ?? replaces?.sale_order_number}
+                Venta {sale?.ml_order_number ?? fuente?.sale_order_number}
               </div>
             )}
             {draftSaleId && !saved && (
@@ -363,19 +389,19 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
           <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="text-4xl">🧾</div>
             <div>
-              <div className="text-lg font-semibold">Factura #{saved.invoice_number} emitida</div>
+              <div className="text-lg font-semibold">Factura #{saved.invoice_number} {edita ? 'corregida' : 'emitida'}</div>
               <div className="text-sm text-neutral-500">{saved.customer_name} · Bs {bs(saved.total_bs)}</div>
               {replaces && <div className="text-xs text-red-600 mt-1">La #{replaces.invoice_number} quedó ANULADA.</div>}
             </div>
             <p className="text-xs text-neutral-500 max-w-sm">
-              Se abrió el diálogo de impresión. Si no salió, tócalo otra vez.
+              Se abrió la vista previa: revisa la hoja y toca “Imprimir”. Si la cerraste, ábrela otra vez.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
-              <button onClick={() => imprimir(saved.id)} className="btn-secondary text-sm">Imprimir de nuevo (mismo N°)</button>
+              <button onClick={() => imprimir(saved.id)} className="btn-secondary text-sm">Ver e imprimir (mismo N°)</button>
               <button onClick={onClose} className="btn-primary text-sm">Listo</button>
             </div>
             <p className="text-[11px] text-neutral-400 max-w-sm">
-              ¿Salió con un error? No hagas otra venta: abre esta venta y toca “¿Salió mal? Corregir factura”.
+              ¿Salió con un error? No hagas otra venta: abre esta venta y toca “¿Salió mal?”.
             </p>
           </div>
         ) : (
@@ -384,7 +410,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
               <div className="flex-1 overflow-auto px-5 py-4 space-y-3 bg-neutral-100">
                 {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
                 <p className="text-sm text-neutral-700">
-                  Así va a salir la factura <b>#{number}</b>. Si algo está mal, toca <b>← Corregir</b>: todavía no se usó el número.
+                  Así va a salir la factura <b>#{number}</b>. Si algo está mal, toca <b>← Corregir</b>: {edita ? 'todavía no se guardó la corrección.' : 'todavía no se usó el número.'}
                 </p>
                 <div className="sticky top-0 z-10 flex items-center justify-center gap-1.5">
                   <button type="button" onClick={() => zoomCon(-0.15)} className="btn-secondary text-sm px-3" title="Alejar">−</button>
@@ -393,7 +419,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                   <button type="button" onClick={() => setZoomVista(0.72)} className="btn-secondary text-xs">Ajustar</button>
                 </div>
                 <div className="w-fit mx-auto bg-white shadow" style={{ zoom: zoomVista }}>
-                  <FacturaVista invoice={{
+                  <FacturaVista membrete={config?.membrete} invoice={{
                     invoice_number: number, invoice_date: date, customer_name: name.trim(),
                     customer_doc: normalizeDoc(doc) || null, customer_address: address.trim() || null,
                     customer_phone: phone.trim() || null, iva_rate: calc.iva_rate,
@@ -408,6 +434,23 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
             )}
             <div className={`flex-1 overflow-y-auto px-5 py-4 space-y-5 ${revisando ? 'hidden' : ''}`}>
               {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
+
+              {edita && (
+                <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 space-y-2">
+                  <p className="text-sm text-sky-900">
+                    Corrige abajo lo que está mal. La factura <b>sigue siendo la #{edita.invoice_number}</b> y se imprime en la
+                    misma hoja. Queda registrado qué se cambió, quién y cuándo.
+                  </p>
+                  <label className="flex items-start gap-2 text-sm text-sky-900 cursor-pointer">
+                    <input type="checkbox" checked={hojaEnBlanco} onChange={e => setHojaEnBlanco(e.target.checked)} className="mt-0.5 w-4 h-4" />
+                    <span>Confirmo que la hoja <b>N° de control {String(edita.invoice_number).padStart(6, '0')}</b> está <b>en blanco</b> (no se imprimió en ella).
+                      Si ya se imprimió, cierra esto y usa “Ya se imprimió y salió mal”.</span>
+                  </label>
+                  <label className="text-xs text-sky-800">¿Qué corriges? <span className="text-red-500">*</span></label>
+                  <input value={voidReason} onChange={e => setVoidReason(e.target.value)}
+                    placeholder="Ej: nombre mal escrito, RIF equivocado, faltó un producto" className={inputCls} />
+                </div>
+              )}
 
               {replaces && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
@@ -429,8 +472,10 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
               <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs text-neutral-500">N° factura</label>
-                  <NumberInput int value={number} onValueChange={setNumber} className={inputCls} />
-                  {config && number !== config.next_number && (
+                  {edita
+                    ? <div className={`${inputCls} bg-neutral-100 tabular-nums`}>{number}</div>
+                    : <NumberInput int value={number} onValueChange={setNumber} className={inputCls} />}
+                  {config && !edita && number !== config.next_number && (
                     <p className="text-[11px] text-amber-700 mt-1">Sugerido: {config.next_number}</p>
                   )}
                 </div>
@@ -638,6 +683,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
             <div className="p-4 border-t flex items-center justify-between gap-2 shrink-0 bg-neutral-50">
               <span className="text-xs text-neutral-500">
                 {problems.length > 0 ? `Falta: ${problems.join(', ')}`
+                  : edita ? `Sigue siendo la factura #${number}`
                   : revisando ? `Revisa la hoja: el #${number} se usa al emitir` : `Será la factura #${number}`}
               </span>
               <div className="flex gap-2">
@@ -646,7 +692,8 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                     <button onClick={() => setRevisando(false)} disabled={busy} className="btn-secondary text-sm">← Corregir</button>
                     <button onClick={submit} disabled={busy || problems.length > 0}
                       className={replaces ? 'btn-danger text-sm' : 'btn-primary text-sm'}>
-                      {busy ? 'Emitiendo…' : replaces ? 'Anular, emitir e imprimir' : 'Emitir e imprimir'}
+                      {busy ? (edita ? 'Guardando…' : 'Emitiendo…')
+                        : edita ? 'Guardar corrección e imprimir' : replaces ? 'Anular, emitir e imprimir' : 'Emitir e imprimir'}
                     </button>
                   </>
                 ) : (
