@@ -208,7 +208,7 @@ export default function AlertasStockClient() {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
         <span>
-          Se revisa sola cada 2 horas{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
+          Se revisa sola cada hora{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
           {' '}El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).
         </span>
         {datos?.esAdmin && (

@@ -17,7 +17,7 @@ export default async function AlertasStockPage() {
     return <SinCuentaML esAdmin={puede(session!.user, 'ml_cuentas')} titulo="Stock" gancho="Entérate de lo que vendes y se te está agotando, antes de perder ventas."
       beneficios={['Tus publicaciones (y cada variante: color, talla…) agotadas o por agotarse.',
         'Solo lo que se vendió en los últimos 30 días: lo urgente de reponer.',
-        'Se revisa solo cada 2 horas, con el link a cada publicación.']} />
+        'Se revisa solo cada hora, con el link a cada publicación.']} />
   }
   return <AlertasStockClient />
 }

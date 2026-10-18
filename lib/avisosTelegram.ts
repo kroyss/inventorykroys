@@ -332,7 +332,7 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
 
   // Stock (2026-10-15): publicación o variante QUE VENDE (últimos DIAS_VENDIDAS días) que se agotó, y si lo pidió,
   // que bajó del límite "por agotarse". Una vez por cada vez que se agota (la ref lleva desde cuándo); las que
-  // marcaron "No hay, quitar" no avisan (sqlCaliente). El stock se revisa en ML cada 2 h (lib/alertasStock.ts).
+  // marcaron "No hay, quitar" no avisan (sqlCaliente). El stock se revisa en ML cada 1 h (lib/alertasStock.ts).
   if ((p.agotada || p.bajo) && disp.stock && !silencio) {
     const umbral = await umbralStock(db)
     const vendidas = `(SELECT COUNT(*) FROM ml_ordenes o WHERE o.fecha > NOW() - INTERVAL '${DIAS_VENDIDAS} days'
