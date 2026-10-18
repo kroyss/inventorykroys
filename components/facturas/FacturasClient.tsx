@@ -455,7 +455,7 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
               <p className="text-xs text-red-800">
                 Anular sin reemplazo: usalo si la factura no debía emitirse (venta equivocada, datos del cliente mal).
-                Si te equivocaste o se dañó la hoja, usa “Anular y corregir”.
+                Si te equivocaste en algún dato o se dañó la hoja, usa “¿Salió mal? Corregir factura”.
               </p>
               <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="Motivo de la anulación"
                 className="w-full border border-neutral-300 rounded px-3 py-1.5 text-sm" />
@@ -480,7 +480,7 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
             <>
               <button onClick={onReemit} className="btn-warning text-sm"
                 title="Salió con un error o se dañó la hoja: anula esta (queda registrada) y emite otra con el siguiente número, con los datos cargados para corregir">
-                ¿Error? Anular y corregir
+                ¿Salió mal? Corregir factura
               </button>
               {!voiding && <button onClick={() => setVoiding(true)} className="btn-secondary text-sm">Anular</button>}
             </>

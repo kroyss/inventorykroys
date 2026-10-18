@@ -116,6 +116,9 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
   })
 
   const [voidReason, setVoidReason] = useState('')
+  // Zoom de la vista "Revisar" (18-10: al 72 % fijo los datos se leían lejos).
+  const [zoomVista, setZoomVista] = useState(0.72)
+  const zoomCon = (d: number) => setZoomVista(z => Math.min(2, Math.max(0.5, Math.round((z + d) * 100) / 100)))
   // Revisar antes de emitir: el número correlativo se gasta recién en "Emitir e imprimir".
   const [revisando, setRevisando] = useState(false)
   const { imprimir, marco } = useImprimirFactura()
@@ -332,7 +335,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
         <div className="px-5 py-4 border-b flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-semibold text-lg">
-              {replaces ? `Anular y corregir (anula #${replaces.invoice_number})` : 'Facturar venta'}
+              {replaces ? `Corregir factura #${replaces.invoice_number}` : 'Facturar venta'}
             </h2>
             {(sale || replaces?.sale_order_number) && (
               <div className="text-xs text-neutral-500 font-mono">
@@ -372,7 +375,7 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
               <button onClick={onClose} className="btn-primary text-sm">Listo</button>
             </div>
             <p className="text-[11px] text-neutral-400 max-w-sm">
-              ¿Salió con un error? En Facturas abre la #{saved.invoice_number} y toca “Anular y corregir”.
+              ¿Salió con un error? No hagas otra venta: abre esta venta y toca “¿Salió mal? Corregir factura”.
             </p>
           </div>
         ) : (
@@ -383,7 +386,13 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
                 <p className="text-sm text-neutral-700">
                   Así va a salir la factura <b>#{number}</b>. Si algo está mal, toca <b>← Corregir</b>: todavía no se usó el número.
                 </p>
-                <div className="w-fit mx-auto bg-white shadow" style={{ zoom: 0.72 }}>
+                <div className="sticky top-0 z-10 flex items-center justify-center gap-1.5">
+                  <button type="button" onClick={() => zoomCon(-0.15)} className="btn-secondary text-sm px-3" title="Alejar">−</button>
+                  <span className="w-14 text-center text-xs tabular-nums text-neutral-600 bg-white/80 rounded">{Math.round(zoomVista * 100)} %</span>
+                  <button type="button" onClick={() => zoomCon(0.15)} className="btn-secondary text-sm px-3" title="Acercar">+</button>
+                  <button type="button" onClick={() => setZoomVista(0.72)} className="btn-secondary text-xs">Ajustar</button>
+                </div>
+                <div className="w-fit mx-auto bg-white shadow" style={{ zoom: zoomVista }}>
                   <FacturaVista invoice={{
                     invoice_number: number, invoice_date: date, customer_name: name.trim(),
                     customer_doc: normalizeDoc(doc) || null, customer_address: address.trim() || null,
@@ -403,13 +412,16 @@ export default function FacturaForm({ sale, replaces, onClose, onSaved }: Props)
               {replaces && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
                   <p className="text-sm text-red-800">
-                    La factura <b>#{replaces.invoice_number}</b> quedará <b>ANULADA</b> (no se borra) y se emite
-                    una nueva con el siguiente número. Usá esto solo si la hoja preimpresa se dañó; si la hoja no se
-                    usó, reimprimí la misma factura.
+                    Corrige abajo lo que salió mal. Al emitir, la <b>#{replaces.invoice_number}</b> queda <b>ANULADA</b> (no se
+                    borra) y sale una nueva con el siguiente número, en la <b>misma venta</b>.
                   </p>
-                  <label className="text-xs text-red-700">Motivo de la anulación <span className="text-red-500">*</span></label>
+                  <p className="text-xs text-red-800">
+                    La hoja impresa de la #{replaces.invoice_number}: márcala <b>ANULADA</b> y guarda el original y la copia.
+                    Si solo se trabó el papel y los datos estaban bien, no hace falta corregir: usa “Imprimir” (mismo número).
+                  </p>
+                  <label className="text-xs text-red-700">¿Qué salió mal? <span className="text-red-500">*</span></label>
                   <input value={voidReason} onChange={e => setVoidReason(e.target.value)}
-                    placeholder="Ej: se trabó el papel, salió corrida" className={inputCls} />
+                    placeholder="Ej: nombre mal escrito, RIF equivocado, se trabó el papel" className={inputCls} />
                 </div>
               )}
 

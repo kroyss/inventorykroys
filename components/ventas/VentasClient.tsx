@@ -123,6 +123,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   // Facturación (solo VE): facturas de la venta abierta y el form de "Facturar"
   const [saleInvoices, setSaleInvoices] = useState<Invoice[]>([])
   const [invoicing, setInvoicing] = useState(false)
+  // 18-10: corregir la factura desde la misma venta (antes solo en Facturas; un usuario no lo encontró e hizo
+  // una venta LOCAL repetida para poder facturar de nuevo → factura doble y stock descontado dos veces).
+  const [corrigiendo, setCorrigiendo] = useState<Invoice | null>(null)
   // Borrador autoguardado de "Facturar venta" (se llenó a medias y se sigue después)
   const [invoiceDraftAt, setInvoiceDraftAt] = useState<string | null>(null)
 
@@ -162,13 +165,14 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (invoicing)     { setInvoicing(false) }
+      if (corrigiendo)   { setCorrigiendo(null) }
+      else if (invoicing) { setInvoicing(false) }
       else if (showForm) { setShowForm(false); setEditing(null); setNumeroNuevo(null) }
       else if (selected) { setSelected(null) }
     }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [showForm, selected, invoicing])
+  }, [showForm, selected, invoicing, corrigiendo])
 
   const selectedId = selected?.id
   const loadSaleInvoices = useCallback(async (saleId: number) => {
@@ -623,19 +627,25 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               {facturas && (
                 <div className="mb-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
                   {activeInvoice ? (
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-semibold">🧾 Factura #{activeInvoice.invoice_number}</div>
-                        <div className="text-xs text-neutral-500 truncate">
-                          {activeInvoice.customer_name} · Bs {bs(activeInvoice.total_bs)}
-                          {activeInvoice.retention_status === 'PENDIENTE' && <span className="text-amber-700"> · retención pendiente</span>}
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-semibold">🧾 Factura #{activeInvoice.invoice_number}</div>
+                          <div className="text-xs text-neutral-500 truncate">
+                            {activeInvoice.customer_name} · Bs {bs(activeInvoice.total_bs)}
+                            {activeInvoice.retention_status === 'PENDIENTE' && <span className="text-amber-700"> · retención pendiente</span>}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <a href={`/factura/${activeInvoice.id}?print=1`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">Imprimir</a>
+                          <a href={`/facturas?id=${activeInvoice.id}`} className="btn-secondary text-xs">Ver</a>
                         </div>
                       </div>
-                      <div className="flex gap-2 shrink-0">
-                        <a href={`/factura/${activeInvoice.id}?print=1`} target="_blank" rel="noreferrer" className="btn-secondary text-xs">Imprimir</a>
-                        <a href={`/facturas?id=${activeInvoice.id}`} className="btn-secondary text-xs">Ver</a>
+                      <div className="mt-2 pt-2 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] text-neutral-500">¿Nombre, RIF, monto o producto mal? No hagas otra venta:</span>
+                        <button onClick={() => setCorrigiendo(activeInvoice)} className="btn-warning text-xs">¿Salió mal? Corregir factura</button>
                       </div>
-                    </div>
+                    </>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
                       {invoiceDraftAt ? (
@@ -726,6 +736,18 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           onClose={() => {
             setInvoicing(false)
             // el form manda lo pendiente al cerrarse; se relee un instante después
+            const id = selected.id
+            setTimeout(() => loadSaleInvoices(id), 600)
+          }}
+          onSaved={() => loadSaleInvoices(selected.id)}
+        />
+      )}
+
+      {corrigiendo && selected && (
+        <FacturaForm
+          replaces={corrigiendo}
+          onClose={() => {
+            setCorrigiendo(null)
             const id = selected.id
             setTimeout(() => loadSaleInvoices(id), 600)
           }}
