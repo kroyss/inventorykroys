@@ -24,15 +24,30 @@ const PATRONES = [
   '214121', '412121', '111143', '111341', '131141', '114113', '114311', '411113', '411311', '113141',
   '114131', '311141', '411131', '211412', '211214', '211232', '2331112',
 ]
-const START_B = 104, STOP = 106
+const START_B = 104, CODE_C = 99, STOP = 106
 
-/** Módulos (anchos alternados barra, espacio, barra…) del texto en Code 128 B. */
+/**
+ * Módulos (anchos alternados barra, espacio, barra…) del texto en Code 128. El prefijo va en el juego B y,
+ * si termina en 4+ dígitos, esos van en el juego C (dos dígitos por símbolo): "COD-0553" ocupa 7 símbolos
+ * en vez de 8, y con el mismo ancho las barras salen más gruesas (más fáciles de leer).
+ */
 export function code128(texto: string): number[] {
-  const valores = [...texto].map(c => {
+  const m = texto.match(/^(.*?)(\d{4,})$/)
+  let prefijo = texto, digitos = ''
+  if (m) {
+    // Cantidad par de dígitos para C; si es impar, el primero queda en B.
+    const par = m[2].length % 2 === 0 ? m[2] : m[2].slice(1)
+    prefijo = texto.slice(0, texto.length - par.length); digitos = par
+  }
+  const valores = [...prefijo].map(c => {
     const v = c.charCodeAt(0) - 32
     if (v < 0 || v > 94) throw new Error(`Carácter no válido para el código de barras: ${c}`)
     return v
   })
+  if (digitos) {
+    valores.push(CODE_C)
+    for (let k = 0; k < digitos.length; k += 2) valores.push(Number(digitos.slice(k, k + 2)))
+  }
   const check = valores.reduce((s, v, i) => s + v * (i + 1), START_B) % 103
   return [START_B, ...valores, check, STOP].flatMap(v => [...PATRONES[v]].map(Number))
 }
@@ -67,7 +82,14 @@ function lineas(texto: string, font: PDFFont, size: number, ancho: number, max: 
 
 const MM = 72 / 25.4
 
-export async function pdfEtiquetas(etiquetas: EtiquetaProducto[], tamano: TamanoEtiqueta): Promise<Uint8Array> {
+/**
+ * Ajuste de la impresora (mm), por tamaño: la página que espera el driver y dónde cae la etiqueta en ella.
+ * Sin ajuste, la página mide lo mismo que la etiqueta. Ej. SolucionesMC (18-10, igual que lo dejaba
+ * Label Cut, que su térmica imprime bien): página 64,6 × 24,7 y la etiqueta 1,8 mm a la derecha.
+ */
+export interface AjusteImpresora { ancho: number; alto: number; x: number; y: number }
+
+export async function pdfEtiquetas(etiquetas: EtiquetaProducto[], tamano: TamanoEtiqueta, ajuste?: AjusteImpresora | null): Promise<Uint8Array> {
   const { ancho, alto } = TAMANOS[tamano]
   const grande = tamano === '57x32'
   const pdf = await PDFDocument.create()
@@ -75,36 +97,45 @@ export async function pdfEtiquetas(etiquetas: EtiquetaProducto[], tamano: Tamano
   const negrita = await pdf.embedFont(StandardFonts.HelveticaBold)
   const normal = await pdf.embedFont(StandardFonts.Helvetica)
   const W = ancho * MM, H = alto * MM
-  const margen = 1.6 * MM
-  const tamCodigo = grande ? 13 : 11
-  const tamNombre = grande ? 7 : 6
+  const PW = (ajuste?.ancho || ancho) * MM, PH = (ajuste?.alto || alto) * MM
+  // Origen de la etiqueta en la página (abajo-izquierda de pdf-lib): x a la derecha, y medido desde arriba.
+  const ox = (ajuste?.x ?? 0) * MM
+  const oy = PH - H - (ajuste?.y ?? 0) * MM
+  const margen = 1.5 * MM
+  const tamCodigo = grande ? 12 : 10
+  const tamNombre = grande ? 8.5 : 7.5
   const maxLineas = grande ? 3 : 2
-  const altoBarras = (grande ? 14 : 10) * MM
-  // Módulo de 0,25 mm = 2 puntos exactos en impresoras de 203 dpi (y 3 en las de 300): barras parejas.
-  const modulo = 0.25 * MM
+  const aire = 2 * MM          // zona libre mínima a cada lado de las barras (la necesita el lector)
+  const separacion = 1 * MM    // entre el nombre y las barras
+  // Módulo de 0,375 mm = 3 puntos exactos en térmicas de 203 dpi: barras parejas y bien gruesas.
+  const moduloIdeal = 0.375 * MM
 
   for (const e of etiquetas) {
     const code = limpiar(e.code)
     const nombre = limpiar(e.name)
     const modulos = code128(code)
     const total = modulos.reduce((s, m) => s + m, 0)
-    // Si no entra (código largo), se achica el módulo hasta caber con 2 mm de aire a cada lado.
-    const m = Math.min(modulo, (W - 2 * margen - 4 * MM) / total)
+    // El más grueso que entra con su aire a los costados (códigos largos: se achica).
+    const m = Math.min(moduloIdeal, (W - 2 * margen - 2 * aire) / total)
+    const renglones = lineas(nombre, normal, tamNombre, W - 2 * margen, maxLineas)
     for (let c = 0; c < Math.max(1, e.copias); c++) {
-      const page = pdf.addPage([W, H])
+      const page = pdf.addPage([PW, PH])
+      const T = (x: number, y: number) => ({ x: ox + x, y: oy + y })
       // COD arriba, grande
-      const yCodigo = H - margen - tamCodigo * 0.78
-      page.drawText(code, { x: margen, y: yCodigo, size: tamCodigo, font: negrita, color: rgb(0, 0, 0) })
-      // Nombre de inventario
-      let y = yCodigo - tamNombre * 1.25
-      for (const l of lineas(nombre, normal, tamNombre, W - 2 * margen, maxLineas)) {
-        page.drawText(l, { x: margen, y, size: tamNombre, font: normal, color: rgb(0, 0, 0) })
-        y -= tamNombre * 1.15
+      const yCodigo = H - margen - tamCodigo * 0.74
+      page.drawText(code, { ...T(margen, yCodigo), size: tamCodigo, font: negrita, color: rgb(0, 0, 0) })
+      // Nombre de inventario, pegado al código
+      let y = yCodigo - tamNombre * 1.2
+      for (const l of renglones) {
+        page.drawText(l, { ...T(margen, y), size: tamNombre, font: normal, color: rgb(0, 0, 0) })
+        y -= tamNombre * 1.1
       }
-      // Código de barras abajo, centrado
+      // Barras: desde el margen de abajo hasta justo debajo del nombre (más altas si el nombre es corto).
+      const techo = y + tamNombre * 1.1 - tamNombre * 0.25 - separacion
+      const altoBarras = Math.max(6 * MM, techo - margen)
       let x = (W - total * m) / 2
       modulos.forEach((anchoMod, i) => {
-        if (i % 2 === 0) page.drawRectangle({ x, y: margen, width: anchoMod * m, height: altoBarras, color: rgb(0, 0, 0) })
+        if (i % 2 === 0) page.drawRectangle({ ...T(x, margen), width: anchoMod * m, height: altoBarras, color: rgb(0, 0, 0) })
         x += anchoMod * m
       })
     }

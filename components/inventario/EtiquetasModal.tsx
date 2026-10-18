@@ -8,6 +8,9 @@ import { TAMANOS, type TamanoEtiqueta } from '@/lib/etiquetasTamanos'
 
 const CLAVE_TAMANO = 'etiquetas_tamano'
 
+interface Ajuste { ancho: number; alto: number; x: number; y: number }
+const num = (v: string) => Number(v.replace(',', '.'))
+
 export default function EtiquetasModal({ items, soloId, onCerrar }: {
   items: InventoryItem[]
   /** Abierta desde la fila de un producto: arranca con solo ese marcado. */
@@ -24,6 +27,32 @@ export default function EtiquetasModal({ items, soloId, onCerrar }: {
   const [buscar, setBuscar] = useState('')
   const [generando, setGenerando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Ajuste de la impresora (por empresa y tamaño): página que espera el driver y dónde cae la etiqueta.
+  const [ajustes, setAjustes] = useState<Partial<Record<TamanoEtiqueta, Ajuste>>>({})
+  const [verAjuste, setVerAjuste] = useState(false)
+  const [borrador, setBorrador] = useState({ ancho: '', alto: '', x: '', y: '' })
+  const [guardandoAjuste, setGuardandoAjuste] = useState(false)
+  useEffect(() => {
+    fetch('/api/inventory/etiquetas-ajuste').then(r => (r.ok ? r.json() : {})).then(setAjustes).catch(() => {})
+  }, [])
+  const ajuste = ajustes[tamano] ?? null
+  useEffect(() => {
+    const t = TAMANOS[tamano], a = ajustes[tamano]
+    setBorrador({ ancho: String(a?.ancho ?? t.ancho), alto: String(a?.alto ?? t.alto), x: String(a?.x ?? 0), y: String(a?.y ?? 0) })
+  }, [tamano, ajustes])
+  const guardarAjuste = async (sinAjuste = false) => {
+    const nuevo = sinAjuste ? null : { ancho: num(borrador.ancho), alto: num(borrador.alto), x: num(borrador.x) || 0, y: num(borrador.y) || 0 }
+    if (nuevo && (!(nuevo.ancho > 0) || !(nuevo.alto > 0))) { setError('Ancho y alto de la página deben ser números'); return }
+    setGuardandoAjuste(true); setError(null)
+    const r = await fetch('/api/inventory/etiquetas-ajuste', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tamano, ajuste: nuevo }),
+    }).catch(() => null)
+    setGuardandoAjuste(false)
+    const d = r ? await r.json().catch(() => null) : null
+    if (!r?.ok) { setError(d?.error ?? 'No se pudo guardar el ajuste'); return }
+    setAjustes(d ?? {})
+    setVerAjuste(false)
+  }
 
   useEffect(() => {
     try { const t = localStorage.getItem(CLAVE_TAMANO); if (t === '50x25' || t === '57x32') setTamano(t) } catch { /* sin almacenamiento */ }
@@ -55,7 +84,7 @@ export default function EtiquetasModal({ items, soloId, onCerrar }: {
     try {
       // pdf-lib solo se carga al imprimir (no pesa en la pantalla de Inventario).
       const { pdfEtiquetas, descargarPdf } = await import('@/lib/etiquetasProducto')
-      const bytes = await pdfEtiquetas(marcados.map(i => ({ code: i.code, name: i.name, copias: copias[i.product_id] })), tamano)
+      const bytes = await pdfEtiquetas(marcados.map(i => ({ code: i.code, name: i.name, copias: copias[i.product_id] })), tamano, ajuste)
       const hoy = new Date().toLocaleDateString('en-CA')
       descargarPdf(bytes, marcados.length === 1 ? `etiqueta-${marcados[0].code}-${tamano}.pdf` : `etiquetas-${total}-${tamano}-${hoy}.pdf`)
     } catch (e) {
@@ -134,9 +163,31 @@ export default function EtiquetasModal({ items, soloId, onCerrar }: {
         <div className="space-y-2 border-t bg-neutral-50 px-5 py-3">
           {error && <p className="text-sm text-red-600">{error}</p>}
           <p className="text-[11px] text-neutral-500">
-            Al imprimir el PDF: <b>Escala 100 %</b> (no “Ajustar”), <b>márgenes: ninguno</b> y en la impresora el papel de <b>{TAMANOS[tamano].nombre}</b>.
-            Prueba primero con una sola etiqueta.
+            Al imprimir el PDF: <b>Escala 100 %</b> (no “Ajustar”) y <b>márgenes: ninguno</b>.
+            Página del PDF: <b>{ajuste ? `${ajuste.ancho} × ${ajuste.alto} mm` : TAMANOS[tamano].nombre}</b>
+            {ajuste && (ajuste.x || ajuste.y) ? <> · etiqueta movida {ajuste.x} mm → / {ajuste.y} mm ↓</> : null}.
+            {' '}<button onClick={() => setVerAjuste(v => !v)} className="underline hover:text-neutral-800">Ajuste de la impresora</button>
           </p>
+          {verAjuste && (
+            <div className="rounded-lg border border-neutral-200 bg-white p-3 space-y-2">
+              <p className="text-[11px] text-neutral-500">
+                Si la impresora no detecta bien la etiqueta o sale corrida, pon aquí el tamaño de papel que tiene configurado y
+                cuánto mover la etiqueta (mm). Se guarda para toda la empresa, para el rollo de {TAMANOS[tamano].nombre}.
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([['ancho', 'Ancho de página'], ['alto', 'Alto de página'], ['x', 'Mover → (mm)'], ['y', 'Mover ↓ (mm)']] as const).map(([k, l]) => (
+                  <label key={k} className="text-[11px] text-neutral-500">{l}
+                    <input value={borrador[k]} inputMode="decimal" onChange={e => setBorrador(b => ({ ...b, [k]: e.target.value }))}
+                      className="mt-0.5 w-full rounded border border-neutral-300 px-2 py-1 text-sm" />
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                {ajuste && <button onClick={() => guardarAjuste(true)} disabled={guardandoAjuste} className="text-xs text-neutral-500 underline">Quitar ajuste</button>}
+                <button onClick={() => guardarAjuste()} disabled={guardandoAjuste} className="btn-primary text-xs">{guardandoAjuste ? 'Guardando…' : 'Guardar ajuste'}</button>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">
               <b className="num">{marcados.length}</b> {marcados.length === 1 ? 'producto' : 'productos'} · <b className="num">{total}</b> {total === 1 ? 'etiqueta' : 'etiquetas'}
