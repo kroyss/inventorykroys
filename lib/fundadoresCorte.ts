@@ -13,7 +13,7 @@ import type { Country } from '@/lib/types'
 
 export const FECHA_CORTE = '2026-10-19'
 const CREADAS_HASTA = FECHA_LIMITE_ACTIVACION     // 18/10: todo lo creado hasta el domingo tiene el mismo plazo
-const HORA_CORTE = 7                              // hora de Venezuela
+const HORA_CORTE = 23                             // hora de Venezuela (18-10: de 7 a 23, un día completo más)
 const CLAVE = `fundadores_corte_${FECHA_CORTE}`
 
 export async function corteFundadores() {

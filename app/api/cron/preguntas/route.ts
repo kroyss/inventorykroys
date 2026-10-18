@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       console.error('[avisos telegram]', err instanceof Error ? err.message : err)
     }
-    // Corte de Fundadores sin MercadoLibre conectado (lib/fundadoresCorte.ts): una sola vez, el lunes 19/10.
+    // Corte de Fundadores sin MercadoLibre conectado (lib/fundadoresCorte.ts): una sola vez, el lunes 19/10 a las 23:00.
     try {
       const r = await corteFundadores()
       if (r) console.log('[corte fundadores]', r)
