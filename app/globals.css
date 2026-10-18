@@ -80,3 +80,13 @@ select:focus-visible, textarea:focus-visible {
 .no-spinner {
   -moz-appearance: textfield;
 }
+
+/* iPhone (17-10): Safari hace zoom solo al tocar un cuadro con letra de menos de 16 px y no vuelve a su tamaño
+   al terminar (la pantalla quedaba "agrandada" hasta pellizcar). En el celular los cuadros de texto van a 16 px.
+   Va con !important porque la mayoría de los cuadros tienen text-sm / text-xs de Tailwind. */
+@media (max-width: 767px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),
+  select, textarea {
+    font-size: 16px !important;
+  }
+}

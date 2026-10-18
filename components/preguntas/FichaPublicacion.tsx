@@ -10,24 +10,37 @@ import type { Ficha } from '@/app/api/preguntas/publicacion/route'
 const dinero = (n: number, moneda: string) =>
   `${moneda === 'COP' ? '$' : moneda === 'VES' ? 'Bs' : 'US$'} ${n.toLocaleString('de-DE', moneda === 'COP' ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+/** Variante a resaltar al abrir (17-10): la agotada desde Stock ("Esta se agotó"), la comprada desde Mensajes. */
+export interface MarcaVariante { id: string | number; texto: string; tono: 'rojo' | 'verde' }
+
 /** Envuelve lo que abre la ficha (foto, título): un botón sin estilo propio. */
-export function AbrirFicha({ item, children, className = '', title = 'Ver la publicación' }: { item: string; children: ReactNode; className?: string; title?: string }) {
+export function AbrirFicha({ item, children, className = '', title = 'Ver la publicación', marcar }: { item: string; children: ReactNode; className?: string; title?: string; marcar?: MarcaVariante | null }) {
   const [abierta, setAbierta] = useState(false)
   return <>
     <button type="button" onClick={() => setAbierta(true)} title={title} className={`text-left ${className}`}>{children}</button>
-    {abierta && <FichaPublicacion item={item} onCerrar={() => setAbierta(false)} />}
+    {abierta && <FichaPublicacion item={item} marcar={marcar} onCerrar={() => setAbierta(false)} />}
   </>
 }
 
-export function FichaPublicacion({ item, onCerrar }: { item: string; onCerrar: () => void }) {
+export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onCerrar: () => void; marcar?: MarcaVariante | null }) {
   const [f, setF] = useState<Ficha | { error: string } | null>(null)
   const [foto, setFoto] = useState(0)
+  // Variante que se tocó para ver su foto (marco azul). Antes se marcaba la de la foto mostrada y, al abrir,
+  // parecía "elegida" la de la primera foto (17-10: se confundía con la agotada).
+  const [tocada, setTocada] = useState<number | null>(null)
   const [desc, setDesc] = useState(false)
 
   useEffect(() => {
     let vivo = true
     fetch(`/api/preguntas/publicacion?item=${item}`)
-      .then(async r => { const d = await r.json().catch(() => ({ error: 'No se pudo leer' })); if (vivo) setF(r.ok ? d : { error: d.error ?? 'No se pudo leer' }) })
+      .then(async r => {
+        const d = await r.json().catch(() => ({ error: 'No se pudo leer' }))
+        if (!vivo) return
+        setF(r.ok ? d : { error: d.error ?? 'No se pudo leer' })
+        // Con una variante a resaltar: arranca en su foto, si tiene.
+        const v = r.ok && marcar ? (d as Ficha).variantes?.find(x => x.id === String(marcar.id)) : null
+        if (v?.foto != null) setFoto(v.foto)
+      })
       .catch(() => vivo && setF({ error: 'Sin conexión' }))
     return () => { vivo = false }
   }, [item])
@@ -134,14 +147,20 @@ export function FichaPublicacion({ item, onCerrar }: { item: string; onCerrar: (
                   <div>
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">Variantes</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {f.variantes.map((v, i) => (
-                        <button key={i} type="button" disabled={v.foto == null} onClick={() => v.foto != null && setFoto(v.foto)}
-                          title={v.foto != null ? 'Ver su foto' : undefined}
-                          className={`rounded-lg border px-2.5 py-1.5 text-left text-xs ${v.foto != null && v.foto === foto ? 'border-sky-500 bg-sky-50' : 'border-neutral-200'} ${v.foto != null ? 'hover:border-neutral-400' : 'cursor-default'}`}>
-                          <span className="block font-medium text-neutral-900">{v.nombre}</span>
-                          <span className={v.stock > 0 ? 'text-neutral-500' : 'text-red-600'}>{v.stock > 0 ? `${v.stock} disp.` : 'Sin stock'}</span>
-                        </button>
-                      ))}
+                      {f.variantes.map((v, i) => {
+                        const marcada = !!marcar && v.id === String(marcar.id)
+                        const tono = marcada ? (marcar!.tono === 'rojo' ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200')
+                          : tocada === i ? 'border-sky-500 bg-sky-50' : 'border-neutral-200'
+                        return (
+                          <button key={i} type="button" disabled={v.foto == null} onClick={() => { if (v.foto != null) { setFoto(v.foto); setTocada(i) } }}
+                            title={v.foto != null ? 'Ver la foto de esta variante' : 'Esta variante no tiene foto propia'}
+                            className={`rounded-lg border px-2.5 py-1.5 text-left text-xs ${tono} ${v.foto != null ? 'hover:border-neutral-400' : 'cursor-default'}`}>
+                            {marcada && <span className={`mb-0.5 block text-[10px] font-semibold uppercase ${marcar!.tono === 'rojo' ? 'text-red-700' : 'text-emerald-700'}`}>{marcar!.texto}</span>}
+                            <span className="block font-medium text-neutral-900">{v.nombre}</span>
+                            <span className={v.stock > 0 ? 'text-neutral-500' : 'text-red-600'}>{v.stock > 0 ? `${v.stock} disp.` : 'Sin stock'}</span>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 )}

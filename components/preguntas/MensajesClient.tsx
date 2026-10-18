@@ -208,7 +208,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null
-    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null; situacion?: Situacion; disponible?: number | null }[] | null>(null)
+    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null; situacion?: Situacion; disponible?: number | null; variacion?: number | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
@@ -345,7 +345,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
         {items?.length ? (
           <div className="flex items-start gap-2.5">
           {items.filter(it => it.imagen).slice(0, 3).map((it, i) => (
-            <AbrirFicha key={it.id + i} item={it.id} className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-neutral-200 bg-white hover:border-neutral-400">
+            <AbrirFicha key={it.id + i} item={it.id} marcar={it.variacion ? { id: it.variacion, texto: 'Esta compró', tono: 'verde' } : null} className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-neutral-200 bg-white hover:border-neutral-400">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={it.imagen!} alt="" className="h-full w-full object-contain" />
             </AbrirFicha>
@@ -355,7 +355,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
               <div key={it.id + i}>
                 <p className="text-sm font-medium text-neutral-900">
                   {/^[A-Z]{3}\d+$/.test(it.id)
-                    ? <AbrirFicha item={it.id} className="hover:underline underline-offset-2">{it.titulo}</AbrirFicha>
+                    ? <AbrirFicha item={it.id} marcar={it.variacion ? { id: it.variacion, texto: 'Esta compró', tono: 'verde' } : null} className="hover:underline underline-offset-2">{it.titulo}</AbrirFicha>
                     : it.titulo}
                   {it.variante && (
                     <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>

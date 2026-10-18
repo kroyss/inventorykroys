@@ -16,7 +16,7 @@ export interface Ficha {
   id: string; titulo: string; precio: number | null; precio_original: number | null; moneda: string
   disponible: number; vendidos: number | null; condicion: string | null; estado: string | null; link: string
   envio_gratis: boolean; garantia: string | null; fotos: string[]
-  variantes: { nombre: string; stock: number; foto: number | null }[]
+  variantes: { id: string; nombre: string; stock: number; foto: number | null }[]
   atributos: { nombre: string; valor: string }[]
   descripcion: string; ejemplo?: boolean
 }
@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
         variantes: (it.variations ?? []).map(v => {
           const i = v.picture_ids?.length ? ids.indexOf(v.picture_ids[0]) : -1
           return {
+            id: String(v.id),
             nombre: (v.attribute_combinations ?? []).map(a => a.value_name).filter(Boolean).join(' · ') || `Variante ${v.id}`,
             stock: v.available_quantity ?? 0, foto: i >= 0 && i < fotos.length ? i : null,
           }
@@ -112,9 +113,9 @@ function fichaEjemplo(item: string, titulo: string, precio: number | null, foto:
     envio_gratis: false, garantia: 'Garantía del vendedor: 30 días',
     fotos: [...(foto ? [foto] : []), color('#2563eb', 'Foto azul'), color('#111827', 'Foto negra'), color('#db2777', 'Foto rosada'), color('#65a30d', 'Detalle')],
     variantes: [
-      { nombre: 'Azul', stock: 15, foto: foto ? 1 : 0 },
-      { nombre: 'Negro', stock: 22, foto: foto ? 2 : 1 },
-      { nombre: 'Rosado', stock: 0, foto: foto ? 3 : 2 },
+      { id: '1', nombre: 'Azul', stock: 15, foto: foto ? 1 : 0 },
+      { id: '2', nombre: 'Negro', stock: 22, foto: foto ? 2 : 1 },
+      { id: '3', nombre: 'Rosado', stock: 0, foto: foto ? 3 : 2 },
     ],
     atributos: [
       { nombre: 'Marca', valor: 'Genérica' }, { nombre: 'Modelo', valor: 'X-200' },

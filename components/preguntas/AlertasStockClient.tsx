@@ -126,6 +126,10 @@ export default function AlertasStockClient() {
   const olvido = filas.filter(f => !f.caliente)
 
 
+  // "Color: Azul 2 Rayas · Talla: M" → "Azul 2 Rayas · M" (como lo muestra la ficha).
+  const soloValores = (v: string) => v.split(' · ').map(p => p.replace(/^[^:]+:\s*/, '')).join(' · ')
+  const marca = (f: Fila) => f.variante && Number(f.variante_id) > 0 && vista !== 'pausadas'
+    ? { id: f.variante_id, texto: vista === 'agotadas' ? 'Esta se agotó' : 'Quedan pocas', tono: 'rojo' as const } : null
   const reciente = (f: Fila) => {
     if (vista === 'pausadas') return true   // pausadas: "Volver a la lista" siempre (no vencen a los 7 días)
     const d = vista === 'agotadas' ? f.agotada_desde : f.bajo_desde
@@ -141,7 +145,7 @@ export default function AlertasStockClient() {
           className="order-5 sm:order-none w-4 h-4 accent-neutral-900 shrink-0" />
       )}
       {f.imagen
-        ? <AbrirFicha item={f.item_id} className="order-1 sm:order-none w-11 h-11 shrink-0 overflow-hidden rounded bg-neutral-100 ring-1 ring-transparent hover:ring-neutral-400">
+        ? <AbrirFicha item={f.item_id} marcar={marca(f)} className="order-1 sm:order-none w-11 h-11 shrink-0 overflow-hidden rounded bg-neutral-100 ring-1 ring-transparent hover:ring-neutral-400">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={f.imagen.replace(/^http:/, 'https:')} alt="" className="h-full w-full object-cover" />
           </AbrirFicha>
@@ -149,10 +153,15 @@ export default function AlertasStockClient() {
       <div className="order-2 sm:order-none min-w-0 flex-1 basis-0 sm:basis-auto">
         <p className="text-sm text-neutral-900 truncate">
           {/* Abre la ficha de la publicación encima (como en Preguntas y Mensajes); desde ahí, a ML. */}
-          <AbrirFicha item={f.item_id} className="max-w-full truncate align-bottom hover:underline underline-offset-2">{f.titulo}</AbrirFicha>
+          <AbrirFicha item={f.item_id} marcar={marca(f)} className="max-w-full truncate align-bottom hover:underline underline-offset-2">{f.titulo}</AbrirFicha>
         </p>
+        {/* La variante completa, en su línea (17-10: "Color: Az…" cortado no decía cuál se agotó). */}
+        {f.variante && vista !== 'pausadas' && (
+          <p className={`text-xs font-semibold ${vista === 'agotadas' ? 'text-red-700' : 'text-amber-700'}`}>
+            {vista === 'agotadas' ? 'Se agotó: ' : 'Quedan pocas: '}{soloValores(f.variante)}
+          </p>
+        )}
         <p className="text-xs text-neutral-500 truncate">
-          {f.variante && <span className="text-neutral-700 font-medium">{f.variante} · </span>}
           {f.cuenta} · {f.item_id}
           {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML</span>}
         </p>

@@ -256,6 +256,7 @@ export interface ItemVenta { id: string; titulo: string; variante: string | null
   usd?: number | null; usd_aprox?: boolean
   /** Situación de la publicación hoy en ML: activa / agotada / pausada a mano (catálogo). */
   situacion?: 'activa' | 'agotada' | 'pausada' | 'pausada_ml' | null
+  variacion?: number | null    // la variante que compró (la ficha la marca con "Esta compró")
   disponible?: number | null   // unidades disponibles hoy en ML (catálogo)
   /** Envío gratis de esta compra según el precio pagado y el peso del portal (ZOOM y TEALCA / solo TEALCA / destino). */
   envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null }
@@ -304,7 +305,7 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
     it.envio = e ? { estado: e.estado, texto: e.texto }
       : { estado: 'sin_peso', texto: 'Sin peso: no está en el portal de MercadoEnvíos ni vinculada a un producto con peso' }
   }
-  return { items: items.map(({ varId: _v, ...it }) => it), comprador }
+  return { items: items.map(({ varId, ...it }) => ({ ...it, variacion: varId })), comprador }
 }
 
 /** Foto del producto vendido: la de la variante (el color que compró) si la publicación tiene
