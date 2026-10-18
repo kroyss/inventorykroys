@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
+import EtiquetasModal from './EtiquetasModal'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useEscape } from '@/components/ui/useEscape'
 import NumberInput from '@/components/ui/NumberInput'
@@ -146,6 +147,8 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
   const confirm = useConfirm()
   const [aviso, setAviso]       = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [aplicandoRec, setAplicandoRec] = useState(false)
+  // Etiquetas (18-10): null = cerrada; 0 = todos con stock; id = solo ese producto.
+  const [etiquetas, setEtiquetas] = useState<number | null>(null)
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [search,   setSearch]   = useState('')
   const [statusF,  setStatusF]  = useState<StockStatus | ''>('')
@@ -399,14 +402,19 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={
-        isAdmin && sinConfigurar > 0 && (
+      <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
+        <button onClick={() => setEtiquetas(0)} className="btn-secondary text-sm whitespace-nowrap"
+          title="Etiquetas con código, nombre y código de barras para estantes y cajas">
+          🏷 Imprimir etiquetas
+        </button>
+        {isAdmin && sinConfigurar > 0 && (
           <button onClick={usarRecomendados} disabled={aplicandoRec} className="btn-secondary text-sm whitespace-nowrap"
             title="Guarda el mínimo y máximo recomendado en los productos que no lo tienen configurado">
             {aplicandoRec ? 'Guardando…' : `Usar recomendados (${sinConfigurar})`}
           </button>
-        )
-      } />
+        )}
+      </>} />
+      {etiquetas !== null && <EtiquetasModal items={items} soloId={etiquetas || null} onCerrar={() => setEtiquetas(null)} />}
       {aviso && (
         <div className={`px-4 py-2 rounded-lg text-sm border ${aviso.type === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
           {aviso.text}
@@ -496,7 +504,11 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
                   <td className="px-3 py-2 text-center">
                     <StatusBadge status={item.status} label={STATUS_LABEL[item.status]} />
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {item.is_active && (
+                      <button onClick={e => { e.stopPropagation(); setEtiquetas(item.product_id) }}
+                        className="btn-secondary text-xs px-2 py-1 mr-1.5" title="Imprimir la etiqueta de este producto" aria-label="Etiqueta">🏷</button>
+                    )}
                     <button
                       onClick={e => { e.stopPropagation(); selectItem(item) }}
                       className="btn-secondary text-xs px-2.5 py-1 whitespace-nowrap"
