@@ -111,7 +111,7 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
                   <div ref={tira} className="relative mt-2 flex gap-1.5 overflow-x-auto pb-1">
                     {f.fotos.map((u, i) => (
                       <button key={i} type="button" onClick={() => setFoto(i)} aria-label={`Foto ${i + 1}`}
-                        className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-white ${i === foto ? 'border-sky-500 ring-2 ring-sky-200' : 'border-neutral-200 hover:border-neutral-400'}`}>
+                        className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-white ${i === foto ? 'border-neutral-800 ring-2 ring-neutral-300' : 'border-neutral-200 hover:border-neutral-400'}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={u} alt="" loading="lazy" className="h-full w-full object-contain" />
                       </button>
