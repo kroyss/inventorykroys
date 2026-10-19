@@ -263,16 +263,21 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
                     <td className="px-3 py-2 text-xs">
                       <div className={especial ? 'text-amber-700 font-medium' : ''}>{p.envio_metodo ?? '—'}</div>
                       <div className="text-neutral-500">{[p.envio_opcion, p.carrier].filter(Boolean).join(' · ')}</div>
-                      {!p.tiene_guia && <div className="text-neutral-400">sin guía</div>}
+                      {/* La guía a la vista (19-10): número y PDF, por si hay que consultarla. */}
+                      {p.guia && <div className="text-neutral-700">Guía <span className="font-mono">{p.guia}</span></div>}
+                      {p.tiene_guia
+                        ? <a href={`/api/pagos-me/${p.id}/archivo?tipo=guia`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                            className="underline text-sky-700">📄 Guía</a>
+                        : <div className="text-neutral-400">sin guía</div>}
                     </td>
                     <td className="px-3 py-2 text-xs">
                       {datos?.desdeML ? <>
                         {p.ml_estado === 'cancelled' && <div className="text-red-700 font-medium">cancelada en ML</div>}
-                        {p.en_despachos ? <div className="text-neutral-700">en Despachos</div>
+                        {p.en_despachos ? <a href="/despachos" onClick={e => e.stopPropagation()} className="text-neutral-700 underline underline-offset-2 hover:text-sky-700">en Despachos →</a>
                           : <div className="text-neutral-400">{p.tiene_guia ? 'todavía no en Despachos' : 'sin guía todavía'}</div>}
                       </> : <>
                         {p.sale_status ? <div>{p.sale_status}</div> : <div className="text-neutral-400">no registrada</div>}
-                        {p.en_despachos && <div className="text-neutral-500">en Despachos</div>}
+                        {p.en_despachos && <a href="/despachos" onClick={e => e.stopPropagation()} className="block text-neutral-500 underline underline-offset-2 hover:text-sky-700">en Despachos →</a>}
                       </>}
                     </td>
                     <td className="px-3 py-2 text-xs" onClick={e => e.stopPropagation()}>
