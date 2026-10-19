@@ -7,7 +7,7 @@ import { dbGlobal } from '@/lib/db'
 
 export const PORCENTAJE_COMPLETO = 0.8
 
-export const SERIES = { automatizaciones: 'Automatizaciones', inventario: 'Inventario' } as const
+export const SERIES = { automatizaciones: 'Automatiza', inventario: 'Inventario' } as const
 export type Serie = keyof typeof SERIES
 /** Orden SQL de las series (Automatizaciones primero). */
 export const SQL_ORDEN_SERIE = `CASE v.serie WHEN 'automatizaciones' THEN 0 ELSE 1 END`

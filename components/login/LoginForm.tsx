@@ -52,7 +52,7 @@ export default function LoginForm({ marca }: { marca: Marca }) {
   const campo = 'w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
   // Automatizaciones primero: es con lo que arranca todo cliente; Inventario es opcional (2026-10-03).
   const productos = [
-    { t: 'Automatizaciones', d: 'Preguntas con IA, mensajes, despachos con manifiesto, reporte de guías, calificaciones y stock de todas tus cuentas' },
+    { t: 'Automatiza', d: 'Preguntas con IA, mensajes, despachos con manifiesto, reporte de guías, calificaciones y stock de todas tus cuentas' },
     { t: 'Inventario',       d: 'Opcional: stock, ventas, compras y la ganancia real de cada venta' },
     { t: 'Radar',            d: 'Qué se vende en MercadoLibre y dónde está la oportunidad' },
   ]
@@ -93,7 +93,7 @@ export default function LoginForm({ marca }: { marca: Marca }) {
       <main className="flex flex-col items-center justify-center px-6 py-10 bg-neutral-50 lg:bg-white">
         <div className="w-full max-w-sm">
           <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">Entrar</h2>
-          <p className="text-sm text-neutral-500 mt-1 mb-7">Una sola cuenta para Inventario, Automatizaciones y Radar.</p>
+          <p className="text-sm text-neutral-500 mt-1 mb-7">Una sola cuenta para Inventario, Automatiza y Radar.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

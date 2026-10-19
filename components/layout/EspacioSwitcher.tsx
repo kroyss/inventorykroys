@@ -18,7 +18,7 @@ function Icono({ de }: { de: keyof typeof ICONOS }) {
   )
 }
 
-const NOMBRES = { inventario: 'Inventario', automatizaciones: 'Automatizaciones' } as const
+const NOMBRES = { inventario: 'Inventario', automatizaciones: 'Automatiza' } as const   // 19-10: un solo nombre
 const CORTOS = { inventario: 'Inventario', automatizaciones: 'Automatiza' } as const   // botón de la barra
 
 // Selector de espacio junto al logo: muestra dónde estás y abre un menú con los demás.
@@ -67,7 +67,7 @@ export default function EspacioSwitcher({ automatizaciones, inventario, modulos,
         <span title={NOMBRES[actual]}>{CORTOS[actual]}</span>
         {/* Estando en otro espacio: punto si Automatizaciones tiene algo pendiente */}
         {actual !== 'automatizaciones' && totalAuto > 0 && (
-          <span className={`w-2 h-2 rounded-full ${urgentesAuto > 0 ? 'bg-red-500' : 'bg-neutral-400'}`} title="Hay pendientes en Automatizaciones" />
+          <span className={`w-2 h-2 rounded-full ${urgentesAuto > 0 ? 'bg-red-500' : 'bg-neutral-400'}`} title="Hay pendientes en Automatiza" />
         )}
         <svg viewBox="0 0 24 24" className={`w-4 h-4 text-neutral-400 transition-transform ${abierto ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>

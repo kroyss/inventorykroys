@@ -7,7 +7,7 @@ import CuentasConectadas, { type CuentaML } from '@/components/automatizaciones/
 import InicioAutomatizaciones, { type Herramienta } from '@/components/automatizaciones/InicioAutomatizaciones'
 import { puede } from '@/lib/permisos'
 
-export const metadata = { title: 'Automatizaciones' }
+export const metadata = { title: 'Automatiza' }
 
 // Inicio del espacio Automatizaciones: lo pendiente ahora + todas las herramientas sobre
 // MercadoLibre, agrupadas por momento de la venta. Lo que la empresa no tiene se muestra
@@ -62,7 +62,7 @@ export default async function AutomatizacionesPage() {
 
   return (
     <div>
-      <PageHeader title="Automatizaciones" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones"
+      <PageHeader title="Automatiza" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones"
         actions={ml && !sinCuentas ? <CuentasConectadas cuentas={cuentas} esAdmin={puede(u, 'ml_cuentas')} /> : undefined} />
       <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={puede(u, 'ml_cuentas')} />
     </div>

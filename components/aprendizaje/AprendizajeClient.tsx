@@ -8,7 +8,7 @@ export interface Video {
   visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
 }
 
-const NOMBRE_SERIE: Record<Video['serie'], string> = { automatizaciones: 'Automatizaciones', inventario: 'Inventario' }
+const NOMBRE_SERIE: Record<Video['serie'], string> = { automatizaciones: 'Automatiza', inventario: 'Inventario' }
 /** Duración a mostrar: la cargada en Plataforma o, si falta, la que reportó el reproductor. */
 const duracionDe = (v: Video) => v.duracion_video ?? (v.duracion_seg > 0 ? v.duracion_seg : null)
 const reloj = (seg: number) => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
@@ -330,7 +330,7 @@ function PrimerosPasos({ agendar, hayVideos }: { agendar: string | null; hayVide
   const pasos: { titulo: string; texto: string; link?: { href: string; label: string; externo?: boolean } }[] = [
     { titulo: 'Aprende primero', texto: hayVideos
         ? 'Mira los videos de esta página, en orden. Tus días de prueba no corren mientras no conectes tu cuenta.'
-        : 'Los videos cortos aparecerán en esta página. Mientras tanto, recorre Automatizaciones con calma: tus días de prueba no corren mientras no conectes tu cuenta.' },
+        : 'Los videos cortos aparecerán en esta página. Mientras tanto, recorre Automatiza con calma: tus días de prueba no corren mientras no conectes tu cuenta.' },
     { titulo: 'Conecta tu cuenta de MercadoLibre', texto: 'Con la cuenta PRINCIPAL abierta en este navegador. Desde ese día empiezan tus días de prueba.',
       link: { href: '/conectar', label: 'Conectar ahora →' } },
     { titulo: 'Escribe tus políticas', texto: 'Envíos, garantía, horarios y formas de pago: con eso la IA responde tus preguntas como tú.',

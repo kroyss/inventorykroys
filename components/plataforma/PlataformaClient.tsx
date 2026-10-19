@@ -322,7 +322,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
             <option value="activo">Activo (ya paga)</option>
             <option value="demo">🎬 Demo para videos: datos ficticios, nada sale a MercadoLibre</option>
           </select>
-          {f.alta === 'demo' && <span className="block mt-1 text-[11px] text-neutral-500">Se crea con 2 cuentas de ML ficticias y todo pendiente (Automatizaciones). Se restaura desde el menú de la cuenta → Demo.</span>}
+          {f.alta === 'demo' && <span className="block mt-1 text-[11px] text-neutral-500">Se crea con 2 cuentas de ML ficticias y todo pendiente (Automatiza). Se restaura desde el menú de la cuenta → Demo.</span>}
         </label>
         <label className="text-xs text-neutral-600">Administrador: nombre completo
           <input className={input} value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} />

@@ -22,7 +22,7 @@ interface Uso {
 }
 
 const SERIES: Record<Serie, { nombre: string; quien: string }> = {
-  automatizaciones: { nombre: 'Automatizaciones', quien: 'todas las empresas' },
+  automatizaciones: { nombre: 'Automatiza', quien: 'todas las empresas' },
   inventario:       { nombre: 'Inventario', quien: 'solo empresas con el módulo Inventario' },
 }
 const reloj = (seg: number | null) => seg ? `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}` : ''
@@ -215,7 +215,7 @@ export default function AprendizajePanel() {
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr><th className="px-4 py-2 text-left">Usuario</th><th className="px-4 py-2 text-left">Empresa</th>
-                  <th className="px-4 py-2 text-left">Automatizaciones</th>
+                  <th className="px-4 py-2 text-left">Automatiza</th>
                   {activosInv > 0 && <th className="px-4 py-2 text-left">Inventario</th>}<th className="px-4 py-2 text-left">Último video</th>
                   <th className="px-4 py-2 text-left">Último ingreso</th></tr>
               </thead>

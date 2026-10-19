@@ -55,7 +55,7 @@ const PRIMARY: NavItem[] = [
 
 const MORE: NavItem[] = [
   { href: '/inventario', label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
-  { href: '/automatizaciones', label: 'Automatizaciones', icon: 'automatizaciones', countries: ['VE', 'CO'] },
+  { href: '/automatizaciones', label: 'Automatiza', icon: 'automatizaciones', countries: ['VE', 'CO'] },
   { href: '/facturas',   label: 'Facturas',   icon: 'facturas',   countries: ['VE'] },
   { href: '/productos',  label: 'Productos',  icon: 'productos',  countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   countries: ['VE', 'CO'] },
