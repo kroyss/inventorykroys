@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { DIAS_SEMANA, proximoAuto, type HorarioME, type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
+import PorConfirmar, { usePorConfirmar } from '@/components/ventas/PorConfirmar'
 
 type Filtro = 'pendiente' | 'valido' | 'invalido' | 'todos'
 interface Resultado { ok: boolean; cuenta: string | null; vistas: number; nuevas: number; error: string | null; at: string }
@@ -45,6 +46,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const [ver, setVer] = useState<PagoME | null>(null)
   const [clave, setClave] = useState<string | null>(null)
   const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
+  // Sin inventario (Fundadores, 19-10): la lista por VENTA, como "Por confirmar"; la tabla queda como Historial.
+  const [vista, setVista] = useState<'ventas' | 'historial'>('ventas')
+  const pc = usePorConfirmar(!!datos?.desdeML)
 
   const cargar = useCallback(async () => {
     const r = await fetch(`/api/pagos-me?estado=${filtro}`)
@@ -194,6 +198,27 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
 
+      {datos?.desdeML && (
+        <div className="flex gap-1 border-b border-neutral-200">
+          {([['ventas', 'Ventas'], ['historial', 'Historial de pagos']] as const).map(([k, t]) => (
+            <button key={k} onClick={() => setVista(k)}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${vista === k ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+      {datos?.desdeML && vista === 'ventas' && (
+        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} onConfirmar={() => {}}
+          onVerificar={async (id, v) => {
+            const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
+            if (!r?.ok) setError('No se pudo guardar la verificación')
+            await Promise.all([pc.cargar(), cargar()])
+          }} />
+      )}
+
+      {(!datos?.desdeML || vista === 'historial') && <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
           {FILTROS.map(f => (
@@ -294,6 +319,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           </table>
         </div>
       )}
+
+      </>}
 
       {/* Comprobante en grande */}
       {ver && (

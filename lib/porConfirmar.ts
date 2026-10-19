@@ -31,7 +31,10 @@ export interface PorConfirmar {
   productos: EstadoProductos
   pago: { verificacion: 'pendiente' | 'valido' | 'invalido'; monto: number | null; retiro: boolean; at: string | null
           // La guía que trajo Pagos ME (para verla desde la fila: components/ventas/VerGuia.tsx).
-          id: number; guia: boolean; guiaNum: string | null } | null
+          id: number; guia: boolean; guiaNum: string | null
+          // Para verificar sin inventario (Pagos ME de los Fundadores, 19-10): contra qué se compara y de dónde vino.
+          totalOrden: number | null; banco: string | null; referencia: string | null; metodo: string | null
+          carrier: string | null; comprobante: boolean; verificadoAt: string | null } | null
   mensaje: { texto: string; at: string } | null    // lo último que escribió el comprador (después de comprar)
   vencida: boolean
 }
@@ -48,6 +51,8 @@ export async function ventasPorConfirmar(db: Pool) {
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_texto END AS msg_texto,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_at END AS msg_at,
             p.creado_at AS pago_at, p.id AS pago_id, p.guia_path IS NOT NULL AS tiene_guia, p.guia AS guia_num,
+            p.total_orden::float AS total_orden, p.banco_emisor, p.referencia, p.metodo_pago, p.carrier,
+            p.comprobante_path IS NOT NULL AS tiene_comprobante, p.verificado_at,
             (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
@@ -101,7 +106,10 @@ export async function ventasPorConfirmar(db: Pool) {
       numero: r.numero, fecha: r.fecha, cuenta: r.cuenta, comprador: r.comprador, nick: r.nick,
       total: r.total, moneda: r.moneda, lineas, productos,
       pago: r.verificacion ? { verificacion: r.verificacion, monto: r.monto, retiro: !!r.retiro, at: r.pago_at,
-                               id: Number(r.pago_id), guia: !!r.tiene_guia, guiaNum: r.guia_num ?? null } : null,
+                               id: Number(r.pago_id), guia: !!r.tiene_guia, guiaNum: r.guia_num ?? null,
+                               totalOrden: r.total_orden ?? null, banco: r.banco_emisor ?? null, referencia: r.referencia ?? null,
+                               metodo: r.metodo_pago ?? null, carrier: r.carrier ?? null, comprobante: !!r.tiene_comprobante,
+                               verificadoAt: r.verificado_at ?? null } : null,
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       vencida: r.vencida,
     }

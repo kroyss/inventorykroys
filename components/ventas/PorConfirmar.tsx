@@ -2,11 +2,16 @@
 // Ventas → Por confirmar (2026-10-12): las ventas de MercadoLibre que todavía no están registradas
 // (lib/porConfirmar.ts). Cada fila dice de un vistazo si se puede confirmar ya (productos, pago,
 // mensaje del comprador) y "Confirmar" abre Nueva venta con todo cargado.
+// Sin inventario (Pagos ME de los Fundadores, 19-10) es la MISMA lista: sin productos ni "Confirmar"; el pago
+// se verifica en la fila (✓ / ✗) y la guía ya está en Despachos. Al activar inventario, gana esos dos pasos.
 import { useCallback, useEffect, useState } from 'react'
 import type { PorConfirmar as Fila } from '@/lib/porConfirmar'
 import { BotonGuia } from './VerGuia'
+import { Monto } from '@/components/pagosme/PagoME'
 
 interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null }
+/** Sin inventario: verificar el pago desde la fila (Pagos ME). */
+type Verificar = (pagoId: number, v: 'valido' | 'invalido' | 'pendiente') => Promise<void>
 
 const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit',
@@ -68,7 +73,16 @@ function estadoPago(f: Fila, ultima: string | null): { tono: Tono; texto: string
   return { tono: 'ambar', texto: 'No ha pagado', title: `Se buscó el ${hora(ultima)} y no apareció: no ha pagado o no subió el comprobante` }
 }
 
-function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (numero: string) => void }) {
+const METODO: Record<string, string> = { mobile_payment: 'Pago móvil', transfer: 'Transferencia', zelle: 'Zelle' }
+
+function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onConfirmar: (numero: string) => void; onVerificar?: Verificar }) {
+  const sinInventario = !!onVerificar
+  const [haciendo, setHaciendo] = useState(false)
+  const verificar = async (v: 'valido' | 'invalido' | 'pendiente') => {
+    if (!onVerificar || !f.pago) return
+    setHaciendo(true)
+    try { await onVerificar(f.pago.id, v) } finally { setHaciendo(false) }
+  }
   const prod = estadoProductos(f)
   const pago = d.pagosME ? estadoPago(f, d.ultimaBusqueda) : null
   const quedan = d.dias - Math.floor((Date.now() - new Date(f.fecha).getTime()) / 86_400_000)
@@ -91,15 +105,30 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-          <Etiqueta tono={prod.tono} title={prod.title}>{prod.texto}</Etiqueta>
+          {!sinInventario && <Etiqueta tono={prod.tono} title={prod.title}>{prod.texto}</Etiqueta>}
           {pago && <Etiqueta tono={pago.tono} title={pago.title}>{pago.texto}</Etiqueta>}
+          {sinInventario && f.pago && f.pago.verificacion === 'pendiente' && f.pago.monto != null && (
+            <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} />
+          )}
           {f.pago?.retiro && <Etiqueta tono="ambar" title="El comprador pasa a buscarlo: no lleva guía ni pasa por Despachos">🏪 Retiro en tienda</Etiqueta>}
           {!f.vencida && quedan <= 2 && <Etiqueta tono="rojo">{quedan <= 0 ? 'Vence hoy' : `Quedan ${quedan} día${quedan === 1 ? '' : 's'}`}</Etiqueta>}
           <span className="text-[11px] text-neutral-400">
             compró {hace(f.fecha)}{f.pago?.at ? ` · pago traído ${hace(f.pago.at)}` : ''} · {f.cuenta}
           </span>
           {f.pago?.guia && <BotonGuia pagoId={f.pago.id} venta={f.numero} />}
+          {sinInventario && f.pago?.comprobante && (
+            <a href={`/api/pagos-me/${f.pago.id}/archivo?tipo=comprobante`} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-inset ring-sky-200 hover:bg-sky-50">
+              🖼 Comprobante
+            </a>
+          )}
         </div>
+        {sinInventario && f.pago && (
+          <div className="text-[11px] text-neutral-500">
+            {[METODO[f.pago.metodo ?? ''] ?? f.pago.metodo, f.pago.banco, f.pago.referencia && `ref. ${f.pago.referencia}`,
+              f.pago.guiaNum && `${f.pago.carrier ? f.pago.carrier.toUpperCase() + ' ' : 'guía '}${f.pago.guiaNum}`].filter(Boolean).join(' · ')}
+          </div>
+        )}
         {f.mensaje && (
           <div className="mt-1 flex items-start gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs text-violet-900 ring-1 ring-inset ring-violet-200">
             <svg className="mt-px h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -110,16 +139,33 @@ function FilaVenta({ f, d, onConfirmar }: { f: Fila; d: Datos; onConfirmar: (num
           </div>
         )}
       </div>
-      <button type="button" onClick={() => onConfirmar(f.numero)}
-        className="btn-primary text-sm whitespace-nowrap self-start sm:self-center">
-        Confirmar
-      </button>
+      {sinInventario ? (
+        f.pago?.verificacion === 'pendiente' ? (
+          <div className="flex gap-2 self-start sm:self-center">
+            <button type="button" onClick={() => verificar('valido')} disabled={haciendo} className="btn-primary text-sm whitespace-nowrap">✓ Pago correcto</button>
+            <button type="button" onClick={() => verificar('invalido')} disabled={haciendo} className="btn-secondary text-sm whitespace-nowrap text-red-700">✗ Inválido</button>
+          </div>
+        ) : f.pago?.verificacion === 'valido' ? (
+          <div className="flex flex-col items-end gap-1 self-start sm:self-center">
+            <a href="/despachos" className="btn-secondary text-sm whitespace-nowrap">Ir a Despachos →</a>
+            <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo} className="text-[11px] text-neutral-400 underline hover:text-neutral-700">deshacer</button>
+          </div>
+        ) : f.pago?.verificacion === 'invalido' ? (
+          <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo}
+            className="text-xs text-neutral-500 underline self-start sm:self-center">Volver a revisar</button>
+        ) : null
+      ) : (
+        <button type="button" onClick={() => onConfirmar(f.numero)}
+          className="btn-primary text-sm whitespace-nowrap self-start sm:self-center">
+          Confirmar
+        </button>
+      )}
     </li>
   )
 }
 
-function Grupo({ titulo, nota, filas, d, onConfirmar, plegable }: {
-  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void; plegable?: boolean
+function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar }: {
+  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void; plegable?: boolean; onVerificar?: Verificar
 }) {
   const [abierto, setAbierto] = useState(!plegable)
   if (!filas.length) return null
@@ -140,18 +186,21 @@ function Grupo({ titulo, nota, filas, d, onConfirmar, plegable }: {
       </button>
       {abierto && (
         <ul className="divide-y divide-neutral-100">
-          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} />)}
+          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} onVerificar={onVerificar} />)}
         </ul>
       )}
     </section>
   )
 }
 
-export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
+export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
   onConfirmar: (numero: string) => void
+  /** Sin inventario (Pagos ME de los Fundadores): se verifica el pago en la fila, sin "Confirmar". */
+  onVerificar?: Verificar
 }) {
+  const sinInventario = !!onVerificar
   const [actualizando, setActualizando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
@@ -204,6 +253,10 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
   const vencidas = datos.filas.filter(f => f.vencida)
   const conPago = vigentes.filter(f => f.pago && f.pago.verificacion !== 'invalido')
   const sinPago = vigentes.filter(f => !conPago.includes(f))
+  // Sin inventario: por verificar · listos para despachar (verificados en los últimos 3 días) · sin pago.
+  const porVerificar = conPago.filter(f => f.pago!.verificacion === 'pendiente')
+  const listos = conPago.filter(f => f.pago!.verificacion === 'valido'
+    && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
 
   return (
     <div className="space-y-3">
@@ -225,7 +278,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          {datos.pagosME && (
+          {datos.pagosME && !sinInventario && (
             <button type="button" onClick={traerME} disabled={buscandoME} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
               <IconoActualizar girando={buscandoME} />
@@ -244,7 +297,17 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         {vigentes.length ? (
-          datos.pagosME ? <>
+          sinInventario ? <>
+            <Grupo titulo="Por verificar" nota="Revisa cada pago contra el banco" filas={porVerificar} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} />
+            {!porVerificar.length && (
+              <div className="px-4 py-6 text-center border-b border-neutral-100">
+                <p className="text-sm font-medium text-neutral-700">Nada por verificar</p>
+                <p className="mt-1 text-xs text-neutral-400">Cuando un cliente pague, su venta aparece aquí después de traer los pagos.</p>
+              </div>
+            )}
+            <Grupo titulo="Listos para despachar" nota="Pago verificado: sus guías están en Despachos" filas={listos} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
+            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha traído" filas={sinPago} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
+          </> : datos.pagosME ? <>
             <Grupo titulo="Con pago" nota="Listas para revisar y confirmar" filas={conPago} d={datos} onConfirmar={onConfirmar} />
             {!conPago.length && (
               <div className="px-4 py-6 text-center border-b border-neutral-100">
@@ -279,7 +342,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar }: {
           </button>
           {verVencidas && (
             <ul className="divide-y divide-neutral-100 border-t border-neutral-200 bg-white">
-              {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} />)}
+              {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} />)}
             </ul>
           )}
         </div>
