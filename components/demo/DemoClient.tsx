@@ -7,7 +7,7 @@ interface Seccion { id: string; titulo: string; texto: string; pendientes: numbe
 
 const RUTA: Record<string, string> = {
   despachos: '/despachos', reportador: '/reportador', preguntas: '/preguntas',
-  mensajes: '/mensajes', calificaciones: '/calificaciones', stock: '/alertas-stock',
+  mensajes: '/mensajes', calificaciones: '/calificaciones', stock: '/alertas-stock', pagos: '/pagos-me',
 }
 
 // Cuenta de demostración: lo pendiente de cada sección y un botón para dejarla como al principio
