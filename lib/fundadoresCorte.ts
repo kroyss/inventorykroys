@@ -38,7 +38,8 @@ export async function corteFundadores() {
       cuentas += c.n
     }
     if (cuentas > 0) continue
-    await dbGlobal().query(`UPDATE organizaciones SET estado = 'vencido' WHERE id = $1 AND estado = 'prueba'`, [o.id])
+    await dbGlobal().query(`UPDATE organizaciones SET estado = 'vencido', motivo_pausa = 'corte_fundadores', pausa_fecha = CURRENT_DATE
+                            WHERE id = $1 AND estado = 'prueba'`, [o.id])
     salen.push(o.nombre)
   }
   // Se marca hecho ANTES de avisar: aunque Telegram falle, el corte no se repite.

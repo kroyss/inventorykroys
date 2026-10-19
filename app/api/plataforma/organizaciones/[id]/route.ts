@@ -31,7 +31,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
          prueba_hasta = CASE WHEN $4 THEN $3::date ELSE prueba_hasta END,
          -- una fecha cambiada a mano (o salir de prueba) manda: ya no se recalcula al conectar ML (mig. 067)
          prueba_dias  = CASE WHEN ($4 AND $3::date IS DISTINCT FROM prueba_hasta) OR $2 IN ('activo', 'vencido') THEN NULL ELSE prueba_dias END,
-         fundador     = COALESCE($5, fundador)
+         fundador     = COALESCE($5, fundador),
+         -- Reactivada (prueba o activa): se borra el motivo de la pausa (migración 105).
+         motivo_pausa = CASE WHEN $2 IN ('prueba', 'activo') THEN NULL ELSE motivo_pausa END,
+         pausa_fecha  = CASE WHEN $2 IN ('prueba', 'activo') THEN NULL ELSE pausa_fecha END
        WHERE id = $1`,
       [id, b.estado ?? null, b.prueba_hasta ?? null, b.prueba_hasta !== undefined, b.fundador ?? null])
     if (!rowCount) return NextResponse.json({ error: 'Organización no encontrada' }, { status: 404 })

@@ -1,6 +1,6 @@
 'use client'
 import { signIn } from 'next-auth/react'
-import { CUENTA_VENCIDA } from '@/lib/cuenta'
+import { CUENTA_VENCIDA, TELEGRAM_SOPORTE, textoCuentaPausada } from '@/lib/cuenta'
 import { useState, FormEvent, KeyboardEvent } from 'react'
 
 import type { Marca } from '@/lib/marca'
@@ -10,6 +10,7 @@ import type { Marca } from '@/lib/marca'
 // de una (VE / CO), se cambia arriba a la derecha.
 export default function LoginForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
+  const [pausada, setPausada]   = useState<string | null>(null)   // cuenta pausada: motivo (lib/cuenta.ts)
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
   const [mayus, setMayus]       = useState(false)
@@ -41,9 +42,10 @@ export default function LoginForm({ marca }: { marca: Marca }) {
       // guardó "esa página → /login" y router.push lo reusaba, volviendo al login hasta un F5.
       window.location.assign(ruta)
     } else {
-      setError(result?.error === CUENTA_VENCIDA
-        ? 'Tu período de prueba terminó. Escríbenos por Telegram para seguir usando el sistema: tus datos siguen guardados.'
-        : 'Usuario o contraseña incorrectos')
+      // Cuenta pausada (19-10): recuadro con el motivo y el botón a Telegram, no la línea roja de clave mala.
+      const [codigo, motivo, fecha] = (result?.error ?? '').split('|')
+      if (codigo === CUENTA_VENCIDA) { setPausada(textoCuentaPausada(motivo ?? 'prueba', fecha)); setError('') }
+      else { setPausada(null); setError('Usuario o contraseña incorrectos') }
       setLoading(false)
     }
   }
@@ -126,6 +128,20 @@ export default function LoginForm({ marca }: { marca: Marca }) {
               <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {error}
               </p>
+            )}
+
+            {pausada && (
+              <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-3">
+                <p className="text-sm text-amber-950">{pausada}</p>
+                <p className="text-xs text-amber-800">Tus datos siguen guardados.</p>
+                <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-[#229ED9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c8bc0]">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                    <path d="M21.9 4.6 18.7 19.7c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.3-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13.3l-4.8-1.5c-1-.3-1.1-1 .2-1.5l18.8-7.2c.9-.3 1.7.2 1.5 1.5z" />
+                  </svg>
+                  Escribirnos por Telegram
+                </a>
+              </div>
             )}
 
             <button

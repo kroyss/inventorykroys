@@ -63,7 +63,8 @@ export const authOptions: NextAuthOptions = {
         const empresa = elegir(todas.filter(e => e.habilitada), credentials.empresa, credentials.country)
         if (!empresa) {
           // Tiene empresas pero su cuenta venció (prueba terminada o sin pago): se le dice.
-          if (todas.length) throw new Error(CUENTA_VENCIDA)
+          // El motivo viaja en el error (CUENTA_VENCIDA|motivo|DD/MM): el login muestra el aviso que corresponde.
+          if (todas.length) throw new Error(`${CUENTA_VENCIDA}|${todas[0].motivoPausa ?? 'prueba'}|${todas[0].pausaFecha ?? ''}`)
           return null   // usuario sin ninguna empresa activa
         }
 

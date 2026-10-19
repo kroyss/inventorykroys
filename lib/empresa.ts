@@ -12,6 +12,8 @@ export interface EmpresaAcceso {
   permisos: string[] | null   // usuario_empresas.permisos (lib/permisos.ts; NULL = los de su rol)
   organizacionId: number
   habilitada: boolean      // la cuenta de su organización está al día (no vencida)
+  motivoPausa?: string | null   // por qué está vencida (migración 105): corte_fundadores · plan · null = prueba
+  pausaFecha?: string | null    // DD/MM en que venció el plan
 }
 
 /** Empresas activas a las que entra un usuario, con su rol en cada una. Por defecto solo las
@@ -20,7 +22,8 @@ export interface EmpresaAcceso {
 export async function empresasDeUsuario(userId: number | string, { incluirVencidas = false } = {}): Promise<EmpresaAcceso[]> {
   const { rows } = await dbGlobal().query(
     `SELECT e.id, e.nombre, e.country, e.modulos, ue.role, ue.permisos, e.organizacion_id AS "organizacionId",
-            ${SQL_CUENTA_HABILITADA} AS habilitada
+            ${SQL_CUENTA_HABILITADA} AS habilitada,
+            o.motivo_pausa AS "motivoPausa", to_char(o.pausa_fecha, 'DD/MM') AS "pausaFecha"
      FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
      JOIN organizaciones o ON o.id = e.organizacion_id
      WHERE ue.user_id = $1 AND e.is_active ${incluirVencidas ? '' : `AND ${SQL_CUENTA_HABILITADA}`}

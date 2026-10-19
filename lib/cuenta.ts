@@ -40,3 +40,11 @@ export const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
 
 /** Mensaje del login (y error que lanza authorize) cuando la cuenta está vencida. */
 export const CUENTA_VENCIDA = 'CUENTA_VENCIDA'
+/** Contacto para reactivar una cuenta pausada (19-10). */
+export const TELEGRAM_SOPORTE = 'https://t.me/elcomerciantedigital'
+/** Qué decirle a quien intenta entrar con la cuenta pausada, según el motivo (migración 105). */
+export function textoCuentaPausada(motivo: string, fecha?: string) {
+  if (motivo === 'corte_fundadores') return 'Tu cupo de Fundador se liberó porque no conectaste tu MercadoLibre a tiempo. Si todavía te interesa, escríbenos para revisar tu caso.'
+  if (motivo === 'plan') return `Tu plan venció${fecha ? ` el ${fecha}` : ''}. Renuévalo para seguir, escríbenos.`
+  return 'Tu prueba gratis terminó. Para seguir usando el sistema, escríbenos para revisar tu caso.'
+}
