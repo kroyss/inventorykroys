@@ -250,7 +250,7 @@ export default function MisAvisosClient() {
               <Fila icono="📦" titulo="Publicación agotada" etiqueta="Recomendado" on={p.agotada} onCambio={v => cambiar({ agotada: v })}
                 ejemplo={'📦 Se agotó · PIKEKE\nHub Usb C + 3.0 A Usb Adaptador Convertidor 4 En 1\nVendiste 12 en los últimos 30 días · ML la pausó\n\n[ Reponer en Stock ]'}>
                 Cuando una publicación o variante <b className="font-medium text-neutral-700">que vende</b> se queda en 0 en MercadoLibre. El stock se revisa
-                cada 2 horas, así que puede llegar hasta 2 horas después. Las que marcaste “No hay, quitar” no avisan.
+                cada hora, así que puede llegar hasta 1 hora después. Las que marcaste “No hay, quitar” no avisan.
                 <label className="mt-2 flex items-center gap-2 text-neutral-600">
                   <input type="checkbox" checked={p.bajo} onChange={ev => cambiar({ bajo: ev.target.checked })} className="h-4 w-4 accent-neutral-900" />
                   Avisarme también cuando esté <b className="font-medium">por agotarse</b> (el límite que pusiste en Stock)

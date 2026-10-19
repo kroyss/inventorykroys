@@ -35,7 +35,7 @@ export default async function AutomatizacionesPage() {
           texto: 'Las preguntas de todas tus cuentas en una bandeja. La IA propone la respuesta con tu publicación, tu stock y tus respuestas de siempre; tú publicas.' },
         { href: '/alertas-stock', titulo: 'Stock', icono: 'stock', activa: stock, aviso: 'alertas',
           pendiente: 'agotadas',
-          texto: 'Lo que vendiste en los últimos 30 días y ya se agotó o está por agotarse en tus cuentas (por variante). Se revisa sola cada 2 horas.' },
+          texto: 'Lo que vendiste en los últimos 30 días y ya se agotó o está por agotarse en tus cuentas (por variante). Se revisa sola cada hora.' },
         { href: '/mensajes', titulo: 'Mensajes', icono: 'mensajes', activa: ml, aviso: 'mensajes', urgente: true,
           pendiente: 'conversaciones sin leer',
           texto: 'Los mensajes de tus ventas sin leer, de todas las cuentas, con el producto y el estado de la venta. Respondes desde aquí.' },
