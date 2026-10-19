@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PorConfirmar as Fila } from '@/lib/porConfirmar'
 import { BotonGuia } from './VerGuia'
+import { BotonComprobante } from './VerComprobante'
 import { Monto } from '@/components/pagosme/PagoME'
 
 interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null }
@@ -117,10 +118,8 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
           </span>
           {f.pago?.guia && <BotonGuia pagoId={f.pago.id} venta={f.numero} />}
           {sinInventario && f.pago?.comprobante && (
-            <a href={`/api/pagos-me/${f.pago.id}/archivo?tipo=comprobante`} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-inset ring-sky-200 hover:bg-sky-50">
-              🖼 Comprobante
-            </a>
+            <BotonComprobante pagoId={f.pago.id} venta={f.numero}
+              datos={{ monto: f.pago.monto, totalOrden: f.pago.totalOrden, banco: f.pago.banco, referencia: f.pago.referencia, metodo: f.pago.metodo }} />
           )}
         </div>
         {sinInventario && f.pago && (
