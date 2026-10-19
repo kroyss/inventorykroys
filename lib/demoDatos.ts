@@ -17,6 +17,10 @@ import { MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
 import type { Pool } from 'pg'
 import datos from '@/lib/demo/datos.json'
 import { TOKEN_DEMO } from '@/lib/demo'
+import { mkdir, writeFile } from 'fs/promises'
+import path from 'path'
+import { UPLOAD_DIR } from '@/lib/uploads'
+import { guiaDemo } from '@/lib/demoPagosME'
 
 // ── Datos fijos ─────────────────────────────────────────────────────────────
 export interface ProductoDemo {
@@ -83,7 +87,7 @@ export const SECCIONES_DEMO = [
   { id: 'mensajes', titulo: 'Mensajes', texto: 'Hasta 10 conversaciones sin leer (guía, factura, cambio de color, reclamo…) y respuestas anteriores para sugerir.' },
   { id: 'calificaciones', titulo: 'Calificaciones', texto: 'Ventas sin calificar: despachadas (positiva), sin despachar o canceladas (neutral) y recientes (esperar).' },
   { id: 'stock', titulo: 'Stock', texto: '6 publicaciones agotadas y 5 por agotarse, por variante, para reponer en un clic.' },
-  { id: 'pagos', titulo: 'Pagos ME', texto: '14 pagos de MercadoEnvíos de hoy sin verificar (con comprobante y guía) y 9 ya verificados; la PC se ve conectada y «Traer» responde al momento. Necesita el módulo Pagos ME.' },
+  { id: 'pagos', titulo: 'Pagos ME', texto: '14 pagos de MercadoEnvíos de hoy sin verificar, con comprobante, y sus guías ya en Despachos («pago sin verificar» hasta verificarlos); los de ayer verificados y despachados. La PC se ve conectada y «Traer» responde al momento. Necesita el módulo Pagos ME.' },
 ] as const
 export type SeccionDemo = typeof SECCIONES_DEMO[number]['id']
 
@@ -495,6 +499,10 @@ const BANCOS = ['Banesco', 'Venezuela', 'Mercantil', 'BBVA Provincial', 'BNC']
 async function pagosME(db: Pool, cx: Cuentas) {
   const r = azar(96)
   await db.query(`DELETE FROM me_pagos WHERE venta BETWEEN '${RANGO.pagos}00001' AND '${RANGO.pagos}99999'`)
+  // Sus guías en Despachos: las del lote pendiente y la jornada de ayer sembrada.
+  await db.query(`DELETE FROM despacho_etiquetas WHERE venta BETWEEN '${RANGO.pagos}00001' AND '${RANGO.pagos}99999'`)
+  await db.query(`DELETE FROM despacho_lotes l WHERE l.status = 'PENDIENTE' AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.lote_id = l.id)`)
+  await borrarJornadas(db, 'pagos')
   await db.query(`DELETE FROM ml_ordenes WHERE ${enRango('pagos')}`)
   await db.query(`DELETE FROM me_pedidos`)
   await db.query(`DELETE FROM me_latidos`)
@@ -544,20 +552,47 @@ async function pagosME(db: Pool, cx: Cuentas) {
     })
   }
   await insertarOrdenes(db, ordenes)
+  // La guía de cada pago, en PDF de verdad (como la que trae la PC): así Despachos arma la hoja 4 por página.
+  const { rows: [emp] } = await db.query(`SELECT NULLIF(current_setting('app.empresa_id', true), '')::int AS id`)
+  const dir = path.join(UPLOAD_DIR, 'pagos-me', `demo-${emp.id}`)
+  await mkdir(dir, { recursive: true })
+  for (const p of pagos as { venta: string; guia: string; carrier: string; envio_opcion: string; cuenta: string; guia_path?: string }[]) {
+    const f = path.join(dir, `${p.venta}.pdf`)
+    await writeFile(f, (await guiaDemo({ venta: p.venta, guia: p.guia, carrier: p.carrier, envio_opcion: p.envio_opcion, cuenta: p.cuenta,
+      banco_emisor: null, banco_receptor: null, referencia: null, fecha_pago: null, monto_pagado: null, metodo_pago: null })).datos)
+    p.guia_path = f
+  }
   await db.query(
     `INSERT INTO me_pagos (venta, cuenta, estado_me, fecha_orden, total_orden, total_orden_usd, metodo_pago, banco_emisor, banco_receptor,
                            referencia, fecha_pago, monto_pagado, envio_metodo, envio_opcion, carrier, guia, comprobante_path, guia_path,
                            verificacion, verificado_por, verificado_at, nota, creado_at)
      SELECT x.venta, x.cuenta, x.estado_me, NOW() - make_interval(secs => x.horas * 3600), x.total_orden, x.total_orden_usd, x.metodo_pago,
             x.banco_emisor, x.banco_receptor, x.referencia, x.fecha_pago, x.monto_pagado, x.envio_metodo, x.envio_opcion, x.carrier, x.guia,
-            'demo:comprobante', 'demo:guia', x.verificacion,
+            'demo:comprobante', x.guia_path, x.verificacion,
             CASE WHEN x.verificacion <> 'pendiente' THEN $2::int END,
             CASE WHEN x.verificacion <> 'pendiente' THEN NOW() - make_interval(secs => (x.horas - 2) * 3600) END,
             x.nota, NOW() - make_interval(secs => (x.horas - 0.3) * 3600)
      FROM jsonb_to_recordset($1::jsonb) AS x(venta text, cuenta text, estado_me text, horas float, total_orden numeric, total_orden_usd numeric,
        metodo_pago text, banco_emisor text, banco_receptor text, referencia text, fecha_pago text, monto_pagado numeric, envio_metodo text,
-       envio_opcion text, carrier text, guia text, verificacion text, nota text)`,
+       envio_opcion text, carrier text, guia text, guia_path text, verificacion text, nota text)`,
     [JSON.stringify(pagos), adm?.id ?? null])
+
+  // Despachos: las de hoy, en el lote pendiente ("Pago sin verificar" hasta verificarlas); las de ayer, ya despachadas.
+  type P = { venta: string; guia: string; carrier: string; cuenta: string; verificacion: string; guia_path: string }
+  const ps = pagos as P[]
+  const compradorDe = (venta: string) => ordenes.find(o => o.id === venta)!.comprador
+  const { rows: [lote] } = await db.query(`INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [adm?.id ?? null])
+  await db.query(
+    `INSERT INTO despacho_etiquetas (lote_id, original_name, file_path, sha256, page_count, venta, guia, remitente, remitente_limpio,
+                                     destinatario, carrier)
+     SELECT $1, 'guide-' || x.venta || '.pdf', x.guia_path, repeat('0', 64), 1, x.venta, x.guia, x.cuenta, x.cuenta, x.destinatario,
+            CASE WHEN x.carrier = 'ZOOM' THEN 'ZOOM' ELSE 'TEALCA' END
+     FROM jsonb_to_recordset($2::jsonb) AS x(venta text, guia_path text, guia text, cuenta text, destinatario text, carrier text)`,
+    [lote.id, JSON.stringify(ps.filter(p => p.verificacion === 'pendiente').map(p => ({ ...p, destinatario: compradorDe(p.venta) })))])
+  await jornadaImpresa(db, 'pagos', 16, ps.filter(p => p.verificacion === 'valido').map(p => ({
+    venta: p.venta, carrier: (p.carrier === 'ZOOM' ? 'ZOOM' : 'TEALCA') as 'ZOOM' | 'TEALCA', guia: p.guia,
+    remitente: p.cuenta, destinatario: compradorDe(p.venta), reporte: 'ENVIADO',
+  })))
 
   // La última traída: la automática de hace 25 minutos, completa en las dos cuentas.
   const vistas = (k: number) => 120 + k * 37
