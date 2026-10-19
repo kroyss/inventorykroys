@@ -12,7 +12,7 @@
 ; Todo queda en %APPDATA%\VigilantePagosME\despertador.json (y en el registro): instalar encima no lo borra.
 
 #define AppName    "Pagos MercadoEnvios"
-#define AppVersion "1.3.5"
+#define AppVersion "1.3.6"
 #define Publisher  "El Comerciante Digital"
 
 [Setup]
@@ -66,15 +66,12 @@ Name: "{autoprograms}\{#AppName}\Despertador Pagos ME"; Filename: "powershell.ex
   Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\despertador.ps1"""; \
   IconFilename: "{app}\vigilante.ico"; Flags: runminimized
 Name: "{autoprograms}\{#AppName}\Ver registro"; Filename: "notepad.exe"; Parameters: """{userappdata}\VigilantePagosME\despertador.log"""
-Name: "{autoprograms}\{#AppName}\Carpeta de la extension de Chrome"; Filename: "{app}\extension"
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\despertador.ps1"""; \
   Description: "Arrancar el programa ahora"; Flags: nowait postinstall runhidden 64bit; Check: IsWin64
 ; La pagina /extension lleva a la Chrome Web Store (o, mientras no este publicada, explica la carga a mano).
 Filename: "https://app.elcomerciantedigital.com/extension"; Description: "Ver como agregar el Asistente de envios a Chrome"; \
-  Flags: nowait postinstall shellexec
-Filename: "{app}\extension"; Description: "Abrir la carpeta de la extension (para cargarla en Chrome)"; \
   Flags: nowait postinstall shellexec
 
 [UninstallRun]

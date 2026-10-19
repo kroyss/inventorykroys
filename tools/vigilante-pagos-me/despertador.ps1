@@ -97,9 +97,10 @@ function DetectarPerfiles {
 $autoPerfiles = (-not $cfg.perfiles) -or (@($cfg.perfiles).Count -eq 0)
 $script:detectados = @()
 $script:detectadosAt = [datetime]::MinValue
-function Perfiles {
+function Perfiles([switch]$Forzar) {
   if (-not $autoPerfiles) { return @($cfg.perfiles) }
-  if (((Get-Date) - $script:detectadosAt).TotalMinutes -ge 10) {
+  # 1.3.6 (19-10): tambien en cada pedido nuevo; antes un perfil recien conectado esperaba hasta 10 min.
+  if ($Forzar -or ((Get-Date) - $script:detectadosAt).TotalMinutes -ge 10) {
     $script:detectados = @(DetectarPerfiles)
     $script:detectadosAt = Get-Date
     if ($script:detectados.Count -eq 0) { Anotar 'Ningun perfil de Chrome tiene la extension todavia (agregala y escribe el codigo en ella)' }
@@ -177,15 +178,22 @@ if ($basica) { $headers.Authorization = $basica }
 $url = "$servidor/api/pagos-me/vigilante/despertador"
 $script:abiertos = @{}      # "pedido|carpeta" ya abiertos: cada perfil se abre una sola vez por pedido
 $script:errores = 0
+$script:ultimoPedido = $null
+$script:conPedido = $false   # hubo pedido en la ultima consulta: se pregunta cada 15 s en vez de cada 60
+$script:revisadoAt = [datetime]::MinValue
 
 function Revisar {
+  $script:revisadoAt = Get-Date
   try {
     $r = Invoke-RestMethod -Method Post -Uri $url -Headers $headers -ContentType 'application/json' -Body '{}' -TimeoutSec 30
     if ($script:errores -gt 0) { Anotar 'Conexion con el sistema recuperada'; $script:errores = 0 }
+    $script:conPedido = [bool]$r.pedido
     if ($r.pedido) {
+      $nuevo = $r.pedido -ne $script:ultimoPedido
+      $script:ultimoPedido = $r.pedido
       # Con nombre (despertador.json a mano) se saltan los que ya lo hicieron; los detectados solos se
       # abren una vez por pedido (si ya lo habian hecho, la extension cierra la ventana enseguida).
-      $faltan = @(Perfiles | Where-Object { (-not $_.perfil) -or ($r.hechos -notcontains $_.perfil) })
+      $faltan = @(Perfiles -Forzar:$nuevo | Where-Object { (-not $_.perfil) -or ($r.hechos -notcontains $_.perfil) })
       $porAbrir = @($faltan | Where-Object { -not $script:abiertos.ContainsKey("$($r.pedido)|$($_.carpeta)") })
       if ($autoPerfiles) {
         if ($porAbrir.Count) { Estado 'trabajo' "trayendo pagos (pedido $($r.pedido))" } else { Estado 'espera' "en espera - pedido $($r.pedido) en curso o listo" }
@@ -211,8 +219,9 @@ function Revisar {
 
 Anotar "Arranca el despertador (Chrome: $chrome)"
 $reloj = New-Object System.Windows.Forms.Timer
-$reloj.Interval = 60000
-$reloj.add_Tick({ Revisar })
+# 1.3.6: tic cada 15 s; consulta al sistema cada 60 s, o cada 15 s mientras hay un pedido en curso (arranca antes).
+$reloj.Interval = 15000
+$reloj.add_Tick({ if ($script:conPedido -or ((Get-Date) - $script:revisadoAt).TotalSeconds -ge 58) { Revisar } })
 $reloj.Start()
 Revisar
 [System.Windows.Forms.Application]::Run()
