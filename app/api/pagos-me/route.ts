@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { leerHorario } from '@/lib/pagosMEComun'
 import { apiError } from '@/lib/apiError'
 import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
+import { esDemo } from '@/lib/demo'
 
 /**
  * GET /api/pagos-me?estado=pendiente|valido|invalido|todos  → pagos traídos por el vigilante + su estado
@@ -43,6 +44,8 @@ export async function GET(req: NextRequest) {
         } : null,
       })
     }
+    // Demo (19-10): no hay PC de verdad; la sembrada se ve siempre con señal.
+    if (await esDemo(s.db)) await s.db.query(`UPDATE me_latidos SET visto_at = NOW()`)
     const estado = req.nextUrl.searchParams.get('estado') ?? 'pendiente'
     const filtro = ['pendiente', 'valido', 'invalido'].includes(estado) ? estado : null
     const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }, { rows: [hor] }, { rows: [ahora] }] = await Promise.all([

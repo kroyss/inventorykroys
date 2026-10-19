@@ -10,6 +10,8 @@
 //   mensajes       2000099994000001…  conversaciones sin leer + historial respondido (sugerencias e IA)
 //   stock          2000099995000001…  ventas de los últimos 30 días de lo agotado / por agotarse
 //   preguntas      preguntas sin responder + historial respondido (memoria de la IA y sugerencias)
+//   pagos          2000099996000001…  Pagos ME: pagos de MercadoEnvíos con comprobante y guía (19-10), la PC
+//                  "conectada" y la última traída; comprobante y guía se dibujan al pedirlos (lib/demoPagosME.ts)
 // Las fechas son relativas al momento de restaurar: siempre se ve "de hoy".
 import { MENSAJES_SUGERIDOS } from '@/lib/mensajesRapidos'
 import type { Pool } from 'pg'
@@ -81,6 +83,7 @@ export const SECCIONES_DEMO = [
   { id: 'mensajes', titulo: 'Mensajes', texto: 'Hasta 10 conversaciones sin leer (guía, factura, cambio de color, reclamo…) y respuestas anteriores para sugerir.' },
   { id: 'calificaciones', titulo: 'Calificaciones', texto: 'Ventas sin calificar: despachadas (positiva), sin despachar o canceladas (neutral) y recientes (esperar).' },
   { id: 'stock', titulo: 'Stock', texto: '6 publicaciones agotadas y 5 por agotarse, por variante, para reponer en un clic.' },
+  { id: 'pagos', titulo: 'Pagos ME', texto: '14 pagos de MercadoEnvíos de hoy sin verificar (con comprobante y guía) y 9 ya verificados; la PC se ve conectada y «Traer» responde al momento. Necesita el módulo Pagos ME.' },
 ] as const
 export type SeccionDemo = typeof SECCIONES_DEMO[number]['id']
 
@@ -90,6 +93,7 @@ export interface OpcionesDemo { preguntas?: number; mensajes?: number }
 
 const RANGO: Record<string, string> = {
   despachos: '20000999910', reportador: '20000999920', calificaciones: '20000999930', mensajes: '20000999940', stock: '20000999950',
+  pagos: '20000999960',
 }
 const enRango = (sec: string) => `id BETWEEN ${RANGO[sec]}00001 AND ${RANGO[sec]}99999`
 
@@ -484,6 +488,97 @@ async function mensajes(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   }
 }
 
+// ── Pagos ME (19-10) ────────────────────────────────────────────────────────
+// Como lo ve un Fundador con Pagos ME: la PC conectada con sus 2 cuentas, la traída automática de hace un rato
+// y los pagos de hoy por verificar contra el banco (uno que no coincide), más los de ayer ya verificados.
+const BANCOS = ['Banesco', 'Venezuela', 'Mercantil', 'BBVA Provincial', 'BNC']
+async function pagosME(db: Pool, cx: Cuentas) {
+  const r = azar(96)
+  await db.query(`DELETE FROM me_pagos WHERE venta BETWEEN '${RANGO.pagos}00001' AND '${RANGO.pagos}99999'`)
+  await db.query(`DELETE FROM ml_ordenes WHERE ${enRango('pagos')}`)
+  await db.query(`DELETE FROM me_pedidos`)
+  await db.query(`DELETE FROM me_latidos`)
+  await db.query(`DELETE FROM me_claves`)
+  await db.query(`DELETE FROM me_vigilante`)
+  const { rows: [t] } = await db.query(
+    `SELECT COALESCE((SELECT official_rate::float FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1), 200) AS bcv`)
+  const { rows: [adm] } = await db.query(
+    `SELECT ue.user_id AS id FROM usuario_empresas ue WHERE ue.empresa_id = NULLIF(current_setting('app.empresa_id', true), '')::int
+     AND ue.role = 'admin' ORDER BY ue.user_id LIMIT 1`)
+
+  // La PC conectada: el programa (DESPERTADOR) y una extensión por cuenta, unida a su cuenta de ML.
+  await db.query(`INSERT INTO me_vigilante (token_hash) VALUES ('demo-' || NULLIF(current_setting('app.empresa_id', true), ''))`)
+  const perfiles = D.cuentas.map((c, k) => ({ perfil: `DEMO-${k + 1}`, cuenta: c.remitente, conexion: cx[c.nickname] }))
+  await db.query(`INSERT INTO me_latidos (perfil, visto_at) VALUES ('DESPERTADOR', NOW())`)
+  for (const p of perfiles) {
+    await db.query(`INSERT INTO me_latidos (perfil, visto_at, cuenta, conexion_id, verificacion, verificado_at) VALUES ($1, NOW(), $2, $3, 'ok', NOW())`,
+      [p.perfil, p.cuenta, p.conexion])
+  }
+
+  const ordenes: Orden[] = []
+  const pagos: Record<string, unknown>[] = []
+  const N = 23
+  for (let i = 0; i < N; i++) {
+    const venta = `${RANGO.pagos}${String(i + 1).padStart(5, '0')}`
+    const c = cuentaDe(cx, i)
+    const hoy = i < 14
+    const horas = hoy ? 0.4 + i * 0.6 : 20 + (i - 14) * 1.3
+    const items = itemsAzar(r, r() < 0.2 ? 2 : 1)
+    const usd = totalDe(items)
+    const comprador = elegir(r, D.compradores)
+    ordenes.push({ id: venta, conexion: cx[c.nickname], horas, comprador, items })
+    const totalBs = Math.round(usd * t.bcv * 100) / 100
+    // Uno de hoy pagó de menos (para mostrar "no coincide"); uno de ayer quedó inválido (la referencia no apareció).
+    const pagado = i === 5 ? Math.round(totalBs * 0.9 * 100) / 100 : totalBs
+    const zoom = r() < 0.8
+    const fecha = new Date(Date.now() - horas * 3_600_000)
+    pagos.push({
+      venta, cuenta: c.remitente, estado_me: 'pending', horas, total_orden: totalBs, total_orden_usd: usd,
+      metodo_pago: r() < 0.85 ? 'mobile_payment' : 'transfer', banco_emisor: elegir(r, BANCOS), banco_receptor: 'Bancamiga',
+      referencia: String(Math.floor(r() * 1e12)).padStart(12, '0'), fecha_pago: fecha.toISOString().slice(0, 10),
+      monto_pagado: pagado,
+      envio_metodo: 'Envío Gratis', envio_opcion: r() < 0.8 ? 'Retiro en agencia' : 'Entrega a domicilio',
+      carrier: zoom ? 'ZOOM' : 'Tealca', guia: zoom ? String(1_100_000_000 + Math.floor(r() * 99_999_999)) : String(500_000 + Math.floor(r() * 499_999)),
+      verificacion: hoy ? 'pendiente' : i === 18 ? 'invalido' : 'valido',
+      nota: i === 18 ? 'La referencia no aparece en el banco: se le escribió al comprador.' : null,
+    })
+  }
+  await insertarOrdenes(db, ordenes)
+  await db.query(
+    `INSERT INTO me_pagos (venta, cuenta, estado_me, fecha_orden, total_orden, total_orden_usd, metodo_pago, banco_emisor, banco_receptor,
+                           referencia, fecha_pago, monto_pagado, envio_metodo, envio_opcion, carrier, guia, comprobante_path, guia_path,
+                           verificacion, verificado_por, verificado_at, nota, creado_at)
+     SELECT x.venta, x.cuenta, x.estado_me, NOW() - make_interval(secs => x.horas * 3600), x.total_orden, x.total_orden_usd, x.metodo_pago,
+            x.banco_emisor, x.banco_receptor, x.referencia, x.fecha_pago, x.monto_pagado, x.envio_metodo, x.envio_opcion, x.carrier, x.guia,
+            'demo:comprobante', 'demo:guia', x.verificacion,
+            CASE WHEN x.verificacion <> 'pendiente' THEN $2::int END,
+            CASE WHEN x.verificacion <> 'pendiente' THEN NOW() - make_interval(secs => (x.horas - 2) * 3600) END,
+            x.nota, NOW() - make_interval(secs => (x.horas - 0.3) * 3600)
+     FROM jsonb_to_recordset($1::jsonb) AS x(venta text, cuenta text, estado_me text, horas float, total_orden numeric, total_orden_usd numeric,
+       metodo_pago text, banco_emisor text, banco_receptor text, referencia text, fecha_pago text, monto_pagado numeric, envio_metodo text,
+       envio_opcion text, carrier text, guia text, verificacion text, nota text)`,
+    [JSON.stringify(pagos), adm?.id ?? null])
+
+  // La última traída: la automática de hace 25 minutos, completa en las dos cuentas.
+  const vistas = (k: number) => 120 + k * 37
+  await db.query(
+    `INSERT INTO me_pedidos (pedido_por, pedido_at, resultados) VALUES (NULL, NOW() - INTERVAL '25 minutes', $1)`,
+    [JSON.stringify(Object.fromEntries(perfiles.map((p, k) => [p.perfil, {
+      at: new Date(Date.now() - 23 * 60_000).toISOString(), ok: true, error: null, cuenta: p.cuenta,
+      nuevas: k === 0 ? 3 : 2, vistas: vistas(k) }])))])
+}
+
+/** "Traer pagos y guías" en la demo: la PC "responde" al momento (no hay PC de verdad). */
+export async function traerDemo(db: Pool, userId: number) {
+  const { rows: perfiles } = await db.query(`SELECT perfil, cuenta FROM me_latidos WHERE perfil <> 'DESPERTADOR'`)
+  await db.query(`UPDATE me_latidos SET visto_at = NOW()`)
+  const ahora = new Date().toISOString()
+  const { rows: [p] } = await db.query(
+    `INSERT INTO me_pedidos (pedido_por, resultados) VALUES ($1, $2) RETURNING id`,
+    [userId, JSON.stringify(Object.fromEntries(perfiles.map((x, k) => [x.perfil, { at: ahora, ok: true, error: null, cuenta: x.cuenta, nuevas: 0, vistas: 120 + k * 37 }])))])
+  return p.id as number
+}
+
 const SEMBRAR: Record<SeccionDemo, (db: Pool, cx: Cuentas, op: OpcionesDemo) => Promise<void>> = {
-  despachos, reportador, preguntas, mensajes, calificaciones, stock,
+  despachos, reportador, preguntas, mensajes, calificaciones, stock, pagos: pagosME,
 }
