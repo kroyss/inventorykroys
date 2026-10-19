@@ -26,10 +26,14 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
 /** Título en una línea que se puede leer completo: se desliza con el dedo, o solo (ida y vuelta) si `animar`. */
 function TituloDeslizable({ texto, animar }: { texto: string; animar: boolean }) {
   const caja = useRef<HTMLSpanElement>(null)
+  // Queda texto a la derecha: se desvanece el borde y sale "›" (19-10: no se notaba que se podía deslizar).
+  const [hayMas, setHayMas] = useState(false)
+  const medir = () => { const el = caja.current; if (el) setHayMas(el.scrollLeft + el.clientWidth < el.scrollWidth - 2) }
   useEffect(() => {
     const el = caja.current
     if (!el) return
     el.scrollLeft = 0
+    medir()
     if (!animar || el.scrollWidth <= el.clientWidth + 2) return
     let pos = 0, dir = 1, pausa = 40          // ~0,7 s quieto en cada punta
     const t = setInterval(() => {
@@ -43,9 +47,15 @@ function TituloDeslizable({ texto, animar }: { texto: string; animar: boolean })
     return () => clearInterval(t)
   }, [animar, texto])
   return (
-    <span ref={caja} title={texto}
-      className="block overflow-x-auto whitespace-nowrap text-sm text-neutral-800 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {texto}
+    <span className="relative block">
+      {/* touch-action propio: deslizar de lado mueve el título; de arriba abajo, la lista. */}
+      <span ref={caja} title={texto} onScroll={medir} style={{ touchAction: 'pan-x pan-y' }}
+        className="block overflow-x-auto whitespace-nowrap text-sm text-neutral-800 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {texto}
+      </span>
+      {hayMas && (
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 flex w-8 items-center justify-end bg-gradient-to-l from-white via-white/80 to-transparent text-sm font-semibold text-neutral-400">›</span>
+      )}
     </span>
   )
 }
@@ -157,7 +167,7 @@ export default function TextoConPublicaciones({ value, onTexto, cuenta, onKeyDow
 
   const listaPublicaciones = abierta ? (
         <ul ref={listaRef} role="listbox" style={enCelular ? undefined : { maxHeight: lugar.alto }}
-          className={`overflow-y-auto overscroll-contain touch-pan-y rounded-lg border border-neutral-200 bg-white py-1 ${
+          className={`overflow-y-auto overscroll-contain rounded-lg border border-neutral-200 bg-white py-1 ${
             enCelular ? 'mb-1 max-h-52' : `absolute left-0 right-0 z-20 shadow-lg ${lugar.arriba ? 'bottom-full mb-1' : 'top-full mt-1'}`}`}>
           <li className="px-3 pb-1 pt-0.5 text-[11px] text-neutral-400">Publicaciones de {cuenta} · desliza el título para leerlo · toca para poner el link</li>
           {lista.map((p, i) => (
