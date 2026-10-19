@@ -4,7 +4,7 @@ import HistorialTasas from '@/components/tasas/HistorialTasas'
 import { KPICard, money } from '@/components/ui'
 import { calcSpreadAndDiscount } from '@/lib/rateUtils'
 import { parseLocalDate } from '@/lib/tz'
-import { parseShippingTable, type ShipTier } from '@/lib/mlShipping'
+import { parseShippingTable, tierFor, TABLA_ZOOM } from '@/lib/mlShipping'
 import MlBreakdown from '@/components/productos/MlBreakdown'
 import BonusSettings from '@/components/tasas/BonusSettings'
 import NegocioSettings from '@/components/tasas/NegocioSettings'
@@ -20,10 +20,12 @@ interface Rate {
   source: string
 }
 
-// Fila editable de la tabla de MercadoEnvíos (peso máx → precio mín).
+// Fila editable de la tabla de MercadoEnvíos: peso máx → precio mínimo de ZOOM y de TEALCA (19-10: cada
+// transportista tiene el suyo; antes era una sola columna = TEALCA).
+interface FilaEnvio { maxKg: number; zoom: number; tealca: number }
 function ShipRowInputs({ row, onChange, onRemove }: {
-  row: ShipTier
-  onChange: (field: 'maxKg' | 'minPrice', val: number) => void
+  row: FilaEnvio
+  onChange: (field: keyof FilaEnvio, val: number) => void
   onRemove: () => void
 }) {
   return (
@@ -31,8 +33,11 @@ function ShipRowInputs({ row, onChange, onRemove }: {
       <input type="number" step="0.001" min="0" value={row.maxKg === 0 ? '' : row.maxKg}
         onChange={e => onChange('maxKg', Number(e.target.value))} placeholder="0.5"
         className="border rounded px-2 py-1 text-sm" />
-      <input type="number" step="0.01" min="0" value={row.minPrice === 0 ? '' : row.minPrice}
-        onChange={e => onChange('minPrice', Number(e.target.value))} placeholder="4.95"
+      <input type="number" step="0.01" min="0" value={row.zoom === 0 ? '' : row.zoom}
+        onChange={e => onChange('zoom', Number(e.target.value))} placeholder="3"
+        className="border rounded px-2 py-1 text-sm" />
+      <input type="number" step="0.01" min="0" value={row.tealca === 0 ? '' : row.tealca}
+        onChange={e => onChange('tealca', Number(e.target.value))} placeholder="3"
         className="border rounded px-2 py-1 text-sm" />
       <button onClick={onRemove} title="Quitar rango"
         className="text-neutral-300 hover:text-red-600 px-1 text-sm">✕</button>
@@ -58,7 +63,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
   const [veEnvio,    setVeEnvio]     = useState('0.65')  // $ envío por venta
   const [veUmbral,   setVeUmbral]    = useState('5')     // envío gratis aplica desde $5
   const [veDescuento, setVeDescuento] = useState('')     // descuento manual GLOBAL (vacío = usa el recomendado)
-  const [shipRows, setShipRows] = useState<ShipTier[]>([]) // tabla MercadoEnvíos peso→precio mín
+  const [shipRows, setShipRows] = useState<FilaEnvio[]>([]) // tabla MercadoEnvíos peso → mínimo ZOOM y TEALCA
   const [shipOpen, setShipOpen] = useState(false)          // modal de edición de la tabla
   const [transitoFactor, setTransitoFactor] = useState('1.4') // Finanzas: factor venta mercancía en tránsito
   const [busy,     setBusy]     = useState(false)
@@ -81,7 +86,10 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
       if (s.ml_umbral)   setVeUmbral(String(s.ml_umbral))
       if (s.ml_descuento != null && s.ml_descuento !== '') setVeDescuento(String(s.ml_descuento))
       if (s.transito_sale_factor) setTransitoFactor(String(s.transito_sale_factor))
-      setShipRows(parseShippingTable(s.ml_shipping_table))
+      // TEALCA = la tabla de siempre (sus rangos de peso mandan); ZOOM, su precio para cada rango.
+      const tealca = parseShippingTable(s.ml_shipping_table)
+      const zoom = parseShippingTable(s.ml_shipping_table_zoom, TABLA_ZOOM)
+      setShipRows(tealca.map(t => ({ maxKg: t.maxKg, tealca: t.minPrice, zoom: tierFor(t.maxKg, zoom)?.minPrice ?? t.minPrice })))
     }
   }
   useEffect(() => { loadAll() }, [])
@@ -181,14 +189,17 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
   // Tabla MercadoEnvíos (peso→precio mínimo para envío gratis) — VE
   const saveShipTable = async () => {
     const clean = shipRows
-      .map(r => ({ maxKg: Number(r.maxKg), minPrice: Number(r.minPrice) }))
-      .filter(r => r.maxKg > 0 && r.minPrice >= 0)
+      .map(r => ({ maxKg: Number(r.maxKg), zoom: Number(r.zoom), tealca: Number(r.tealca) }))
+      .filter(r => r.maxKg > 0 && r.zoom >= 0 && r.tealca >= 0)
       .sort((a, b) => a.maxKg - b.maxKg)
     if (clean.length === 0) { setError('La tabla debe tener al menos un rango válido'); return }
     setBusy(true); setError(null); setOkMsg(null)
     const res = await fetch('/api/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ml_shipping_table: JSON.stringify(clean) }),
+      body: JSON.stringify({
+        ml_shipping_table: JSON.stringify(clean.map(r => ({ maxKg: r.maxKg, minPrice: r.tealca }))),
+        ml_shipping_table_zoom: JSON.stringify(clean.map(r => ({ maxKg: r.maxKg, minPrice: r.zoom }))),
+      }),
     })
     setBusy(false)
     if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
@@ -306,17 +317,20 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
       {shipOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShipOpen(false)}>
           <div className="absolute inset-0 bg-black/30" />
-          <div className="relative bg-white rounded-xl border border-neutral-200 shadow-2xl p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="relative bg-white rounded-xl border border-neutral-200 shadow-2xl p-5 w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <h2 className="font-semibold">📦 Tabla MercadoEnvíos</h2>
               <button onClick={() => setShipOpen(false)} className="text-neutral-400 hover:text-neutral-700 text-lg">✕</button>
             </div>
             <p className="text-xs text-neutral-500 mb-3">
-              Peso máximo del rango → precio mínimo (USD) para que la publicación tenga envío gratis. Editala cuando ML cambie la tabla.
+              Peso máximo del rango → precio mínimo (USD) para tener envío gratis con cada transportista. Edítala cuando ML
+              cambie la tabla: se aplica en todo el sistema (Productos, Promociones, Preguntas, Mensajes, la IA y la ficha).
+              TEALCA también es la que usa Productos para el tope de descuento y el costo de envío.
             </p>
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
               <div className="text-[11px] text-neutral-500">Hasta (kg)</div>
-              <div className="text-[11px] text-neutral-500">Precio mín (USD)</div>
+              <div className="text-[11px] text-neutral-500">ZOOM (USD)</div>
+              <div className="text-[11px] text-neutral-500">TEALCA (USD)</div>
               <div></div>
               {shipRows.map((r, i) => (
                 <ShipRowInputs key={i} row={r}
@@ -325,7 +339,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
               ))}
             </div>
             <div className="flex items-center justify-between gap-2 mt-4">
-              <button onClick={() => setShipRows(rows => [...rows, { maxKg: 0, minPrice: 0 }])}
+              <button onClick={() => setShipRows(rows => [...rows, { maxKg: 0, zoom: 0, tealca: 0 }])}
                 className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100">
                 + Agregar rango
               </button>
@@ -438,10 +452,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
             </div>
           </div>}
 
-          {/* Bonos por ventas del mes (metas y montos) */}
           <NegocioSettings conDespachos={false} />
-
-          {bonos && <BonusSettings />}
         </div>
 
         {/* Columna derecha: historial corto (los últimos días; el resto en una ventana) */}
@@ -478,6 +489,8 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
               </tbody>
             </table>
         )} />
+        {/* Bonos por ventas del mes (19-10: debajo del historial, que tenía el espacio vacío) */}
+        {bonos && <BonusSettings />}
         </div>
       </div>
 

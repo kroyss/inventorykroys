@@ -9,6 +9,7 @@
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
 import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { envioGratisAhora } from '@/lib/mlShipping'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
@@ -245,7 +246,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   let envio: ReturnType<typeof envioGratisAhora> = null
   if ((q.item_moneda ?? 'USD') === 'USD' && await empresaConPromociones(db)) {
     const { rows: [peso] } = await db.query(`SELECT ${sqlPesoPublicacion('$1::text')} AS kg`, [q.item_id]).catch(() => ({ rows: [] }))
-    envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original)
+    envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original, await leerTablasEnvio(db))
   }
   const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import {
-  envioPorTransportista, topeDescuento, unidadesParaGratis, parseShippingTable, TABLA_TEALCA, TABLA_ZOOM, type EstadoEnvio,
+  envioPorTransportista, topeDescuento, unidadesParaGratis, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
 } from '@/lib/mlShipping'
 import { mlNetFor, type VeRate } from '@/lib/pricingVE'
 import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
@@ -107,6 +107,8 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     return () => { vivo = false }
   }, [])
   const shipTable = useMemo(() => parseShippingTable(ml.ml_shipping_table), [ml.ml_shipping_table])
+  // ZOOM y TEALCA de Ajustes (19-10: antes fijas en el código).
+  const tablas = useMemo(() => tablasEnvio(ml), [ml])
 
   const margenA = useMemo(() => (f: FilaPromo, precio: number) => {
     if (f.costo == null || !veRate) return null
@@ -119,8 +121,8 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     const adentro = f.promos.filter(p => p.estado === 'started' && p.precio != null)
     const enPromo = adentro.length ? adentro.reduce((a, b) => (b.precio! < a.precio! ? b : a)) : null
     const actual = enPromo?.precio ?? f.precio
-    const envio = envioPorTransportista(f.peso, actual)
-    const sinPromo = envioPorTransportista(f.peso, f.precio)
+    const envio = envioPorTransportista(f.peso, actual, tablas)
+    const sinPromo = envioPorTransportista(f.peso, f.precio, tablas)
     return {
       ...f, enPromo, actual, envio,
       envioBase: sinPromo,   // al precio publicado: contra esto se mide lo que hace un descuento nuevo
@@ -128,8 +130,8 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       // destino (quitaEnvio), o tenía ZOOM y queda solo TEALCA (quitaZoom: sigue gratis, es advertencia).
       quitaEnvio: !!enPromo && envio.estado === 'destino' && (sinPromo.estado === 'ambas' || sinPromo.estado === 'tealca'),
       quitaZoom: !!enPromo && sinPromo.estado === 'ambas' && envio.estado === 'tealca',
-      uTealca: envio.estado === 'destino' ? unidadesParaGratis(f.peso, actual, TABLA_TEALCA) : null,
-      uZoom: envio.estado === 'destino' || envio.estado === 'tealca' ? unidadesParaGratis(f.peso, actual, TABLA_ZOOM) : null,
+      uTealca: envio.estado === 'destino' ? unidadesParaGratis(f.peso, actual, tablas.tealca) : null,
+      uZoom: envio.estado === 'destino' || envio.estado === 'tealca' ? unidadesParaGratis(f.peso, actual, tablas.zoom) : null,
       descuento: enPromo && f.precio > 0 ? (1 - actual / f.precio) * 100 : 0,
       candidatas: f.promos.filter(p => p.estado === 'candidate'),
       topeAmbas: topeDescuento(f.precio, envio.minZoom),
@@ -137,7 +139,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       topePiso: topeDescuento(f.precio, PISO_ML),   // hasta cuánto se puede bajar sin cruzar los $2 de ML
       margen: margenA(f, actual),
     }
-  }), [filas, margenA])
+  }), [filas, margenA, tablas])
   type Vista = typeof vistas[number]
   const porClave = useMemo(() => new Map(vistas.map(v => [clave(v), v])), [vistas])
 
@@ -496,7 +498,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
 
       {modal?.tipo === 'agregar' && (
         <AgregarModal modal={modal} setModal={setModal} filas={modal.claves.map(k => porClave.get(k)).filter(Boolean) as Vista[]}
-          campanas={campanas} margenA={margenA} margenMin={margenMin}
+          campanas={campanas} margenA={margenA} margenMin={margenMin} tablas={tablas}
           onHecho={(msg, err) => { setModal(null); if (err) setError(err); else { setAviso(msg); setSel(new Set()) } router.refresh() }} />
       )}
       {modal?.tipo === 'nueva' && (
@@ -515,9 +517,9 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
 type VistaModal = FilaPromo & { envio: ReturnType<typeof envioPorTransportista>; envioBase: ReturnType<typeof envioPorTransportista> }
 
 /** Vista previa antes de agregar a una campaña: precio nuevo, envío antes → después, unidades y margen. */
-function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, onHecho }: {
+function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, tablas, onHecho }: {
   modal: Extract<Modal, { tipo: 'agregar' }>; setModal: (m: Modal) => void; filas: VistaModal[]
-  campanas: CampanaVista[]; margenA: (f: FilaPromo, precio: number) => number | null; margenMin: number
+  campanas: CampanaVista[]; margenA: (f: FilaPromo, precio: number) => number | null; margenMin: number; tablas: TablasEnvio
   onHecho: (msg: string, err?: string) => void
 }) {
   const confirmarAviso = useConfirm()
@@ -559,11 +561,11 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
     const bajoMin = cand?.minimo != null && precio < cand.minimo
     // Siempre contra el envío AL PRECIO PUBLICADO (no contra el de otra promo que ya le haya bajado el precio).
     const base = f.envioBase
-    const despues = envioPorTransportista(f.peso, precio)
+    const despues = envioPorTransportista(f.peso, precio, tablas)
     const sinGratis = despues.estado === 'destino' && base.estado !== 'destino' && base.estado !== 'sin_peso'
     const pierdeZoom = base.estado === 'ambas' && despues.estado === 'tealca'
     const pierde = sinGratis || pierdeZoom
-    const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, TABLA_TEALCA) : null
+    const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, tablas.tealca) : null
     const margen = margenA(f, precio)
     // Hasta qué % aguanta: con ZOOM (mínimo de ZOOM) y con algún envío gratis (mínimo de TEALCA).
     const topeZoom = base.estado === 'ambas' ? topeDescuento(f.precio, base.minZoom) : null
@@ -670,7 +672,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, on
   const reintentar = async (f: VistaModal) => {
     const p = reintento[f.id] ?? Math.min(80, modal.pct + 5)
     const precio = precioConPiso(f.precio, p)
-    const e = envioPorTransportista(f.peso, precio).estado
+    const e = envioPorTransportista(f.peso, precio, tablas).estado
     const aviso = e === 'destino' && f.envioBase.estado !== 'destino' && f.envioBase.estado !== 'sin_peso'
       ? `Con ${p}% (${usd(precio)}) queda SIN envío gratis: cobro a destino.`
       : e === 'tealca' && f.envioBase.estado === 'ambas' ? `Con ${p}% (${usd(precio)}) pierde ZOOM: queda solo TEALCA.` : null

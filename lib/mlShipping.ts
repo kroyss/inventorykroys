@@ -36,18 +36,18 @@ export const DEFAULT_SHIPPING_TABLE: ShipTier[] = [
 ]
 
 /** Lee la tabla de un objeto de settings; si no hay o es inválida, usa el default. */
-export function parseShippingTable(raw: string | undefined | null): ShipTier[] {
-  if (!raw) return DEFAULT_SHIPPING_TABLE
+export function parseShippingTable(raw: string | undefined | null, def: ShipTier[] = DEFAULT_SHIPPING_TABLE): ShipTier[] {
+  if (!raw) return def
   try {
     const arr = JSON.parse(raw)
-    if (!Array.isArray(arr) || arr.length === 0) return DEFAULT_SHIPPING_TABLE
+    if (!Array.isArray(arr) || arr.length === 0) return def
     const clean = arr
       .map(t => ({ maxKg: Number(t.maxKg), minPrice: Number(t.minPrice) }))
       .filter(t => t.maxKg > 0 && t.minPrice >= 0)
       .sort((a, b) => a.maxKg - b.maxKg)
-    return clean.length ? clean : DEFAULT_SHIPPING_TABLE
+    return clean.length ? clean : def
   } catch {
-    return DEFAULT_SHIPPING_TABLE
+    return def
   }
 }
 
@@ -172,24 +172,30 @@ export function shipInfo(
 // ── Envío gratis POR TRANSPORTISTA (2026-10-16, Promociones) ─────────────────
 // Cada transportista tiene su propio mínimo por peso (aviso del portal de MercadoEnvíos, oct-2026).
 // Una publicación tiene envío gratis por los que llega: ZOOM pide igual o más que TEALCA, así que
-// queda en uno de tres estados: ZOOM y TEALCA · solo TEALCA · cobro a destino. La tabla de arriba
-// (DEFAULT_SHIPPING_TABLE = la de TEALCA) sigue siendo la de Productos (tope y costo de envío).
+// queda en uno de tres estados: ZOOM y TEALCA · solo TEALCA · cobro a destino.
+// Desde el 19-10 las dos son EDITABLES en Ajustes (una sola fuente para todo el sistema):
+//   TEALCA = `ml_shipping_table` (la de siempre: también tope de descuento y costo de envío en Productos)
+//   ZOOM   = `ml_shipping_table_zoom`
+// Estas constantes son el respaldo si no hay nada guardado.
 export const TABLA_ZOOM: ShipTier[] = [
   { maxKg: 0.5, minPrice: 3 }, { maxKg: 1, minPrice: 10 }, { maxKg: 1.5, minPrice: 20 }, { maxKg: 2, minPrice: 20 },
   { maxKg: 3, minPrice: 30 }, { maxKg: 4, minPrice: 40 }, { maxKg: 5, minPrice: 50 }, { maxKg: 10, minPrice: 60 },
-  { maxKg: 80, minPrice: 80 }, { maxKg: 100, minPrice: 200 },
+  { maxKg: 80, minPrice: 80 }, { maxKg: 999, minPrice: 200 },
 ]
-export const TABLA_TEALCA: ShipTier[] = [
-  { maxKg: 0.5, minPrice: 3 }, { maxKg: 1, minPrice: 7 }, { maxKg: 1.5, minPrice: 15 }, { maxKg: 2, minPrice: 20 },
-  { maxKg: 3, minPrice: 30 }, { maxKg: 4, minPrice: 40 }, { maxKg: 5, minPrice: 50 }, { maxKg: 10, minPrice: 60 },
-  { maxKg: 80, minPrice: 80 }, { maxKg: 100, minPrice: 200 },
-]
+export const TABLA_TEALCA: ShipTier[] = DEFAULT_SHIPPING_TABLE
+
+export interface TablasEnvio { zoom: ShipTier[]; tealca: ShipTier[] }
+export const TABLAS_DEFAULT: TablasEnvio = { zoom: TABLA_ZOOM, tealca: TABLA_TEALCA }
+/** Las dos tablas a partir de los settings guardados (JSON); lo que falte, del respaldo. */
+export function tablasEnvio(s: { ml_shipping_table?: string | null; ml_shipping_table_zoom?: string | null } | null | undefined): TablasEnvio {
+  return { zoom: parseShippingTable(s?.ml_shipping_table_zoom, TABLA_ZOOM), tealca: parseShippingTable(s?.ml_shipping_table, TABLA_TEALCA) }
+}
 
 export type EstadoEnvio = 'ambas' | 'tealca' | 'destino' | 'sin_peso'
 
 /** Envío gratis a un precio dado: por qué transportistas, y los mínimos de cada uno para ese peso. */
-export function envioPorTransportista(pesoKg: number | null | undefined, precio: number) {
-  const z = tierFor(pesoKg, TABLA_ZOOM), t = tierFor(pesoKg, TABLA_TEALCA)
+export function envioPorTransportista(pesoKg: number | null | undefined, precio: number, tablas: TablasEnvio = TABLAS_DEFAULT) {
+  const z = tierFor(pesoKg, tablas.zoom), t = tierFor(pesoKg, tablas.tealca)
   if (!z || !t) return { estado: 'sin_peso' as EstadoEnvio, minZoom: null, minTealca: null }
   const estado: EstadoEnvio = precio >= z.minPrice ? 'ambas' : precio >= t.minPrice ? 'tealca' : 'destino'
   return { estado, minZoom: z.minPrice, minTealca: t.minPrice }
@@ -225,11 +231,12 @@ export const RANGO_ENVIO: Record<EstadoEnvio, number> = { ambas: 2, tealca: 1, d
  * solo por TEALCA o cobro a destino. Con `precioSinPromo` dice si es la promoción la que le quitó ZOOM o el envío
  * gratis (cuando la promo termina, el precio vuelve y el estado cambia solo). null = sin peso o sin precio.
  */
-export function envioGratisAhora(pesoKg: number | null | undefined, precio: number | null | undefined, precioSinPromo?: number | null) {
+export function envioGratisAhora(pesoKg: number | null | undefined, precio: number | null | undefined, precioSinPromo?: number | null,
+  tablas: TablasEnvio = TABLAS_DEFAULT) {
   if (pesoKg == null || !(pesoKg > 0) || precio == null || !(precio > 0)) return null
-  const e = envioPorTransportista(pesoKg, precio)
+  const e = envioPorTransportista(pesoKg, precio, tablas)
   if (e.estado === 'sin_peso') return null
-  const base = precioSinPromo && precioSinPromo > precio ? envioPorTransportista(pesoKg, precioSinPromo).estado : null
+  const base = precioSinPromo && precioSinPromo > precio ? envioPorTransportista(pesoKg, precioSinPromo, tablas).estado : null
   const porPromo = base != null && RANGO_ENVIO[base] > RANGO_ENVIO[e.estado]
   const texto = e.estado === 'ambas' ? 'Envío gratis por ZOOM y TEALCA'
     : e.estado === 'tealca' ? 'Envío gratis SOLO por TEALCA (ZOOM no llega a este precio)'

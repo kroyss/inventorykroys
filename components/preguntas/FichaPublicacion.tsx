@@ -146,7 +146,13 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
                   <span className={`rounded-full px-2.5 py-1 font-medium ${f.disponible > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
                     {f.disponible > 0 ? `${f.disponible} disponibles` : 'Sin stock'}
                   </span>
-                  {f.envio_gratis && <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800">Envío gratis</span>}
+                  {/* Con peso: el envío gratis real a este precio (19-10); sin peso, lo que dice ML. */}
+                  {f.envio ? (
+                    f.envio.estado === 'ambas' ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800">Envío gratis</span>
+                    : f.envio.estado === 'tealca' ? <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-800" title="El precio no llega al mínimo de ZOOM para su peso">Envío gratis solo TEALCA</span>
+                    : f.envio.unidades ? <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-800" title="A 1 unidad el precio no llega al mínimo de su peso: cobro a destino">Envío gratis desde {f.envio.unidades} u.</span>
+                    : <span className="rounded-full bg-red-50 px-2.5 py-1 font-medium text-red-700" title="El precio no llega al mínimo de su peso: cobro a destino">Sin envío gratis</span>
+                  ) : f.envio_gratis && <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800">Envío gratis</span>}
                   {f.garantia && <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-neutral-700">{f.garantia}</span>}
                 </div>
                 {f.variantes.length > 0 && (

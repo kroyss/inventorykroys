@@ -1,3 +1,4 @@
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { NextRequest, NextResponse } from 'next/server'
 import { sqlDisponible, sqlPesoPublicacion, sqlSituacion } from '@/lib/promocionesSesion'
 import { tieneModulo } from '@/lib/modulos'
@@ -77,6 +78,7 @@ export async function GET(req: NextRequest) {
       preguntas: rows, total: tot.n, page, tam: TAM, contadores: n, cuentas,
       plantillas: leerPlantillas(pl?.value),
       configuracion: { ml: mlConfigurado(), ia: iaConfigurada() },
+      tablasEnvio: conEnvio ? await leerTablasEnvio(s.db) : null,   // ZOOM y TEALCA de Ajustes (19-10)
     })
   } catch (err) {
     return apiError(err)

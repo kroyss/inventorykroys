@@ -58,7 +58,7 @@ const CreateSchema = z.object({
 // Parámetros de MercadoLibre que se copian de la empresa de la plataforma del mismo país
 // (son datos del mercado, no del negocio). Lo propio de cada negocio (cuentas ML,
 // remitente, bonos, facturación, exceso) arranca vacío y lo configura el cliente.
-const AJUSTES_DE_MERCADO = ['ml_comision', 'ml_envio', 'ml_umbral', 'ml_shipping_table', 'tealca_guia_digitos',
+const AJUSTES_DE_MERCADO = ['ml_comision', 'ml_envio', 'ml_umbral', 'ml_shipping_table', 'ml_shipping_table_zoom', 'tealca_guia_digitos',
                             'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten']
 
 /**

@@ -6,6 +6,7 @@
 // al responder o con el botón "Marcar como leída".
 import { empresaConPromociones, sqlDisponible, sqlPesoPublicacion, sqlSituacion } from '@/lib/promocionesSesion'
 import { envioGratisAhora } from '@/lib/mlShipping'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
 import { copiarNotas, leerNotas } from '@/lib/notasML'
@@ -298,10 +299,11 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
   const { rows: pesos } = !conEnvio ? { rows: [] as { publicacion: string; kg: number | null }[] } : await db.query(
     `SELECT x AS publicacion, ${sqlPesoPublicacion('x')} AS kg FROM unnest($1::text[]) x`,
     [[...new Set(items.map(it => it.id))]]).catch(() => ({ rows: [] as { publicacion: string; kg: number | null }[] }))
+  const tablas = conEnvio ? await leerTablasEnvio(db) : undefined
   for (const it of items) {
     if (!conEnvio || !it.usd) { it.envio = null; continue }
     const kg = pesos.find(p => p.publicacion === it.id)?.kg
-    const e = kg ? envioGratisAhora(kg * it.cantidad, it.usd * it.cantidad) : null
+    const e = kg ? envioGratisAhora(kg * it.cantidad, it.usd * it.cantidad, null, tablas) : null
     it.envio = e ? { estado: e.estado, texto: e.texto }
       : { estado: 'sin_peso', texto: 'Sin peso: no está en el portal de MercadoEnvíos ni vinculada a un producto con peso' }
   }

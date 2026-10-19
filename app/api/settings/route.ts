@@ -7,7 +7,7 @@ import { puede } from '@/lib/permisos'
 
 // Claves que solo existen con su módulo: sin él no se guardan (y ml_descuento se lee como 0).
 const DE_MODULO: Record<string, Modulo> = {
-  ml_descuento: 'descuento_ml', ml_shipping_table: 'descuento_ml',
+  ml_descuento: 'descuento_ml', ml_shipping_table: 'descuento_ml', ml_shipping_table_zoom: 'descuento_ml',
   transito_sale_factor: 'finanzas',
   bono_meta_1: 'bonos', bono_meta_2: 'bonos', bono_meta_3: 'bonos', bono_meta_4: 'bonos',
   bono_monto_1: 'bonos', bono_monto_2: 'bonos', bono_monto_3: 'bonos', bono_monto_4: 'bonos',
@@ -16,7 +16,8 @@ const DE_MODULO: Record<string, Modulo> = {
 // Claves permitidas (parámetros de costos ML por país). Evita escrituras arbitrarias.
 const ALLOWED = new Set([
   'ml_comision', 'ml_envio', 'ml_umbral', 'ml_descuento', // VE (ml_descuento = descuento manual global)
-  'ml_shipping_table',                               // VE (tabla MercadoEnvíos peso→precio mín, JSON)
+  'ml_shipping_table',                               // VE (tabla MercadoEnvíos peso→precio mín, JSON) = TEALCA
+  'ml_shipping_table_zoom',                          // VE: la de ZOOM (19-10), mismos rangos de peso
   'ml_cuentas',                                      // cuentas de MercadoLibre de la empresa (JSON)
   'despacho_remitente',                              // remitente del manifiesto (vacío = nombre de la empresa)
   'preguntas_politicas',                             // Preguntas ML: políticas que usa la IA (texto libre)

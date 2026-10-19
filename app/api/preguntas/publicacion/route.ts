@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlFetch, ErrorML, CuentaDesconectada } from '@/lib/ml'
+import { envioGratisAhora, unidadesParaGratis } from '@/lib/mlShipping'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
+import { sqlPesoPublicacion } from '@/lib/promocionesSesion'
 
 interface ItemML {
   id: string; title: string; price: number | null; original_price?: number | null; currency_id?: string
@@ -16,6 +19,9 @@ export interface Ficha {
   id: string; titulo: string; precio: number | null; precio_original: number | null; moneda: string
   disponible: number; vendidos: number | null; condicion: string | null; estado: string | null; link: string
   envio_gratis: boolean; garantia: string | null; fotos: string[]
+  /** Envío gratis REAL a este precio (19-10), con el peso y las tablas ZOOM/TEALCA de Ajustes. null = sin peso:
+   *  queda lo que dice ML (envio_gratis). `unidades` = desde cuántas llega a envío gratis (cobro a destino a 1). */
+  envio?: { estado: 'ambas' | 'tealca' | 'destino'; unidades: number | null } | null
   variantes: { id: string; nombre: string; stock: number; foto: number | null }[]
   atributos: { nombre: string; valor: string }[]
   descripcion: string; ejemplo?: boolean
@@ -86,6 +92,14 @@ export async function GET(req: NextRequest) {
           .filter(a => a.name && a.value_name && !SIN_INTERES.has(a.id ?? ''))
           .map(a => ({ nombre: a.name!, valor: a.value_name! })).slice(0, 24),
         descripcion: (desc.plain_text ?? '').trim(),
+      }
+      // Envío gratis real (19-10): ML marca "envío gratis" aunque el precio no llegue al mínimo de su peso.
+      if (ficha.envio_gratis && ficha.moneda === 'USD' && ficha.precio) {
+        const { rows: [p] } = await s.db.query(`SELECT ${sqlPesoPublicacion('$1::text')} AS kg`, [item]).catch(() => ({ rows: [] }))
+        const tablas = await leerTablasEnvio(s.db)
+        const e = envioGratisAhora(p?.kg, ficha.precio, null, tablas)
+        if (e) ficha.envio = { estado: e.estado as 'ambas' | 'tealca' | 'destino',
+          unidades: e.estado === 'destino' ? unidadesParaGratis(p.kg, ficha.precio, tablas.tealca)?.unidades ?? null : null }
       }
       return NextResponse.json(ficha)
     } catch (err) {

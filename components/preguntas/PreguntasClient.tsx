@@ -2,7 +2,7 @@
 import SituacionChip, { type Situacion } from './SituacionChip'
 import TextoConPublicaciones from './TextoConPublicaciones'
 import { AbrirFicha } from './FichaPublicacion'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { DatosDeItem, DatosProductos } from './DatosProducto'
 import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
 import { useSearchParams } from 'next/navigation'
@@ -11,7 +11,7 @@ import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type S
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
-import { envioGratisAhora } from '@/lib/mlShipping'
+import { envioGratisAhora, type TablasEnvio } from '@/lib/mlShipping'
 
 interface Pregunta {
   id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null; datos_guardados?: number
@@ -169,8 +169,12 @@ function Precio({ p, umbral }: { p: Pregunta; umbral: number | null }) {
 
 /** Envío gratis AL PRECIO DE AHORA (con la promo, si hay): por ZOOM y TEALCA, solo TEALCA o cobro a destino.
  *  Cuando la promoción termina el precio vuelve (se relee cada 30 min) y esto cambia solo. */
+// Tablas ZOOM y TEALCA de Ajustes (19-10): llegan con la lista; sin ellas, las de respaldo.
+const TablasEnvioCtx = createContext<TablasEnvio | undefined>(undefined)
+
 function EnvioGratis({ p }: { p: Pregunta }) {
-  const e = envioGratisAhora(p.item_peso, precioUSD(p), p.item_precio_original)
+  const tablas = useContext(TablasEnvioCtx)
+  const e = envioGratisAhora(p.item_peso, precioUSD(p), p.item_precio_original, tablas)
   if (!e) return p.envio_activo && precioUSD(p) ? (
     <span className="text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ring-neutral-200 text-neutral-400 whitespace-nowrap"
       title="Esta publicación no tiene peso: no está en el portal de MercadoEnvíos (pausada o sin envío configurado) ni vinculada a un producto con peso">
@@ -192,6 +196,7 @@ interface Datos {
   preguntas: Pregunta[]; total: number; page: number; tam: number
   contadores: { pendientes: number; respondidas: number; cerradas_sin_respuesta: number }
   cuentas: Cuenta[]; configuracion: { ml: boolean; ia: boolean }
+  tablasEnvio?: TablasEnvio | null
   plantillas: Plantilla[]
 }
 type Vista = 'pendientes' | 'respondidas' | 'cuentas'
@@ -281,6 +286,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }:
   const cont = datos?.contadores
 
   return (
+    <TablasEnvioCtx.Provider value={datos?.tablasEnvio ?? undefined}>
     <div className="space-y-4">
       <PageHeader title="Preguntas" subtitle="Todas las preguntas de tus cuentas de MercadoLibre en una bandeja, con respuesta sugerida por IA"
         actions={<>
@@ -405,6 +411,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }:
         </>
       )}
     </div>
+    </TablasEnvioCtx.Provider>
   )
 }
 
