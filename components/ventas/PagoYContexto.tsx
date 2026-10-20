@@ -238,6 +238,14 @@ export function PagoDeVenta({ numero, compraAt, pagoOk, onPagoOk, onPago, puedeV
       {/* Verificación */}
       {invalido ? (
         <p className="px-3 pb-2.5 text-xs text-red-700">Este pago se marcó INVÁLIDO en Pagos ME: revísalo antes de seguir.</p>
+      ) : puedeVerificar && pago.verificacion === 'valido' ? (
+        // 20-10: ya verificado (a mano o con "Comprobar con el banco"): no hay nada que marcar, sin casilla.
+        <div className="mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm">
+          <span className="font-medium text-emerald-800">✓ Pago verificado{pago.verificado_por ? <span className="font-normal text-neutral-500"> · por {pago.verificado_por}</span> : null}</span>
+          <button type="button" onClick={() => onPagoOk(!pagoOk)} className="ml-auto text-[11px] text-neutral-500 underline hover:text-neutral-800">
+            {pagoOk ? 'No procesar todavía' : 'Procesar al guardar'}
+          </button>
+        </div>
       ) : puedeVerificar ? (
         <label className={`mx-3 mb-2 flex items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer select-none transition-colors ${
           pagoOk ? 'border-emerald-400 bg-white' : 'border-neutral-200 bg-white hover:border-emerald-300'}`}>
@@ -252,6 +260,8 @@ export function PagoDeVenta({ numero, compraAt, pagoOk, onPagoOk, onPago, puedeV
           ? (pagoOk || pago.verificacion === 'valido'
             ? 'Al guardar: el pago queda verificado y la venta queda CERRADA (se descuenta el stock). Solo falta que la retire.'
             : 'Sin marcarlo, la venta queda en borrador hasta verificar el pago.')
+          : pagoOk && pago.verificacion === 'valido'
+          ? 'Al guardar: la venta queda PROCESADA (se descuenta el stock) y su guía entra al lote de Despachos.'
           : pagoOk
           ? 'Al guardar: el pago queda verificado, la venta PROCESADA y su guía entra al lote de Despachos.'
           : pago.verificacion === 'valido'
