@@ -127,7 +127,9 @@ export default function VentasForm({ editing, products, country, onClose, onSave
   const [pagoOkDe, setPagoOkDe] = useState<string | null>(null)   // número de orden marcado como "pago correcto"
   const alPago = useCallback((p: PagoME | null) => setPagoME({ numero: numeroActual, pago: p }), [numeroActual])
   const pagoActual = numeroCompleto && pagoME?.numero === numeroActual ? pagoME.pago : null
-  const pagoOk = !!pagoActual && pagoActual.verificacion !== 'invalido' && pagoOkDe === numeroActual
+  // 20-10: un pago YA verificado (a mano o con "Comprobar con el banco") viene marcado; se puede desmarcar ("no:<número>").
+  const pagoOk = !!pagoActual && pagoActual.verificacion !== 'invalido'
+    && (pagoActual.verificacion === 'valido' ? pagoOkDe !== `no:${numeroActual}` : pagoOkDe === numeroActual)
   const puedeVerificar = !editing || editing.status === 'BORRADOR'
 
   // Solo vale lo encontrado para el número que está escrito ahora.
@@ -430,7 +432,7 @@ Revísala en el detalle que se abre ahora.`)
 
           {numeroCompleto && country === 'VE' && (
             <PagoDeVenta key={`pago-${numeroActual}`} numero={numeroActual} compraAt={mlVenta?.fecha ?? null} onPago={alPago} puedeVerificar={puedeVerificar}
-              pagoOk={pagoOk} onPagoOk={v => setPagoOkDe(v ? numeroActual : null)} />
+              pagoOk={pagoOk} onPagoOk={v => setPagoOkDe(v ? numeroActual : pagoActual?.verificacion === 'valido' ? `no:${numeroActual}` : null)} />
           )}
 
           {/* Lo que compró en MercadoLibre */}
