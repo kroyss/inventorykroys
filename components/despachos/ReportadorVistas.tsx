@@ -2,6 +2,7 @@
 import { useState, type ReactNode } from 'react'
 import { Tabs } from '@/components/ui'
 import ReportadorHistorial from '@/components/despachos/ReportadorHistorial'
+import { EnEsperaReportador } from '@/components/despachos/EnEspera'
 
 /** Reportador: pestañas Reportar (API, Tealca, mensajes y programa de respaldo) e Historial. */
 export default function ReportadorVistas({ reportar, vistaInicial, jornadaInicial }: {
@@ -10,6 +11,7 @@ export default function ReportadorVistas({ reportar, vistaInicial, jornadaInicia
   const [vista, setVista] = useState(vistaInicial)
   return (
     <div className="space-y-4">
+      <EnEsperaReportador />
       <Tabs value={vista} onChange={setVista} items={[
         { value: 'reportar', label: 'Reportar' },
         { value: 'historial', label: 'Historial' },

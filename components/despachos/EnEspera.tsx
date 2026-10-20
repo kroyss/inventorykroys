@@ -25,10 +25,33 @@ const hace = (f: string | null) => {
 /** Los apartados en espera (se recargan con `recargar`). */
 export function useEnEspera() {
   const [lista, setLista] = useState<Apartado[]>([])
+  const [disponible, setDisponible] = useState(false)   // sin Despachos (403) no se muestra nada
   const recargar = useCallback(() =>
-    fetch('/api/despachos/apartados').then(r => r.ok ? r.json() : null).then(d => { if (d) setLista(d.espera) }).catch(() => {}), [])
+    fetch('/api/despachos/apartados').then(r => { setDisponible(r.ok); return r.ok ? r.json() : null })
+      .then(d => { if (d) setLista(d.espera) }).catch(() => {}), [])
   useEffect(() => { recargar() }, [recargar])
-  return { lista, recargar }
+  return { lista, recargar, disponible }
+}
+
+/** En el Reportador (20-10): el mismo "En espera" de Despachos, para apartar una guía antes de que se reporte. */
+export function EnEsperaReportador() {
+  const espera = useEnEspera()
+  const [abierto, setAbierto] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+  if (!espera.disponible) return null
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="mr-auto text-xs text-neutral-500">¿Una guía no debe reportarse todavía? Apártala y no se le escribe al comprador.</span>
+        <button onClick={() => setAbierto(true)} className="btn-secondary text-sm">Apartar una guía…</button>
+        <BotonEnEspera lista={espera.lista} onAbrir={() => setAbierto(true)} />
+      </div>
+      <AvisoEnEspera lista={espera.lista} onAbrir={() => setAbierto(true)} />
+      {aviso && <div className="rounded border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">{aviso}</div>}
+      {abierto && <PanelEnEspera lista={espera.lista} onCerrar={() => setAbierto(false)}
+        onCambio={msg => { setAviso(msg); espera.recargar() }} />}
+    </div>
+  )
 }
 
 /** Botón junto a Historial: gris con 0, ámbar con alguno, rojo si alguno lleva más de 2 días. */
