@@ -326,7 +326,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
 
       <AvisoEnEspera lista={espera.lista} onAbrir={() => setPanelEspera({ pre: null })} />
       {panelEspera && (
-        <PanelEnEspera lista={espera.lista} preseleccion={panelEspera.pre} onCerrar={() => setPanelEspera(null)}
+        <PanelEnEspera lista={espera.lista} preseleccion={panelEspera.pre} onCerrar={() => setPanelEspera(null)} conInventario={!desdeML}
           onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />
       )}
 

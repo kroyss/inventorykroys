@@ -77,8 +77,9 @@ export function AvisoEnEspera({ lista, onAbrir }: { lista: Apartado[]; onAbrir: 
 }
 
 /** Panel al costado: lo que está en espera (Sale hoy / Ya no se envía) y buscar un envío para apartarlo. */
-export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio }: {
+export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInventario = false }: {
   lista: Apartado[]; preseleccion?: Apartado | null; onCerrar: () => void; onCambio: (aviso: string) => void
+  conInventario?: boolean   // con Inventario: "Corregir pedido" (Ventas, mig. 108) en cada envío en espera
 }) {
   const [buscar, setBuscar] = useState('')
   const [candidatos, setCandidatos] = useState<Apartado[] | null>(null)
@@ -165,6 +166,10 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio }: {
                       <div className="font-mono text-xs">{a.venta ?? '—'} · {a.guia_ver ?? '—'} <span className="font-sans text-neutral-400">{a.carrier}</span></div>
                       <div className="text-xs text-neutral-600">{a.destinatario ?? ''}</div>
                       <div className="mt-1 text-xs text-neutral-700">“{a.apartado_nota}”</div>
+                      {conInventario && a.venta && (
+                        <a href={`/ventas?venta=${encodeURIComponent(a.venta)}`} className="mt-1 inline-block text-xs font-medium text-sky-700 hover:underline"
+                          title="Cambio de última hora: corrige los productos de la venta y el inventario se ajusta solo">Corregir pedido →</a>
+                      )}
                       <div className={`text-[11px] ${viejo ? 'font-medium text-red-700' : 'text-neutral-400'}`}>
                         {a.apartado_por ?? '—'} · {hace(a.apartado_at)} · {ETAPA[a.etapa]}
                       </div>

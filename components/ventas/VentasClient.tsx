@@ -1,4 +1,5 @@
 'use client'
+import CorregirPedido, { NotaAjustes } from '@/components/ventas/CorregirPedido'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
@@ -121,6 +122,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   // bajar su Excel (recuperación cuando una descarga anterior falló).
   const [redownloadMode, setRedownloadMode] = useState(false)
   const [busy, setBusy]         = useState(false)
+  // Corregir pedido (mig. 108): ventana y versión de la nota (se relee al guardar).
+  const [corrigePedido, setCorrigePedido] = useState(false)
+  const [ajustesVer, setAjustesVer] = useState(0)
+  const [avisoAjuste, setAvisoAjuste] = useState<string | null>(null)
   const [error, setError]       = useState<string | null>(null)
   // Facturación (solo VE): facturas de la venta abierta y el form de "Facturar"
   const [saleInvoices, setSaleInvoices] = useState<Invoice[]>([])
@@ -206,6 +211,16 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     if (q.get('new') === '1') {
       setEditing(null); setShowForm(true)
     } else if (q.get('vista') === 'confirmar' && porConfirmar) setVistaPC(true)
+    // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta.
+    const venta = q.get('venta')?.trim()
+    if (venta) {
+      fetch(`/api/sales?search=${encodeURIComponent(venta)}&pageSize=5`).then(r => r.ok ? r.json() : null).then(async d => {
+        const s = (d?.rows ?? d?.sales ?? []).find((x: Sale) => x.ml_order_number === venta)
+        if (!s) return
+        const fresh: Sale = await fetch(`/api/sales/${s.id}`).then(r => r.json())
+        if (fresh?.id) setSelected(fresh)
+      }).catch(() => {})
+    }
   }, [])
 
   // Guard de "última petición": al entrar desde el dashboard salen dos consultas
@@ -674,6 +689,8 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                   )}
                 </div>
               )}
+              <NotaAjustes saleId={selected.id} version={ajustesVer} />
+              {avisoAjuste && <div className="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">{avisoAjuste}</div>}
               <div className="text-xs text-neutral-500 mb-2">Productos ({selected.items.length})</div>
               <div className="space-y-1">
                 {selected.items.map((i: SaleItem) => (
@@ -727,6 +744,11 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 <button onClick={() => doAction('PROCESADA')} disabled={busy || !canAdvance} className="btn-primary text-sm">Procesar</button>
               )}
               {['PROCESADA','DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
+                <button onClick={() => { setAvisoAjuste(null); setCorrigePedido(true) }} disabled={busy}
+                  title="Cambio de última hora (otro color, algo más, error al procesar): se corrige esta venta y el inventario se ajusta solo"
+                  className="btn-secondary text-sm">Corregir pedido</button>
+              )}
+              {['PROCESADA','DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
                 <button onClick={() => setSelected(null)} className="btn-secondary text-sm">Salir</button>
               )}
               {['DESCARGADA','DESCARGADA_LOCAL'].includes(selected.status) && (
@@ -735,6 +757,18 @@ export default function VentasClient({ products: initialProducts, userRole, coun
             </div>
           </div>
         </div>
+      )}
+
+      {corrigePedido && selected && (
+        <CorregirPedido saleId={selected.id} orden={selected.ml_order_number} items={selected.items} products={products}
+          facturaEmitida={activeInvoice ? String(activeInvoice.invoice_number) : null}
+          onCerrar={() => setCorrigePedido(false)}
+          onListo={async msg => {
+            setCorrigePedido(false); setAvisoAjuste(msg); setAjustesVer(v => v + 1)
+            const fresh: Sale = await fetch(`/api/sales/${selected.id}`).then(r => r.json())
+            if (fresh?.id) setSelected(fresh)
+            reload(); refetchProducts()
+          }} />
       )}
 
       {invoicing && selected && (
