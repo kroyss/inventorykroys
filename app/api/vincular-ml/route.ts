@@ -14,7 +14,8 @@ import { desvincular, filasVincular, productosParaVincular, vincular } from '@/l
 async function sesion() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: unauthorized() } as const
-  if (!puede(session.user, 'vincular_ml') || !tieneModulo(session.user, 'inventario')) return { error: forbidden() } as const
+  const permitido = puede(session.user, 'vincular_ml') || (puede(session.user, 'ver_productos') && puede(session.user, 'importar_ml'))
+  if (!permitido || !tieneModulo(session.user, 'inventario')) return { error: forbidden() } as const
   if (!tieneModulo(session.user, 'preguntas')) {
     return { error: NextResponse.json({ error: 'Primero hay que conectar las cuentas de MercadoLibre' }, { status: 400 }) } as const
   }

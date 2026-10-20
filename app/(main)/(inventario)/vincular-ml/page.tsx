@@ -11,6 +11,7 @@ export const metadata = { title: 'Vincular con MercadoLibre' }
 // vincular_ml, sin ver Productos); el dueño, desde Productos → "Vincular con ML".
 export default async function VincularMLPage() {
   const session = await getServerSession(authOptions)
-  if (!session || !puede(session.user, 'vincular_ml')) redirect('/dashboard')
+  // También quien ya tenía "Importar desde ML" (el botón de Productos lleva aquí).
+  if (!session || !(puede(session.user, 'vincular_ml') || (puede(session.user, 'ver_productos') && puede(session.user, 'importar_ml')))) redirect('/dashboard')
   return <VincularMLClient conCuentas={tieneModulo(session.user, 'preguntas')} />
 }
