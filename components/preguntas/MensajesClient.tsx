@@ -660,10 +660,25 @@ const unir = (notas: NotaML[]) => notas.map(n => n.texto.trim()).filter(Boolean)
 /** Notas de la venta en MercadoLibre (las mismas en Mensajes y en Ventas): se guardan al instante en ML.
  *  `onNotas`: el texto de todas juntas cada vez que cambian (Ventas lo usa como nota de la venta). */
 export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio: () => void; onNotas?: (texto: string) => void }) {
-  const [datos, setDatos] = useState<{ notas: NotaML[]; error: string | null } | null>(null)
+  const [datos, setDatos] = useState<{ notas: NotaML[]; error: string | null; pendiente?: boolean } | null>(null)
   const [editando, setEditando] = useState<{ id: string | null; texto: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [guardada, setGuardada] = useState(false)   // "✓ guardada" un momento, para que no quede la duda
+  // ML todavía no mostraba el cambio (pendiente): se vuelve a leer sola a los pocos segundos.
+  useEffect(() => {
+    if (!datos?.pendiente) return
+    let vivo = true
+    const t = setTimeout(() => {
+      fetch(`/api/mensajes/${pack}/notas`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d && !d.error) setDatos(d) }).catch(() => {})
+    }, 5000)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [datos, pack])
+  useEffect(() => {
+    if (!guardada) return
+    const t = setTimeout(() => setGuardada(false), 2500)
+    return () => clearTimeout(t)
+  }, [guardada])
   const confirm = useConfirm()
 
   useEffect(() => {
@@ -681,7 +696,7 @@ export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'No se pudo guardar la nota'); return }
-      setDatos(d); setEditando(null); onCambio(); onNotas?.(unir(d.notas))
+      setDatos(d); setEditando(null); setGuardada(true); onCambio(); onNotas?.(unir(d.notas))
     } finally { setGuardando(false) }
   }
   const guardar = () => {
@@ -745,11 +760,15 @@ export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio
             <span className="text-[11px] font-semibold uppercase tracking-wide">Nota</span>
           </span>
           <p className="min-w-0 flex-1 truncate text-sm text-neutral-800" title={n.texto}>{n.texto}</p>
-          <span className="shrink-0 text-[11px] text-neutral-400">{new Date(n.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>
-          <span className="flex shrink-0 gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          {datos.pendiente
+            ? <span className="shrink-0 text-[11px] font-medium text-amber-700" title="Ya se mandó a MercadoLibre; en unos segundos se confirma sola">guardando en ML…</span>
+            : guardada
+            ? <span className="shrink-0 text-[11px] font-medium text-emerald-700">✓ guardada</span>
+            : <span className="shrink-0 text-[11px] text-neutral-400">{new Date(n.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</span>}
+          {n.id !== 'pendiente' && <span className="flex shrink-0 gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             <button onClick={() => setEditando({ id: n.id, texto: n.texto })} className="rounded px-1.5 text-[11px] text-neutral-500 hover:bg-amber-100 hover:text-neutral-900">Editar</button>
             <button onClick={() => borrar(n)} className="rounded px-1.5 text-[11px] text-neutral-400 hover:bg-red-50 hover:text-red-600">Borrar</button>
-          </span>
+          </span>}
         </div>
       ))}
       {error && <p className="text-xs text-red-600">{error}</p>}
