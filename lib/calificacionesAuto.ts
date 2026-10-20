@@ -45,6 +45,12 @@ export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'n
       await db.query(`UPDATE ml_ordenes SET cal_vendedor = COALESCE(cal_vendedor, 'ya_calificada') WHERE id = $1`, [id])
       return { id, ok: false, detalle: msg }
     }
+    // ML ya no deja calificar una orden vieja (20-10, BUYBOOK_SHOP con ventas de julio): "You can't submit a not
+    // fulfilled feedback after order has expired". Nunca se va a poder: sale de la lista para no confundir.
+    if (e instanceof ErrorML && e.status >= 400 && e.status < 500 && /expired/i.test(`${msg} ${JSON.stringify(e.datos ?? '')}`)) {
+      await db.query(`UPDATE ml_ordenes SET cal_vendedor = 'cerrada_ml' WHERE id = $1 AND cal_vendedor IS NULL`, [id])
+      return { id, ok: false, quitada: true, detalle: 'MercadoLibre ya no deja calificarla: pasó su plazo' }
+    }
     // ML cierra la calificación del vendedor cuando el comprador ya calificó y pasó el plazo
     // (visto con SHOPIT_VE: compradores arrepentidos que calificaron el mismo día). Se confirma
     // releyendo: si el comprador calificó y ML rechazó (4xx, no sesión ni límite), sale de la lista.
