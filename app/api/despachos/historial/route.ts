@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const q = (req.nextUrl.searchParams.get('q') ?? '').trim()
     if (q) {
       const { rows } = await db.query(`
-        SELECT e.id, e.venta, e.guia, e.destinatario, e.remitente, e.reimpresion, e.original_name,
+        SELECT e.id, e.venta, e.guia, e.destinatario, e.remitente, e.reimpresion, e.original_name, e.apartado, e.apartado_nota,
                l.id AS lote_id, l.generated_at, j.id AS jornada_id, j.status AS jornada_status, j.closed_at
         FROM despacho_etiquetas e
         JOIN despacho_lotes l     ON l.id = e.lote_id AND l.status = 'GENERADO'

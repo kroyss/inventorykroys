@@ -541,6 +541,13 @@ async function pendienteAhora(db: Pool, e: EmpresaAvisos, d: Destinatario, disp:
        WHERE ${SQL_REPORTABLE} AND ${SQL_SIN_REPORTAR}`)
     if (r.n) pend.push(`🚚 ${n(r.n)} guía${r.n === 1 ? '' : 's'} sin reportar al comprador`)
   }
+  // Envíos apartados en Despachos hace más de 2 días (mig. 107): que no queden en el limbo.
+  if (disp.reportador) {
+    const { rows: [w] } = await db.query(
+      `SELECT COUNT(DISTINCT COALESCE(venta, id::text))::int AS n FROM despacho_etiquetas
+       WHERE apartado = 'espera' AND apartado_at < NOW() - INTERVAL '2 days'`)
+    if (w.n) pend.push(`⏸ ${n(w.n)} envío${w.n === 1 ? '' : 's'} en espera hace más de 2 días (Despachos → En espera)`)
+  }
   if (disp.pregunta && c.preguntas) pend.push(`❓ ${n(c.preguntas)} pregunta${c.preguntas === 1 ? '' : 's'} sin responder`)
   if (disp.mensaje && c.mensajes) pend.push(`✉️ ${n(c.mensajes)} conversaci${c.mensajes === 1 ? 'ón' : 'ones'} con mensajes sin leer`)
   if (disp.negativa) {

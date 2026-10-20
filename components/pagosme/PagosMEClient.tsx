@@ -298,10 +298,12 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
                     <td className="px-3 py-2 text-xs">
                       {datos?.desdeML ? <>
                         {p.ml_estado === 'cancelled' && <div className="text-red-700 font-medium">cancelada en ML</div>}
+                        {p.apartado && <div className="font-medium text-amber-700">{p.apartado === 'espera' ? '⏸ apartado: en espera' : '✕ envío cancelado'}</div>}
                         {p.en_despachos ? <a href="/despachos" onClick={e => e.stopPropagation()} className="text-neutral-700 underline underline-offset-2 hover:text-sky-700">en Despachos →</a>
                           : <div className="text-neutral-400">{p.tiene_guia ? 'todavía no en Despachos' : 'sin guía todavía'}</div>}
                       </> : <>
                         {p.sale_status ? <div>{p.sale_status}</div> : <div className="text-neutral-400">no registrada</div>}
+                        {p.apartado && <div className="font-medium text-amber-700">{p.apartado === 'espera' ? '⏸ apartado: en espera' : '✕ envío cancelado'}</div>}
                         {p.en_despachos && <a href="/despachos" onClick={e => e.stopPropagation()} className="block text-neutral-500 underline underline-offset-2 hover:text-sky-700">en Despachos →</a>}
                       </>}
                     </td>

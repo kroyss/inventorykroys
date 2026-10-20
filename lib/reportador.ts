@@ -27,7 +27,8 @@ export type EstadoResultado = typeof ESTADOS_RESULTADO[number]
 
 // Pendiente de reportar: nunca intentado, o intentado con error/rechazo (se reintenta,
 // como el script que los dejaba en la cola). ENVIADO / SIN_CHAT / CSV son finales.
-export const SQL_PENDIENTE = `(e.reporte_estado IS NULL OR e.reporte_estado IN ('RECHAZADO', 'ERROR'))`
+// Apartado (en espera o cancelado, migración 107): no se reporta hasta que lo liberen.
+export const SQL_PENDIENTE = `((e.reporte_estado IS NULL OR e.reporte_estado IN ('RECHAZADO', 'ERROR')) AND e.apartado IS NULL)`
 
 // Envíos que entran al Reportador: impresos, no reimpresiones (ese comprador ya fue
 // reportado), de jornadas CERRADAS (el paquete ya se entregó al transportista). Los

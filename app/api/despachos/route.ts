@@ -18,7 +18,9 @@ export async function GET() {
          FROM despacho_jornadas j LEFT JOIN users u ON u.id = j.opened_by
          WHERE j.status = 'ABIERTA'`),
       db.query(
-        `SELECT l.id, l.generated_at, l.label_count, l.page_count, u.username AS generated_by
+        `SELECT l.id, l.generated_at, l.label_count, l.page_count, u.username AS generated_by,
+                l.output_path IS NULL AS ya_impreso,   -- "Sale hoy" de un apartado de otra jornada (sin PDF nuevo)
+                (SELECT COUNT(*)::int FROM despacho_etiquetas x WHERE x.lote_id = l.id AND x.impresa AND x.apartado IS NOT NULL) AS apartados
          FROM despacho_lotes l
          JOIN despacho_jornadas j ON j.id = l.jornada_id AND j.status = 'ABIERTA'
          LEFT JOIN users u ON u.id = l.generated_by
@@ -61,7 +63,7 @@ export async function GET() {
       ? {
           ...abierta.rows[0],
           lotes: lotes.rows,
-          total_envios: lotes.rows.reduce((s, l) => s + (l.label_count ?? 0), 0),
+          total_envios: lotes.rows.reduce((s, l) => s + (l.label_count ?? 0) - (l.apartados ?? 0), 0),
         }
       : null
 

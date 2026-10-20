@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const { rowCount } = await db.query(
       `UPDATE despacho_etiquetas e SET
-         incluida = COALESCE($1, e.incluida),
+         incluida = CASE WHEN e.apartado IS NULL THEN COALESCE($1, e.incluida) ELSE e.incluida END,   -- apartado: se libera en "En espera"
          pago_forzado_por = CASE WHEN $4::boolean IS NULL THEN e.pago_forzado_por WHEN $4 THEN $5::int ELSE NULL END,
          pago_forzado_at  = CASE WHEN $4::boolean IS NULL THEN e.pago_forzado_at  WHEN $4 THEN NOW() ELSE NULL END
        FROM despacho_lotes l

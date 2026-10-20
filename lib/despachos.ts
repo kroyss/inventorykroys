@@ -223,6 +223,7 @@ export interface EtiquetaValidada {
   destinatario: string | null
   incluida: boolean
   impresa: boolean
+  apartado?: 'espera' | 'cancelado' | null   // mig. 107
   sale_id: number | null
   sale_status: string | null
   customer_name: string | null
@@ -252,7 +253,7 @@ const VENTA_NUM = `CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END`
 const SQL_DESDE_ML = `
   SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
          e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
-         e.incluida, e.impresa,
+         e.incluida, e.impresa, e.apartado,
          NULL::int AS sale_id, o.estado AS sale_status, o.comprador AS customer_name,
          COALESCE(e.nota_despacho, o.notas) AS sale_notes, o.notas AS nota_ml, e.nota_despacho,
          -- Nombre real del comprador (migración 080, o el de la mensajería); customer_name es su apodo de ML.
@@ -354,7 +355,7 @@ async function validarConInventario(db: Pool, loteId: number): Promise<EtiquetaV
   const { rows } = await db.query(
     `SELECT e.id, e.original_name, e.file_path, e.sha256, e.page_count, e.carrier, e.venta, e.guia,
             e.remitente, e.remitente_limpio, e.destinatario, e.read_error,
-            e.incluida, e.impresa,
+            e.incluida, e.impresa, e.apartado,
             s.id AS sale_id, s.status AS sale_status, s.customer_name, s.notes AS sale_notes,
             COALESCE((
               SELECT JSON_AGG(JSON_BUILD_OBJECT(

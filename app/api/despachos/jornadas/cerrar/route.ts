@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
        FROM despacho_etiquetas e
        JOIN despacho_lotes l ON l.id = e.lote_id
        WHERE l.jornada_id = $1 AND l.status = 'GENERADO' AND e.impresa
+         AND e.apartado IS NULL   -- apartados (mig. 107): no salen en esta jornada
        ORDER BY l.generated_at, e.original_name, e.id`,
       [jornada.id, remitente])
     if (envios.length === 0) {

@@ -1,4 +1,5 @@
 'use client'
+import { AvisoEnEspera, BotonEnEspera, PanelEnEspera, useEnEspera, type Apartado } from '@/components/despachos/EnEspera'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader, EmptyState } from '@/components/ui'
@@ -18,6 +19,7 @@ interface Etiqueta {
   remitente: string | null
   destinatario: string | null
   incluida: boolean
+  apartado?: 'espera' | 'cancelado' | null   // en "En espera" (mig. 107)
   sale_status: string | null
   sale_notes: string | null
   customer_name?: string | null
@@ -39,7 +41,8 @@ interface LoteDetalle {
   imprimibles: number
   etiquetas: Etiqueta[]
 }
-interface LoteGenerado { id: number; generated_at: string; label_count: number; page_count: number; generated_by: string | null }
+interface LoteGenerado { id: number; generated_at: string; label_count: number; page_count: number; generated_by: string | null
+  ya_impreso: boolean; apartados: number }   // ya_impreso: "Sale hoy" de un apartado de otra jornada (sin PDF)
 interface Overview {
   jornada: { id: number; opened_at: string; opened_by: string | null; lotes: LoteGenerado[]; total_envios: number } | null
   pendientes: { id: number; created_at: string; created_by: string | null; etiquetas: number }[]
@@ -119,6 +122,9 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
   // quedan a un clic en el aviso.
   const [recienCerrada, setRecienCerrada] = useState<{ id: number; transportistas: string[] } | null>(null)
   const [fallas, setFallas]     = useState<Falla[]>([])
+  // En espera (apartados, mig. 107): botón junto a Historial, línea de aviso y panel al costado.
+  const espera = useEnEspera()
+  const [panelEspera, setPanelEspera] = useState<{ pre: Apartado | null } | null>(null)
 
   const cargar = useCallback(() => fetch('/api/despachos').then(async res => {
     if (!res.ok) { setError((await errorDe(res)).error ?? 'Error'); return }
@@ -312,8 +318,17 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
         subtitle={data.jornada
           ? `Jornada abierta desde ${fechaHora(data.jornada.opened_at)} · ${data.jornada.total_envios} envío(s)`
           : 'Sin jornada abierta: se abre sola al generar el primer lote'}
-        actions={<Link href="/despachos/historial" className="btn-secondary text-sm">Historial</Link>}
+        actions={<div className="flex gap-2">
+          <BotonEnEspera lista={espera.lista} onAbrir={() => setPanelEspera({ pre: null })} />
+          <Link href="/despachos/historial" className="btn-secondary text-sm">Historial</Link>
+        </div>}
       />
+
+      <AvisoEnEspera lista={espera.lista} onAbrir={() => setPanelEspera({ pre: null })} />
+      {panelEspera && (
+        <PanelEnEspera lista={espera.lista} preseleccion={panelEspera.pre} onCerrar={() => setPanelEspera(null)}
+          onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">
@@ -345,6 +360,10 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
           onNota={(e, nota) => patchEtiqueta(l.id, e, { nota })}
           onToggle={e => patchEtiqueta(l.id, e, { incluida: !e.incluida })}
           onForzarPago={(e, v) => patchEtiqueta(l.id, e, { forzar_pago: v })}
+          onApartar={e => setPanelEspera({ pre: {
+            id: e.id, venta: e.venta, guia_ver: e.guia, carrier: e.carrier, destinatario: e.comprador_nombre ?? e.destinatario,
+            remitente: e.remitente, impresa: false, apartado: null, apartado_nota: null, apartado_at: null, apartado_por: null, etapa: 'sin_imprimir',
+          } })}
           onRevalidar={cargar}
           onAgregar={f => subir(f, l.id)}
           onGenerar={() => generar(l)}
@@ -379,9 +398,10 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
                     <td className="px-4 py-2 text-right">{l.page_count}</td>
                     <td className="px-4 py-2 text-neutral-500">{l.generated_by ?? '—'}</td>
                     <td className="px-4 py-2 text-right">
-                      <button onClick={() => descargar(`/api/despachos/lotes/${l.id}/pdf`)} className="btn-secondary text-xs">
-                        ↓ PDF
-                      </button>
+                      {l.ya_impreso
+                        ? <span className="text-xs text-neutral-500" title="Estaba en espera y se liberó: su etiqueta ya estaba impresa">venía en espera · ya impresa</span>
+                        : <button onClick={() => descargar(`/api/despachos/lotes/${l.id}/pdf`)} className="btn-secondary text-xs">↓ PDF</button>}
+                      {l.apartados > 0 && <div className="mt-0.5 text-[11px] text-amber-700">{l.apartados} en espera (no sale{l.apartados === 1 ? '' : 'n'})</div>}
                     </td>
                   </tr>
                 ))}
@@ -548,7 +568,7 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, onToggle, onForzarPago, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, onToggle, onForzarPago, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
   impresion: Impresion
@@ -557,6 +577,7 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
   busy: string | null
   onToggle: (e: Etiqueta) => void
   onForzarPago: (e: Etiqueta, forzar: boolean) => void
+  onApartar: (e: Etiqueta) => void
   onRevalidar: () => void
   onAgregar: (f: File[]) => void
   onGenerar: () => void
@@ -623,7 +644,7 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
               return (
                 <tr key={e.id} className={`border-t border-neutral-100 align-top ${!e.incluida ? 'opacity-50' : ''}`}>
                   <td className="px-3 py-2 text-center">
-                    {IMPRIMIBLE[e.estado] && (
+                    {IMPRIMIBLE[e.estado] && !e.apartado && (
                       <input type="checkbox" checked={e.incluida} onChange={() => onToggle(e)} title="Incluir en el PDF" />
                     )}
                   </td>
@@ -649,8 +670,15 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
                     {desdeML && e.venta ? <NotaEditable e={e} onGuardar={n => onNota(e, n)} /> : nota}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    <span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span>
-                    {e.detalle && <div className="text-neutral-500 mt-0.5">{e.detalle}</div>}
+                    {e.apartado
+                      ? <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">{e.apartado === 'espera' ? '⏸ En espera' : '✕ Cancelado'}</span>
+                      : <span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span>}
+                    {e.detalle && !e.apartado && <div className="text-neutral-500 mt-0.5">{e.detalle}</div>}
+                    {!e.apartado && e.venta && (
+                      <button onClick={() => onApartar(e)} className="mt-1 block text-neutral-500 underline hover:text-neutral-800" title="Sacarlo de este despacho sin perderlo">
+                        Apartar…
+                      </button>
+                    )}
                     {/* Pagos ME: despachar con el pago sin verificar queda registrado (quién). */}
                     {e.estado === 'PAGO' && (
                       <button onClick={() => onForzarPago(e, true)} className="mt-1 block text-amber-800 underline hover:text-amber-950">

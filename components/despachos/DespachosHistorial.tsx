@@ -21,6 +21,7 @@ interface Lote { id: number; generated_at: string; label_count: number; page_cou
 interface EtiquetaHallada {
   id: number; venta: string | null; guia: string | null; destinatario: string | null; remitente: string | null
   reimpresion: boolean; lote_id: number; generated_at: string; jornada_id: number | null
+  apartado?: 'espera' | 'cancelado' | null; apartado_nota?: string | null   // mig. 107
   jornada_status: string | null; closed_at: string | null
 }
 
@@ -124,7 +125,8 @@ export default function DespachosHistorial() {
               <tbody>
                 {hallazgos.map(e => (
                   <tr key={e.id} className="border-t border-neutral-100">
-                    <td className="px-4 py-2 font-mono text-xs">{e.venta ?? '—'}{e.reimpresion && <span className="ml-1 text-amber-700">(reimpresión)</span>}</td>
+                    <td className="px-4 py-2 font-mono text-xs">{e.venta ?? '—'}{e.reimpresion && <span className="ml-1 text-amber-700">(reimpresión)</span>}
+                      {e.apartado && <div className="font-sans text-amber-700" title={e.apartado_nota ?? ''}>{e.apartado === 'cancelado' ? '✕ Envío cancelado' : '⏸ En espera'}{e.apartado_nota ? `: ${e.apartado_nota}` : ''}</div>}</td>
                     <td className="px-4 py-2 font-mono text-xs">{e.guia ?? '—'}</td>
                     <td className="px-4 py-2 max-w-[14rem] truncate">{e.destinatario ?? '—'}</td>
                     <td className="px-4 py-2 text-xs text-neutral-500 whitespace-nowrap">
