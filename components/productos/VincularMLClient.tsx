@@ -199,11 +199,20 @@ function FilaVariante({ f, productos, esDueno, pedir, onCambio }: {
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
+            {/* 20-10: la sugerencia es texto para LEER, no un botón grande (se tocaba rápido sin revisar) y pide confirmar. */}
             {f.estado === 'parecida' && f.producto && (
-              <button disabled={ocupado} onClick={() => vincularA(f.producto!)} className="btn-primary text-xs disabled:opacity-50"
-                title="El sistema cree que es este producto: revisa el nombre antes de tocar">
-                Vincular con {f.producto.code} · {f.producto.name}
-              </button>
+              <>
+                <span className="text-xs text-neutral-500">¿Es este? <span className="text-neutral-800">{f.producto.code} · {f.producto.name}</span></span>
+                <button disabled={ocupado} className="btn-secondary text-xs disabled:opacity-50" onClick={async () => {
+                  if (!await confirm({ title: '¿Es el mismo producto?', confirmText: 'Sí, vincular', cancelText: 'No, revisar',
+                    message: `Publicación: ${f.titulo}${f.variante ? ` · ${f.variante}` : ''}
+
+Producto: ${f.producto!.code} · ${f.producto!.name}
+
+Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es otro…».` })) return
+                  vincularA(f.producto!)
+                }}>Sí, es este</button>
+              </>
             )}
             <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary text-xs">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>
             {!f.duda && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="text-xs text-neutral-500 underline">No sé, para Marcos</button>}
