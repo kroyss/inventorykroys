@@ -181,7 +181,13 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                         {a.apartado_por ?? '—'} · {hace(a.apartado_at)} · {ETAPA[a.etapa]}
                       </div>
                       <div className="mt-2 flex gap-2">
-                        <button disabled={ocupado} onClick={() => accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: sale hoy (entra en la jornada abierta y se reporta con ella).`)}
+                        <button disabled={ocupado} onClick={async () => {
+                          // 20-10: "Sale hoy" lo suma a la jornada abierta (o abre una): sale en el próximo manifiesto y esa
+                          // noche se reporta. Si en realidad sale otro día, que lo deje en espera y lo toque ese día.
+                          if (!await confirm({ title: '¿Este paquete sale en el despacho de hoy?', confirmText: 'Sí, sale hoy', cancelText: 'No, sigue en espera',
+                            message: `Entra en la jornada que se cierra hoy: sale en su manifiesto y al cerrarla se le reporta la guía al comprador.${a.impresa ? ' La etiqueta ya está impresa: no se vuelve a imprimir.' : ''} Si sale otro día, déjalo en espera y tócalo ese día.` })) return
+                          accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: sale hoy (entra en la jornada abierta y se reporta al cerrarla).`)
+                        }}
                           className="btn-secondary text-xs disabled:opacity-50">Sale hoy</button>
                         <button disabled={ocupado} onClick={async () => {
                           // No tiene vuelta atrás: nunca se despacha ni se reporta (queda en el historial como cancelado).
