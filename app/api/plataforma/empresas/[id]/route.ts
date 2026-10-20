@@ -52,6 +52,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       [id, body.nombre ?? null, body.modulos ?? null, body.is_active ?? null,
        body.ia_limite_mes !== undefined, body.ia_limite_mes ?? null])
     if (!rowCount) return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 })
+    // Historia de la cuenta (mig. 106): apagarla o encenderla a mano.
+    if (body.is_active !== undefined) {
+      await dbGlobal().query(
+        `INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle, por)
+         SELECT organizacion_id, $2, nombre, $3 FROM empresas WHERE id = $1`,
+        [id, body.is_active ? 'encendida' : 'apagada', session.user.id]).catch(e => console.error('[organizacion_eventos]', e))
+    }
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message ?? err.message }, { status: 400 })

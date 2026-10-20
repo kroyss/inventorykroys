@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { dbGlobal } from '@/lib/db'
 import { DIAS_PRUEBA } from '@/lib/cuenta'
-import { CORTE_ISO, saleEnElCorte } from '@/lib/fundadoresCorte'
+import { corteQueLeToca } from '@/lib/fundadoresCorte'
+import { textoCorte } from '@/lib/fundadoresCortes'
 import AvisoCorte from './AvisoCorte'
 
 // Aviso arriba de todas las pantallas sobre la cuenta de la organización (lib/cuenta.ts):
@@ -15,8 +16,10 @@ const AVISAR_DESDE = 7
 function ddmm(f: string) { return `${f.slice(8, 10)}/${f.slice(5, 7)}` }
 
 export default async function AvisoCuenta({ organizacionId, esAdmin }: { organizacionId: number; esAdmin: boolean }) {
-  // Último plazo del corte de Fundadores sin MercadoLibre (18-10, solo este tránsito): reemplaza al aviso de abajo.
-  if (await saleEnElCorte(organizacionId).catch(() => false)) return <AvisoCorte hasta={CORTE_ISO} esAdmin={esAdmin} />
+  // Plazo de su corte de Fundadores sin MercadoLibre (lib/fundadoresCortes.ts): reemplaza al aviso de abajo.
+  const corte = await corteQueLeToca(organizacionId).catch(() => null)
+  // El texto de la fecha sale del servidor (el navegador podría escribir la hora distinto y no coincidir).
+  if (corte) return <AvisoCorte hasta={corte} corto={textoCorte(corte)} largo={textoCorte(corte, true)} esAdmin={esAdmin} />
   const { rows: [o] } = await dbGlobal().query(
     `SELECT estado, fundador, prueba_dias, to_char(prueba_hasta, 'YYYY-MM-DD') AS hasta,
             prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan

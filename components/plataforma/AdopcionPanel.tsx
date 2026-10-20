@@ -13,7 +13,7 @@ export interface Empresa {
   usuarios_7d: number; ultimo_uso: string | null; abierta_at: string | null; en_linea: boolean; abierta: boolean
 }
 type Nivel = 'integrado' | 'parcial' | 'sin_uso' | 'no_entra' | 'sin_ventas' | 'sin_conectar'
-type FiltroUso = 'todos' | 'activos' | 'dormidos' | 'sin_conectar'
+type FiltroUso = 'todos' | 'sin_conectar' | 'por_vencer' | 'dormidos'
 type Orden = 'actividad' | 'ultimo' | 'ventas' | 'nombre'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : null)
@@ -86,8 +86,9 @@ function siguiente(e: Empresa, n: Nivel) {
   return null
 }
 
-/** Una empresa de la lista de Plataforma (filtros, búsqueda y estado de la cuenta los pone PlataformaClient). */
-export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean }
+/** Una empresa de la lista de Plataforma (búsqueda y estado de la cuenta los pone PlataformaClient; 20-10 aquí
+ *  solo llegan las que pueden entrar: las inactivas van plegadas aparte). porVencer = le quedan ≤ 5 días. */
+export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean }
 
 export const CEROS = {
   propia: false, cuentas: null, ventas: 0, preguntas: 0, preguntas_sistema: 0, guias: 0, reportadas: 0, calificadas: 0,
@@ -96,8 +97,8 @@ export const CEROS = {
 }
 
 const FILTROS_USO: { k: FiltroUso; t: string }[] = [
-  { k: 'todos', t: 'Todos' }, { k: 'activos', t: 'Activos en el período' },
-  { k: 'dormidos', t: 'Dormidos (7+ días sin entrar)' }, { k: 'sin_conectar', t: 'Sin conectar ML' },
+  { k: 'todos', t: 'Todos' }, { k: 'sin_conectar', t: 'Sin conectar ML' },
+  { k: 'por_vencer', t: 'Por vencer' }, { k: 'dormidos', t: 'Dormidos (7+ días sin entrar)' },
 ]
 
 /** Plataforma → Clientes: la lista de empresas con su uso. Tocar una fila abre su ficha (onAbrir). */
@@ -131,7 +132,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
   const esActivo = (x: typeof filas[number]) => x.act > 0
   const esDormido = (x: typeof filas[number]) => !!x.e.cuentas && diasSin(x.e.ultimo_uso ?? x.e.abierta_at) > 7
   const pasa: Record<FiltroUso, (x: typeof filas[number]) => boolean> = {
-    todos: () => true, activos: esActivo, dormidos: esDormido, sin_conectar: x => !x.e.cuentas,
+    todos: () => true, dormidos: esDormido, sin_conectar: x => !x.e.cuentas, por_vencer: x => x.b.porVencer,
   }
   const maxAct = Math.max(1, ...clientes.map(x => x.act))
   const ordenar = (x: typeof filas[number], y: typeof filas[number]) =>
@@ -144,7 +145,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
     .sort((x, y) => Number(y.e.propia) - Number(x.e.propia) || Number(y.b.activa) - Number(x.b.activa) || ordenar(x, y))
 
   const TARJETAS: [string, number, string][] = [
-    ['Activos', clientes.filter(esActivo).length, `usaron el sistema en ${dias} días`],
+    ['Lo usaron', clientes.filter(esActivo).length, `hicieron algo en el sistema en ${dias} días`],
     ['Dormidos', clientes.filter(esDormido).length, 'más de 7 días sin entrar'],
     ['Sin conectar ML', clientes.filter(x => !x.e.cuentas).length, 'no pueden usar nada aún'],
     ['Integrados', clientes.filter(x => x.n === 'integrado').length, 'preguntas y guías por el sistema'],
@@ -195,7 +196,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr className="[&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-medium">
-              <th>Empresa</th><th>Cuenta</th><th>Último uso</th><th>Actividad ({dias} días)</th><th>Qué usa</th><th>Estado</th><th className="w-6" />
+              <th>Empresa</th><th>Cuenta</th><th>Último uso</th><th>Actividad ({dias} días)</th><th>Qué usa</th><th>Uso</th><th className="w-6" />
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -212,7 +213,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
                     <div className="text-[11px] text-neutral-400">{b.detalle}</div>
                     <div className="max-w-[14rem] truncate text-[11px] text-neutral-400" title={e.cuentas ?? ''}>{e.cuentas ?? 'sin cuenta de ML'}</div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5">{b.cuenta}{!b.activa && <div className="mt-0.5 text-[11px] text-neutral-500">Desactivada</div>}</td>
+                  <td className="px-3 py-2.5">{b.cuenta}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-xs">
                     {e.en_linea ? <span className="font-medium text-emerald-700"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />usando ahora</span>
                       : <span className={diasSin(e.ultimo_uso ?? e.abierta_at) > 7 ? 'text-red-600' : 'text-neutral-600'}>{e.ultimo_uso ? hace(e.ultimo_uso) : e.abierta_at ? `entró ${hace(e.abierta_at)}` : 'nunca'}</span>}

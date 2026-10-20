@@ -30,11 +30,14 @@ export async function GET() {
       `SELECT e.id, e.nombre, e.country, e.modulos, e.is_active, e.created_at, e.ia_limite_mes,
               o.id AS organizacion_id, o.nombre AS organizacion,
               o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.prueba_dias, o.fundador,
+              o.motivo_pausa, to_char(o.pausa_fecha, 'YYYY-MM-DD') AS pausa_fecha,
+              to_char(o.created_at AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') AS creada, u.cuentas,
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
               (SELECT string_agg(u.username, ', ' ORDER BY u.username)
                  FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
                  WHERE ue.empresa_id = e.id AND ue.role = 'admin') AS admins
        FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
+       LEFT JOIN plataforma_uso_clientes() u ON u.empresa_id = e.id
        ORDER BY o.nombre, e.id`)
     return NextResponse.json({ empresas: rows, modulos: MODULOS, hoy: currentDate() })
   } catch (err) {

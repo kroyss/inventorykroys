@@ -10,6 +10,7 @@ import AprendizajePanel from './AprendizajePanel'
 import ResumenPanel from './ResumenPanel'
 import AdopcionPanel from './AdopcionPanel'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
+import { corteDeAlta, corteISO } from '@/lib/fundadoresCortes'
 
 interface Empresa {
   id: number
@@ -27,19 +28,56 @@ interface Empresa {
   prueba_dias: number | null
   fundador: boolean
   ia_limite_mes: number | null
+  motivo_pausa: string | null
+  pausa_fecha: string | null
+  creada: string
+  cuentas: string | null      // cuentas de MercadoLibre conectadas (null = ninguna)
 }
 
-type Filtro = 'todas' | 'prueba' | 'activo' | 'vencido' | 'desactivadas'
-const FILTROS: { k: Filtro; t: string; ok: (e: Empresa, hoy: string) => boolean }[] = [
-  { k: 'todas',        t: 'Todas',        ok: () => true },
-  { k: 'prueba',       t: 'En prueba',    ok: (e, h) => e.is_active && estadoEfectivo(e.estado, e.prueba_hasta, h) === 'prueba' },
-  { k: 'activo',       t: 'Activas',      ok: (e, h) => e.is_active && ['activo', 'propietario'].includes(estadoEfectivo(e.estado, e.prueba_hasta, h)) },
-  { k: 'vencido',      t: 'Vencidas',     ok: (e, h) => e.is_active && estadoEfectivo(e.estado, e.prueba_hasta, h) === 'vencido' },
-  { k: 'desactivadas', t: 'Desactivadas', ok: e => !e.is_active },
-]
-const TONO_ESTADO: Record<EstadoCuenta, string> = {
-  propietario: 'bg-neutral-100 text-neutral-700', activo: 'bg-green-100 text-green-800',
-  prueba: 'bg-amber-100 text-amber-800', vencido: 'bg-red-100 text-red-800',
+// Clientes (20-10, "los inactivos me hacen ruido"): a la vista solo los que PUEDEN ENTRAR (en prueba o pagando);
+// las pausadas y las apagadas a mano quedan guardadas y plegadas al final ("Inactivos guardados"), con su motivo y
+// el botón Reactivar. El buscador las encuentra igual.
+const puedeEntrar = (e: Empresa, hoy: string) => e.is_active && estadoEfectivo(e.estado, e.prueba_hasta, hoy) !== 'vencido'
+const diasHasta = (f: string, hoy: string) => Math.round((Date.parse(`${f}T12:00:00Z`) - Date.parse(`${hoy}T12:00:00Z`)) / 86_400_000)
+
+/** El estado de la cuenta en una frase (lo que se lee en la lista). */
+function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; extra?: string; alerta?: boolean } {
+  const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
+  if (!e.is_active) return { icono: '⛔', texto: 'Apagada a mano', extra: 'nadie puede entrar' }
+  if (est === 'propietario') return { icono: '🏠', texto: 'Tu empresa' }
+  if (est === 'activo') return { icono: '✅', texto: 'Pagando', extra: e.cuentas ? 'ML conectado' : 'sin ML' }
+  if (est === 'vencido') {
+    if (e.motivo_pausa === 'corte_fundadores') return { icono: '⏸', texto: 'Pausada', extra: `no conectó ML (corte ${e.pausa_fecha ? ddmm(e.pausa_fecha) : ''})` }
+    if (e.motivo_pausa === 'plan') return { icono: '⏸', texto: 'Pausada', extra: 'venció su plan' }
+    if (e.motivo_pausa === 'manual') return { icono: '⏸', texto: 'Pausada por ti', extra: e.pausa_fecha ? `el ${ddmm(e.pausa_fecha)}` : undefined }
+    return { icono: '⏸', texto: 'Pausada', extra: e.prueba_hasta ? `terminó su prueba el ${ddmm(e.prueba_hasta)}` : 'terminó su prueba' }
+  }
+  // En prueba
+  const partes: string[] = []
+  let alerta = false
+  if (e.prueba_dias != null) partes.push(`sus ${e.prueba_dias} días empiezan al conectar ML`)
+  else if (e.prueba_hasta) {
+    const d = diasHasta(e.prueba_hasta, hoy)
+    partes.push(`vence ${ddmm(e.prueba_hasta)}${d <= 5 ? ` · quedan ${d} día${d === 1 ? '' : 's'}` : ''}`)
+    alerta = d <= 5
+  }
+  if (!e.cuentas) {
+    const c = e.fundador ? corteDeAlta(e.creada) : null
+    const pendiente = !!c && Date.parse(corteISO(c)) > Date.now()
+    partes.push(pendiente ? `sin ML · corte ${ddmm(c!.fecha)} ${c!.hora > 12 ? `${c!.hora - 12} pm` : `${c!.hora} am`}` : 'sin ML')
+    alerta = alerta || pendiente
+  } else partes.push('ML conectado')
+  return { icono: alerta ? '⚠️' : '🟢', texto: 'En prueba', extra: partes.join(' · '), alerta }
+}
+
+function FraseCuenta({ e, hoy }: { e: Empresa; hoy: string }) {
+  const f = fraseCuenta(e, hoy)
+  return (
+    <div className="min-w-[10rem]">
+      <div className="whitespace-nowrap text-xs font-medium text-neutral-800">{f.icono} {f.texto}{e.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}</div>
+      {f.extra && <div className={`text-[11px] ${f.alerta ? 'text-amber-700' : 'text-neutral-500'}`}>{f.extra}</div>}
+    </div>
+  )
 }
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
@@ -72,7 +110,8 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
-  const [filtro, setFiltro]     = useState<Filtro>('todas')
+  const [verInactivos, setVerInactivos] = useState(false)
+  const [reactivar, setReactivar] = useState<Empresa | null>(null)
   const [buscar, setBuscar]     = useState('')
   const confirm = useConfirm()
 
@@ -92,6 +131,21 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'Error'); return }
     setAviso(`${e.nombre}: cambios guardados. Sus usuarios los ven en su próximo clic.`)
+    cargar()
+  }
+
+  const pausar = async (e: Empresa) => {
+    if (!await confirm({
+      title: `Pausar ${e.organizacion}`, confirmText: 'Pausar',
+      message: 'Sus usuarios no podrán entrar desde su próximo clic (verán que su cuenta está pausada, con el botón de Telegram). Los datos se conservan y la reactivas cuando quieras.',
+    })) return
+    setError(null); setAviso(null)
+    const r = await fetch(`/api/plataforma/organizaciones/${e.organizacion_id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'vencido' }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { setError(d.error ?? 'No se pudo pausar'); return }
+    setAviso(`${e.organizacion}: pausada. Queda en "Inactivos guardados".`)
     cargar()
   }
 
@@ -117,9 +171,12 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     return () => window.removeEventListener('keydown', k)
   }, [abierta])
   const q = buscar.trim().toLowerCase()
-  const fil = FILTROS.find(f => f.k === filtro)!
-  const visibles = empresas.filter(e => fil.ok(e, hoy)
-    && (!q || e.nombre.toLowerCase().includes(q) || (e.admins ?? '').toLowerCase().includes(q) || e.organizacion.toLowerCase().includes(q)))
+  const coincide = (e: Empresa) => !q || e.nombre.toLowerCase().includes(q) || (e.admins ?? '').toLowerCase().includes(q) || e.organizacion.toLowerCase().includes(q)
+  const activas = empresas.filter(e => puedeEntrar(e, hoy) && coincide(e))
+  const inactivas = empresas.filter(e => !puedeEntrar(e, hoy) && coincide(e))
+  const totalInactivas = empresas.filter(e => !puedeEntrar(e, hoy))
+  const clientesActivos = empresas.filter(e => puedeEntrar(e, hoy) && e.estado !== 'propietario').length
+  const mostrarInactivas = verInactivos || (!!q && inactivas.length > 0)
 
   return (
     <div className="space-y-4">
@@ -133,7 +190,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {([['hoy', 'Hoy'], ['clientes', `Clientes${empresas.length ? ` (${empresas.filter(e => e.is_active).length})` : ''}`], ['fundadores', 'Fundadores'],
+        {([['hoy', 'Hoy'], ['clientes', `Clientes${empresas.length ? ` (${clientesActivos})` : ''}`], ['fundadores', 'Fundadores'],
            ['contenido', 'Contenido'], ['interno', 'Interno']] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
@@ -170,14 +227,10 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
 
       {/* Lista corta: lo que se mira seguido. El detalle (módulos, IA, acciones) va en el panel lateral. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5">
-          {FILTROS.map(f => (
-            <button key={f.k} onClick={() => setFiltro(f.k)}
-              className={`px-3 py-1 rounded-full text-xs border ${filtro === f.k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>
-              {f.t} <span className="opacity-60">{empresas.filter(e => f.ok(e, hoy)).length}</span>
-            </button>
-          ))}
-        </div>
+        <p className="text-sm text-neutral-600">
+          <b className="text-neutral-900">{clientesActivos}</b> clientes pueden entrar
+          {totalInactivas.length > 0 && <span className="text-neutral-400"> · {totalInactivas.length} inactivos guardados abajo</span>}
+        </p>
         <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Buscar empresa o admin…"
           className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-64" />
       </div>
@@ -185,17 +238,48 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       {/* Una sola lista (2026-10-15): cada empresa con su estado de cuenta y su uso del sistema; la ficha
           (módulos, IA, acciones) se abre al tocarla, como antes. */}
       <AdopcionPanel abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
-        base={visibles.map(e => {
-          const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
-          return {
-            id: e.id, nombre: e.nombre, activa: e.is_active,
-            detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.fundador ? ' · Fundador' : ''}${e.admins ? ` · ${e.admins}` : ''}`,
-            cuenta: <>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${TONO_ESTADO[est]}`}>{ETIQUETA_ESTADO[est]}</span>
-              {est === 'prueba' && e.prueba_hasta && <div className="text-[11px] text-neutral-400 mt-0.5">hasta {e.prueba_hasta.slice(8, 10)}/{e.prueba_hasta.slice(5, 7)}</div>}
-            </>,
-          }
-        })} />
+        base={activas.map(e => ({
+          id: e.id, nombre: e.nombre, activa: true,
+          porVencer: e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5,
+          detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.admins ? ` · ${e.admins}` : ''}`,
+          cuenta: <FraseCuenta e={e} hoy={hoy} />,
+        }))} />
+
+      {/* Inactivos: guardados, fuera de la vista rápida. Con la búsqueda se abren solos si hay coincidencias. */}
+      {totalInactivas.length > 0 && (
+        <div className="rounded-xl border border-neutral-200 bg-white">
+          <button onClick={() => setVerInactivos(v => !v)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-50">
+            <span>
+              {mostrarInactivas ? '▾' : '▸'} Inactivos guardados:{' '}
+              <b className="text-neutral-800">{totalInactivas.filter(e => e.is_active).length}</b> pausados ·{' '}
+              <b className="text-neutral-800">{totalInactivas.filter(e => !e.is_active).length}</b> apagados a mano
+            </span>
+            <span className="text-xs text-neutral-400">{mostrarInactivas ? 'Ocultar' : 'Ver todos'}</span>
+          </button>
+          {mostrarInactivas && (
+            <ul className="divide-y divide-neutral-100 border-t border-neutral-100">
+              {inactivas.length === 0 && <li className="px-4 py-3 text-sm text-neutral-400">Ninguno coincide con la búsqueda.</li>}
+              {inactivas.map(e => (
+                <li key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5">
+                  <button onClick={() => { setError(null); setAviso(null); setAbierta(e.id) }} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-sm font-medium text-neutral-800 hover:underline">{e.nombre}</div>
+                    <div className="truncate text-[11px] text-neutral-400">{e.country}{e.admins ? ` · ${e.admins}` : ''}{e.cuentas ? ` · ${e.cuentas}` : ' · sin ML'}</div>
+                  </button>
+                  <FraseCuenta e={e} hoy={hoy} />
+                  {e.is_active
+                    ? <button onClick={() => { setError(null); setAviso(null); setReactivar(e) }} className="btn-secondary text-xs">Reactivar…</button>
+                    : <button onClick={() => actualizar(e, { is_active: true })} className="btn-secondary text-xs">Encender</button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {reactivar && (
+        <Reactivar e={reactivar} hoy={hoy} onCancelar={() => setReactivar(null)} onError={msg => { setReactivar(null); setError(msg) }}
+          onListo={msg => { setReactivar(null); setAviso(msg); cargar() }} />
+      )}
 
       {/* Panel lateral con todo el detalle de la empresa */}
       {sel && (
@@ -221,8 +305,28 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
 
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Cuenta</h3>
-                <Cuenta e={sel} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} />
+                <div className="mb-2"><FraseCuenta e={sel} hoy={hoy} /></div>
+                {sel.estado !== 'propietario' && sel.is_active && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {puedeEntrar(sel, hoy)
+                      ? <button onClick={() => pausar(sel)} className="btn-secondary text-xs">Pausar (no podrá entrar)</button>
+                      : <button onClick={() => setReactivar(sel)} className="btn-primary text-xs">Reactivar…</button>}
+                  </div>
+                )}
+                {sel.estado !== 'propietario' && (
+                  <details className="text-xs text-neutral-500">
+                    <summary className="cursor-pointer select-none">Cambiar estado, fecha o Fundador a mano</summary>
+                    <div className="mt-2"><Cuenta e={sel} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} /></div>
+                  </details>
+                )}
               </section>
+
+              {sel.estado !== 'propietario' && (
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Historia</h3>
+                  <Historia key={`${sel.organizacion_id}-${sel.estado}-${sel.prueba_hasta}-${sel.is_active}`} organizacionId={sel.organizacion_id} />
+                </section>
+              )}
 
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Módulos</h3>
@@ -521,5 +625,87 @@ function EliminarEmpresa({ e, onCancelar, onEliminada }: {
         <button onClick={onCancelar} className="btn-secondary text-sm">Cancelar</button>
       </div>
     </section>
+  )
+}
+
+/** Reactivar una cuenta pausada (20-10): cuántos días le das, en un paso. Vuelve a "en prueba" hasta esa fecha. */
+function Reactivar({ e, hoy, onCancelar, onListo, onError }: {
+  e: Empresa; hoy: string; onCancelar: () => void; onListo: (msg: string) => void; onError: (msg: string) => void
+}) {
+  const sumar = (n: number) => { const d = new Date(`${hoy}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+  const [hasta, setHasta] = useState(sumar(7))
+  const [enviando, setEnviando] = useState(false)
+  const guardar = async () => {
+    setEnviando(true)
+    const r = await fetch(`/api/plataforma/organizaciones/${e.organizacion_id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'prueba', prueba_hasta: hasta }),
+    })
+    const d = await r.json().catch(() => ({}))
+    setEnviando(false)
+    if (!r.ok) { onError(d.error ?? 'No se pudo reactivar'); return }
+    onListo(`${e.organizacion}: reactivada hasta el ${ddmm(hasta)}. Ya puede entrar.`)
+  }
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30" onClick={onCancelar} />
+      <div className="relative w-full max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow-2xl">
+        <h3 className="font-semibold">Reactivar {e.organizacion}</h3>
+        <p className="text-sm text-neutral-600">¿Cuántos días le das? Puede entrar desde ya y vuelve a pausarse sola al vencer.</p>
+        <div className="flex gap-2">
+          {[7, 15, 30].map(n => (
+            <button key={n} type="button" onClick={() => setHasta(sumar(n))}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm ${hasta === sumar(n) ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 text-neutral-700'}`}>
+              {n} días
+            </button>
+          ))}
+        </div>
+        <label className="block text-xs text-neutral-500">O hasta el día
+          <input type="date" value={hasta} min={hoy} onChange={ev => setHasta(ev.target.value)} className={input} />
+        </label>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCancelar} className="btn-secondary text-sm">Cancelar</button>
+          <button onClick={guardar} disabled={enviando || !hasta || hasta < hoy} className="btn-primary text-sm disabled:opacity-50">
+            {enviando ? 'Reactivando…' : `Reactivar hasta el ${hasta ? ddmm(hasta) : '—'}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Historia de la cuenta (mig. 106): creada, conectó ML, pausas y reactivaciones, de la más vieja a la más nueva. */
+function Historia({ organizacionId }: { organizacionId: number }) {
+  const [d, setD] = useState<{ creada: string; conectada: string | null; eventos: { fecha: string; tipo: string; detalle: string | null; por: string | null }[] } | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/plataforma/organizaciones/${organizacionId}`).then(r => r.ok ? r.json() : null).then(x => { if (vivo) setD(x) })
+    return () => { vivo = false }
+  }, [organizacionId])
+  if (!d) return <p className="text-xs text-neutral-400">Cargando…</p>
+  const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Caracas' })
+  const MOTIVO: Record<string, string> = { corte_fundadores: 'no conectó MercadoLibre a tiempo (corte)', manual: 'la pausaste tú', plan: 'venció su plan' }
+  const texto = (t: string, det: string | null) =>
+    t === 'pausada' ? `⏸ Pausada: ${MOTIVO[det ?? ''] ?? 'terminó su prueba'}`
+    : t === 'reactivada' ? `▶️ Reactivada${det ? ` hasta el ${ddmm(det)}` : ''}`
+    : t === 'activa' ? '✅ Pasó a pagar'
+    : t === 'fecha' ? `📅 Vencimiento cambiado al ${det ? ddmm(det) : '—'}`
+    : t === 'apagada' ? `⛔ Apagada a mano${det ? ` (${det})` : ''}`
+    : t === 'encendida' ? `🔌 Encendida de nuevo${det ? ` (${det})` : ''}`
+    : t
+  const filas: { f: string; t: string; por?: string | null }[] = [
+    { f: d.creada, t: '🆕 Creada' },
+    ...(d.conectada ? [{ f: d.conectada, t: '🔗 Conectó MercadoLibre' }] : []),
+    ...d.eventos.map(v => ({ f: v.fecha, t: texto(v.tipo, v.detalle), por: v.por })),
+  ].sort((a, b) => a.f.localeCompare(b.f))
+  return (
+    <ol className="space-y-1 text-xs">
+      {filas.map((x, i) => (
+        <li key={i} className="flex gap-2">
+          <span className="w-20 shrink-0 tabular-nums text-neutral-400">{fecha(x.f)}</span>
+          <span className="text-neutral-700">{x.t}{x.por ? <span className="text-neutral-400"> · {x.por}</span> : null}</span>
+        </li>
+      ))}
+      {!d.conectada && <li className="text-neutral-400">Todavía no conecta MercadoLibre.</li>}
+    </ol>
   )
 }
