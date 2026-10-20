@@ -26,6 +26,7 @@ export async function GET() {
        LEFT JOIN despacho_jornadas j ON j.id = l.jornada_id
        WHERE e.carrier = 'TEALCA' AND e.impresa AND NOT e.reimpresion AND l.status = 'GENERADO'
          AND (e.reporte_estado IS NULL OR e.reporte_estado IN ('RECHAZADO', 'ERROR'))
+         AND e.apartado IS DISTINCT FROM 'cancelado'   -- mig. 107: no se envía
        ORDER BY l.generated_at DESC, e.id DESC
        LIMIT 300`)
     return NextResponse.json({ digitos: await digitosGuiaTealca(db), envios: rows })

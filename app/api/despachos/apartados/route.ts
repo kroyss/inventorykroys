@@ -32,9 +32,10 @@ export async function GET(req: NextRequest) {
   const denied = despachosForbidden(session)
   if (denied) return denied
   try {
-    const buscar = (req.nextUrl.searchParams.get('buscar') ?? '').trim().replace(/[^\w-]/g, '')
+    // Venta, guía o nombre (con espacios y acentos); sin los comodines de ILIKE.
+    const buscar = (req.nextUrl.searchParams.get('buscar') ?? '').trim().replace(/[%_\\]/g, '').slice(0, 60)
     const [{ rows: espera }, candidatos] = await Promise.all([
-      db.query(`SELECT ${COLUMNAS} ${DESDE} WHERE e.apartado = 'espera' ORDER BY e.apartado_at`),
+      db.query(`SELECT ${COLUMNAS} ${DESDE} WHERE e.apartado = 'espera' AND l.status <> 'DESCARTADO' ORDER BY e.apartado_at`),
       buscar.length >= 4
         ? db.query(
             `SELECT ${COLUMNAS} ${DESDE}

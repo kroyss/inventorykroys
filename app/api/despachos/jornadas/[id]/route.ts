@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       SELECT l.id, l.generated_at, l.label_count, l.page_count, u.username AS generated_by,
              COALESCE(JSON_AGG(JSON_BUILD_OBJECT(
                'id', e.id, 'venta', e.venta, 'guia', e.guia,
-               'destinatario', e.destinatario, 'reimpresion', e.reimpresion
+               'destinatario', e.destinatario, 'reimpresion', e.reimpresion, 'apartado', e.apartado
              ) ORDER BY e.id) FILTER (WHERE e.id IS NOT NULL), '[]'::json) AS etiquetas
       FROM despacho_lotes l
       LEFT JOIN users u ON u.id = l.generated_by

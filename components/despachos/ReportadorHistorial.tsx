@@ -7,6 +7,7 @@ interface Envio {
   reimpresion: boolean; reporte_estado: string | null; reporte_detalle: string | null
   reporte_intentos: number; reportado_at: string | null; reporte_mensaje: string | null
   jornada_id: number; closed_at: string
+  apartado?: 'espera' | 'cancelado' | null; apartado_nota?: string | null   // Despachos → En espera (mig. 107)
 }
 type FiltroEstado = 'todos' | 'enviados' | 'problema' | 'pendientes'
 interface Dia { jornada: number; closed_at: string; envios: Envio[] }
@@ -21,6 +22,10 @@ const ESTADO_UI: Record<string, { label: string; cls: string }> = {
 }
 const REIMPRESION = { label: 'Reimpresión (ya reportado)', cls: 'bg-neutral-100 text-neutral-600' }
 const PENDIENTE = { label: 'Pendiente', cls: 'bg-sky-100 text-sky-800' }
+const APARTADO = {
+  espera:    { label: 'En espera (no se reporta)', cls: 'bg-amber-100 text-amber-900' },
+  cancelado: { label: 'Envío cancelado',           cls: 'bg-neutral-200 text-neutral-600' },
+}
 
 const TZ = 'America/Caracas'
 const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -29,6 +34,7 @@ const dia = (s: string) => new Date(s).toLocaleDateString('es-VE', { timeZone: T
 
 function grupo(e: Envio): FiltroEstado | null {
   if (e.reimpresion) return null
+  if (e.apartado === 'cancelado' && !e.reporte_estado) return null   // nunca se reporta
   if (!e.reporte_estado) return 'pendientes'
   if (e.reporte_estado === 'ENVIADO' || e.reporte_estado === 'CSV') return 'enviados'
   return 'problema'
@@ -199,7 +205,7 @@ function FilaDia({ d, abierto, onToggle }: { d: Dia; abierto: boolean; onToggle:
               </thead>
               <tbody>
                 {filas.map(e => {
-                  const ui = e.reimpresion ? REIMPRESION : ESTADO_UI[e.reporte_estado ?? ''] ?? PENDIENTE
+                  const ui = e.reimpresion ? REIMPRESION : ESTADO_UI[e.reporte_estado ?? ''] ?? (e.apartado ? APARTADO[e.apartado] : PENDIENTE)
                   const api = e.reporte_detalle?.startsWith('API')
                   const detalle = e.reporte_detalle?.replace(/^API:?\s*/, '') || null
                   const ver = verMsg === e.id
@@ -213,6 +219,7 @@ function FilaDia({ d, abierto, onToggle }: { d: Dia; abierto: boolean; onToggle:
                       <td className="px-3 py-2 text-xs text-neutral-500 min-w-56">
                         {e.reporte_estado && <span className="text-neutral-400">{api ? 'por API' : 'programa'}{e.reportado_at ? ` ${fechaHora(e.reportado_at)}` : ''}{detalle ? ' · ' : ''}</span>}
                         {detalle}
+                        {!e.reporte_estado && e.apartado && e.apartado_nota && <span className="text-amber-800">“{e.apartado_nota}”</span>}
                         {e.reporte_intentos > 1 ? ` · ${e.reporte_intentos} intentos` : ''}
                         {e.reporte_mensaje && (
                           <button onClick={() => setVerMsg(ver ? null : e.id)} className="ml-2 underline underline-offset-2 hover:text-neutral-800">

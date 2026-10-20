@@ -14,9 +14,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     const { rows: [l] } = await db.query(
-      `SELECT output_path, label_count, to_char(generated_at, 'YYYYMMDD_HH24MI') AS sello
+      `SELECT output_path, label_count, page_count, to_char(generated_at, 'YYYYMMDD_HH24MI') AS sello
        FROM despacho_lotes WHERE id = $1 AND status = 'GENERADO'`, [id])
     if (!l) return NextResponse.json({ error: 'Lote no generado' }, { status: 404 })
+    // Lote de un envío que estaba "En espera" y salió otro día (mig. 107): no tiene PDF propio.
+    if (l.page_count === 0 && !l.output_path) {
+      return NextResponse.json({ error: 'Este lote no tiene PDF propio: su etiqueta ya venía impresa (estaba en espera). Baja la etiqueta original.' }, { status: 404 })
+    }
     return descargaPdf(l.output_path, `Lote${id}_${l.label_count}etiquetas_${l.sello}.pdf`)
   } catch (err) {
     return apiError(err)

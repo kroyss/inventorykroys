@@ -545,7 +545,8 @@ async function pendienteAhora(db: Pool, e: EmpresaAvisos, d: Destinatario, disp:
   if (disp.reportador) {
     const { rows: [w] } = await db.query(
       `SELECT COUNT(DISTINCT COALESCE(venta, id::text))::int AS n FROM despacho_etiquetas
-       WHERE apartado = 'espera' AND apartado_at < NOW() - INTERVAL '2 days'`)
+       WHERE apartado = 'espera' AND apartado_at < NOW() - INTERVAL '2 days'
+         AND lote_id NOT IN (SELECT id FROM despacho_lotes WHERE status = 'DESCARTADO')`)
     if (w.n) pend.push(`⏸ ${n(w.n)} envío${w.n === 1 ? '' : 's'} en espera hace más de 2 días (Despachos → En espera)`)
   }
   if (disp.pregunta && c.preguntas) pend.push(`❓ ${n(c.preguntas)} pregunta${c.preguntas === 1 ? '' : 's'} sin responder`)

@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
       [jornada.id, remitente])
     if (envios.length === 0) {
       await client.query('ROLLBACK')
-      return NextResponse.json({ error: 'La jornada no tiene envíos' }, { status: 400 })
+      const { rows: [ap] } = await client.query(
+        `SELECT COUNT(*)::int AS n FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
+         WHERE l.jornada_id = $1 AND l.status = 'GENERADO' AND e.impresa AND e.apartado IS NOT NULL`, [jornada.id])
+      return NextResponse.json({ error: ap.n ? `La jornada no tiene envíos para hoy: ${ap.n} están en espera o cancelados.` : 'La jornada no tiene envíos' }, { status: 400 })
     }
 
     // Un manifiesto por transportista: van a lugares distintos.

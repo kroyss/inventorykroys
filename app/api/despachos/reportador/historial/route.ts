@@ -6,7 +6,7 @@ import { cuentaDe, cuentaPorVenta, leerConfig, SQL_CUENTA_VENTA } from '@/lib/re
 
 const COLUMNAS = `
   e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, e.destinatario,
-  e.reimpresion, e.reporte_estado, e.reporte_detalle, e.reporte_intentos, e.reportado_at,
+  e.reimpresion, e.reporte_estado, e.reporte_detalle, e.reporte_intentos, e.reportado_at, e.apartado, e.apartado_nota,
   e.reporte_mensaje, j.id AS jornada_id, j.closed_at, ${SQL_CUENTA_VENTA} AS cuenta_venta`
 const DESDE = `
   FROM despacho_etiquetas e
