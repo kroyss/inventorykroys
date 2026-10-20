@@ -13,6 +13,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { leerHilo } from '@/lib/mensajesML'
+import { registrarOrigen } from '@/lib/respuestasOrigen'
 
 export const CLAVE_CONFIG = 'recordatorios_pago'
 export const CLAVE_TURNO = 'recordatorios_pago_turno'
@@ -239,6 +240,8 @@ async function recordarUna(db: Pool, c: Candidato, cfg: ConfigRecordatorios, tur
          ultimo_at = NOW(), actualizada_at = NOW()`,
       [c.pack, c.conexion_id, c.productos, c.comprador, c.comprador_nombre, texto])
     await anotar(db, c, { turno, enviado: true })
+    // Registro de quién lo mandó (en la conversación sale "automático").
+    await registrarOrigen(db, { modulo: 'mensajes', ref: String(c.pack), fuente: 'automatica', base: texto, texto })
     return 'enviado'
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300)

@@ -16,6 +16,7 @@ import { cuentaDe, cuentaPorVenta, leerConfig, mensajeEnvio, paginaML, problemas
 import { remitenteConfigurado } from '@/lib/despachos'
 import { ES_STAGING } from '@/lib/entorno'
 import { esDemo } from '@/lib/demo'
+import { registrarOrigen } from '@/lib/respuestasOrigen'
 
 // MercadoLibre manda solo, A NOMBRE DEL VENDEDOR, "Gracias por tu compra. El número de guía
 // para tu envío es: …" cuando el comprador llena el formulario. Tiene la misma guía pero NO es
@@ -166,6 +167,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         await cerrar('RECHAZADO', `moderación ${mod}`, mensaje)
         procesados.push({ ...base, resultado: 'RECHAZADO', detalle: `MercadoLibre lo moderó (${mod})`, mensaje })
       } else {
+        await registrarOrigen(db, { modulo: 'mensajes', ref: String(o.pack_id ?? o.id), fuente: 'automatica', base: mensaje, texto: mensaje })
         await cerrar('ENVIADO', mod ? `moderación ${mod}` : null, mensaje)
         procesados.push({ ...base, resultado: 'ENVIADO', detalle: `Desde ${orden.cuenta}`, mensaje })
       }

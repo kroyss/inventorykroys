@@ -648,7 +648,8 @@ function FilaHistorial({ p }: { p: Pregunta }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
         <span className="font-semibold text-neutral-700">{p.cuenta}</span>
         <Producto p={p} />
-        <span className="ml-auto whitespace-nowrap">{new Date(p.respuesta_fecha ?? p.fecha).toLocaleDateString('es-VE')}</span>
+        <span className="ml-auto whitespace-nowrap">{new Date(p.respuesta_fecha ?? p.fecha).toLocaleString('es-VE',
+          { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         <StatusBadge status={e.status} label={e.label} />
       </div>
       <p className="text-neutral-900">{p.texto}</p>

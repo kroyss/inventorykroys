@@ -21,7 +21,8 @@ export interface Conversacion {
   comprador_nick: string | null; comprador_nombre: string | null
 }
 interface Adjunto { archivo: string; nombre: string; tipo: string | null }
-interface Mensaje { propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: Adjunto[] }
+interface Mensaje { propio: boolean; texto: string; fecha: string; leido: string | null; moderacion: string | null; adjuntos: Adjunto[]
+  autor?: string | null }   // quién del equipo lo mandó (lib/mensajesAutor.ts)
 
 function hace(fecha: string | null) {
   if (!fecha) return ''
@@ -434,6 +435,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             )}
             <div className={`text-[11px] mt-1 ${m.propio ? 'text-neutral-400' : 'text-neutral-500'}`}>
               {new Date(m.fecha).toLocaleString('es-VE')}
+              {m.propio && m.autor ? ` · ${m.autor}` : ''}
               {m.propio && m.moderacion && m.moderacion !== 'clean' ? ` · ${m.moderacion}` : ''}
               {!m.propio && !m.leido ? ' · sin leer' : ''}
             </div>

@@ -455,7 +455,7 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
   // Lo que hizo el sistema solo (ayer).
   const solo: string[] = []
   const { rows: [s] } = await db.query(
-    `SELECT (SELECT COUNT(*) FROM respuestas_origen WHERE fuente = 'automatica' AND fecha::date = CURRENT_DATE - 1)::int AS respuestas,
+    `SELECT (SELECT COUNT(*) FROM respuestas_origen WHERE modulo = 'preguntas' AND fuente = 'automatica' AND fecha::date = CURRENT_DATE - 1)::int AS respuestas,
             (SELECT COUNT(*) FROM ml_recordatorios WHERE ultimo_at::date = CURRENT_DATE - 1)::int AS recordatorios,
             (SELECT value FROM app_settings WHERE key = 'calificaciones_auto_ultimo') AS cal`)
   let calificadas = 0

@@ -9,6 +9,7 @@ import { preguntasDeComprador } from '@/lib/preguntasComprador'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { tieneModulo } from '@/lib/modulos'
 import { leerConfigDb } from '@/lib/recordatoriosPago'
+import { autoresDelHilo } from '@/lib/mensajesAutor'
 
 async function conversacion(db: import('pg').Pool, pack: string) {
   const { rows: [c] } = await db.query(
@@ -38,11 +39,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
     const preguntas = venta?.comprador.id ? await preguntasDeComprador(s.db, venta.comprador.id).catch(() => []) : []
     // Recordatorios de pago (solo con Pagos ME): si ya se le mandaron, el botón "Ya pagó, no recordar".
     let recordatorio: { enviados: number; detenido: string | null } | null = null
-    if (tieneModulo(s.session.user, 'pagos_me') && (await leerConfigDb(s.db)).activo) {
+    const cfgRec = tieneModulo(s.session.user, 'pagos_me') ? await leerConfigDb(s.db) : null
+    // Quién mandó cada mensaje propio (registro del sistema; lib/mensajesAutor.ts).
+    const autores = await autoresDelHilo(s.db, pack, h.mensajes, cfgRec ? [cfgRec.texto, cfgRec.final?.texto ?? ''] : [])
+      .catch(e => { console.error('[mensajes autor]', e); return h.mensajes.map(() => null) })
+    const mensajes = h.mensajes.map((m, i) => ({ ...m, autor: autores[i] }))
+    if (cfgRec?.activo) {
       const { rows: [r] } = await s.db.query(`SELECT enviados, detenido FROM ml_recordatorios WHERE pack_id = $1::bigint`, [pack])
       if (r && (r.enviados > 0 || r.detenido)) recordatorio = r
     }
-    return NextResponse.json({ cuenta: c.nickname, ...h, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas, recordatorio })
+    return NextResponse.json({ cuenta: c.nickname, ...h, mensajes, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas, recordatorio })
   } catch (err) {
     return apiError(err)
   }
@@ -82,8 +88,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pac
       const ids: string[] = []
       for (const f of archivos) ids.push(await subirAdjunto(s.db, c.conexion_id, f))
       const h = await responderHilo(s.db, c.conexion_id, pack, texto, dejarSinLeer, ids)
-      if (texto) await registrarOrigen(s.db, { modulo: 'mensajes', ref: pack, fuente, base, texto, usuarioId: s.session.user.id })
-      return NextResponse.json({ cuenta: c.nickname, ...h })
+      // También los que van solo con archivo (texto vacío): así queda quién los mandó.
+      await registrarOrigen(s.db, { modulo: 'mensajes', ref: pack, fuente: texto ? fuente : undefined, base, texto, usuarioId: s.session.user.id })
+      const autores = await autoresDelHilo(s.db, pack, h.mensajes).catch(() => h.mensajes.map(() => null))
+      return NextResponse.json({ cuenta: c.nickname, ...h, mensajes: h.mensajes.map((m, i) => ({ ...m, autor: autores[i] })) })
     } catch (e) {
       // Que nunca parezca que "se cayó el sistema" (2026-10-17, caso de un comprador que bloqueó el chat):
       // ML no avisa el bloqueo en el estado de la conversación (sigue "active"); solo rechaza el envío.

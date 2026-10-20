@@ -346,7 +346,7 @@ async function guardarMensajes(db: Pool, conexionId: number, pack: string, msgs:
 
 // Mensajes automáticos del vendedor que NO son respuestas (no se sugieren): el aviso de ML con
 // la guía, el mensaje de bienvenida y los del Reportador.
-const AUTOMATICOS = '(n[uú]mero de gu[ií]a para tu env[ií]o|gracias por preferirnos|gu[ií]a (zoom|tealca)|gu[ií]a de rastreo|podr[aá]s validar el paso a paso)'
+export const AUTOMATICOS = '(n[uú]mero de gu[ií]a para tu env[ií]o|gracias por preferirnos|gu[ií]a (zoom|tealca)|gu[ií]a de rastreo|podr[aá]s validar el paso a paso)'
 
 export interface Sugerencia { pregunta: string; respuesta: string; parecido: number }
 
