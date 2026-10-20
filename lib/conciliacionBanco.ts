@@ -21,6 +21,19 @@ export interface MovBanco {
   ref: string            // solo dígitos, sin ceros a la izquierda
   concepto: string
   monto: number          // crédito (> 0)
+  emisor?: string | null // banco desde el que pagaron, si la descripción lo dice (Provincial: "DR OB 0412… 102BAN")
+}
+
+// Código de banco (los 4 dígitos de la cuenta, 01xx) → el nombre que usa Pagos ME en banco_emisor.
+const BANCO_POR_CODIGO: Record<string, string> = {
+  '102': 'Venezuela', '134': 'Banesco', '105': 'Mercantil', '108': 'BBVA Provincial', '191': 'BNC', '172': 'Bancamiga',
+  '174': 'BANPLUS', '163': 'Banco del Tesoro', '114': 'Bancaribe', '104': 'Venezolano De Crédito', '151': 'BFC',
+  '175': 'Bicentenario', '115': 'Banco Exterior', '171': 'Banco Activo', '168': 'Bancrecer', '177': 'BANFANB', '138': 'Banco Plaza',
+}
+/** Banco de origen escrito en la descripción: "… 102BAN", "134BANES", "CR.I/REC 0134 V0…", "TRF CR INM 0102 V0…". */
+export function emisorDe(concepto: string): string | null {
+  const m = concepto.match(/\b(1\d{2})[A-Z]{2,}/) ?? concepto.match(/\b0(1\d{2})\b/)
+  return m ? BANCO_POR_CODIGO[m[1]] ?? null : null
 }
 
 export interface EstadoCuenta { banco: string; desde: string; hasta: string; movimientos: MovBanco[]; filas: number }
@@ -76,8 +89,10 @@ export function leerFilas(datos: ArrayBuffer | Uint8Array): string[][] {
 
 export function leerEstadoCuenta(datos: ArrayBuffer | Uint8Array, nombreArchivo = '', banco?: string): EstadoCuenta {
   const filas = leerFilas(datos)
-  const iT = filas.findIndex(f => f.some(c => norm(c) === 'fecha') && f.some(c => norm(c).startsWith('referencia')))
-  if (iT < 0) throw new Error('No encontré la fila de títulos (Fecha, Referencia…) en el archivo')
+  // Títulos: Fecha + Referencia, o Fecha + Descripción (Provincial no trae columna de referencia).
+  const iT = filas.findIndex(f => f.some(c => norm(c) === 'fecha')
+    && f.some(c => norm(c).startsWith('referencia') || norm(c).startsWith('descripcion') || norm(c).startsWith('concepto')))
+  if (iT < 0) throw new Error('No encontré la fila de títulos (Fecha, Referencia o Descripción…) en el archivo')
   const tit = filas[iT].map(norm)
   const col = (...nombres: string[]) => tit.findIndex(t => nombres.some(n => t === n || t.startsWith(n)))
   const cFecha = col('fecha'), cRef = col('referencia'), cConc = col('concepto', 'descripcion')
@@ -95,7 +110,9 @@ export function leerEstadoCuenta(datos: ArrayBuffer | Uint8Array, nombreArchivo 
     if (cCred < 0 && cTipo >= 0 && /^n?d/i.test(f[cTipo]) && !/^nc/i.test(f[cTipo])) monto = -Math.abs(monto)  // ND = débito
     if (cCred >= 0 && cDeb >= 0 && numeroBanco(f[cDeb]) > 0 && monto === 0) continue
     if (!(monto > 0)) continue
-    movimientos.push({ banco: b, fecha, ref: digitos(f[cRef]), concepto, monto: Math.round(monto * 100) / 100 })
+    movimientos.push({ banco: b, fecha, ref: cRef >= 0 ? digitos(f[cRef]) : '', concepto, monto: Math.round(monto * 100) / 100,
+                       // "ABO.DRV…" (Provincial): transferencia desde otra cuenta del mismo banco.
+                       emisor: emisorDe(concepto) ?? (/^ABO\.?\s*DRV/i.test(concepto) ? b : null) })
   }
   const fechas = movimientos.map(m => m.fecha).sort()
   return { banco: b, desde: fechas[0] ?? '', hasta: fechas.at(-1) ?? '', movimientos, filas: filas.length - iT - 1 }
@@ -106,6 +123,7 @@ export function leerEstadoCuenta(datos: ArrayBuffer | Uint8Array, nombreArchivo 
 export interface PagoME {
   id: number; venta: string
   banco_receptor: string | null; metodo_pago: string | null
+  banco_emisor?: string | null      // desde qué banco dijo que pagó (cruza con la descripción, p. ej. Provincial)
   referencia: string | null; fecha_pago: string | null      // YYYY-MM-DD
   monto_pagado: number | null; total_orden: number | null
 }
@@ -163,14 +181,14 @@ export function cruzarPagos(pagosEnt: PagoME[], estados: EstadoCuenta[], op: Opc
       && estados.some(e => e.banco === banco && e.desde <= fecha && fecha <= e.hasta)
 
   // 1. Agrupar: varias ventas con la misma referencia (≥ 6 dígitos) y fecha cercana = un solo pago.
-  type Grupo = { ventas: PagoME[]; ref: string; fecha: string | null; monto: number; banco: string | null }
+  type Grupo = { ventas: PagoME[]; ref: string; fecha: string | null; monto: number; banco: string | null; emisor: string | null }
   const grupos: Grupo[] = []
   for (const p of pagosEnt) {
     const ref = digitos(p.referencia), monto = Number(p.monto_pagado ?? p.total_orden ?? 0)
     const g = ref.length >= 6 ? grupos.find(x => x.ref === ref && x.banco === p.banco_receptor && x.fecha && p.fecha_pago
       && Math.abs(dia(x.fecha) - dia(p.fecha_pago)) <= 1) : undefined
     if (g) { g.ventas.push(p); g.monto = Math.round((g.monto + monto) * 100) / 100 }
-    else grupos.push({ ventas: [p], ref, fecha: p.fecha_pago, monto, banco: p.banco_receptor })
+    else grupos.push({ ventas: [p], ref, fecha: p.fecha_pago, monto, banco: p.banco_receptor, emisor: p.banco_emisor ?? null })
   }
 
   const enVentana = (g: Grupo, m: MovBanco) => {
@@ -212,6 +230,24 @@ export function cruzarPagos(pagosEnt: PagoME[], estados: EstadoCuenta[], op: Opc
     const rivales = grupos.filter(x => x !== g && !res.has(x) && Math.abs(x.monto - g.monto) < 0.005 && enVentana(x, cands[0]))
     if (rivales.length) continue
     asignar(g, cands[0], 'probable', `Mismo monto y fecha, la referencia no coincide (el comprador la escribió distinta)`)
+  }
+  // 2b'. Sin referencia en el banco (Provincial): mismo banco de origen + monto (exacto o con embalaje) + fecha,
+  //      y único con esas tres cosas.
+  //      Solo contra pagos que dijeron ESE banco destino (o ninguno): un pago a otro banco no compite.
+  //      Dos pagos idénticos (mismo comprador, dos ventas) contra dos créditos idénticos: uno a uno.
+  const destinoOk = (g: Grupo, m: MovBanco) => !g.banco || g.banco === m.banco
+  const calza = (g: Grupo, m: MovBanco) => !!g.emisor && m.emisor === g.emisor && destinoOk(g, m) && enVentana(g, m)
+    && ['exacto', 'embalaje'].includes(compararMonto(m.monto, g.monto, g.ventas.length, margen))
+  for (const g of grupos) {
+    if (res.has(g) || !g.emisor) continue
+    const cands = movs.filter(m => !usado.has(m) && calza(g, m))
+    if (!cands.length) continue
+    const rivales = grupos.filter(x => x !== g && !res.has(x) && cands.some(m => calza(x, m)))
+    const gemelos = cands.every(m => Math.abs(m.monto - cands[0].monto) < 0.005)
+      && rivales.every(x => Math.abs(x.monto - g.monto) < 0.005 && x.emisor === g.emisor)
+    if (!(cands.length === 1 && !rivales.length) && !(gemelos && cands.length === rivales.length + 1)) continue
+    const mo = compararMonto(cands[0].monto, g.monto, g.ventas.length, margen)
+    asignar(g, cands[0], 'probable', `Mismo banco de origen (${g.emisor}), fecha y ${mo === 'exacto' ? 'monto exacto' : `monto + Bs ${bs(cands[0].monto - g.monto)} (embalaje)`}; el banco no muestra referencia`)
   }
   // 2c. Referencia sin monto que calce: para revisar.
   for (const p of pares) {

@@ -10,10 +10,11 @@ const i = lineas.findIndex(l => l.startsWith('id,venta'))
 const cab = lineas[i].split(',')
 const pagos: (PagoME & { verificacion: string })[] = lineas.slice(i + 1).map(l => l.split(',')).filter(c => /^\d+$/.test(c[1] ?? ''))
   .map(c => Object.fromEntries(cab.map((k, j) => [k, c[j] ?? ''])))
-  .map(r => ({ id: +r.id, venta: r.venta, banco_receptor: r.banco_receptor || null, metodo_pago: r.metodo_pago || null,
+  .map(r => ({ id: +r.id, venta: r.venta, banco_receptor: r.banco_receptor || null, metodo_pago: r.metodo_pago || null, banco_emisor: r.banco_emisor || null,
     referencia: r.referencia || null, fecha_pago: r.fecha_pago || null, monto_pagado: r.monto_pagado ? +r.monto_pagado : null,
     total_orden: r.total_orden ? +r.total_orden : null, verificacion: r.verificacion }))
-const estados = archivos.map(f => leerEstadoCuenta(readFileSync(f), f))
+// "Banco=archivo" fuerza el banco (cuando el nombre o el contenido no lo dicen, p. ej. Provincial).
+const estados = archivos.map(a => { const [b, f] = a.includes('=') ? a.split(/=(.+)/) : [undefined, a]; return leerEstadoCuenta(readFileSync(f), f, b) })
 for (const e of estados) console.log(`${e.banco}: ${e.movimientos.length} créditos de ${e.filas} filas, ${e.desde} → ${e.hasta}`)
 
 const r = cruzarPagos(pagos, estados)
