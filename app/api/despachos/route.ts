@@ -19,7 +19,7 @@ export async function GET() {
          WHERE j.status = 'ABIERTA'`),
       db.query(
         `SELECT l.id, l.generated_at, l.label_count, l.page_count, u.username AS generated_by,
-                l.output_path IS NULL AS ya_impreso,   -- "Sale hoy" de un apartado de otra jornada (sin PDF nuevo)
+                (l.page_count = 0 AND l.output_path IS NULL) AS ya_impreso,   -- "Sale hoy" de un apartado de otra jornada (sin PDF nuevo)
                 (SELECT COUNT(*)::int FROM despacho_etiquetas x WHERE x.lote_id = l.id AND x.impresa AND x.apartado IS NOT NULL) AS apartados
          FROM despacho_lotes l
          JOIN despacho_jornadas j ON j.id = l.jornada_id AND j.status = 'ABIERTA'

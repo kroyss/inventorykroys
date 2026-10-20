@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { despachosForbidden } from '@/lib/despachos'
+import { RESERVA_HORAS } from '@/lib/reportador'
 
 // Envíos apartados (20-10, migración 107): sacar un envío puntual de Despachos / Reportador sin perderlo.
 //   GET  ?buscar=venta|guía → los que están "En espera" y, si se busca, los envíos que se pueden apartar.
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
     await db.query('BEGIN')
     const { rows: [e] } = await db.query(
       `SELECT e.id, e.venta, e.impresa, e.apartado, e.lote_id, e.reimpresion, e.reporte_estado, e.incluida, l.status AS lote_status,
+              (e.reporte_tomado_at > NOW() - make_interval(hours => ${RESERVA_HORAS})) AS tomado,
               j.status AS jornada_status
        FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id LEFT JOIN despacho_jornadas j ON j.id = l.jornada_id
        WHERE e.id = $1 FOR UPDATE OF e`, [b.id])
@@ -78,6 +80,11 @@ export async function POST(req: NextRequest) {
       const { rows: [ok] } = await db.query(`SELECT 1 FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
                                              WHERE e.id = $1 AND e.apartado IS NULL AND ${APARTABLE}`, [b.id])
       if (!ok) { await db.query('ROLLBACK'); return NextResponse.json({ error: 'Este envío ya no se puede apartar (ya se reportó, o ya está apartado)' }, { status: 409 }) }
+      // El Reportador (programa de la PC o el del sistema) lo tomó para mandarlo: apartarlo ahora no frenaría el mensaje.
+      if (e.tomado) {
+        await db.query('ROLLBACK')
+        return NextResponse.json({ error: 'El Reportador lo está enviando en este momento: espera unos minutos y vuelve a intentar (si ya salió, no hace falta apartarlo).' }, { status: 409 })
+      }
       await db.query(
         `UPDATE despacho_etiquetas SET apartado = $2, apartado_nota = $3, apartado_por = $4, apartado_at = NOW(),
                 incluida = CASE WHEN impresa THEN incluida ELSE FALSE END
