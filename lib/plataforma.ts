@@ -14,3 +14,8 @@ export async function soloDueno() {
 /** "En línea ahora" en Plataforma: usó el sistema en estos minutos (users.ultima_actividad se marca como
  *  máximo cada 2 minutos, lib/auth.ts). Con la página abierta los avisos la mantienen al día. */
 export const EN_LINEA_MINUTOS = 5
+
+/** Puede entrar (20-10, Plataforma muestra solo a estos; los inactivos quedan plegados en Clientes): empresa
+ *  encendida y cuenta en prueba vigente, pagando o propietaria. Alias: e = empresas, o = organizaciones. */
+export const SQL_PUEDE_ENTRAR = `(e.is_active AND (o.estado IN ('activo', 'propietario')
+  OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date))))`

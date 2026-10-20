@@ -11,6 +11,8 @@ export interface Empresa {
   ventas: number; preguntas: number; preguntas_sistema: number; guias: number; reportadas: number
   calificadas: number; calificadas_sistema: number; mensajes_sistema: number; stock: number; ia: number
   usuarios_7d: number; ultimo_uso: string | null; abierta_at: string | null; en_linea: boolean; abierta: boolean
+  telegram: boolean            // vinculó los avisos por Telegram
+  pagos_me: number | null      // pagos de MercadoEnvíos verificados en el período (null = sin el módulo)
 }
 type Nivel = 'integrado' | 'parcial' | 'sin_uso' | 'no_entra' | 'sin_ventas' | 'sin_conectar'
 type FiltroUso = 'todos' | 'sin_conectar' | 'por_vencer' | 'dormidos'
@@ -40,9 +42,12 @@ export function UsoChips({ e }: { e: Empresa }) {
     ['Calificaciones', e.calificadas_sistema, `${e.calificadas_sistema} de ${e.calificadas} calificaciones hechas desde el sistema`],
     ['Stock', e.stock, 'Cambios de stock desde el sistema'],
     ['IA', e.ia, 'Borradores con IA'],
+    ['Pagos ME', e.pagos_me ?? 0, 'Pagos de MercadoEnvíos verificados en el sistema'],
   ]
   const usados = usos.filter(([, n]) => n > 0)
-  if (!usados.length) return <span className="text-[11px] text-neutral-400">nada en el período</span>
+  // Sin uso en el período pero con algo encendido: se dice igual (Telegram, o Pagos ME activo sin pagos aún).
+  const pagosSinUso = e.pagos_me === 0
+  if (!usados.length && !e.telegram && !pagosSinUso) return <span className="text-[11px] text-neutral-400">nada en el período</span>
   return (
     <div className="flex flex-wrap gap-1">
       {usados.map(([t, n, ayuda]) => (
@@ -50,6 +55,8 @@ export function UsoChips({ e }: { e: Empresa }) {
           {t} <b className="tabular-nums">{n}</b>
         </span>
       ))}
+      {e.telegram && <span title="Vinculó los avisos por Telegram" className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[11px] text-sky-700">Telegram ✓</span>}
+      {pagosSinUso && <span title="Tiene Pagos ME activo pero no verificó pagos en el período" className="whitespace-nowrap rounded-full bg-neutral-50 px-2 py-0.5 text-[11px] text-neutral-400 ring-1 ring-inset ring-neutral-200">Pagos ME 0</span>}
     </div>
   )
 }
@@ -93,7 +100,7 @@ export interface BaseCliente { id: number; nombre: string; detalle: string; cuen
 export const CEROS = {
   propia: false, cuentas: null, ventas: 0, preguntas: 0, preguntas_sistema: 0, guias: 0, reportadas: 0, calificadas: 0,
   calificadas_sistema: 0, mensajes_sistema: 0, stock: 0, ia: 0, usuarios_7d: 0, ultimo_uso: null, abierta_at: null,
-  en_linea: false, abierta: false,
+  en_linea: false, abierta: false, telegram: false, pagos_me: null,
 }
 
 const FILTROS_USO: { k: FiltroUso; t: string }[] = [

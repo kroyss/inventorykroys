@@ -432,7 +432,9 @@ function ListaFundadores() {
       fetch('/api/plataforma/adopcion?dias=7').then(r => r.json()),
     ]).then(([e, a]) => {
       if (!vivo) return
-      setDatos({ emp: (e.empresas ?? []).filter((x: Emp) => x.fundador && x.is_active), uso: new Map((a.empresas ?? []).map((u: Uso) => [u.id, u])), hoy: e.hoy })
+      // Solo los que pueden entrar (20-10): los pausados quedan en Clientes → Inactivos guardados.
+      const puede = (x: Emp) => x.is_active && x.estado !== 'vencido' && !(x.estado === 'prueba' && !!x.prueba_hasta && x.prueba_hasta < e.hoy)
+      setDatos({ emp: (e.empresas ?? []).filter((x: Emp) => x.fundador && puede(x)), uso: new Map((a.empresas ?? []).map((u: Uso) => [u.id, u])), hoy: e.hoy })
     }).catch(() => {})
     return () => { vivo = false }
   }, [])

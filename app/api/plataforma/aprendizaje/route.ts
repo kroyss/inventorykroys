@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
-import { EN_LINEA_MINUTOS, soloDueno } from '@/lib/plataforma'
+import { EN_LINEA_MINUTOS, soloDueno, SQL_PUEDE_ENTRAR } from '@/lib/plataforma'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { idDeYoutube, linkAgendar, segundosDe, SQL_ORDEN_SERIE } from '@/lib/aprendizaje'
 
@@ -40,6 +40,7 @@ export async function GET() {
          FROM users u
          JOIN usuario_empresas ue ON ue.user_id = u.id
          JOIN empresas e ON e.id = ue.empresa_id AND e.organizacion_id <> $1
+         JOIN organizaciones o ON o.id = e.organizacion_id AND ${SQL_PUEDE_ENTRAR}
          LEFT JOIN aprendizaje_progreso p ON p.user_id = u.id
          LEFT JOIN aprendizaje_videos v ON v.id = p.video_id
          WHERE u.is_active
@@ -60,7 +61,7 @@ export async function GET() {
          FROM plataforma_uso_clientes() u
          JOIN empresas e ON e.id = u.empresa_id
          JOIN organizaciones o ON o.id = e.organizacion_id
-         WHERE e.organizacion_id <> $1 AND e.is_active
+         WHERE e.organizacion_id <> $1 AND ${SQL_PUEDE_ENTRAR}
          ORDER BY u.conectada_at IS NULL, u.ultima_actividad DESC NULLS LAST, e.nombre`, [ORGANIZACION_PLATAFORMA]),
       // En línea ahora: cualquier usuario (también los de la plataforma) que usó el sistema hace poco.
       db.query(
