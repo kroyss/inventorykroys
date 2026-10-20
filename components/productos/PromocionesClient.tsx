@@ -530,6 +530,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
   // Las que con este % quedan SIN envío gratis quedan fuera, salvo que se pida agregarlas igual.
   // Perder solo ZOOM (sigue gratis por TEALCA) no bloquea: es una advertencia fuerte.
   const [conPierden, setConPierden] = useState(false)
+  // Varias campañas seguidas (20-10, pedido del dueño): al terminar una, la ventana sigue abierta para agregar las
+  // mismas publicaciones a otra. Aquí quedan las ya hechas (los datos de la pantalla no se recargan hasta cerrar).
+  const [hechas, setHechas] = useState<{ clave: string; nombre: string; ok: number; mal: number; okIds: string[] }[]>([])
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
   const conexionId = conexiones[0]
@@ -540,7 +543,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
   }).length
   const opciones = campanas.filter(c => c.conexionId === conexionId && c.estado !== 'finished')
     .map(c => ({ c, n: puedenEntrar(c) }))
-    .filter(o => o.n > 0 || `${o.c.conexionId}|${o.c.id}` === modal.campana)
+    .filter(o => (o.n > 0 || `${o.c.conexionId}|${o.c.id}` === modal.campana) && !hechas.some(h => h.clave === `${o.c.conexionId}|${o.c.id}`))
   const camp = campanas.find(c => `${c.conexionId}|${c.id}` === modal.campana) ?? null
   const propia = camp?.tipo === 'SELLER_CAMPAIGN'
   // ML no guarda publicaciones en una campaña que todavía no empezó (responde "ok" pero no queda).
@@ -580,6 +583,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
       : base.estado === 'sin_peso' ? 'Sin peso: envío sin verificar' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
+      ?? (() => { const h = [...hechas].reverse().find(x => x.okIds.includes(f.id)); return h ? { nombre: h.nombre, precio: null } : undefined })()
     return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
       cambio, antes: cambio ? cand!.precio! : null, ajustada }
   })
@@ -652,8 +656,18 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     }
     setEnviando(false); setAvance(null); setEnCola(new Set())
     // Todo bien: se cierra. Con errores (o sin confirmar) queda abierto para ver el motivo y reintentar a mano.
-    const ok = todos.filter(x => x.ok).length
-    if (todos.every(x => x.ok && !x.porConfirmar) && !todos.some(x => x.manda)) onHecho(`${ok} agregada${ok === 1 ? '' : 's'} a "${camp.nombre}" y comprobada${ok === 1 ? '' : 's'} en MercadoLibre.`)
+    // Todo bien: no se cierra (20-10): queda anotada y se puede elegir otra campaña para las mismas publicaciones.
+    if (todos.every(x => x.ok && !x.porConfirmar) && !todos.some(x => x.manda)) pasarAOtra(nuevos)
+  }
+  /** Anota la campaña actual como hecha (con lo que respondió ML) y deja elegir otra. */
+  const pasarAOtra = (res: typeof resultados = resultados) => {
+    if (!camp) return
+    const r = Object.values(res)
+    if (r.length) setHechas(h => [...h.filter(x => x.clave !== modal.campana),
+      { clave: modal.campana, nombre: camp.nombre, ok: r.filter(x => x.ok).length, mal: r.filter(x => !x.ok).length,
+        okIds: Object.entries(res).filter(([, x]) => x.ok).map(([id]) => id) }])
+    setResultados({}); setReintento({}); setConPierden(false)
+    setModal({ ...modal, campana: '' })
   }
   const confirmar = async () => {
     const sinGratis = validas.filter(x => x.sinGratis).length
@@ -681,27 +695,46 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     await enviar([{ id: f.id, precio, precioAntes: f.precio, cambio: filasPrev.find(x => x.f.id === f.id)?.cambio }])
   }
   const hayResultados = Object.keys(resultados).length > 0
+  const hayAlgo = hayResultados || hechas.length > 0
   const resumen = () => {
     const r = Object.values(resultados)
-    const bien = r.filter(x => x.ok).length, mal = r.length - bien
-    return `«${camp?.nombre ?? ''}»: ${bien} agregada${bien === 1 ? '' : 's'}${mal ? ` · ${mal} no entr${mal === 1 ? 'ó' : 'aron'} (el motivo queda en "Cambios hechos desde el sistema")` : ''}.`
+    const todas = [...hechas.filter(h => h.clave !== modal.campana),
+      ...(camp && r.length ? [{ nombre: camp.nombre, ok: r.filter(x => x.ok).length, mal: r.filter(x => !x.ok).length }] : [])]
+    const mal = todas.reduce((s, h) => s + h.mal, 0)
+    return todas.map(h => `«${h.nombre}»: ${h.ok} agregada${h.ok === 1 ? '' : 's'}${h.mal ? ` · ${h.mal} no entr${h.mal === 1 ? 'ó' : 'aron'}` : ''}`).join(' · ')
+      + (mal ? ' (el motivo queda en "Cambios hechos desde el sistema").' : '.')
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { if (!enviando) { if (hayResultados) onHecho(resumen()); else setModal(null) } }}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { if (!enviando) { if (hayAlgo) onHecho(resumen()); else setModal(null) } }}>
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-4 space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Agregar a una campaña · vista previa</h2>
-          <button onClick={() => { if (hayResultados) onHecho(resumen()); else setModal(null) }} disabled={enviando}
+          <button onClick={() => { if (hayAlgo) onHecho(resumen()); else setModal(null) }} disabled={enviando}
             title={enviando ? 'Espera a que termine de agregar' : undefined} className="text-neutral-500 text-sm disabled:opacity-40">Cerrar ✕</button>
         </div>
+        {hechas.length > 0 && !mezcla && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            <div>✓ {hechas.map(h => `«${h.nombre}»: ${h.ok} agregada${h.ok === 1 ? '' : 's'}${h.mal ? ` (${h.mal} no entr${h.mal === 1 ? 'ó' : 'aron'})` : ''}`).join(' · ')}</div>
+            {!modal.campana && <div className="mt-0.5 text-xs">¿Agregar también a otra campaña? Elígela abajo. Si no, toca <b>Terminar</b>. Si quedan en varias, MercadoLibre cobra la más baja y las otras esperan.</div>}
+          </div>
+        )}
         {mezcla ? (
           <p className="text-sm text-red-700">Elegiste publicaciones de más de una cuenta. Las campañas son de cada cuenta: filtra por una cuenta y vuelve a seleccionar.</p>
         ) : <>
           <div className="flex flex-wrap items-end gap-3 text-sm">
             <label className="space-y-1"><span className="block text-xs text-neutral-500">Campaña</span>
-              <select value={modal.campana} onChange={e => { const c = campanas.find(x => `${x.conexionId}|${x.id}` === e.target.value); setModal({ ...modal, campana: e.target.value, pct: c?.pctDefecto ?? modal.pct }) }} className="border border-neutral-300 rounded-lg px-2 py-1.5 min-w-[240px]">
-                <option value="">Elegir…</option>
+              <select value={modal.campana} disabled={enviando} onChange={e => {
+                const c = campanas.find(x => `${x.conexionId}|${x.id}` === e.target.value)
+                if (hayResultados && camp) {   // lo de la campaña anterior queda anotado arriba
+                  const r = Object.values(resultados)
+                  setHechas(h => [...h.filter(x => x.clave !== modal.campana), { clave: modal.campana, nombre: camp.nombre, ok: r.filter(x => x.ok).length,
+                    mal: r.filter(x => !x.ok).length, okIds: Object.entries(resultados).filter(([, x]) => x.ok).map(([id]) => id) }])
+                  setResultados({}); setReintento({}); setConPierden(false)
+                }
+                setModal({ ...modal, campana: e.target.value, pct: c?.pctDefecto ?? modal.pct })
+              }} className={`border rounded-lg px-2 py-1.5 min-w-[240px] ${hechas.length && !modal.campana ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-neutral-300'}`}>
+                <option value="">{hechas.length ? 'Elegir otra campaña…' : 'Elegir…'}</option>
                 {opciones.map(({ c, n }) => <option key={c.id} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'} · {n} de {filas.length}</option>)}
               </select>
             </label>
@@ -795,7 +828,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
                               <button onClick={() => reintentar(x.f)} disabled={enviando} className="btn-secondary text-[11px] px-2 py-0.5">Reintentar</button>
                             </span>
                           )}</span>
-                        : <>{x.motivo ?? (x.cambio ? `${usd(x.antes)} → ${usd(x.precio)}` : x.otra ? <span title={`También en «${x.otra.nombre}»`}>+ otra promo: {usd(x.otra.precio)}</span> : '')}
+                        : <>{x.motivo ?? (x.cambio ? `${usd(x.antes)} → ${usd(x.precio)}` : x.otra ? <span title={`También en «${x.otra.nombre}»: ML cobra la más baja`}>+ otra promo: {x.otra.precio != null ? usd(x.otra.precio) : `«${x.otra.nombre}» (recién)`}</span> : '')}
                           {x.advertencia && <span className={`block font-medium ${x.ajustada ? 'text-emerald-700' : x.sinGratis ? 'text-red-700' : x.pierdeZoom ? 'text-amber-800' : 'text-neutral-500'}`}>{x.advertencia}</span>}</>}
                     </td>
                     <td className="px-2 py-1.5 text-center">
@@ -811,7 +844,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
           </div>
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setModal(null)} className="btn-ghost text-sm">Cancelar</button>
-            {hayResultados && <button onClick={() => onHecho(resumen())} disabled={enviando} className="btn-secondary text-sm">Terminar</button>}
+            {hayResultados && camp && <button onClick={() => pasarAOtra()} disabled={enviando} className="btn-secondary text-sm" title="Deja esta campaña como está y elige otra para las mismas publicaciones">Agregar también a otra…</button>}
+            {hayAlgo && <button onClick={() => onHecho(resumen())} disabled={enviando} className="btn-secondary text-sm">Terminar</button>}
             <button onClick={confirmar} disabled={!camp || sinEmpezar || !validas.length || enviando} className="btn-primary text-sm">
               {enviando ? (avance && avance.total > TANDA ? `Agregando… ${avance.hechas} de ${avance.total}` : 'Agregando y comprobando…') : `Agregar ${validas.length} a la campaña`}
             </button>
