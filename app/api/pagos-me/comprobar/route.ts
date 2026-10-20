@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
       s.db.query(
         `SELECT p.id::int AS id, p.venta, p.cuenta, p.banco_emisor, p.banco_receptor, p.metodo_pago, p.referencia,
                 p.fecha_pago, p.monto_pagado::float AS monto_pagado, p.total_orden::float AS total_orden, p.verificacion,
-                p.comprobante_path IS NOT NULL AS comprobante
+                p.comprobante_path IS NOT NULL AS comprobante,
+                -- 20-10: si la venta ya está cargada en Ventas (por eso no sale en Por confirmar), su estado.
+                (SELECT s.status FROM sales s WHERE s.ml_order_number = p.venta ORDER BY s.id DESC LIMIT 1) AS venta_estado
          FROM me_pagos p
          WHERE p.fecha_orden > NOW() - INTERVAL '30 days' AND p.verificacion <> 'invalido'
          ORDER BY p.fecha_orden DESC`),

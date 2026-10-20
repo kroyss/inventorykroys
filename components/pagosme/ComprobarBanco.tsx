@@ -8,12 +8,14 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { BotonComprobante } from '@/components/ventas/VerComprobante'
 import type { EstadoCuenta, MovBanco, PagoME as PagoCruce, ResultadoCruce, ResultadoPago } from '@/lib/conciliacionBanco'
 
-interface Pago extends PagoCruce { cuenta: string | null; banco_emisor: string | null; verificacion: string; comprobante: boolean }
+interface Pago extends PagoCruce { cuenta: string | null; banco_emisor: string | null; verificacion: string; comprobante: boolean
+  venta_estado: string | null }   // ya cargada en Ventas (no sale en Por confirmar)
 interface Archivo { nombre: string; datos: ArrayBuffer; banco: string; estado: EstadoCuenta | null; error: string | null }
 
 const BANCOS = ['Bancamiga', 'Banesco', 'Mercantil', 'BBVA Provincial', 'Banco Plaza']
 const bs = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const dm = (f: string | null) => f ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : '—'
+const ESTADO_VENTA: Record<string, string> = { BORRADOR: 'Borrador', REABIERTA: 'Reabierta', PAGO_VERIFICADO: 'Pago verificado', PROCESADA: 'Procesada', DESCARGADA: 'Despachada', DESCARGADA_LOCAL: 'Entregada' }
 const lib = () => import('@/lib/conciliacionBanco')   // xlsx pesa: solo se carga al subir un archivo
 
 const GRUPOS: { k: ResultadoPago['nivel']; t: string; ayuda: string; cls: string }[] = [
@@ -215,6 +217,12 @@ function FilaResultado({ r, pendientes, aprobable, ocupado, onAprobar }: {
     <li className="grid gap-2 px-4 py-2.5 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
       <div className="min-w-0">
         <div className="font-mono text-xs text-neutral-800">{pendientes.map(v => v.venta).join(' + ')}</div>
+        {p.venta_estado && (
+          <a href={`/ventas?venta=${encodeURIComponent(p.venta)}`} className="text-[11px] font-medium text-sky-700 hover:underline"
+            title="Ya está cargada en Ventas: por eso no sale en Por confirmar. Ábrela para verificar el pago">
+            Ya en Ventas · {ESTADO_VENTA[p.venta_estado] ?? p.venta_estado} → Abrir venta
+          </a>
+        )}
         <div className="text-xs text-neutral-500">
           Dijo: <b className="text-neutral-700">Bs {bs(pendientes.reduce((s, v) => s + Number(v.monto_pagado ?? 0), 0))}</b> · {dm(p.fecha_pago)}
           {p.referencia ? ` · ref ${p.referencia}` : ''} · {p.banco_emisor ?? '?'} → {p.banco_receptor ?? (p.metodo_pago === 'transfer' ? 'transferencia' : '?')}
