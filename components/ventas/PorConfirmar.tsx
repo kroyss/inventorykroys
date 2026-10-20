@@ -209,6 +209,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const [error, setError] = useState<string | null>(null)
   const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
   const [verVencidas, setVerVencidas] = useState(false)
+  // Buscador (20-10): nombre, apodo de ML, número de venta, producto o cuenta.
+  const [buscar, setBuscar] = useState('')
   // "Traer ME" (2026-10-12; Pagos ME salió del menú de los usuarios): le pide a la PC del vigilante que traiga
   // los pagos y guías del portal. Tarda 1-3 min: se recarga la lista cada 10 s hasta que llega la búsqueda nueva.
   const [pidiendoME, setPidiendoME] = useState<number | null>(null)
@@ -255,8 +257,12 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
 
   if (!datos) return <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-400">Cargando…</div>
 
-  const vigentes = datos.filas.filter(f => !f.vencida)
-  const vencidas = datos.filas.filter(f => f.vencida)
+  const q = buscar.trim().toLowerCase()
+  const coincide = (f: Fila) => !q || [f.numero, f.comprador, f.nick, f.cuenta, ...f.lineas.map(l => `${l.titulo} ${l.variante ?? ''}`)]
+    .some(t => (t ?? '').toLowerCase().includes(q))
+  const filas = datos.filas.filter(coincide)
+  const vigentes = filas.filter(f => !f.vencida)
+  const vencidas = filas.filter(f => f.vencida)
   const conPago = vigentes.filter(f => f.pago && f.pago.verificacion !== 'invalido')
   const sinPago = vigentes.filter(f => !conPago.includes(f))
   // Sin inventario: por verificar · listos para despachar (verificados en los últimos 3 días) · sin pago.
@@ -319,6 +325,13 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           </div>
         </div>, document.body)}
       {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
+      {datos.filas.length > 0 && (
+        <div className="flex items-center gap-2">
+          <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por nombre, apodo, número de venta o producto…"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm sm:max-w-md" />
+          {q && <span className="shrink-0 text-xs text-neutral-500">{filas.length} de {datos.filas.length}</span>}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         {vigentes.length ? (
