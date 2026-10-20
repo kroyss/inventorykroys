@@ -42,7 +42,7 @@ interface LoteDetalle {
   etiquetas: Etiqueta[]
 }
 interface LoteGenerado { id: number; generated_at: string; label_count: number; page_count: number; generated_by: string | null
-  ya_impreso: boolean; apartados: number }   // ya_impreso: "Sale hoy" de un apartado de otra jornada (sin PDF)
+  ya_impreso: boolean; apartados: number }   // ya_impreso: "Sale en el próximo manifiesto" de un apartado de otra jornada (sin PDF)
 interface Overview {
   jornada: { id: number; opened_at: string; opened_by: string | null; lotes: LoteGenerado[]; total_envios: number } | null
   pendientes: { id: number; created_at: string; created_by: string | null; etiquetas: number }[]

@@ -12,7 +12,7 @@ import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
 //   POST { id, accion: 'apartar', tipo: 'espera'|'cancelado', nota } · { id, accion: 'liberar' } · { id, accion: 'cancelar', nota? }
 // Se puede apartar mientras no se haya reportado: en un lote sin imprimir (además se desmarca del PDF), impresa
 // con la jornada abierta (no entra al manifiesto) o con la jornada ya cerrada (no lo reporta el Reportador).
-// "Sale hoy" de una impresa cuya jornada ya cerró: pasa a la jornada abierta de hoy (en un lote "ya impreso",
+// "Sale en el próximo manifiesto" de una impresa cuya jornada ya cerró: pasa a la jornada abierta de hoy (en un lote "ya impreso",
 // sin PDF nuevo) para que entre a su manifiesto y se reporte con esa tanda.
 
 const COLUMNAS = `e.id, e.venta, e.guia, COALESCE(e.guia_final, e.guia) AS guia_ver, e.carrier, e.destinatario, e.remitente, e.impresa,
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
                 apartado_nota = COALESCE(NULLIF($3, ''), apartado_nota)
          WHERE ${MISMAS.replace('$9', '$4')}`, [b.id, userId, b.nota ?? null, e.venta])
     } else {
-      // Liberar ("Sale hoy")
+      // Liberar ("Sale en el próximo manifiesto")
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }
       if (!e.impresa) {
         if (e.lote_status !== 'PENDIENTE') {

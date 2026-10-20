@@ -69,14 +69,14 @@ export function AvisoEnEspera({ lista, onAbrir }: { lista: Apartado[]; onAbrir: 
   const viejos = lista.filter(a => diasDesde(a.apartado_at) > DIAS_ALERTA).length
   return (
     <div className={`flex flex-wrap items-center gap-2 rounded-lg border px-4 py-2 text-sm ${viejos ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-      ⏸ <b>{lista.length} envío{lista.length === 1 ? '' : 's'} en espera</b>: no sale{lista.length === 1 ? '' : 'n'} hoy salvo que lo{lista.length === 1 ? '' : 's'} liberes.
+      ⏸ <b>{lista.length} envío{lista.length === 1 ? '' : 's'} en espera</b>: no sale{lista.length === 1 ? '' : 'n'} en ningún manifiesto hasta que lo{lista.length === 1 ? '' : 's'} liberes.
       {viejos > 0 && <span>{viejos} lleva{viejos === 1 ? '' : 'n'} más de {DIAS_ALERTA} días.</span>}
       <button onClick={onAbrir} className="ml-auto font-medium underline">Ver</button>
     </div>
   )
 }
 
-/** Panel al costado: lo que está en espera (Sale hoy / Ya no se envía) y buscar un envío para apartarlo. */
+/** Panel al costado: lo que está en espera (Sale en el próximo manifiesto / Ya no se envía) y buscar un envío para apartarlo. */
 export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInventario = false }: {
   lista: Apartado[]; preseleccion?: Apartado | null; onCerrar: () => void; onCambio: (aviso: string) => void
   conInventario?: boolean   // con Inventario: "Corregir pedido" (Ventas, mig. 108) en cada envío en espera
@@ -138,7 +138,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
             <FormApartar e={apartando} ocupado={ocupado} onCancelar={() => setApartando(null)}
               onApartar={async (tipo, nota) => {
                 const ok = await accion({ accion: 'apartar', id: apartando.id, tipo, nota },
-                  `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'quedó en espera (cuando vaya a salir, toca «Sale hoy»).' : 'cancelado, no se enviará.'}`)
+                  `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'quedó en espera (cuando vaya a salir, toca «Sale en el próximo manifiesto»).' : 'cancelado, no se enviará.'}`)
                 if (ok) { setApartando(null); setBuscar(''); setCandidatos(null) }
               }} />
           ) : (
@@ -182,13 +182,13 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                       </div>
                       <div className="mt-2 flex gap-2">
                         <button disabled={ocupado} onClick={async () => {
-                          // 20-10: "Sale hoy" lo suma a la jornada abierta (o abre una): sale en el próximo manifiesto y esa
+                          // 20-10: "Sale en el próximo manifiesto" lo suma a la jornada abierta (o abre una): sale en el próximo manifiesto y esa
                           // noche se reporta. Si en realidad sale otro día, que lo deje en espera y lo toque ese día.
-                          if (!await confirm({ title: '¿Este paquete sale en el despacho de hoy?', confirmText: 'Sí, sale hoy', cancelText: 'No, sigue en espera',
-                            message: `Entra en la jornada que se cierra hoy: sale en su manifiesto y al cerrarla se le reporta la guía al comprador.${a.impresa ? ' La etiqueta ya está impresa: no se vuelve a imprimir.' : ''} Si sale otro día, déjalo en espera y tócalo ese día.` })) return
-                          accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: sale hoy (entra en la jornada abierta y se reporta al cerrarla).`)
+                          if (!await confirm({ title: '¿Este paquete sale en el próximo manifiesto?', confirmText: 'Sí, va en el próximo', cancelText: 'No, sigue en espera',
+                            message: `Entra en la jornada abierta: sale en el manifiesto que se genere al cerrarla (normalmente el de hoy) y en ese momento se le reporta la guía al comprador.${a.impresa ? ' La etiqueta ya está impresa: no se vuelve a imprimir.' : ''} Si el paquete sale otro día, déjalo en espera y tócalo ese día.` })) return
+                          accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: va en el próximo manifiesto (entra en la jornada abierta y se reporta al cerrarla).`)
                         }}
-                          className="btn-secondary text-xs disabled:opacity-50">Sale hoy</button>
+                          className="btn-secondary text-xs disabled:opacity-50">Sale en el próximo manifiesto</button>
                         <button disabled={ocupado} onClick={async () => {
                           // No tiene vuelta atrás: nunca se despacha ni se reporta (queda en el historial como cancelado).
                           if (!await confirm({ title: `Cancelar el envío ${a.venta ?? ''}`, confirmText: 'Sí, no se envía', danger: true,
@@ -222,7 +222,7 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
       <h3 className="font-semibold">Apartar {e.venta ?? 'envío'}</h3>
       <p className="text-xs text-neutral-500">{e.destinatario ?? ''} · guía {e.guia_ver ?? '—'} · {ETAPA[e.etapa]}</p>
       <div className="space-y-1.5">
-        {([['espera', 'Hoy no sale', 'Queda en espera; sale cuando lo liberes.'], ['cancelado', 'No se enviará', 'Desistió, pago mal o error: nunca se despacha ni se reporta.']] as const).map(([v, t, d]) => (
+        {([['espera', 'Todavía no sale', 'Queda en espera; sale en el próximo manifiesto cuando lo liberes.'], ['cancelado', 'No se enviará', 'Desistió, pago mal o error: nunca se despacha ni se reporta.']] as const).map(([v, t, d]) => (
           <label key={v} className={`flex cursor-pointer gap-2 rounded-lg border px-3 py-2 ${tipo === v ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'}`}>
             <input type="radio" checked={tipo === v} onChange={() => setTipo(v)} className="mt-0.5" />
             <span><b className="text-sm">{t}</b><span className="block text-xs text-neutral-500">{d}</span></span>
@@ -241,7 +241,7 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
         <button onClick={onCancelar} className="btn-secondary text-xs">Cancelar</button>
         <button disabled={ocupado || nota.trim().length < 2} onClick={() => onApartar(tipo, nota.trim())}
           className={`text-xs disabled:opacity-50 ${tipo === 'cancelado' ? 'btn-primary !bg-red-600 hover:!bg-red-700' : 'btn-primary'}`}>
-          {tipo === 'espera' ? 'Apartar: hoy no sale' : 'Cancelar el envío'}
+          {tipo === 'espera' ? 'Apartar: todavía no sale' : 'Cancelar el envío'}
         </button>
       </div>
     </section>
