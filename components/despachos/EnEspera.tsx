@@ -86,6 +86,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
   const [apartando, setApartando] = useState<Apartado | null>(preseleccion ?? null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [hecho, setHecho] = useState<string | null>(null)   // confirmación de lo último que se hizo (sin dudas de "¿falta algo?")
   const confirm = useConfirm()
 
   useEffect(() => {
@@ -108,7 +109,8 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
     const r = await fetch('/api/despachos/apartados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const d = await r.json().catch(() => ({}))
     setOcupado(false)
-    if (!r.ok) { setError(d.error ?? 'No se pudo'); return false }
+    if (!r.ok) { setError(d.error ?? 'No se pudo'); setHecho(null); return false }
+    setHecho(aviso)
     onCambio(aviso)
     return true
   }
@@ -126,12 +128,17 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
         </div>
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4 text-sm">
           {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</div>}
+          {hecho && !error && (
+            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-800">
+              <b>✓ Listo.</b> {hecho} No tienes que hacer nada más ahora.
+            </div>
+          )}
 
           {apartando ? (
             <FormApartar e={apartando} ocupado={ocupado} onCancelar={() => setApartando(null)}
               onApartar={async (tipo, nota) => {
                 const ok = await accion({ accion: 'apartar', id: apartando.id, tipo, nota },
-                  `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'en espera, hoy no sale' : 'cancelado, no se enviará'}.`)
+                  `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'quedó en espera (cuando vaya a salir, toca «Sale hoy»).' : 'cancelado, no se enviará.'}`)
                 if (ok) { setApartando(null); setBuscar(''); setCandidatos(null) }
               }} />
           ) : (
@@ -175,7 +182,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                       </div>
                       <div className="mt-2 flex gap-2">
                         <button disabled={ocupado} onClick={() => accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: sale hoy (entra en la jornada abierta y se reporta con ella).`)}
-                          className="btn-primary text-xs disabled:opacity-50">Sale hoy</button>
+                          className="btn-secondary text-xs disabled:opacity-50">Sale hoy</button>
                         <button disabled={ocupado} onClick={async () => {
                           // No tiene vuelta atrás: nunca se despacha ni se reporta (queda en el historial como cancelado).
                           if (!await confirm({ title: `Cancelar el envío ${a.venta ?? ''}`, confirmText: 'Sí, no se envía', danger: true,
@@ -190,6 +197,9 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
               </ul>
             )}
           </section>
+        </div>
+        <div className="flex justify-end border-t bg-neutral-50 px-5 py-3">
+          <button onClick={onCerrar} className="btn-primary text-sm">Listo, cerrar</button>
         </div>
       </aside>
     </div>
