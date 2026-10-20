@@ -58,6 +58,7 @@ const MORE: NavItem[] = [
   { href: '/automatizaciones', label: 'Automatiza', icon: 'automatizaciones', countries: ['VE', 'CO'] },
   { href: '/facturas',   label: 'Facturas',   icon: 'facturas',   countries: ['VE'] },
   { href: '/productos',  label: 'Productos',  icon: 'productos',  countries: ['VE', 'CO'] },
+  { href: '/vincular-ml', label: 'Vincular ML', icon: 'productos', countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: 'ajustes',    countries: ['VE', 'CO'] },
   { href: '/usuarios',   label: 'Usuarios',   icon: 'usuarios',   countries: ['VE', 'CO'] },
@@ -107,7 +108,8 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   }, [pathname])
 
   const visible = (items: NavItem[]) =>
-    items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos))
+    items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos)
+      && !(i.href === '/vincular-ml' && puede(u, 'ver_productos')))   // quien ve Productos entra desde ahí
 
   const auto    = espacioActual(pathname, modulos) === 'automatizaciones'
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador') || modulos.includes('preguntas')

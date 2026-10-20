@@ -37,6 +37,9 @@ export const PERMISOS = {
   ver_reportador:     { tipo: 'seccion', nombre: 'Reportador', usuario: true, modulo: 'reportador', soloVE: true },
   ver_stock:          { tipo: 'seccion', nombre: 'Stock (publicaciones por agotarse)', usuario: true, modulo: 'alertas_stock' },
   ver_aprendizaje:    { tipo: 'seccion', nombre: 'Aprendizaje', usuario: true },
+  // 20-10 (mig. 109): solo la pantalla de unir publicación/variante ↔ producto, SIN ver Productos ni precios.
+  vincular_ml:        { tipo: 'seccion', nombre: 'Vincular publicaciones de ML', usuario: true, modulo: 'inventario',
+                        detalle: 'Unir cada publicación (o variante) de MercadoLibre con su producto. No ve precios ni costos' },
   // ── Acciones (dentro de las secciones) ──
   costos:                  { tipo: 'accion', nombre: 'Ver costos y ganancias', usuario: false, modulo: 'inventario',
                              detalle: 'Inicio completo (ventas, ganancia, bonos) y costos/totales en Compras e Importaciones' },
@@ -95,6 +98,7 @@ const SECCION_DE_RUTA: [string, Permiso][] = [
   ['/reportes', 'ver_reportes'], ['/finanzas', 'ver_finanzas'], ['/preguntas', 'ver_preguntas'],
   ['/mensajes', 'ver_mensajes'], ['/calificaciones', 'ver_calificaciones'], ['/despachos', 'ver_despachos'],
   ['/reportador', 'ver_reportador'], ['/alertas-stock', 'ver_stock'], ['/aprendizaje', 'ver_aprendizaje'],
+  ['/vincular-ml', 'vincular_ml'],
 ]
 const SOLO_ADMIN = ['/tasas', '/usuarios', '/plataforma']
 

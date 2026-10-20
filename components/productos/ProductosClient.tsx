@@ -514,9 +514,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     <div className="space-y-4">
       <PageHeader title="Productos" subtitle="Catálogo, precios y margen neto de cada producto" actions={<>
         {importarML && (
-          <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"
-            title="Convertir tus publicaciones de MercadoLibre en productos, o vincularlas a los que ya tienes">
-            Importar desde ML
+          <Link href="/vincular-ml" className="btn-secondary text-sm whitespace-nowrap"
+            title="Unir cada publicación (o color/modelo) de MercadoLibre con su producto; ver las dudas del equipo y crear productos nuevos">
+            Vincular con ML
           </Link>
         )}
         {country === 'VE' && descuento && (

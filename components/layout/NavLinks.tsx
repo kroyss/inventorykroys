@@ -17,6 +17,8 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   { href: '/productos',  label: 'Productos', countries: ['VE', 'CO'] as Country[] },
   { href: '/reportes',   label: 'Reportes',  countries: ['VE', 'CO'] as Country[] },
   { href: '/finanzas',   label: 'Finanzas',  countries: ['VE', 'CO'] as Country[] },
+  // Para los empleados (permiso vincular_ml); quien ve Productos entra desde ahí ("Vincular con ML").
+  { href: '/vincular-ml', label: 'Vincular ML', countries: ['VE', 'CO'] as Country[] },
   // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     countries: ['VE', 'CO'], espacio: 'automatizaciones' },
@@ -59,6 +61,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
     l => rutaPermitida(l.href, u) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
       && (l.espacio ?? 'inventario') === espacioActual(pathname, modulos)
       && (!l.soloDesdeML || ventasDesdeML({ modulos }))
+      && !(l.href === '/vincular-ml' && puede(u, 'ver_productos'))
   )
   const activo = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))

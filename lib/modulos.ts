@@ -57,6 +57,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/calificaciones': 'preguntas',
   '/alertas-stock': 'alertas_stock',
   '/pagos-me':       'pagos_me',
+  '/vincular-ml':    'inventario',
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
   '/productos/promociones':   'promociones',
