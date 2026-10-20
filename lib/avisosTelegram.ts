@@ -21,6 +21,7 @@ import { sqlCaliente, SQL_VENDIDA, umbralStock, DIAS_VENDIDAS } from '@/lib/aler
 import { ventasDesdeML } from '@/lib/modulos'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import { SQL_PENDIENTE as SQL_SIN_REPORTAR, SQL_REPORTABLE } from '@/lib/reportador'
+import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
 import {
   ENTORNO, TelegramBloqueado, corto, enviarTelegram, esc, leerActualizaciones, telegramConfigurado, urlSistema,
   type Boton,
@@ -544,9 +545,8 @@ async function pendienteAhora(db: Pool, e: EmpresaAvisos, d: Destinatario, disp:
   // Envíos apartados en Despachos hace más de 2 días (mig. 107): que no queden en el limbo.
   if (disp.reportador) {
     const { rows: [w] } = await db.query(
-      `SELECT COUNT(DISTINCT COALESCE(venta, id::text))::int AS n FROM despacho_etiquetas
-       WHERE apartado = 'espera' AND apartado_at < NOW() - INTERVAL '2 days'
-         AND lote_id NOT IN (SELECT id FROM despacho_lotes WHERE status = 'DESCARTADO')`)
+      `SELECT COUNT(DISTINCT COALESCE(e.venta, e.id::text))::int AS n FROM despacho_etiquetas e
+       WHERE e.apartado = 'espera' AND e.apartado_at < NOW() - INTERVAL '2 days' AND ${SIGUE_EN_ESPERA}`)
     if (w.n) pend.push(`⏸ ${n(w.n)} envío${w.n === 1 ? '' : 's'} en espera hace más de 2 días (Despachos → En espera)`)
   }
   if (disp.pregunta && c.preguntas) pend.push(`❓ ${n(c.preguntas)} pregunta${c.preguntas === 1 ? '' : 's'} sin responder`)

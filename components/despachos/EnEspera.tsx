@@ -3,6 +3,7 @@
 // su panel al costado y el formulario para apartar. Un solo lugar para todo lo frenado, lo hayan detenido al armar
 // etiquetas o cuando ya estaba por reportar.
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 export interface Apartado {
   id: number; venta: string | null; guia_ver: string | null; carrier: string; destinatario: string | null; remitente: string | null
@@ -11,7 +12,7 @@ export interface Apartado {
 }
 
 const ETAPA: Record<Apartado['etapa'], string> = {
-  sin_imprimir: 'sin imprimir', impresa: 'etiqueta impresa (jornada de hoy)', por_reportar: 'jornada cerrada, sin reportar',
+  sin_imprimir: 'sin imprimir', impresa: 'etiqueta impresa, jornada abierta', por_reportar: 'jornada cerrada, sin reportar',
 }
 const DIAS_ALERTA = 2
 const diasDesde = (f: string | null) => (f ? (Date.now() - new Date(f).getTime()) / 864e5 : 0)
@@ -61,6 +62,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio }: {
   const [apartando, setApartando] = useState<Apartado | null>(preseleccion ?? null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const confirm = useConfirm()
 
   useEffect(() => {
     const k = (ev: KeyboardEvent) => { if (ev.key === 'Escape') onCerrar() }
@@ -146,7 +148,12 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio }: {
                       <div className="mt-2 flex gap-2">
                         <button disabled={ocupado} onClick={() => accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: sale hoy (entra en la jornada abierta y se reporta con ella).`)}
                           className="btn-primary text-xs disabled:opacity-50">Sale hoy</button>
-                        <button disabled={ocupado} onClick={() => accion({ accion: 'cancelar', id: a.id }, `${a.venta ?? 'Envío'}: cancelado, queda en el historial.`)}
+                        <button disabled={ocupado} onClick={async () => {
+                          // No tiene vuelta atrás: nunca se despacha ni se reporta (queda en el historial como cancelado).
+                          if (!await confirm({ title: `Cancelar el envío ${a.venta ?? ''}`, confirmText: 'Sí, no se envía', danger: true,
+                            message: 'No va a salir nunca ni se le mandará la guía al comprador. Queda en el historial como "envío cancelado". Esto no se puede deshacer.' })) return
+                          accion({ accion: 'cancelar', id: a.id }, `${a.venta ?? 'Envío'}: cancelado, queda en el historial.`)
+                        }}
                           className="btn-secondary text-xs disabled:opacity-50">Ya no se envía</button>
                       </div>
                     </li>
@@ -188,7 +195,8 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
       )}
       <div className="flex justify-end gap-2">
         <button onClick={onCancelar} className="btn-secondary text-xs">Cancelar</button>
-        <button disabled={ocupado || nota.trim().length < 2} onClick={() => onApartar(tipo, nota.trim())} className="btn-primary text-xs disabled:opacity-50">
+        <button disabled={ocupado || nota.trim().length < 2} onClick={() => onApartar(tipo, nota.trim())}
+          className={`text-xs disabled:opacity-50 ${tipo === 'cancelado' ? 'btn-primary !bg-red-600 hover:!bg-red-700' : 'btn-primary'}`}>
           {tipo === 'espera' ? 'Apartar: hoy no sale' : 'Cancelar el envío'}
         </button>
       </div>

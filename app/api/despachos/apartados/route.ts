@@ -5,6 +5,7 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { despachosForbidden } from '@/lib/despachos'
 import { RESERVA_HORAS } from '@/lib/reportador'
+import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
 
 // Envíos apartados (20-10, migración 107): sacar un envío puntual de Despachos / Reportador sin perderlo.
 //   GET  ?buscar=venta|guía → los que están "En espera" y, si se busca, los envíos que se pueden apartar.
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     // Venta, guía o nombre (con espacios y acentos); sin los comodines de ILIKE.
     const buscar = (req.nextUrl.searchParams.get('buscar') ?? '').trim().replace(/[%_\\]/g, '').slice(0, 60)
     const [{ rows: espera }, candidatos] = await Promise.all([
-      db.query(`SELECT ${COLUMNAS} ${DESDE} WHERE e.apartado = 'espera' AND l.status <> 'DESCARTADO' ORDER BY e.apartado_at`),
+      db.query(`SELECT ${COLUMNAS} ${DESDE} WHERE e.apartado = 'espera' AND ${SIGUE_EN_ESPERA} ORDER BY e.apartado_at`),
       buscar.length >= 4
         ? db.query(
             `SELECT ${COLUMNAS} ${DESDE}

@@ -44,7 +44,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const aImprimir = (await etiquetasValidadas(db, lote.id, desdeML, tieneModulo(session.user, 'pagos_me')))
-      .filter(e => e.incluida && IMPRIMIBLE[e.estado])
+      .filter(e => e.incluida && !e.apartado && IMPRIMIBLE[e.estado])   // apartado (mig. 107): nunca se imprime
     if (aImprimir.length === 0) {
       await client.query('ROLLBACK')
       return NextResponse.json({ error: 'No hay etiquetas listas para imprimir en este lote' }, { status: 400 })
