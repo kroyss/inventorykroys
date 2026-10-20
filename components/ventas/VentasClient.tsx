@@ -1,5 +1,6 @@
 'use client'
 import CorregirPedido, { NotaAjustes } from '@/components/ventas/CorregirPedido'
+import { LineaBancoVenta } from '@/components/ventas/LineaBanco'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
 import VentasForm from './VentasForm'
@@ -688,6 +689,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                     </div>
                   )}
                 </div>
+              )}
+              {/* Lo que dijo el banco de su pago (Comprobar con el banco, mig. 110): para "Verificar pago". */}
+              {porConfirmar && !selected.ml_order_number.startsWith('LOCAL-') && ['BORRADOR', 'REABIERTA', 'PAGO_VERIFICADO'].includes(selected.status) && (
+                <LineaBancoVenta key={selected.ml_order_number} venta={selected.ml_order_number} />
               )}
               <NotaAjustes saleId={selected.id} version={ajustesVer} />
               {avisoAjuste && <div className="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">{avisoAjuste}</div>}

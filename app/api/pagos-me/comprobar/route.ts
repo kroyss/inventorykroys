@@ -13,10 +13,19 @@ import { puede } from '@/lib/permisos'
 const MARGEN_DEFECTO = 700
 const CLAVE = 'conciliacion_margen_embalaje'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const s = await sesionPagosME()
   if ('error' in s) return s.error
   try {
+    // ?venta= → lo que dijo el banco de ese pago (Ventas: al lado de "Verificar pago").
+    const venta = req.nextUrl.searchParams.get('venta')
+    if (venta) {
+      const { rows: [b] } = await s.db.query(
+        `SELECT banco_nivel AS nivel, banco_motivo AS motivo, banco_mov AS mov, banco_at AS at FROM me_pagos
+         WHERE (venta = $1 OR venta IN (SELECT id::text FROM ml_ordenes WHERE pack_id::text = $1)) AND banco_nivel IS NOT NULL
+         ORDER BY banco_at DESC LIMIT 1`, [venta])
+      return NextResponse.json({ banco: b ?? null })
+    }
     const [{ rows: pagos }, { rows: [m] }] = await Promise.all([
       s.db.query(
         `SELECT p.id::int AS id, p.venta, p.cuenta, p.banco_emisor, p.banco_receptor, p.metodo_pago, p.referencia,
@@ -44,6 +53,35 @@ export async function PUT(req: NextRequest) {
       `INSERT INTO app_settings (key, value) VALUES ($1, $2)
        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [CLAVE, String(margen)])
     return NextResponse.json({ ok: true })
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
+    return apiError(err)
+  }
+}
+
+// POST { resultados: [{ ids, nivel, motivo, mov }] } → guarda lo que dijo el banco de cada pago (lo ven todos en Por
+// confirmar). Solo el movimiento que le corresponde, no el estado de cuenta. "sin_estado" no se guarda (no pisa un
+// resultado anterior). Lo puede hacer cualquier usuario de Por confirmar (decisión del dueño, 20-10).
+const Mov = z.object({ banco: z.string().max(40), fecha: z.string().max(10), monto: z.number(), ref: z.string().max(40), concepto: z.string().max(200) })
+const Resultados = z.object({ resultados: z.array(z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(20),
+  nivel: z.enum(['seguro', 'probable', 'revisar', 'no_aparece']),
+  motivo: z.string().max(300),
+  mov: Mov.nullable(),
+})).max(2000) })
+
+export async function POST(req: NextRequest) {
+  const s = await sesionPagosME()
+  if ('error' in s) return s.error
+  try {
+    const { resultados } = Resultados.parse(await req.json())
+    if (!resultados.length) return NextResponse.json({ ok: true, guardados: 0 })
+    const { rowCount } = await s.db.query(
+      `UPDATE me_pagos p SET banco_nivel = x.nivel, banco_motivo = x.motivo, banco_mov = x.mov, banco_at = NOW(), banco_por = $2
+       FROM jsonb_to_recordset($1::jsonb) AS x(id bigint, nivel text, motivo text, mov jsonb)
+       WHERE p.id = x.id`,
+      [JSON.stringify(resultados.flatMap(r => r.ids.map(id => ({ id, nivel: r.nivel, motivo: r.motivo, mov: r.mov })))), s.userId])
+    return NextResponse.json({ ok: true, guardados: rowCount })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return apiError(err)

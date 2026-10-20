@@ -35,6 +35,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
   const [aviso, setAviso] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [abierto, setAbierto] = useState<Record<string, boolean>>({ seguro: true, probable: true, revisar: true })
+  const [guardado, setGuardado] = useState<number | null>(null)   // pagos con el resultado del banco guardado
 
   const cargarPagos = useCallback(() => fetch('/api/pagos-me/comprobar', { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
@@ -49,8 +50,23 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
     const estados = archivos.map(a => a.estado).filter((e): e is EstadoCuenta => !!e)
     if (!estados.length) return   // sin archivos válidos no se muestra resultado (ver `hayEstados`)
     let vivo = true
-    lib().then(({ cruzarPagos }) => { if (vivo) setResultado(cruzarPagos(pagos, estados, { margenEmbalaje: margen })) })
-    return () => { vivo = false }
+    let espera: ReturnType<typeof setTimeout> | undefined
+    lib().then(({ cruzarPagos }) => {
+      if (!vivo) return
+      const r = cruzarPagos(pagos, estados, { margenEmbalaje: margen })
+      setResultado(r)
+      // Se guarda lo que dijo el banco de cada pago (mig. 110): todo el equipo lo ve en Por confirmar y en la venta.
+      // Solo el movimiento que le corresponde, no el estado de cuenta; "sin estado de cuenta" no se guarda.
+      espera = setTimeout(() => {
+        const resultados = r.pagos.filter(x => x.nivel !== 'sin_estado').map(x => ({
+          ids: x.ventas.map(v => v.id), nivel: x.nivel, motivo: x.motivo.slice(0, 300),
+          mov: x.mov ? { banco: x.mov.banco.slice(0, 40), fecha: x.mov.fecha, monto: x.mov.monto, ref: x.mov.ref.slice(0, 40), concepto: x.mov.concepto.slice(0, 200) } : null,
+        }))
+        fetch('/api/pagos-me/comprobar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resultados }) })
+          .then(res => res.ok ? res.json() : null).then(d => { if (vivo && d) setGuardado(d.guardados) }).catch(() => {})
+      }, 800)
+    })
+    return () => { vivo = false; if (espera) clearTimeout(espera) }
   }, [pagos, archivos, margen])
 
   const leer = async (a: Omit<Archivo, 'estado' | 'error'>): Promise<Archivo> => {
@@ -147,6 +163,11 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
       </div>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {guardado != null && hayEstados && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          🏦 Resultado guardado en {guardado} pago{guardado === 1 ? '' : 's'}: todo el equipo lo ve en cada venta de Por confirmar.
+        </div>
+      )}
       {aviso && <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">✓ {aviso}</div>}
 
       {resultado && hayEstados && (

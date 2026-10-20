@@ -5,7 +5,10 @@
 // Sin inventario (Pagos ME de los Fundadores, 19-10) es la MISMA lista: sin productos ni "Confirmar"; el pago
 // se verifica en la fila (✓ / ✗) y la guía ya está en Despachos. Al activar inventario, gana esos dos pasos.
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { PorConfirmar as Fila } from '@/lib/porConfirmar'
+import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
+import LineaBanco from './LineaBanco'
 import { BotonGuia } from './VerGuia'
 import { BotonComprobante } from './VerComprobante'
 import { Monto } from '@/components/pagosme/PagoME'
@@ -122,6 +125,8 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
               datos={{ monto: f.pago.monto, totalOrden: f.pago.totalOrden, banco: f.pago.banco, referencia: f.pago.referencia, metodo: f.pago.metodo }} />
           )}
         </div>
+        {/* Lo que dijo el banco (20-10, "Comprobar con el banco"): para verificar sabiendo qué llegó de verdad. */}
+        {f.pago?.bancoRes && f.pago.verificacion !== 'invalido' && <LineaBanco b={f.pago.bancoRes} />}
         {sinInventario && f.pago && (
           <div className="text-[11px] text-neutral-500">
             {[METODO[f.pago.metodo ?? ''] ?? f.pago.metodo, f.pago.banco, f.pago.referencia && `ref. ${f.pago.referencia}`,
@@ -208,6 +213,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   // los pagos y guías del portal. Tarda 1-3 min: se recarga la lista cada 10 s hasta que llega la búsqueda nueva.
   const [pidiendoME, setPidiendoME] = useState<number | null>(null)
   const [avisoME, setAvisoME] = useState<string | null>(null)
+  // "Comprobar con el banco" (20-10): cualquier usuario sube los estados de cuenta; el resultado queda en cada venta.
+  const [banco, setBanco] = useState(false)
   const ultimaME = datos?.ultimaBusqueda ? new Date(datos.ultimaBusqueda).getTime() : 0
   // Buscando = se pidió y todavía no llegó una búsqueda terminada después del pedido.
   const buscandoME = pidiendoME != null && ultimaME < pidiendoME - 5000
@@ -276,7 +283,13 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
               : <>última <b className="text-neutral-700">{datos.sincronizadas_at ? hora(datos.sincronizadas_at) : '—'}</b></>}
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {datos.pagosME && (
+            <button type="button" onClick={() => setBanco(true)} title="Sube los estados de cuenta y el sistema dice qué pagos llegaron de verdad"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 shadow-sm hover:border-sky-400 hover:bg-sky-100">
+              🏦 Comprobar con el banco
+            </button>
+          )}
           {datos.pagosME && !sinInventario && (
             <button type="button" onClick={traerME} disabled={buscandoME} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
@@ -292,6 +305,19 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
         </div>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
+      {banco && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+          <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-neutral-50 shadow-2xl sm:rounded-2xl">
+            <div className="flex items-center justify-between border-b bg-white px-5 py-3">
+              <h3 className="font-semibold">🏦 Comprobar con el banco</h3>
+              <button onClick={() => { setBanco(false); onRecargar() }} className="btn-ghost !px-2 !py-1" aria-label="Cerrar">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4"><ComprobarBanco onAprobados={() => { onRecargar() }} /></div>
+            <div className="flex justify-end border-t bg-white px-5 py-3">
+              <button onClick={() => { setBanco(false); onRecargar() }} className="btn-primary text-sm">Listo, cerrar</button>
+            </div>
+          </div>
+        </div>, document.body)}
       {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">

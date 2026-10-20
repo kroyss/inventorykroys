@@ -1,5 +1,4 @@
 'use client'
-import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { DIAS_SEMANA, proximoAuto, type HorarioME, type PagoME } from '@/lib/pagosMEComun'
@@ -48,8 +47,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const [clave, setClave] = useState<string | null>(null)
   const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
   // Sin inventario (Fundadores, 19-10): la lista por VENTA, como "Por confirmar"; la tabla queda como Historial.
-  // 20-10: + 'Comprobar con el banco' (ComprobarBanco), en las dos versiones.
-  const [vista, setVista] = useState<'ventas' | 'historial' | 'banco'>('ventas')
+  const [vista, setVista] = useState<'ventas' | 'historial'>('ventas')
   const pc = usePorConfirmar(!!datos?.desdeML)
 
   const cargar = useCallback(async () => {
@@ -200,11 +198,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
 
-      {datos && (
+      {datos?.desdeML && (
         <div className="flex gap-1 border-b border-neutral-200">
-          {(datos.desdeML
-            ? [['ventas', 'Ventas'], ['historial', 'Historial de pagos'], ['banco', 'Comprobar con el banco']] as const
-            : [['ventas', 'Pagos'], ['banco', 'Comprobar con el banco']] as const).map(([k, t]) => (
+          {([['ventas', 'Ventas'], ['historial', 'Historial de pagos']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setVista(k)}
               className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${vista === k ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
               {t}
@@ -212,8 +208,6 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           ))}
         </div>
       )}
-      {vista === 'banco' && <ComprobarBanco onAprobados={() => { cargar(); if (datos?.desdeML) pc.cargar() }} />}
-
       {datos?.desdeML && vista === 'ventas' && (
         <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} onConfirmar={() => {}}
           onVerificar={async (id, v) => {
@@ -224,7 +218,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           }} />
       )}
 
-      {vista !== 'banco' && (!datos?.desdeML || vista === 'historial') && <>
+      {(!datos?.desdeML || vista === 'historial') && <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
           {FILTROS.map(f => (

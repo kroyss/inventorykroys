@@ -12,6 +12,12 @@
 import type { Pool } from 'pg'
 import { leerPlantillasCal, traerOrden } from '@/lib/calificacionesML'
 
+/** Lo que dijo el banco de un pago (migración 110). */
+export interface BancoPago {
+  nivel: 'seguro' | 'probable' | 'revisar' | 'no_aparece'; motivo: string; at: string
+  mov: { banco: string; fecha: string; monto: number; ref: string; concepto: string } | null
+}
+
 export const DIAS_MAX = 8
 export const DIAS_CON_PAGO = 30
 
@@ -34,7 +40,9 @@ export interface PorConfirmar {
           id: number; guia: boolean; guiaNum: string | null
           // Para verificar sin inventario (Pagos ME de los Fundadores, 19-10): contra qué se compara y de dónde vino.
           totalOrden: number | null; banco: string | null; referencia: string | null; metodo: string | null
-          carrier: string | null; comprobante: boolean; verificadoAt: string | null } | null
+          carrier: string | null; comprobante: boolean; verificadoAt: string | null
+          // Lo que dijo el banco (mig. 110, "Comprobar con el banco"): null si todavía no se cruzó.
+          bancoRes: BancoPago | null } | null
   mensaje: { texto: string; at: string } | null    // lo último que escribió el comprador (después de comprar)
   vencida: boolean
 }
@@ -53,6 +61,7 @@ export async function ventasPorConfirmar(db: Pool) {
             p.creado_at AS pago_at, p.id AS pago_id, p.guia_path IS NOT NULL AS tiene_guia, p.guia AS guia_num,
             p.total_orden::float AS total_orden, p.banco_emisor, p.referencia, p.metodo_pago, p.carrier,
             p.comprobante_path IS NOT NULL AS tiene_comprobante, p.verificado_at,
+            p.banco_nivel, p.banco_motivo, p.banco_mov, p.banco_at,
             (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
@@ -109,7 +118,8 @@ export async function ventasPorConfirmar(db: Pool) {
                                id: Number(r.pago_id), guia: !!r.tiene_guia, guiaNum: r.guia_num ?? null,
                                totalOrden: r.total_orden ?? null, banco: r.banco_emisor ?? null, referencia: r.referencia ?? null,
                                metodo: r.metodo_pago ?? null, carrier: r.carrier ?? null, comprobante: !!r.tiene_comprobante,
-                               verificadoAt: r.verificado_at ?? null } : null,
+                               verificadoAt: r.verificado_at ?? null,
+                               bancoRes: r.banco_nivel ? { nivel: r.banco_nivel, motivo: r.banco_motivo ?? '', mov: r.banco_mov ?? null, at: r.banco_at } : null } : null,
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       vencida: r.vencida,
     }
