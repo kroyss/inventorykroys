@@ -72,7 +72,9 @@ const Solicitud = z.object({
   .refine(s => saltaAContacto(s) || PREGUNTAS.every(p => s[p.campo]), { message: 'Responde todas las preguntas' })
 
 function ipDe(req: NextRequest) {
-  return req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
+  // Detrás de Cloudflare (20-10, desde la caída de IPv4 de Contabo): la IP real del visitante viene en cf-connecting-ip;
+  // x-real-ip sería la de Cloudflare (y muchos postulantes distintos parecerían la misma persona).
+  return req.headers.get('cf-connecting-ip') ?? req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
 }
 
 export async function POST(req: NextRequest) {
