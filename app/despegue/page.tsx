@@ -135,14 +135,14 @@ export default async function DespeguePage() {
                   cada miniatura) y play: es una persona real y un caso real. Lleva a los videos. */}
               <a href="#video" className="group inline-flex items-center gap-3 rounded-2xl border border-lime-400/40 bg-lime-400/[0.08] py-2 pl-2 pr-4 transition hover:border-lime-400/70 hover:bg-lime-400/[0.12]">
                 <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-lime-400" aria-hidden="true"
-                  style={{ backgroundImage: `url(${PLAYLIST_PORTADA})`, backgroundSize: '192px 144px', backgroundPosition: '-2px -84px' }}>
+                  style={{ backgroundImage: `url(${PLAYLIST_PORTADA})`, backgroundSize: '192px 144px', backgroundPosition: '1px -83px' }}>
                   <span className="absolute inset-0 grid place-items-center bg-neutral-950/35">
                     <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 text-white drop-shadow" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                   </span>
                 </span>
                 <span className="leading-tight">
                   <span className="block text-xs font-bold uppercase tracking-[0.18em] text-lime-400">Caso real</span>
-                  <span className="block text-sm text-neutral-200">Mi cuenta, grabada de principio a fin <span className="text-lime-400 transition group-hover:translate-y-0.5">· ver ↓</span></span>
+                  <span className="block text-sm text-neutral-200">Mi cuenta, grabada de principio a fin <span className="whitespace-nowrap text-lime-400">· ver ↓</span></span>
                 </span>
               </a>
               <h1 className="mt-4 text-[2.1rem] font-semibold leading-[1.08] tracking-tight sm:text-[3.4rem]">
