@@ -10,6 +10,9 @@ type Estado =
   | 'OK' | 'REIMPRESION' | 'ERROR_PDF' | 'NO_ETIQUETA' | 'SIN_VENTA'
   | 'ESTADO' | 'SIN_PRODUCTOS' | 'DUPLICADA' | 'YA_IMPRESA' | 'PAGO'
 
+// Ventas que ya descontaron inventario: se corrigen con "Corregir pedido" (Ventas, mig. 108) sin reabrirlas.
+const VENTA_PROCESADA = new Set(['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'])
+
 interface Etiqueta {
   id: number
   original_name: string
@@ -678,6 +681,16 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
                       <button onClick={() => onApartar(e)} className="mt-1 block text-neutral-500 underline hover:text-neutral-800" title="Sacarlo de este despacho sin perderlo">
                         Apartar…
                       </button>
+                    )}
+                    {/* 21-10: corregir desde aquí (antes del PDF). La etiqueta lee la venta en vivo: al guardar la corrección
+                        en Ventas, este lote ya la muestra. Procesada → Corregir pedido (sin reabrir; productos y notas); si
+                        no, se abre la venta para editarla normal. Solo con inventario (sin inventario la nota se edita aquí). */}
+                    {!desdeML && !e.apartado && e.venta && e.sale_status && (
+                      <a href={`/ventas?venta=${encodeURIComponent(e.venta)}${VENTA_PROCESADA.has(e.sale_status) ? '&corregir=1' : ''}`}
+                        className="mt-1 block font-medium text-sky-700 hover:underline"
+                        title={VENTA_PROCESADA.has(e.sale_status) ? 'Cambiar productos o notas sin reabrir la venta: el inventario se ajusta solo' : 'Abrir la venta para editarla'}>
+                        {VENTA_PROCESADA.has(e.sale_status) ? 'Corregir pedido →' : 'Abrir venta →'}
+                      </a>
                     )}
                     {/* Pagos ME: despachar con el pago sin verificar queda registrado (quién). */}
                     {e.estado === 'PAGO' && (

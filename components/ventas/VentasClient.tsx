@@ -212,14 +212,18 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     if (q.get('new') === '1') {
       setEditing(null); setShowForm(true)
     } else if (q.get('vista') === 'confirmar' && porConfirmar) setVistaPC(true)
-    // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta.
+    // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta. Con &corregir=1 (21-10, desde
+    // una fila del lote de Despachos) abre además Corregir pedido, si la venta ya descontó inventario.
     const venta = q.get('venta')?.trim()
     if (venta) {
       fetch(`/api/sales?search=${encodeURIComponent(venta)}&pageSize=5`).then(r => r.ok ? r.json() : null).then(async d => {
         const s = (d?.rows ?? d?.sales ?? []).find((x: Sale) => x.ml_order_number === venta)
         if (!s) return
         const fresh: Sale = await fetch(`/api/sales/${s.id}`).then(r => r.json())
-        if (fresh?.id) setSelected(fresh)
+        if (fresh?.id) {
+          setSelected(fresh)
+          if (q.get('corregir') === '1' && ['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'].includes(fresh.status)) setCorrigePedido(true)
+        }
       }).catch(() => {})
     }
   }, [])
@@ -765,7 +769,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       )}
 
       {corrigePedido && selected && (
-        <CorregirPedido saleId={selected.id} orden={selected.ml_order_number} items={selected.items} products={products}
+        <CorregirPedido saleId={selected.id} orden={selected.ml_order_number} items={selected.items} notaVenta={selected.notes ?? null} products={products}
           facturaEmitida={activeInvoice ? String(activeInvoice.invoice_number) : null}
           onCerrar={() => setCorrigePedido(false)}
           onListo={async msg => {

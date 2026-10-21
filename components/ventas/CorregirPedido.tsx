@@ -2,19 +2,22 @@
 // Corregir pedido (20-10, migración 108; API /api/sales/[id]/ajuste): cambio de última hora sobre una venta que ya
 // descontó inventario. Una ventana: los productos de la venta (cambiar, agregar, quitar), el motivo y guardar.
 // Se corrige la misma venta y el inventario se ajusta por la diferencia; queda la nota (VentaAjustes).
+// 21-10: también las NOTAS (la de cada producto y la de la venta, que es la que imprime la etiqueta de Despachos),
+// sin reabrir la venta y sin mover inventario.
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { InventoryItem, SaleItem } from '@/lib/types'
 
-type Linea = { key: number; product_id: number | null; quantity: number; unit_price: number }
+type Linea = { key: number; product_id: number | null; quantity: number; unit_price: number; notes: string }
 const money = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function CorregirPedido({ saleId, orden, items, products, facturaEmitida, onCerrar, onListo }: {
-  saleId: number; orden: string; items: SaleItem[]; products: InventoryItem[]; facturaEmitida: string | null
+export default function CorregirPedido({ saleId, orden, items, notaVenta = null, products, facturaEmitida, onCerrar, onListo }: {
+  saleId: number; orden: string; items: SaleItem[]; notaVenta?: string | null; products: InventoryItem[]; facturaEmitida: string | null
   onCerrar: () => void; onListo: (msg: string) => void
 }) {
   const [lineas, setLineas] = useState<Linea[]>(() =>
-    items.map((i, k) => ({ key: k, product_id: i.product_id, quantity: i.quantity, unit_price: i.unit_price })))
+    items.map((i, k) => ({ key: k, product_id: i.product_id, quantity: i.quantity, unit_price: i.unit_price, notes: i.notes ?? '' })))
+  const [nota, setNota] = useState(notaVenta ?? '')
   const [motivo, setMotivo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -38,6 +41,10 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
   const totalAntes = items.reduce((s, i) => s + i.quantity * i.unit_price, 0)
   const totalDespues = lineas.reduce((s, l) => s + (l.product_id != null ? l.quantity * l.unit_price : 0), 0)
   const faltaProducto = lineas.some(l => l.product_id == null)
+  // ¿Cambió alguna nota? (la de un producto que ya estaba, o la de la venta). Solo notas = no se mueve inventario.
+  const notaAntes = (pid: number) => (items.find(i => i.product_id === pid)?.notes ?? '').trim()
+  const notasCambian = (nota.trim() !== (notaVenta ?? '').trim())
+    || lineas.some(l => l.product_id != null && items.some(i => i.product_id === l.product_id) && l.notes.trim() !== notaAntes(l.product_id))
 
   const cambiar = (key: number, c: Partial<Linea>) => setLineas(ls => ls.map(l => l.key === key ? { ...l, ...c } : l))
   // Al elegir otro producto se mantiene el precio de la línea (cambio de color/modelo); en una línea nueva, el de venta.
@@ -51,12 +58,13 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
     setGuardando(true); setError(null)
     const r = await fetch(`/api/sales/${saleId}/ajuste`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ motivo, items: lineas.filter(l => l.product_id != null).map(l => ({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price })) }),
+      body: JSON.stringify({ motivo, nota_venta: nota,
+        items: lineas.filter(l => l.product_id != null).map(l => ({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price, notes: l.notes })) }),
     })
     const d = await r.json().catch(() => ({}))
     setGuardando(false)
     if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
-    onListo(`Pedido corregido: inventario ajustado y nota guardada.${d.factura ? ` Ojo: la factura #${d.factura} quedó con los productos viejos: corrígela en Facturas.` : ''}`)
+    onListo(`Pedido corregido: ${cambios.length ? 'inventario ajustado y ' : ''}nota guardada.${d.factura ? ` Ojo: la factura #${d.factura} quedó con los productos viejos: corrígela en Facturas.` : ''}`)
   }
 
   return createPortal(
@@ -91,6 +99,8 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
                       onChange={ev => elegir(l, ev.target.value)} placeholder="Buscar producto…"
                       className="w-full rounded border border-neutral-300 px-2 py-1 text-sm" />
                     {l.product_id != null && porId.get(l.product_id) && <div className="text-[11px] text-neutral-400">stock {porId.get(l.product_id)!.quantity}</div>}
+                    <input value={l.notes} onChange={ev => cambiar(l.key, { notes: ev.target.value })} maxLength={500} placeholder="Nota de este producto (opcional)"
+                      className="mt-1 w-full rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-700" />
                   </td>
                   <td className="py-1 pr-2">
                     <input type="number" min={1} value={l.quantity} onChange={ev => cambiar(l.key, { quantity: Math.max(1, parseInt(ev.target.value) || 1) })}
@@ -108,7 +118,7 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
               ))}
             </tbody>
           </table>
-          <button onClick={() => setLineas(ls => [...ls, { key: Date.now(), product_id: null, quantity: 1, unit_price: 0 }])}
+          <button onClick={() => setLineas(ls => [...ls, { key: Date.now(), product_id: null, quantity: 1, unit_price: 0, notes: '' }])}
             className="text-xs font-medium text-sky-700 hover:underline">+ Agregar producto</button>
 
           {cambios.length > 0 && (
@@ -123,6 +133,11 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
             </div>
           )}
 
+          <label className="block text-xs text-neutral-500">Nota de la venta <span className="text-neutral-400">(es la que sale en la etiqueta de Despachos)</span>
+            <textarea value={nota} onChange={ev => setNota(ev.target.value)} maxLength={2000} rows={2}
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900" />
+          </label>
+
           <label className="block text-xs text-neutral-500">¿Qué pasó? (queda en la nota de la venta)
             <input value={motivo} onChange={ev => setMotivo(ev.target.value)} maxLength={300}
               placeholder="Ej.: el cliente pidió una en azul por el chat"
@@ -132,7 +147,7 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
         </div>
         <div className="flex justify-end gap-2 border-t bg-neutral-50 px-5 py-3">
           <button onClick={onCerrar} className="btn-secondary text-sm">Cancelar</button>
-          <button onClick={guardar} disabled={guardando || faltaProducto || motivo.trim().length < 3 || cambios.length === 0 && Math.abs(totalDespues - totalAntes) < 0.005}
+          <button onClick={guardar} disabled={guardando || faltaProducto || motivo.trim().length < 3 || cambios.length === 0 && Math.abs(totalDespues - totalAntes) < 0.005 && !notasCambian}
             className="btn-primary text-sm disabled:opacity-50">{guardando ? 'Guardando…' : 'Guardar corrección'}</button>
         </div>
       </div>
@@ -143,7 +158,7 @@ export default function CorregirPedido({ saleId, orden, items, products, factura
 
 /** La nota: cada corrección de la venta (antes → después, quién, cuándo, por qué). */
 export function NotaAjustes({ saleId, version }: { saleId: number; version: number }) {
-  type Item = { nombre: string; cantidad: number; precio: number }
+  type Item = { nombre: string; cantidad: number; precio: number; nota?: string | null }
   type Ajuste = { id: number; fecha: string; motivo: string; antes: Item[]; despues: Item[]; por: string | null; despues_de_enviado: boolean; factura: string | null }
   const [ajustes, setAjustes] = useState<Ajuste[]>([])
   useEffect(() => {
@@ -152,7 +167,7 @@ export function NotaAjustes({ saleId, version }: { saleId: number; version: numb
     return () => { vivo = false }
   }, [saleId, version])
   if (!ajustes.length) return null
-  const txt = (xs: Item[]) => xs.map(x => `${x.cantidad} × ${x.nombre}`).join(' + ')
+  const txt = (xs: Item[]) => xs.map(x => `${x.cantidad} × ${x.nombre}${x.nota ? ` («${x.nota}»)` : ''}`).join(' + ')
   const fecha = (f: string) => new Date(f).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
   return (
     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3">

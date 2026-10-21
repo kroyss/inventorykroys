@@ -16,7 +16,9 @@ import { parseShippingTable, shippingCostVE } from '@/lib/mlShipping'
 //     y si hay una factura emitida que quedó desactualizada (se avisa: se corrige en Facturas).
 // Todo en una transacción: o queda completo o no queda nada.
 //   GET  → los ajustes de la venta (la nota)
-//   POST { items: [{ product_id, quantity, unit_price }], motivo }
+//   POST { items: [{ product_id, quantity, unit_price, notes? }], motivo, nota_venta? }
+// Notas (21-10): `notes` de cada producto y `nota_venta` (la que imprime la etiqueta de Despachos) se pueden corregir
+// aquí SIN reabrir y SIN mover inventario. Si no vienen (undefined), quedan como estaban: igual que antes.
 
 const ESTADOS_CON_INVENTARIO = ['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL']
 
@@ -42,11 +44,16 @@ const Body = z.object({
     product_id: z.number().int().positive(),
     quantity:   z.number().int().positive('La cantidad debe ser 1 o más'),
     unit_price: z.number().min(0),
+    notes:      z.string().max(500).nullable().optional(),
   })).min(1, 'La venta debe quedar con al menos un producto').max(50),
   motivo: z.string().trim().min(3, 'Escribe qué pasó (corto)').max(300),
+  nota_venta: z.string().max(2000).nullable().optional(),
 })
 
-type Linea = { product_id: number; nombre: string; cantidad: number; precio: number }
+// Nota vacía = sin nota (no se guarda '' para no confundirla con una nota).
+const limpia = (t: string | null | undefined) => (t ?? '').trim() || null
+
+type Linea = { product_id: number; nombre: string; cantidad: number; precio: number; nota?: string | null }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -58,16 +65,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const b = Body.parse(await req.json())
     // Un producto una sola vez (si viene repetido, se suma).
-    const nuevos = new Map<number, { quantity: number; unit_price: number }>()
+    const nuevos = new Map<number, { quantity: number; unit_price: number; notes?: string | null }>()
     for (const i of b.items) {
       const x = nuevos.get(i.product_id)
-      nuevos.set(i.product_id, { quantity: (x?.quantity ?? 0) + i.quantity, unit_price: x?.unit_price ?? i.unit_price })
+      nuevos.set(i.product_id, { quantity: (x?.quantity ?? 0) + i.quantity, unit_price: x?.unit_price ?? i.unit_price,
+        notes: x?.notes !== undefined ? x.notes : i.notes })
     }
     const costFactor = await localCostFactor(session.user.country)
 
     await db.query('BEGIN')
     const { rows: [sale] } = await db.query(
-      `SELECT id, status, ml_order_number, discount_percent::float AS discount_percent, total_amount::float AS total_amount
+      `SELECT id, status, ml_order_number, notes, discount_percent::float AS discount_percent, total_amount::float AS total_amount
        FROM sales WHERE id = $1 FOR UPDATE`, [id])
     if (!sale) { await db.query('ROLLBACK'); return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 }) }
     if (!ESTADOS_CON_INVENTARIO.includes(sale.status)) {
@@ -95,11 +103,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!prod.has(pid)) { await db.query('ROLLBACK'); return NextResponse.json({ error: `Producto ${pid} no existe` }, { status: 400 }) }
     }
 
-    // ¿Cambió algo?
+    // ¿Cambió algo? Productos/cantidades/precios, o alguna nota (la de un producto o la de la venta).
+    const notaDe = (pid: number) => { const n = nuevos.get(pid)!; return n.notes !== undefined ? limpia(n.notes) : limpia(viejoPor.get(pid)?.notes) }
     const igual = nuevos.size === viejoPor.size && [...nuevos].every(([pid, n]) => {
       const v = viejoPor.get(pid); return !!v && v.quantity === n.quantity && Math.abs(v.unit_price - n.unit_price) < 0.005
     })
-    if (igual) { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No cambiaste nada en el pedido' }, { status: 400 }) }
+    const notasCambian = [...nuevos.keys()].some(pid => viejoPor.has(pid) && notaDe(pid) !== limpia(viejoPor.get(pid)!.notes))
+    const notaVentaNueva = b.nota_venta !== undefined ? limpia(b.nota_venta) : limpia(sale.notes)
+    const notaVentaCambia = notaVentaNueva !== limpia(sale.notes)
+    if (igual && !notasCambian && !notaVentaCambia) { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No cambiaste nada en el pedido' }, { status: 400 }) }
 
     // Inventario por la diferencia. Primero se valida TODO (que alcance el stock) y después se mueve.
     const referencia = `Venta #${id} (corrección)`
@@ -140,22 +152,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             + shippingCostVE(precio, peso, parseShippingTable(tabla), mlp.ml_envio ?? 0.65, mlp.ml_umbral ?? 5)) * 100) / 100
     }
 
-    // La venta queda con los productos nuevos: los que siguen conservan costo, comisión y nota.
-    await db.query(`DELETE FROM sale_items WHERE sale_id = $1`, [id])
-    let bruto = 0
-    for (const [pid, n] of nuevos) {
-      const v = viejoPor.get(pid), p = prod.get(pid)!
-      const mismoPrecio = !!v && Math.abs(v.unit_price - n.unit_price) < 0.005
-      const unitCost = v?.unit_cost != null ? v.unit_cost : Math.round(p.costo * costFactor * 100) / 100
-      const unitCom = esLocal ? 0 : mismoPrecio && v?.unit_commission != null ? v.unit_commission : comision(n.unit_price, p.weight_kg)
-      bruto += n.quantity * n.unit_price
-      await db.query(
-        `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price, notes, unit_cost, unit_commission)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [id, pid, n.quantity, n.unit_price, n.quantity * n.unit_price, v?.notes ?? null, unitCost, unitCom])
+    let total: number = sale.total_amount
+    if (igual) {
+      // SOLO NOTAS (21-10): no se toca nada más de la venta (ni líneas, ni costos, ni comisiones, ni el total): solo
+      // la nota de los productos que cambió. Sin borrar y volver a crear las líneas.
+      for (const pid of nuevos.keys()) {
+        if (notaDe(pid) !== limpia(viejoPor.get(pid)?.notes)) {
+          await db.query(`UPDATE sale_items SET notes = $3 WHERE sale_id = $1 AND product_id = $2`, [id, pid, notaDe(pid)])
+        }
+      }
+    } else {
+      // La venta queda con los productos nuevos: los que siguen conservan costo, comisión y nota (o la nota corregida).
+      await db.query(`DELETE FROM sale_items WHERE sale_id = $1`, [id])
+      let bruto = 0
+      for (const [pid, n] of nuevos) {
+        const v = viejoPor.get(pid), p = prod.get(pid)!
+        const mismoPrecio = !!v && Math.abs(v.unit_price - n.unit_price) < 0.005
+        const unitCost = v?.unit_cost != null ? v.unit_cost : Math.round(p.costo * costFactor * 100) / 100
+        const unitCom = esLocal ? 0 : mismoPrecio && v?.unit_commission != null ? v.unit_commission : comision(n.unit_price, p.weight_kg)
+        bruto += n.quantity * n.unit_price
+        await db.query(
+          `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price, notes, unit_cost, unit_commission)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, pid, n.quantity, n.unit_price, n.quantity * n.unit_price, notaDe(pid), unitCost, unitCom])
+      }
+      total = Math.round((sale.discount_percent > 0 ? bruto * (1 - sale.discount_percent / 100) : bruto) * 100) / 100
     }
-    const total = Math.round((sale.discount_percent > 0 ? bruto * (1 - sale.discount_percent / 100) : bruto) * 100) / 100
-    await db.query(`UPDATE sales SET total_amount = $2, updated_at = NOW() WHERE id = $1`, [id, total])
+    await db.query(`UPDATE sales SET total_amount = $2, notes = CASE WHEN $3::boolean THEN $4 ELSE notes END, updated_at = NOW() WHERE id = $1`,
+      [id, total, notaVentaCambia, notaVentaNueva])
 
     // La nota: ¿ya había salido el paquete? ¿hay una factura emitida que quedó vieja?
     const { rows: [salio] } = await db.query(
@@ -164,13 +188,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                       WHERE e.venta = $1 AND e.impresa AND j.status = 'CERRADA' AND e.apartado IS NULL) AS si`, [sale.ml_order_number])
     const { rows: [fac] } = await db.query(
       `SELECT invoice_number FROM invoices WHERE sale_id = $1 AND status = 'EMITIDA' LIMIT 1`, [id])
-    const linea = (pid: number, cantidad: number, precio: number): Linea => ({ product_id: pid, nombre: prod.get(pid)?.name ?? viejoPor.get(pid)?.nombre ?? String(pid), cantidad, precio })
+    const linea = (pid: number, cantidad: number, precio: number, nota: string | null): Linea =>
+      ({ product_id: pid, nombre: prod.get(pid)?.name ?? viejoPor.get(pid)?.nombre ?? String(pid), cantidad, precio, nota })
+    // La nota de la venta va en el motivo (la tabla guarda antes/después de los productos).
+    const motivo = notaVentaCambia
+      ? `${b.motivo} · Nota de la venta: «${limpia(sale.notes) ?? '—'}» → «${notaVentaNueva ?? '—'}»`.slice(0, 2000) : b.motivo
     await db.query(
       `INSERT INTO venta_ajustes (sale_id, por, motivo, antes, despues, total_antes, total_despues, despues_de_enviado, factura)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, userId, b.motivo,
-       JSON.stringify([...viejoPor].map(([pid, v]) => linea(pid, v.quantity, v.unit_price))),
-       JSON.stringify([...nuevos].map(([pid, n]) => linea(pid, n.quantity, n.unit_price))),
+      [id, userId, motivo,
+       JSON.stringify([...viejoPor].map(([pid, v]) => linea(pid, v.quantity, v.unit_price, limpia(v.notes)))),
+       JSON.stringify([...nuevos].map(([pid, n]) => linea(pid, n.quantity, n.unit_price, notaDe(pid)))),
        sale.total_amount, total, !!salio?.si, fac?.invoice_number != null ? String(fac.invoice_number) : null])
     await db.query('COMMIT')
     return NextResponse.json({ ok: true, total, factura: fac?.invoice_number ?? null, despues_de_enviado: !!salio?.si })
