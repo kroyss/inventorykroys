@@ -3,7 +3,7 @@ import { hash } from 'bcryptjs'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
-import { PRODUCTOS } from '@/lib/productos'
+import { PRODUCTOS, conProductosImplicitos } from '@/lib/productos'
 import { soloDueno } from '@/lib/plataforma'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     const { rows: [u] } = await db.query(
       `INSERT INTO users (username, email, password_hash, full_name, role, country_access, is_active, productos)
        VALUES ($1, NULLIF($2, ''), $3, $4, 'user', 'VE', TRUE, $5) RETURNING id`,
-      [body.username, body.email, await hash(body.password, 10), body.full_name, body.productos])
+      [body.username, body.email, await hash(body.password, 10), body.full_name, conProductosImplicitos(body.productos)])
     return NextResponse.json({ id: u.id }, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message ?? err.message }, { status: 400 })

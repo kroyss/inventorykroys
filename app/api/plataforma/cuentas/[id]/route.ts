@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
-import { PRODUCTOS } from '@/lib/productos'
+import { PRODUCTOS, conProductosImplicitos } from '@/lib/productos'
 import { soloDueno } from '@/lib/plataforma'
 import { hash } from 'bcryptjs'
 import { PASSWORD_MAX, PASSWORD_MIN } from '@/lib/usuarios'
@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
          password_hash = COALESCE($6, password_hash)
          ${corta ? ', session_version = session_version + 1' : ''}
        WHERE id = $1`,
-      [id, body.email ?? null, body.productos ?? null, body.full_name ?? null, body.is_active ?? null,
+      [id, body.email ?? null, body.productos ? conProductosImplicitos(body.productos) : null, body.full_name ?? null, body.is_active ?? null,
        body.password ? await hash(body.password, 10) : null])
     if (!rowCount) return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 })
     return NextResponse.json({ ok: true })
