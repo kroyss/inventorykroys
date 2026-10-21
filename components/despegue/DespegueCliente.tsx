@@ -88,7 +88,8 @@ export function VideoSerie() {
       </div>
       <a href={PLAYLIST_URL} target="_blank" rel="noreferrer"
         className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-lime-400 hover:text-lime-300">
-        ▶ Ver la lista completa en YouTube <span aria-hidden="true">↗</span>
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+        Ver la lista completa en YouTube <span aria-hidden="true">↗</span>
       </a>
     </div>
   )

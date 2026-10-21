@@ -47,6 +47,21 @@ const RADAR = [
   { n: '+45.000', d: 'productos con su actividad medida: si suben o se apagan' },
 ]
 
+// Íconos de trazo (24×24) en lugar de emojis (21-10: los emojis se veían de WhatsApp y distintos en cada teléfono).
+const ICONO = {
+  cohete: 'M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5',
+  regalo: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+  radar: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-1 6-6',
+  pino: 'M17 14l3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17zM12 22v-3',
+}
+function Icono({ d, className = 'h-4 w-4' }: { d: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  )
+}
+
 // Página pública del Programa Despegue (sin login; ver proxy.ts). El grupo y sus cupos salen de despegue_grupos
 // (migración 112) y se leen en cada visita: el dueño sube "tomados" en Plataforma cuando alguien paga.
 export default async function DespeguePage() {
@@ -98,7 +113,8 @@ export default async function DespeguePage() {
 
         <div className="relative mx-auto max-w-5xl px-5 pb-14 pt-10 sm:px-8 sm:pb-20 sm:pt-14">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">
-            🚀 Programa Despegue <span className="text-neutral-500">·</span> El Comerciante Digital
+            <span className="inline-flex items-center gap-2"><Icono d={ICONO.cohete} className="h-3.5 w-3.5" />Programa Despegue</span>{' '}
+            <span className="text-neutral-500">·</span> El Comerciante Digital
           </p>
           <div className="mt-4 grid items-center gap-10 lg:grid-cols-[1.25fr_1fr]">
             <div>
@@ -131,14 +147,17 @@ export default async function DespeguePage() {
                 (el cuadro recorta sus adornos con overflow-hidden). */}
             <div className="relative mt-4 lg:mt-0">
             <span className="absolute -top-3.5 left-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950 shadow-[0_6px_20px_-4px_rgba(163,230,53,0.7)]">
-              🎁 Bono exclusivo
+              <Icono d={ICONO.regalo} className="h-3.5 w-3.5" />Bono exclusivo
             </span>
             <div className="relative overflow-hidden rounded-2xl border border-lime-400/50 bg-gradient-to-br from-lime-400/[0.10] via-white/[0.03] to-white/[0.02] p-5 pt-7 shadow-[0_0_70px_-20px_rgba(163,230,53,0.55)] backdrop-blur sm:p-6 sm:pt-8">
               <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/20" />
               <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border border-lime-400/25" />
-              <p className="relative text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">🎯 Domingo de Radar</p>
+              <p className="relative flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime-400 text-neutral-950"><Icono d={ICONO.radar} className="h-5 w-5" /></span>
+                Domingo de Radar
+              </p>
               <p className="relative mt-2 text-sm leading-relaxed text-neutral-300">
-                Encuentra <b className="text-white">productos ganadores</b> con datos reales: <b className="text-white">24 h de acceso completo</b>,
+                Encuentra <b className="text-white">productos ganadores</b> con datos reales: <b className="text-white">24 horas de acceso completo</b>,
                 cada domingo del programa.
               </p>
               <p className="relative mt-2 inline-flex items-center gap-1.5 rounded-full border border-lime-400/30 bg-lime-400/10 px-2.5 py-1 text-[11px] font-semibold text-lime-300">
@@ -235,7 +254,7 @@ export default async function DespeguePage() {
               <li key={s.fecha} className={`flex items-center gap-4 border-b border-neutral-100 px-4 py-3.5 last:border-b-0 sm:px-5 ${s.n == null ? 'bg-neutral-50' : ''}`}>
                 <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${
                   s.n == null ? 'bg-white text-base ring-1 ring-neutral-200' : s.n === 1 ? 'bg-lime-400 text-neutral-950' : 'bg-neutral-900 text-white'}`}>
-                  {s.n ?? '🎄'}
+                  {s.n ?? <Icono d={ICONO.pino} className="h-4 w-4 text-lime-700" />}
                 </span>
                 <span className={`min-w-0 flex-1 text-sm ${s.n == null ? 'italic text-neutral-500' : 'font-medium text-neutral-900'}`}>
                   {s.n === 1 ? <>Inicio: bienvenida · {s.tema}</> : s.tema}
