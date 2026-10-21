@@ -48,12 +48,59 @@ const SELECCIONADOS: Record<number, { telegram: string }[]> = {
   ],
 }
 
+// 21-10: la fase Fundadores terminó. Quien entre ve que concluyó con éxito y cómo enterarse de lo que viene (la Comunidad
+// de Telegram). La página de antes queda intacta debajo por si se reabre: ?vista=previa la sigue mostrando.
+const PROGRAMA_CONCLUIDO = true
+
+function FundadoresConcluido() {
+  const anio = new Date().getFullYear()
+  return (
+    <div className="flex min-h-screen flex-col bg-neutral-950 text-white">
+      <section className="relative flex flex-1 items-center overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[34rem] w-[34rem] rounded-full border border-lime-400/15" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-[24rem] w-[24rem] rounded-full border border-lime-400/20" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-[14rem] w-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
+        <div className="relative mx-auto w-full max-w-3xl px-5 py-16 sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">
+            Programa Fundadores <span className="text-neutral-500">·</span> El Comerciante Digital
+          </p>
+          <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-lime-400/40 bg-lime-400/10 px-3 py-1 text-sm font-semibold text-lime-300">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+            Fase concluida
+          </p>
+          <h1 className="mt-4 text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
+            La fase Fundadores <span className="text-lime-400">concluyó con éxito.</span>
+          </h1>
+          <p className="mt-5 leading-relaxed text-neutral-400 lg:text-lg">
+            Gracias a todos los vendedores que se postularon y a los Fundadores que nos acompañaron en esta primera etapa.
+            Las postulaciones ya están cerradas.
+          </p>
+          <p className="mt-3 leading-relaxed text-neutral-400 lg:text-lg">
+            Vienen <b className="text-white">nuevas etapas y fases</b>. Para enterarte primero, únete a nuestra Comunidad de Vendedores en Telegram.
+          </p>
+          <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noreferrer"
+            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-6 py-4 text-base font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
+            Únete a la Comunidad de Vendedores
+          </a>
+        </div>
+      </section>
+      <footer className="border-t border-white/10 py-6 text-center text-xs text-neutral-500">
+        © {anio} El Comerciante Digital · Todos los derechos reservados
+      </footer>
+    </div>
+  )
+}
+
 // Página pública del Programa Fundadores (sin login; ver proxy.ts). Muestra las 2 tandas
 // (5 + 15 = 20 pioneros desde el 07-10-2026; los cupos salen de fundadores_tandas) y el formulario. Lo de la base se lee en cada visita.
 // ?vista=previa: muestra el formulario aunque la inscripción esté cerrada, sin poder enviarlo
 // (para revisar cómo quedan las preguntas).
 export default async function FundadoresPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const previa = (await searchParams).vista === 'previa'
+  if (PROGRAMA_CONCLUIDO && !previa) return <FundadoresConcluido />
   await connection()
   const { rows: tandas } = await dbGlobal().query<Tanda>(
     `SELECT t.numero, t.cupos, t.abierta, to_char(t.inscribe_desde, 'YYYY-MM-DD') AS inscribe_desde,
