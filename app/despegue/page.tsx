@@ -127,10 +127,23 @@ export default async function DespeguePage() {
 
             {/* Lo que te llevas (21-10, en lugar del cuadro día 1 → día 35, que repetía el título): el Domingo de Radar con
                 sus cifras + el resto en una línea. Cifras redondeadas hacia abajo: revisarlas con cada corrida mensual del Radar. */}
-            <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-white/[0.03] p-5 backdrop-blur sm:p-6">
-              <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/15" />
-              <p className="relative text-[11px] font-semibold uppercase tracking-[0.18em] text-lime-400">🎯 Domingo de Radar</p>
-              <p className="relative mt-1 text-sm text-neutral-300">Cada domingo, <b className="text-white">24 h de acceso completo</b> para elegir qué vender con datos.</p>
+            {/* Presentado como BONO (21-10, pedido del dueño): es lo que nadie más ofrece. La cinta va fuera del cuadro
+                (el cuadro recorta sus adornos con overflow-hidden). */}
+            <div className="relative mt-4 lg:mt-0">
+            <span className="absolute -top-3.5 left-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950 shadow-[0_6px_20px_-4px_rgba(163,230,53,0.7)]">
+              🎁 Bono exclusivo
+            </span>
+            <div className="relative overflow-hidden rounded-2xl border border-lime-400/50 bg-gradient-to-br from-lime-400/[0.10] via-white/[0.03] to-white/[0.02] p-5 pt-7 shadow-[0_0_70px_-20px_rgba(163,230,53,0.55)] backdrop-blur sm:p-6 sm:pt-8">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/20" />
+              <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border border-lime-400/25" />
+              <p className="relative text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">🎯 Domingo de Radar</p>
+              <p className="relative mt-2 text-sm leading-relaxed text-neutral-300">
+                Encuentra <b className="text-white">productos ganadores</b> con datos reales: <b className="text-white">24 h de acceso completo</b>,
+                cada domingo del programa.
+              </p>
+              <p className="relative mt-2 inline-flex items-center gap-1.5 rounded-full border border-lime-400/30 bg-lime-400/10 px-2.5 py-1 text-[11px] font-semibold text-lime-300">
+                ✓ Incluido · solo para los del Programa Despegue
+              </p>
               <ul className="relative mt-5 grid grid-cols-2 gap-x-4 gap-y-4">
                 {RADAR.map((x, k) => (
                   <li key={x.d} className={k === RADAR.length - 1 ? 'col-span-2 border-t border-white/10 pt-4' : ''}>
@@ -140,8 +153,9 @@ export default async function DespeguePage() {
                 ))}
               </ul>
               <p className="relative mt-5 border-t border-white/10 pt-4 text-xs leading-relaxed text-neutral-400">
-                <span className="text-white">+</span> reunión semanal de 60 min · 3 sesiones 1 a 1 de 45 min · grupo de Telegram
+                <b className="text-neutral-200">Además:</b> reunión semanal de 60 min · 3 sesiones 1 a 1 de 45 min · grupo de Telegram
               </p>
+            </div>
             </div>
           </div>
         </div>
