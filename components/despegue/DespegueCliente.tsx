@@ -2,7 +2,7 @@
 // Partes con interacción de la página /despegue (21-10-2026): medir el embudo, el botón de Telegram y la serie
 // de YouTube (se carga recién al tocar play: la página abre rápido aun con mala conexión).
 import { useEffect, useState } from 'react'
-import { LINK_TELEGRAM, PLAYLIST_EMBED, PLAYLIST_PORTADA, PLAYLIST_URL } from '@/lib/despegue'
+import { LINK_TELEGRAM, PLAYLIST_EMBED, PLAYLIST_URL } from '@/lib/despegue'
 
 // Mismo id de navegador que la página de Fundadores (`ecd_nav`): la misma persona en las dos páginas.
 function navegadorId() {
@@ -62,7 +62,7 @@ export function BotonCupo({ texto = 'Apartar mi cupo por Telegram', grande = fal
 }
 
 /** La serie de YouTube: portada con play; al tocarla se carga el reproductor (lista completa). */
-export function VideoSerie() {
+export function VideoSerie({ portada }: { portada: string }) {
   const [play, setPlay] = useState(false)
   return (
     <div>
@@ -74,13 +74,13 @@ export function VideoSerie() {
           <button type="button" onClick={() => { setPlay(true); medir('video') }}
             className="group absolute inset-0 h-full w-full" aria-label="Ver la serie: Vendiendo en Mercado Libre desde Cero">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={PLAYLIST_PORTADA} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80 transition group-hover:opacity-100" />
+            <img src={portada} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-80 transition group-hover:opacity-100" />
             <span className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-neutral-950/10 to-transparent" />
             <span className="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-lime-400 text-neutral-950 shadow-xl transition group-hover:scale-110 sm:h-20 sm:w-20">
               <svg viewBox="0 0 24 24" className="ml-1 h-7 w-7 sm:h-8 sm:w-8" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
             </span>
             <span className="absolute bottom-3 left-4 right-4 text-left">
-              <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-lime-400">Serie en YouTube · 5 episodios</span>
+              <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-lime-400">Serie en YouTube · episodio por episodio</span>
               <span className="block text-sm font-semibold text-white sm:text-base">Vendiendo en Mercado Libre desde Cero</span>
             </span>
           </button>

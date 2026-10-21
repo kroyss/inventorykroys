@@ -13,8 +13,23 @@ export const COMUNIDAD_TELEGRAM = 'https://t.me/comerciantedigitalve'
 export const PLAYLIST_ID = 'PLECJe7v2_uYU'
 export const PLAYLIST_URL = `https://www.youtube.com/playlist?list=${PLAYLIST_ID}`
 export const PLAYLIST_EMBED = `https://www.youtube-nocookie.com/embed/videoseries?list=${PLAYLIST_ID}&rel=0`
-/** Portada del reproductor antes de tocar play (miniatura del episodio 5, "25 días vendiendo"). */
+/** Foto del sello "Caso real" (recorte de la cara en la miniatura del episodio 5: el recorte está calculado para ESTA imagen). */
 export const PLAYLIST_PORTADA = 'https://i.ytimg.com/vi/HDb7QVVhOPA/hqdefault.jpg'
+
+/**
+ * Portada del reproductor = la que YouTube da HOY para la lista (su episodio más nuevo), por oEmbed, guardada 1 hora.
+ * 21-10: estaba fija en el episodio 5 y al subir el 6 quedó vieja. Si YouTube no responde, la del episodio 5.
+ */
+export async function portadaSerie(): Promise<string> {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(PLAYLIST_URL)}`,
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(3000) })
+    const j = r.ok ? await r.json() as { thumbnail_url?: string } : null
+    return j?.thumbnail_url?.startsWith('https://i.ytimg.com/') ? j.thumbnail_url : PLAYLIST_PORTADA
+  } catch {
+    return PLAYLIST_PORTADA
+  }
+}
 
 /** Pago único (21-10: sin cuotas). */
 export const PRECIO = 99

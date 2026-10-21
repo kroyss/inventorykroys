@@ -2,7 +2,7 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, portadaSerie, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
@@ -79,6 +79,7 @@ export default async function DespeguePage() {
     `SELECT id, nombre, cupos, tomados, to_char(inicio, 'YYYY-MM-DD') AS inicio, to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta
      FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1`)
   const hoy = currentDate('America/Caracas')
+  const portada = await portadaSerie()
   const cupos = g?.cupos ?? 8
   const tomados = Math.min(g?.tomados ?? 0, cupos)
   const quedan = cupos - tomados
@@ -234,7 +235,7 @@ export default async function DespeguePage() {
               En Despegue te enseño a hacer lo mismo, <b className="text-white">paso a paso y con tu cuenta</b>.
             </p>
           </div>
-          <VideoSerie />
+          <VideoSerie portada={portada} />
         </div>
       </section>
 
