@@ -77,7 +77,7 @@ $('conectar').onclick = async () => {
     await chrome.storage.local.set({ clave: d.clave, servidor, perfil: nuevo, basica })
     $('clave').value = d.clave; $('perfil').value = nuevo
     const r2 = await chrome.runtime.sendMessage({ tipo: 'latido' })
-    $('estado').textContent = `✓ Conectado. ${r2?.texto ?? ''}`
+    $('estado').textContent = r2?.texto ? `✓ ${r2.texto.replace(/ ✓/, '')}` : '✓ Conectado.'
     $('codigo').value = ''
     modoConectado(true)
     await verificar()

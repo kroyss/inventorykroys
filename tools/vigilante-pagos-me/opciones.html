@@ -48,15 +48,15 @@
     <label>Sistema
       <select id="servidor">
         <option value="https://app.elcomerciantedigital.com">Producción (app.elcomerciantedigital.com)</option>
-        <option value="https://staging.elcomerciantedigital.com">Staging (pruebas)</option>
+        <!--solo-staging--><option value="https://staging.elcomerciantedigital.com">Staging (pruebas)</option><!--/solo-staging-->
       </select>
     </label>
     <label>Clave del vigilante <small>(se pone sola al conectar con código)</small>
       <input id="clave" placeholder="me_…" autocomplete="off">
     </label>
-    <label>Usuario:clave de staging <small>(solo para pruebas en staging)</small>
+    <!--solo-staging--><label>Usuario:clave de staging <small>(solo para pruebas en staging)</small>
       <input id="basica" placeholder="usuario:clave" autocomplete="off">
-    </label>
+    </label><!--/solo-staging-->
     <button id="guardar">Guardar</button>
     <button id="probar">Probar conexión</button>
   </details>

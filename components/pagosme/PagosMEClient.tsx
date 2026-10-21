@@ -520,7 +520,7 @@ function CodigoConexion({ codigo, vence, onCerrar }: { codigo: string; vence: st
         {copiado ? 'Copiado ✓' : 'Copiar'}
       </button>
       <p className="text-xs text-emerald-800 flex-1 min-w-[200px]">
-        Escríbelo en el programa al instalarlo y en el Asistente de envíos de cada cuenta de Chrome. Vale hasta las {hasta}.
+        Escríbelo en el programa al instalarlo y en el Asistente de envíos de cada cuenta de Chrome. Vale hasta las {hasta}{hasta.endsWith('.') ? '' : '.'}
         Las PCs que ya estaban conectadas siguen funcionando.
       </p>
       <button onClick={onCerrar} className="text-emerald-700 text-xs">Cerrar ✕</button>

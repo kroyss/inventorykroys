@@ -104,7 +104,7 @@ const contenido = [
   foto('06-tienda-chrome.png'),
   p('Confirma con ', b('Añadir extensión'), '.'),
   foto('07-anadir-extension.png', 340),
-  nota('Chrome dice «Leer tu historial de navegación» por un permiso técnico (la extensión necesita encontrar y cerrar la pestaña del portal que abre). No lee tu historial.'),
+  nota('Si Chrome dice «Leer tu historial de navegación» es una versión anterior de la extensión (un permiso técnico para cerrar la pestaña del portal que abre): no lee tu historial. La versión nueva ya no lo pide.'),
   p('Listo. No hace falta «Iniciar sesión en Chrome»: cierra este aviso con la ✕.'),
   foto('08-extension-anadida.png', 260),
 
@@ -203,7 +203,7 @@ const dueno = [
     ['2. Programa', 'Sale «Windows protegió su PC»: decirle que es normal (programa nuevo sin firma comprada). Más información → Ejecutar de todas formas.'],
     ['3. Código', 'Lo genera ÉL en Pagos ME («Genera tu código»). Vale 60 min y sirve para el programa y para todas las extensiones.'],
     ['4. Finalizar', 'Dejar marcadas «Arrancar el programa» y «Ver cómo agregar el Asistente». Si aparece una casilla «Abrir la carpeta de la extensión», desmarcarla.'],
-    ['5. Extensión', 'Mirar en QUÉ perfil de Chrome se abrió la tienda: tiene que ser el de una cuenta de ML. «Leer tu historial» lo pide Chrome por un permiso técnico: no lee su historial. No hace falta «Iniciar sesión en Chrome».'],
+    ['5. Extensión', 'Mirar en QUÉ perfil de Chrome se abrió la tienda: tiene que ser el de una cuenta de ML. Si Chrome dice «Leer tu historial», es la versión anterior de la extensión (la 1.3.6 ya no lo pide): no lee su historial. No hace falta «Iniciar sesión en Chrome».'],
     ['6. Conectar', 'Rompecabezas → pin → abrir el Asistente → mismo código → Conectar. Debe decir «Conectado al sistema» con su cuenta de MercadoEnvíos.'],
     ['7. Otras cuentas', 'En cada perfil: app.elcomerciantedigital.com/extension → Añadir → mismo código. El programa no se reinstala.'],
     ['8. Prueba', '«Traer pagos y guías». No tocar Chrome mientras trabaja. En 1–2 min: aviso verde ✅ Listo con lo de cada cuenta. Ícono ME verde junto al reloj.'],
