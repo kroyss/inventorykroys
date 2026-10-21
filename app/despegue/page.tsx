@@ -127,7 +127,7 @@ export default async function DespeguePage() {
             <span className="hidden text-neutral-500 sm:inline">· </span>
             <span className="mt-1 block text-neutral-500 sm:mt-0 sm:inline sm:text-lime-400">El Comerciante Digital</span>
           </p>
-          <div className="mt-4 grid items-center gap-10 lg:grid-cols-[1.25fr_1fr]">
+          <div className="mt-4 grid items-center gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
             <div>
               {/* Corto a propósito (21-10): se lee de un vistazo; el detalle (gris → verde, envío gratis) va en "Esto lo hice yo". */}
               <h1 className="text-[2.25rem] font-semibold leading-[1.08] tracking-tight sm:text-6xl">
