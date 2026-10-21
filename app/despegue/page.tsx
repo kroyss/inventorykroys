@@ -123,7 +123,9 @@ export default async function DespeguePage() {
         <div className="relative mx-auto max-w-5xl px-5 pb-14 pt-10 sm:px-8 sm:pb-20 sm:pt-14">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">
             <span className="inline-flex items-center gap-2"><Icono d={ICONO.cohete} className="h-3.5 w-3.5" />Programa Despegue</span>{' '}
-            <span className="text-neutral-500">·</span> El Comerciante Digital
+            {/* En celular la marca baja a su propia línea (no se corta a la mitad). */}
+            <span className="hidden text-neutral-500 sm:inline">· </span>
+            <span className="mt-1 block text-neutral-500 sm:mt-0 sm:inline sm:text-lime-400">El Comerciante Digital</span>
           </p>
           <div className="mt-4 grid items-center gap-10 lg:grid-cols-[1.25fr_1fr]">
             <div>
@@ -136,9 +138,9 @@ export default async function DespeguePage() {
                 Lo hice con una cuenta desde cero, y lo grabé todo. En <b className="text-white">8 semanas</b> te enseño a hacer lo
                 mismo con <b className="text-white">tu cuenta</b>, <b className="text-white">empieces de cero o ya tengas una</b>, acompañado de principio a fin.
               </p>
-              <p className="mt-5 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-lime-400/30 bg-lime-400/[0.07] px-4 py-1.5 text-sm">
+              <p className="mt-5 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border border-lime-400/30 bg-lime-400/[0.07] px-4 py-1.5 text-sm sm:rounded-full">
                 <span className="font-semibold text-lime-400">Empieza el {fechaLarga(inicio)}</span>
-                <span className="text-neutral-500">·</span>
+                <span className="hidden text-neutral-500 sm:inline">·</span>
                 <span className="text-neutral-300">solo {cupos} cupos</span>
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">
