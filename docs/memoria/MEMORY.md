@@ -1,0 +1,41 @@
+# Memory Index
+
+- [Flujo mensual MensajeGrupo](project_mensajegrupo_flujo_mensual.md) — cruce ventas+calificaciones ML por cuenta (SOLUCION-MC/PIKEKE), día 15, en D:\MensajeGrupo, evita re-contactar via historial.
+- [No tocar lo que funciona](feedback_no_tocar_lo_que_funciona.md) — experimentos en carpeta nueva; copiar antes de modificar código viejo.
+- [Despacho ML vía API](project_despacho_ml_api.md) — producto vendible de etiquetas/guías; OAuth VE funciona, pero envío/guía no sale por API en MLV.
+- [Fidelidad códigos de barras](feedback_fidelidad_codigos_barras.md) — etiquetas ML: no tocar el método vectorial de etiquetas_ml.py; validar escaneando.
+- [Commit y push los hago yo](feedback_commit_push_yo.md) — inventario: commit+push a origin main lo hago yo; producción en VPS con permiso; staging lo opero yo.
+- [ComercianteDigital multiempresa](project_comerciantedigital_multiempresa.md) — inventario para clientes: opción B (empresa_id + RLS), solo VE, Despachos+Reportador como gancho.
+- [Staging primero](feedback_staging_primero.md) — todo cambio va a staging.elcomerciantedigital.com, el usuario revisa, recién después producción.
+- [API ML: preguntas, calificar, mensajes](project_ml_api_preguntas.md) — en MLV SÍ se puede responder, calificar y mensajear por API (probado 30/09 en staging con PIKEKE).
+- [RustDesk en el VPS](reference_rustdesk_vps.md) — servidor propio en /opt/rustdesk (hbbs/hbbr), clave en data/id_ed25519.pub; no borrar data/.
+- [Programa Fundadores](project_programa_fundadores.md) — elcomerciantedigital.com → /fundadores en prod desde 02/10; Rondas 4–5 y 11–12 oct; nginx solo expone esa página.
+- [¿Para todos o solo para mí?](feedback_cambio_todos_o_solo_yo.md) — cada cambio: núcleo (todas) o módulo solo del dueño; UNA sola base (mismas pantallas, clientes con menos opciones), nunca dos versiones
+- [Modo sin inventario](project_modo_sin_inventario.md) — Fundadores arrancan en Herramientas (todo desde ML, módulo inventario apagado); inventario es el paso 2.
+- [Manual: solo PDF](feedback_manual_solo_pdf.md) — al modificar el manual entregar solo PDF (Word por COM), no .docx.
+- [Avisos por Telegram](project_idea_bot_telegram.md) — en PRODUCCIÓN y ABIERTO a Fundadores 16-10; pendiente créditos IA y vencimiento de suscripción
+- [Cuenta demo para videos](project_cuenta_demo.md) — alta Demo en Plataforma, ML simulado (TOKEN_DEMO), restaurar en /demo, 50 PDFs en Demo videos/Despachos
+- [Caída 06-10: no dbEmpresa en layout](feedback_no_dbempresa_en_layout.md) — Navbar agotó el pool; usar conEmpresa en lo global, no esconder errores, vigilar conexiones tras deploy
+- [Siempre en español](feedback_siempre_espanol.md) — toda respuesta al usuario en español, sin excepción
+- [Idea: extensión guías MercadoEnvíos](project_idea_extension_guias.md) — pendiente 07-10: bajar en lote las guías PDF del portal (no hay lote ni API pública); extensión en la sesión del vendedor
+- [Precios y planes](project_precios_planes.md) — texto final: Emprende $6 (≤50 ventas) / Esencial $10 / Automatizaciones $14 / +Inventario $18 (Bs a BCV); Fundadores 30% de por vida
+- [Esperar autorización](feedback_esperar_autorizacion.md) — ante un problema o comentario: responder/proponer, NO implementar ni subir a staging sin su OK
+- [Pagos ME](project_pagos_me.md) — prod SolucionesMC + versión clientes (apagada, se activa en Plataforma); extensión APROBADA en Chrome Web Store 17-10 (no listada), /extension redirige; 1.3.5 en revisión
+- [Deploy arrastra main](feedback_deploy_arrastra_main.md) — deploy.sh publica todo main: revisar commits pendientes de OK y migraciones antes de subir a prod
+- [Privacidad de clientes](feedback_privacidad_clientes.md) — mensajes a Fundadores sin "revisé tu cuenta" ni cifras de sus datos; mirar datos solo para orientar al dueño
+- [Staging: tokens ML viejos](project_staging_ml_tokens.md) — en staging lo que consulta ML no funciona (copias vencidas); no forzarlo, probar con Demo o en prod
+- [Pendientes costos ML](project_pendientes_costos_ml.md) — aparcado 12-10: MercadoEnvíos cambió políticas + comisión ML automática desde ventas reales
+- [No probar en web](feedback_no_probar_en_web.md) — no abrir navegador para verificar por mi cuenta (gasta tokens); solo si lo pide o preguntando antes
+- [No pgrep para esperar deploys](feedback_no_pgrep_espera.md) — pgrep/pkill -f por ssh se encuentran a sí mismos: deploy en primer plano o esperar la notificación
+- [Idea: {nombre} en Mensajes](project_idea_nombre_respuestas.md) — aparcada 13-10: nombre del comprador en respuestas rápidas; Preguntas no (API no da el nombre)
+- [Idea: bloquear compradores](project_idea_bloquear_compradores.md) — API de ML NO permite bloquear (403/405, probado 17-10); solo desde la web de ML
+- [Idea: recordatorio de calificación](project_idea_recordatorio_calificacion.md) — aparcada 14-10: ventana MLV ~7 días desde la compra; diseño acordado (día 5, solo concretada+positiva); NO armar hasta que lo pida
+- [Vincular con ML](project_idea_vincular_publicaciones.md) — en prod 20-10 (mig 109): manual con clic, variante = producto, empleados sin precios; gemelas/limpieza NO sin OK
+- [Promociones ML](project_promociones_ml.md) — Fases 1-3 en prod 16-10 (mig 094/097/099): editar campañas propias, varias promos por publicación, comprobar con precio real
+- [Novedades](project_novedades.md) — REGLA: cada cambio que noten los Fundadores → borrador en Novedades al subir a prod (lo propio no va)
+- [Combos](project_combos.md) — QUITADOS de todos lados 16-10 (5ac8b08), columnas mig 098 sin uso; si vuelve: solo manual, nunca por título
+- [Plazo cambio de calificación](project_cambio_calificacion_plazo.md) — pendiente 17-10: ¿ML quita a los 5 días corridos o hábiles? usuario avisa; ajustar diasRespuesta
+- [Propuesta en el mensaje](feedback_propuesta_en_mensaje.md) — REGLA FIRME: propuestas y preguntas SIEMPRE escritas completas en el mensaje; nunca solo en el recuadro de cierre
+- [Cortes Fundadores](project_aviso_corte_fundadores.md) — corte 1 programado 19-10 23:00; PENDIENTE 20-10: corte 2 (creados 19–23/10, sin ML al dom 25/10 23:00); sábado 24+ = otro corte
+- [Comprobador de pagos con el banco](project_comprobador_pagos_banco.md) — en prod 20-10 (pestaña en Pagos ME, cruce en el navegador); BDV fuera; falta formato de Banco Plaza
+- [Caída IPv4 20-10 → Cloudflare](project_caida_ipv4_cloudflare.md) — sitio ahora Proxied por Cloudflare; SSH caído; fix Fundadores IP (542fb28) sin desplegar
