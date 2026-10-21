@@ -12,30 +12,39 @@ export const metadata = {
     + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Solo 8 cupos.',
 }
 
+// Qué incluye (21-10): 4 tarjetas, una idea cada una. El Domingo de Radar NO va aquí: es el bono de la portada.
 // Íconos de trazo (24×24).
 const INCLUYE = [
   { t: 'Reunión en vivo cada semana', s: '60 min por Meet',
-    d: 'El tema de la semana y revisión de cuentas en vivo: aprendes también de los casos de los demás.',
+    d: 'El tema de la semana y revisión de cuentas en vivo.',
     i: 'M15 10l4.6-2.3A1 1 0 0 1 21 8.6v6.8a1 1 0 0 1-1.4.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z' },
-  { t: 'Domingo de Radar', s: '24 horas de acceso completo',
-    d: 'Cada domingo del programa, nuestro Radar de MercadoLibre abierto para ti: qué se vende, a qué precio y con cuánta competencia.',
-    i: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-1 6-6' },
-  { t: '3 sesiones solo para ti', s: '45 min cada una, 1 a 1',
-    d: 'Diagnóstico de tu cuenta al inicio, revisión a mitad del programa y tu plan de cierre.',
+  { t: '3 sesiones solo para ti', s: '45 min cada una',
+    d: 'Diagnóstico al inicio, revisión a mitad del programa y plan de cierre.',
     i: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1' },
-  { t: 'Grupo de Telegram', s: 'con los demás del programa',
-    d: 'Para tus dudas de la semana y para compartir avances con gente que está en lo mismo que tú.',
+  { t: 'Grupo de Telegram', s: 'todo el programa',
+    d: 'Tus dudas y tus avances, con gente que está en lo mismo que tú.',
     i: 'M7 8h10M7 12h6m-9 8 3-3h11a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12z' },
   { t: 'Tareas semanales', s: 'claras y cortas',
-    d: 'Lo que tienes que hacer en tu cuenta cada semana para avanzar, sin perderte.',
+    d: 'Lo que haces en tu cuenta cada semana para avanzar sin perderte.',
     i: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9' },
 ]
 
 const PARA_TI = [
   'Quieres empezar a vender en MercadoLibre y no sabes por dónde.',
-  'Tienes una cuenta con publicaciones pero vendes poco, o está parada, y quieres saber qué corregir.',
+  'Tienes cuenta con publicaciones, pero vendes poco o está parada.',
   'Quieres hacerlo con método, no a prueba y error.',
 ]
+
+/** Encabezado igual en todas las secciones de la parte clara: etiqueta, título y (opcional) una línea. */
+function Encabezado({ etiqueta, titulo, children }: { etiqueta: string; titulo: string; children?: React.ReactNode }) {
+  return (
+    <div className="max-w-2xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">{etiqueta}</p>
+      <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">{titulo}</h2>
+      {children && <div className="mt-2 text-sm leading-relaxed text-neutral-600">{children}</div>}
+    </div>
+  )
+}
 
 // El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías,
 // 2.514 búsquedas en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo).
@@ -105,7 +114,7 @@ export default async function DespeguePage() {
       <style>{'html { scroll-behavior: smooth; }'}</style>
 
       {/* ── Portada ── */}
-      <section className="relative overflow-hidden bg-neutral-950 text-white">
+      <section id="top" className="relative overflow-hidden bg-neutral-950 text-white">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[34rem] w-[34rem] rounded-full border border-lime-400/15" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-[24rem] w-[24rem] rounded-full border border-lime-400/20" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 h-[14rem] w-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
@@ -199,57 +208,63 @@ export default async function DespeguePage() {
         </div>
       </section>
 
-      <main className="mx-auto max-w-5xl space-y-16 px-5 py-14 sm:px-8 sm:py-20">
-        {/* ── Para quién ── */}
-        <section className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-          <div className="rounded-2xl border border-lime-200 bg-lime-50 p-6">
-            <h2 className="text-lg font-semibold text-neutral-900">Es para ti si…</h2>
-            <ul className="mt-4 space-y-3">
+      <main className="mx-auto max-w-5xl space-y-12 px-5 py-10 sm:space-y-14 sm:px-8 sm:py-14">
+        {/* ── Para quién ── (una sola tarjeta: el "no es para ti" es una línea, no una columna medio vacía) */}
+        <section>
+          <Encabezado etiqueta="Para quién es" titulo="¿Es para ti?" />
+          <div className="mt-5 rounded-2xl border border-lime-200 bg-lime-50 p-5 sm:p-6">
+            <ul className="grid gap-4 sm:grid-cols-3 sm:gap-6">
               {PARA_TI.map(x => (
-                <li key={x} className="flex gap-3 text-sm text-neutral-700">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime-500 text-[11px] font-bold text-white">✓</span>
+                <li key={x} className="flex gap-3 text-sm leading-relaxed text-neutral-800">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime-500 text-[11px] font-bold text-white" aria-hidden="true">✓</span>
                   {x}
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-            <h2 className="text-lg font-semibold text-neutral-900">No es para ti si…</h2>
-            <p className="mt-4 flex gap-3 text-sm text-neutral-600">
-              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-neutral-200 text-[11px] font-bold text-neutral-600">✕</span>
-              Buscas ganar dinero sin trabajar en tu cuenta. Cada semana hay tareas.
+            <p className="mt-5 flex gap-3 border-t border-lime-200 pt-4 text-sm leading-relaxed text-neutral-600">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-neutral-200 text-[11px] font-bold text-neutral-600" aria-hidden="true">✕</span>
+              <span><b className="text-neutral-900">No es para ti</b> si buscas ganar sin trabajar en tu cuenta: cada semana hay tareas.</span>
             </p>
           </div>
         </section>
 
-        {/* ── Qué incluye ── */}
+        {/* ── Qué incluye ── (4 tarjetas en 2×2, ícono al lado; el Radar es el bono de la portada y aquí solo se recuerda) */}
         <section>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">Qué incluye</p>
-          <h2 className="mt-2 text-2xl font-semibold text-neutral-900 sm:text-3xl">Acompañado, no solo con un curso.</h2>
-          <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {INCLUYE.map((x, k) => (
-              <li key={x.t} className={`rounded-2xl border p-5 ${k === 1 ? 'border-neutral-900 bg-neutral-950 text-white sm:col-span-2 lg:col-span-1' : 'border-neutral-200 bg-white'}`}>
-                <span className={`grid h-10 w-10 place-items-center rounded-full ${k === 1 ? 'bg-lime-400 text-neutral-950' : 'bg-lime-100 text-lime-800'}`} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={x.i} /></svg>
+          <Encabezado etiqueta="Qué incluye" titulo="Acompañado, no solo con un curso." />
+          <ul className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4">
+            {INCLUYE.map(x => (
+              <li key={x.t} className="flex gap-4 rounded-2xl border border-neutral-200 bg-white p-5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-lime-100 text-lime-800" aria-hidden="true">
+                  <Icono d={x.i} className="h-5 w-5" />
                 </span>
-                <p className={`mt-4 font-semibold ${k === 1 ? 'text-white' : 'text-neutral-900'}`}>{x.t}</p>
-                <p className={`text-xs font-medium ${k === 1 ? 'text-lime-400' : 'text-lime-700'}`}>{x.s}</p>
-                <p className={`mt-2 text-sm leading-relaxed ${k === 1 ? 'text-neutral-400' : 'text-neutral-500'}`}>{x.d}</p>
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-semibold text-neutral-900">{x.t}</span>
+                    <span className="text-xs font-medium text-lime-700">{x.s}</span>
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-neutral-500">{x.d}</span>
+                </span>
               </li>
             ))}
           </ul>
+          <a href="#top" className="mt-3 flex items-center gap-3 rounded-2xl bg-neutral-950 px-5 py-3.5 text-sm text-neutral-300 transition hover:bg-neutral-900">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-lime-400 text-neutral-950" aria-hidden="true">
+              <Icono d={ICONO.radar} className="h-4 w-4" />
+            </span>
+            <span><b className="text-lime-400">+ Bono:</b> <b className="text-white">Domingo de Radar</b>, cada domingo 24 horas de acceso completo.</span>
+          </a>
         </section>
 
         {/* ── Las 8 semanas ── */}
         <section>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">El camino</p>
-          <h2 className="mt-2 text-2xl font-semibold text-neutral-900 sm:text-3xl">Las 8 semanas</h2>
-          <p className="mt-2 text-sm text-neutral-600">
-            <b className="text-neutral-900">¿Empiezas de cero?</b> Construyes cada etapa desde el principio.{' '}
-            <b className="text-neutral-900">¿Ya tienes cuenta?</b> En cada etapa revisamos lo que tienes y corregimos lo que te frena.
-          </p>
-          <p className="mt-1 text-sm text-neutral-500">Cada domingo: Radar abierto todo el día y la tarea de la semana. La reunión, en la semana.</p>
-          <ol className="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+          <Encabezado etiqueta="El camino" titulo="Las 8 semanas">
+            <p>
+              <b className="text-neutral-900">¿Empiezas de cero?</b> Construyes cada etapa desde el principio.{' '}
+              <b className="text-neutral-900">¿Ya tienes cuenta?</b> En cada etapa revisamos lo que tienes y corregimos lo que te frena.
+            </p>
+            <p className="mt-1 text-neutral-500">Cada domingo: Radar abierto todo el día y la tarea de la semana. La reunión, en la semana.</p>
+          </Encabezado>
+          <ol className="mt-5 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
             {SEMANAS.map(s => (
               <li key={s.fecha} className={`flex items-center gap-4 border-b border-neutral-100 px-4 py-3.5 last:border-b-0 sm:px-5 ${s.n == null ? 'bg-neutral-50' : ''}`}>
                 <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${
