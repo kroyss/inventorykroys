@@ -41,23 +41,11 @@ const PARA_TI = [
 // 2.514 búsquedas en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo).
 const RADAR = [
   { n: '+45.000', d: 'productos de MercadoLibre Venezuela' },
-  { n: '320', d: 'categorías' },
+  { n: '+320', d: 'categorías' },
   { n: '+2.500', d: 'búsquedas en tendencia: las que más crecen y las más populares' },
   { n: '+1.100', d: 'tendencias validadas con Google Trends' },
   { n: '+45.000', d: 'productos con su actividad medida: si suben o se apagan' },
 ]
-
-// Termómetro de reputación de MercadoLibre: gris (sin reputación) → verde.
-const TERMOMETRO = ['bg-red-500', 'bg-orange-400', 'bg-yellow-300', 'bg-lime-300', 'bg-green-500']
-function Termometro({ nivel }: { nivel: number | null }) {
-  return (
-    <div className="flex gap-1" aria-hidden="true">
-      {TERMOMETRO.map((c, i) => (
-        <span key={c} className={`h-2 flex-1 rounded-full ${nivel == null ? 'bg-neutral-600' : i === nivel ? c : 'bg-white/10'}`} />
-      ))}
-    </div>
-  )
-}
 
 // Página pública del Programa Despegue (sin login; ver proxy.ts). El grupo y sus cupos salen de despegue_grupos
 // (migración 112) y se leen en cada visita: el dueño sube "tomados" en Plataforma cuando alguien paga.
@@ -114,9 +102,9 @@ export default async function DespeguePage() {
           </p>
           <div className="mt-4 grid items-center gap-10 lg:grid-cols-[1.25fr_1fr]">
             <div>
-              <h1 className="text-[2rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-                De <span className="text-neutral-400">0 ventas</span> y reputación gris a{' '}
-                <span className="text-lime-400">11 ventas</span>, reputación verde y envío gratis,{' '}
+              {/* Corto a propósito (21-10): se lee de un vistazo; el detalle (gris → verde, envío gratis) va en "Esto lo hice yo". */}
+              <h1 className="text-[2.25rem] font-semibold leading-[1.08] tracking-tight sm:text-6xl">
+                De <span className="text-neutral-500">0</span> a <span className="text-lime-400">11 ventas</span> y reputación verde{' '}
                 <span className="whitespace-nowrap">en <span className="text-lime-400">35 días</span>.</span>
               </h1>
               <p className="mt-5 leading-relaxed text-neutral-400 lg:text-lg">
@@ -137,33 +125,23 @@ export default async function DespeguePage() {
               <div className="mt-6 max-w-sm">{cuposBarra()}</div>
             </div>
 
-            {/* Antes → después */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur sm:p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">La cuenta que abrí desde cero</p>
-              <div className="mt-4 space-y-5">
-                <div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-semibold text-neutral-300">Día 1</span>
-                    <span className="text-xs text-neutral-500">reputación gris</span>
-                  </div>
-                  <p className="mt-1 text-3xl font-semibold tabular-nums text-neutral-400">0 <span className="text-base font-medium">ventas</span></p>
-                  <div className="mt-2"><Termometro nivel={null} /></div>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-neutral-500">
-                  <span className="h-px flex-1 bg-white/10" /> 7 días: primera venta <span className="h-px flex-1 bg-white/10" />
-                </div>
-                <div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-semibold text-lime-400">Día 35</span>
-                    <span className="text-xs text-lime-300">reputación verde</span>
-                  </div>
-                  <p className="mt-1 text-3xl font-semibold tabular-nums text-white">11 <span className="text-base font-medium text-neutral-300">ventas</span></p>
-                  <div className="mt-2"><Termometro nivel={4} /></div>
-                  <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-lime-400/15 px-2.5 py-1 text-xs font-semibold text-lime-300">
-                    ✓ MercadoEnvíos con envío gratis activo
-                  </p>
-                </div>
-              </div>
+            {/* Lo que te llevas (21-10, en lugar del cuadro día 1 → día 35, que repetía el título): el Domingo de Radar con
+                sus cifras + el resto en una línea. Cifras redondeadas hacia abajo: revisarlas con cada corrida mensual del Radar. */}
+            <div className="relative overflow-hidden rounded-2xl border border-lime-400/25 bg-white/[0.03] p-5 backdrop-blur sm:p-6">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/15" />
+              <p className="relative text-[11px] font-semibold uppercase tracking-[0.18em] text-lime-400">🎯 Domingo de Radar</p>
+              <p className="relative mt-1 text-sm text-neutral-300">Cada domingo, <b className="text-white">24 h de acceso completo</b> para elegir qué vender con datos.</p>
+              <ul className="relative mt-5 grid grid-cols-2 gap-x-4 gap-y-4">
+                {RADAR.map((x, k) => (
+                  <li key={x.d} className={k === RADAR.length - 1 ? 'col-span-2 border-t border-white/10 pt-4' : ''}>
+                    <p className="text-2xl font-semibold tracking-tight text-lime-400 sm:text-3xl">{x.n}</p>
+                    <p className="mt-0.5 text-xs leading-snug text-neutral-400">{x.d}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="relative mt-5 border-t border-white/10 pt-4 text-xs leading-relaxed text-neutral-400">
+                <span className="text-white">+</span> reunión semanal de 60 min · 3 sesiones 1 a 1 de 45 min · grupo de Telegram
+              </p>
             </div>
           </div>
         </div>
@@ -185,29 +163,6 @@ export default async function DespeguePage() {
             </p>
           </div>
           <VideoSerie />
-        </div>
-      </section>
-
-      {/* ── Domingo de Radar ── (cifras redondeadas hacia abajo; revisarlas con cada corrida mensual del Radar) */}
-      <section className="relative overflow-hidden border-t border-white/5 bg-neutral-950 text-white">
-        <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-1/2 h-[26rem] w-[26rem] -translate-y-1/2 rounded-full border border-lime-400/10" />
-        <div aria-hidden="true" className="pointer-events-none absolute -left-12 top-1/2 h-[16rem] w-[16rem] -translate-y-1/2 rounded-full border border-lime-400/15" />
-        <div className="relative mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">🎯 Domingo de Radar</p>
-          <h2 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">Cada domingo, el mercado completo en tus manos.</h2>
-          <p className="mt-4 max-w-2xl leading-relaxed text-neutral-400">
-            24 horas de acceso completo al <b className="text-white">Radar de Oportunidades</b>: lo que más se vende en
-            MercadoLibre Venezuela, a qué precio real y con cuánta competencia. Así eliges qué vender con datos, no con corazonadas.
-          </p>
-          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {RADAR.map((x, k) => (
-              <li key={x.d} className={`rounded-2xl border border-white/10 bg-white/[0.03] p-4 ${k === RADAR.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}>
-                <p className="text-2xl font-semibold tracking-tight text-lime-400 sm:text-3xl">{x.n}</p>
-                <p className="mt-1 text-xs leading-snug text-neutral-400">{x.d}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-neutral-500">Datos actualizados cada mes.</p>
         </div>
       </section>
 
