@@ -118,17 +118,32 @@ const contenido = [
   p('¿Tienes otra cuenta en otro perfil de Chrome? Abre ese perfil, entra a ', b('app.elcomerciantedigital.com/extension'), ' y repite los pasos 5 y 6 con el mismo código (o uno nuevo si ya pasó la hora). El programa no se vuelve a instalar.'),
 
   paso(8, 'Prueba: trae tus pagos y guías'),
-  p('En Pagos ME toca ', b('Traer pagos y guías'), '. Chrome se abre solo con cada cuenta, trabaja y se cierra: no lo toques. En 1 o 2 minutos aparece el aviso verde ', b('Listo'), ' con lo que trajo de cada cuenta.'),
-  fotoPendiente('aviso verde «Listo» con las cuentas'),
+  p('En Pagos ME toca ', b('Traer pagos y guías'), '. Chrome se abre solo con cada cuenta, trabaja y se cierra: no lo toques. En 1 o 2 minutos aparece el aviso verde ', b('✅ Listo'), ' con lo que trajo de cada cuenta.'),
   p('Junto al reloj de Windows queda el ícono ', b('ME'), ': verde = todo bien.'),
-  fotoPendiente('ícono ME verde junto al reloj'),
 
   h1('Cómo se usa cada día'),
-  vineta(b('Solo:'), ' trae en los horarios de «Traer automático» (los cambias en Configurar).'),
-  vineta(b('A mano:'), ' cuando quieras, «Traer pagos y guías» y espera el aviso verde.'),
-  vineta(b('Verifica'), ' los pagos contra el banco en la pestaña «Sin verificar» y después ve a Despachos: las guías ya están ahí.'),
+  paso('A', 'Los pagos llegan solos'),
+  p('El programa trae ', b('de lunes a sábado a las 8:00, 12:00, 4:00 y 7:00 p. m.'), ' Para cambiar las horas: en Pagos ME, ', b('Traer automático → Configurar'), '. ¿Necesitas algo ya? Toca ', b('Traer pagos y guías'), ' y espera el aviso verde.'),
+  paso('B', 'Verifica cada pago'),
+  p('En Pagos ME, pestaña ', b('Ventas'), ', tus ventas salen en tres grupos:'),
+  vineta(b('Por verificar:'), ' el cliente pagó. Mira el pago y el comprobante y toca ', b('✓ Pago correcto'), ' o ', b('✗ Inválido'), '.'),
+  vineta(b('Listos para despachar:'), ' pago verificado. Su guía ya está en Despachos.'),
+  vineta(b('Sin pago todavía:'), ' el cliente no ha pagado (o el pago todavía no se trajo).'),
+  p(b('Atajo: 🏦 Comprobar con el banco.'), ' Sube los estados de cuenta del día (Bancamiga, Banesco, Mercantil o Provincial) y el sistema te dice qué pagos llegaron de verdad. Los seguros se aprueban todos con un clic. Banco de Venezuela no se puede, porque no deja exportar el estado de cuenta.'),
+  paso('C', 'Imprime en Despachos'),
+  p('Las guías ya están en el lote de Despachos: ', b('no hace falta bajarlas del portal'), '. Imprime como siempre.'),
+  recuadro('Importante', [
+    [b('Despachos no imprime una guía si su pago no está verificado.'), ' Es a propósito: así no sale un paquete sin cobrar. Si tienes que despachar uno igual (un cliente de confianza, por ejemplo), en la guía toca ', b('Despachar igual'), '.'],
+    [b('Ya no bajes las guías del portal a mano.'), ' Si una guía ya está en Despachos, el programa no trae el pago de esa venta.'],
+  ]),
 
   h1('Preguntas frecuentes'),
+  h2('Pagos ME dice que una cuenta de MercadoEnvíos «no corresponde»'),
+  p('Ese Chrome tiene abierta una cuenta de MercadoEnvíos que no es ninguna de tus cuentas de MercadoLibre conectadas al sistema. Por seguridad no se trae nada de ella: en ese perfil de Chrome entra al portal con la cuenta correcta.'),
+  h2('Una venta pagada sale en «Sin pago todavía»'),
+  p('El pago todavía no se trajo: toca «Traer pagos y guías». Si sigue igual, revisa en el portal de MercadoEnvíos que el pago tenga comprobante cargado.'),
+  h2('Venta con retiro en tienda'),
+  p('No tiene guía de envío, así que no va a Despachos. El pago se verifica igual.'),
   h2('¿Puedo usar solo la extensión, sin el programa?'),
   p('Sí, pero entonces Chrome tiene que estar abierto en cada cuenta cuando toques «Traer» o llegue el horario. El programa es el que abre Chrome solo, aunque nadie esté mirando. Recomendado: programa + extensión.'),
   h2('¿Y si la PC estaba apagada?'),
@@ -140,6 +155,118 @@ const contenido = [
   h2('¿Necesitas ayuda?'),
   p('Escríbenos por Telegram. Si quieres, te acompañamos la primera vez conectándonos a tu PC.'),
 ]
+
+// ── Guía del dueño (21-10): qué revisar, qué decir y qué hacer al activarle Pagos ME a un Fundador ──
+const tabla = (filas, anchos = [3200, 5826]) => new Table({ width: { size: 9026, type: WidthType.DXA }, columnWidths: anchos,
+  rows: filas.map((f, i) => new TableRow({ children: f.map((c, j) => new TableCell({ width: { size: anchos[j], type: WidthType.DXA },
+    shading: i === 0 ? { fill: 'E8F5EE', type: ShadingType.CLEAR, color: 'auto' } : undefined,
+    margins: { top: 80, bottom: 80, left: 120, right: 120 },
+    borders: { top: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' }, bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
+               left: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' }, right: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' } },
+    children: [new Paragraph({ children: [t(c, { bold: i === 0, size: 20 })] })] })) })) })
+const check = (...runs) => new Paragraph({ spacing: { after: 70 }, indent: { left: 360, hanging: 360 },
+  children: [t('☐  '), ...runs.map(r => typeof r === 'string' ? t(r) : r)] })
+const dice = text => new Paragraph({ spacing: { after: 100 }, indent: { left: 360 },
+  border: { left: { style: BorderStyle.SINGLE, size: 18, color: VERDE, space: 10 } },
+  children: [t(`«${text}»`, { italics: true })] })
+
+const dueno = [
+  new Paragraph({ spacing: { after: 60 }, children: [t('El Comerciante Digital · uso interno', { color: VERDE, bold: true, size: 22 })] }),
+  new Paragraph({ heading: HeadingLevel.TITLE, spacing: { after: 120 }, children: [t('Activar Pagos ME a un Fundador')] }),
+  p(t('Tu guía paso a paso: qué revisar antes, qué decirle, cómo instalarlo con él y qué mostrarle. Unos 20 minutos por Fundador.', { color: GRIS })),
+
+  h1('1. Antes de la llamada (tú solo, 3 min)'),
+  check('Es de ', b('Venezuela'), ' (Pagos ME es solo VE).'),
+  check('Tiene ', b('sus cuentas de MercadoLibre conectadas'), ' en el sistema y ya entran sus ventas. Sin eso, la lista de Ventas sale vacía y el sistema no puede comprobar de qué cuenta es cada Chrome.'),
+  check('Tiene ', b('Despachos'), ' prendido (ahí caen las guías).'),
+  check('Su usuario es ', b('administrador'), ' de su empresa (solo el admin genera el código de conexión).'),
+  check(b('Plataforma'), ' → abre su empresa → Módulos → prende ', b('Pagos ME'), '. Le aparece en el menú ', b('Automatiza → Pagos ME'), '.'),
+  check('El horario automático ya viene puesto: ', b('lunes a sábado, 8:00, 12:00, 4:00 y 7:00 p. m.'), ' Si quiere otro, se cambia con él en la llamada.'),
+  check('Ten a mano la guía para Fundadores en PDF, para mandársela al terminar.'),
+
+  h1('2. Qué decirle (el porqué, 1 min)'),
+  dice('Esto te ahorra entrar al portal de MercadoEnvíos venta por venta. Un programa en tu PC trae solo los pagos, los comprobantes y las guías de todas tus cuentas.'),
+  dice('Tú solo revisas que cada pago llegó al banco, con un clic, y las guías ya te esperan en Despachos para imprimir.'),
+  dice('Tu contraseña no sale de tu PC: usa la sesión de MercadoLibre que ya tienes abierta en Chrome, y solo lee el portal, no cambia nada.'),
+
+  h1('3. Qué necesita él (pídelo antes de conectarte)'),
+  vineta('La ', b('PC con Windows donde imprime las guías'), ', prendida en los horarios en que quiere traer.'),
+  vineta(b('Google Chrome con un perfil por cada cuenta de MercadoLibre'), ' y la sesión de ML abierta en cada perfil. Si usa una sola cuenta, basta con un perfil.'),
+  vineta('Su usuario y clave de El Comerciante Digital (admin).'),
+  vineta('RustDesk abierto, si lo vas a acompañar desde tu PC.'),
+
+  h1('4. Instalación con él (10 min)'),
+  p('Sigue la guía para Fundadores; aquí va solo lo que tienes que mirar en cada paso.'),
+  tabla([
+    ['Paso', 'Qué revisar / qué decirle'],
+    ['1. Pagos ME', 'Entrar desde ESA PC. Debe ver el recuadro verde con los pasos.'],
+    ['2. Programa', 'Sale «Windows protegió su PC»: decirle que es normal (programa nuevo sin firma comprada). Más información → Ejecutar de todas formas.'],
+    ['3. Código', 'Lo genera ÉL en Pagos ME («Genera tu código»). Vale 60 min y sirve para el programa y para todas las extensiones.'],
+    ['4. Finalizar', 'Dejar marcadas «Arrancar el programa» y «Ver cómo agregar el Asistente». Si aparece una casilla «Abrir la carpeta de la extensión», desmarcarla.'],
+    ['5. Extensión', 'Mirar en QUÉ perfil de Chrome se abrió la tienda: tiene que ser el de una cuenta de ML. «Leer tu historial» lo pide Chrome por un permiso técnico: no lee su historial. No hace falta «Iniciar sesión en Chrome».'],
+    ['6. Conectar', 'Rompecabezas → pin → abrir el Asistente → mismo código → Conectar. Debe decir «Conectado al sistema» con su cuenta de MercadoEnvíos.'],
+    ['7. Otras cuentas', 'En cada perfil: app.elcomerciantedigital.com/extension → Añadir → mismo código. El programa no se reinstala.'],
+    ['8. Prueba', '«Traer pagos y guías». No tocar Chrome mientras trabaja. En 1–2 min: aviso verde ✅ Listo con lo de cada cuenta. Ícono ME verde junto al reloj.'],
+  ]),
+
+  h1('5. Qué mostrarle después de la prueba (5 min)'),
+  paso('A', 'Pagos ME → pestaña Ventas'),
+  vineta(b('Por verificar'), ': abre una, muéstrale el pago, el comprobante y la guía. Toca ', b('✓ Pago correcto'), '.'),
+  vineta('Esa venta pasa a ', b('Listos para despachar'), '.'),
+  vineta(b('🏦 Comprobar con el banco'), ': si usa Bancamiga, Banesco, Mercantil o Provincial, súbele un estado de cuenta y que vea cómo aprueba solos los seguros. Con Banco de Venezuela no funciona.'),
+  paso('B', 'Despachos'),
+  vineta('Muéstrale que la guía ', b('ya está en el lote'), ' sin haberla bajado.'),
+  vineta('Muéstrale una con ', b('«Pago sin verificar»'), ': no se imprime hasta verificar. Si hace falta despachar una igual, existe ', b('Despachar igual'), '.'),
+
+  h1('6. Las 3 cosas que tiene que recordar'),
+  recuadro('Díselas al cerrar', [
+    [b('1. Verificar antes de imprimir.'), ' Si no verifica, Despachos no le imprime esas guías.'],
+    [b('2. Ya no bajar guías del portal a mano.'), ' Si sube una guía a mano, el programa no trae el pago de esa venta.'],
+    [b('3. La PC prendida en los horarios.'), ' Si estaba apagada no pasa nada: al prenderla trae lo que faltaba.'],
+  ]),
+
+  h1('7. Si algo falla'),
+  tabla([
+    ['Lo que ve', 'Qué hacer'],
+    ['El código no sirve', 'Venció (60 min) o se escribió mal. Generar otro: lo ya conectado sigue funcionando.'],
+    ['Aviso rojo «la cuenta no corresponde»', 'Ese Chrome tiene abierta otra cuenta de MercadoEnvíos. Entrar al portal con la cuenta correcta en ese perfil.'],
+    ['Una cuenta no trajo nada', 'Ver que su perfil tenga la extensión «Conectado» y la sesión de ML abierta (la extensión entra sola al portal si ML está abierto). Volver a Traer.'],
+    ['Ícono ME rojo / «PC sin señal»', 'Sin internet o PC apagada. Si sigue, cerrar sesión de Windows y volver a entrar (el programa arranca solo).'],
+    ['Venta pagada en «Sin pago todavía»', 'Traer de nuevo. Si sigue: en el portal ese pago no tiene comprobante, o su guía ya estaba en Despachos (subida a mano).'],
+    ['Guía «Pago sin verificar»', 'Verificar en Pagos ME → Ventas, o «Despachar igual».'],
+    ['Venta con retiro en tienda', 'Normal: no lleva guía y no va a Despachos.'],
+  ]),
+
+  h1('8. Después (al día siguiente)'),
+  vineta('En ', b('Plataforma → Adopción'), ' mira si tiene pagos verificados. Si sale en 0, escríbele para ver si se trabó.'),
+  vineta('Pregúntale si las guías salieron completas en Despachos el primer día.'),
+]
+
+const estilos = {
+  default: { document: { run: { font: 'Arial', size: 22 } } },
+  paragraphStyles: [
+    { id: 'Title', name: 'Title', basedOn: 'Normal', next: 'Normal', run: { size: 44, bold: true, font: 'Arial', color: '111111' } },
+    { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+      run: { size: 30, bold: true, font: 'Arial', color: VERDE }, paragraph: { outlineLevel: 0 } },
+    { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+      run: { size: 24, bold: true, font: 'Arial', color: '222222' }, paragraph: { outlineLevel: 1 } },
+  ],
+}
+const vinetas = { config: [{ reference: 'vinetas', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT,
+  style: { paragraph: { indent: { left: 540, hanging: 270 } } } }] }] }
+const seccion = (pie, children) => ({
+  properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1200, bottom: 1200, left: 1440, right: 1440 } } },
+  footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER,
+    children: [t(`${pie} · `, { size: 16, color: '999999' }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: '999999' })] })] }) },
+  children,
+})
+const docDueno = new Document({ creator: 'El Comerciante Digital', title: 'Activar Pagos ME a un Fundador', styles: estilos, numbering: vinetas,
+  sections: [seccion('Uso interno · Activar Pagos ME', dueno)] })
+Packer.toBuffer(docDueno).then(buf => {
+  const out = path.join(__dirname, 'Guia-Dueno-Activar-Pagos-ME.docx')
+  fs.writeFileSync(out, buf)
+  console.log('ok', out)
+})
 
 const doc = new Document({
   creator: 'El Comerciante Digital', title: 'Pagos de MercadoEnvíos, automáticos — Guía para Fundadores',
