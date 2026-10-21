@@ -1,9 +1,8 @@
-import { Fragment } from 'react'
 import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, PRECIO, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
@@ -132,10 +131,20 @@ export default async function DespeguePage() {
             <div>
               {/* CASO DE ÉXITO del dueño, no promesa (21-10: alguien leyó "De 0 a 11 ventas en 35 días" como lo que le iba a pasar
                   a él). Etiqueta "Caso real" + primera persona; lo que se compra es el método y el acompañamiento. */}
-              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-neutral-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-lime-400" aria-hidden="true" />
-                Caso real · mi cuenta, grabada de principio a fin
-              </p>
+              {/* Sello con la cara del dueño (recorte de la portada de la serie: su foto va abajo a la izquierda en
+                  cada miniatura) y play: es una persona real y un caso real. Lleva a los videos. */}
+              <a href="#video" className="group inline-flex items-center gap-3 rounded-2xl border border-lime-400/40 bg-lime-400/[0.08] py-2 pl-2 pr-4 transition hover:border-lime-400/70 hover:bg-lime-400/[0.12]">
+                <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-lime-400" aria-hidden="true"
+                  style={{ backgroundImage: `url(${PLAYLIST_PORTADA})`, backgroundSize: '430%', backgroundPosition: '13% 87%' }}>
+                  <span className="absolute inset-0 grid place-items-center bg-neutral-950/35">
+                    <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 text-white drop-shadow" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  </span>
+                </span>
+                <span className="leading-tight">
+                  <span className="block text-xs font-bold uppercase tracking-[0.18em] text-lime-400">Caso real</span>
+                  <span className="block text-sm text-neutral-200">Mi cuenta, grabada de principio a fin <span className="text-lime-400 transition group-hover:translate-y-0.5">· ver ↓</span></span>
+                </span>
+              </a>
               <h1 className="mt-4 text-[2.1rem] font-semibold leading-[1.08] tracking-tight sm:text-[3.4rem]">
                 Así llevé una cuenta nueva de <span className="text-neutral-500">0</span> a <span className="text-lime-400">11 ventas</span>{' '}
                 <span className="whitespace-nowrap">en <span className="text-lime-400">35 días</span>.</span>
@@ -171,11 +180,16 @@ export default async function DespeguePage() {
               <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/20" />
               <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border border-lime-400/25" />
               {/* Gancho (21-10, opción B elegida por el dueño): las preguntas de quien no sabe qué vender. */}
-              <p className="relative text-lg font-medium leading-snug text-neutral-200 sm:text-xl">
-                {/* Cada pregunta entera en su línea si no cabe (no se corta a la mitad). */}
-                {/* El espacio va FUERA de cada pregunta: dentro del nowrap no habría dónde partir la línea (21-10: se salía de la pantalla). */}
-                {['¿Qué vender?', '¿Qué se mueve?', '¿Qué está creciendo?'].map(q => <Fragment key={q}><span className="whitespace-nowrap">{q}</span>{' '}</Fragment>)}
-              </p>
+              {/* Fichas-ETIQUETA (no botones: sin efecto al pasar el mouse), con el "?" en verde. flex-wrap: en celular
+                  bajan a otra fila enteras, nunca se cortan. */}
+              <ul className="relative flex flex-wrap gap-2">
+                {['Qué vender', 'Qué se mueve', 'Qué está creciendo'].map(q => (
+                  <li key={q} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-neutral-950/60 px-2.5 py-1 text-sm font-medium text-white">
+                    <span className="font-bold text-lime-400" aria-hidden="true">¿</span>{q}<span className="font-bold text-lime-400" aria-hidden="true">?</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="relative mt-2 text-xs text-neutral-400">El Radar te responde las tres:</p>
               <p className="relative mt-3 flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime-400 text-neutral-950"><Icono d={ICONO.radar} className="h-5 w-5" /></span>
                 Domingo de Radar
