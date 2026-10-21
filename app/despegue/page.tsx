@@ -8,7 +8,7 @@ import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/Despegu
 
 export const metadata = {
   title: 'Programa Despegue',
-  description: 'De 0 ventas y reputación gris a 11 ventas, reputación verde y MercadoEnvíos gratis activo, en 35 días. '
+  description: 'Caso real: así llevé una cuenta nueva de 0 a 11 ventas en 35 días. '
     + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Solo 8 cupos.',
 }
 
@@ -129,14 +129,19 @@ export default async function DespeguePage() {
           </p>
           <div className="mt-4 grid items-center gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
             <div>
-              {/* Corto a propósito (21-10): se lee de un vistazo; el detalle (gris → verde, envío gratis) va en "Esto lo hice yo". */}
-              <h1 className="text-[2.25rem] font-semibold leading-[1.08] tracking-tight sm:text-6xl">
-                De <span className="text-neutral-500">0</span> a <span className="text-lime-400">11 ventas</span> y reputación verde{' '}
+              {/* CASO DE ÉXITO del dueño, no promesa (21-10: alguien leyó "De 0 a 11 ventas en 35 días" como lo que le iba a pasar
+                  a él). Etiqueta "Caso real" + primera persona; lo que se compra es el método y el acompañamiento. */}
+              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-neutral-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-lime-400" aria-hidden="true" />
+                Caso real · mi cuenta, grabada de principio a fin
+              </p>
+              <h1 className="mt-4 text-[2.1rem] font-semibold leading-[1.08] tracking-tight sm:text-[3.4rem]">
+                Así llevé una cuenta nueva de <span className="text-neutral-500">0</span> a <span className="text-lime-400">11 ventas</span>{' '}
                 <span className="whitespace-nowrap">en <span className="text-lime-400">35 días</span>.</span>
               </h1>
               <p className="mt-5 leading-relaxed text-neutral-400 lg:text-lg">
-                Lo hice con una cuenta desde cero, y lo grabé todo. En <b className="text-white">8 semanas</b> te enseño a hacer lo
-                mismo con <b className="text-white">tu cuenta</b>, <b className="text-white">empieces de cero o ya tengas una</b>, acompañado de principio a fin.
+                Te muestro cómo lo hice, paso a paso. En <b className="text-white">8 semanas</b> te acompaño a aplicar
+                <b className="text-white"> el mismo método en tu cuenta</b>, empieces de cero o ya tengas una.
               </p>
               <p className="mt-5 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border border-lime-400/30 bg-lime-400/[0.07] px-4 py-1.5 text-sm sm:rounded-full">
                 <span className="font-semibold text-lime-400">Empieza el {fechaLarga(inicio)}</span>
@@ -150,6 +155,7 @@ export default async function DespeguePage() {
                 </a>
               </div>
               <div className="mt-6 max-w-sm">{cuposBarra()}</div>
+              <p className="mt-3 max-w-sm text-xs text-neutral-500">Tus resultados dependen de tu producto, tu capital y tu trabajo.</p>
             </div>
 
             {/* Lo que te llevas (21-10, en lugar del cuadro día 1 → día 35, que repetía el título): el Domingo de Radar con
