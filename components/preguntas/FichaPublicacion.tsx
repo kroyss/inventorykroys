@@ -5,6 +5,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
 import { createPortal } from 'react-dom'
+import { puede } from '@/lib/permisos'
+import CambiarStock from './CambiarStock'
 import type { Ficha } from '@/app/api/preguntas/publicacion/route'
 
 const dinero = (n: number, moneda: string) =>
@@ -35,6 +37,11 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
   // parecía "elegida" la de la primera foto (17-10: se confundía con la agotada).
   const [tocada, setTocada] = useState<number | null>(null)
   const [desc, setDesc] = useState(false)
+  // Cambiar stock desde la ficha (21-10, ventana CambiarStock), solo con el permiso; al guardar se relee la ficha.
+  const { data: ses } = useSession()
+  const puedeStock = !!ses?.user && puede(ses.user, 'reponer_stock')
+  const [stock, setStock] = useState(false)
+  const [recarga, setRecarga] = useState(0)
 
   useEffect(() => {
     let vivo = true
@@ -49,13 +56,15 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
       })
       .catch(() => vivo && setF({ error: 'Sin conexión' }))
     return () => { vivo = false }
-  }, [item])
+  }, [item, recarga])
 
   const n = f && !('error' in f) ? f.fotos.length : 0
   useEffect(() => {
     // En captura en window (antes que los de document) y sin propagar: Esc cierra solo la ficha, no la
     // ventana de atrás (Nueva venta, "Lo que se habló" de Por confirmar, que escuchan en document).
     const tecla = (e: KeyboardEvent) => {
+      // Con la ventana de stock abierta encima, las teclas son de ella (Esc la cierra a ella, no a la ficha).
+      if (stock) return
       if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onCerrar() }
       else if (e.key === 'ArrowRight' && n > 1) setFoto(i => (i + 1) % n)
       else if (e.key === 'ArrowLeft' && n > 1) setFoto(i => (i - 1 + n) % n)
@@ -64,7 +73,7 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
     const antes = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { window.removeEventListener('keydown', tecla, true); document.body.style.overflow = antes }
-  }, [n, onCerrar])
+  }, [n, onCerrar, stock])
 
   // Portal al body: encima de cualquier ventana (p. ej. Nueva venta), sin heredar su posición.
   return createPortal(
@@ -145,7 +154,13 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
                 <div className="flex flex-wrap gap-1.5 text-xs">
                   <span className={`rounded-full px-2.5 py-1 font-medium ${f.disponible > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
                     {f.disponible > 0 ? `${f.disponible} disponibles` : 'Sin stock'}
+                    {puedeStock && (
+                      <button type="button" onClick={() => setStock(true)} title="Cambiar stock en MercadoLibre" aria-label="Cambiar stock en MercadoLibre"
+                        className="-mr-1 ml-1 rounded-full px-1 opacity-60 hover:bg-black/5 hover:opacity-100">✎</button>
+                    )}
                   </span>
+                  {stock && <CambiarStock item={item} variante={marcar ? String(marcar.id) : null} origen="ficha"
+                    onCerrar={() => setStock(false)} onGuardado={() => setRecarga(n => n + 1)} />}
                   {/* Con peso: el envío gratis real a este precio (19-10); sin peso, lo que dice ML. */}
                   {f.envio ? (
                     f.envio.estado === 'ambas' ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800">Envío gratis</span>

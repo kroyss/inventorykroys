@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import { PageHeader, Tabs, Cargando } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { AbrirFicha } from './FichaPublicacion'
+import CambiarStock from './CambiarStock'
 
 interface Fila {
   item_id: string; variante_id: string; titulo: string; variante: string | null; disponible: number; estado: string
   permalink: string | null; imagen: string | null; agotada_desde: string | null; bajo_desde: string | null
   ultima_agotada_at: string | null; cuenta: string
   pausada_desde?: string | null   // migración 101: pausada a mano (con stock)
+  sub_status?: string | null      // migración 111: motivo de ML (vacío = la pausó el vendedor)
   caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
 }
 interface Datos {
@@ -120,6 +122,46 @@ export default function AlertasStockClient() {
   }
   const cuantas = (datos?.filas ?? []).filter(f => marcadas.has(clave(f)) && (nuevo[clave(f)] ?? '') !== '').length
 
+  // Pausadas (21-10): reactivar desde aquí (una o varias, de a 10) y "✎" para cambiar el stock en la ventana
+  // única (CambiarStock). Las que ML frenó (en revisión, infracción…) no se ofrecen: hay que verlas en ML.
+  const frenadaPorML = (f: Fila) => /under_review|forbidden|suspended|waiting_for_patch|freezed|banned/.test(f.sub_status ?? '')
+  const [selP, setSelP] = useState<Set<string>>(new Set())
+  const [reactivando, setReactivando] = useState<{ hechas: number; total: number } | null>(null)
+  const [stockDe, setStockDe] = useState<Fila | null>(null)
+  const alternarP = (f: Fila) => setSelP(m => { const x = new Set(m); if (x.has(clave(f))) x.delete(clave(f)); else x.add(clave(f)); return x })
+  const reactivar = async (lista: Fila[]) => {
+    if (!lista.length) return
+    const cuentas = [...new Set(lista.map(f => f.cuenta))].join(', ')
+    if (!await confirm({ title: lista.length === 1 ? 'Reactivar en MercadoLibre' : `Reactivar ${lista.length} publicaciones`,
+      message: lista.length === 1 ? `«${lista[0].titulo}» en ${lista[0].cuenta} vuelve a estar a la venta con ${lista[0].disponible} u.`
+        : `Vuelven a estar a la venta en ${cuentas}, con el stock que tiene cada una.`,
+      confirmText: 'Reactivar' })) return
+    setAviso(null)
+    const res: Record<string, { ok: boolean; error?: string }> = {}
+    setReactivando({ hechas: 0, total: lista.length })
+    try {
+      for (let i = 0; i < lista.length; i += 10) {
+        const lote = lista.slice(i, i + 10)
+        const r = await fetch('/api/stock-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cambios: lote.map(f => ({ item_id: f.item_id, variante_id: null, cantidad: null })), reactivar: true, origen: 'pausadas' }) })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) { setAviso({ ok: false, texto: d.error ?? 'No se pudo reactivar' }); break }
+        for (const x of d.resultados as { item_id: string; ok: boolean; error?: string }[]) {
+          const f = lote.find(y => y.item_id === x.item_id)
+          if (f) res[clave(f)] = x
+        }
+        setReactivando({ hechas: Math.min(i + 10, lista.length), total: lista.length })
+      }
+    } finally { setReactivando(null) }
+    setResultado(r => ({ ...r, ...res }))
+    const bien = Object.values(res).filter(x => x.ok).length, mal = Object.values(res).length - bien
+    if (Object.keys(res).length) setAviso({ ok: mal === 0, texto: `${bien} reactivada${bien === 1 ? '' : 's'} en MercadoLibre${mal ? ` · ${mal} no se pudo (mira cada fila)` : ''}.` })
+    // Las que quedaron activas salen de la lista al momento; el resto se recarga detrás.
+    setDatos(d => d && { ...d, filas: d.filas.filter(f => !res[clave(f)]?.ok), contadores: { ...d.contadores, pausadas: Math.max(0, d.contadores.pausadas - bien) } })
+    setSelP(new Set())
+    setVez(n => n + 1)
+  }
+
   const q = buscar.trim().toLowerCase()
   const filas = (datos?.filas ?? []).filter(f => !q || `${f.titulo} ${f.variante ?? ''} ${f.item_id} ${f.cuenta}`.toLowerCase().includes(q))
   const calientes = filas.filter(f => f.caliente)
@@ -139,6 +181,11 @@ export default function AlertasStockClient() {
     // Celular: dos líneas (arriba foto, título y estado; abajo casilla, stock nuevo y botón); antes todo en una
     // línea y el estado se salía del margen. Desde sm: una sola línea en el orden del código (sm:order-none).
     <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2">
+      {datos?.puedeStock && vista === 'pausadas' && (
+        <input type="checkbox" checked={selP.has(clave(f))} onChange={() => alternarP(f)} disabled={frenadaPorML(f)}
+          title={frenadaPorML(f) ? 'MercadoLibre la frenó: revísala en MercadoLibre' : 'Marcar para reactivar'}
+          className="order-5 sm:order-none w-4 h-4 accent-neutral-900 shrink-0" />
+      )}
       {datos?.puedeStock && vista !== 'pausadas' && (
         <input type="checkbox" checked={marcadas.has(clave(f))} onChange={() => alternar(f)} disabled={(nuevo[clave(f)] ?? '') === ''}
           title={(nuevo[clave(f)] ?? '') === '' ? 'Escribe primero el stock nuevo' : 'Incluir en la actualización'}
@@ -164,6 +211,7 @@ export default function AlertasStockClient() {
         <p className="text-xs text-neutral-500 truncate">
           {f.cuenta} · {f.item_id}
           {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML</span>}
+          {vista === 'pausadas' && frenadaPorML(f) && <span className="text-red-600"> · MercadoLibre la frenó (en revisión): revísala en ML</span>}
         </p>
         {resultado[clave(f)] && !resultado[clave(f)].ok && <p className="text-xs text-red-600">{resultado[clave(f)].error}</p>}
       </div>
@@ -174,7 +222,15 @@ export default function AlertasStockClient() {
       )}
       {/* "Volver a avisar" solo si la quitaron a mano y todavía está dentro de los 7 días (si no, ya es vieja). */}
       {/* Columna de ancho fijo (con o sin botón) para que el stock y el estado queden alineados. */}
-      <div className="order-7 sm:order-none ml-auto sm:ml-0 sm:w-32 shrink-0 flex justify-end">
+      <div className={`order-7 sm:order-none ml-auto sm:ml-0 shrink-0 flex items-center justify-end gap-1.5 ${vista === 'pausadas' && datos?.puedeStock ? 'sm:w-64' : 'sm:w-32'}`}>
+        {vista === 'pausadas' && datos?.puedeStock && !frenadaPorML(f) && <>
+          <button type="button" onClick={() => setStockDe(f)} title="Cambiar el stock (y reactivar) en MercadoLibre" aria-label="Cambiar stock"
+            className="inline-flex items-center rounded-full border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:border-neutral-500">✎</button>
+          <button type="button" onClick={() => reactivar([f])} disabled={!!reactivando}
+            className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-300 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
+            ▶ Reactivar
+          </button>
+        </>}
         {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
           title={vista === 'pausadas' ? (f.caliente ? 'Ya la revisaste: sale de la lista (vuelve si la reactivas y la pausas de nuevo)' : 'Vuelve a la lista')
             : f.caliente ? 'No hay para reponer: deja de avisar hasta que lo repongas y vuelva a agotarse' : 'Vuelve a contar en el aviso'}
@@ -244,6 +300,29 @@ export default function AlertasStockClient() {
             {enviando ? 'Actualizando…' : `Actualizar en MercadoLibre${cuantas ? ` (${cuantas})` : ''}`}
           </button>
         </div>
+      )}
+
+      {datos?.puedeStock && vista === 'pausadas' && (datos.filas.length > 0 || aviso) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-2.5">
+          <p className="text-sm text-neutral-600">
+            {reactivando ? `Reactivando ${reactivando.hechas} de ${reactivando.total}… no cierres esta pantalla.`
+              : aviso ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
+              : 'Marca las que quieras volver a poner a la venta, o usa ▶ en cada una. Con ✎ cambias el stock antes.'}
+          </p>
+          <button onClick={() => reactivar((datos?.filas ?? []).filter(f => selP.has(clave(f))))} disabled={!selP.size || !!reactivando}
+            className="btn-primary text-sm disabled:opacity-40">
+            {reactivando ? 'Reactivando…' : `Reactivar en MercadoLibre${selP.size ? ` (${selP.size})` : ''}`}
+          </button>
+        </div>
+      )}
+      {stockDe && (
+        <CambiarStock item={stockDe.item_id} origen="pausadas" onCerrar={() => setStockDe(null)}
+          onGuardado={res => {
+            if (res.some(r => r.item_id === stockDe.item_id && r.estado === 'active')) {
+              setDatos(d => d && { ...d, filas: d.filas.filter(x => x.item_id !== stockDe.item_id) })
+            }
+            setVez(n => n + 1)
+          }} />
       )}
 
       {/* Al cambiar de pestaña no se muestra la lista anterior mientras llega la nueva. */}

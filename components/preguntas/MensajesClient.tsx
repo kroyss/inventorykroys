@@ -361,7 +361,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
                   {it.variante && (
                     <span className="ml-1.5 inline-block align-middle text-xs font-medium text-sky-800 bg-sky-50 ring-1 ring-inset ring-sky-200 rounded-full px-2 py-0.5">{it.variante}</span>
                   )}
-                  {it.situacion && <span className="ml-1.5 inline-block align-middle"><SituacionChip s={it.situacion} disp={it.disponible} /></span>}
+                  {it.situacion && <span className="ml-1.5 inline-block align-middle"><SituacionChip s={it.situacion} disp={it.disponible} item={/^[A-Z]{3}\d+$/.test(it.id) ? it.id : null} variante={it.variacion != null ? String(it.variacion) : null} origen="mensajes" /></span>}
                 </p>
                 {/* Cantidad × precio = total (ML muestra "6 x precio" sin el total). En bolívares, también
                     el dólar al que se vendió (con el descuento): "2 × US$ 12,50 · Bs 2.300,00 = US$ 25,00 · Bs 4.600,00". */}

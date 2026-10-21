@@ -1,5 +1,6 @@
 'use client'
 import SituacionChip, { type Situacion } from './SituacionChip'
+import CambiarStock from './CambiarStock'
 import TextoConPublicaciones from './TextoConPublicaciones'
 import { AbrirFicha } from './FichaPublicacion'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
@@ -84,7 +85,7 @@ function Producto({ p, umbral = null }: { p: Pregunta; umbral?: number | null })
           ? <span className="font-medium text-neutral-800 line-clamp-2 sm:truncate max-w-[30rem]">{nombre}</span>
           : <span className="text-neutral-500">Publicación sin vincular a un producto</span>}
       {p.producto_code && <span className="hidden sm:inline font-mono text-neutral-400">{p.producto_code}</span>}
-      <SituacionChip s={p.item_situacion} disp={p.item_disponible} />
+      <SituacionChip s={p.item_situacion} disp={p.item_disponible} item={p.item_id} origen="preguntas" />
       <Precio p={p} umbral={umbral} />
       {p.producto_stock !== null && (
         <span className={p.producto_stock > 0 ? 'text-emerald-700' : 'text-red-600'} title="Stock del sistema (tu inventario), no el de la publicación">
@@ -566,7 +567,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
         {avisosTexto.length > 0 && <p className="text-xs text-amber-700">Ojo: {avisosTexto.join(' · ')}. Puedes publicar igual; al publicar se verifica si quedó.</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
         {pausada && (
-          <Reponer id={p.id} esAdmin={esAdmin} hayTexto={!!texto.trim() && problemas.length === 0}
+          <Reponer item={p.item_id} esAdmin={esAdmin} hayTexto={!!texto.trim() && problemas.length === 0}
             onRepuesta={(estado, publicar) => { setEstadoItem(estado); setError(null); if (publicar && estado === 'active') enviar() }} />
         )}
       </div>
@@ -705,66 +706,32 @@ function CuentasYPoliticas() {
 
 /** Publicación pausada (sin stock): MercadoLibre no deja responder. Reponer la cantidad desde aquí
  *  (admin) y, si ya hay respuesta escrita, publicarla en el mismo paso. */
-function Reponer({ id, esAdmin, hayTexto, onRepuesta }: {
-  id: string; esAdmin: boolean; hayTexto: boolean; onRepuesta: (estado: string, publicar: boolean) => void
+// Publicación pausada: ML no deja responder. Se queda el aviso; el stock se cambia en la ventana única
+// (CambiarStock, 21-10): todas las variantes, la gemela de la otra cuenta, reactivar si estaba pausada a mano y
+// "Publicar mi respuesta al guardar" (antes "Reponer y publicar respuesta").
+function Reponer({ item, esAdmin, hayTexto, onRepuesta }: {
+  item: string; esAdmin: boolean; hayTexto: boolean; onRepuesta: (estado: string, publicar: boolean) => void
 }) {
-  const [info, setInfo] = useState<{ disponible: number; variantes: { id: string; nombre: string; disponible: number }[] } | null>(null)
-  const [cantidad, setCantidad] = useState('')
-  const [variante, setVariante] = useState('')
-  const [enviando, setEnviando] = useState(false)
+  const [abierta, setAbierta] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!esAdmin) return
-    let vivo = true
-    fetch(`/api/preguntas/${id}/reponer`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setInfo(d) }).catch(() => {})
-    return () => { vivo = false }
-  }, [id, esAdmin])
-
-  const reponer = async (publicar: boolean) => {
-    const n = parseInt(cantidad, 10)
-    if (!(n >= 1)) return
-    setEnviando(true); setError(null)
-    try {
-      const r = await fetch(`/api/preguntas/${id}/reponer`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cantidad: n, variante_id: variante || null }),
-      })
-      const d = await r.json().catch(() => ({}))
-      if (!r.ok) { setError(d.error ?? 'No se pudo reponer'); return }
-      if (d.estado !== 'active') { setError('Se cargó el stock, pero MercadoLibre todavía la muestra pausada. Actívala en MercadoLibre y vuelve a publicar.'); return }
-      onRepuesta(d.estado, publicar)
-    } finally { setEnviando(false) }
-  }
-
-  const conVariantes = (info?.variantes.length ?? 0) > 0
   return (
     <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2 text-sm">
       <p className="text-amber-900">
         <b>MercadoLibre no deja responder:</b> la publicación está pausada, casi siempre porque se quedó sin stock.
-        {esAdmin ? ' Si tienes unidades, repónlas aquí y se reactiva. Si no, elimina la pregunta.' : ' Pídele a un administrador que reponga el stock, o elimina la pregunta.'}
+        {esAdmin ? ' Si tienes unidades, repónlas y se reactiva. Si no, elimina la pregunta.' : ' Pídele a un administrador que reponga el stock, o elimina la pregunta.'}
       </p>
       {esAdmin && (
-        <div className="flex flex-wrap items-center gap-2">
-          {conVariantes && (
-            <select value={variante} onChange={e => setVariante(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-              <option value="">Elige la variante…</option>
-              {info!.variantes.map(v => <option key={v.id} value={v.id}>{v.nombre} ({v.disponible} u.)</option>)}
-            </select>
-          )}
-          <input inputMode="numeric" value={cantidad} onChange={e => setCantidad(e.target.value.replace(/\D/g, '').slice(0, 5))}
-            placeholder="Unidades" className="w-24 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm text-right num bg-white" />
-          <button onClick={() => reponer(false)} disabled={enviando || !cantidad || (conVariantes && !variante)} className="btn-secondary text-sm">
-            {enviando ? 'Reponiendo…' : 'Reponer stock'}
-          </button>
-          {hayTexto && (
-            <button onClick={() => reponer(true)} disabled={enviando || !cantidad || (conVariantes && !variante)} className="btn-primary text-sm">
-              Reponer y publicar respuesta
-            </button>
-          )}
-        </div>
+        <button type="button" onClick={() => { setError(null); setAbierta(true) }} className="btn-secondary text-sm">Reponer stock…</button>
       )}
       {error && <p className="text-xs text-red-600">{error}</p>}
+      {abierta && (
+        <CambiarStock item={item} origen="preguntas" publicar={hayTexto} onCerrar={() => setAbierta(false)}
+          onGuardado={(res, publicar) => {
+            const estado = [...res].reverse().find(r => r.item_id === item)?.estado ?? 'paused'
+            if (estado !== 'active') { setError('Se guardó, pero MercadoLibre todavía la muestra pausada: revísala en MercadoLibre.'); return }
+            onRepuesta(estado, publicar)
+          }} />
+      )}
     </div>
   )
 }

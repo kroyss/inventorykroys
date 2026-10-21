@@ -74,7 +74,7 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
     const lote = ids.slice(i, i + POR_MULTIGET)
     const r = await mlFetch<{ code: number; body: ItemML }[]>(db, conexionId,
       `/items?ids=${lote.join(',')}&attributes=id,title,status,sub_status,available_quantity,permalink,thumbnail,variations`)
-    const filas: { item: string; var: number; titulo: string; variante: string | null; disp: number; estado: string; link: string | null; img: string | null }[] = []
+    const filas: { item: string; var: number; titulo: string; variante: string | null; disp: number; estado: string; link: string | null; img: string | null; sub: string | null }[] = []
     for (const x of r) {
       const it = x.code === 200 ? x.body : null
       if (!it) continue
@@ -84,10 +84,12 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
       // por publicación. Pausada por falta de stock sí es alerta (agotada).
       if (it.status === 'paused' && !(it.sub_status ?? []).includes('out_of_stock') && it.available_quantity > 0) {
         filas.push({ item: it.id, titulo: it.title, estado: 'pausada', link: it.permalink ?? null, img: it.thumbnail ?? null,
-          var: 0, variante: null, disp: it.available_quantity })
+          var: 0, variante: null, disp: it.available_quantity,
+          // El motivo de ML (migración 111): vacío = la pausó el vendedor; under_review/forbidden… = la frenó ML.
+          sub: (it.sub_status ?? []).join(',') || null })
         continue
       }
-      const base = { item: it.id, titulo: it.title, estado: it.status, link: it.permalink ?? null, img: it.thumbnail ?? null }
+      const base = { item: it.id, titulo: it.title, estado: it.status, link: it.permalink ?? null, img: it.thumbnail ?? null, sub: null }
       if (it.variations?.length) {
         for (const v of it.variations) {
           const nombre = (v.attribute_combinations ?? []).map(a => `${a.name}: ${a.value_name ?? '—'}`).join(' · ') || null
@@ -100,15 +102,15 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
     if (!filas.length) continue
     await db.query(
       `INSERT INTO ml_stock_alertas AS a (item_id, variante_id, conexion_id, titulo, variante, disponible, estado, permalink, imagen,
-                                          agotada_desde, bajo_desde, ultima_agotada_at, pausada_desde, actualizado_at)
+                                          agotada_desde, bajo_desde, ultima_agotada_at, pausada_desde, actualizado_at, sub_status)
        SELECT f.item, f.var, $1, f.titulo, f.variante, f.disp, f.estado, f.link, f.img,
               CASE WHEN f.estado <> 'pausada' AND f.disp <= 0 THEN NOW() END,
               CASE WHEN f.estado <> 'pausada' AND f.disp > 0 AND f.disp < $2 THEN NOW() END,
               CASE WHEN f.estado <> 'pausada' AND f.disp <= 0 THEN NOW() END,
               CASE WHEN f.estado = 'pausada' THEN NOW() END,
-              NOW()
-       FROM unnest($3::text[], $4::bigint[], $5::text[], $6::text[], $7::int[], $8::text[], $9::text[], $10::text[])
-            AS f(item, var, titulo, variante, disp, estado, link, img)
+              NOW(), f.sub
+       FROM unnest($3::text[], $4::bigint[], $5::text[], $6::text[], $7::int[], $8::text[], $9::text[], $10::text[], $11::text[])
+            AS f(item, var, titulo, variante, disp, estado, link, img, sub)
        ON CONFLICT (empresa_id, item_id, variante_id) DO UPDATE SET
          conexion_id = EXCLUDED.conexion_id, titulo = EXCLUDED.titulo, variante = EXCLUDED.variante,
          disponible = EXCLUDED.disponible, estado = EXCLUDED.estado, permalink = EXCLUDED.permalink, imagen = EXCLUDED.imagen,
@@ -116,10 +118,10 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
          bajo_desde = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible > 0 AND EXCLUDED.disponible < $2 THEN COALESCE(a.bajo_desde, NOW()) END,
          ultima_agotada_at = CASE WHEN EXCLUDED.estado <> 'pausada' AND EXCLUDED.disponible <= 0 THEN NOW() ELSE a.ultima_agotada_at END,
          pausada_desde = CASE WHEN EXCLUDED.estado = 'pausada' THEN COALESCE(a.pausada_desde, NOW()) END,
-         actualizado_at = NOW()`,
+         actualizado_at = NOW(), sub_status = EXCLUDED.sub_status`,
       [conexionId, umbral,
        filas.map(f => f.item), filas.map(f => f.var), filas.map(f => f.titulo), filas.map(f => f.variante),
-       filas.map(f => f.disp), filas.map(f => f.estado), filas.map(f => f.link), filas.map(f => f.img)])
+       filas.map(f => f.disp), filas.map(f => f.estado), filas.map(f => f.link), filas.map(f => f.img), filas.map(f => f.sub)])
   }
   // Lo que ya no está publicado (cerrado, borrado): fuera. Las pausadas a mano se quedan (estado 'pausada').
   await db.query(`DELETE FROM ml_stock_alertas WHERE conexion_id = $1 AND actualizado_at < $2`, [conexionId, inicio])

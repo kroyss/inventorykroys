@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const [{ rows }, { rows: [n] }, { rows: [rev] }] = await Promise.all([
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
-                a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, c.nickname AS cuenta,
+                a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
                 ${caliente} AS caliente, a.descartada_at
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
