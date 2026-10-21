@@ -2,25 +2,25 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, CUOTA, PRECIO, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PRECIO, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
 export const metadata = {
   title: 'Programa Despegue',
   description: 'De 0 ventas y reputación gris a 11 ventas, reputación verde y MercadoEnvíos gratis activo, en 35 días. '
-    + '8 semanas de acompañamiento para empezar a vender en MercadoLibre Venezuela. Solo 8 cupos.',
+    + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Solo 8 cupos.',
 }
 
 // Íconos de trazo (24×24).
 const INCLUYE = [
-  { t: 'Reunión en vivo cada semana', s: '90 min por Meet',
+  { t: 'Reunión en vivo cada semana', s: '60 min por Meet',
     d: 'El tema de la semana y revisión de cuentas en vivo: aprendes también de los casos de los demás.',
     i: 'M15 10l4.6-2.3A1 1 0 0 1 21 8.6v6.8a1 1 0 0 1-1.4.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z' },
   { t: 'Domingo de Radar', s: '24 horas de acceso completo',
     d: 'Cada domingo del programa, nuestro Radar de MercadoLibre abierto para ti: qué se vende, a qué precio y con cuánta competencia.',
     i: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0-1 6-6' },
-  { t: '3 sesiones solo para ti', s: '1 a 1',
+  { t: '3 sesiones solo para ti', s: '45 min cada una, 1 a 1',
     d: 'Diagnóstico de tu cuenta al inicio, revisión a mitad del programa y tu plan de cierre.',
     i: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1' },
   { t: 'Grupo de Telegram', s: 'con los demás del programa',
@@ -33,8 +33,18 @@ const INCLUYE = [
 
 const PARA_TI = [
   'Quieres empezar a vender en MercadoLibre y no sabes por dónde.',
-  'Tienes una cuenta parada o que vende poco.',
+  'Tienes una cuenta con publicaciones pero vendes poco, o está parada, y quieres saber qué corregir.',
   'Quieres hacerlo con método, no a prueba y error.',
+]
+
+// El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías,
+// 2.514 búsquedas en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo).
+const RADAR = [
+  { n: '+45.000', d: 'productos de MercadoLibre Venezuela' },
+  { n: '320', d: 'categorías' },
+  { n: '+2.500', d: 'búsquedas en tendencia: las que más crecen y las más populares' },
+  { n: '+1.100', d: 'tendencias validadas con Google Trends' },
+  { n: '+45.000', d: 'productos con su actividad medida: si suben o se apagan' },
 ]
 
 // Termómetro de reputación de MercadoLibre: gris (sin reputación) → verde.
@@ -111,7 +121,7 @@ export default async function DespeguePage() {
               </h1>
               <p className="mt-5 leading-relaxed text-neutral-400 lg:text-lg">
                 Lo hice con una cuenta desde cero, y lo grabé todo. En <b className="text-white">8 semanas</b> te enseño a hacer lo
-                mismo con <b className="text-white">tu cuenta</b>, acompañado de principio a fin.
+                mismo con <b className="text-white">tu cuenta</b>, <b className="text-white">empieces de cero o ya tengas una</b>, acompañado de principio a fin.
               </p>
               <p className="mt-5 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-lime-400/30 bg-lime-400/[0.07] px-4 py-1.5 text-sm">
                 <span className="font-semibold text-lime-400">Empieza el {fechaLarga(inicio)}</span>
@@ -178,6 +188,29 @@ export default async function DespeguePage() {
         </div>
       </section>
 
+      {/* ── Domingo de Radar ── (cifras redondeadas hacia abajo; revisarlas con cada corrida mensual del Radar) */}
+      <section className="relative overflow-hidden border-t border-white/5 bg-neutral-950 text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-1/2 h-[26rem] w-[26rem] -translate-y-1/2 rounded-full border border-lime-400/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -left-12 top-1/2 h-[16rem] w-[16rem] -translate-y-1/2 rounded-full border border-lime-400/15" />
+        <div className="relative mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">🎯 Domingo de Radar</p>
+          <h2 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">Cada domingo, el mercado completo en tus manos.</h2>
+          <p className="mt-4 max-w-2xl leading-relaxed text-neutral-400">
+            24 horas de acceso completo al <b className="text-white">Radar de Oportunidades</b>: lo que más se vende en
+            MercadoLibre Venezuela, a qué precio real y con cuánta competencia. Así eliges qué vender con datos, no con corazonadas.
+          </p>
+          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {RADAR.map((x, k) => (
+              <li key={x.d} className={`rounded-2xl border border-white/10 bg-white/[0.03] p-4 ${k === RADAR.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}>
+                <p className="text-2xl font-semibold tracking-tight text-lime-400 sm:text-3xl">{x.n}</p>
+                <p className="mt-1 text-xs leading-snug text-neutral-400">{x.d}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-neutral-500">Datos actualizados cada mes.</p>
+        </div>
+      </section>
+
       <main className="mx-auto max-w-5xl space-y-16 px-5 py-14 sm:px-8 sm:py-20">
         {/* ── Para quién ── */}
         <section className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
@@ -223,7 +256,11 @@ export default async function DespeguePage() {
         <section>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">El camino</p>
           <h2 className="mt-2 text-2xl font-semibold text-neutral-900 sm:text-3xl">Las 8 semanas</h2>
-          <p className="mt-2 text-sm text-neutral-500">Cada domingo: Radar abierto todo el día y la tarea de la semana. La reunión, en la semana.</p>
+          <p className="mt-2 text-sm text-neutral-600">
+            <b className="text-neutral-900">¿Empiezas de cero?</b> Construyes cada etapa desde el principio.{' '}
+            <b className="text-neutral-900">¿Ya tienes cuenta?</b> En cada etapa revisamos lo que tienes y corregimos lo que te frena.
+          </p>
+          <p className="mt-1 text-sm text-neutral-500">Cada domingo: Radar abierto todo el día y la tarea de la semana. La reunión, en la semana.</p>
           <ol className="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
             {SEMANAS.map(s => (
               <li key={s.fecha} className={`flex items-center gap-4 border-b border-neutral-100 px-4 py-3.5 last:border-b-0 sm:px-5 ${s.n == null ? 'bg-neutral-50' : ''}`}>
@@ -252,8 +289,8 @@ export default async function DespeguePage() {
                   <span className="text-5xl font-semibold tracking-tight sm:text-6xl">${PRECIO}</span>
                   <span className="text-lg text-neutral-500 line-through">${PRECIO_DESPUES}</span>
                 </p>
-                <p className="mt-2 text-neutral-400">Precio de lanzamiento: después será <b className="text-white">${PRECIO_DESPUES}</b>.</p>
-                <p className="mt-1 text-neutral-400">Puedes pagarlo en <b className="text-white">2 cuotas de ${CUOTA}</b>.</p>
+                <p className="mt-2 text-neutral-400">Precio de lanzamiento para este primer grupo: después será <b className="text-white">${PRECIO_DESPUES}</b>.</p>
+                <p className="mt-1 text-neutral-400"><b className="text-white">Pago único</b>: las 8 semanas completas.</p>
                 <p className="mt-4 text-sm font-medium text-lime-300">El cupo se aparta con el pago.</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">

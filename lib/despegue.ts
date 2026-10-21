@@ -16,18 +16,19 @@ export const PLAYLIST_EMBED = `https://www.youtube-nocookie.com/embed/videoserie
 /** Portada del reproductor antes de tocar play (miniatura del episodio 5, "25 días vendiendo"). */
 export const PLAYLIST_PORTADA = 'https://i.ytimg.com/vi/HDb7QVVhOPA/hqdefault.jpg'
 
-export const PRECIO = 90
-export const PRECIO_DESPUES = 120
-export const CUOTA = 45
+/** Pago único (21-10: sin cuotas). */
+export const PRECIO = 99
+export const PRECIO_DESPUES = 119
 
-/** Las 8 semanas (grupo 1). El 27-12 es descanso navideño: sin reunión y con el Radar cerrado. */
+/** Las 8 semanas (grupo 1), como ETAPAS que sirven a quien empieza de cero (la construye) y a quien ya tiene
+ *  cuenta (la revisa y la ajusta). El 27-12 es descanso navideño: sin reunión y con el Radar cerrado. */
 export const SEMANAS: { n: number | null; fecha: string; tema: string }[] = [
-  { n: 1, fecha: '2026-11-08', tema: 'Qué vender, con cuánto capital y desde dónde' },
-  { n: 2, fecha: '2026-11-15', tema: 'Tus primeras publicaciones: título, fotos y precio' },
-  { n: 3, fecha: '2026-11-22', tema: 'El precio real: comisión, envío y cuánto te queda' },
-  { n: 4, fecha: '2026-11-29', tema: 'Primeras ventas: preguntas, mensajes y rapidez' },
-  { n: 5, fecha: '2026-12-06', tema: 'MercadoEnvíos: activarlo y despachar' },
-  { n: 6, fecha: '2026-12-13', tema: 'Reputación: calificaciones y reclamos' },
+  { n: 1, fecha: '2026-11-08', tema: 'Diagnóstico y qué vender: qué conviene vender o qué está fallando en tu cuenta' },
+  { n: 2, fecha: '2026-11-15', tema: 'Publicaciones que venden: crear o corregir título, fotos y precio' },
+  { n: 3, fecha: '2026-11-22', tema: 'El precio real: comisión, envío y cuánto te queda de verdad' },
+  { n: 4, fecha: '2026-11-29', tema: 'De visitas a ventas: preguntas, mensajes y rapidez' },
+  { n: 5, fecha: '2026-12-06', tema: 'MercadoEnvíos: activarlo y despachar sin errores' },
+  { n: 6, fecha: '2026-12-13', tema: 'Reputación: subirla, cuidarla y manejar reclamos' },
   { n: 7, fecha: '2026-12-20', tema: 'Reponer y crecer en temporada' },
   { n: null, fecha: '2026-12-27', tema: 'Descanso navideño' },
   { n: 8, fecha: '2027-01-03', tema: 'Tu plan para los próximos meses' },
