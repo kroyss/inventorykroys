@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import VisitasFundadores from './VisitasFundadores'
+import DespegueCard from './DespegueCard'
 import { CUPOS_ESPERA, PREGUNTAS, PUNTO_NICK, type Pregunta } from '@/lib/fundadores'
 
 interface Tanda { numero: number; cupos: number; abierta: boolean; inscribe_desde: string | null; inscribe_hasta: string | null; tomados: number }
@@ -160,6 +161,8 @@ export default function FundadoresPanel() {
     <div className="space-y-4">
       {/* 17-10: el programa cerró. Arriba, los Fundadores y cómo van; el programa (rondas, postulaciones y
           visitas) queda plegado abajo. */}
+      {/* 21-10: el programa nuevo, arriba (cupos que se suben a mano al cobrar). */}
+      <DespegueCard />
       <ListaFundadores />
 
       <details className="group rounded-xl border border-neutral-200 bg-white px-4 py-3" open={cuenta('calificado') > 0}>
