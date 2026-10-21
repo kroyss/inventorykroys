@@ -163,13 +163,17 @@ export default async function DespeguePage() {
             <div className="relative overflow-hidden rounded-2xl border border-lime-400/50 bg-gradient-to-br from-lime-400/[0.10] via-white/[0.03] to-white/[0.02] p-5 pt-7 shadow-[0_0_70px_-20px_rgba(163,230,53,0.55)] backdrop-blur sm:p-6 sm:pt-8">
               <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/20" />
               <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border border-lime-400/25" />
-              <p className="relative flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
+              {/* Gancho (21-10, opción B elegida por el dueño): las preguntas de quien no sabe qué vender. */}
+              <p className="relative text-lg font-semibold leading-snug text-lime-400 sm:text-xl">
+                ¿Qué vender? ¿Qué se mueve? ¿Qué está creciendo?
+              </p>
+              <p className="relative mt-3 flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime-400 text-neutral-950"><Icono d={ICONO.radar} className="h-5 w-5" /></span>
                 Domingo de Radar
               </p>
               <p className="relative mt-2 text-sm leading-relaxed text-neutral-300">
-                Encuentra <b className="text-white">productos ganadores</b> con datos reales: <b className="text-white">24 horas de acceso completo</b>,
-                cada domingo del programa.
+                <b className="text-white">Deja de adivinar:</b> el Radar te lo dice con datos reales de MercadoLibre Venezuela.{' '}
+                <b className="text-white">24 horas de acceso completo</b>, cada domingo del programa.
               </p>
               <p className="relative mt-2 inline-flex items-center gap-1.5 rounded-full border border-lime-400/30 bg-lime-400/10 px-2.5 py-1 text-[11px] font-semibold text-lime-300">
                 ✓ Incluido · solo para los del Programa Despegue
