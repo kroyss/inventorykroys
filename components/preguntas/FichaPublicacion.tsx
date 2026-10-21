@@ -156,7 +156,7 @@ export function FichaPublicacion({ item, onCerrar, marcar }: { item: string; onC
                     {f.disponible > 0 ? `${f.disponible} disponibles` : 'Sin stock'}
                     {puedeStock && (
                       <button type="button" onClick={() => setStock(true)} title="Cambiar stock en MercadoLibre" aria-label="Cambiar stock en MercadoLibre"
-                        className="-mr-1 ml-1 rounded-full px-1 opacity-60 hover:bg-black/5 hover:opacity-100">✎</button>
+                        className="relative -mr-1 ml-1.5 border-l border-black/15 pl-1.5 pr-0.5 font-semibold text-neutral-800 hover:text-black after:absolute after:-inset-x-1.5 after:-inset-y-2 after:content-['']">✎</button>
                     )}
                   </span>
                   {stock && <CambiarStock item={item} variante={marcar ? String(marcar.id) : null} origen="ficha"
