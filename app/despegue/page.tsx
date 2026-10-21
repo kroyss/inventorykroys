@@ -164,7 +164,7 @@ export default async function DespeguePage() {
               <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-lime-400/20" />
               <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full border border-lime-400/25" />
               {/* Gancho (21-10, opción B elegida por el dueño): las preguntas de quien no sabe qué vender. */}
-              <p className="relative text-lg font-semibold leading-snug text-lime-400 sm:text-xl">
+              <p className="relative text-lg font-medium leading-snug text-neutral-200 sm:text-xl">
                 {/* Cada pregunta entera en su línea si no cabe (no se corta a la mitad). */}
                 {['¿Qué vender?', '¿Qué se mueve?', '¿Qué está creciendo?'].map(q => <span key={q} className="whitespace-nowrap">{q} </span>)}
               </p>
