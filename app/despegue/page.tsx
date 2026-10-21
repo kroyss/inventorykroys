@@ -131,11 +131,11 @@ export default async function DespeguePage() {
             <div>
               {/* CASO DE ÉXITO del dueño, no promesa (21-10: alguien leyó "De 0 a 11 ventas en 35 días" como lo que le iba a pasar
                   a él). Etiqueta "Caso real" + primera persona; lo que se compra es el método y el acompañamiento. */}
-              {/* Sello con la cara del dueño (recorte de la portada de la serie: su foto va abajo a la izquierda en
+              {/* Sello con la cara del dueño (recorte de la portada hqdefault 480×360 al 40%: su círculo, centro ~(60,265), cae justo en el sello de 44 px;
                   cada miniatura) y play: es una persona real y un caso real. Lleva a los videos. */}
               <a href="#video" className="group inline-flex items-center gap-3 rounded-2xl border border-lime-400/40 bg-lime-400/[0.08] py-2 pl-2 pr-4 transition hover:border-lime-400/70 hover:bg-lime-400/[0.12]">
                 <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-lime-400" aria-hidden="true"
-                  style={{ backgroundImage: `url(${PLAYLIST_PORTADA})`, backgroundSize: '430%', backgroundPosition: '13% 87%' }}>
+                  style={{ backgroundImage: `url(${PLAYLIST_PORTADA})`, backgroundSize: '192px 144px', backgroundPosition: '-2px -84px' }}>
                   <span className="absolute inset-0 grid place-items-center bg-neutral-950/35">
                     <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4 text-white drop-shadow" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                   </span>
