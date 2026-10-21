@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import AvisoPesos from '@/components/preguntas/AvisoPesos'
+import type { ConflictoPesos } from '@/lib/mlShipping'
 
 interface Producto { id: number; code: string; name: string; stock: number }
 interface Fila {
@@ -15,6 +17,8 @@ interface Fila {
   producto: { id: number; code: string; name: string; toda: boolean } | null
   ventas60: number; vinculado_por: string | null; vinculado_at: string | null; propio: boolean
   duda: { id: number; nota: string; por: string | null; creada_at: string } | null
+  otros?: { id: number; code: string; name: string }[]   // más productos con el mismo código (21-10)
+  conflicto?: ConflictoPesos | null                       // …de distinto peso y el envío gratis cambia según cuál
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
 type Filtro = 'pendientes' | 'dudas' | 'vinculadas' | 'todas'
@@ -193,9 +197,28 @@ function FilaVariante({ f, productos, esDueno, pedir, onCambio }: {
                 setOcupado(true)
                 const ok = await pedir({ accion: 'desvincular', codigo: f.codigo, product_id: f.producto!.id })
                 setOcupado(false)
-                if (ok) onCambio({ estado: 'nueva', producto: null, vinculado_por: null, vinculado_at: null, propio: false }, f.propio && f.vinculado_por === 'tú' ? -1 : 0)
+                // Si había otro producto con el mismo código, ese queda como el vinculado.
+                if (ok) onCambio(f.otros?.length
+                  ? { producto: { ...f.otros[0], toda: false }, otros: f.otros.slice(1), conflicto: null }
+                  : { estado: 'nueva', producto: null, vinculado_por: null, vinculado_at: null, propio: false }, f.propio && f.vinculado_por === 'tú' ? -1 : 0)
               }}>Deshacer</button>
             )}
+            {/* Más productos con el mismo código (21-10): antes quedaban escondidos detrás del primero. */}
+            {f.otros?.map(o => (
+              <span key={o.id} className="inline-flex items-center gap-2">
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">✓ {o.code} · {o.name}</span>
+                {esDueno && (
+                  <button disabled={ocupado} className="text-neutral-500 underline hover:text-red-600" onClick={async () => {
+                    if (!await confirm({ title: 'Deshacer el vínculo', message: `Se separa "${f.variante ?? f.titulo}" de ${o.name}.`, confirmText: 'Deshacer' })) return
+                    setOcupado(true)
+                    const ok = await pedir({ accion: 'desvincular', codigo: f.codigo, product_id: o.id })
+                    setOcupado(false)
+                    if (ok) onCambio({ otros: f.otros!.filter(x => x.id !== o.id), conflicto: null })
+                  }}>Deshacer</button>
+                )}
+              </span>
+            ))}
+            <AvisoPesos c={f.conflicto} />
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">

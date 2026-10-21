@@ -12,7 +12,8 @@ import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type S
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
-import { envioGratisAhora, type TablasEnvio } from '@/lib/mlShipping'
+import { conflictoPesos, envioGratisAhora, type PesoVinculado, type TablasEnvio } from '@/lib/mlShipping'
+import AvisoPesos from './AvisoPesos'
 
 interface Pregunta {
   id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null; datos_guardados?: number
@@ -29,6 +30,7 @@ interface Pregunta {
   comprador_id: string | null; previas: number
   item_precio: number | null; item_precio_original: number | null; item_moneda: string | null
   item_peso?: number | null    // peso del portal de MercadoEnvíos o del producto (para el envío gratis por transportista)
+  item_pesos?: PesoVinculado[] | null   // vinculada a varios productos de distinto peso (21-10): ver AvisoPesos
   envio_activo?: boolean       // la empresa tiene Promociones: se muestra el envío gratis (o que falta el peso)
   item_situacion?: Situacion   // activa / agotada / pausada (catálogo de ML)
   item_disponible?: number | null   // unidades disponibles en ML (suma de variantes)
@@ -185,10 +187,13 @@ function EnvioGratis({ p }: { p: Pregunta }) {
     : e.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'
   const txt = e.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : e.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA' : '⚠ Sin envío gratis'
   return (
-    <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${estilo}`}
-      title={`${e.texto}${e.porPromo ? ' — por la promoción: al terminar vuelve a su envío normal' : ''} · mínimos para su peso: ZOOM $${e.minZoom} · TEALCA $${e.minTealca}`}>
-      {txt}{e.porPromo ? ' · por la promo' : ''}
-    </span>
+    <>
+      <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${estilo}`}
+        title={`${e.texto}${e.porPromo ? ' — por la promoción: al terminar vuelve a su envío normal' : ''} · mínimos para su peso: ZOOM $${e.minZoom} · TEALCA $${e.minTealca}`}>
+        {txt}{e.porPromo ? ' · por la promo' : ''}
+      </span>
+      <AvisoPesos c={conflictoPesos(p.item_pesos, precioUSD(p), tablas)} />
+    </>
   )
 }
 

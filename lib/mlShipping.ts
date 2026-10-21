@@ -243,3 +243,29 @@ export function envioGratisAhora(pesoKg: number | null | undefined, precio: numb
     : 'Sin envío gratis a 1 unidad: cobro a destino'
   return { estado: e.estado, texto, porPromo, minZoom: e.minZoom, minTealca: e.minTealca }
 }
+
+// ── Publicación vinculada a varios productos de distinto peso (21-10) ───────
+// Sin peso del portal, el envío se calcula con el producto vinculado MÁS pesado (sqlPesoPublicacion). Si la
+// publicación tiene varios productos y el envío gratis cambia según cuál, casi siempre es un vínculo mal hecho
+// (MLV740065063: rollo de 30 cm unido también al de 150 cm → "Sin envío gratis"). Con el mismo resultado no se avisa.
+export interface PesoVinculado { code: string; kg: number }
+export type ConflictoPesos = (PesoVinculado & { estado: EstadoEnvio })[]
+
+export function conflictoPesos(pesos: PesoVinculado[] | null | undefined, precio: number | null | undefined,
+  tablas: TablasEnvio = TABLAS_DEFAULT): ConflictoPesos | null {
+  if (!pesos || pesos.length < 2 || precio == null || !(precio > 0)) return null
+  const c = pesos.map(p => ({ ...p, estado: envioPorTransportista(p.kg, precio, tablas).estado }))
+  return new Set(c.map(x => x.estado)).size > 1 ? c : null
+}
+
+const kgTexto = (kg: number) => `${String(Math.round(kg * 1000) / 1000).replace('.', ',')} kg`
+const ESTADO_CORTO: Record<EstadoEnvio, string> = { ambas: 'envío gratis', tealca: 'gratis solo TEALCA', destino: 'sin envío gratis', sin_peso: 'sin peso' }
+/** "⚠ Vinculada a 2 productos (0,6 kg y 3 kg)" + el detalle de cada uno, para el chip y su título. */
+export function textoConflicto(c: ConflictoPesos) {
+  const kgs = c.map(x => kgTexto(x.kg))
+  return {
+    corto: `⚠ Vinculada a ${c.length} productos (${kgs.slice(0, -1).join(', ')} y ${kgs[kgs.length - 1]})`,
+    detalle: `${c.map(x => `${x.code} · ${kgTexto(x.kg)}: ${ESTADO_CORTO[x.estado]}`).join(' · ')}. `
+      + 'El envío se calcula con el más pesado: si uno está mal vinculado, quítalo en Vincular con ML.',
+  }
+}

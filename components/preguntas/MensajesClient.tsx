@@ -1,5 +1,7 @@
 'use client'
 import SituacionChip, { type Situacion } from './SituacionChip'
+import AvisoPesos from './AvisoPesos'
+import type { ConflictoPesos } from '@/lib/mlShipping'
 import TextoConPublicaciones from './TextoConPublicaciones'
 import { BotonEditar, BotonEliminar } from './BotonesEdicion'
 import { AbrirFicha, VerME } from './FichaPublicacion'
@@ -209,7 +211,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null
-    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null; situacion?: Situacion; disponible?: number | null; variacion?: number | null }[] | null>(null)
+    envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string; conflicto?: ConflictoPesos | null } | null; situacion?: Situacion; disponible?: number | null; variacion?: number | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
   const [recordatorio, setRecordatorio] = useState<{ enviados: number; detenido: string | null } | null>(null)
   const [texto, setTexto] = useState('')
@@ -381,6 +383,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
                         : it.envio.estado === 'sin_peso' ? 'Envío: sin peso' : '⚠ Sin envío gratis'}
                     </span>
                   )}
+                  {it.envio?.conflicto && <span className="ml-1"><AvisoPesos c={it.envio.conflicto} /></span>}
                 </p>
               </div>
             ))}

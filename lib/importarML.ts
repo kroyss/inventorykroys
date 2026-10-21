@@ -32,6 +32,8 @@ export interface FilaImportar {
   permalink: string | null
   estado: EstadoImportar
   producto: { id: number; code: string; name: string; toda: boolean } | null   // vinculada (toda = por la publicación) o parecida
+  /** Otros productos vinculados al MISMO código (21-10): antes solo se veía el primero y un vínculo de más quedaba escondido. */
+  otros?: { id: number; code: string; name: string }[]
 }
 
 /** Trigramas como pg_trgm: por palabra (letras y números), en minúscula, con "  " delante y " " detrás. */
@@ -72,16 +74,26 @@ export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
 
   // Vinculadas: por el código exacto o por el de toda la publicación.
   const { rows: cods } = await db.query(
-    `SELECT DISTINCT ON (m.ml_code) m.ml_code, p.id, p.code, p.name
+    `SELECT m.ml_code, p.id, p.code, p.name
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id
      WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[])
      ORDER BY m.ml_code, p.code`, [[...new Set(filas.map(f => f.codigo.split(':')[0]))]])
-  const porCodigo = new Map(cods.map(r => [r.ml_code as string, { id: r.id as number, code: r.code as string, name: r.name as string }]))
+  const todosDe = new Map<string, { id: number; code: string; name: string }[]>()
+  for (const r of cods) {
+    const l = todosDe.get(r.ml_code) ?? []
+    if (!l.some(x => x.id === r.id)) l.push({ id: r.id, code: r.code, name: r.name })
+    todosDe.set(r.ml_code, l)
+  }
+  const porCodigo = new Map([...todosDe].map(([k, l]) => [k, l[0]]))
   for (const f of filas) {
     const exacto = porCodigo.get(f.codigo)
     const dePub = f.codigo.includes(':') ? porCodigo.get(f.codigo.split(':')[0]) : undefined
     const p = exacto ?? dePub
-    if (p) { f.estado = 'vinculada'; f.producto = { ...p, toda: !exacto } }
+    if (p) {
+      f.estado = 'vinculada'; f.producto = { ...p, toda: !exacto }
+      const otros = (todosDe.get(exacto ? f.codigo : f.codigo.split(':')[0]) ?? []).slice(1)
+      if (otros.length) f.otros = otros
+    }
   }
 
   // Parecidas: SKU = código del producto, o nombre parecido (trigramas, como pg_trgm). Se calcula en

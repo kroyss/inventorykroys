@@ -358,7 +358,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             shipping_cost:      form.shipping_cost,
             ...precios,
             weight_kg:          weightNum,
-            ml_codes:           form.ml_codes.filter(m => m.code.trim()),
+            // Todas las cuentas, también las vaciadas: vacío = se quita ese código (21-10; antes se filtraban
+            // y borrar un código en el formulario no hacía nada).
+            ml_codes:           form.ml_codes,
           }),
         })
       }

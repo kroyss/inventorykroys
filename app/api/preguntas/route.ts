@@ -1,6 +1,6 @@
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { NextRequest, NextResponse } from 'next/server'
-import { sqlDisponible, sqlPesoPublicacion, sqlSituacion } from '@/lib/promocionesSesion'
+import { sqlDisponible, sqlPesoPublicacion, sqlPesosVinculados, sqlSituacion } from '@/lib/promocionesSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { sugerenciasPara } from '@/lib/sugerenciasServidor'
 import { apiError } from '@/lib/apiError'
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       `SELECT p.id::text, p.item_id, p.item_titulo, p.item_permalink, p.item_estado, p.item_imagen, p.item_variantes, p.texto, p.estado,
               p.item_precio::float, p.item_precio_original::float, p.item_moneda,
               ${conEnvio ? sqlPesoPublicacion('p.item_id') : 'NULL::float'} AS item_peso, ${conEnvio ? 'TRUE' : 'FALSE'} AS envio_activo,
+              ${conEnvio ? sqlPesosVinculados('p.item_id') : 'NULL::jsonb'} AS item_pesos,
               ${sqlSituacion('p.item_id', 'p.item_estado')} AS item_situacion, ${sqlDisponible('p.item_id')} AS item_disponible,
               p.fecha, p.respuesta, p.respuesta_estado, p.respuesta_fecha, p.comprador_id::text,
               (SELECT COUNT(*)::int FROM ml_preguntas q WHERE q.comprador_id = p.comprador_id AND q.id <> p.id) AS previas,

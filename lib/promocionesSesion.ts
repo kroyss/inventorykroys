@@ -31,6 +31,16 @@ export const sqlPesoPublicacion = (col: string) => `COALESCE(
    WHERE pm.is_active AND pm.unidades = 1 AND pd.weight_kg > 0
      AND split_part(pm.ml_code, ':', 1) = regexp_replace(${col}, '^[A-Z]{3}', '')))`
 
+/** SQL (21-10): los productos vinculados a la publicación entera ({code, kg}) cuando NO hay peso del portal y
+ *  pesan distinto; NULL si no. Es lo que usa `conflictoPesos` (lib/mlShipping.ts) para avisar un vínculo mal hecho. */
+export const sqlPesosVinculados = (col: string) => `CASE WHEN NOT EXISTS (
+    SELECT 1 FROM me_productos mp WHERE mp.publicacion = ${col} AND mp.peso_kg > 0) THEN
+  (SELECT CASE WHEN COUNT(DISTINCT pd.weight_kg) > 1
+               THEN jsonb_agg(jsonb_build_object('code', pd.code, 'kg', pd.weight_kg::float) ORDER BY pd.weight_kg) END
+   FROM product_ml_codes pm JOIN products pd ON pd.id = pm.product_id
+   WHERE pm.is_active AND pd.is_active AND pm.unidades = 1 AND pd.weight_kg > 0
+     AND pm.ml_code = regexp_replace(${col}, '^[A-Z]{3}', '')) END`
+
 /** SQL de la situación de una publicación (17-10): 'activa', 'agotada' (pausada sin stock) o 'pausada' (a mano, con
  *  stock), del catálogo que ya se trae de ML; si no está en el catálogo, la del estado guardado (`estadoCol`). */
 export const sqlSituacion = (col: string, estadoCol = 'NULL::text') => `COALESCE(

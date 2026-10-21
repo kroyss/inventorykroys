@@ -5,6 +5,9 @@
 // Orden: lo que más se vendió en 60 días primero. Sin precios ni costos para quien no tiene "costos".
 import type { Pool } from 'pg'
 import { filasImportar, vincularCodigo, type FilaImportar } from '@/lib/importarML'
+import { conflictoPesos, type ConflictoPesos, type PesoVinculado } from '@/lib/mlShipping'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
+import { sqlPesosVinculados } from '@/lib/promocionesSesion'
 
 export interface FilaVincular extends Omit<FilaImportar, 'precio' | 'moneda'> {
   precio?: number | null; moneda?: string | null
@@ -12,6 +15,8 @@ export interface FilaVincular extends Omit<FilaImportar, 'precio' | 'moneda'> {
   vinculado_por: string | null; vinculado_at: string | null
   propio: boolean        // lo vinculó quien está mirando (puede deshacerlo)
   duda: { id: number; nota: string; por: string | null; creada_at: string } | null
+  /** Vinculada a varios productos de distinto peso y el envío gratis cambia según cuál (21-10): casi siempre un vínculo de más. */
+  conflicto?: ConflictoPesos | null
 }
 
 const DIAS_VENTAS = 60
@@ -36,6 +41,13 @@ export async function filasVincular(db: Pool, conPrecios: boolean, userId: numbe
   const nVentas = new Map(ventas.map(v => [v.cod as string, v.n as number]))
   const porCodigo = new Map(quien.map(q => [q.ml_code as string, q]))
   const dudaDe = new Map(dudas.map(d => [d.codigo as string, d]))
+  // Pesos de las publicaciones con más de un producto (pocas): para el aviso de envío gratis.
+  const multiples = filas.filter(f => f.otros?.length && !f.codigo.includes(':') && (f.moneda ?? 'USD') === 'USD')
+  const [pesos, tablas] = multiples.length ? await Promise.all([
+    db.query(`SELECT x AS item, ${sqlPesosVinculados('x')} AS pesos FROM unnest($1::text[]) x`, [multiples.map(f => f.item_id)])
+      .then(r => new Map(r.rows.map(x => [x.item as string, x.pesos as PesoVinculado[] | null]))),
+    leerTablasEnvio(db),
+  ]) : [new Map<string, PesoVinculado[] | null>(), undefined]
   return filas.map(f => {
     const q = f.estado === 'vinculada' ? porCodigo.get(f.producto?.toda ? f.codigo.split(':')[0] : f.codigo) : undefined
     const d = dudaDe.get(f.codigo)
@@ -44,6 +56,7 @@ export async function filasVincular(db: Pool, conPrecios: boolean, userId: numbe
       ventas60: nVentas.get(f.codigo) ?? 0,
       vinculado_por: q?.por ?? null, vinculado_at: q?.vinculado_at ?? null, propio: !!q && q.vinculado_por === userId,
       duda: d ? { id: d.id, nota: d.nota, por: d.por, creada_at: d.creada_at } : null,
+      conflicto: f.otros?.length ? conflictoPesos(pesos.get(f.item_id), f.precio, tablas) : null,
     }
     if (!conPrecios) { delete fila.precio; delete fila.moneda }
     return fila

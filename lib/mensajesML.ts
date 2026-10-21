@@ -4,8 +4,8 @@
 // [{ resource: '/packs/{pack}/sellers/{seller}', count }]. Leer una conversación con
 // mark_as_read=false NO la marca como leída (así ML sigue avisando en su app); se marca
 // al responder o con el botón "Marcar como leída".
-import { empresaConPromociones, sqlDisponible, sqlPesoPublicacion, sqlSituacion } from '@/lib/promocionesSesion'
-import { envioGratisAhora } from '@/lib/mlShipping'
+import { empresaConPromociones, sqlDisponible, sqlPesoPublicacion, sqlPesosVinculados, sqlSituacion } from '@/lib/promocionesSesion'
+import { conflictoPesos, envioGratisAhora, type ConflictoPesos, type PesoVinculado } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, ML_API, tokenVigente, CuentaDemo } from '@/lib/ml'
@@ -260,7 +260,7 @@ export interface ItemVenta { id: string; titulo: string; variante: string | null
   variacion?: number | null    // la variante que compró (la ficha la marca con "Esta compró")
   disponible?: number | null   // unidades disponibles hoy en ML (catálogo)
   /** Envío gratis de esta compra según el precio pagado y el peso del portal (ZOOM y TEALCA / solo TEALCA / destino). */
-  envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string } | null }
+  envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string; conflicto?: ConflictoPesos | null } | null }
 
 /** Productos de la venta con el link a cada publicación, y el comprador (se guarda en la bandeja). */
 export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
@@ -296,15 +296,18 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
   }
   // Sin peso en el portal (pausada o sin envío configurado): el del producto vinculado; si tampoco hay, se avisa.
   const conEnvio = await empresaConPromociones(db)
-  const { rows: pesos } = !conEnvio ? { rows: [] as { publicacion: string; kg: number | null }[] } : await db.query(
-    `SELECT x AS publicacion, ${sqlPesoPublicacion('x')} AS kg FROM unnest($1::text[]) x`,
-    [[...new Set(items.map(it => it.id))]]).catch(() => ({ rows: [] as { publicacion: string; kg: number | null }[] }))
+  const { rows: pesos } = !conEnvio ? { rows: [] as { publicacion: string; kg: number | null; pesos: PesoVinculado[] | null }[] } : await db.query(
+    `SELECT x AS publicacion, ${sqlPesoPublicacion('x')} AS kg, ${sqlPesosVinculados('x')} AS pesos FROM unnest($1::text[]) x`,
+    [[...new Set(items.map(it => it.id))]]).catch(() => ({ rows: [] as { publicacion: string; kg: number | null; pesos: PesoVinculado[] | null }[] }))
   const tablas = conEnvio ? await leerTablasEnvio(db) : undefined
   for (const it of items) {
     if (!conEnvio || !it.usd) { it.envio = null; continue }
-    const kg = pesos.find(p => p.publicacion === it.id)?.kg
+    const fila = pesos.find(p => p.publicacion === it.id)
+    const kg = fila?.kg
     const e = kg ? envioGratisAhora(kg * it.cantidad, it.usd * it.cantidad, null, tablas) : null
-    it.envio = e ? { estado: e.estado, texto: e.texto }
+    // Vinculada a productos de distinto peso y el envío cambia según cuál (21-10): se avisa al lado.
+    const conflicto = conflictoPesos(fila?.pesos?.map((p: PesoVinculado) => ({ ...p, kg: p.kg * it.cantidad })), it.usd * it.cantidad, tablas)
+    it.envio = e ? { estado: e.estado, texto: e.texto, conflicto }
       : { estado: 'sin_peso', texto: 'Sin peso: no está en el portal de MercadoEnvíos ni vinculada a un producto con peso' }
   }
   return { items: items.map(({ varId, ...it }) => ({ ...it, variacion: varId })), comprador }
