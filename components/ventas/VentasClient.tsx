@@ -212,18 +212,32 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     if (q.get('new') === '1') {
       setEditing(null); setShowForm(true)
     } else if (q.get('vista') === 'confirmar' && porConfirmar) setVistaPC(true)
-    // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta. Con &corregir=1 (21-10, desde
-    // una fila del lote de Despachos) abre además Corregir pedido, si la venta ya descontó inventario.
+    // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta.
+    // &editar=1 (21-10, "Editar venta →" en una fila del lote de Despachos): abre DIRECTO la pantalla Editar venta.
+    // Si ya está procesada, antes se reabre (con aviso: el stock vuelve y se descuenta otra vez al "Actualizar y procesar").
     const venta = q.get('venta')?.trim()
     if (venta) {
       fetch(`/api/sales?search=${encodeURIComponent(venta)}&pageSize=5`).then(r => r.ok ? r.json() : null).then(async d => {
         const s = (d?.rows ?? d?.sales ?? []).find((x: Sale) => x.ml_order_number === venta)
         if (!s) return
-        const fresh: Sale = await fetch(`/api/sales/${s.id}`).then(r => r.json())
-        if (fresh?.id) {
-          setSelected(fresh)
-          if (q.get('corregir') === '1' && ['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'].includes(fresh.status)) setCorrigePedido(true)
+        let fresh: Sale = await fetch(`/api/sales/${s.id}`).then(r => r.json())
+        if (!fresh?.id) return
+        if (q.get('editar') !== '1') { setSelected(fresh); return }
+        if (!['BORRADOR', 'REABIERTA'].includes(fresh.status)) {
+          const ok = await confirm({
+            title: `Editar la venta ${fresh.ml_order_number}`,
+            message: 'Para editarla se reabre: el stock vuelve al inventario y se descuenta de nuevo al guardar con «Actualizar y procesar».',
+            confirmText: 'Editar venta',
+          })
+          if (!ok) { setSelected(fresh); return }
+          const r = await fetch(`/api/sales/${fresh.id}/status`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'REABIERTA' }),
+          })
+          if (!r.ok) { setError((await r.json().catch(() => ({}))).error ?? 'No se pudo reabrir la venta'); setSelected(fresh); return }
+          fresh = await fetch(`/api/sales/${fresh.id}`).then(r2 => r2.json())
+          reload()
         }
+        setSelected(null); setEditing(fresh); setShowForm(true)
       }).catch(() => {})
     }
   }, [])
