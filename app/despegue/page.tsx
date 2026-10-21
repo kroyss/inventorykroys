@@ -160,8 +160,9 @@ export default async function DespeguePage() {
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">
                 {accion(true)}
-                <a href="#video" className="text-sm font-medium text-neutral-300 underline-offset-4 hover:text-white hover:underline">
-                  Ver la prueba en video ↓
+                {/* 21-10: el sello "Caso real" ya lleva a los videos; aquí, a lo que incluye (la parte clara). */}
+                <a href="#programa" className="text-sm font-medium text-neutral-300 underline-offset-4 hover:text-white hover:underline">
+                  ¿Qué incluye? ↓
                 </a>
               </div>
               <div className="mt-6 max-w-sm">{cuposBarra()}</div>
@@ -237,7 +238,7 @@ export default async function DespeguePage() {
         </div>
       </section>
 
-      <main className="mx-auto max-w-5xl space-y-12 px-5 py-10 sm:space-y-14 sm:px-8 sm:py-14">
+      <main id="programa" className="mx-auto max-w-5xl scroll-mt-2 space-y-12 px-5 py-10 sm:space-y-14 sm:px-8 sm:py-14">
         {/* ── Para quién ── (una sola tarjeta: el "no es para ti" es una línea, no una columna medio vacía) */}
         <section>
           <Encabezado etiqueta="Para quién es" titulo="¿Es para ti?" />
