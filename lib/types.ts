@@ -301,6 +301,7 @@ export interface Sale {
   processed_by: string | null
   reopen_count: number
   is_flex: boolean
+  guia_impresa?: boolean   // su guía ya se imprimió en Despachos (GET /api/sales/[id], 22-10)
   items: SaleItem[]
 }
 

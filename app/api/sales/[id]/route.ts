@@ -23,6 +23,8 @@ export async function GET(
       s.discount_percent::float AS discount_percent,
       s.notes, s.created_at, s.updated_at,
       s.payment_verified_at, s.processed_at, s.reopen_count, s.is_flex,
+      -- ¿Su guía ya se imprimió en Despachos? (22-10: el aviso de "Reabrir" lo dice: el paquete ya salió)
+      EXISTS (SELECT 1 FROM despacho_etiquetas de WHERE de.venta = s.ml_order_number AND de.impresa) AS guia_impresa,
       uc.username AS created_by,
       uv.username AS verified_by,
       up.username AS processed_by,

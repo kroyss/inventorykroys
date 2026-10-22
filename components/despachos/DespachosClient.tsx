@@ -679,9 +679,9 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
                         Apartar…
                       </button>
                     )}
-                    {/* 21-10: volver al paso anterior para corregir (antes del PDF): abre DIRECTO "Editar venta" en Ventas; si ya
-                        estaba procesada, Ventas la reabre con aviso (el stock vuelve y se descuenta de nuevo al procesar). La
-                        etiqueta lee la venta en vivo: al guardar, este lote ya muestra lo corregido. Solo con inventario. */}
+                    {/* Corregir antes del PDF (22-10): venta procesada → Ventas abre DIRECTO "Corregir pedido" (no se reabre; el stock
+                        se ajusta por la diferencia); en borrador → "Editar venta". La etiqueta lee la venta en vivo: al guardar, este
+                        lote ya muestra lo corregido. Solo con inventario. */}
                     {!desdeML && !e.apartado && e.venta && e.sale_status && (
                       <a href={`/ventas?venta=${encodeURIComponent(e.venta)}&editar=1`}
                         className="mt-1 block font-medium text-sky-700 hover:underline"

@@ -1,5 +1,6 @@
 'use client'
 import CorregirPedido, { NotaAjustes } from '@/components/ventas/CorregirPedido'
+import AvisoReabrir from '@/components/ventas/AvisoReabrir'
 import { LineaBancoVenta } from '@/components/ventas/LineaBanco'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Sale, SaleStatus, SaleItem, InventoryItem, UserRole, Country } from '@/lib/types'
@@ -125,6 +126,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   const [busy, setBusy]         = useState(false)
   // Corregir pedido (mig. 108): ventana y versión de la nota (se relee al guardar).
   const [corrigePedido, setCorrigePedido] = useState(false)
+  // 22-10: Reabrir pide confirmación (AvisoReabrir). soloCorregir: desde Despachos se abre Corregir pedido SIN la ficha detrás.
+  const [avisoReabrir, setAvisoReabrir] = useState(false)
+  const [soloCorregir, setSoloCorregir] = useState(false)
   const [ajustesVer, setAjustesVer] = useState(0)
   const [avisoAjuste, setAvisoAjuste] = useState<string | null>(null)
   const [error, setError]       = useState<string | null>(null)
@@ -213,29 +217,18 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       setEditing(null); setShowForm(true)
     } else if (q.get('vista') === 'confirmar' && porConfirmar) setVistaPC(true)
     // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta.
-    // &editar=1 (21-10, "Editar venta →" en una fila del lote de Despachos): abre DIRECTO la pantalla Editar venta.
-    // Si ya está procesada, antes se reabre (con aviso: el stock vuelve y se descuenta otra vez al "Actualizar y procesar").
+    // &editar=1 ("Editar venta →" en una fila del lote de Despachos, 22-10): venta PROCESADA → Corregir pedido directo
+    // (no se reabre: sigue procesada y el stock se ajusta por la diferencia), sin la ficha detrás. Borrador → Editar venta.
     const venta = q.get('venta')?.trim()
     if (venta) {
       fetch(`/api/sales?search=${encodeURIComponent(venta)}&pageSize=5`).then(r => r.ok ? r.json() : null).then(async d => {
         const s = (d?.rows ?? d?.sales ?? []).find((x: Sale) => x.ml_order_number === venta)
         if (!s) return
-        let fresh: Sale = await fetch(`/api/sales/${s.id}`).then(r => r.json())
+        const fresh: Sale = await fetch(`/api/sales/${s.id}`).then(r => r.json())
         if (!fresh?.id) return
         if (q.get('editar') !== '1') { setSelected(fresh); return }
-        if (!['BORRADOR', 'REABIERTA'].includes(fresh.status)) {
-          const ok = await confirm({
-            title: `Editar la venta ${fresh.ml_order_number}`,
-            message: 'Para editarla se reabre: el stock vuelve al inventario y se descuenta de nuevo al guardar con «Actualizar y procesar».',
-            confirmText: 'Editar venta',
-          })
-          if (!ok) { setSelected(fresh); return }
-          const r = await fetch(`/api/sales/${fresh.id}/status`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'REABIERTA' }),
-          })
-          if (!r.ok) { setError((await r.json().catch(() => ({}))).error ?? 'No se pudo reabrir la venta'); setSelected(fresh); return }
-          fresh = await fetch(`/api/sales/${fresh.id}`).then(r2 => r2.json())
-          reload()
+        if (['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'].includes(fresh.status)) {
+          setSelected(fresh); setSoloCorregir(true); setAvisoAjuste(null); setCorrigePedido(true); return
         }
         setSelected(null); setEditing(fresh); setShowForm(true)
       }).catch(() => {})
@@ -619,7 +612,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       </div>}
 
       {/* Slide-over detalle */}
-      {selected && (
+      {selected && !soloCorregir && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/30" onClick={() => setSelected(null)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl flex flex-col">
@@ -761,7 +754,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 </>
               )}
               {!['BORRADOR','REABIERTA'].includes(selected.status) && (
-                <button onClick={() => doAction('REABIERTA')} disabled={busy} className="btn-warning text-sm">Reabrir</button>
+                // Gris claro (22-10): es una vuelta atrás poco frecuente, no la acción principal; antes de reabrir, el aviso.
+                <button onClick={() => setAvisoReabrir(true)} disabled={busy}
+                  className="rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:border-neutral-300 hover:bg-neutral-200 disabled:opacity-50">Reabrir</button>
               )}
               {selected.status === 'PAGO_VERIFICADO' && (
                 <button onClick={() => doAction('PROCESADA')} disabled={busy || !canAdvance} className="btn-primary text-sm">Procesar</button>
@@ -785,13 +780,22 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       {corrigePedido && selected && (
         <CorregirPedido saleId={selected.id} orden={selected.ml_order_number} items={selected.items} notaVenta={selected.notes ?? null} products={products}
           facturaEmitida={activeInvoice ? String(activeInvoice.invoice_number) : null}
-          onCerrar={() => setCorrigePedido(false)}
+          onCerrar={() => { setCorrigePedido(false); if (soloCorregir) { setSoloCorregir(false); setSelected(null) } }}
           onListo={async msg => {
-            setCorrigePedido(false); setAvisoAjuste(msg); setAjustesVer(v => v + 1)
+            setCorrigePedido(false); setSoloCorregir(false); setAvisoAjuste(msg); setAjustesVer(v => v + 1)
             const fresh: Sale = await fetch(`/api/sales/${selected.id}`).then(r => r.json())
             if (fresh?.id) setSelected(fresh)
             reload(); refetchProducts()
           }} />
+      )}
+
+      {avisoReabrir && selected && (
+        <AvisoReabrir orden={selected.ml_order_number} guiaImpresa={!!selected.guia_impresa}
+          factura={activeInvoice ? String(activeInvoice.invoice_number) : null}
+          puedeCorregir={['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'].includes(selected.status)}
+          busy={busy} onCancelar={() => setAvisoReabrir(false)}
+          onCorregir={() => { setAvisoReabrir(false); setAvisoAjuste(null); setCorrigePedido(true) }}
+          onReabrir={async () => { await doAction('REABIERTA'); setAvisoReabrir(false) }} />
       )}
 
       {invoicing && selected && (
