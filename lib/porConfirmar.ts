@@ -150,3 +150,42 @@ export async function completarNombres(db: Pool, maximo = 5) {
   }
   return rows.length
 }
+
+// ── Ya cargadas con pago por verificar (22-10-2026) ─────────────────────────
+// Una venta cargada a mano ANTES de que llegara el pago (p. ej. para facturar con retención) queda en borrador. Cuando
+// Pagos ME trae su pago, no se duplica nada (la venta ya existe) pero el pago queda "sin verificar" y la venta no salía en
+// ningún lado: no está en Por confirmar (esa lista es de ventas sin cargar). Aquí aparecen, para verificar el pago y
+// procesarla en un paso. NADA se mueve solo: el pago sigue sin verificar hasta que alguien toca "Pago correcto y procesar".
+export interface CargadaConPago {
+  sale_id: number; numero: string; cliente: string | null; total: number; creada: string
+  productos: { nombre: string; cantidad: number }[]
+  factura: string | null
+  pago: { id: number; verificacion: 'pendiente' | 'valido'; monto: number | null; totalOrden: number | null
+          banco: string | null; referencia: string | null; metodo: string | null; comprobante: boolean; guia: boolean
+          at: string; bancoRes: BancoPago | null }
+}
+
+export async function cargadasConPago(db: Pool): Promise<CargadaConPago[]> {
+  const { rows } = await db.query(
+    `SELECT s.id AS sale_id, s.ml_order_number AS numero, s.customer_name AS cliente, s.total_amount::float AS total, s.created_at AS creada,
+            COALESCE((SELECT JSON_AGG(JSON_BUILD_OBJECT('nombre', pr.name, 'cantidad', si.quantity) ORDER BY si.id)
+                      FROM sale_items si JOIN products pr ON pr.id = si.product_id WHERE si.sale_id = s.id), '[]'::json) AS productos,
+            (SELECT i.invoice_number::text FROM invoices i WHERE i.sale_id = s.id AND i.status = 'EMITIDA' LIMIT 1) AS factura,
+            p.id AS pago_id, p.verificacion, p.monto_pagado::float AS monto, p.total_orden::float AS total_orden,
+            p.banco_emisor, p.referencia, p.metodo_pago, p.comprobante_path IS NOT NULL AS tiene_comprobante,
+            p.guia_path IS NOT NULL AS tiene_guia, p.creado_at AS pago_at,
+            p.banco_nivel, p.banco_motivo, p.banco_mov, p.banco_at
+     FROM sales s
+     JOIN me_pagos p ON p.venta = s.ml_order_number AND p.verificacion IN ('pendiente', 'valido')
+     WHERE s.status IN ('BORRADOR', 'REABIERTA') AND s.ml_order_number NOT LIKE 'LOCAL-%'
+       AND s.created_at > NOW() - make_interval(days => $1)
+     ORDER BY p.creado_at DESC`, [DIAS_CON_PAGO])
+  return rows.map(r => ({
+    sale_id: Number(r.sale_id), numero: r.numero, cliente: r.cliente, total: r.total, creada: r.creada,
+    productos: r.productos, factura: r.factura ?? null,
+    pago: { id: Number(r.pago_id), verificacion: r.verificacion, monto: r.monto, totalOrden: r.total_orden ?? null,
+            banco: r.banco_emisor ?? null, referencia: r.referencia ?? null, metodo: r.metodo_pago ?? null,
+            comprobante: !!r.tiene_comprobante, guia: !!r.tiene_guia, at: r.pago_at,
+            bancoRes: r.banco_nivel ? { nivel: r.banco_nivel, motivo: r.banco_motivo ?? '', mov: r.banco_mov ?? null, at: r.banco_at } : null },
+  }))
+}

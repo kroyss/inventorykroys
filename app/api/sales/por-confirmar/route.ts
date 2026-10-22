@@ -3,9 +3,10 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
-import { DIAS_MAX, ventasPorConfirmar } from '@/lib/porConfirmar'
+import { DIAS_MAX, cargadasConPago, ventasPorConfirmar } from '@/lib/porConfirmar'
 
 // GET  /api/sales/por-confirmar → ventas de ML sin registrar (lib/porConfirmar.ts) + última búsqueda de pagos
+//      + (con Pagos ME e inventario, 22-10) las YA CARGADAS en borrador cuyo pago trajo Pagos ME: 'cargadas'
 // POST /api/sales/por-confirmar → trae ya de ML las ventas de los últimos días (sin esperar al cron)
 export async function GET() {
   const s = await sesionPreguntas()
@@ -13,6 +14,8 @@ export async function GET() {
   try {
     const { dias, filas } = await ventasPorConfirmar(s.db)
     let ultimaBusqueda: string | null = null
+    // Solo con inventario: sin inventario (Fundadores) no hay ventas cargadas.
+    const cargadas = tieneModulo(s.session.user, 'pagos_me') && tieneModulo(s.session.user, 'inventario') ? await cargadasConPago(s.db) : []
     if (tieneModulo(s.session.user, 'pagos_me')) {
       // La última búsqueda TERMINADA (un pedido recién hecho, sin resultados, no cuenta: "Traer ME" espera la nueva).
       const { rows: [p] } = await s.db.query(`SELECT pedido_at, resultados FROM me_pedidos WHERE resultados <> '{}'::jsonb ORDER BY pedido_at DESC LIMIT 1`)
@@ -20,7 +23,7 @@ export async function GET() {
       ultimaBusqueda = fin ?? (p ? new Date(p.pedido_at).toISOString() : null)
     }
     const { rows: [sync] } = await s.db.query(`SELECT MIN(ordenes_sync_at) AS at FROM ml_conexiones WHERE estado = 'activa'`)
-    return NextResponse.json({ dias, filas, ultimaBusqueda, pagosME: tieneModulo(s.session.user, 'pagos_me'), sincronizadas_at: sync?.at ?? null })
+    return NextResponse.json({ dias, filas, cargadas, ultimaBusqueda, pagosME: tieneModulo(s.session.user, 'pagos_me'), sincronizadas_at: sync?.at ?? null })
   } catch (err) {
     return apiError(err)
   }

@@ -6,14 +6,16 @@
 // se verifica en la fila (✓ / ✗) y la guía ya está en Despachos. Al activar inventario, gana esos dos pasos.
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { PorConfirmar as Fila } from '@/lib/porConfirmar'
+import type { CargadaConPago, PorConfirmar as Fila } from '@/lib/porConfirmar'
 import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
 import LineaBanco from './LineaBanco'
 import { BotonGuia } from './VerGuia'
 import { BotonComprobante } from './VerComprobante'
 import { Monto } from '@/components/pagosme/PagoME'
 
-interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null }
+interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null
+  /** Ya cargadas en borrador cuyo pago trajo Pagos ME (22-10, solo con inventario). */
+  cargadas?: CargadaConPago[] }
 /** Sin inventario: verificar el pago desde la fila (Pagos ME). */
 type Verificar = (pagoId: number, v: 'valido' | 'invalido' | 'pendiente') => Promise<void>
 
@@ -197,6 +199,74 @@ function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar }: {
   )
 }
 
+// ── Ya cargadas · pago por verificar (22-10-2026) ───────────────────────────
+// Ventas que se cargaron a mano antes de que llegara el pago (p. ej. para facturar con retención) y cuyo pago ya trajo
+// Pagos ME. Nada se mueve solo: "Pago correcto y procesar" hace los mismos dos pasos de siempre (pago válido → la venta
+// pasa a Pago verificado; y Procesar → descuenta el stock). Si algo falla (p. ej. sin stock) se detiene y lo dice.
+function FilaCargada({ c, onListo }: { c: CargadaConPago; onListo: () => Promise<void> }) {
+  const [haciendo, setHaciendo] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const json = { 'Content-Type': 'application/json' }
+  const procesar = async () => {
+    setHaciendo(true); setMsg(null)
+    try {
+      const v = c.pago.verificacion === 'pendiente'
+        ? await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: json, body: JSON.stringify({ ids: [c.pago.id], verificacion: 'valido' }) })
+        : await fetch('/api/pagos-me/vincular', { method: 'POST', headers: json, body: JSON.stringify({ venta: c.numero }) })
+      if (!v.ok) throw new Error((await v.json().catch(() => ({}))).error ?? 'No se pudo marcar el pago como correcto')
+      const p = await fetch(`/api/sales/${c.sale_id}/status`, { method: 'PUT', headers: json, body: JSON.stringify({ status: 'PROCESADA' }) })
+      if (!p.ok) throw new Error(`El pago quedó correcto, pero la venta no se pudo procesar: ${(await p.json().catch(() => ({}))).error ?? 'error'}. Ábrela para resolverlo.`)
+      await onListo()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Error')
+    } finally { setHaciendo(false) }
+  }
+  const invalido = async () => {
+    setHaciendo(true); setMsg(null)
+    const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: json, body: JSON.stringify({ ids: [c.pago.id], verificacion: 'invalido' }) }).catch(() => null)
+    setHaciendo(false)
+    if (!r?.ok) { setMsg('No se pudo guardar'); return }
+    await onListo()
+  }
+  return (
+    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center hover:bg-neutral-50/70">
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="truncate font-semibold text-neutral-900">{c.cliente ?? 'Sin nombre'}</span>
+          <span className="font-mono text-[11px] text-neutral-400">{c.numero}</span>
+        </div>
+        <div className="space-y-0.5 text-sm text-neutral-700">
+          {c.productos.map((p, k) => <div key={k} className="truncate"><span className="font-medium">{p.cantidad} ×</span> {p.nombre}</div>)}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <Etiqueta tono="ambar" title="Cargada a mano antes de que llegara el pago: sigue en borrador hasta verificar el pago">Borrador · ya cargada</Etiqueta>
+          {c.factura && <Etiqueta tono="gris" title="Ya tiene factura emitida">Factura #{c.factura}</Etiqueta>}
+          {c.pago.verificacion === 'valido'
+            ? <Etiqueta tono="verde">Pago ya verificado · falta procesar</Etiqueta>
+            : c.pago.monto != null && <Monto p={{ monto_pagado: c.pago.monto, total_orden: c.pago.totalOrden }} />}
+          <span className="text-[11px] text-neutral-400">pago traído {hace(c.pago.at)}</span>
+          {c.pago.guia && <BotonGuia pagoId={c.pago.id} venta={c.numero} />}
+          {c.pago.comprobante && (
+            <BotonComprobante pagoId={c.pago.id} venta={c.numero}
+              datos={{ monto: c.pago.monto, totalOrden: c.pago.totalOrden, banco: c.pago.banco, referencia: c.pago.referencia, metodo: c.pago.metodo }} />
+          )}
+        </div>
+        {c.pago.bancoRes && <LineaBanco b={c.pago.bancoRes} />}
+        {msg && <p className="text-xs text-red-700">{msg}</p>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+        <button type="button" onClick={procesar} disabled={haciendo} className="btn-primary whitespace-nowrap text-sm">
+          {haciendo ? 'Procesando…' : '✓ Pago correcto y procesar'}
+        </button>
+        {c.pago.verificacion === 'pendiente' && (
+          <button type="button" onClick={invalido} disabled={haciendo} className="btn-secondary whitespace-nowrap text-sm text-red-700">✗ Inválido</button>
+        )}
+        <a href={`/ventas?venta=${encodeURIComponent(c.numero)}`} className="text-xs text-neutral-500 underline hover:text-neutral-800">Abrir venta</a>
+      </div>
+    </li>
+  )
+}
+
 export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
@@ -267,6 +337,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const sinPago = vigentes.filter(f => !conPago.includes(f))
   // Sin inventario: por verificar · listos para despachar (verificados en los últimos 3 días) · sin pago.
   const porVerificar = conPago.filter(f => f.pago!.verificacion === 'pendiente')
+  // Ya cargadas con pago por verificar (22-10): también entran en la búsqueda.
+  const cargadas = (datos.cargadas ?? []).filter(c => !q || [c.numero, c.cliente, ...c.productos.map(p => p.nombre)].some(t => (t ?? '').toLowerCase().includes(q)))
   const listos = conPago.filter(f => f.pago!.verificacion === 'valido'
     && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
 
@@ -333,6 +405,19 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
         </div>
       )}
 
+      {!sinInventario && cargadas.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+          <div className="flex items-baseline gap-2 border-b border-amber-100 bg-amber-50/70 px-4 py-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900">Ya cargadas · pago por verificar</h3>
+            <span className="text-xs font-medium text-amber-700">{cargadas.length}</span>
+            <span className="hidden text-[11px] text-amber-800/70 sm:inline">· Cargadas antes de que llegara el pago: verifícalo y quedan procesadas</span>
+          </div>
+          <ul className="divide-y divide-neutral-100">
+            {cargadas.map(c => <FilaCargada key={c.sale_id} c={c} onListo={onRecargar} />)}
+          </ul>
+        </section>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         {vigentes.length ? (
           sinInventario ? <>
@@ -391,7 +476,9 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
 
 /** Las que hay que trabajar: con pago (0 = al día). Sin Pagos ME, todas las vigentes. */
 export function pendientesPorConfirmar(datos: Datos | null) {
-  return datos?.filas.filter(f => !f.vencida && (!datos.pagosME || (!!f.pago && f.pago.verificacion !== 'invalido'))).length ?? 0
+  // + las ya cargadas cuyo pago trajo Pagos ME (22-10): también hay que trabajarlas.
+  return (datos?.filas.filter(f => !f.vencida && (!datos.pagosME || (!!f.pago && f.pago.verificacion !== 'invalido'))).length ?? 0)
+    + (datos?.cargadas?.length ?? 0)
 }
 
 /** Número dentro del botón "Por confirmar" (botón blanco): naranja si hay ventas por confirmar. */
