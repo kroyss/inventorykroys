@@ -506,7 +506,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
 
       {vistaPC && (
         <PorConfirmar datos={pc.datos} onRecargar={pc.cargar}
-          onConfirmar={n => { setNumeroNuevo(n); setEditing(null); setShowForm(true) }} />
+          onConfirmar={n => { setNumeroNuevo(n); setEditing(null); setShowForm(true) }}
+          onVerificarCargada={async id => {
+            // Ya cargada con pago (22-10): la MISMA venta en Editar venta (no se crea otra), con su pago para verificar.
+            const fresh: Sale = await fetch(`/api/sales/${id}`).then(r => r.json()).catch(() => null)
+            if (fresh?.id) { setNumeroNuevo(null); setEditing(fresh); setShowForm(true) }
+          }} />
       )}
 
       {/* Tabla (desktop) / tarjetas (mobile) */}

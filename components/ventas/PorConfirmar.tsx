@@ -163,7 +163,8 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
       ) : (
         <button type="button" onClick={() => onConfirmar(f.numero)}
           className="btn-primary text-sm whitespace-nowrap self-start sm:self-center">
-          Confirmar
+          {/* "Verificar" (22-10, pedido del dueño): abre la venta para revisarla; recién adentro se confirma y procesa. */}
+          Verificar
         </button>
       )}
     </li>
@@ -201,33 +202,9 @@ function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar }: {
 
 // ── Ya cargadas · pago por verificar (22-10-2026) ───────────────────────────
 // Ventas que se cargaron a mano antes de que llegara el pago (p. ej. para facturar con retención) y cuyo pago ya trajo
-// Pagos ME. Nada se mueve solo: "Pago correcto y procesar" hace los mismos dos pasos de siempre (pago válido → la venta
-// pasa a Pago verificado; y Procesar → descuenta el stock). Si algo falla (p. ej. sin stock) se detiene y lo dice.
-function FilaCargada({ c, onListo }: { c: CargadaConPago; onListo: () => Promise<void> }) {
-  const [haciendo, setHaciendo] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
-  const json = { 'Content-Type': 'application/json' }
-  const procesar = async () => {
-    setHaciendo(true); setMsg(null)
-    try {
-      const v = c.pago.verificacion === 'pendiente'
-        ? await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: json, body: JSON.stringify({ ids: [c.pago.id], verificacion: 'valido' }) })
-        : await fetch('/api/pagos-me/vincular', { method: 'POST', headers: json, body: JSON.stringify({ venta: c.numero }) })
-      if (!v.ok) throw new Error((await v.json().catch(() => ({}))).error ?? 'No se pudo marcar el pago como correcto')
-      const p = await fetch(`/api/sales/${c.sale_id}/status`, { method: 'PUT', headers: json, body: JSON.stringify({ status: 'PROCESADA' }) })
-      if (!p.ok) throw new Error(`El pago quedó correcto, pero la venta no se pudo procesar: ${(await p.json().catch(() => ({}))).error ?? 'error'}. Ábrela para resolverlo.`)
-      await onListo()
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Error')
-    } finally { setHaciendo(false) }
-  }
-  const invalido = async () => {
-    setHaciendo(true); setMsg(null)
-    const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: json, body: JSON.stringify({ ids: [c.pago.id], verificacion: 'invalido' }) }).catch(() => null)
-    setHaciendo(false)
-    if (!r?.ok) { setMsg('No se pudo guardar'); return }
-    await onListo()
-  }
+// Pagos ME. "Verificar" (como en las demás filas) abre ESA venta en la pantalla de siempre (Editar venta): ahí se
+// revisa el pago, lo que compró en ML, productos y nota, y se procesa con "Actualizar y procesar". Nada se mueve solo.
+function FilaCargada({ c, onVerificar }: { c: CargadaConPago; onVerificar: (saleId: number) => void }) {
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center hover:bg-neutral-50/70">
       <div className="min-w-0 flex-1 space-y-1">
@@ -252,25 +229,21 @@ function FilaCargada({ c, onListo }: { c: CargadaConPago; onListo: () => Promise
           )}
         </div>
         {c.pago.bancoRes && <LineaBanco b={c.pago.bancoRes} />}
-        {msg && <p className="text-xs text-red-700">{msg}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-        <button type="button" onClick={procesar} disabled={haciendo} className="btn-primary whitespace-nowrap text-sm">
-          {haciendo ? 'Procesando…' : '✓ Pago correcto y procesar'}
-        </button>
-        {c.pago.verificacion === 'pendiente' && (
-          <button type="button" onClick={invalido} disabled={haciendo} className="btn-secondary whitespace-nowrap text-sm text-red-700">✗ Inválido</button>
-        )}
-        <a href={`/ventas?venta=${encodeURIComponent(c.numero)}`} className="text-xs text-neutral-500 underline hover:text-neutral-800">Abrir venta</a>
-      </div>
+      <button type="button" onClick={() => onVerificar(c.sale_id)}
+        className="btn-primary text-sm whitespace-nowrap self-start sm:self-center">
+        Verificar
+      </button>
     </li>
   )
 }
 
-export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar }: {
+export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
   onConfirmar: (numero: string) => void
+  /** Ya cargadas (22-10): abre la venta existente en Editar venta. */
+  onVerificarCargada?: (saleId: number) => void
   /** Sin inventario (Pagos ME de los Fundadores): se verifica el pago en la fila, sin "Confirmar". */
   onVerificar?: Verificar
 }) {
@@ -405,7 +378,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
         </div>
       )}
 
-      {!sinInventario && cargadas.length > 0 && (
+      {!sinInventario && onVerificarCargada && cargadas.length > 0 && (
         <section className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
           <div className="flex items-baseline gap-2 border-b border-amber-100 bg-amber-50/70 px-4 py-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-900">Ya cargadas · pago por verificar</h3>
@@ -413,7 +386,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             <span className="hidden text-[11px] text-amber-800/70 sm:inline">· Cargadas antes de que llegara el pago: verifícalo y quedan procesadas</span>
           </div>
           <ul className="divide-y divide-neutral-100">
-            {cargadas.map(c => <FilaCargada key={c.sale_id} c={c} onListo={onRecargar} />)}
+            {cargadas.map(c => <FilaCargada key={c.sale_id} c={c} onVerificar={onVerificarCargada} />)}
           </ul>
         </section>
       )}
