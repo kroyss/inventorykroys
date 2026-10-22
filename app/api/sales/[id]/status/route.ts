@@ -313,12 +313,17 @@ export async function PUT(
         // Retiro en tienda (2026-10-12): sin guía no pasa por Despachos; pagada y procesada queda cerrada.
         const { rows: [retiro] } = (sale.ml_order_number as string).startsWith('LOCAL-') ? { rows: [] } : await db.query(
           `SELECT 1 FROM me_pagos WHERE venta = $1 AND ${SQL_RETIRO_EN_TIENDA} LIMIT 1`, [sale.ml_order_number])
+        // Reabierta con la guía ya impresa (22-10, Drystar 2000019110155834): al procesarla de nuevo la guía no se
+        // vuelve a imprimir, así que quedaba para siempre en "Por descargar". Ya salió: queda descargada.
+        const { rows: [impresa] } = await db.query(
+          `SELECT 1 FROM despacho_etiquetas WHERE venta = $1 AND impresa LIMIT 1`, [sale.ml_order_number])
+        const guiaYaImpresa = !!impresa
         await db.query(
           `UPDATE sales
            SET status=$4, processed_by=$1, processed_at=NOW(), updated_at=NOW(),
                is_flex = COALESCE($3, is_flex)
            WHERE id=$2`,
-          [userId, id, isFlexBody ?? null, retiro ? 'DESCARGADA' : 'PROCESADA']
+          [userId, id, isFlexBody ?? null, retiro || guiaYaImpresa ? 'DESCARGADA' : 'PROCESADA']
         )
 
       } else if (newStatus === 'DESCARGADA') {
