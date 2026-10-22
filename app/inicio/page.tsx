@@ -4,7 +4,7 @@ import { currentDate } from '@/lib/tz'
 import { COMUNIDAD_TELEGRAM, RADAR_CIFRAS, TELEGRAM_DESPEGUE, fechaLarga, type GrupoDespegue } from '@/lib/despegue'
 
 export const metadata = {
-  title: 'El Comerciante Digital',
+  title: { absolute: 'El Comerciante Digital · MercadoLibre Venezuela' },
   description: 'Herramientas y acompañamiento para vender en MercadoLibre Venezuela: automatizaciones, pagos de MercadoEnvíos, '
     + 'inventario, Radar de Oportunidades y el Programa Despegue.',
 }
