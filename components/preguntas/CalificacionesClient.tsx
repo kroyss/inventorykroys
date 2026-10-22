@@ -48,7 +48,7 @@ const sugeridaDe = (o: Orden): Tipo => o.cal_recibida_concretada === true ? 'con
 function LoQueDijo({ o, leyendo }: { o: Orden; leyendo: boolean }) {
   if (leyendo) return <div className="text-xs text-neutral-400">Te calificó · leyendo…</div>
   const r = o.cal_recibida
-  if (!r || !RATING[r]) return <div className="text-xs text-neutral-400">Ya te calificó (ML no muestra el detalle)</div>
+  if (!r || !RATING[r]) return <div className="text-xs text-neutral-400">Ya te calificó · ML muestra qué dijo cuando tú califiques</div>
   const color = r === 'positive' ? 'text-emerald-700' : r === 'negative' ? 'text-red-700' : 'text-neutral-600'
   const conc = o.cal_recibida_concretada === true ? 'Concretada' : o.cal_recibida_concretada === false ? 'No concretada' : null
   return (
