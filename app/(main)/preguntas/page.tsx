@@ -6,6 +6,7 @@ import PreguntasClient from '@/components/preguntas/PreguntasClient'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
+import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 
 export const metadata = { title: 'Preguntas' }
 
@@ -23,5 +24,6 @@ export default async function PreguntasPage({ searchParams }: { searchParams: Pr
         'Respuestas rápidas y tus respuestas anteriores a preguntas parecidas, gratis y a un clic.']} />
   }
   return <PreguntasClient isAdmin={puede(session!.user, 'automatizaciones_config')}
-    puedeCuentas={puede(session!.user, 'ml_cuentas')} puedeReponer={puede(session!.user, 'reponer_stock')} />
+    puedeCuentas={puede(session!.user, 'ml_cuentas')} puedeReponer={puede(session!.user, 'reponer_stock')}
+    verAvisosInternos={session!.user.organizacionId === ORGANIZACION_PLATAFORMA} />
 }

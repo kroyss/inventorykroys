@@ -221,7 +221,14 @@ export const SQL_BANDEJA_ML = `
   ${SQL_GUIA}
   WHERE o.cal_vendedor IS NULL`
 
-export const sqlBandeja = (desdeML: boolean) => desdeML ? SQL_BANDEJA_ML : SQL_BANDEJA
+/** Días desde la compra en que ML deja de aceptar una calificación "no concretada" ("You can't submit a not fulfilled
+ *  feedback after order has expired"). Medido 22-10: ninguna de 21 días o menos dio ese error; desde 22 sí (BUYBOOK_SHOP,
+ *  ventas de julio). Pasado eso ya no se puede calificar: salen de la bandeja sin tener que intentarlo una por una. */
+export const DIAS_VENCE_NO_CONCRETADA = 21
+
+export const sqlBandeja = (desdeML: boolean) =>
+  `SELECT * FROM (${desdeML ? SQL_BANDEJA_ML : SQL_BANDEJA}) bv
+   WHERE NOT (bv.sugerencia = 'no_concretada' AND bv.fecha < NOW() - INTERVAL '${DIAS_VENCE_NO_CONCRETADA} days')`
 
 /** ¿Ya se puede calificar? (sobre la bandeja `b`): pasaron los días de espera desde `base` (el reporte o la
  *  compra) o el tope desde la compra. `listaEl` = el día en que pasa a calificable. */

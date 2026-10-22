@@ -227,7 +227,9 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
 
 // isAdmin = "Configurar automatizaciones" (pestaña Configuración); conectar cuentas y reponer stock
 // son permisos aparte (lib/permisos.ts).
-export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean }) {
+export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, verAvisosInternos = false }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean
+  /** Solo la organización dueña de la plataforma (22-10): "envío gratis sin confirmar" confundía a los Fundadores. */
+  verAvisosInternos?: boolean }) {
   // ?vista=cuentas abre Políticas y respuestas rápidas (las cuentas de ML están en /cuentas-ml).
   const pedida = useSearchParams().get('vista')
   const [vista, setVista] = useState<Vista>(isAdmin && pedida === 'cuentas' ? 'cuentas' : 'pendientes')
@@ -401,7 +403,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }:
                 )
               })()}
               {datos.preguntas.map(p => (
-                <TarjetaPendiente key={p.id} p={p} esAdmin={puedeReponer} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
+                <TarjetaPendiente key={p.id} p={p} esAdmin={puedeReponer} verAvisosInternos={verAvisosInternos} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
                   onRespondida={msg => { setAviso(msg); cargar() }}
                   onCambioSugerida={(id, intacta) => setEditadas(e => { const n = new Set(e); if (intacta) n.delete(id); else n.add(id); return n })} />
               ))}
@@ -422,8 +424,8 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer }:
 }
 
 // ── Pregunta sin responder ─────────────────────────────────────────────────
-function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCambioSugerida }: {
-  p: Pregunta; esAdmin: boolean; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
+function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, onRespondida, onCambioSugerida }: {
+  p: Pregunta; esAdmin: boolean; verAvisosInternos: boolean; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
   /** Avisa si el cuadro sigue con la sugerida sin cambios (entra en "Enviar las sugeridas"). */
   onCambioSugerida?: (id: string, intacta: boolean) => void
 }) {
@@ -551,7 +553,7 @@ function TarjetaPendiente({ p, esAdmin, iaLista, plantillas, onRespondida, onCam
                 : 'El sistema eligió esta respuesta rápida: con tus respuestas anteriores a preguntas así, coincidió este porcentaje de las veces.'}>
               Sugerida: {sug.titulo} · {sug.por_palabras?.length ? <>por «{sug.por_palabras.join('», «')}»</> : <>coincidió {sug.respaldo}% en tu historial</>}
             </span>
-            {sug.sin_confirmar && (
+            {sug.sin_confirmar && verAvisosInternos && (
               <span className="text-amber-700" title="Cuando la envíes sin cambios, el sistema aprende que este producto tiene envío gratis.">
                 envío gratis sin confirmar en este producto
               </span>
