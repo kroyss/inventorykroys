@@ -53,14 +53,17 @@ export default function LoginForm({ marca }: { marca: Marca }) {
   const revisarMayus = (e: KeyboardEvent<HTMLInputElement>) => setMayus(e.getModifierState('CapsLock'))
   const campo = 'w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-lime-600 focus:ring-2 focus:ring-lime-400/50'
   // Automatizaciones primero: es con lo que arranca todo cliente; Inventario es opcional (2026-10-03).
+  // 22-10: Pagos MercadoEnvíos y Despachos con nombre propio (antes no se veían en la entrada).
   const productos = [
-    { t: 'Automatiza', d: 'Preguntas con IA, mensajes, despachos con manifiesto, reporte de guías, calificaciones y stock de todas tus cuentas' },
-    { t: 'Inventario',       d: 'Opcional: stock, ventas, compras y la ganancia real de cada venta' },
-    { t: 'Radar',            d: 'Qué se vende en MercadoLibre y dónde está la oportunidad' },
+    { t: 'Automatiza',         d: 'Preguntas con IA, mensajes, calificaciones y stock de todas tus cuentas' },
+    { t: 'Pagos MercadoEnvíos', d: 'Los pagos de tus ventas verificados solos, con recordatorio al comprador que no pagó' },
+    { t: 'Despachos',          d: 'Las guías de todas tus cuentas en un solo PDF listo para imprimir, con manifiesto y aviso al comprador' },
+    { t: 'Inventario',         d: 'Opcional: stock, ventas, compras y la ganancia real de cada venta' },
+    { t: 'Radar',              d: 'Qué se vende en MercadoLibre y dónde está la oportunidad' },
   ]
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr] bg-white">
+    <div className="min-h-screen grid grid-rows-[auto_1fr] lg:grid-rows-1 lg:grid-cols-[1.1fr_1fr] bg-white">
 
       {/* Panel de marca (solo en pantallas grandes; sin logo: el dueño lo pidió, 2026-10-03) */}
       <aside className="relative overflow-hidden bg-neutral-950 text-white px-14 py-12 hidden lg:flex flex-col">
@@ -73,7 +76,7 @@ export default function LoginForm({ marca }: { marca: Marca }) {
             Tu negocio en MercadoLibre, <span className="text-lime-400">bajo control.</span>
           </h1>
           <p className="text-neutral-400 mt-3 text-sm leading-relaxed">{marca.lema}</p>
-          <ul className="mt-10 space-y-5">
+          <ul className="mt-9 space-y-4">
             {productos.map(p => (
               <li key={p.t} className="flex gap-3">
                 <span className="mt-1.5 w-2 h-2 rounded-full bg-lime-400 shadow-[0_0_10px_2px_rgba(163,230,53,0.5)] shrink-0" />
@@ -90,6 +93,16 @@ export default function LoginForm({ marca }: { marca: Marca }) {
           © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados
         </p>
       </aside>
+
+      {/* Celular (22-10): el panel de marca no entra; queda una franja negra con el nombre y el lema,
+          para que no sea un formulario suelto sin decir de quién es. */}
+      <header className="lg:hidden relative overflow-hidden bg-neutral-950 text-white px-6 py-6">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 w-48 h-48 rounded-full border border-lime-400/20" />
+        <p className="relative text-[11px] uppercase tracking-[0.18em] text-neutral-500">{marca.nombre}</p>
+        <p className="relative mt-1 text-xl font-semibold leading-snug tracking-tight">
+          Tu negocio en MercadoLibre, <span className="text-lime-400">bajo control.</span>
+        </p>
+      </header>
 
       {/* Formulario */}
       <main className="flex flex-col items-center justify-center px-6 py-10 bg-neutral-50 lg:bg-white">
