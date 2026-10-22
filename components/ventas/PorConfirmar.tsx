@@ -4,10 +4,11 @@
 // mensaje del comprador) y "Confirmar" abre Nueva venta con todo cargado.
 // Sin inventario (Pagos ME de los Fundadores, 19-10) es la MISMA lista: sin productos ni "Confirmar"; el pago
 // se verifica en la fila (✓ / ✗) y la guía ya está en Despachos. Al activar inventario, gana esos dos pasos.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CargadaConPago, PorConfirmar as Fila } from '@/lib/porConfirmar'
 import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
+import { borrarMemoria, leerMemoria, recruzarMemoria, type EstadoGuardado } from '@/lib/bancoMemoria'
 import LineaBanco from './LineaBanco'
 import { BotonGuia } from './VerGuia'
 import { BotonComprobante } from './VerComprobante'
@@ -260,6 +261,25 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const [avisoME, setAvisoME] = useState<string | null>(null)
   // "Comprobar con el banco" (20-10): cualquier usuario sube los estados de cuenta; el resultado queda en cada venta.
   const [banco, setBanco] = useState(false)
+  // Estados de cuenta de hoy en este navegador (22-10, lib/bancoMemoria.ts): cuando llegan pagos nuevos sin lo que
+  // dijo el banco, se cruzan solos. `cruzados` = los pagos ya intentados (los que no aparecen no se reintentan en bucle).
+  const [memoria, setMemoria] = useState<EstadoGuardado[]>(() => typeof window === 'undefined' ? [] : leerMemoria())
+  useEffect(() => {
+    const leer = () => setMemoria(leerMemoria())
+    window.addEventListener('banco-memoria', leer)
+    return () => window.removeEventListener('banco-memoria', leer)
+  }, [])
+  const cruzados = useRef(new Set<string>())
+  useEffect(() => {
+    if (!datos?.pagosME || !memoria.length || banco) return
+    const sinBanco = [
+      ...datos.filas.filter(f => f.pago?.verificacion === 'pendiente' && !f.pago.bancoRes).map(f => f.numero),
+      ...(datos.cargadas ?? []).filter(c => !c.pago.bancoRes).map(c => c.numero),
+    ].filter(n => !cruzados.current.has(n))
+    if (!sinBanco.length) return
+    sinBanco.forEach(n => cruzados.current.add(n))
+    recruzarMemoria().then(n => { if (n) onRecargar() }).catch(() => {})
+  }, [datos, memoria, banco, onRecargar])
   const ultimaME = datos?.ultimaBusqueda ? new Date(datos.ultimaBusqueda).getTime() : 0
   // Buscando = se pidió y todavía no llegó una búsqueda terminada después del pedido.
   const buscandoME = pidiendoME != null && ultimaME < pidiendoME - 5000
@@ -356,6 +376,15 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
         </div>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
+      {datos.pagosME && memoria.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          <span>🏦 En memoria: estado de cuenta de <b>{[...new Set(memoria.map(m => m.estado.banco))].join(', ')}</b>
+            {' '}(subido {new Date(memoria.map(m => m.at).sort().at(-1)!).toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' })}).
+            Los pagos que vayan llegando se comprueban solos.</span>
+          <button type="button" onClick={() => { borrarMemoria(); cruzados.current.clear() }}
+            className="ml-auto font-medium text-sky-800 underline hover:text-sky-950">Quitar</button>
+        </div>
+      )}
       {banco && createPortal(
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" role="dialog" aria-modal="true">
           <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-neutral-50 shadow-2xl sm:rounded-2xl">

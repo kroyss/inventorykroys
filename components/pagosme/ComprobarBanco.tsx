@@ -7,10 +7,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { BotonComprobante } from '@/components/ventas/VerComprobante'
 import type { EstadoCuenta, MovBanco, PagoME as PagoCruce, ResultadoCruce, ResultadoPago } from '@/lib/conciliacionBanco'
+import { guardarMemoria, hoyVE, leerMemoria, resultadosParaGuardar } from '@/lib/bancoMemoria'
 
 interface Pago extends PagoCruce { cuenta: string | null; banco_emisor: string | null; verificacion: string; comprobante: boolean
   venta_estado: string | null }   // ya cargada en Ventas (no sale en Por confirmar)
-interface Archivo { nombre: string; datos: ArrayBuffer; banco: string; estado: EstadoCuenta | null; error: string | null }
+// datos = null: vino de la memoria del navegador (lib/bancoMemoria.ts; solo queda lo leído, no el archivo).
+interface Archivo { nombre: string; datos: ArrayBuffer | null; banco: string; estado: EstadoCuenta | null; error: string | null; at?: string }
 
 const BANCOS = ['Bancamiga', 'Banesco', 'Mercantil', 'BBVA Provincial', 'Banco Plaza']
 const bs = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -31,7 +33,9 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
   const [pagos, setPagos] = useState<Pago[] | null>(null)
   const [margen, setMargen] = useState(700)
   const [puedeConfigurar, setPuedeConfigurar] = useState(false)
-  const [archivos, setArchivos] = useState<Archivo[]>([])
+  // Se abre después de un clic (modal / pestaña): leer el navegador al iniciar no choca con el servidor.
+  const [archivos, setArchivos] = useState<Archivo[]>(() => typeof window === 'undefined' ? []
+    : leerMemoria().map(e => ({ nombre: e.nombre, datos: null, banco: e.estado.banco, estado: e.estado, error: null, at: e.at })))
   const [resultado, setResultado] = useState<ResultadoCruce | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -45,6 +49,10 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
     setPagos(d.pagos); setMargen(d.margen); setPuedeConfigurar(d.puedeConfigurar)
   }), [])
   useEffect(() => { cargarPagos() }, [cargarPagos])
+  // Los estados de cuenta de hoy que quedaron en este navegador (22-10): no hay que volver a subirlos.
+  useEffect(() => {
+    guardarMemoria(archivos.filter(a => a.estado).map(a => ({ nombre: a.nombre, at: a.at ?? new Date().toISOString(), estado: a.estado! })))
+  }, [archivos])
 
   // Cada vez que cambian los archivos, el margen o los pagos: se vuelve a cruzar.
   useEffect(() => {
@@ -55,15 +63,12 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
     let espera: ReturnType<typeof setTimeout> | undefined
     lib().then(({ cruzarPagos }) => {
       if (!vivo) return
-      const r = cruzarPagos(pagos, estados, { margenEmbalaje: margen })
+      const r = cruzarPagos(pagos, estados, { margenEmbalaje: margen, hoy: hoyVE() })
       setResultado(r)
       // Se guarda lo que dijo el banco de cada pago (mig. 110): todo el equipo lo ve en Por confirmar y en la venta.
       // Solo el movimiento que le corresponde, no el estado de cuenta; "sin estado de cuenta" no se guarda.
       espera = setTimeout(() => {
-        const resultados = r.pagos.filter(x => x.nivel !== 'sin_estado').map(x => ({
-          ids: x.ventas.map(v => v.id), nivel: x.nivel, motivo: x.motivo.slice(0, 300),
-          mov: x.mov ? { banco: x.mov.banco.slice(0, 40), fecha: x.mov.fecha, monto: x.mov.monto, ref: x.mov.ref.slice(0, 40), concepto: x.mov.concepto.slice(0, 200) } : null,
-        }))
+        const resultados = resultadosParaGuardar(r)
         fetch('/api/pagos-me/comprobar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resultados }) })
           .then(res => res.ok ? res.json() : null).then(d => { if (vivo && d) setGuardado(d.guardados) }).catch(() => {})
       }, 800)
@@ -73,6 +78,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
 
   const leer = async (a: Omit<Archivo, 'estado' | 'error'>): Promise<Archivo> => {
     const { leerEstadoCuenta } = await lib()
+    if (!a.datos) return { ...a, estado: null, error: 'Vuelve a subir el archivo para cambiar el banco' }
     try {
       const e = leerEstadoCuenta(new Uint8Array(a.datos), a.nombre, a.banco || undefined)
       return { ...a, banco: e.banco, estado: e.banco === 'Desconocido' ? null : e,
@@ -84,8 +90,9 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
   const subir = async (files: FileList | null) => {
     if (!files?.length) return
     setError(null)
-    const nuevos = await Promise.all([...files].map(async f => leer({ nombre: f.name, datos: await f.arrayBuffer(), banco: '' })))
-    setArchivos(as => [...as, ...nuevos])
+    const nuevos = await Promise.all([...files].map(async f => leer({ nombre: f.name, datos: await f.arrayBuffer(), banco: '', at: new Date().toISOString() })))
+    // Un estado nuevo de un banco reemplaza al anterior de ese banco (siempre queda el más reciente).
+    setArchivos(as => [...as.filter(a => !nuevos.some(n => n.estado && n.banco === a.banco)), ...nuevos])
   }
   const cambiarBanco = async (i: number, banco: string) => {
     const a = await leer({ ...archivos[i], banco })
@@ -128,7 +135,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-neutral-900">Sube los estados de cuenta</h2>
-            <p className="text-xs text-neutral-500">Bancamiga, Banesco, Mercantil, Provincial… ({nPend} pagos por verificar en los últimos 30 días). Los archivos no salen de tu computadora.</p>
+            <p className="text-xs text-neutral-500">Bancamiga, Banesco, Mercantil, Provincial… ({nPend} pagos por verificar en los últimos 30 días). Los archivos no salen de tu computadora: quedan en ella hasta mañana y los pagos que vayan llegando se comprueban solos.</p>
           </div>
           <label className="btn-primary cursor-pointer text-sm">
             + Subir archivos
@@ -140,7 +147,8 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
             {archivos.map((a, i) => (
               <li key={i} className="flex flex-wrap items-center gap-2 px-3 py-2">
                 <span className="min-w-0 flex-1 truncate text-neutral-700" title={a.nombre}>{a.nombre}</span>
-                <select value={BANCOS.includes(a.banco) ? a.banco : ''} onChange={e => cambiarBanco(i, e.target.value)}
+                {a.at && !a.datos && <span className="text-[11px] text-sky-700">en memoria · {new Date(a.at).toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' })}</span>}
+                <select value={BANCOS.includes(a.banco) ? a.banco : ''} onChange={e => cambiarBanco(i, e.target.value)} disabled={!a.datos}
                   className="rounded border border-neutral-300 px-2 py-1 text-xs">
                   <option value="">¿Qué banco?</option>
                   {BANCOS.map(b => <option key={b} value={b}>{b}</option>)}

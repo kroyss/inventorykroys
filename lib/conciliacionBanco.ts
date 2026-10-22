@@ -148,6 +148,10 @@ export interface OpcionesCruce {
   margenEmbalaje?: number        // Bs por venta que puede sumar el comprador (embalaje opcional). Default 700.
   diasAntes?: number             // el banco puede mostrar el pago hasta N días ANTES de la fecha que dijo (default 1)
   diasDespues?: number           // … o N días DESPUÉS (fines de semana, default 3)
+  /** Hoy (YYYY-MM-DD, Venezuela). Si el estado de cuenta llega hasta HOY, ese día está a medias: un pago de hoy que
+   *  no aparece puede haber entrado después de bajarlo (22-10: el estado queda en memoria y se cruza con las ventas
+   *  que van llegando). Entonces no es "no aparece" sino "sube uno más nuevo". */
+  hoy?: string
 }
 
 const dia = (s: string) => Date.parse(s + 'T12:00:00Z') / 864e5
@@ -177,8 +181,10 @@ export function cruzarPagos(pagosEnt: PagoME[], estados: EstadoCuenta[], op: Opc
   // dentro del rango casi siempre es un archivo incompleto (pasó con Banesco 17–18/10), no "no llegó nada".
   const diasConCredito = new Set(movs.map(m => `${m.banco}|${m.fecha}`))
   const cubre = (banco: string | null, fecha: string | null) =>
-    !!banco && !!fecha && diasConCredito.has(`${banco}|${fecha}`)
+    !!banco && !!fecha && diasConCredito.has(`${banco}|${fecha}`) && !(op.hoy && fecha >= op.hoy)
       && estados.some(e => e.banco === banco && e.desde <= fecha && fecha <= e.hasta)
+  // Hasta qué día llega lo subido de cada banco (para decir "más nuevo que el estado de cuenta").
+  const hastaDe = (banco: string) => estados.filter(e => e.banco === banco).map(e => e.hasta).sort().at(-1) ?? ''
 
   // 1. Agrupar: varias ventas con la misma referencia (≥ 6 dígitos) y fecha cercana = un solo pago.
   type Grupo = { ventas: PagoME[]; ref: string; fecha: string | null; monto: number; banco: string | null; emisor: string | null }
@@ -263,6 +269,8 @@ export function cruzarPagos(pagosEnt: PagoME[], estados: EstadoCuenta[], op: Opc
     res.set(g, { ventas: g.ventas, nivel, mov: null, diferencia: null,
       motivo: nivel === 'no_aparece' ? `No está en ${g.banco} ni en los otros estados subidos`
         : !g.banco ? 'Transferencia sin banco destino: puede estar en un banco que no subiste'
+        : estados.some(e => e.banco === g.banco) && g.fecha && (g.fecha > hastaDe(g.banco) || (op.hoy && g.fecha >= op.hoy))
+          ? `Más nuevo que el estado de ${g.banco} subido (llega hasta el ${hastaDe(g.banco).slice(8, 10)}/${hastaDe(g.banco).slice(5, 7)}): sube uno más reciente`
         : estados.some(e => e.banco === g.banco) ? `El estado de ${g.banco} no trae movimientos del ${g.fecha ?? '—'} (¿archivo incompleto?)`
         : `Falta el estado de cuenta de ${g.banco}` })
   }
