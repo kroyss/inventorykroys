@@ -122,6 +122,14 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
         ))}
         {estado.enEquipo > 0 && <span className="text-neutral-500">tomados por un equipo: <b className="num">{estado.enEquipo}</b></span>}
       </div>
+      {/* Sin pendientes (22-10, Panda Parts): el botón apagado no decía por qué. Solo entra lo que pasó por Despachos. */}
+      {estado.total === 0 && !corriendo && (
+        <p className="text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded-lg px-3 py-2">
+          <b>No hay guías para reportar.</b> Se reportan las que imprimes en <Link href="/despachos" className="underline underline-offset-2 hover:text-neutral-900">Despachos</Link>,
+          después de <b>cerrar la jornada</b> y sacar el manifiesto. Las de Tealca entran cuando les escribes la guía final.
+          Si imprimes las guías directo desde MercadoLibre, el sistema no se entera.
+        </p>
+      )}
       <p className="text-xs text-neutral-500">
         Cuentas conectadas a la API: {conectadas.length ? <b className="text-neutral-800">{conectadas.join(', ')}</b> : 'ninguna'}
         {conEscritorio && <>{' · '}las ventas de otras cuentas quedan para el programa de escritorio (abajo, de respaldo).</>}{' '}
