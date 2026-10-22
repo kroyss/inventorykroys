@@ -70,6 +70,8 @@ export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'n
 /** Hora (del país de la empresa) por defecto de la calificación automática; cada empresa elige la suya (plantillas.hora). */
 export const HORA_AUTO = 10
 const MAX_POR_DIA = 300
+/** Minutos sin avanzar para dar por muerta una tanda "corriendo" (guarda avance cada 10 ventas, ~10 s). */
+const MIN_SIN_AVANCE = 10
 export const CLAVE_ULTIMO = 'calificaciones_auto_ultimo'
 
 /** Si la empresa lo tiene prendido y hoy no corrió: califica las concretadas. Lo llama el cron. */
@@ -80,28 +82,43 @@ export async function calificarAutomatico(db: Pool, conInventario: boolean) {
   // Una vez al día, desde la hora elegida en Configuración (p.hora; antes fija HORA_AUTO): se "toma" el
   // día antes de calificar (dos pasadas del cron no lo repiten). Si se elige una hora que ya pasó y hoy
   // no corrió, corre en la próxima pasada. La conexión tiene el TimeZone de la empresa (hora del país).
-  const { rowCount } = await db.query(
+  // Latido (22-10): la tanda guarda su avance (cuenta + updated_at) mientras califica. Si quedó "corriendo"
+  // y lleva MIN_SIN_AVANCE sin avanzar, murió (p. ej. un reinicio por actualización a las 10:00: el 20 y
+  // 21-10 no calificó nada) y la próxima pasada la retoma, sumando a lo ya contado. Repetirla es seguro:
+  // las ya calificadas se saltan.
+  const { rows: [tomada] } = await db.query(
     `INSERT INTO app_settings (key, value) SELECT $1, json_build_object('fecha', CURRENT_DATE::text, 'estado', 'corriendo')::text
      WHERE EXTRACT(HOUR FROM LOCALTIME) >= $2
-     ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-     WHERE (app_settings.value::json->>'fecha') IS DISTINCT FROM CURRENT_DATE::text`, [CLAVE_ULTIMO, p.hora])
-  if (!rowCount) return null
+     ON CONFLICT (empresa_id, key) DO UPDATE SET value = CASE
+         WHEN (app_settings.value::json->>'fecha') IS DISTINCT FROM CURRENT_DATE::text THEN EXCLUDED.value
+         ELSE app_settings.value END, updated_at = NOW()
+     WHERE (app_settings.value::json->>'fecha') IS DISTINCT FROM CURRENT_DATE::text
+        OR ((app_settings.value::json->>'estado') = 'corriendo' AND app_settings.updated_at < NOW() - make_interval(mins => $3))
+     RETURNING value`, [CLAVE_ULTIMO, p.hora, MIN_SIN_AVANCE])
+  if (!tomada) return null
+  const previo = (() => { try { return JSON.parse(tomada.value) } catch { return {} } })()
+  let calificadas = Number(previo.calificadas) || 0, errores = Number(previo.errores) || 0, quitadas = Number(previo.quitadas) || 0
+  let sinRegistrar = 0
+  const guardar = async (estado: 'corriendo' | 'listo') => {
+    await registrarUso(db, 'calificacion', sinRegistrar)
+    sinRegistrar = 0
+    await db.query(
+      `UPDATE app_settings SET value = json_build_object('fecha', CURRENT_DATE::text, 'estado', $2::text, 'at', $3::text,
+         'calificadas', $4::int, 'errores', $5::int, 'quitadas', $6::int)::text, updated_at = NOW() WHERE key = $1`,
+      [CLAVE_ULTIMO, estado, new Date().toISOString(), calificadas, errores, quitadas])
+  }
   const { rows } = await db.query(
     `SELECT b.id FROM (${sqlBandeja(!conInventario)}) b
      WHERE b.sugerencia = 'concretada' AND ${sqlLista(p.esperaDias)}
      ORDER BY b.fecha LIMIT ${MAX_POR_DIA}`, [p.noConcretada.dias])
   const demo = await esDemo(db)
-  let calificadas = 0, errores = 0, quitadas = 0
-  for (const { id } of rows) {
+  for (const [i, { id }] of rows.entries()) {
     const r = await calificarUna(db, id, 'concretada', p, demo)
-    if (r.ok && r.detalle !== 'Ya estaba calificada') calificadas++
+    if (r.ok && r.detalle !== 'Ya estaba calificada') { calificadas++; sinRegistrar++ }
     else if (r.quitada) quitadas++
     else if (!r.ok) errores++
+    if ((i + 1) % 10 === 0) await guardar('corriendo')
   }
-  await registrarUso(db, 'calificacion', calificadas)
-  await db.query(
-    `UPDATE app_settings SET value = json_build_object('fecha', CURRENT_DATE::text, 'estado', 'listo', 'at', $2::text,
-       'calificadas', $3::int, 'errores', $4::int, 'quitadas', $5::int)::text, updated_at = NOW() WHERE key = $1`,
-    [CLAVE_ULTIMO, new Date().toISOString(), calificadas, errores, quitadas])
+  await guardar('listo')
   return { calificadas, errores, quitadas }
 }
