@@ -177,6 +177,7 @@ const PAGO_ME = `EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text
 /** SQL de la bandeja: ventas sin calificar + su estado en el sistema + sugerencia. */
 export const SQL_BANDEJA = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
+         o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
          x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE},
          CASE
            -- En el sistema (procesada/descargada o facturada) y, si lleva guía en Despachos, despachada.
@@ -202,6 +203,7 @@ export const SQL_BANDEJA = `
  *  si no lo usa, 'revisar' (no se sabe). Cada una se puede cambiar antes de calificar. */
 export const SQL_BANDEJA_ML = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
+         o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
          x.nickname AS cuenta,
          CASE WHEN g.reportada_at IS NOT NULL THEN 'REPORTADA' WHEN g.impresa THEN 'DESPACHADA' END AS sistema_estado,
          FALSE AS facturada, ${BASE},

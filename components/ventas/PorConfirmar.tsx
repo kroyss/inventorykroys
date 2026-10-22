@@ -379,8 +379,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
       {datos.pagosME && memoria.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
           <span>🏦 En memoria: estado de cuenta de <b>{[...new Set(memoria.map(m => m.estado.banco))].join(', ')}</b>
-            {' '}(subido {new Date(memoria.map(m => m.at).sort().at(-1)!).toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' })}).
-            Los pagos que vayan llegando se comprueban solos.</span>
+            {' '}(subido {new Date(memoria.map(m => m.at).sort().at(-1)!).toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' })}).</span>
           <button type="button" onClick={() => { borrarMemoria(); cruzados.current.clear() }}
             className="ml-auto font-medium text-sky-800 underline hover:text-sky-950">Quitar</button>
         </div>

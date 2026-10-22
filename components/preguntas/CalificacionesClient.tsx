@@ -7,6 +7,8 @@ import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
   cal_comprador: string | null; cuenta: string; sistema_estado: string | null; facturada: boolean
+  // Lo que dijo el comprador (22-10): rating ('' = ML no dio el detalle; null = todavía no leído), concretada y comentario.
+  cal_recibida?: string | null; cal_recibida_concretada?: boolean | null; cal_recibida_msg?: string | null
   // 'revisar': el sistema no puede saberlo (impresa y nunca reportada, o empresa sin Despachos): decide una persona.
   sugerencia: 'concretada' | 'no_concretada' | 'esperar' | 'revisar'
   en_espera: boolean            // todavía en los días de espera (desde el reporte o la compra): pestaña Próximas
@@ -37,6 +39,26 @@ type Tipo = 'concretada' | 'no_concretada'
 const diaMes = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
 
 const RATING: Record<string, string> = { positive: 'positiva', neutral: 'neutral', negative: 'negativa' }
+
+/** La sugerencia de cada venta; si el comprador dijo que SÍ se concretó, se sigue eso (22-10). */
+const sugeridaDe = (o: Orden): Tipo => o.cal_recibida_concretada === true ? 'concretada'
+  : (o.sugerencia === 'esperar' || o.sugerencia === 'revisar' ? 'concretada' : o.sugerencia)
+
+/** "Te calificó: Concretada · Positiva — 'comentario'" (verde / gris / rojo según la calificación). */
+function LoQueDijo({ o, leyendo }: { o: Orden; leyendo: boolean }) {
+  if (leyendo) return <div className="text-xs text-neutral-400">Te calificó · leyendo…</div>
+  const r = o.cal_recibida
+  if (!r || !RATING[r]) return <div className="text-xs text-neutral-400">Ya te calificó (ML no muestra el detalle)</div>
+  const color = r === 'positive' ? 'text-emerald-700' : r === 'negative' ? 'text-red-700' : 'text-neutral-600'
+  const conc = o.cal_recibida_concretada === true ? 'Concretada' : o.cal_recibida_concretada === false ? 'No concretada' : null
+  return (
+    <div className="mt-0.5 max-w-[18rem] text-xs leading-snug">
+      <span className="text-neutral-500">Te calificó: </span>
+      <b className={color}>{conc ? `${conc} · ` : ''}{RATING[r][0].toUpperCase() + RATING[r].slice(1)}</b>
+      {o.cal_recibida_msg && <span className="text-neutral-500" title={o.cal_recibida_msg}> — “{o.cal_recibida_msg.length > 90 ? o.cal_recibida_msg.slice(0, 90) + "…" : o.cal_recibida_msg}”</span>}
+    </div>
+  )
+}
 const MOTIVOS: Record<string, string> = {
   BUYER_NOT_ENOUGH_MONEY: 'El comprador no pagó / no tenía el dinero',
   BUYER_REGRETS: 'El comprador se arrepintió',
@@ -51,7 +73,8 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
   const [vista, setVista] = useState<'listas' | 'proximas' | 'esperando' | 'config'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [elegidas, setElegidas] = useState<Record<string, Tipo | null>>({})
-  const [filtro, setFiltro] = useState<'todas' | Tipo | 'revisar'>('todas')
+  const [filtro, setFiltro] = useState<'todas' | Tipo | 'revisar' | 'calificaron'>('todas')
+  const [leyendo, setLeyendo] = useState<Set<string>>(new Set())
   const [corriendo, setCorriendo] = useState(false)
   const [progreso, setProgreso] = useState<{ hechas: number; total: number; errores: string[]; quitadas: string[] } | null>(null)
   const [actualizando, setActualizando] = useState(false)
@@ -65,7 +88,23 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
     setDatos(d)
     // Por defecto, cada una con su sugerencia marcada (salvo las que siguen en días de espera y las de
     // "Revisar": esas las decide una persona, venta por venta).
-    setElegidas(Object.fromEntries((d.ordenes as Orden[]).filter(o => o.sugerencia !== 'esperar' && o.sugerencia !== 'revisar' && !o.en_espera).map(o => [o.id, o.sugerencia as Tipo])))
+    setElegidas(Object.fromEntries((d.ordenes as Orden[]).filter(o => o.sugerencia !== 'esperar' && o.sugerencia !== 'revisar' && !o.en_espera).map(o => [o.id, sugeridaDe(o)])))
+    // Lo que dijo el comprador de las que ya te calificaron sin detalle guardado: se lee de ML de a 10, una vez por venta.
+    const faltan = (d.ordenes as Orden[]).filter(o => o.cal_comprador && o.cal_recibida == null && !o.en_espera).map(o => o.id)
+    if (vista !== 'listas' || !faltan.length) return
+    setLeyendo(new Set(faltan))
+    for (let i = 0; i < faltan.length; i += 10) {
+      const lote = faltan.slice(i, i + 10)
+      const r2 = await fetch('/api/calificaciones/comprador', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: lote }) }).catch(() => null)
+      const j = r2?.ok ? await r2.json().catch(() => null) : null
+      const res = new Map<string, { rating: string | null; concretada: boolean | null; mensaje: string | null }>(
+        (j?.resultados ?? []).map((x: { id: string }) => [x.id, x]))
+      setDatos(x => x && { ...x, ordenes: x.ordenes.map(o => res.has(o.id)
+        ? { ...o, cal_recibida: res.get(o.id)!.rating ?? '', cal_recibida_concretada: res.get(o.id)!.concretada, cal_recibida_msg: res.get(o.id)!.mensaje } : o) })
+      // Si el comprador dijo que SÍ se concretó, la sugerencia lo sigue (solo si nadie la cambió a mano).
+      setElegidas(x => ({ ...x, ...Object.fromEntries([...res].filter(([id, v]) => v.concretada === true && x[id] === 'no_concretada').map(([id]) => [id, 'concretada' as Tipo])) }))
+      setLeyendo(x => { const n = new Set(x); lote.forEach(id => n.delete(id)); return n })
+    }
   }, [vista])
   useEffect(() => { cargar() }, [cargar])
 
@@ -80,12 +119,13 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
     } finally { setActualizando(false) }
   }
 
-  const visibles = useMemo(() => (datos?.ordenes ?? []).filter(o => filtro === 'todas' || o.sugerencia === filtro), [datos, filtro])
+  const visibles = useMemo(() => (datos?.ordenes ?? []).filter(o => filtro === 'todas' || (filtro === 'calificaron' ? !!o.cal_comprador : o.sugerencia === filtro)), [datos, filtro])
+  const nCalificaron = (datos?.ordenes ?? []).filter(o => o.cal_comprador && !o.en_espera).length
   const aCalificar = visibles.filter(o => elegidas[o.id] && !o.en_espera)
   // Marcar / desmarcar del lote (casilla): al marcar vuelve la sugerencia de esa venta.
   const marcables = visibles.filter(o => !o.en_espera)
   const todas = marcables.length > 0 && marcables.every(o => elegidas[o.id])
-  const sugerida = (o: Orden): Tipo => (o.sugerencia === 'esperar' || o.sugerencia === 'revisar' ? 'concretada' : o.sugerencia)
+  const sugerida = sugeridaDe
   const marcar = (o: Orden, si: boolean) => setElegidas(x => ({ ...x, [o.id]: si ? sugerida(o) : null }))
   const marcarTodas = (si: boolean) =>
     setElegidas(x => ({ ...x, ...Object.fromEntries(marcables.map(o => [o.id, si ? (x[o.id] ?? sugerida(o)) : null])) }))
@@ -180,12 +220,13 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
 
           {vista === 'listas' && datos.ordenes.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
-              {(['todas', 'concretada', 'no_concretada', 'revisar'] as const).filter(f => f !== 'revisar' || datos.contadores.revisar > 0).map(f => (
+              {(['todas', 'concretada', 'no_concretada', 'revisar', 'calificaron'] as const).filter(f => (f !== 'revisar' || datos.contadores.revisar > 0) && (f !== 'calificaron' || nCalificaron > 0)).map(f => (
                 <button key={f} onClick={() => setFiltro(f)}
                   className={`px-3 py-1 text-xs font-medium rounded-full border ${filtro === f ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-600 border-neutral-200'}`}>
                   {f === 'todas' ? `Todas ${datos.contadores.concretadas + datos.contadores.no_concretadas + (datos.contadores.revisar ?? 0)}`
                     : f === 'concretada' ? `Concretadas ${datos.contadores.concretadas}`
-                    : f === 'no_concretada' ? `No concretadas ${datos.contadores.no_concretadas}` : `Revisar ${datos.contadores.revisar}`}
+                    : f === 'no_concretada' ? `No concretadas ${datos.contadores.no_concretadas}`
+                    : f === 'calificaron' ? `Ya te calificaron ${nCalificaron}` : `Revisar ${datos.contadores.revisar}`}
                 </button>
               ))}
               <span className="ml-auto text-sm text-neutral-600">{aCalificar.length} marcadas</span>
@@ -254,7 +295,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                         <div className="text-xs text-neutral-400">{o.cuenta} · {new Date(o.fecha).toLocaleDateString('es-VE')}</div>
                       </td>
                       <td className="px-3 py-2 text-neutral-700">{o.comprador ?? '—'}
-                        {o.cal_comprador && <div className="text-xs text-neutral-400">te calificó {RATING[o.cal_comprador] ?? o.cal_comprador}</div>}
+                        {o.cal_comprador && <LoQueDijo o={o} leyendo={leyendo.has(o.id)} />}
                         {/* Antes de calificar: ¿el comprador escribió? Un chip que abre la conversación sin salir a ML
                             (azul = el último mensaje es del comprador; gris = tuyo; clarito = sin mensajes). */}
                         <div className="mt-1">
@@ -293,6 +334,12 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                             <option value="no_concretada">No concretada · {RATING[datos.plantillas.noConcretada.rating]}</option>
                             <option value="">No calificar ahora</option>
                           </select>}
+                          {/* Lo contrario de lo que dijo el comprador queda "contradictoria" en ML. */}
+                          {!o.en_espera && elegidas[o.id] && o.cal_recibida_concretada != null && (elegidas[o.id] === 'concretada') !== o.cal_recibida_concretada && (
+                            <p className="mt-1 max-w-[14rem] text-[11px] leading-snug text-amber-700">
+                              El comprador dijo que {o.cal_recibida_concretada ? 'sí' : 'no'} se concretó: si calificas distinto queda contradictoria.
+                            </p>
+                          )}
                         </td>
                       )}
                       {vista === 'proximas' && (

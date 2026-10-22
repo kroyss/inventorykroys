@@ -135,7 +135,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-neutral-900">Sube los estados de cuenta</h2>
-            <p className="text-xs text-neutral-500">Bancamiga, Banesco, Mercantil, Provincial… ({nPend} pagos por verificar en los últimos 30 días). Los archivos no salen de tu computadora: quedan en ella hasta mañana y los pagos que vayan llegando se comprueban solos.</p>
+            <p className="text-xs text-neutral-500">Bancamiga, Banesco, Mercantil, Provincial… ({nPend} pagos por verificar en los últimos 30 días). Los archivos no salen de tu computadora: quedan en ella hasta mañana.</p>
           </div>
           <label className="btn-primary cursor-pointer text-sm">
             + Subir archivos
