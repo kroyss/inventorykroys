@@ -54,7 +54,10 @@ export async function PUT(req: NextRequest) {
     const { tomados, caso_ventas } = Body.parse(await req.json())
     if (tomados === undefined && caso_ventas === undefined) return NextResponse.json({ error: 'Nada que guardar' }, { status: 400 })
     const { rows: [g] } = await dbGlobal().query(
-      `UPDATE despegue_grupos SET tomados = COALESCE(LEAST($1::int, cupos), tomados), caso_ventas = COALESCE($2::int, caso_ventas),
+      // OJO (22-10): LEAST(NULL, cupos) en Postgres da cupos (ignora el NULL): al guardar solo las ventas del caso los cupos
+      // quedaban en 8/8. Por eso CASE: si no viene 'tomados', no se toca.
+      `UPDATE despegue_grupos SET tomados = CASE WHEN $1::int IS NULL THEN tomados ELSE LEAST($1::int, cupos) END,
+              caso_ventas = COALESCE($2::int, caso_ventas),
               actualizado_at = NOW()
        WHERE id = (SELECT id FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1)
        RETURNING cupos, tomados, caso_ventas`, [tomados ?? null, caso_ventas ?? null])
