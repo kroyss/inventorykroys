@@ -2,13 +2,13 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, portadaSerie, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, RADAR_CIFRAS, portadaSerie, diasEntre, ritmoVentas, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
 export const metadata = {
   title: 'Programa Despegue',
-  description: 'Caso real: así llevé una cuenta nueva de 0 a 11 ventas en 35 días. '
+  description: 'Caso real: así llevé una cuenta nueva de 0, con reputación gris, a reputación verde con MercadoEnvíos activado en 35 días. '
     + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Solo 8 cupos.',
 }
 
@@ -48,13 +48,7 @@ function Encabezado({ etiqueta, titulo, children }: { etiqueta: string; titulo: 
 
 // El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías,
 // 2.514 búsquedas en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo).
-const RADAR = [
-  { n: '+45.000', d: 'productos de MercadoLibre Venezuela' },
-  { n: '+320', d: 'categorías' },
-  { n: '+2.500', d: 'búsquedas en tendencia: las que más crecen y las más populares' },
-  { n: '+1.100', d: 'tendencias validadas con Google Trends' },
-  { n: '+45.000', d: 'productos con su actividad medida: si suben o se apagan' },
-]
+const RADAR = RADAR_CIFRAS
 
 // Íconos de trazo (24×24) en lugar de emojis (21-10: los emojis se veían de WhatsApp y distintos en cada teléfono).
 const ICONO = {
@@ -76,10 +70,15 @@ function Icono({ d, className = 'h-4 w-4' }: { d: string; className?: string }) 
 export default async function DespeguePage() {
   await connection()
   const { rows: [g] } = await dbGlobal().query<GrupoDespegue>(
-    `SELECT id, nombre, cupos, tomados, to_char(inicio, 'YYYY-MM-DD') AS inicio, to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta
+    `SELECT id, nombre, cupos, tomados, to_char(inicio, 'YYYY-MM-DD') AS inicio, to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta,
+            to_char(caso_inicio, 'YYYY-MM-DD') AS caso_inicio, caso_ventas
      FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1`)
   const hoy = currentDate('America/Caracas')
   const portada = await portadaSerie()
+  // El caso real (mig. 113): día de la cuenta desde el 15-09 y las ventas que lleva (las sube el dueño en Plataforma).
+  const diaCaso = diasEntre(g?.caso_inicio ?? '2026-09-15', hoy)
+  const ventasCaso = g?.caso_ventas ?? 17
+  const ritmo = ritmoVentas(diaCaso, ventasCaso)
   const cupos = g?.cupos ?? 8
   const tomados = Math.min(g?.tomados ?? 0, cupos)
   const quedan = cupos - tomados
@@ -143,13 +142,25 @@ export default async function DespeguePage() {
                 </span>
                 <span className="leading-tight">
                   <span className="block text-xs font-bold uppercase tracking-[0.18em] text-lime-400">Caso real</span>
-                  <span className="block text-sm text-neutral-200">Mi cuenta, grabada de principio a fin <span className="whitespace-nowrap text-lime-400">· ver ↓</span></span>
+                  <span className="block text-sm text-neutral-200">Cuenta desde cero, grabada de principio a fin <span className="whitespace-nowrap text-lime-400">· ver ↓</span></span>
                 </span>
               </a>
-              <h1 className="mt-4 text-[2.1rem] font-semibold leading-[1.08] tracking-tight sm:text-[3.4rem]">
-                Así llevé una cuenta nueva de <span className="text-neutral-500">0</span> a <span className="text-lime-400">11 ventas</span>{' '}
+              {/* 21-10: el HITO (fijo, grabado en la serie) en el título; el avance va en la línea de abajo y se actualiza solo. */}
+              <h1 className="mt-4 text-[1.85rem] font-semibold leading-[1.12] tracking-tight sm:text-[2.75rem]">
+                Así llevé una cuenta nueva de <span className="text-neutral-500">0, con reputación gris,</span> a{' '}
+                <span className="text-lime-400">reputación verde</span> con <span className="text-lime-400">MercadoEnvíos activado</span>{' '}
                 <span className="whitespace-nowrap">en <span className="text-lime-400">35 días</span>.</span>
               </h1>
+              {/* El avance de hoy (mig. 113): el día se calcula desde caso_inicio; las ventas las sube el dueño en Plataforma. */}
+              <p className="mt-4 inline-flex items-start gap-2.5 text-sm leading-snug text-neutral-300 sm:text-base">
+                <span className="relative mt-1.5 flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-400 opacity-60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-lime-400" />
+                </span>
+                <span>
+                  Hoy, día {diaCaso}: <b className="text-white">{ventasCaso} ventas</b>{ritmo ? <>, {ritmo}</> : null}, y sumando.
+                </span>
+              </p>
               <p className="mt-5 leading-relaxed text-neutral-400 lg:text-lg">
                 Te muestro cómo lo hice, paso a paso. En <b className="text-white">8 semanas</b> te acompaño a aplicar
                 <b className="text-white"> el mismo método en tu cuenta</b>, empieces de cero o ya tengas una.

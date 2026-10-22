@@ -52,6 +52,24 @@ export const SEMANAS: { n: number | null; fecha: string; tema: string }[] = [
 export interface GrupoDespegue {
   id: number; nombre: string; cupos: number; tomados: number
   inicio: string; aparta_hasta: string   // YYYY-MM-DD
+  caso_inicio: string; caso_ventas: number  // el caso real (mig. 113): desde cuándo y cuántas ventas lleva
+}
+
+/** Días transcurridos entre dos fechas YYYY-MM-DD (el 15-09 al 21-10 = 36). */
+export function diasEntre(desde: string, hasta: string) {
+  const t = (x: string) => { const [a, m, d] = x.split('-').map(Number); return Date.UTC(a, m - 1, d) }
+  return Math.max(0, Math.round((t(hasta) - t(desde)) / 86_400_000))
+}
+
+/** "casi una cada 2 días" / "más de una cada 2 días" / "más de una venta por día", con los números reales. */
+export function ritmoVentas(dias: number, ventas: number): string | null {
+  if (ventas <= 0 || dias <= 0) return null
+  const cada = dias / ventas
+  if (cada < 0.95) return 'más de una venta por día'
+  if (cada <= 1.05) return 'una venta por día'
+  const n = Math.round(cada)
+  if (Math.abs(cada - n) < 0.05) return `una cada ${n} días`
+  return cada > n ? `casi una cada ${n} días` : `más de una cada ${n} días`
 }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -90,3 +108,13 @@ export function origenDe(v: { utm_source?: string; referrer?: string }, ua: stri
   if (/WhatsApp/i.test(ua)) return 'whatsapp'
   return 'directo'
 }
+
+// El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías, 2.514 búsquedas
+// en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo). Lo usan /despegue y /inicio.
+export const RADAR_CIFRAS = [
+  { n: '+45.000', d: 'productos de MercadoLibre Venezuela' },
+  { n: '+320', d: 'categorías' },
+  { n: '+2.500', d: 'búsquedas en tendencia: las que más crecen y las más populares' },
+  { n: '+1.100', d: 'tendencias validadas con Google Trends' },
+  { n: '+45.000', d: 'productos con su actividad medida: si suben o se apagan' },
+]

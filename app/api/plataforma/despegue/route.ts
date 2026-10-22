@@ -8,6 +8,7 @@ import { soloDueno } from '@/lib/plataforma'
 //   GET → el grupo que anuncia la página (cupos y tomados) + el embudo de la página (personas que entraron,
 //         vieron el video y tocaron Telegram; total y de hoy, hora Caracas) y de dónde llegaron.
 //   PUT { tomados } → el contador "Quedan X de 8": se sube a mano cada vez que alguien paga su cupo.
+//   PUT { caso_ventas } → las ventas de la cuenta del caso real (mig. 113): "Hoy, día N: X ventas" en la página.
 
 const HOY = `(v.fecha AT TIME ZONE 'America/Caracas')::date = (NOW() AT TIME ZONE 'America/Caracas')::date`
 
@@ -18,7 +19,8 @@ export async function GET() {
     const db = dbGlobal()
     const [{ rows: [grupo] }, { rows: [embudo] }, { rows: origenes }] = await Promise.all([
       db.query(`SELECT id, nombre, cupos, tomados, to_char(inicio, 'YYYY-MM-DD') AS inicio,
-                       to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta
+                       to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta,
+                       to_char(caso_inicio, 'YYYY-MM-DD') AS caso_inicio, caso_ventas
                 FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1`),
       db.query(
         `SELECT COUNT(DISTINCT navegador_id) FILTER (WHERE evento = 'vista')::int AS personas,
@@ -40,17 +42,22 @@ export async function GET() {
   }
 }
 
-const Body = z.object({ tomados: z.number().int().min(0).max(100) })
+const Body = z.object({
+  tomados:     z.number().int().min(0).max(100).optional(),
+  caso_ventas: z.number().int().min(0).max(100000).optional(),
+})
 
 export async function PUT(req: NextRequest) {
   const { error } = await soloDueno()
   if (error) return error
   try {
-    const { tomados } = Body.parse(await req.json())
+    const { tomados, caso_ventas } = Body.parse(await req.json())
+    if (tomados === undefined && caso_ventas === undefined) return NextResponse.json({ error: 'Nada que guardar' }, { status: 400 })
     const { rows: [g] } = await dbGlobal().query(
-      `UPDATE despegue_grupos SET tomados = LEAST($1, cupos), actualizado_at = NOW()
+      `UPDATE despegue_grupos SET tomados = COALESCE(LEAST($1::int, cupos), tomados), caso_ventas = COALESCE($2::int, caso_ventas),
+              actualizado_at = NOW()
        WHERE id = (SELECT id FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1)
-       RETURNING cupos, tomados`, [tomados])
+       RETURNING cupos, tomados, caso_ventas`, [tomados ?? null, caso_ventas ?? null])
     if (!g) return NextResponse.json({ error: 'No hay grupo' }, { status: 404 })
     return NextResponse.json(g)
   } catch (err) {
