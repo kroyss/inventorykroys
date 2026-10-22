@@ -238,9 +238,12 @@ export default async function DespeguePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">Esto lo hice yo</p>
             <h2 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">No te lo cuento: te lo muestro.</h2>
             <p className="mt-4 leading-relaxed text-neutral-400">
-              Abrí una cuenta desde cero, sin ventas y con reputación gris. A los <b className="text-white">7 días</b> tuve la primera
-              venta. A los <b className="text-white">35 días</b> ya tenía <b className="text-white">11 ventas</b>, reputación verde y
-              MercadoEnvíos con envío gratis activo. Lo grabé todo, episodio por episodio.
+              {/* 21-10: sin números fijos que se vuelvan viejos: el hito (7 y 35 días) y el avance de hoy (mismos datos que la
+                  línea de la portada: día desde caso_inicio, ventas desde Plataforma). */}
+              Abrí una cuenta desde cero, sin ventas y con reputación gris. A los <b className="text-white">7 días</b> llegó la primera
+              venta, y a los <b className="text-white">35 días</b> ya tenía <b className="text-white">reputación verde</b> y{' '}
+              <b className="text-white">MercadoEnvíos con envío gratis activo</b>. Hoy, <b className="text-white">día {diaCaso}</b>, llevo{' '}
+              <b className="text-white">{ventasCaso} ventas</b> y sigo grabando cada paso.
             </p>
             <p className="mt-3 leading-relaxed text-neutral-400">
               En Despegue te enseño a hacer lo mismo, <b className="text-white">paso a paso y con tu cuenta</b>.
