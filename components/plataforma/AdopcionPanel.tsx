@@ -13,6 +13,7 @@ export interface Empresa {
   usuarios_7d: number; ultimo_uso: string | null; abierta_at: string | null; en_linea: boolean; abierta: boolean
   telegram: boolean            // vinculó los avisos por Telegram
   pagos_me: number | null      // pagos de MercadoEnvíos verificados en el período (null = sin el módulo)
+  pagos_me_estado?: 'vinculado' | 'intento' | 'sin_intentar' | null   // en qué quedó la conexión (23-10)
 }
 type Nivel = 'integrado' | 'parcial' | 'sin_uso' | 'no_entra' | 'sin_ventas' | 'sin_conectar'
 type FiltroUso = 'todos' | 'sin_conectar' | 'por_vencer' | 'dormidos'
@@ -32,6 +33,12 @@ export const diasSin = (f: string | null) => (f ? (Date.now() - new Date(f).getT
 export const actividad = (e: Pick<Empresa, 'preguntas_sistema' | 'mensajes_sistema' | 'guias' | 'reportadas' | 'calificadas_sistema' | 'stock' | 'ia'>) =>
   e.preguntas_sistema + e.mensajes_sistema + e.guias + e.reportadas + e.calificadas_sistema + e.stock + e.ia
 
+const PAGOS_ME_ESTADO = {
+  vinculado:    { t: 'Pagos ME vinculado ✓', c: 'bg-emerald-50 text-emerald-800 ring-emerald-200', ayuda: 'El Asistente de envíos se conectó al menos una vez (o ya trajo pagos)' },
+  intento:      { t: 'Pagos ME: lo intentó', c: 'bg-amber-50 text-amber-800 ring-amber-200', ayuda: 'Generó el código o instaló el programa, pero el Asistente nunca se conectó en Chrome' },
+  sin_intentar: { t: 'Pagos ME: sin intentar', c: 'bg-neutral-50 text-neutral-500 ring-neutral-200', ayuda: 'Tiene el módulo activo, pero nunca generó el código ni instaló nada' },
+} as const
+
 /** Qué usa, con cuántas veces (solo lo que usó). */
 export function UsoChips({ e }: { e: Empresa }) {
   const usos: [string, number, string][] = [
@@ -47,7 +54,8 @@ export function UsoChips({ e }: { e: Empresa }) {
   const usados = usos.filter(([, n]) => n > 0)
   // Sin uso en el período pero con algo encendido: se dice igual (Telegram, o Pagos ME activo sin pagos aún).
   const pagosSinUso = e.pagos_me === 0
-  if (!usados.length && !e.telegram && !pagosSinUso) return <span className="text-[11px] text-neutral-400">nada en el período</span>
+  const conexion = e.pagos_me_estado ? PAGOS_ME_ESTADO[e.pagos_me_estado] : null
+  if (!usados.length && !e.telegram && !pagosSinUso && !conexion) return <span className="text-[11px] text-neutral-400">nada en el período</span>
   return (
     <div className="flex flex-wrap gap-1">
       {usados.map(([t, n, ayuda]) => (
@@ -55,6 +63,7 @@ export function UsoChips({ e }: { e: Empresa }) {
           {t} <b className="tabular-nums">{n}</b>
         </span>
       ))}
+      {conexion && <span title={conexion.ayuda} className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset ${conexion.c}`}>{conexion.t}</span>}
       {e.telegram && <span title="Vinculó los avisos por Telegram" className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[11px] text-sky-700">Telegram ✓</span>}
       {pagosSinUso && <span title="Tiene Pagos ME activo pero no verificó pagos en el período" className="whitespace-nowrap rounded-full bg-neutral-50 px-2 py-0.5 text-[11px] text-neutral-400 ring-1 ring-inset ring-neutral-200">Pagos ME 0</span>}
     </div>

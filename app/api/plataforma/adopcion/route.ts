@@ -33,12 +33,18 @@ export async function GET(req: NextRequest) {
        ORDER BY e.organizacion_id = $2 DESC, a.ventas DESC, e.nombre`, [dias, ORGANIZACION_PLATAFORMA, EN_LINEA_MINUTOS, ENTORNO])
     // Pagos ME (solo con el módulo, hoy pocas empresas): pagos verificados en el período. me_pagos es por empresa
     // (RLS): se cuenta con la conexión de cada una. null = no tiene el módulo.
+    // 23-10: y en qué quedó la conexión (vinculado / lo intentó / sin intentar), con lo que el sistema ya guarda.
     for (const r of rows) {
-      r.pagos_me = r.con_pagos_me
+      const m = r.con_pagos_me
         ? await conEmpresa(r.id, r.country as Country, db => db.query(
-            `SELECT COUNT(*)::int AS n FROM me_pagos WHERE verificado_at > NOW() - make_interval(days => $1)`, [dias]))
-            .then(x => x.rows[0].n as number).catch(() => 0)
+            `SELECT (SELECT COUNT(*)::int FROM me_pagos WHERE verificado_at > NOW() - make_interval(days => $1)) AS n,
+                    (EXISTS (SELECT 1 FROM me_latidos WHERE perfil <> 'DESPERTADOR') OR EXISTS (SELECT 1 FROM me_pagos)) AS vinculado,
+                    (EXISTS (SELECT 1 FROM me_latidos) OR EXISTS (SELECT 1 FROM me_claves) OR EXISTS (SELECT 1 FROM me_codigos)
+                     OR EXISTS (SELECT 1 FROM me_pedidos WHERE pedido_por IS NOT NULL)) AS intento`, [dias]))
+            .then(x => x.rows[0]).catch(() => null)
         : null
+      r.pagos_me = m ? m.n as number : r.con_pagos_me ? 0 : null
+      r.pagos_me_estado = m ? (m.vinculado ? 'vinculado' : m.intento ? 'intento' : 'sin_intentar') : null
       delete r.con_pagos_me
     }
     return NextResponse.json({ dias, empresas: rows })
