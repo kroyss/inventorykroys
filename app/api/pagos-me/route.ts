@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { leerHorario } from '@/lib/pagosMEComun'
 import { apiError } from '@/lib/apiError'
-import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME, conTraerAutomatico } from '@/lib/pagosME'
+import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
 
 /**
@@ -48,7 +47,7 @@ export async function GET(req: NextRequest) {
     if (await esDemo(s.db)) await s.db.query(`UPDATE me_latidos SET visto_at = NOW()`)
     const estado = req.nextUrl.searchParams.get('estado') ?? 'pendiente'
     const filtro = ['pendiente', 'valido', 'invalido'].includes(estado) ? estado : null
-    const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }, { rows: [hor] }, { rows: [ahora] }] = await Promise.all([
+    const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }] = await Promise.all([
       s.db.query(
         `${SELECT_PAGOS}
          WHERE ($1::text IS NULL OR p.verificacion = $1) AND p.fecha_orden > NOW() - INTERVAL '30 days'
@@ -71,16 +70,12 @@ export async function GET(req: NextRequest) {
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                   FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
       s.db.query(`SELECT (SELECT creado_at FROM me_vigilante) AS creado_at, EXISTS (SELECT 1 FROM me_claves) AS con_codigo`),
-      s.db.query(`SELECT value FROM app_settings WHERE key = 'pagos_me_horario'`),
-      // Día (1 = lunes) y hora de Venezuela (la conexión tiene el TimeZone de la empresa), para "Próximo automático".
-      s.db.query(`SELECT EXTRACT(ISODOW FROM NOW())::int AS dia, to_char(NOW(), 'HH24:MI') AS hm`),
     ])
     return NextResponse.json({
       pagos,
       conteo: Object.fromEntries(conteo.map(c => [c.verificacion, c.n])),
       vigilante: { clave: !!clave?.creado_at || !!clave?.con_codigo, latidos, pedido: pedido ?? null },
       desdeML: s.desdeML,
-      horario: leerHorario(hor?.value), ahora, automatico: await conTraerAutomatico(s.db),
     })
   } catch (err) {
     return apiError(err)

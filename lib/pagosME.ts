@@ -16,7 +16,6 @@ import { mkdir, readFile, writeFile } from 'fs/promises'
 import path from 'path'
 import type { Pool } from 'pg'
 import { dbEmpresa, dbGlobal } from '@/lib/db'
-import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { leerEtiquetas, sha256 } from '@/lib/despachos'
@@ -28,16 +27,6 @@ const DIR = path.join(UPLOAD_DIR, 'pagos-me')
 export const MAX_ARCHIVO = 5 * 1024 * 1024
 /** Un pedido de "Traer pagos y guías" vale por este tiempo: después los perfiles lo ignoran. */
 export const PEDIDO_VIGENTE_MIN = 30
-
-/** Traer AUTOMÁTICO por horario: solo la empresa dueña de la plataforma (24-10, decisión del dueño). A los
- *  Fundadores el programa abriendo Chrome solo les parece invasivo ("que lo están hackeando"): para ellos se trae
- *  EXCLUSIVAMENTE al tocar «Traer pagos y guías». */
-export async function conTraerAutomatico(db: Pool) {
-  const { rows: [e] } = await db.query(
-    `SELECT organizacion_id = $1 AS si FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int`,
-    [ORGANIZACION_PLATAFORMA]).catch(() => ({ rows: [] as { si: boolean }[] }))
-  return !!e?.si
-}
 /** En pantalla, una traída se muestra "trayendo" a lo sumo esto (una normal tarda 1–2 min): pasado
  *  este tiempo, la cuenta que no respondió se muestra como "no respondió: revisa la PC". */
 export const TRAIDA_EN_CURSO_MIN = 5
