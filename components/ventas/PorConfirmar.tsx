@@ -14,6 +14,31 @@ import LineaBanco from './LineaBanco'
 import { BotonGuia } from './VerGuia'
 import { BotonComprobante } from './VerComprobante'
 import { Monto } from '@/components/pagosme/PagoME'
+import { LoQueSeHablo } from './PagoYContexto'
+import { NotasVenta } from '@/components/preguntas/MensajesClient'
+
+const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
+
+/** Nota de la venta en MercadoLibre, editable (la misma de Mensajes y de Ventas), en una ventanita (23-10). */
+function ChipNota({ numero }: { numero: string }) {
+  const [abierta, setAbierta] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setAbierta(true)} title="Ver y editar la nota de la venta en MercadoLibre (el comprador no la ve)"
+        className={`${chipCls} bg-white text-neutral-600 ring-neutral-200 hover:bg-neutral-50`}>📝 Nota</button>
+      {abierta && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4" onClick={() => setAbierta(false)}>
+          <div className="w-full max-w-lg space-y-3 rounded-xl bg-white p-4 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-neutral-900">Nota de la venta <span className="font-mono text-xs text-neutral-400">{numero}</span></h3>
+              <button type="button" onClick={() => setAbierta(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Cerrar">✕</button>
+            </div>
+            <NotasVenta pack={numero} onCambio={() => {}} />
+          </div>
+        </div>, document.body)}
+    </>
+  )
+}
 
 interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null
   /** Ya cargadas en borrador cuyo pago trajo Pagos ME (22-10, solo con inventario). */
@@ -209,6 +234,11 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
             compró {hace(f.fecha)}{f.pago?.at ? ` · pago traído ${hace(f.pago.at)}` : ''} · {f.cuenta}
           </span>
           {f.pago?.guia && <BotonGuia pagoId={f.pago.id} venta={f.numero} />}
+          {/* 23-10: lo mismo que ve el equipo al verificar (Ventas): la conversación con el comprador y la nota de la venta. */}
+          <LoQueSeHablo numero={f.numero} chip
+            className={`${chipCls} ${f.mensaje ? 'bg-sky-50 text-sky-800 ring-sky-200 font-medium hover:bg-sky-100' : 'bg-white text-neutral-600 ring-neutral-200 hover:bg-neutral-50'}`}
+            etiqueta={<>💬 {f.mensaje ? 'Escribió' : 'Conversación'} ›</>} />
+          <ChipNota numero={f.numero} />
           {f.despacho && (
             <Etiqueta tono={f.despacho === 'impresa' ? 'verde' : 'gris'}
               title={f.despacho === 'impresa' ? 'Su guía ya salió impresa en Despachos' : 'Su guía ya está cargada en Despachos, todavía sin imprimir'}>
