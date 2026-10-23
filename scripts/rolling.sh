@@ -54,8 +54,35 @@ cambiar() {   # servicio puerto puerto_de_la_otra
   echo "  ✓ $1 responde en :$2"
 }
 
-echo "→ compilando la versión $DEPLOYMENT_ID (sigue atendiendo la actual)"
-docker compose -f "$COMPOSE" build
+# 23-10-2026: la imagen se compila EN GITHUB (.github/workflows/imagen.yml) y llega sola como inventory-ci:<commit>
+# (scripts/recibir-imagen.sh). Aquí se espera a que llegue (hasta ESPERA_CI s) y se usa; así el VPS no compila y la
+# app no se pone lenta. Si no llega (GitHub caído, sin llave…) o con LOCAL=1, se compila aquí como antes (plan B).
+COMMIT=$(git rev-parse --short=12 HEAD)
+IMAGEN_APP=$(docker inspect -f '{{.Config.Image}}' "$SA" 2>/dev/null || true)
+traida=0
+# Si nunca llegó ninguna de GitHub (todavía sin configurar), no se espera: se compila aquí directo.
+if [ "${LOCAL:-0}" != 1 ] && [ -n "$IMAGEN_APP" ] && [ -n "$(docker images -q inventory-ci 2>/dev/null | head -1)" ]; then
+  echo "→ esperando la versión $COMMIT compilada en GitHub (hasta $(( ${ESPERA_CI:-720} / 60 )) min)"
+  for _ in $(seq 1 $(( ${ESPERA_CI:-720} / 10 ))); do
+    if docker image inspect "inventory-ci:$COMMIT" >/dev/null 2>&1; then traida=1; break; fi
+    sleep 10
+  done
+fi
+if [ "$traida" = 1 ]; then
+  docker tag "inventory-ci:$COMMIT" "$IMAGEN_APP"
+  DEPLOYMENT_ID=$(docker image inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$IMAGEN_APP" | sed -n 's/^DEPLOYMENT_ID=//p')
+  export DEPLOYMENT_ID
+  echo "  ✓ llegó de GitHub: versión $DEPLOYMENT_ID (el VPS no compiló)"
+  # Lo demás que se compila aquí (el servicio de etiquetas, Python, chico y casi siempre en caché).
+  for s in "${OTROS[@]}"; do
+    img=$(docker inspect -f '{{.Config.Image}}' "$s" 2>/dev/null || true)
+    if [ -n "$img" ] && [ "$img" != "$IMAGEN_APP" ]; then docker compose -f "$COMPOSE" build "$s"; fi
+  done
+else
+  [ "${LOCAL:-0}" = 1 ] || echo "  ✗ no llegó de GitHub: se compila aquí (plan B)"
+  echo "→ compilando la versión $DEPLOYMENT_ID (sigue atendiendo la actual)"
+  docker compose -f "$COMPOSE" build
+fi
 
 cambiar "$SB" "$PB" "$PA"
 cambiar "$SA" "$PA" "$PB"

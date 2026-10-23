@@ -1,0 +1,55 @@
+# Compila la imagen de la app EN GITHUB (no en el VPS) y se la entrega al servidor lista (23-10-2026).
+# Antes cada subida compilaba en el mismo VPS que atiende a los clientes y la app se ponía lenta ~4 min.
+# Ahora el VPS solo recibe la imagen y hace el cambio sin corte de siempre (scripts/rolling.sh la espera).
+# No usa el registro de GitHub (la cuenta gratis da 1 GB/mes de descargas privadas): la imagen viaja por SSH con
+# una llave que SOLO puede entregar imágenes (forced command en el VPS: scripts/recibir-imagen.sh).
+# Si esto falla, rolling.sh compila en el VPS como antes (plan B): la subida nunca queda trabada.
+name: Imagen para el servidor
+on:
+  push:
+    branches: [main, importar-ml]
+  workflow_dispatch:
+concurrency:
+  group: imagen-${{ github.sha }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versión
+        id: v
+        run: |
+          echo "commit=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "id=$(git rev-parse --short HEAD)-$(TZ=America/Caracas date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
+      - name: Llave del servidor
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_LLAVE_IMAGENES }}" > ~/.ssh/imagenes && chmod 600 ~/.ssh/imagenes
+          printf '%s\n' "${{ secrets.VPS_HUELLA }}" > ~/.ssh/known_hosts
+      - name: ¿El servidor ya la tiene?
+        id: ya
+        run: |
+          if ssh -i ~/.ssh/imagenes -o BatchMode=yes -o ConnectTimeout=20 root@${{ secrets.VPS_IP }} "tiene ${{ steps.v.outputs.commit }}"; then
+            echo "si=1" >> "$GITHUB_OUTPUT"; echo "El servidor ya tiene esta versión: no se compila de nuevo."
+          fi
+      - uses: docker/setup-buildx-action@v3
+        if: steps.ya.outputs.si != '1'
+      - name: Compilar
+        if: steps.ya.outputs.si != '1'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: inventory-ci:${{ steps.v.outputs.commit }}
+          build-args: DEPLOYMENT_ID=${{ steps.v.outputs.id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Entregar al servidor
+        if: steps.ya.outputs.si != '1'
+        run: |
+          docker save inventory-ci:${{ steps.v.outputs.commit }} | gzip -1 \
+            | ssh -i ~/.ssh/imagenes -o BatchMode=yes -o ServerAliveInterval=30 root@${{ secrets.VPS_IP }} "cargar ${{ steps.v.outputs.commit }}"
