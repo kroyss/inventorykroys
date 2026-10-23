@@ -32,7 +32,13 @@ jobs:
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           # Pegadas desde el Bloc de notas traen saltos de línea de Windows (\r): ssh no lee la llave así.
-          printf '%s\n' "$LLAVE" | tr -d '\r' | sed '/^[[:space:]]*$/d' > ~/.ssh/imagenes && chmod 600 ~/.ssh/imagenes
+          # Se acepta pegada tal cual (-----BEGIN…) o en una sola línea en base64 (más fácil de pegar sin romperla).
+          if printf '%s' "$LLAVE" | grep -q 'BEGIN OPENSSH'; then
+            printf '%s\n' "$LLAVE" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d' > ~/.ssh/imagenes
+          else
+            printf '%s' "$LLAVE" | tr -d '\r\n ' | base64 -d > ~/.ssh/imagenes
+          fi
+          chmod 600 ~/.ssh/imagenes
           printf '%s\n' "$HUELLA" | tr -d '\r' > ~/.ssh/known_hosts
           ssh-keygen -y -f ~/.ssh/imagenes > /dev/null && echo "Llave leída bien" || { echo "La llave guardada en GitHub no se puede leer: vuelve a pegarla completa"; exit 1; }
       - name: ¿El servidor ya la tiene?
