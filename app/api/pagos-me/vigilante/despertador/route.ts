@@ -42,6 +42,10 @@ async function disparoAutomatico(db: Pool) {
   if (!horario.dias.includes(t.dia)) return
   const hora = [...horario.horas].reverse().find(x => x <= t.hm)
   if (!hora) return
+  // Sin ningún perfil de Chrome conectado nunca (23-10, recién instalado): no hay con qué traer. Antes se pedía la
+  // traída atrasada de las 8:00 al conectar el programa a las 11 y quedaba "no se hizo" sin que nadie supiera por qué.
+  const { rows: [perfil] } = await db.query(`SELECT 1 FROM me_latidos WHERE perfil <> 'DESPERTADOR' LIMIT 1`)
+  if (!perfil) return
   await db.query(
     `INSERT INTO me_pedidos (pedido_por)
      SELECT NULL WHERE NOT EXISTS (

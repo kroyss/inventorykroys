@@ -129,6 +129,14 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const todos = pagos.length > 0 && pagos.every(p => marcados.has(p.id))
   const toggle = (id: number) => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
+  // Mientras carga no se muestra nada a medias (23-10: sin datos se veía unos segundos la vista con inventario).
+  if (!datos) return (
+    <div className="space-y-4">
+      <PageHeader title="Pagos MercadoEnvíos" subtitle="Pagos y guías traídos del portal: verifícalos de corrido contra el banco" />
+      <p className="text-sm text-neutral-400">Cargando…</p>
+    </div>
+  )
+
   return (
     <div className="space-y-4">
       <PageHeader title="Pagos MercadoEnvíos" subtitle="Pagos y guías traídos del portal: verifícalos de corrido contra el banco"
@@ -193,7 +201,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
-      {pedido && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
+      {/* Sin nada conectado (recién instalado o todo desconectado) no hay traída que mostrar: se ven los pasos. */}
+      {pedido && (despertador || perfiles.length > 0) && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
         pcPrendida={!!despertador?.conectado} />}
 
       {datos && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
