@@ -22,7 +22,8 @@ interface Datos {
 }
 
 /** Programa para la PC (tools/vigilante-pagos-me/instalador → public/descargas). */
-const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe'
+// Con la versión en el enlace (23-10): Cloudflare guarda los .exe hasta 4 h; así cada versión nueva se baja al momento.
+const DESCARGA_PROGRAMA = '/descargas/InstalarPagosME.exe?v=1.3.7'
 
 const hora = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', {
   timeZone: 'America/Caracas', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
