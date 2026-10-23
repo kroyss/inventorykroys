@@ -2,7 +2,7 @@
 // Vincular publicaciones de ML (20-10, migración 109; API /api/vincular-ml). Una tarjeta por publicación, de la que
 // más vende a la que menos; dentro, una fila por variante (cada color/modelo es un producto aparte). Cada vínculo lo
 // hace una persona con un clic: el sistema solo sugiere. "No sé, para Marcos" deja la duda con su nota.
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -143,7 +143,7 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
       ) : (
         <div className="space-y-3">
           {grupos.slice(0, ver).map(g => (
-            <section key={`${g.cuenta}|${g.item_id}`} className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <section key={`${g.cuenta}|${g.item_id}`} className="scroll-mt-16 rounded-xl border border-neutral-200 bg-white shadow-sm">
               <div className="flex items-start gap-3 border-b border-neutral-100 px-4 py-3">
                 {g.thumbnail
                   // eslint-disable-next-line @next/next/no-img-element
@@ -195,7 +195,7 @@ function FilaVariante({ f, productos, esDueno, pedir, onCambio }: {
   }
 
   return (
-    <li className="px-4 py-2.5 text-sm">
+    <li className={`scroll-mt-16 px-4 py-2.5 text-sm ${modo === 'elegir' && celular ? 'bg-lime-50/60' : ''}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <div className="min-w-[10rem] flex-1">
           <span className="font-medium text-neutral-800">{f.variante ?? 'Publicación sin variantes'}</span>
@@ -298,56 +298,64 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
   )
 }
 
-/** Buscador a pantalla completa del celular. Tocar un producto solo lo marca: vincula el botón de abajo, así un
- *  toque al deslizar la lista no vincula nada. */
+/** Buscador del celular, DENTRO de la tarjeta (22-10: a pantalla completa se perdía de vista qué se vinculaba).
+ *  Al abrir, la página deja arriba la foto y el título de la publicación (o, si la variante queda muy abajo, la
+ *  variante con un recordatorio del título). Tocar un producto solo lo marca: vincula el botón, así un toque al
+ *  deslizar no vincula nada. */
 function SelectorCelular({ f, productos, ocupado, onElegir, onCerrar }: {
   f: Fila; productos: Producto[]; ocupado: boolean
   onElegir: (p: Producto) => void; onCerrar: () => void
 }) {
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Producto | null>(null)
+  const [recordar, setRecordar] = useState(false)
+  const caja = useRef<HTMLDivElement>(null)
+  const entrada = useRef<HTMLInputElement>(null)
   const res = useMemo(() => buscarProductos(productos, q), [productos, q])
-  // Detrás no se desliza la página mientras está abierto.
+
   useEffect(() => {
-    const antes = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = antes }
+    const li = caja.current?.closest('li'), tarjeta = caja.current?.closest('section')
+    if (!li || !tarjeta) return
+    const lejos = li.getBoundingClientRect().top - tarjeta.getBoundingClientRect().top > 160
+    ;(lejos ? li : tarjeta).scrollIntoView({ block: 'start', behavior: 'smooth' })
+    setRecordar(lejos)
+    entrada.current?.focus({ preventScroll: true })
   }, [])
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
-      <div className="space-y-2 border-b border-neutral-200 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button onClick={onCerrar} className="-ml-1 px-1 py-1 text-sm text-neutral-600">← Volver</button>
-        <div>
-          <p className="line-clamp-2 text-sm font-medium text-neutral-900">{f.titulo}</p>
-          {f.variante && <p className="text-xs text-neutral-500">{f.variante}</p>}
-        </div>
-        <input type="search" value={q} onChange={e => { setQ(e.target.value); setSel(null) }} autoFocus
-          placeholder="Nombre o código del producto…" className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base" />
-      </div>
-      <ul className="flex-1 divide-y divide-neutral-100 overflow-y-auto overscroll-contain">
-        {!q.trim() ? (
-          <li className="px-4 py-8 text-center text-sm text-neutral-400">Escribe parte del nombre (las palabras en cualquier orden) o el código.</li>
-        ) : res.length === 0 ? (
-          <li className="px-4 py-8 text-center text-sm text-neutral-400">No hay productos con eso.</li>
-        ) : res.map(p => (
-          <li key={p.id}>
-            <button onClick={() => setSel(p)}
-              className={`flex w-full items-start gap-3 px-4 py-3 text-left ${sel?.id === p.id ? 'bg-lime-50' : 'active:bg-neutral-50'}`}>
-              <span className={`mt-1 h-4 w-4 shrink-0 rounded-full border ${sel?.id === p.id ? 'border-lime-600 bg-lime-500' : 'border-neutral-300'}`} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm text-neutral-900">{p.name}</span>
-                <span className="block text-xs text-neutral-500"><span className="font-mono">{p.code}</span> · stock {p.stock}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {sel && (
-        <div className="border-t border-neutral-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <button disabled={ocupado} onClick={() => onElegir(sel)} className="btn-primary w-full py-3">Vincular con {sel.code}</button>
+    <div ref={caja} className="mt-2 space-y-2 rounded-lg border border-lime-300 bg-lime-50/40 p-2">
+      {recordar && (
+        <div className="flex items-center gap-2 text-xs text-neutral-600">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {f.thumbnail && <img src={f.thumbnail} alt="" className="h-8 w-8 shrink-0 rounded border bg-white object-contain" />}
+          <span className="line-clamp-2">{f.titulo}</span>
         </div>
       )}
+      <input ref={entrada} type="search" value={q} onChange={e => { setQ(e.target.value); setSel(null) }}
+        placeholder="Nombre o código del producto…" className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base" />
+      <div className="flex gap-2">
+        <button disabled={!sel || ocupado} onClick={() => sel && onElegir(sel)} className="btn-primary flex-1 disabled:opacity-50">
+          {sel ? `Vincular con ${sel.code}` : 'Toca un producto'}
+        </button>
+        <button onClick={onCerrar} className="btn-secondary">Cancelar</button>
+      </div>
+      {q.trim() && (res.length === 0
+        ? <p className="px-1 py-3 text-center text-sm text-neutral-400">No hay productos con eso.</p>
+        : <ul className="divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            {res.map(p => (
+              <li key={p.id}>
+                <button onClick={() => setSel(p)}
+                  className={`flex w-full items-start gap-3 px-3 py-3 text-left ${sel?.id === p.id ? 'bg-lime-50' : 'active:bg-neutral-50'}`}>
+                  <span className={`mt-1 h-4 w-4 shrink-0 rounded-full border ${sel?.id === p.id ? 'border-lime-600 bg-lime-500' : 'border-neutral-300'}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm text-neutral-900">{p.name}</span>
+                    <span className="block text-xs text-neutral-500"><span className="font-mono">{p.code}</span> · stock {p.stock}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>)}
+      {!q.trim() && <p className="px-1 text-xs text-neutral-500">Escribe parte del nombre (las palabras en cualquier orden) o el código.</p>}
     </div>
   )
 }
