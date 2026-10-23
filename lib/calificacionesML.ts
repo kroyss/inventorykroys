@@ -186,6 +186,9 @@ export const SQL_BANDEJA = `
                 AND (g.impresa IS NOT TRUE OR ${GUIA_OK}) THEN 'concretada'
            WHEN (f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'))
                 AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
+           -- Sin cargar y marcada "No se concretó" (mig 115) o cancelada en ML: va antes que el pago (23-10: con pago
+           -- verificado y reembolsada quedaba "esperar" para siempre).
+           WHEN s.id IS NULL AND (o.no_concretada_at IS NOT NULL OR o.estado = 'cancelled') THEN 'no_concretada'
            WHEN ${PAGO_ME} THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
            WHEN s.id IS NULL AND o.fecha < NOW() - make_interval(days => $1) THEN 'no_concretada'
            ELSE 'esperar'
@@ -212,8 +215,9 @@ export const SQL_BANDEJA_ML = `
            WHEN ${GUIA_OK} THEN 'concretada'
            WHEN g.impresa AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
            WHEN g.impresa THEN 'esperar'                                                         -- impresa, falta reportarla
+           -- Marcada "No se concretó" (mig 115) o cancelada en ML: antes que el pago (23-10, ver SQL_BANDEJA).
+           WHEN o.no_concretada_at IS NOT NULL OR o.estado = 'cancelled' THEN 'no_concretada'
            WHEN ${PAGO_ME} THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
-           WHEN o.estado = 'cancelled' THEN 'no_concretada'
            WHEN o.fecha < NOW() - make_interval(days => $1) THEN CASE WHEN m.usa_despachos THEN 'no_concretada' ELSE 'revisar' END
            ELSE 'esperar'
          END AS sugerencia

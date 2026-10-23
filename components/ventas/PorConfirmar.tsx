@@ -4,9 +4,10 @@
 // mensaje del comprador) y "Confirmar" abre Nueva venta con todo cargado.
 // Sin inventario (Pagos ME de los Fundadores, 19-10) es la MISMA lista: sin productos ni "Confirmar"; el pago
 // se verifica en la fila (✓ / ✗) y la guía ya está en Despachos. Al activar inventario, gana esos dos pasos.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { CargadaConPago, PorConfirmar as Fila } from '@/lib/porConfirmar'
+import type { CargadaConPago, NoConcretada, PorConfirmar as Fila } from '@/lib/porConfirmar'
+import { MOTIVOS_NO_CONCRETADA, type MotivoNoConcretada } from '@/lib/noConcretada'
 import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
 import { borrarMemoria, leerMemoria, recruzarMemoria, type EstadoGuardado } from '@/lib/bancoMemoria'
 import LineaBanco from './LineaBanco'
@@ -16,7 +17,92 @@ import { Monto } from '@/components/pagosme/PagoME'
 
 interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pagosME: boolean; sincronizadas_at: string | null
   /** Ya cargadas en borrador cuyo pago trajo Pagos ME (22-10, solo con inventario). */
-  cargadas?: CargadaConPago[] }
+  cargadas?: CargadaConPago[]
+  /** Marcadas "No se concretó" (mig 115), para ver y deshacer. */
+  noConcretadas?: NoConcretada[] }
+/** Recargar la lista desde cualquier fila (lo da PorConfirmar). */
+const Recargar = createContext<() => Promise<void>>(async () => {})
+
+async function pedirNoConcretada(numero: string, motivo: MotivoNoConcretada | null, nota: string | null) {
+  const r = await fetch('/api/sales/por-confirmar', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ numero, motivo, nota }),
+  })
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'No se pudo')
+}
+
+/** "No se concretó" (23-10): se pagó pero no se pudo cumplir y se devolvió. ML no avisa la cancelación hasta calificar,
+ *  así que la marca la persona: sale de Por confirmar y Calificaciones la sugiere no concretada. El pago NO cambia. */
+function NoSeConcreto({ f }: { f: Fila }) {
+  const recargar = useContext(Recargar)
+  const [abierto, setAbierto] = useState(false)
+  const [motivo, setMotivo] = useState<MotivoNoConcretada | null>(f.sinStock ? 'sin_stock' : null)
+  const [nota, setNota] = useState('')
+  const [haciendo, setHaciendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (!abierto) return (
+    <button type="button" onClick={() => setAbierto(true)} className="text-[11px] text-neutral-400 underline hover:text-red-700">No se concretó</button>
+  )
+  const listo = !!motivo && (motivo !== 'otro' || nota.trim().length >= 2)
+  return (
+    <div className="w-full space-y-2 rounded-lg border border-red-200 bg-red-50/50 p-3 text-xs sm:w-72">
+      <p className="font-medium text-neutral-800">¿Por qué no se concretó?</p>
+      {f.sinStock && <p className="text-[11px] text-red-700">El sistema ve que no hay stock suficiente.</p>}
+      <div className="space-y-1">
+        {(Object.entries(MOTIVOS_NO_CONCRETADA) as [MotivoNoConcretada, string][]).map(([k, t]) => (
+          <label key={k} className="flex items-center gap-2"><input type="radio" checked={motivo === k} onChange={() => setMotivo(k)} /> {t}</label>
+        ))}
+      </div>
+      <input value={nota} onChange={e => setNota(e.target.value)} maxLength={300}
+        placeholder={motivo === 'otro' ? 'Qué pasó (obligatorio)' : 'Nota (opcional)'} className="w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm" />
+      <p className="text-[11px] text-neutral-500">Sale de esta lista y en Calificaciones queda como no concretada. El pago no cambia. Se puede deshacer.</p>
+      {error && <p className="text-red-700">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" disabled={!listo || haciendo} className="btn-primary flex-1 text-xs" onClick={async () => {
+          setHaciendo(true); setError(null)
+          try { await pedirNoConcretada(f.numero, motivo, nota.trim() || null); await recargar() }
+          catch (e) { setError(e instanceof Error ? e.message : 'No se pudo'); setHaciendo(false) }
+        }}>Marcar no concretada</button>
+        <button type="button" onClick={() => setAbierto(false)} className="btn-secondary text-xs">Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+function ListaNoConcretadas({ filas }: { filas: NoConcretada[] }) {
+  const recargar = useContext(Recargar)
+  const [ver, setVer] = useState(false)
+  const [haciendo, setHaciendo] = useState<string | null>(null)
+  if (!filas.length) return null
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-neutral-50/60">
+      <button type="button" onClick={() => setVer(v => !v)} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left">
+        <span className="text-sm font-medium text-neutral-600">No se concretaron <span className="text-neutral-400">{filas.length}</span></span>
+        <span className="text-xs text-neutral-400">Marcadas a mano (reembolsadas) · {ver ? 'Ocultar' : 'Ver'}</span>
+      </button>
+      {ver && (
+        <ul className="divide-y divide-neutral-100 border-t border-neutral-200 bg-white">
+          {filas.map(n => (
+            <li key={n.numero} className="flex flex-col gap-1 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <span className="font-medium text-neutral-900">{n.comprador ?? n.nick ?? 'Sin nombre'}</span>
+                <span className="ml-2 font-mono text-[11px] text-neutral-400">{n.numero}</span>
+                {n.productos && <div className="truncate text-xs text-neutral-500">{n.productos}</div>}
+                <div className="text-xs text-red-700">
+                  {MOTIVOS_NO_CONCRETADA[n.motivo] ?? n.motivo}{n.nota ? ` · “${n.nota}”` : ''}
+                  <span className="text-neutral-400"> · {n.por ?? '—'} · {hora(n.at)}</span>
+                </div>
+              </div>
+              <button type="button" disabled={haciendo === n.numero} className="self-start text-xs text-neutral-500 underline hover:text-neutral-800 sm:self-center"
+                onClick={async () => { setHaciendo(n.numero); try { await pedirNoConcretada(n.numero, null, null); await recargar() } finally { setHaciendo(null) } }}>
+                Deshacer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 /** Sin inventario: verificar el pago desde la fila (Pagos ME). */
 type Verificar = (pagoId: number, v: 'valido' | 'invalido' | 'pendiente') => Promise<void>
 
@@ -146,6 +232,7 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
           </div>
         )}
       </div>
+      <div className="flex flex-col items-start gap-2 sm:items-end">
       {sinInventario ? (
         f.pago?.verificacion === 'pendiente' ? (
           <div className="flex gap-2 self-start sm:self-center">
@@ -168,6 +255,8 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
           Verificar
         </button>
       )}
+      <NoSeConcreto f={f} />
+      </div>
     </li>
   )
 }
@@ -336,6 +425,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
     && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
 
   return (
+    <Recargar.Provider value={onRecargar}>
     <div className="space-y-3">
       <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Una línea por botón: qué trae y cuándo fue la última vez. */}
@@ -471,7 +561,9 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           )}
         </div>
       )}
+      <ListaNoConcretadas filas={datos.noConcretadas ?? []} />
     </div>
+    </Recargar.Provider>
   )
 }
 
