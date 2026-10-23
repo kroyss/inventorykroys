@@ -26,10 +26,15 @@ jobs:
           echo "commit=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
           echo "id=$(git rev-parse --short HEAD)-$(TZ=America/Caracas date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
       - name: Llave del servidor
+        env:
+          LLAVE: ${{ secrets.VPS_LLAVE_IMAGENES }}
+          HUELLA: ${{ secrets.VPS_HUELLA }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_LLAVE_IMAGENES }}" > ~/.ssh/imagenes && chmod 600 ~/.ssh/imagenes
-          printf '%s\n' "${{ secrets.VPS_HUELLA }}" > ~/.ssh/known_hosts
+          # Pegadas desde el Bloc de notas traen saltos de línea de Windows (\r): ssh no lee la llave así.
+          printf '%s\n' "$LLAVE" | tr -d '\r' | sed '/^[[:space:]]*$/d' > ~/.ssh/imagenes && chmod 600 ~/.ssh/imagenes
+          printf '%s\n' "$HUELLA" | tr -d '\r' > ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/imagenes > /dev/null && echo "Llave leída bien" || { echo "La llave guardada en GitHub no se puede leer: vuelve a pegarla completa"; exit 1; }
       - name: ¿El servidor ya la tiene?
         id: ya
         run: |
