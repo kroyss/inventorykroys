@@ -9,6 +9,9 @@
 import type { Pool } from 'pg'
 import { ErrorML, mlFetch } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
+import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
+import { huecoVariasUnidades, type HuecoUnidades } from '@/lib/mlShipping'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
 
 interface ItemML {
   id: string; title: string; status: string; sub_status?: string[]; available_quantity: number; thumbnail?: string
@@ -33,6 +36,22 @@ export async function conexionDeItem(db: Pool, item: string): Promise<number | n
        (SELECT conexion_id FROM ml_preguntas WHERE item_id = $1 ORDER BY fecha DESC LIMIT 1),
        (SELECT conexion_id FROM ml_ordenes WHERE items[1] LIKE $1 || '%' ORDER BY fecha DESC LIMIT 1)) AS c`, [item])
   return r?.c ?? null
+}
+
+/** Hueco de varias unidades por la promo (24-10, lib/mlShipping.ts): con 1 unidad es gratis pero comprando 2 o 3
+ *  no. Solo empresas con Promociones (las del envío gratis por transportista). null = no hay hueco o no se sabe. */
+export async function huecoDePublicacion(db: Pool, conexionId: number, item: string): Promise<HuecoUnidades | null> {
+  if (!await empresaConPromociones(db)) return null
+  try {
+    const [sp, { rows: [p] }, tablas] = await Promise.all([
+      mlFetch<{ amount: number | null; regular_amount: number | null; currency_id: string | null }>(
+        db, conexionId, `/items/${item}/sale_price?context=channel_marketplace`),
+      db.query(`SELECT ${sqlPesoPublicacion('$1::text')} AS kg`, [item]),
+      leerTablasEnvio(db),
+    ])
+    if ((sp?.currency_id ?? 'USD') !== 'USD') return null
+    return huecoVariasUnidades(p?.kg, sp?.amount, sp?.regular_amount, tablas)
+  } catch { return null }   // sin precio de ML o sin peso: la ventana funciona igual, sin el aviso
 }
 
 /** La publicación como está ahora en MercadoLibre. */

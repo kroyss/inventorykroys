@@ -12,7 +12,7 @@ import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type S
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
-import { conflictoPesos, envioGratisAhora, type PesoVinculado, type TablasEnvio } from '@/lib/mlShipping'
+import { conflictoPesos, envioGratisAhora, huecoVariasUnidades, textoHueco, type PesoVinculado, type TablasEnvio } from '@/lib/mlShipping'
 import AvisoPesos from './AvisoPesos'
 
 interface Pregunta {
@@ -178,6 +178,8 @@ const TablasEnvioCtx = createContext<TablasEnvio | undefined>(undefined)
 function EnvioGratis({ p }: { p: Pregunta }) {
   const tablas = useContext(TablasEnvioCtx)
   const e = envioGratisAhora(p.item_peso, precioUSD(p), p.item_precio_original, tablas)
+  // Con la promo, 1 unidad sigue gratis pero 2 o 3 no (24-10): el comprador que lleva varios se queda sin envío gratis.
+  const hueco = e ? huecoVariasUnidades(p.item_peso, precioUSD(p), p.item_precio_original, tablas, p.item_disponible) : null
   if (!e) return p.envio_activo && precioUSD(p) ? (
     <span className="text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset ring-neutral-200 text-neutral-400 whitespace-nowrap"
       title="Esta publicación no tiene peso: no está en el portal de MercadoEnvíos (pausada o sin envío configurado) ni vinculada a un producto con peso">
@@ -193,6 +195,12 @@ function EnvioGratis({ p }: { p: Pregunta }) {
         {txt}{e.porPromo ? ' · por la promo' : ''}
       </span>
       <AvisoPesos c={conflictoPesos(p.item_pesos, precioUSD(p), tablas)} />
+      {hueco && (
+        <span className="text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap text-red-700 bg-red-50 ring-red-200 font-semibold"
+          title={`${textoHueco(hueco)}. Si pregunta por llevar varios, avísale o baja la promo.`}>
+          ⚠ Comprando {hueco.unidades}: sin envío gratis
+        </span>
+      )}
     </>
   )
 }

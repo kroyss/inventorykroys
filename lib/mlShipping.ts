@@ -244,6 +244,45 @@ export function envioGratisAhora(pesoKg: number | null | undefined, precio: numb
   return { estado: e.estado, texto, porPromo, minZoom: e.minZoom, minTealca: e.minTealca }
 }
 
+// ── Hueco de VARIAS unidades por la promoción (24-10, balanza MLV794933472) ──
+// Con 1 unidad sigue gratis, pero comprando 2 o 3 el paquete pasa a otro rango de peso y al precio de la promo
+// ya no llega al mínimo (a precio normal sí): 2 × 0,9 kg = 1,8 kg pide $20 y la promo da 2 × $9,63 = $19,26.
+// Solo cuenta lo que causa la promo y hasta lo que hay disponible (sin stock para 2, no hay hueco).
+export interface HuecoUnidades {
+  unidades: number; kg: number; minimo: number; paga: number
+  /** Descuento máximo (%) sobre el precio normal que mantiene gratis de 1 a `unidades` (null = no se calcula). */
+  tope: number | null
+}
+const MAX_HUECO = 3
+export function huecoVariasUnidades(pesoKg: number | null | undefined, precioPromo: number | null | undefined,
+  precioNormal: number | null | undefined, tablas: TablasEnvio = TABLAS_DEFAULT, disponible?: number | null): HuecoUnidades | null {
+  if (pesoKg == null || !(pesoKg > 0) || precioPromo == null || !(precioPromo > 0) || precioNormal == null || !(precioNormal > precioPromo)) return null
+  if (envioPorTransportista(pesoKg, precioPromo, tablas).estado === 'destino') return null   // con 1 ya no llega: lo avisa lo de siempre
+  const max = Math.min(MAX_HUECO, disponible == null ? MAX_HUECO : disponible)
+  for (let n = 2; n <= max; n++) {
+    const t = tierFor(pesoKg * n, tablas.tealca)
+    if (!t) return null
+    if (precioPromo * n < t.minPrice && precioNormal * n >= t.minPrice) {
+      // Tope: el menor de los descuentos que aguanta cada cantidad de 1 a n (las que a precio normal llegan).
+      let tope: number | null = null
+      for (let k = 1; k <= n; k++) {
+        const tk = tierFor(pesoKg * k, tablas.tealca)
+        const d = tk ? topeDescuento(precioNormal * k, tk.minPrice) : null
+        if (d != null) tope = tope == null ? d : Math.min(tope, d)
+      }
+      return { unidades: n, kg: Math.round(pesoKg * n * 100) / 100, minimo: t.minPrice, paga: Math.round(precioPromo * n * 100) / 100, tope }
+    }
+  }
+  return null
+}
+
+/** Texto corto del hueco, igual en todas las pantallas. */
+export function textoHueco(h: HuecoUnidades) {
+  const kg = h.kg.toLocaleString('de-DE', { maximumFractionDigits: 2 })
+  return `Comprando ${h.unidades} queda SIN envío gratis por la promo: ${kg} kg pide $${h.minimo} y pagaría $${h.paga.toLocaleString('de-DE', { minimumFractionDigits: 2 })}`
+    + (h.tope != null ? ` · la promo aguanta hasta ${h.tope.toLocaleString('de-DE')}%` : '')
+}
+
 // ── Publicación vinculada a varios productos de distinto peso (21-10) ───────
 // Sin peso del portal, el envío se calcula con el producto vinculado MÁS pesado (sqlPesoPublicacion). Si la
 // publicación tiene varios productos y el envío gratis cambia según cuál, casi siempre es un vínculo mal hecho

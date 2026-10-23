@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import {
-  envioPorTransportista, topeDescuento, unidadesParaGratis, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
+  envioPorTransportista, topeDescuento, unidadesParaGratis, huecoVariasUnidades, textoHueco, tierFor, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
 } from '@/lib/mlShipping'
 import { mlNetFor, type VeRate } from '@/lib/pricingVE'
 import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
@@ -53,9 +53,18 @@ const pctReal = (publicado: number, precio: number) => publicado > 0 ? (1 - prec
 // Precio de promo que NO le quita el envío gratis (pedido del dueño 17-10): si con el % pedido bajaría del
 // mínimo de TEALCA para su peso, queda justo en ese mínimo = el máximo descuento seguro. Solo para las que
 // hoy tienen envío gratis; perder solo ZOOM no se ajusta (es advertencia). `sinMargen`: ya está en el mínimo.
-const precioSeguro = (publicado: number, pct: number, base: { estado: EstadoEnvio; minTealca: number | null }) => {
+// Desde el 24-10 cuida también 2 y 3 unidades: comprando varias el paquete cambia de rango de peso y el mínimo por
+// unidad puede ser mayor (2 × 0,9 kg = 1,8 kg pide $20 → $10 c/u, más que los $7 de 1 unidad).
+const precioSeguro = (publicado: number, pct: number, base: { estado: EstadoEnvio; minTealca: number | null },
+  peso: number | null, tablas: TablasEnvio) => {
   const pedido = precioConPiso(publicado, pct)
-  const min = base.estado === 'ambas' || base.estado === 'tealca' ? base.minTealca : null
+  let min = base.estado === 'ambas' || base.estado === 'tealca' ? base.minTealca : null
+  if (min != null && peso != null && peso > 0) {
+    for (let n = 2; n <= 3; n++) {
+      const t = tierFor(peso * n, tablas.tealca)
+      if (t && publicado * n >= t.minPrice) min = Math.max(min, Math.ceil(t.minPrice / n * 100) / 100)
+    }
+  }
   if (min == null || pedido >= min) return { precio: pedido, ajustada: false, sinMargen: false }
   if (publicado <= min) return { precio: publicado, ajustada: false, sinMargen: true }
   return { precio: Math.max(PISO_ML, redondear(min)), ajustada: true, sinMargen: false }
@@ -130,6 +139,8 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
       // destino (quitaEnvio), o tenía ZOOM y queda solo TEALCA (quitaZoom: sigue gratis, es advertencia).
       quitaEnvio: !!enPromo && envio.estado === 'destino' && (sinPromo.estado === 'ambas' || sinPromo.estado === 'tealca'),
       quitaZoom: !!enPromo && sinPromo.estado === 'ambas' && envio.estado === 'tealca',
+      // 1 unidad sigue gratis pero comprando 2 o 3 no, por la promo (24-10): cuenta como "le quita el envío gratis".
+      hueco: enPromo ? huecoVariasUnidades(f.peso, actual, f.precio, tablas) : null,
       uTealca: envio.estado === 'destino' ? unidadesParaGratis(f.peso, actual, tablas.tealca) : null,
       uZoom: envio.estado === 'destino' || envio.estado === 'tealca' ? unidadesParaGratis(f.peso, actual, tablas.zoom) : null,
       descuento: enPromo && f.precio > 0 ? (1 - actual / f.precio) * 100 : 0,
@@ -155,7 +166,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     if (v.precio <= PISO_ML) return false
     if (v.envioBase.estado === 'sin_peso') return false
     // Con el máximo seguro: las que no aguantarían el % se proponen ajustadas (si aguantan al menos 1%).
-    const s = precioSeguro(v.precio, pctDe(c), v.envioBase)
+    const s = precioSeguro(v.precio, pctDe(c), v.envioBase, v.peso, tablas)
     if (s.sinMargen || pctReal(v.precio, s.precio) < 1) return false
     return !(p?.minimo != null && s.precio < p.minimo)
   })
@@ -168,7 +179,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     todas: () => true,
     adentro: v => !!v.enPromo,
     candidatas: v => v.candidatas.length > 0,
-    quita: v => v.quitaEnvio,
+    quita: v => v.quitaEnvio || !!v.hueco,
     margen: v => v.margen != null && v.margen < margenMin,
     tealca: v => v.quitaZoom,
     destino: v => v.envio.estado === 'destino',
@@ -442,6 +453,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                             </div>
                           ))}
                           {v.quitaEnvio && <div className="mt-0.5 text-red-700 font-medium">⚠ La promo le quita el envío gratis</div>}
+                          {!v.quitaEnvio && v.hueco && <div className="mt-0.5 text-red-700 font-medium">⚠ {textoHueco(v.hueco)}</div>}
                           {v.quitaZoom && <div className="mt-0.5 text-amber-800 font-medium">⚠ La promo le quita ZOOM (sigue gratis por TEALCA)</div>}
                           {/* Botón chico con borde (antes un enlace gris que se confundía con texto, 2026-10-17). */}
                           <button onClick={() => sacar(v, v.enPromo!)} disabled={!!busy}
@@ -551,7 +563,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
 
   const filasPrev = filas.map(f => {
     const seguro = conPierden ? { precio: precioConPiso(f.precio, modal.pct), ajustada: false, sinMargen: false }
-      : precioSeguro(f.precio, modal.pct, f.envioBase)
+      : precioSeguro(f.precio, modal.pct, f.envioBase, f.peso, tablas)
     const precio = seguro.precio
     const ajustada = seguro.ajustada
     const enPiso = !ajustada && f.precio > PISO_ML && precio === PISO_ML && redondear(f.precio * (1 - modal.pct / 100)) < PISO_ML
@@ -565,7 +577,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     // Siempre contra el envío AL PRECIO PUBLICADO (no contra el de otra promo que ya le haya bajado el precio).
     const base = f.envioBase
     const despues = envioPorTransportista(f.peso, precio, tablas)
-    const sinGratis = despues.estado === 'destino' && base.estado !== 'destino' && base.estado !== 'sin_peso'
+    // Comprando 2 o 3 pierde el envío gratis por la promo (24-10). Sin "agregarlas igual" el precio ya viene ajustado.
+    const hueco = huecoVariasUnidades(f.peso, precio, f.precio, tablas)
+    const sinGratis = (despues.estado === 'destino' && base.estado !== 'destino' && base.estado !== 'sin_peso') || !!hueco
     const pierdeZoom = base.estado === 'ambas' && despues.estado === 'tealca'
     const pierde = sinGratis || pierdeZoom
     const unidades = despues.estado === 'destino' ? unidadesParaGratis(f.peso, precio, tablas.tealca) : null
@@ -579,7 +593,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const advertencia = motivo ? null
       : ajustada ? `Ajustada a −${pct(pctReal(f.precio, precio))} (envío gratis)`
       : pierdeZoom ? `⚠ Solo TEALCA${topeZoom ? ` · ZOOM hasta ${pct(topeZoom)}` : ''}`
-      : sinGratis ? '⚠ Sin envío gratis'
+      : sinGratis ? (hueco && despues.estado !== 'destino' ? `⚠ Comprando ${hueco.unidades}: sin envío gratis` : '⚠ Sin envío gratis')
       : base.estado === 'sin_peso' ? 'Sin peso: envío sin verificar' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
@@ -673,7 +687,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const sinGratis = validas.filter(x => x.sinGratis).length
     const zoom = validas.filter(x => x.pierdeZoom).length
     const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
-    const avisos = [sinGratis && `• ${sinGratis} queda${sinGratis === 1 ? '' : 'n'} SIN envío gratis (cobro a destino).`,
+    const avisos = [sinGratis && `• ${sinGratis} queda${sinGratis === 1 ? '' : 'n'} SIN envío gratis (cobro a destino, con 1 unidad o comprando 2 o 3).`,
       zoom && `• ${zoom} pierde${zoom === 1 ? '' : 'n'} ZOOM: solo tendrá${zoom === 1 ? '' : 'n'} envío gratis por TEALCA. En Preguntas y Mensajes se verá así mientras dure la promoción.`,
       bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con margen menor a ${margenMin}%.`].filter(Boolean).join('\n')
     if (avisos && !await confirmarAviso({
@@ -689,7 +703,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const e = envioPorTransportista(f.peso, precio, tablas).estado
     const aviso = e === 'destino' && f.envioBase.estado !== 'destino' && f.envioBase.estado !== 'sin_peso'
       ? `Con ${p}% (${usd(precio)}) queda SIN envío gratis: cobro a destino.`
-      : e === 'tealca' && f.envioBase.estado === 'ambas' ? `Con ${p}% (${usd(precio)}) pierde ZOOM: queda solo TEALCA.` : null
+      : (() => { const h = huecoVariasUnidades(f.peso, precio, f.precio, tablas); return h ? `Con ${p}% (${usd(precio)}): ${textoHueco(h)}.` : null })()
+      ?? (e === 'tealca' && f.envioBase.estado === 'ambas' ? `Con ${p}% (${usd(precio)}) pierde ZOOM: queda solo TEALCA.` : null)
     if (aviso && !await confirmarAviso({ title: 'Revisa el envío antes de reintentar', message: `${aviso}\n\n¿Reintentar igual?`,
       confirmText: `Reintentar con ${p}%`, cancelText: 'Volver' })) return
     await enviar([{ id: f.id, precio, precioAntes: f.precio, cambio: filasPrev.find(x => x.f.id === f.id)?.cambio }])

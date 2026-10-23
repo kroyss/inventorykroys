@@ -8,7 +8,7 @@
 //   - las preguntas de publicaciones pausadas no salen en el panel de ML pero la API sí
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
 import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
-import { envioGratisAhora } from '@/lib/mlShipping'
+import { envioGratisAhora, huecoVariasUnidades, textoHueco } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
@@ -244,9 +244,12 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)
   // Envío gratis por transportista: solo empresas con Promociones (las demás, como antes).
   let envio: ReturnType<typeof envioGratisAhora> = null
+  let hueco: ReturnType<typeof huecoVariasUnidades> = null
   if ((q.item_moneda ?? 'USD') === 'USD' && await empresaConPromociones(db)) {
     const { rows: [peso] } = await db.query(`SELECT ${sqlPesoPublicacion('$1::text')} AS kg`, [q.item_id]).catch(() => ({ rows: [] }))
-    envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original, await leerTablasEnvio(db))
+    const tablas = await leerTablasEnvio(db)
+    envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original, tablas)
+    hueco = envio ? huecoVariasUnidades(peso?.kg, q.item_precio, q.item_precio_original, tablas) : null
   }
   const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
@@ -282,7 +285,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     pregunta: { id: Number(q.id), texto: q.texto, item_id: q.item_id, fecha: q.fecha },
     item, titulo: q.item_titulo ?? prod?.name ?? null, descripcion,
     precioML: q.item_precio ? { precio: q.item_precio, original: q.item_precio_original, moneda: q.item_moneda ?? 'USD' } : null,
-    envio: envio ? `${envio.texto}${envio.porPromo ? ' (es por la promoción vigente; al terminar vuelve a su envío normal)' : ''}` : null,
+    envio: envio ? `${envio.texto}${envio.porPromo ? ' (es por la promoción vigente; al terminar vuelve a su envío normal)' : ''}${hueco ? `. OJO: ${textoHueco(hueco).replace(/ · la promo aguanta.*$/, '')}` : ''}` : null,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol?.value ?? '',

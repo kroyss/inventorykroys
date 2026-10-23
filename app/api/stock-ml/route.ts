@@ -4,7 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML, CuentaDesconectada } from '@/lib/ml'
 import { registrarUso } from '@/lib/usoAcciones'
-import { aplicarCambio, conexionDeItem, gemelasDe, leerPublicacion, type PubStock } from '@/lib/stockML'
+import { aplicarCambio, conexionDeItem, gemelasDe, huecoDePublicacion, leerPublicacion, type PubStock } from '@/lib/stockML'
 
 // Cambiar stock y reactivar en MercadoLibre (2026-10-21, lib/stockML.ts). Permiso "Cambiar el stock en
 // MercadoLibre" (reponer_stock). La ventana: components/preguntas/CambiarStock.tsx.
@@ -24,16 +24,21 @@ export async function GET(req: NextRequest) {
   try {
     const conexionId = await conexionDeItem(s.db, item)
     if (!conexionId) return NextResponse.json({ error: 'Publicación no encontrada en tus cuentas' }, { status: 404 })
-    const [principal, { producto, gemelas }] = await Promise.all([
+    const [pub, { producto, gemelas }, hueco] = await Promise.all([
       leerPublicacion(s.db, conexionId, item),
       gemelasDe(s.db, item, variante),
+      huecoDePublicacion(s.db, conexionId, item),
     ])
+    const principal = { ...pub, hueco }
     // Las gemelas, leídas de ML (de a una; suelen ser 1 o 2).
-    const otras: (PubStock & { variante_foco: string | null })[] = []
+    const otras: (PubStock & { variante_foco: string | null; hueco: Awaited<ReturnType<typeof huecoDePublicacion>> })[] = []
     for (const g of gemelas) {
       const c = await conexionDeItem(s.db, g.item_id)
       if (!c || otras.some(o => o.item_id === g.item_id)) continue
-      try { otras.push({ ...(await leerPublicacion(s.db, c, g.item_id)), variante_foco: g.variante_id }) } catch { /* sin acceso: se omite */ }
+      try {
+        const [p, hueco] = await Promise.all([leerPublicacion(s.db, c, g.item_id), huecoDePublicacion(s.db, c, g.item_id)])
+        otras.push({ ...p, variante_foco: g.variante_id, hueco })
+      } catch { /* sin acceso: se omite */ }
     }
     return NextResponse.json({ principal, variante_foco: variante, gemelas: otras, producto })
   } catch (err) {

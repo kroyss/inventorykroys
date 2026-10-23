@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { textoHueco, type HuecoUnidades } from '@/lib/mlShipping'
 
 // Cambiar stock en MercadoLibre (2026-10-21; API /api/stock-ml, lib/stockML.ts). UNA sola ventana para todo:
 // el chip ✎ de Preguntas y Mensajes, la ficha de la publicación, "Reponer stock" de Preguntas y Stock → Pausadas.
@@ -11,6 +12,8 @@ interface Pub {
   item_id: string; cuenta: string; titulo: string; estado: string; disponible: number; imagen: string | null
   variantes: { id: string; nombre: string; disponible: number }[]
   variante_foco?: string | null
+  /** Con la promo, comprando 2 o 3 queda sin envío gratis (24-10). Solo empresas con Promociones. */
+  hueco?: HuecoUnidades | null
 }
 interface Datos { principal: Pub; variante_foco: string | null; gemelas: Pub[]; producto: { code: string; name: string; stock: number | null } | null }
 export interface ResultadoStock { item_id: string; variante_id: string | null; ok: boolean; estado?: string; disponible?: number; total?: number; error?: string }
@@ -112,6 +115,16 @@ export default function CambiarStock({ item, variante = null, origen, publicar, 
                 .map(v => fila(p, v, v.id === p.variante_foco))
             : fila(p, { id: null, nombre: null, disponible: p.disponible }, false)}
         </ul>
+        {p.hueco && (() => {
+          // Avisa si lo que va a quedar publicado deja comprar esa cantidad (no bloquea).
+          const filas = p.variantes.length ? p.variantes.map(v => ({ k: clave(p.item_id, v.id), actual: v.disponible })) : [{ k: clave(p.item_id, null), actual: p.disponible }]
+          const queda = Math.max(...filas.map(f => { const t = valores[f.k]; return t ? parseInt(t, 10) : f.actual }))
+          return queda >= p.hueco.unidades && (
+            <p className="mt-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+              ⚠ {textoHueco(p.hueco)}. Opciones: bajar la promo o publicar menos de {p.hueco.unidades} disponibles.
+            </p>
+          )
+        })()}
         {errores.map((r, k) => <p key={k} className="mt-1 text-xs text-red-600">{r.error}</p>)}
       </div>
     )
