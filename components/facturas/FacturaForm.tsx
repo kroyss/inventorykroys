@@ -69,16 +69,19 @@ const saleLines = (sale?: Sale): Line[] => {
   }))
 }
 
-/** Líneas de varias ventas: el mismo producto al mismo precio se junta en una línea con la cantidad sumada. */
+/** Líneas de varias ventas: el mismo producto va en UNA línea con la cantidad sumada (23-10: con precios distintos
+ *  entre ventas salían varias líneas del mismo producto y se llegaba al tope de 7). El precio es el promedio, con 4
+ *  decimales para que el total cuadre con lo vendido. Sin otras ventas, las líneas de siempre. */
 const juntarLineas = (sale: Sale | undefined, otras: VentaAgrupable[]): Line[] => {
+  if (!otras.length) return saleLines(sale)
   const todas = [...saleLines(sale), ...otras.flatMap(v => saleLines(v as unknown as Sale))]
-  const out: Line[] = []
+  const out: (Line & { totalUsd: number })[] = []
   for (const l of todas) {
-    const igual = l.product_id != null && out.find(o => o.product_id === l.product_id && o.unit_price_usd === l.unit_price_usd)
-    if (igual) igual.quantity += l.quantity
-    else out.push({ ...l })
+    const igual = l.product_id != null && out.find(o => o.product_id === l.product_id)
+    if (igual) { igual.quantity += l.quantity; igual.totalUsd += l.quantity * l.unit_price_usd }
+    else out.push({ ...l, totalUsd: l.quantity * l.unit_price_usd })
   }
-  return out
+  return out.map(({ totalUsd, ...l }) => ({ ...l, unit_price_usd: Math.round(totalUsd / l.quantity * 10000) / 10000 }))
 }
 const resumenItems = (v: VentaAgrupable) => v.items.map(i => `${i.quantity}× ${i.product_name}`).join(', ')
 

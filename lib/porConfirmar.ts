@@ -170,7 +170,7 @@ export async function marcarNoConcretada(db: Pool, numero: string, userId: numbe
   motivo: MotivoNoConcretada | null, nota: string | null) {
   const { rowCount } = await db.query(
     `UPDATE ml_ordenes SET no_concretada_at = CASE WHEN $2::text IS NULL THEN NULL ELSE NOW() END,
-            no_concretada_motivo = $2, no_concretada_nota = $3, no_concretada_por = CASE WHEN $2::text IS NULL THEN NULL ELSE $4 END
+            no_concretada_motivo = $2, no_concretada_nota = $3, no_concretada_por = CASE WHEN $2::text IS NULL THEN NULL ELSE $4::int END
      WHERE (id::text = $1 OR pack_id::text = $1)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = $1)`, [numero, motivo, nota, userId])
   return rowCount ?? 0
