@@ -17,7 +17,9 @@ const Body = z.object({
  * subir: las que no están, o a las que les falta la guía o el comprobante que ahora sí tienen.
  * Así nunca se vuelve a bajar lo que ya se trajo.
  *
- * Tampoco se trae lo que ya está RESUELTO: la orden ya está en Despachos (su guía se cargó o imprimió).
+ * Tampoco se trae lo que ya está RESUELTO: la guía de la orden ya se IMPRIMIÓ en Despachos. (23-10: antes bastaba con
+ * que estuviera cargada; una guía subida a mano antes de traer el pago dejaba ese pago sin traer y, sin inventario,
+ * la guía se imprimía sin pago verificado. Ahora el pago se trae y Despachos la frena hasta verificarlo.)
  * La venta registrada y verificada a mano SÍ se trae (2026-10-11): su guía tiene que llegar sola a
  * Despachos, y el pago entra ya válido (ver vigilante/orden). La venta se busca por número de orden y
  * por su paquete (ml_ordenes).
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
          LEFT JOIN ml_ordenes o ON o.id::text = x.venta
        )
        SELECT v.venta FROM v
-       WHERE EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (v.venta, v.pack))`, [nuevas]) : { rows: [] }
+       WHERE EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (v.venta, v.pack) AND e.impresa)`, [nuevas]) : { rows: [] }
     const resuelta = new Set(resueltas.map(r => r.venta as string))
     const faltan = ordenes.filter(o => {
       const r = ya.get(o.venta)

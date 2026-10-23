@@ -39,6 +39,7 @@ export interface PagoME {
   sale_status: string | null
   sale_total: number | null
   en_despachos: boolean
+  guia_impresa?: boolean   // ya se imprimió en Despachos (23-10)
   apartado: 'espera' | 'cancelado' | null   // apartado en Despachos (mig. 107)
   /** Estado de la venta en MercadoLibre (empresas sin ventas cargadas). */
   ml_estado?: string | null

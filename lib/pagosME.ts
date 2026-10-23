@@ -42,6 +42,7 @@ export const SELECT_PAGOS = `
          p.verificacion, u.username AS verificado_por, p.verificado_at, p.nota,
          s.id AS sale_id, s.status AS sale_status, s.total_amount::float AS sale_total,
          EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta) AS en_despachos,
+         EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.impresa) AS guia_impresa,
          (SELECT e.apartado FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.apartado IS NOT NULL LIMIT 1) AS apartado,
          (SELECT u.estado FROM ((SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num LIMIT 1)
            UNION ALL (SELECT o.estado FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) u LIMIT 1) AS ml_estado

@@ -238,6 +238,8 @@ export interface EtiquetaValidada {
   comprador_nombre?: string | null
   /** Pagos MercadoEnvíos: el pago de la venta traído del portal (null = no hay o módulo apagado). */
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
+  /** Sin inventario: la venta se marcó "No se concretó" en Por confirmar (mig 115). */
+  no_concretada?: boolean
   estado: EstadoEtiqueta
   detalle: string | null
 }
@@ -259,7 +261,7 @@ const SQL_DESDE_ML = `
          -- Nombre real del comprador (migración 080, o el de la mensajería); customer_name es su apodo de ML.
          COALESCE(NULLIF(o.comprador_nombre, ''), (SELECT NULLIF(TRIM(c.comprador_nombre), '') FROM ml_conversaciones c
            WHERE c.pack_id = COALESCE(o.pack_id, o.id) LIMIT 1)) AS comprador_nombre,
-         o.id::text AS orden_ml,
+         o.id::text AS orden_ml, o.no_concretada_at IS NOT NULL AS no_concretada,
          COALESCE((
            SELECT JSON_AGG(JSON_BUILD_OBJECT(
                     'product_name', (d->>'titulo') || COALESCE(' (' || (d->>'variante') || ')', ''),
@@ -278,7 +280,7 @@ const SQL_DESDE_ML = `
            WHERE d.lote_id = e.lote_id AND d.guia = e.guia) AS primera_con_guia
   FROM despacho_etiquetas e
   LEFT JOIN LATERAL (
-    SELECT id, pack_id, estado, comprador, comprador_nombre, notas, detalle FROM ml_ordenes
+    SELECT id, pack_id, estado, comprador, comprador_nombre, notas, detalle, no_concretada_at FROM ml_ordenes
     WHERE id = ${VENTA_NUM} OR pack_id = ${VENTA_NUM}
     ORDER BY (id = ${VENTA_NUM}) DESC LIMIT 1
   ) o ON TRUE
@@ -323,7 +325,7 @@ export async function refrescarVentasML(db: Pool, loteId: number) {
 // desdeML: la empresa no lleva inventario → las ventas son las de MercadoLibre (ver SQL_DESDE_ML).
 export async function etiquetasValidadas(db: Pool, loteId: number, desdeML = false, pagosME = false): Promise<EtiquetaValidada[]> {
   const etiquetas = desdeML ? await validarDesdeML(db, loteId) : await validarConInventario(db, loteId)
-  return pagosME ? conPagosME(db, loteId, etiquetas) : etiquetas
+  return pagosME ? conPagosME(db, loteId, etiquetas, desdeML) : etiquetas
 }
 
 /**
@@ -331,7 +333,7 @@ export async function etiquetasValidadas(db: Pool, loteId: number, desdeML = fal
  * pago traído del portal y SIN verificar no se imprime (estado PAGO), salvo "Despachar igual".
  * Sin pago traído (venta local, cobro a destino manejado aparte…) no cambia nada.
  */
-async function conPagosME(db: Pool, loteId: number, etiquetas: EtiquetaValidada[]) {
+async function conPagosME(db: Pool, loteId: number, etiquetas: EtiquetaValidada[], desdeML: boolean) {
   const { rows } = await db.query(
     `SELECT e.id, p.verificacion, u.username AS forzado_por
      FROM despacho_etiquetas e
@@ -341,7 +343,11 @@ async function conPagosME(db: Pool, loteId: number, etiquetas: EtiquetaValidada[
   const pagos = new Map(rows.map(r => [r.id as number, r]))
   return etiquetas.map(e => {
     const p = pagos.get(e.id)
-    if (!p) return { ...e, pago: null }
+    // Sin inventario (23-10): una guía subida a mano cuyo pago no se trajo nadie la verificó. No se bloquea (hay ventas
+    // que se cobran aparte) pero se avisa. Con inventario el control es la venta registrada: ahí no se avisa.
+    if (!p) return desdeML && IMPRIMIBLE[e.estado] && !e.impresa
+      ? { ...e, pago: null, detalle: [e.detalle, 'Pago no traído de Pagos ME: nadie lo verificó'].filter(Boolean).join(' · ') }
+      : { ...e, pago: null }
     const pago = { verificacion: p.verificacion, forzado_por: p.forzado_por ?? null }
     if (IMPRIMIBLE[e.estado] && !e.impresa && p.verificacion !== 'valido' && !p.forzado_por) {
       return { ...e, pago, estado: 'PAGO' as const,
@@ -427,6 +433,9 @@ async function validarDesdeML(db: Pool, loteId: number): Promise<EtiquetaValidad
     else if (r.primera_con_guia !== r.id)      { estado = 'DUPLICADA';   detalle = 'La misma guía está dos veces en este lote' }
     else if (!r.orden_ml)                      { estado = 'SIN_VENTA';   detalle = `La venta ${r.venta} no está en las ventas de MercadoLibre de tus cuentas conectadas` }
     else if (r.sale_status === 'cancelled')    { estado = 'ESTADO';      detalle = 'La venta está cancelada en MercadoLibre' }
+    // 23-10: sin inventario la guía entra sola a Despachos al llegar el pago; si después se marcó "No se concretó"
+    // (se devolvió el dinero) no debe salir. Con inventario no hace falta: sin venta registrada ya es SIN_VENTA.
+    else if (r.no_concretada)                  { estado = 'ESTADO';      detalle = 'Marcada «No se concretó» en Por confirmar (se devolvió el dinero). Si fue un error, deshazlo allá' }
     else if (r.items.length === 0)             { estado = 'SIN_PRODUCTOS'; detalle = 'MercadoLibre no trajo los productos de la venta' }
     else if (r.venta_ya_impresa)               { estado = 'REIMPRESION'; detalle = 'Esta venta ya salió en otro lote' }
 

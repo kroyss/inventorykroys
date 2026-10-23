@@ -209,6 +209,12 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
             compró {hace(f.fecha)}{f.pago?.at ? ` · pago traído ${hace(f.pago.at)}` : ''} · {f.cuenta}
           </span>
           {f.pago?.guia && <BotonGuia pagoId={f.pago.id} venta={f.numero} />}
+          {f.despacho && (
+            <Etiqueta tono={f.despacho === 'impresa' ? 'verde' : 'gris'}
+              title={f.despacho === 'impresa' ? 'Su guía ya salió impresa en Despachos' : 'Su guía ya está cargada en Despachos, todavía sin imprimir'}>
+              {f.despacho === 'impresa' ? '✓ Guía ya impresa' : 'Guía en Despachos'}
+            </Etiqueta>
+          )}
           {sinInventario && f.pago?.comprobante && (
             <BotonComprobante pagoId={f.pago.id} venta={f.numero}
               datos={{ monto: f.pago.monto, totalOrden: f.pago.totalOrden, banco: f.pago.banco, referencia: f.pago.referencia, metodo: f.pago.metodo }} />
@@ -551,7 +557,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
               Vencidas <span className="text-neutral-400">{vencidas.length}</span>
             </span>
             <span className="text-xs text-neutral-400">
-              Más de {datos.dias} días sin registrar: Calificaciones las toma como no concretadas · {verVencidas ? 'Ocultar' : 'Ver'}
+              {/* Sin inventario no se "registra" nada: vence la que no pagó (23-10). */}
+              Más de {datos.dias} días {sinInventario ? 'sin pago' : 'sin registrar'}: Calificaciones las toma como no concretadas · {verVencidas ? 'Ocultar' : 'Ver'}
             </span>
           </button>
           {verVencidas && (
