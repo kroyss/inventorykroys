@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS } from '@/components/ui'
+import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS, ESTADOS_VENTA_VE } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 
@@ -68,7 +68,7 @@ const MOTIVOS: Record<string, string> = {
 }
 
 /** Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema. */
-export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) {
+export default function CalificacionesClient({ isAdmin, despachaVE = false }: { isAdmin: boolean; despachaVE?: boolean }) {
   const confirm = useConfirm()
   const [vista, setVista] = useState<'listas' | 'proximas' | 'esperando' | 'config'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -311,7 +311,7 @@ export default function CalificacionesClient({ isAdmin }: { isAdmin: boolean }) 
                       <td className="px-3 py-2 whitespace-nowrap">
                         {o.sistema_estado === 'REPORTADA' ? <span className="text-xs font-medium text-emerald-700">Guía reportada</span>
                           : o.sistema_estado === 'DESPACHADA' ? <span className={`text-xs font-medium ${datos.conReportador ? 'text-sky-700' : 'text-emerald-700'}`}>Guía impresa</span>
-                          : o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={STATUS_LABELS[o.sistema_estado]} />
+                          : o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={(despachaVE && ESTADOS_VENTA_VE[o.sistema_estado]) || STATUS_LABELS[o.sistema_estado]} />
                           : <span className="text-xs text-amber-700">{datos.desdeML ? 'Sin despachar' : 'No cargada'}</span>}
                         {o.facturada && <div className="text-xs text-emerald-700 mt-0.5">Facturada</div>}
                         {/* Con inventario: la guía en Despachos va aparte del estado de la venta. */}

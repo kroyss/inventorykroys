@@ -525,6 +525,9 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
     setShowReceive(true)
   }
 
+  // Todo lo que faltaba llega justo (sin parcial ni diferencias) → "Recibir y finalizar" (23-10, igual que en locales).
+  const recibeTodo = !recvPartial && recvItems.length > 0 && recvItems.every(i => i.received_qty === i.expected - i.already_received)
+
   const submitReceive = async () => {
     if (!selected) return
     const items = recvItems
@@ -557,12 +560,20 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items, partial: recvPartial }),
     })
-    setBusy(false)
     if (!res.ok) {
+      setBusy(false)
       const e = await res.json()
       setError(e.error ?? 'Error')
       return
     }
+    // El mismo finalizar de siempre, encadenado: si falla, queda RECIBIDA como antes.
+    if (recibeTodo) {
+      const f = await fetch(`/api/imports/${selected.id}/status/finalize`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'FINALIZADA' }),
+      })
+      if (!f.ok) setError(`Quedó recibida pero no se pudo finalizar: ${(await f.json().catch(() => ({}))).error ?? 'error'}`)
+    }
+    setBusy(false)
     setShowReceive(false)
     reload()
   }
@@ -1143,9 +1154,16 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                 </tbody>
               </table>
             </div>
+            {!recvPartial && (
+              <p className="px-4 pb-3 text-xs text-neutral-500">
+                {recibeTodo
+                  ? 'Llegó todo lo esperado: queda finalizada y se carga al inventario.'
+                  : 'Con cantidades distintas queda «Recibida» para revisarla antes de finalizar.'}
+              </p>
+            )}
             <div className="p-4 border-t flex justify-end gap-2 bg-neutral-50">
               <button onClick={() => setShowReceive(false)} className="btn-secondary text-sm">Cancelar</button>
-              <button onClick={submitReceive} disabled={busy} className="btn-primary text-sm">Confirmar recepción</button>
+              <button onClick={submitReceive} disabled={busy} className="btn-primary text-sm">{recibeTodo ? 'Recibir y finalizar' : 'Confirmar recepción'}</button>
             </div>
           </div>
         </div>

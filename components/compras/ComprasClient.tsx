@@ -513,6 +513,9 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
     setShowReceive(true)
   }
 
+  // Todo lo que faltaba llega justo (sin parcial ni diferencias) → "Recibir y finalizar".
+  const recibeTodo = !recvPartial && recvItems.length > 0 && recvItems.every(i => i.received_qty === i.expected - i.already_received)
+
   async function submitReceive() {
     if (!selected) return
 
@@ -545,8 +548,16 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
       }),
     })
     const data = await r.json()
+    if (!r.ok) { setSaving(false); setError(data.error ?? 'Error'); return }
+    // Llegó todo (23-10): recibir ya la finaliza y carga el inventario; antes eran dos clics seguidos (35 de 36
+    // finalizadas a los minutos). Es el mismo "finalize" de siempre: si falla, queda RECIBIDA como antes.
+    if (recibeTodo) {
+      const f = await fetch(`/api/purchases/${selected.id}/status`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'finalize' }),
+      })
+      if (!f.ok) setError(`Quedó recibida pero no se pudo finalizar: ${(await f.json().catch(() => ({}))).error ?? 'error'}`)
+    }
     setSaving(false)
-    if (!r.ok) { setError(data.error ?? 'Error'); return }
     setShowReceive(false)
     await reload()
   }
@@ -1166,11 +1177,16 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 />
                 <span>Recepción parcial (carga inventario ahora, permite recibir más después)</span>
               </label>
+              {!recvPartial && <p className="text-xs text-neutral-500">
+                {recibeTodo
+                  ? 'Llegó todo lo esperado: queda finalizada y se carga al inventario.'
+                  : 'Con cantidades distintas queda «Recibida» para revisarla antes de finalizar.'}
+              </p>}
             </div>
             <div className="p-5 border-t flex justify-end gap-3">
               <button onClick={() => setShowReceive(false)} className="btn-secondary">Cancelar</button>
               <button onClick={submitReceive} disabled={saving} className="btn-primary">
-                {saving ? 'Guardando...' : 'Confirmar Recepción'}
+                {saving ? 'Guardando...' : recibeTodo ? 'Recibir y finalizar' : 'Confirmar Recepción'}
               </button>
             </div>
           </div>

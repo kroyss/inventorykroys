@@ -10,7 +10,7 @@ import FacturaForm from '@/components/facturas/FacturaForm'
 import SalioMal from '@/components/facturas/SalioMal'
 import { useImprimirFactura } from '@/components/facturas/ImprimirAqui'
 import { bs, type Invoice } from '@/lib/invoices'
-import { Pagination, PageHeader, StatusBadge, chipCls } from '@/components/ui'
+import { Pagination, PageHeader, StatusBadge, chipCls, ESTADOS_VENTA_VE } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
 import { itemsTooltip } from '@/lib/itemsTooltip'
@@ -28,7 +28,7 @@ const DEEP_LINK_STATUSES = [
 const money = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-const STATUS_LABELS: Record<SaleStatus, string> = {
+const STATUS_BASE: Record<string, string> = {
   BORRADOR:         'Borrador',
   PAGO_VERIFICADO:  'Verificado',
   PROCESADA:        'Procesada',
@@ -37,7 +37,7 @@ const STATUS_LABELS: Record<SaleStatus, string> = {
   REABIERTA:        'Reabierta',
 }
 
-const CHIP_LABELS: Record<string, string> = {
+const CHIP_BASE: Record<string, string> = {
   all:              'Todas',
   BORRADOR:         'Borrador',
   PAGO_VERIFICADO:  'Verificado',
@@ -83,6 +83,10 @@ const EMPTY_COUNTS: Counts = {
 export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true }: Props) {
   // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
   const directoVE = country === 'VE' && !verificarPagos
+  // VE con el flujo completo: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE); CO y VE simple quedan igual.
+  const despachaVE = country === 'VE' && !directoVE
+  const STATUS_LABELS = despachaVE ? { ...STATUS_BASE, ...ESTADOS_VENTA_VE } : STATUS_BASE
+  const CHIP_LABELS = despachaVE ? { ...CHIP_BASE, ...ESTADOS_VENTA_VE } : CHIP_BASE
   // Por confirmar (2026-10-12): ventas de ML sin registrar; "Confirmar" abre el form con ese número.
   const [vistaPC, setVistaPC] = useState(false)
   const [numeroNuevo, setNumeroNuevo] = useState<string | null>(null)

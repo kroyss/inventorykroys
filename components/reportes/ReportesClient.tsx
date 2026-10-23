@@ -34,7 +34,7 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 // analisisStock: módulo. Sin él no están Stock (reposición/declive/remate, calibrado a importaciones)
 // ni Conteos (conteos físicos).
 // importaciones: módulo. Sin él no se ofrece el filtro Local/Importación (solo hay compras locales).
-export default function ReportesClient({ analisisStock, importaciones }: { analisisStock: boolean; importaciones: boolean }) {
+export default function ReportesClient({ analisisStock, importaciones, despachaVE = false }: { analisisStock: boolean; importaciones: boolean; despachaVE?: boolean }) {
   const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', 'ventas')
   const tab = !analisisStock && (tabGuardada === 'stock' || tabGuardada === 'conteos') ? 'ventas' : tabGuardada
   const stateTabs = analisisStock ? STATE_TABS : STATE_TABS.filter(t => t.key !== 'stock' && t.key !== 'conteos')
@@ -156,7 +156,7 @@ export default function ReportesClient({ analisisStock, importaciones }: { anali
       {loading && <Cargando />}
 
       {!loading && data && tab === 'ventas'     && data.sales       && (
-        <SalesReport data={data} search={search} setSearch={setSearch} statusF={ventaStatus} setStatusF={setVentaStatus} />
+        <SalesReport data={data} search={search} setSearch={setSearch} statusF={ventaStatus} setStatusF={setVentaStatus} despachaVE={despachaVE} />
       )}
       {!loading && data && tab === 'compras'    && data.purchases   && (
         <PurchasesReport data={data} search={search} setSearch={setSearch} tipo={importaciones ? compraTipo : ''} setTipo={setCompraTipo} importaciones={importaciones} />
@@ -187,7 +187,7 @@ function SearchBar({ value, onChange, placeholder }: { value: string; onChange: 
 }
 
 // ───── ventas ─────
-function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
+function SalesReport({ data, search, setSearch, statusF, setStatusF, despachaVE }: any) {
   const rows = useMemo(() => {
     let r = data.sales as any[]
     if (statusF) r = r.filter(s => s.status === statusF)
@@ -223,8 +223,8 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF }: any) {
         <SearchBar value={search} onChange={setSearch} placeholder="Buscar orden o cliente…" />
         <select value={statusF} onChange={e => setStatusF(e.target.value)} className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm">
           <option value="">Todos los estados</option>
-          <option value="PROCESADA">Procesada</option>
-          <option value="DESCARGADA">Descargada</option>
+          <option value="PROCESADA">{despachaVE ? 'Por despachar' : 'Procesada'}</option>
+          <option value="DESCARGADA">{despachaVE ? 'Despachada' : 'Descargada'}</option>
           <option value="DESCARGADA_LOCAL">Local entregada</option>
         </select>
       </div>

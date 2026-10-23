@@ -46,6 +46,9 @@ export const STATUS_LABELS: Record<string, string> = {
   ADUANA: 'En aduana', EN_IMPORTADOR_PAGAR: 'Importador por pagar',
   OK: 'En nivel', BAJO: 'Stock bajo', SIN_STOCK: 'Sin stock', INACTIVO: 'Inactivo',
 }
+/** Ventas en VE con el flujo completo (23-10): en VE ya no se descarga Excel; "Procesada" = falta imprimir la guía y
+ *  "Descargada" = guía impresa en Despachos. Solo cambia el texto: los estados siguen iguales. CO queda como está. */
+export const ESTADOS_VENTA_VE: Record<string, string> = { PROCESADA: 'Por despachar', DESCARGADA: 'Despachada' }
 /** @deprecated usar StatusBadge; se deja por compatibilidad. */
 export const STATUS_STYLES: Record<string, string> = Object.fromEntries(
   Object.keys(TONO_ESTADO).map(k => [k, 'bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200']))
