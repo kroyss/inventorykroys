@@ -8,7 +8,7 @@ import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/Despegu
 
 export const metadata = {
   title: 'Programa Despegue',
-  description: 'Caso real: así llevé una cuenta nueva de 0, con reputación gris, a reputación verde con MercadoEnvíos activado en 35 días. '
+  description: 'Caso real: así llevé una cuenta nueva de 0, con reputación gris, a reputación verde con MercadoEnvíos activado en 5 semanas. '
     + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Solo 8 cupos.',
 }
 
@@ -149,7 +149,7 @@ export default async function DespeguePage() {
               <h1 className="mt-4 text-[1.85rem] font-semibold leading-[1.12] tracking-tight sm:text-[2.75rem]">
                 Así llevé una cuenta nueva de <span className="text-neutral-500">0, con reputación gris,</span> a{' '}
                 <span className="text-lime-400">reputación verde</span> con <span className="text-lime-400">MercadoEnvíos activado</span>{' '}
-                <span className="whitespace-nowrap">en <span className="text-lime-400">35 días</span>.</span>
+                <span className="whitespace-nowrap">en <span className="text-lime-400">5 semanas</span>.</span>
               </h1>
               {/* El avance de hoy (mig. 113): el día se calcula desde caso_inicio; las ventas las sube el dueño en Plataforma. */}
               <p className="mt-4 inline-flex items-start gap-2.5 text-sm leading-snug text-neutral-300 sm:text-base">
