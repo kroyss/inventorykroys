@@ -75,12 +75,36 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
     return () => clearInterval(t)
   }, [trabajando, cargar])
 
+  // Después de "Traer pagos y guías" (23-10): la pantalla se refresca sola hasta que llega el resultado de ESE pedido,
+  // aunque al abrirla no hubiera ningún perfil conectado (antes quedaba mostrando la traída vieja y parecía que no trajo).
+  const [pedidoEn, setPedidoEn] = useState<number | null>(null)
+  const recargarVentas = pc.cargar
+  const llego = !!pedidoEn && !!pedido && new Date(pedido.pedido_at).getTime() >= pedidoEn - 60_000
+    && Object.keys(pedido.resultados).length > 0 && !trabajando
+  const esperandoTraida = !!pedidoEn && !llego
+  useEffect(() => {
+    if (!esperandoTraida || !pedidoEn) return
+    const t = setInterval(() => {
+      if (Date.now() - pedidoEn > 5 * 60_000) { setPedidoEn(null); return }   // a los 5 min deja de insistir
+      cargar(); recargarVentas()
+    }, 5000)
+    return () => clearInterval(t)
+  }, [esperandoTraida, pedidoEn, cargar, recargarVentas])
+  // Cuando llega, se recarga una vez más la lista de Ventas (los pagos nuevos) y se deja de esperar.
+  useEffect(() => {
+    if (!llego) return
+    recargarVentas()
+    const t = setTimeout(() => setPedidoEn(null), 0)
+    return () => clearTimeout(t)
+  }, [llego, recargarVentas])
+
   const traer = async () => {
     setBusy('traer'); setError(null); setAviso(null)
     const r = await fetch('/api/pagos-me/traer', { method: 'POST' })
     setBusy(null)
     if (!r.ok) { setError('No se pudo pedir'); return }
     setAviso('Pedido enviado: el vigilante lo toma en menos de 1 minuto. Esta pantalla se actualiza sola.')
+    setPedidoEn(Date.now())
     cargar()
   }
 
