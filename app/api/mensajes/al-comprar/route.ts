@@ -21,7 +21,7 @@ export async function GET() {
 
 const Config = z.object({
   activo: z.boolean(),
-  texto: z.string().trim().min(10, 'Escribe el mensaje').max(300, 'Máximo 300 caracteres (con el nombre y el producto no puede pasar de 350)'),
+  texto: z.string().trim().min(10, 'Escribe el mensaje').max(MAX_TEXTO, `Máximo ${MAX_TEXTO} caracteres (MercadoLibre corta lo que pase)`),
 })
 
 export async function PUT(req: NextRequest) {
