@@ -67,6 +67,11 @@ export async function bcvRateFor(db: Q, ymd: string): Promise<{ rate: number; ra
   return r ? { rate: r.rate, rate_date: r.rate_date } : null
 }
 
+/** ¿La factura `inv` incluye la venta `venta`? La principal (invoices.sale_id) o una agrupada (invoice_sales,
+ *  mig 114). Toda búsqueda de "la factura de esta venta" pasa por aquí. */
+export const sqlFacturaIncluye = (inv: string, venta: string) =>
+  `(${inv}.sale_id = ${venta} OR EXISTS (SELECT 1 FROM invoice_sales xs WHERE xs.invoice_id = ${inv}.id AND xs.sale_id = ${venta}))`
+
 const INVOICE_SELECT = `
   SELECT
     i.id, i.invoice_number, i.control_number, i.sale_id, s.ml_order_number AS sale_order_number,
@@ -87,6 +92,10 @@ const INVOICE_SELECT = `
       FROM jsonb_array_elements(i.correcciones) c
     ), '[]'::json) AS correcciones,
     uc.username AS created_by, i.created_at,
+    COALESCE((
+      SELECT JSON_AGG(JSON_BUILD_OBJECT('id', xs.sale_id, 'ml_order_number', sx.ml_order_number, 'customer_name', sx.customer_name) ORDER BY xs.id)
+      FROM invoice_sales xs JOIN sales sx ON sx.id = xs.sale_id WHERE xs.invoice_id = i.id
+    ), '[]'::json) AS otras_ventas,
     COALESCE((
       SELECT JSON_AGG(JSON_BUILD_OBJECT(
         'id', it.id, 'product_id', it.product_id, 'description', it.description,

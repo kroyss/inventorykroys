@@ -6,6 +6,7 @@ import { requestConnection } from '@/lib/requestConnection'
 import { mlOrderError } from '@/lib/orderNumber'
 import { tieneModulo } from '@/lib/modulos'
 import { notaAlGuardarVenta } from '@/lib/notasML'
+import { sqlFacturaIncluye } from '@/lib/invoicesServer'
 
 export async function GET(
   _: NextRequest,
@@ -172,7 +173,7 @@ export async function DELETE(
   }
   // Una factura (aunque esté anulada) es registro fiscal: la venta no se puede borrar.
   const { rows: [inv] } = await db.query(
-    `SELECT invoice_number FROM invoices WHERE sale_id = $1 LIMIT 1`, [id]
+    `SELECT invoice_number FROM invoices i WHERE ${sqlFacturaIncluye('i', '$1')} LIMIT 1`, [id]
   )
   if (inv) {
     return NextResponse.json({ error: `No se puede eliminar: la venta tiene la factura #${inv.invoice_number}` }, { status: 409 })

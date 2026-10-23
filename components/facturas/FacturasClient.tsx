@@ -172,7 +172,8 @@ export default function FacturasClient(_: { userRole: UserRole }) {
                     {r.customer_name}
                     {r.customer_doc && <span className="text-xs text-neutral-400 ml-1">{r.customer_doc}</span>}
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs hidden md:table-cell">{r.sale_order_number ?? '—'}</td>
+                  <td className="px-3 py-2 font-mono text-xs hidden md:table-cell">{r.sale_order_number ?? '—'}
+                    {!!r.otras_ventas?.length && <span className="ml-1 font-sans text-neutral-500">+{r.otras_ventas.length}</span>}</td>
                   <td className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${r.status === 'ANULADA' ? 'line-through' : 'font-semibold'}`}>{bs(r.total_bs)}</td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">
                     {r.status === 'ANULADA' ? (
@@ -381,7 +382,9 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             <div><div className="text-neutral-500">Fecha</div><div className="font-medium">{fmtDate(inv.invoice_date)}</div></div>
-            <div><div className="text-neutral-500">Venta</div><div className="font-mono">{inv.sale_order_number ?? '—'}</div></div>
+            <div><div className="text-neutral-500">{inv.otras_ventas?.length ? `Ventas (${inv.otras_ventas.length + 1})` : 'Venta'}</div>
+              <div className="font-mono">{inv.sale_order_number ?? '—'}</div>
+              {inv.otras_ventas?.map(v => <div key={v.id} className="font-mono">{v.ml_order_number}</div>)}</div>
             <div className="col-span-2"><div className="text-neutral-500">Cliente</div>
               <div className="font-medium">{inv.customer_name}</div>
               <div className="text-neutral-500">

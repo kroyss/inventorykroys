@@ -67,6 +67,8 @@ export interface Invoice {
   correcciones?: { fecha: string; usuario: string | null; motivo: string }[]
   items: InvoiceItem[]
   files?: InvoiceFile[]
+  /** Las demás ventas facturadas en esta misma hoja (la principal es sale_id). */
+  otras_ventas?: { id: number; ml_order_number: string; customer_name: string }[]
 }
 
 export interface InvoiceCustomer {

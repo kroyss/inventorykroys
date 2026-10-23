@@ -4,7 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { facturasHabilitadas } from '@/lib/modulos'
 import { calcInvoice, normalizeDoc, round2, MAX_INVOICE_LINES } from '@/lib/invoices'
-import { getInvoice, listInvoices, nextInvoiceNumber } from '@/lib/invoicesServer'
+import { getInvoice, listInvoices, nextInvoiceNumber, sqlFacturaIncluye } from '@/lib/invoicesServer'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     if (status === 'EMITIDA' || status === 'ANULADA') add('i.status = ?', status)
     if (sp.get('retention') === 'PENDIENTE') conds.push(`i.retention_status = 'PENDIENTE' AND i.status = 'EMITIDA'`)
     const saleId = sp.get('sale_id')
-    if (saleId && /^\d+$/.test(saleId)) add('i.sale_id = ?', saleId)
+    if (saleId && /^\d+$/.test(saleId)) { params.push(saleId); conds.push(sqlFacturaIncluye('i', `$${params.length}`)) }
     const from = sp.get('date_from') ?? ''
     const to   = sp.get('date_to') ?? ''
     if (DATE_RE.test(from)) add('i.invoice_date >= ?::date', from)
@@ -38,6 +38,8 @@ export async function GET(req: NextRequest) {
         OR i.customer_name ILIKE '%' || ${p} || '%'
         OR i.customer_doc  ILIKE '%' || ${p} || '%'
         OR s.ml_order_number ILIKE '%' || ${p} || '%'
+        OR EXISTS (SELECT 1 FROM invoice_sales xs JOIN sales sx ON sx.id = xs.sale_id
+                   WHERE xs.invoice_id = i.id AND sx.ml_order_number ILIKE '%' || ${p} || '%')
       )`)
     }
 
@@ -50,6 +52,8 @@ export async function GET(req: NextRequest) {
 
 const CreateSchema = z.object({
   sale_id:        z.number().int().positive().nullable(),
+  // Las demás ventas que van en la misma hoja (mig 114). Solo con una venta principal.
+  otras_ventas:   z.array(z.number().int().positive()).max(30).default([]),
   invoice_number: z.number().int().positive().optional(),
   control_number: z.string().max(30).optional(),
   invoice_date:   z.string().regex(DATE_RE),
@@ -112,9 +116,15 @@ export async function POST(req: NextRequest) {
     // Serializa la numeración: dos personas facturando a la vez no toman el mismo número.
     await client.query(`SELECT pg_advisory_xact_lock(hashtext('invoices_number'))`)
 
-    if (body.sale_id) {
-      const { rows: [sale] } = await client.query(`SELECT id FROM sales WHERE id = $1`, [body.sale_id])
-      if (!sale) {
+    const otras = [...new Set(body.otras_ventas)].filter(x => x !== body.sale_id)
+    if (otras.length && !body.sale_id) {
+      await client.query('ROLLBACK')
+      return NextResponse.json({ error: 'Para juntar ventas hace falta la venta principal' }, { status: 400 })
+    }
+    const todas = body.sale_id ? [body.sale_id, ...otras] : []
+    if (todas.length) {
+      const { rows } = await client.query(`SELECT id FROM sales WHERE id = ANY($1::int[])`, [todas])
+      if (rows.length !== todas.length) {
         await client.query('ROLLBACK')
         return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 })
       }
@@ -131,13 +141,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (body.sale_id) {
-      const { rows: [dup] } = await client.query(
-        `SELECT invoice_number FROM invoices WHERE sale_id = $1 AND status = 'EMITIDA'`, [body.sale_id]
+    // Una venta, una factura vigente: ni la principal ni las agrupadas pueden estar ya en una EMITIDA (como
+    // principal o agrupada). Va dentro del candado de numeración, así dos emisiones a la vez no se pisan.
+    if (todas.length) {
+      const { rows: [dup] } = await client.query(`
+        SELECT i.invoice_number, s.ml_order_number FROM invoices i
+        JOIN sales s ON s.id = ANY($1::int[]) AND ${sqlFacturaIncluye('i', 's.id')}
+        WHERE i.status = 'EMITIDA' LIMIT 1`, [todas]
       )
       if (dup) {
         await client.query('ROLLBACK')
-        return NextResponse.json({ error: `Esta venta ya tiene la factura #${dup.invoice_number}. Si salió con un error, no hagas otra venta: abre la venta y toca "¿Salió mal?".` }, { status: 409 })
+        return NextResponse.json({ error: otras.length
+          ? `La venta ${dup.ml_order_number} ya está en la factura #${dup.invoice_number}: quítala de esta.`
+          : `Esta venta ya tiene la factura #${dup.invoice_number}. Si salió con un error, no hagas otra venta: abre la venta y toca "¿Salió mal?".` }, { status: 409 })
       }
     }
 
@@ -189,9 +205,12 @@ export async function POST(req: NextRequest) {
     if (body.replaces_id) {
       await client.query(`UPDATE invoices SET replaced_by = $1 WHERE id = $2`, [inv.id, body.replaces_id])
     }
-    // Emitida: el borrador autoguardado de esa venta ya no sirve.
-    if (body.sale_id) {
-      await client.query(`DELETE FROM invoice_drafts WHERE sale_id = $1`, [body.sale_id])
+    for (const v of otras) {
+      await client.query(`INSERT INTO invoice_sales (invoice_id, sale_id) VALUES ($1, $2)`, [inv.id, v])
+    }
+    // Emitida: los borradores autoguardados de esas ventas ya no sirven.
+    if (todas.length) {
+      await client.query(`DELETE FROM invoice_drafts WHERE sale_id = ANY($1::int[])`, [todas])
     }
 
     await client.query('COMMIT')

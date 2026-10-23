@@ -44,6 +44,14 @@ interface Draft {
   withIva: boolean
   ivaRate: number
   lines: Line[]
+  otras?: VentaAgrupable[]
+}
+
+/** Otra venta que va en la misma hoja (GET /api/invoices/agrupables, mig 114). */
+interface VentaAgrupable {
+  id: number; ml_order_number: string; customer_name: string; created_at: string
+  discount_percent: number; total_amount: number
+  items: { product_id: number; product_name: string; product_code: string; quantity: number; unit_price: number }[]
 }
 
 interface DatosGuia {
@@ -60,6 +68,19 @@ const saleLines = (sale?: Sale): Line[] => {
     unit_price_usd: round2(i.unit_price * (1 - disc / 100)),
   }))
 }
+
+/** Líneas de varias ventas: el mismo producto al mismo precio se junta en una línea con la cantidad sumada. */
+const juntarLineas = (sale: Sale | undefined, otras: VentaAgrupable[]): Line[] => {
+  const todas = [...saleLines(sale), ...otras.flatMap(v => saleLines(v as unknown as Sale))]
+  const out: Line[] = []
+  for (const l of todas) {
+    const igual = l.product_id != null && out.find(o => o.product_id === l.product_id && o.unit_price_usd === l.unit_price_usd)
+    if (igual) igual.quantity += l.quantity
+    else out.push({ ...l })
+  }
+  return out
+}
+const resumenItems = (v: VentaAgrupable) => v.items.map(i => `${i.quantity}× ${i.product_name}`).join(', ')
 
 const hhmm = (iso: string) => new Date(iso).toLocaleString('es-VE', {
   day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -129,6 +150,10 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
   const [revisando, setRevisando] = useState(false)
   const { imprimir, marco } = useImprimirFactura()
   const saleId = fuente ? fuente.sale_id : sale?.id ?? null
+  // Ventas agrupadas en esta hoja. Al corregir (mismo número o nuevo) se conservan las de la factura original.
+  const [otras, setOtras] = useState<VentaAgrupable[]>([])
+  const otrasFijas = fuente?.otras_ventas ?? []
+  const cambiarOtras = (nuevas: VentaAgrupable[]) => { setOtras(nuevas); setLines(juntarLineas(sale, nuevas)) }
 
   // Borrador autoguardado (solo al facturar una venta; no al reemitir)
   const draftSaleId = !fuente && sale ? sale.id : null
@@ -151,6 +176,7 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
     if (d.withIva !== undefined)   setWithIva(d.withIva)
     if (d.ivaRate !== undefined)   setIvaRate(d.ivaRate)
     if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines)
+    if (Array.isArray(d.otras)) setOtras(d.otras)
   }
 
   // Config inicial (próximo número, IVA por defecto, tasa BCV de hoy) y, encima, el borrador
@@ -247,7 +273,7 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
   // ── Autoguardado ──────────────────────────────────────────────────────────
   const draftJson = JSON.stringify({
     control, date, rate, rateTouched, name, doc, address, phone,
-    isSpecial, retPct, withIva, ivaRate, lines,
+    isSpecial, retPct, withIva, ivaRate, lines, otras,
   } satisfies Draft)
 
   const saveDraft = async (json: string, keepalive = false) => {
@@ -293,7 +319,7 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
     setControl(''); setDate(config?.today ?? date); setRateTouched(false)
     setName(sale?.customer_name ?? ''); setDoc(''); setAddress(''); setPhone('')
     setIsSpecial(false); setRetPct(75); setWithIva(true); setIvaRate(config?.iva ?? 16)
-    setLines(saleLines(sale))
+    setLines(saleLines(sale)); setOtras([])
     lastSavedRef.current = ''
     setDraftInfo(null); setDraftState('idle')
   }
@@ -323,6 +349,7 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sale_id: saleId,
+        otras_ventas: replaces ? otrasFijas.map(v => v.id) : otras.map(v => v.id),
         invoice_number: number,
         control_number: control || undefined,
         invoice_date: date,
@@ -366,6 +393,7 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
             {(sale || fuente?.sale_order_number) && (
               <div className="text-xs text-neutral-500 font-mono">
                 Venta {sale?.ml_order_number ?? fuente?.sale_order_number}
+                {(otras.length || otrasFijas.length) ? ` + ${otras.length || otrasFijas.length} más` : ''}
               </div>
             )}
             {draftSaleId && !saved && (
@@ -587,6 +615,14 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
                 </div>
               </section>
 
+              {/* Varias ventas en una hoja (23-10, mig 114) */}
+              {sale && !fuente && <JuntarVentas venta={sale} otras={otras} onCambio={cambiarOtras} />}
+              {fuente && otrasFijas.length > 0 && (
+                <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                  Esta factura incluye también: {otrasFijas.map(v => v.ml_order_number).join(', ')}. Siguen en la factura corregida.
+                </p>
+              )}
+
               {/* Detalle */}
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -710,5 +746,71 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
         )}
       </div>
     </div>
+  )
+}
+
+/** Buscar y marcar otras ventas para la misma hoja. Sin texto sugiere las del mismo comprador (30 días); con texto
+ *  busca por nº de orden, comprador o producto. Las ya facturadas no salen nunca (lo filtra el servidor). */
+function JuntarVentas({ venta, otras, onCambio }: { venta: Sale; otras: VentaAgrupable[]; onCambio: (v: VentaAgrupable[]) => void }) {
+  const [q, setQ] = useState('')
+  const [res, setRes] = useState<VentaAgrupable[] | null>(null)
+  const [abierto, setAbierto] = useState(false)
+  useEffect(() => {
+    if (!abierto) return
+    const t = setTimeout(() => {
+      fetch(`/api/invoices/agrupables?venta=${venta.id}&q=${encodeURIComponent(q.trim())}`)
+        .then(r => r.ok ? r.json() : []).then(d => setRes(Array.isArray(d) ? d : [])).catch(() => setRes([]))
+    }, q.trim() ? 300 : 0)
+    return () => clearTimeout(t)
+  }, [q, abierto, venta.id])
+  const marcadas = new Set(otras.map(v => v.id))
+  const fechaCorta = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
+
+  return (
+    <section className="space-y-2 rounded-lg border border-neutral-200 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">
+          Juntar con otras ventas
+          {otras.length > 0 && <span className="ml-1 font-normal text-neutral-500">· {otras.length + 1} ventas en esta factura</span>}
+        </h3>
+        {!abierto && <button onClick={() => setAbierto(true)} className="text-xs text-neutral-600 underline hover:text-neutral-900">Buscar ventas</button>}
+      </div>
+      {otras.length > 0 && (
+        <ul className="space-y-1">
+          {otras.map(v => (
+            <li key={v.id} className="flex items-start justify-between gap-2 rounded bg-lime-50 px-2 py-1.5 text-xs">
+              <span className="min-w-0"><span className="font-mono">{v.ml_order_number}</span> · {v.customer_name}
+                <span className="block truncate text-neutral-500">{resumenItems(v)}</span></span>
+              <button onClick={() => onCambio(otras.filter(x => x.id !== v.id))} className="shrink-0 text-neutral-500 underline hover:text-red-600">Quitar</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {abierto && (
+        <>
+          <input type="search" value={q} onChange={e => setQ(e.target.value)} autoFocus
+            placeholder="Nº de orden, comprador o producto (nombre o código)…" className={inputCls} />
+          <p className="text-[11px] text-neutral-500">
+            {q.trim() ? 'Últimos 90 días, sin factura.' : `Del mismo comprador (${venta.customer_name}), últimos 30 días, sin factura.`}
+            {' '}Al agregar o quitar una venta, el detalle se arma de nuevo con todas.
+          </p>
+          {res === null ? <p className="text-xs text-neutral-400">Buscando…</p>
+            : res.filter(v => !marcadas.has(v.id)).length === 0 ? <p className="text-xs text-neutral-400">No hay ventas sin factura con eso.</p>
+            : (
+              <ul className="max-h-56 divide-y divide-neutral-100 overflow-y-auto rounded border border-neutral-200">
+                {res.filter(v => !marcadas.has(v.id)).map(v => (
+                  <li key={v.id} className="flex items-start justify-between gap-2 px-2 py-1.5 text-xs">
+                    <span className="min-w-0">
+                      <span className="font-mono">{v.ml_order_number}</span> · {fechaCorta(v.created_at)} · {v.customer_name}
+                      <span className="block truncate text-neutral-500">{resumenItems(v)} · $ {bs(v.total_amount)}</span>
+                    </span>
+                    <button onClick={() => onCambio([...otras, v])} className="btn-secondary shrink-0 text-xs">Agregar</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+        </>
+      )}
+    </section>
   )
 }

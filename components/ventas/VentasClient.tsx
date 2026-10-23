@@ -678,6 +678,14 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                             {activeInvoice.customer_name} · Bs {bs(activeInvoice.total_bs)}
                             {activeInvoice.retention_status === 'PENDIENTE' && <span className="text-amber-700"> · retención pendiente</span>}
                           </div>
+                          {/* Factura de varias ventas (mig 114): con cuáles va junta esta. */}
+                          {(() => {
+                            const juntas = [activeInvoice.sale_order_number, ...(activeInvoice.otras_ventas ?? []).map(v => v.ml_order_number)]
+                              .filter((n): n is string => !!n && n !== selected.ml_order_number)
+                            return juntas.length > 0 && (
+                              <div className="text-[11px] text-neutral-500">Junto con {juntas.length === 1 ? 'la venta' : `${juntas.length} ventas`}: <span className="font-mono">{juntas.join(', ')}</span></div>
+                            )
+                          })()}
                         </div>
                         <div className="flex gap-2 shrink-0">
                           <button onClick={() => verFactura(activeInvoice.id)} className="btn-secondary text-xs">Imprimir</button>

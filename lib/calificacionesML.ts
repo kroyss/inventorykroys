@@ -7,6 +7,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
+import { sqlFacturaIncluye } from '@/lib/invoicesServer'
 
 export const DIAS_VENTANA = 90          // ventas que se traen de ML
 export const SYNC_MINUTOS = 58          // cada cuánto el cron refresca las ventas (≈ cada hora; 58 y no 60 para
@@ -193,7 +194,7 @@ export const SQL_BANDEJA = `
   JOIN ml_conexiones x ON x.id = o.conexion_id
   -- LATERAL: busca la venta por índice orden a orden (un JOIN con IN comparaba contra todas las ventas).
   LEFT JOIN LATERAL (SELECT s.id, s.status FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text) LIMIT 1) s ON TRUE
-  LEFT JOIN LATERAL (SELECT i.id FROM invoices i WHERE i.sale_id = s.id AND i.status <> 'ANULADA' LIMIT 1) f ON TRUE
+  LEFT JOIN LATERAL (SELECT i.id FROM invoices i WHERE ${sqlFacturaIncluye('i', 's.id')} AND i.status <> 'ANULADA' LIMIT 1) f ON TRUE
   ${SQL_GUIA}
   WHERE o.cal_vendedor IS NULL`
 

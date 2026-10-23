@@ -5,6 +5,7 @@ import { getSessionDb, unauthorized } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
 import { localCostFactor } from '@/lib/localCost'
 import { parseShippingTable, shippingCostVE } from '@/lib/mlShipping'
+import { sqlFacturaIncluye } from '@/lib/invoicesServer'
 
 // Corregir pedido (20-10, migración 108): un cambio de última hora sobre una venta que YA descontó inventario
 // (el cliente cambió de color, se agregó algo, error al procesar). Se corrige la MISMA venta, sin reabrirla:
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                       JOIN despacho_jornadas j ON j.id = l.jornada_id
                       WHERE e.venta = $1 AND e.impresa AND j.status = 'CERRADA' AND e.apartado IS NULL) AS si`, [sale.ml_order_number])
     const { rows: [fac] } = await db.query(
-      `SELECT invoice_number FROM invoices WHERE sale_id = $1 AND status = 'EMITIDA' LIMIT 1`, [id])
+      `SELECT invoice_number FROM invoices i WHERE ${sqlFacturaIncluye('i', '$1')} AND status = 'EMITIDA' LIMIT 1`, [id])
     const linea = (pid: number, cantidad: number, precio: number, nota: string | null): Linea =>
       ({ product_id: pid, nombre: prod.get(pid)?.name ?? viejoPor.get(pid)?.nombre ?? String(pid), cantidad, precio, nota })
     // La nota de la venta va en el motivo (la tabla guarda antes/después de los productos).

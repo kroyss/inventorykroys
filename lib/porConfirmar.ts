@@ -11,6 +11,7 @@
 //   - Sin pago, a los DIAS_MAX, o cancelada en ML: sale de la lista.
 import type { Pool } from 'pg'
 import { leerPlantillasCal, traerOrden } from '@/lib/calificacionesML'
+import { sqlFacturaIncluye } from '@/lib/invoicesServer'
 
 /** Lo que dijo el banco de un pago (migración 110). */
 export interface BancoPago {
@@ -170,7 +171,7 @@ export async function cargadasConPago(db: Pool): Promise<CargadaConPago[]> {
     `SELECT s.id AS sale_id, s.ml_order_number AS numero, s.customer_name AS cliente, s.total_amount::float AS total, s.created_at AS creada,
             COALESCE((SELECT JSON_AGG(JSON_BUILD_OBJECT('nombre', pr.name, 'cantidad', si.quantity) ORDER BY si.id)
                       FROM sale_items si JOIN products pr ON pr.id = si.product_id WHERE si.sale_id = s.id), '[]'::json) AS productos,
-            (SELECT i.invoice_number::text FROM invoices i WHERE i.sale_id = s.id AND i.status = 'EMITIDA' LIMIT 1) AS factura,
+            (SELECT i.invoice_number::text FROM invoices i WHERE ${sqlFacturaIncluye('i', 's.id')} AND i.status = 'EMITIDA' LIMIT 1) AS factura,
             p.id AS pago_id, p.verificacion, p.monto_pagado::float AS monto, p.total_orden::float AS total_orden,
             p.banco_emisor, p.referencia, p.metodo_pago, p.comprobante_path IS NOT NULL AS tiene_comprobante,
             p.guia_path IS NOT NULL AS tiene_guia, p.creado_at AS pago_at,
