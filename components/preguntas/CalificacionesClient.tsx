@@ -52,6 +52,12 @@ const sugeridaDe = (o: Orden): Tipo => o.cal_recibida_concretada === true ? 'con
 function LoQueDijo({ o, leyendo }: { o: Orden; leyendo: boolean }) {
   if (leyendo) return <div className="text-xs text-neutral-400">Te calificó · leyendo…</div>
   const r = o.cal_recibida
+  // 24-10: ML no deja ver la calificación, pero ya dijo que el comprador tiene el producto (rechazó la no concretada).
+  if ((!r || !RATING[r]) && o.cal_recibida_concretada === true) return (
+    <div className="mt-0.5 max-w-[18rem] rounded bg-amber-50 px-1.5 py-1 text-xs leading-snug text-amber-900 ring-1 ring-inset ring-amber-200">
+      El comprador le dijo a ML que <b>ya tiene el producto</b>: solo se puede calificar <b>concretada</b>. Si no es así, háblale por mensaje.
+    </div>
+  )
   if (!r || !RATING[r]) return <div className="text-xs text-neutral-400">Ya te calificó · ML muestra qué dijo cuando tú califiques</div>
   const color = r === 'positive' ? 'text-emerald-700' : r === 'negative' ? 'text-red-700' : 'text-neutral-600'
   const conc = o.cal_recibida_concretada === true ? 'Concretada' : o.cal_recibida_concretada === false ? 'No concretada' : null

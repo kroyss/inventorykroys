@@ -47,6 +47,12 @@ export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'n
       await db.query(`UPDATE ml_ordenes SET cal_vendedor = COALESCE(cal_vendedor, 'ya_calificada') WHERE id = $1`, [id])
       return { id, ok: false, detalle: msg }
     }
+    // 24-10: el comprador le dijo a ML que ya tiene el producto ("Buyer gave fulfilled feedback"): ML no acepta una NO
+    // concretada. Se anota que el comprador dijo concretada (la lista la pasa sola a "Concretada" con el aviso).
+    if (e instanceof ErrorML && e.status === 400 && /buyer gave fulfilled/i.test(`${msg} ${JSON.stringify(e.datos ?? '')}`)) {
+      await db.query(`UPDATE ml_ordenes SET cal_recibida_concretada = TRUE, cal_contradictoria = FALSE WHERE id = $1`, [id])
+      return { id, ok: false, detalle: 'El comprador le dijo a ML que ya tiene el producto: califícala como CONCRETADA (o habla con él por mensaje si no es así)' }
+    }
     // ML ya no deja calificar una orden vieja (20-10, BUYBOOK_SHOP con ventas de julio): "You can't submit a not
     // fulfilled feedback after order has expired". Nunca se va a poder: sale de la lista para no confundir.
     if (e instanceof ErrorML && e.status >= 400 && e.status < 500 && /expired/i.test(`${msg} ${JSON.stringify(e.datos ?? '')}`)) {
