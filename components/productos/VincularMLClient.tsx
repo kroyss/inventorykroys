@@ -2,7 +2,7 @@
 // Vincular publicaciones de ML (20-10, migración 109; API /api/vincular-ml). Una tarjeta por publicación, de la que
 // más vende a la que menos; dentro, una fila por variante (cada color/modelo es un producto aparte). Cada vínculo lo
 // hace una persona con un clic: el sistema solo sugiere. "No sé, para Marcos" deja la duda con su nota.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -24,6 +24,19 @@ interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mi
 type Filtro = 'pendientes' | 'dudas' | 'vinculadas' | 'todas'
 
 const POR_PAGINA = 25
+
+// Celular (22-10): la lista de sugerencias del navegador (datalist) casi no se puede usar en el teléfono. Ahí se abre
+// un buscador a pantalla completa; en la computadora queda el de siempre.
+const CELULAR = '(max-width: 639px)'
+const suscribirCelular = (cb: () => void) => { const m = matchMedia(CELULAR); m.addEventListener('change', cb); return () => m.removeEventListener('change', cb) }
+const useCelular = () => useSyncExternalStore(suscribirCelular, () => matchMedia(CELULAR).matches, () => false)
+const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+/** Palabras sueltas, en cualquier orden y sin acentos, contra código + nombre. */
+function buscarProductos(productos: Producto[], q: string) {
+  const palabras = sinAcentos(q).split(/\s+/).filter(Boolean)
+  if (!palabras.length) return []
+  return productos.filter(p => { const t = sinAcentos(`${p.code} ${p.name}`); return palabras.every(w => t.includes(w)) }).slice(0, 15)
+}
 const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
 
 export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }) {
@@ -100,12 +113,14 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
         {([['pendientes', 'Por vincular', pendientes], ['dudas', 'Dudas', dudas], ['vinculadas', 'Vinculadas', vinculadas], ['todas', 'Todas', total]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
-            className={`rounded-full border px-3 py-1 text-xs ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
+            className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
           </button>
         ))}
+        </div>
         {cuentas.length > 1 && (
           <select value={cuenta} onChange={e => { setCuenta(e.target.value); setVer(POR_PAGINA) }} className="rounded-lg border border-neutral-300 px-2 py-1 text-xs">
             <option value="">Todas las cuentas</option>
@@ -113,7 +128,7 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
           </select>
         )}
         <input type="search" value={buscar} onChange={e => { setBuscar(e.target.value); setVer(POR_PAGINA) }} placeholder="Buscar publicación, variante o MLV…"
-          className="ml-auto w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm sm:w-72" />
+          className="ml-auto w-full rounded-lg border border-neutral-300 px-3 py-2 text-base sm:w-72 sm:py-1.5 sm:text-sm" />
       </div>
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
@@ -166,6 +181,7 @@ function FilaVariante({ f, productos, esDueno, pedir, onCambio }: {
   onCambio: (c: Partial<Fila>, sumaHoy?: number) => void
 }) {
   const confirm = useConfirm()
+  const celular = useCelular()
   const [modo, setModo] = useState<'nada' | 'elegir' | 'duda'>('nada')
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -221,12 +237,12 @@ function FilaVariante({ f, productos, esDueno, pedir, onCambio }: {
             <AvisoPesos c={f.conflicto} />
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {/* 20-10: la sugerencia es texto para LEER, no un botón grande (se tocaba rápido sin revisar) y pide confirmar. */}
             {f.estado === 'parecida' && f.producto && (
               <>
                 <span className="text-xs text-neutral-500">¿Es este? <span className="text-neutral-800">{f.producto.code} · {f.producto.name}</span></span>
-                <button disabled={ocupado} className="btn-secondary text-xs disabled:opacity-50" onClick={async () => {
+                <button disabled={ocupado} className="btn-secondary w-full text-xs disabled:opacity-50 sm:w-auto" onClick={async () => {
                   if (!await confirm({ title: '¿Es el mismo producto?', confirmText: 'Sí, vincular', cancelText: 'No, revisar',
                     message: `Publicación: ${f.titulo}${f.variante ? ` · ${f.variante}` : ''}
 
@@ -237,8 +253,8 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
                 }}>Sí, es este</button>
               </>
             )}
-            <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary text-xs">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>
-            {!f.duda && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="text-xs text-neutral-500 underline">No sé, para Marcos</button>}
+            <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary w-full text-xs sm:w-auto">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>
+            {!f.duda && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="py-1 text-xs text-neutral-500 underline sm:py-0">No sé, para Marcos</button>}
           </div>
         )}
       </div>
@@ -254,7 +270,10 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
         </div>
       )}
 
-      {modo === 'elegir' && (
+      {modo === 'elegir' && celular && (
+        <SelectorCelular f={f} productos={productos} ocupado={ocupado} onElegir={vincularA} onCerrar={() => { setModo('nada'); setTexto('') }} />
+      )}
+      {modo === 'elegir' && !celular && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input list="vml-productos" value={texto} onChange={e => setTexto(e.target.value)} autoFocus placeholder="Buscar producto por nombre o código…"
             className="min-w-[16rem] flex-1 rounded border border-neutral-300 px-2 py-1 text-sm" />
@@ -265,7 +284,7 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
       {modo === 'duda' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input value={texto} onChange={e => setTexto(e.target.value)} autoFocus maxLength={300} placeholder="¿Qué duda tienes? (ej.: no encuentro el color wengue)"
-            className="min-w-[16rem] flex-1 rounded border border-neutral-300 px-2 py-1 text-sm" />
+            className="w-full flex-1 rounded border border-neutral-300 px-2 py-2 text-base sm:w-auto sm:min-w-[16rem] sm:py-1 sm:text-sm" />
           <button disabled={texto.trim().length < 2 || ocupado} className="btn-secondary text-xs disabled:opacity-50" onClick={async () => {
             setOcupado(true)
             const ok = await pedir({ accion: 'duda', codigo: f.codigo, cuenta: f.cuenta, titulo: f.titulo, variante: f.variante, nota: texto.trim() })
@@ -276,5 +295,59 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
         </div>
       )}
     </li>
+  )
+}
+
+/** Buscador a pantalla completa del celular. Tocar un producto solo lo marca: vincula el botón de abajo, así un
+ *  toque al deslizar la lista no vincula nada. */
+function SelectorCelular({ f, productos, ocupado, onElegir, onCerrar }: {
+  f: Fila; productos: Producto[]; ocupado: boolean
+  onElegir: (p: Producto) => void; onCerrar: () => void
+}) {
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState<Producto | null>(null)
+  const res = useMemo(() => buscarProductos(productos, q), [productos, q])
+  // Detrás no se desliza la página mientras está abierto.
+  useEffect(() => {
+    const antes = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = antes }
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
+      <div className="space-y-2 border-b border-neutral-200 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <button onClick={onCerrar} className="-ml-1 px-1 py-1 text-sm text-neutral-600">← Volver</button>
+        <div>
+          <p className="line-clamp-2 text-sm font-medium text-neutral-900">{f.titulo}</p>
+          {f.variante && <p className="text-xs text-neutral-500">{f.variante}</p>}
+        </div>
+        <input type="search" value={q} onChange={e => { setQ(e.target.value); setSel(null) }} autoFocus
+          placeholder="Nombre o código del producto…" className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base" />
+      </div>
+      <ul className="flex-1 divide-y divide-neutral-100 overflow-y-auto overscroll-contain">
+        {!q.trim() ? (
+          <li className="px-4 py-8 text-center text-sm text-neutral-400">Escribe parte del nombre (las palabras en cualquier orden) o el código.</li>
+        ) : res.length === 0 ? (
+          <li className="px-4 py-8 text-center text-sm text-neutral-400">No hay productos con eso.</li>
+        ) : res.map(p => (
+          <li key={p.id}>
+            <button onClick={() => setSel(p)}
+              className={`flex w-full items-start gap-3 px-4 py-3 text-left ${sel?.id === p.id ? 'bg-lime-50' : 'active:bg-neutral-50'}`}>
+              <span className={`mt-1 h-4 w-4 shrink-0 rounded-full border ${sel?.id === p.id ? 'border-lime-600 bg-lime-500' : 'border-neutral-300'}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm text-neutral-900">{p.name}</span>
+                <span className="block text-xs text-neutral-500"><span className="font-mono">{p.code}</span> · stock {p.stock}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {sel && (
+        <div className="border-t border-neutral-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button disabled={ocupado} onClick={() => onElegir(sel)} className="btn-primary w-full py-3">Vincular con {sel.code}</button>
+        </div>
+      )}
+    </div>
   )
 }
