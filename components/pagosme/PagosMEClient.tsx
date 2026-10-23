@@ -16,6 +16,8 @@ interface Datos {
     pedido: { id: number; pedido_at: string; vigente: boolean; automatico: boolean; resultados: Record<string, Resultado> } | null
   }
   horario: HorarioME
+  /** Traer automático por horario: solo la empresa dueña (24-10); los Fundadores traen solo con el botón. */
+  automatico: boolean
   ahora: { dia: number; hm: string }
   /** Sin ventas cargadas: las guías van solas a Despachos con las ventas de MercadoLibre. */
   desdeML: boolean
@@ -230,7 +232,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
       {pedido && (despertador || perfiles.length > 0) && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
         pcPrendida={!!despertador?.conectado} />}
 
-      {datos && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
+      {datos?.automatico && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
 
       {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}

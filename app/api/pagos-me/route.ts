@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { leerHorario } from '@/lib/pagosMEComun'
 import { apiError } from '@/lib/apiError'
-import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
+import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME, conTraerAutomatico } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
 
 /**
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
       conteo: Object.fromEntries(conteo.map(c => [c.verificacion, c.n])),
       vigilante: { clave: !!clave?.creado_at || !!clave?.con_codigo, latidos, pedido: pedido ?? null },
       desdeML: s.desdeML,
-      horario: leerHorario(hor?.value), ahora,
+      horario: leerHorario(hor?.value), ahora, automatico: await conTraerAutomatico(s.db),
     })
   } catch (err) {
     return apiError(err)

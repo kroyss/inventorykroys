@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import type { Pool } from 'pg'
-import { autenticarVigilante, PEDIDO_VIGENTE_MIN } from '@/lib/pagosME'
+import { autenticarVigilante, conTraerAutomatico, PEDIDO_VIGENTE_MIN } from '@/lib/pagosME'
 import { leerHorario } from '@/lib/pagosMEComun'
 
 /**
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
  * con la PC apagada a las 8:00, al prender a las 8:30 trae una vez; a las 13:00 solo la de 12:00.
  */
 async function disparoAutomatico(db: Pool) {
+  if (!await conTraerAutomatico(db)) return   // Fundadores: solo con el botón (24-10)
   const { rows: [cfg] } = await db.query(`SELECT value FROM app_settings WHERE key = 'pagos_me_horario'`)
   const horario = leerHorario(cfg?.value)   // sin configurar = 8, 12, 16 y 19 h de lunes a sábado
   if (!horario.activo || !horario.horas.length) return

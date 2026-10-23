@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { sesionPagosME } from '@/lib/pagosME'
+import { conTraerAutomatico, sesionPagosME } from '@/lib/pagosME'
 import { leerHorario } from '@/lib/pagosMEComun'
 import { puede } from '@/lib/permisos'
 
@@ -26,6 +26,7 @@ export async function PUT(req: NextRequest) {
   const s = await sesionPagosME()
   if ('error' in s) return s.error
   if (!puede(s.session.user, 'pagos_me_config')) return NextResponse.json({ error: 'Solo el administrador' }, { status: 403 })
+  if (!await conTraerAutomatico(s.db)) return NextResponse.json({ error: 'Los pagos se traen solo con el botón' }, { status: 403 })
   try {
     const b = Body.parse(await req.json())
     const h = leerHorario(JSON.stringify(b))   // ordena y quita repetidas
