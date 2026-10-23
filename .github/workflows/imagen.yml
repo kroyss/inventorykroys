@@ -36,7 +36,10 @@ jobs:
           if printf '%s' "$LLAVE" | grep -q 'BEGIN OPENSSH'; then
             printf '%s\n' "$LLAVE" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d' > ~/.ssh/imagenes
           else
-            printf '%s' "$LLAVE" | tr -d '\r\n ' | base64 -d > ~/.ssh/imagenes
+            # Solo los caracteres de base64 (el Bloc de notas puede agregar invisibles al copiar).
+            LIMPIA=$(printf '%s' "$LLAVE" | tr -cd 'A-Za-z0-9+/=')
+            echo "Llave recibida: ${#LIMPIA} caracteres (deberían ser unos 548)"
+            printf '%s' "$LIMPIA" | base64 -d > ~/.ssh/imagenes || { echo "No es la llave en una sola línea: vuelve a pegarla"; exit 1; }
           fi
           chmod 600 ~/.ssh/imagenes
           printf '%s\n' "$HUELLA" | tr -d '\r' > ~/.ssh/known_hosts
