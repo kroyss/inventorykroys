@@ -15,12 +15,6 @@ const ESTADO: Record<string, { t: string; c: string }> = {
 }
 // Ejemplo para medir el largo: un nombre y un producto típicos (el producto se acorta solo si hace falta).
 const EJEMPLO = { nombre: 'Alejandra', producto: 'Audífonos Bluetooth Inalámbricos Con Micrófono Negro' }
-// Lo que MercadoLibre suele bloquear o moderar en los mensajes: teléfonos, correos y enlaces de afuera.
-const RIESGOS: [RegExp, string][] = [
-  [/(\+?58|0)\s?4\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}|\b\d{7,}\b/, 'un número de teléfono'],
-  [/[\w.+-]+@[\w-]+\.[\w.]+/, 'un correo'],
-  [/https?:\/\/|www\.|\.com\b|\.ve\b|wa\.me|bit\.ly/i, 'un enlace'],
-]
 
 export default function MensajeAlComprar() {
   const [d, setD] = useState<Datos | null>(null)
@@ -57,7 +51,6 @@ export default function MensajeAlComprar() {
   const lectura = !d.puedeConfigurar
   const ejemplo = cfg.texto.replaceAll('{nombre}', EJEMPLO.nombre).replaceAll('{producto}', EJEMPLO.producto).replace(/\s{2,}/g, ' ').trim()
   const largo = ejemplo.length
-  const riesgos = RIESGOS.filter(([re]) => re.test(cfg.texto)).map(([, t]) => t)
 
   return (
     <div className="space-y-4">
@@ -88,12 +81,6 @@ export default function MensajeAlComprar() {
             </span>
           </div>
           {largo > d.max && <p className="text-xs text-red-700">Con un nombre y un producto normales pasa de {d.max}: ML lo cortaría. Acórtalo.</p>}
-          {riesgos.length > 0 && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-inset ring-amber-200">
-              ⚠️ Tiene {riesgos.join(', ')}. MercadoLibre suele bloquear o moderar los mensajes con datos de contacto o enlaces de afuera,
-              {' '}y puede afectar tu reputación. Mejor indicar los pasos dentro de MercadoLibre.
-            </p>
-          )}
           <p className="text-xs text-neutral-500"><b>Así le llega:</b> {ejemplo}</p>
           <p className="text-xs text-neutral-400">
             Para no tener problemas con MercadoLibre: que sea de <b>la compra</b> (cómo pagar, cómo coordinar el envío), sin promociones ni
