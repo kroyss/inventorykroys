@@ -202,7 +202,9 @@ function Revisar {
         $k = "$($r.pedido)|$($p.carpeta)"
         $quien = if ($p.perfil) { $p.perfil } else { 'el perfil' }
         Anotar "Pedido $($r.pedido): abro Chrome con $quien ($($p.carpeta))"
-        Start-Process -FilePath $chrome -ArgumentList @("--profile-directory=`"$($p.carpeta)`"", 'https://www.mercadoenvios.com.ve/vendedor/orden#vigilante')
+        # 1.3.7 (23-10): --new-window. Si el perfil ya estaba abierto, sin esto la pestana entraba en la ventana de la
+        # persona y al terminar el Asistente cerraba esa ventana entera (con todo lo que estaba haciendo).
+        Start-Process -FilePath $chrome -ArgumentList @("--profile-directory=`"$($p.carpeta)`"", '--new-window', 'https://www.mercadoenvios.com.ve/vendedor/orden#vigilante')
         $script:abiertos[$k] = $true
         Start-Sleep -Seconds 3
       }
