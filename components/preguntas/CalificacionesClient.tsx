@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS, ESTADOS_VENTA_VE } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
-import { MAX_DIAS_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS, diasParaConcretarSola } from '@/lib/noConcretada'
+import { DIA_AUTO_NO_CONCRETADA, MAX_DIAS_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS, diasParaConcretarSola } from '@/lib/noConcretada'
 
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
@@ -24,6 +24,7 @@ interface Plantillas {
   auto: boolean
   hora?: number
   autoNoConcretada?: boolean
+  horaNc?: number
 }
 const horaTxt = (h: number | undefined) => `${String(h ?? 10).padStart(2, '0')}:00`
 interface Datos {
@@ -35,6 +36,7 @@ interface Datos {
   desdeML?: boolean
   /** Última calificación automática (lib/calificacionesAuto.ts). */
   autoUltimo: { fecha: string; estado: string; at?: string; calificadas?: number; errores?: number; quitadas?: number } | null
+  autoNcUltimo?: { fecha: string; estado: string; at?: string; calificadas?: number; errores?: number; quitadas?: number } | null
 }
 type Tipo = 'concretada' | 'no_concretada'
 /** 'YYYY-MM-DD' → 'dd/mm' (sin pasar por Date: no se corre un día). */
@@ -186,10 +188,14 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
 
       {!datos ? <Cargando /> : vista === 'config' ? <Configuracion plantillas={datos.plantillas} desdeML={!!datos.desdeML} onGuardado={cargar} /> : (
         <>
-          {datos.plantillas.auto && vista === 'listas' && (
+          {(datos.plantillas.auto || datos.plantillas.autoNoConcretada) && vista === 'listas' && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-              <b>Calificación automática activa:</b> todos los días desde las {horaTxt(datos.plantillas.hora)} se califican solas las <b>concretadas</b>; las no concretadas siguen esperando que las revises.
-              {datos.autoUltimo?.estado === 'listo' && (
+              <b>Calificación automática activa:</b>{' '}
+              {datos.plantillas.auto ? <>todos los días desde las {horaTxt(datos.plantillas.hora)} se califican solas las <b>concretadas</b></> : <>las concretadas las calificas tú</>}
+              {datos.plantillas.autoNoConcretada
+                ? <>, y el <b>día {DIA_AUTO_NO_CONCRETADA}</b> desde las {horaTxt(datos.plantillas.horaNc)} las <b>no concretadas</b> que se te pasaron{datos.autoNcUltimo?.estado === 'listo' ? ` (última: ${datos.autoNcUltimo.calificadas ?? 0})` : ''}.</>
+                : <>; las no concretadas siguen esperando que las revises.</>}
+              {datos.plantillas.auto && datos.autoUltimo?.estado === 'listo' && (
                 <> Última: {new Date(datos.autoUltimo.at ?? datos.autoUltimo.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {datos.autoUltimo.calificadas ?? 0} calificadas
                   {datos.autoUltimo.quitadas ? ` · ${datos.autoUltimo.quitadas} que ML ya no permitía` : ''}
                   {datos.autoUltimo.errores ? <span className="text-amber-800"> · {datos.autoUltimo.errores} con error (quedan en la lista)</span> : ''}.</>
@@ -321,7 +327,8 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                           <div className={`text-xs mt-0.5 ${o.reportada_at ? 'text-emerald-700' : 'text-sky-700'}`}>{o.reportada_at ? 'Guía reportada' : 'Guía sin reportar'}</div>
                         )}
                         {/* 23-10: ML la da por concretada sola a los 7 días de la compra y cobra la comisión. */}
-                        {o.sugerencia === 'no_concretada' && (() => {
+                        {/* También en "Por definir" (sin cargar todavía): para ver venir las que vencen. */}
+                        {(o.sugerencia === 'no_concretada' || (o.sugerencia === 'esperar' && !o.sistema_estado)) && (() => {
                           const q = diasParaConcretarSola(o.fecha)
                           return (
                             <div className={`mt-0.5 text-xs font-medium ${q <= 1 ? 'text-red-700' : 'text-amber-700'}`}
@@ -414,22 +421,32 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
           Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prenderlo aceptas que se publiquen sin revisarlas una por una.
         </p>
       </section>
-      {/* 23-10: ML concreta sola a los 7 días y cobra la comisión de las ventas que no se pagaron. */}
-      <section className={`lg:col-span-2 rounded-xl border shadow-sm p-4 space-y-2 ${p.autoNoConcretada ? 'bg-amber-50 border-amber-200' : 'bg-white border-neutral-200'}`}>
+      {/* 23-10: red de seguridad, igual que la de las concretadas. ML concreta sola a los 7 días y cobra la comisión. */}
+      <section className={`lg:col-span-2 rounded-xl border shadow-sm p-4 space-y-2 ${p.autoNoConcretada ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={!!p.autoNoConcretada} onChange={e => setP({ ...p, autoNoConcretada: e.target.checked })} className="mt-1 w-4 h-4" />
           <span>
-            <span className="font-semibold text-neutral-900">Calificar automáticamente las no concretadas</span>
+            <span className="font-semibold text-neutral-900">Calificar automáticamente las no concretadas (red de seguridad)</span>
             <span className="block text-sm text-neutral-600">
               MercadoLibre da la venta por <b>concretada sola a los {ML_CONCRETA_SOLA_DIAS} días</b> de la compra y te cobra la comisión, aunque
-              {' '}nunca te hayan pagado. Con esto, cada hora el sistema marca <b>no concretada</b> (con el texto de &quot;Venta no concretada&quot;)
-              {' '}las que pasaron los días de abajo <b>sin pago traído, sin {desdeML ? 'guía en Despachos' : 'registrar en Ventas ni guía en Despachos'}</b>.
+              {' '}nunca te hayan pagado. Con esto, <b>el día {DIA_AUTO_NO_CONCRETADA} desde la compra</b> el sistema marca <b>no concretada</b> (con el
+              {' '}texto de &quot;Venta no concretada&quot;) las que se te pasaron: <b>sin pago traído, sin {desdeML ? 'guía en Despachos' : 'registrar en Ventas ni guía en Despachos'}</b>.
             </span>
           </span>
         </label>
+        <div className="flex flex-wrap items-center gap-2 pl-7 text-sm text-neutral-700">
+          Calificar el día {DIA_AUTO_NO_CONCRETADA} desde las
+          <select value={p.horaNc ?? 10} onChange={e => setP({ ...p, horaNc: Number(e.target.value) })}
+            className="border border-neutral-300 rounded-lg bg-white px-2 py-1 text-sm font-medium">
+            {Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)}
+          </select>
+          <span className="text-xs text-neutral-500">
+            Ej.: una compra del 14 se califica sola el 20 desde esa hora, al menos medio día antes de que ML la concrete. Las que marques tú antes no las toca.
+          </span>
+        </div>
         <p className="pl-7 text-xs text-neutral-500">
-          Ojo: una venta que se cobró por fuera del sistema (cobro a destino, una venta personal) también quedaría como no concretada. Si
-          {' '}trabajas así, déjalo apagado y márcalas a mano: cada una muestra cuántos días le quedan antes de que ML la concrete.
+          Ojo: una venta que se cobró por fuera del sistema (cobro a destino, una venta personal) también quedaría como no concretada.
+          {' '}Las calificaciones son públicas en MercadoLibre y salen a tu nombre.
         </p>
       </section>
       <section className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-1">
@@ -472,7 +489,7 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
         </div>
         <p className={`text-xs ${p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? 'text-red-700 font-medium' : 'text-neutral-500'}`}>
           MercadoLibre la concreta sola a los {ML_CONCRETA_SOLA_DIAS} días y cobra la comisión: máximo {MAX_DIAS_NO_CONCRETADA}.
-          {p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? ' Con 6 te queda un solo día para marcarlas: mejor 3 o 4.' : ' Recomendado: 3 o 4.'}
+          {p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? ` Con ${MAX_DIAS_NO_CONCRETADA} te quedan ${ML_CONCRETA_SOLA_DIAS - MAX_DIAS_NO_CONCRETADA} días para marcarlas: mejor 3 o 4.` : ' Recomendado: 3 o 4.'}
         </p>
         <input value={p.noConcretada.mensaje} maxLength={160} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, mensaje: e.target.value } })}
           className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm" />

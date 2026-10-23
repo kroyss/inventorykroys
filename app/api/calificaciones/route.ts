@@ -47,13 +47,17 @@ export async function GET(req: NextRequest) {
     const { rows: [ua] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_auto_ultimo'`)
     let autoUltimo: unknown = null
     try { autoUltimo = ua ? JSON.parse(ua.value) : null } catch { /* ignorado */ }
+    // La de no concretadas (red de seguridad, 23-10).
+    const { rows: [un] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_auto_nc'`)
+    let autoNcUltimo: unknown = null
+    try { autoNcUltimo = un ? JSON.parse(un.value) : null } catch { /* ignorado */ }
     const { rows: cuentas } = await s.db.query(
       `SELECT nickname, ordenes_sync_at FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
     // Cómo decide "concretada" esta empresa (para el aviso de la pantalla).
     const { rows: [modo] } = await s.db.query(
       `SELECT COALESCE((SELECT 'reportador' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS con_reportador,
               EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos`)
-    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML, autoUltimo,
+    return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML, autoUltimo, autoNcUltimo,
       conReportador: !!modo?.con_reportador, usaDespachos: !!modo?.usa_despachos, topeDias: TOPE_DIAS })
   } catch (err) {
     return apiError(err)

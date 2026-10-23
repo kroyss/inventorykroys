@@ -28,6 +28,8 @@ export interface PlantillasCalificacion {
   /** Calificar solas las NO concretadas (23-10): sin pago, sin registrar y sin guía, antes de que ML las concrete sola a
    *  los 7 días y cobre la comisión. Apagado por defecto (lib/calificacionesAuto.ts → noConcretadasAutomaticas). */
   autoNoConcretada: boolean
+  /** Desde qué hora del día 6 corre la automática de no concretadas. */
+  horaNc: number
 }
 export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   concretada:   { rating: 'positive', mensaje: 'Excelente, persona seria y responsable, un placer !' },
@@ -36,6 +38,7 @@ export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   auto: false,
   hora: 10,
   autoNoConcretada: false,
+  horaNc: 10,
 }
 
 export function leerPlantillasCal(json: string | null | undefined): PlantillasCalificacion {
@@ -45,13 +48,14 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
       concretada: { ...PLANTILLAS_DEFAULT.concretada, ...(v?.concretada ?? {}) },
       noConcretada: (() => {
         const nc = { ...PLANTILLAS_DEFAULT.noConcretada, ...(v?.noConcretada ?? {}) }
-        // Tope (23-10): a los 7 días ML ya la concretó sola; lo guardado en 7 o más vale como 6.
+        // Tope (23-10): a los 7 días ML ya la concretó sola; lo guardado por encima del tope vale como el tope (5).
         return { ...nc, dias: Math.max(1, Math.min(MAX_DIAS_NO_CONCRETADA, Math.round(Number(nc.dias) || 3))) }
       })(),
       esperaDias: Math.max(0, Math.min(60, Math.round(Number(v?.esperaDias) || 0))),
       auto: v?.auto === true,
       hora: Number.isInteger(v?.hora) && v.hora >= 0 && v.hora <= 23 ? v.hora : PLANTILLAS_DEFAULT.hora,
       autoNoConcretada: v?.autoNoConcretada === true,
+      horaNc: Number.isInteger(v?.horaNc) && v.horaNc >= 0 && v.horaNc <= 23 ? v.horaNc : PLANTILLAS_DEFAULT.horaNc,
     }
   } catch { return PLANTILLAS_DEFAULT }
 }

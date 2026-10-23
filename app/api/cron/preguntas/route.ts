@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
       try {
         const r = await conEmpresa(e.id, e.country as Country, db => calificarAutomatico(db, e.inventario))
         if (r) console.log('[calificacion automatica]', e.id, r)
-        // No concretadas (23-10, solo si la empresa lo prendió): cada hora, antes de que ML las concrete solas.
+        // No concretadas (23-10, solo si la empresa lo prendió): red de seguridad el día 6, antes de que ML las concrete.
         const nc = await conEmpresa(e.id, e.country as Country, db => noConcretadasAutomaticas(db, e.inventario))
         if (nc) console.log('[no concretadas automaticas]', e.id, nc)
       } catch (err) {

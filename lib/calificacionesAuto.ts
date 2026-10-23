@@ -10,7 +10,7 @@ import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
 import { leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion } from '@/lib/calificacionesML'
 import { registrarUso } from '@/lib/usoAcciones'
-import { ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
+import { DIA_AUTO_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
 
 export interface ResultadoCal { id: string; ok: boolean; detalle?: string; quitada?: boolean }
 
@@ -125,26 +125,31 @@ export async function calificarAutomatico(db: Pool, conInventario: boolean) {
   return { calificadas, errores, quitadas }
 }
 
-const CLAVE_NC = 'calificaciones_auto_nc'
+export const CLAVE_NC = 'calificaciones_auto_nc'
 
-/** No concretadas automáticas (23-10, solo con plantillas.autoNoConcretada): cada hora (no una vez al día, para no
- *  pasarse del día 7) califica "no concretada" las que el sistema ya sugiere así y que además NO tienen pago traído, ni
- *  venta registrada, ni guía en Despachos, y que todavía no cumplieron los 7 días. Lo llama el cron. */
+/** No concretadas automáticas, RED DE SEGURIDAD (23-10, solo con plantillas.autoNoConcretada; como la de las
+ *  concretadas): una vez al día desde plantillas.horaNc, califica "no concretada" las que llegaron a su día 6 de
+ *  CALENDARIO desde la compra (DIA_AUTO_NO_CONCRETADA) y nadie tocó: ML las concreta solas a los 7 días y cobra la
+ *  comisión. Solo las que el sistema ya sugiere así y que además NO tienen pago traído, ni venta registrada, ni guía en
+ *  Despachos. Lo llama el cron. */
 export async function noConcretadasAutomaticas(db: Pool, conInventario: boolean) {
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
   const p = leerPlantillasCal(pl?.value)
   if (!p.autoNoConcretada) return null
-  // Una pasada por hora (dos pasadas del cron no la repiten).
+  // Se "toma" el día (dos pasadas del cron no lo repiten); la conexión tiene el TimeZone de la empresa.
   const { rows: [tomada] } = await db.query(
-    `INSERT INTO app_settings (key, value) VALUES ($1, to_char(NOW(), 'YYYY-MM-DD HH24'))
+    `INSERT INTO app_settings (key, value) SELECT $1, json_build_object('fecha', CURRENT_DATE::text, 'estado', 'corriendo')::text
+     WHERE EXTRACT(HOUR FROM LOCALTIME) >= $2
      ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-     WHERE app_settings.value IS DISTINCT FROM EXCLUDED.value
-     RETURNING value`, [CLAVE_NC])
+     WHERE (app_settings.value::json->>'fecha') IS DISTINCT FROM CURRENT_DATE::text
+     RETURNING value`, [CLAVE_NC, p.horaNc])
   if (!tomada) return null
   const { rows } = await db.query(
     `SELECT b.id FROM (${sqlBandeja(!conInventario)}) b
      JOIN ml_ordenes o ON o.id = b.id::bigint
-     WHERE b.sugerencia = 'no_concretada' AND o.fecha > NOW() - make_interval(days => ${ML_CONCRETA_SOLA_DIAS})
+     WHERE b.sugerencia = 'no_concretada'
+       AND o.fecha::date <= CURRENT_DATE - ${DIA_AUTO_NO_CONCRETADA}
+       AND o.fecha > NOW() - make_interval(days => ${ML_CONCRETA_SOLA_DIAS})
        AND NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
        AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack_id::text))
@@ -158,5 +163,9 @@ export async function noConcretadasAutomaticas(db: Pool, conInventario: boolean)
     else if (!r.ok) errores++
   }
   if (calificadas) await registrarUso(db, 'calificacion', calificadas)
+  await db.query(
+    `UPDATE app_settings SET value = json_build_object('fecha', CURRENT_DATE::text, 'estado', 'listo', 'at', $2::text,
+       'calificadas', $3::int, 'errores', $4::int, 'quitadas', $5::int)::text, updated_at = NOW() WHERE key = $1`,
+    [CLAVE_NC, new Date().toISOString(), calificadas, errores, quitadas])
   return rows.length ? { calificadas, errores, quitadas } : null
 }
