@@ -12,6 +12,7 @@ interface Prefs {
   mensaje: boolean; mensaje_min: number
   negativa: boolean; neutral: boolean
   contradictoria: boolean
+  concreta_sola: boolean
   agotada: boolean; bajo: boolean
   promos: boolean
   cierre: boolean; cierre_hora: number
@@ -244,6 +245,12 @@ export default function MisAvisosClient() {
               <Fila icono="🟣" titulo="Calificación contradictoria" on={p.contradictoria} onCambio={v => cambiar({ contradictoria: v })}
                 ejemplo={'🟣 Calificación contradictoria · PIKEKE\n👤 DOUGLAJSA · venta 2000018742658414\n📦 Termómetro Digital Lcd\n\nEl comprador dijo que la venta SÍ se concretó (te calificó positiva) y tú la marcaste como no concretada.\n\n[ Corregir en Reputación ]'}>
                 Cuando el comprador dice que la venta se concretó y tú la marcaste como no concretada. Se arregla con <b className="font-medium text-neutral-700">Corregir</b> en Reputación.
+              </Fila>
+            )}
+            {d.negativa && (
+              <Fila icono="⏰" titulo="Venta sin pago que ML concreta sola" etiqueta="Recomendado" on={p.concreta_sola} onCambio={v => cambiar({ concreta_sola: v })}
+                ejemplo={'⏰ 3 ventas sin pago que ML concreta solas pronto\n\nMercadoLibre las da por concretadas a los 7 días y te cobra la comisión. Márcalas no concretadas antes:\n\n• PIKEKE · kelly mora · Receptor Bluetooth · se concreta el 25/10 a la 1 p. m.\n\n[ ⭐ Calificar ahora ]'}>
+                Dos días antes de que MercadoLibre dé por concretada (y te cobre la comisión) una venta que nadie pagó. Una vez por venta.
               </Fila>
             )}
             {d.stock && (

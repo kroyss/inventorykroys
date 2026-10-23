@@ -4,7 +4,7 @@ import { conEmpresa, dbGlobal } from '@/lib/db'
 import { revisarStockPendiente } from '@/lib/alertasStock'
 import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
-import { calificarAutomatico } from '@/lib/calificacionesAuto'
+import { calificarAutomatico, noConcretadasAutomaticas } from '@/lib/calificacionesAuto'
 import { recordarPagos } from '@/lib/recordatoriosPago'
 import { responderAutomaticas } from '@/lib/automaticasPreguntas'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
@@ -104,6 +104,9 @@ export async function GET(req: NextRequest) {
       try {
         const r = await conEmpresa(e.id, e.country as Country, db => calificarAutomatico(db, e.inventario))
         if (r) console.log('[calificacion automatica]', e.id, r)
+        // No concretadas (23-10, solo si la empresa lo prendió): cada hora, antes de que ML las concrete solas.
+        const nc = await conEmpresa(e.id, e.country as Country, db => noConcretadasAutomaticas(db, e.inventario))
+        if (nc) console.log('[no concretadas automaticas]', e.id, nc)
       } catch (err) {
         console.error('[calificacion automatica]', e.id, err instanceof Error ? err.message : err)
       }

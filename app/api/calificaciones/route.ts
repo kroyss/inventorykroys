@@ -23,7 +23,9 @@ export async function GET(req: NextRequest) {
     // en_espera: todavía en los días de espera de la empresa, contados desde `base` (el reporte de la guía
     // con Reportador; si no, la compra) con el tope de TOPE_DIAS (lib/calificacionesML.ts). Fecha del país
     // (la conexión tiene su TimeZone). Desde 2026-10-14 va aparte ("Próximas") y no cuenta en el aviso.
-    const espera = `(NOT ${sqlLista(plantillas.esperaDias)})`
+    // 23-10: la espera es para las concretadas (que le llegue al comprador). Una NO concretada no espera: ML la concreta
+    // sola a los 7 días y cobra la comisión, así que se puede calificar apenas se sugiere.
+    const espera = `(b.sugerencia <> 'no_concretada' AND NOT ${sqlLista(plantillas.esperaDias)})`
     const { rows } = await s.db.query(
       `SELECT b.*, ${espera} AS en_espera, ${sqlListaEl(plantillas.esperaDias)} AS lista_el,
               -- Si hubo mensajes en la venta (2026-10-17, pedido de un usuario): antes de calificar una no

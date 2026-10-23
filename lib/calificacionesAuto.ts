@@ -3,13 +3,14 @@
 //   - switch por empresa (plantillas.auto), APAGADO por defecto, a riesgo de quien lo prende;
 //   - una vez al día, desde HORA_AUTO (hora del país de la empresa), califica en lote las que el
 //     sistema sugiere "concretada" (en el sistema / despachada) y ya pasaron los días de espera;
-//   - las NO concretadas nunca se califican solas (ventas personales, cobro a destino… que no
-//     pasan por el sistema): siguen esperando revisión a mano.
+//   - las NO concretadas solo se califican solas si la empresa prende plantillas.autoNoConcretada (23-10, apagado
+//     por defecto): ML las concreta solas a los 7 días y cobra la comisión. Ver noConcretadasAutomaticas.
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
 import { leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion } from '@/lib/calificacionesML'
 import { registrarUso } from '@/lib/usoAcciones'
+import { ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
 
 export interface ResultadoCal { id: string; ok: boolean; detalle?: string; quitada?: boolean }
 
@@ -20,7 +21,8 @@ export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'n
     `SELECT conexion_id, cal_vendedor, fecha::date > CURRENT_DATE - $2::int AS en_espera FROM ml_ordenes WHERE id = $1`,
     [id, p.esperaDias])
   if (!fila) return { id, ok: false, detalle: 'Venta no encontrada' }
-  if (fila.en_espera) return { id, ok: false, detalle: `Todavía en los ${p.esperaDias} días de espera` }
+  // La espera es para las concretadas; una no concretada no puede esperar (ML la concreta sola a los 7 días).
+  if (fila.en_espera && tipo === 'concretada') return { id, ok: false, detalle: `Todavía en los ${p.esperaDias} días de espera` }
   if (fila.cal_vendedor) return { id, ok: true, detalle: 'Ya estaba calificada' }
   const cuerpo = tipo === 'concretada'
     ? { fulfilled: true, rating: p.concretada.rating, message: p.concretada.mensaje }
@@ -121,4 +123,40 @@ export async function calificarAutomatico(db: Pool, conInventario: boolean) {
   }
   await guardar('listo')
   return { calificadas, errores, quitadas }
+}
+
+const CLAVE_NC = 'calificaciones_auto_nc'
+
+/** No concretadas automáticas (23-10, solo con plantillas.autoNoConcretada): cada hora (no una vez al día, para no
+ *  pasarse del día 7) califica "no concretada" las que el sistema ya sugiere así y que además NO tienen pago traído, ni
+ *  venta registrada, ni guía en Despachos, y que todavía no cumplieron los 7 días. Lo llama el cron. */
+export async function noConcretadasAutomaticas(db: Pool, conInventario: boolean) {
+  const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
+  const p = leerPlantillasCal(pl?.value)
+  if (!p.autoNoConcretada) return null
+  // Una pasada por hora (dos pasadas del cron no la repiten).
+  const { rows: [tomada] } = await db.query(
+    `INSERT INTO app_settings (key, value) VALUES ($1, to_char(NOW(), 'YYYY-MM-DD HH24'))
+     ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+     WHERE app_settings.value IS DISTINCT FROM EXCLUDED.value
+     RETURNING value`, [CLAVE_NC])
+  if (!tomada) return null
+  const { rows } = await db.query(
+    `SELECT b.id FROM (${sqlBandeja(!conInventario)}) b
+     JOIN ml_ordenes o ON o.id = b.id::bigint
+     WHERE b.sugerencia = 'no_concretada' AND o.fecha > NOW() - make_interval(days => ${ML_CONCRETA_SOLA_DIAS})
+       AND NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
+       AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack_id::text))
+     ORDER BY b.fecha LIMIT ${MAX_POR_DIA}`, [p.noConcretada.dias])
+  const demo = await esDemo(db)
+  let calificadas = 0, errores = 0, quitadas = 0
+  for (const { id } of rows) {
+    const r = await calificarUna(db, id, 'no_concretada', p, demo)
+    if (r.ok && r.detalle !== 'Ya estaba calificada') calificadas++
+    else if (r.quitada) quitadas++
+    else if (!r.ok) errores++
+  }
+  if (calificadas) await registrarUso(db, 'calificacion', calificadas)
+  return rows.length ? { calificadas, errores, quitadas } : null
 }

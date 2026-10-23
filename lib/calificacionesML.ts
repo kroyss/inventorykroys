@@ -8,6 +8,7 @@ import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
 import { sqlFacturaIncluye } from '@/lib/invoicesServer'
+import { ML_CONCRETA_SOLA_DIAS, MAX_DIAS_NO_CONCRETADA } from '@/lib/noConcretada'
 
 export const DIAS_VENTANA = 90          // ventas que se traen de ML
 export const SYNC_MINUTOS = 58          // cada cuánto el cron refresca las ventas (≈ cada hora; 58 y no 60 para
@@ -24,6 +25,9 @@ export interface PlantillasCalificacion {
   auto: boolean
   /** Desde qué hora (del país) corre la automática del día (2026-10-15: antes fija a las 10). */
   hora: number
+  /** Calificar solas las NO concretadas (23-10): sin pago, sin registrar y sin guía, antes de que ML las concrete sola a
+   *  los 7 días y cobre la comisión. Apagado por defecto (lib/calificacionesAuto.ts → noConcretadasAutomaticas). */
+  autoNoConcretada: boolean
 }
 export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   concretada:   { rating: 'positive', mensaje: 'Excelente, persona seria y responsable, un placer !' },
@@ -31,6 +35,7 @@ export const PLANTILLAS_DEFAULT: PlantillasCalificacion = {
   esperaDias: 0,
   auto: false,
   hora: 10,
+  autoNoConcretada: false,
 }
 
 export function leerPlantillasCal(json: string | null | undefined): PlantillasCalificacion {
@@ -38,10 +43,15 @@ export function leerPlantillasCal(json: string | null | undefined): PlantillasCa
     const v = JSON.parse(json ?? '')
     return {
       concretada: { ...PLANTILLAS_DEFAULT.concretada, ...(v?.concretada ?? {}) },
-      noConcretada: { ...PLANTILLAS_DEFAULT.noConcretada, ...(v?.noConcretada ?? {}) },
+      noConcretada: (() => {
+        const nc = { ...PLANTILLAS_DEFAULT.noConcretada, ...(v?.noConcretada ?? {}) }
+        // Tope (23-10): a los 7 días ML ya la concretó sola; lo guardado en 7 o más vale como 6.
+        return { ...nc, dias: Math.max(1, Math.min(MAX_DIAS_NO_CONCRETADA, Math.round(Number(nc.dias) || 3))) }
+      })(),
       esperaDias: Math.max(0, Math.min(60, Math.round(Number(v?.esperaDias) || 0))),
       auto: v?.auto === true,
       hora: Number.isInteger(v?.hora) && v.hora >= 0 && v.hora <= 23 ? v.hora : PLANTILLAS_DEFAULT.hora,
+      autoNoConcretada: v?.autoNoConcretada === true,
     }
   } catch { return PLANTILLAS_DEFAULT }
 }
@@ -226,10 +236,11 @@ export const SQL_BANDEJA_ML = `
   ${SQL_GUIA}
   WHERE o.cal_vendedor IS NULL`
 
-/** Días desde la compra en que ML deja de aceptar una calificación "no concretada" ("You can't submit a not fulfilled
- *  feedback after order has expired"). Medido 22-10: ninguna de 21 días o menos dio ese error; desde 22 sí (BUYBOOK_SHOP,
- *  ventas de julio). Pasado eso ya no se puede calificar: salen de la bandeja sin tener que intentarlo una por una. */
-export const DIAS_VENCE_NO_CONCRETADA = 21
+/** Días desde la compra en que ML deja de aceptar una calificación "no concretada" ("order has expired"). 23-10: ML la
+ *  da por concretada SOLA a los 7 días y cobra la comisión (56 ventas sin pago de SolucionesMC, del 10 al 16-10, se
+ *  rechazaron a los 8-13 días). Antes se usaba 21 (medido con ventas de otro tipo). Pasado eso ya no se puede: salen de la
+ *  bandeja sin intentarlo una por una. */
+export const DIAS_VENCE_NO_CONCRETADA = ML_CONCRETA_SOLA_DIAS
 
 export const sqlBandeja = (desdeML: boolean) =>
   `SELECT * FROM (${desdeML ? SQL_BANDEJA_ML : SQL_BANDEJA}) bv

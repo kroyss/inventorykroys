@@ -19,6 +19,7 @@ import { SQL_MENSAJE_VIGENTE } from '@/lib/mensajesML'
 import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
 import { sqlCaliente, SQL_VENDIDA, umbralStock, DIAS_VENDIDAS } from '@/lib/alertasStock'
 import { ventasDesdeML } from '@/lib/modulos'
+import { ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import { SQL_PENDIENTE as SQL_SIN_REPORTAR, SQL_REPORTABLE } from '@/lib/reportador'
 import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
@@ -36,6 +37,7 @@ export interface PrefsAvisos {
   mensaje: boolean; mensaje_min: number
   negativa: boolean; neutral: boolean
   contradictoria: boolean
+  concreta_sola: boolean
   agotada: boolean; bajo: boolean
   promos: boolean
   cierre: boolean; cierre_hora: number
@@ -49,6 +51,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   mensaje: true, mensaje_min: 60,
   negativa: true, neutral: false,
   contradictoria: true,
+  concreta_sola: true,
   agotada: true, bajo: false,
   promos: true,
   cierre: false, cierre_hora: 18,
@@ -387,6 +390,29 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
         + (r.cal_recibida_msg ? `\n💬 <i>“${esc(corto(r.cal_recibida_msg, 300))}”</i>` : '')
         + '\n\nSi de verdad se vendió, corrígela para que la venta cuente bien.',
         [[{ texto: 'Corregir en Reputación', url: urlSistema('/reputacion') }]])) enviados++
+    }
+  }
+
+  // No concretadas que ML concreta sola (23-10): a los 7 días ML da la venta por concretada y cobra la comisión. Las que
+  // el sistema sugiere "no concretada", sin calificar, con 5 días o más: una vez por venta.
+  if (p.concreta_sola && disp.negativa && !silencio) {
+    const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
+    const { rows } = await db.query(
+      `SELECT b.id, b.fecha, b.comprador, b.productos, b.cuenta FROM (${sqlBandeja(ventasDesdeML(e))}) b
+       WHERE b.sugerencia = 'no_concretada'
+         AND b.fecha < NOW() - make_interval(days => ${ML_CONCRETA_SOLA_DIAS - 2})
+         AND b.fecha > NOW() - make_interval(days => ${ML_CONCRETA_SOLA_DIAS})
+       ORDER BY b.fecha LIMIT 30`, [leerPlantillasCal(pl?.value).noConcretada.dias])
+    const nuevas = await pendientes(d, e, 'concreta_sola', rows.map(r => r.id))
+    const lista = rows.filter(r => nuevas.has(r.id))
+    if (lista.length) {
+      const html = `${cab}⏰ <b>${lista.length === 1 ? 'Una venta sin pago que ML concreta sola pronto' : `${lista.length} ventas sin pago que ML concreta solas pronto`}</b>\n\n`
+        + 'MercadoLibre las da por concretadas a los 7 días y te cobra la comisión. Márcalas <b>no concretadas</b> antes:\n\n'
+        + lista.slice(0, 10).map(r => `• ${esc(r.cuenta)} · ${esc(r.comprador ?? 'Comprador')}${r.productos ? ` · ${esc(corto(r.productos, 50))}` : ''}`
+          + ` · se concreta el ${fechaCorta(new Date(new Date(r.fecha).getTime() + ML_CONCRETA_SOLA_DIAS * 86_400_000))}`).join('\n')
+        + (lista.length > 10 ? `\n… y ${lista.length - 10} más` : '')
+      if (await mandar(d, e, 'concreta_sola', lista.map(r => r.id), html,
+        [[{ texto: '⭐ Calificar ahora', url: urlSistema('/calificaciones') }]])) enviados++
     }
   }
 
