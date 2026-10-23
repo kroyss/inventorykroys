@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 export interface Apartado {
   id: number; venta: string | null; guia_ver: string | null; carrier: string; destinatario: string | null; remitente: string | null
   impresa: boolean; apartado: 'espera' | 'cancelado' | null; apartado_nota: string | null; apartado_at: string | null
+  productos?: string | null   // qué lleva (23-10)
   apartado_por: string | null; etapa: 'sin_imprimir' | 'impresa' | 'por_reportar'
 }
 
@@ -154,6 +155,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                         <div className="min-w-0 flex-1">
                           <div className="font-mono text-xs">{c.venta ?? '—'} · {c.guia_ver ?? '—'} <span className="font-sans text-neutral-400">{c.carrier}</span></div>
                           <div className="truncate text-xs text-neutral-500">{c.destinatario ?? ''} · {ETAPA[c.etapa]}</div>
+                          {c.productos && <div className="truncate text-xs text-neutral-700">📦 {c.productos}</div>}
                         </div>
                         <button onClick={() => setApartando(c)} className="btn-secondary text-xs">Apartar…</button>
                       </li>
@@ -172,6 +174,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                     <li key={a.id} className={`rounded-lg border px-3 py-2.5 ${viejo ? 'border-red-200 bg-red-50/50' : 'border-neutral-200'}`}>
                       <div className="font-mono text-xs">{a.venta ?? '—'} · {a.guia_ver ?? '—'} <span className="font-sans text-neutral-400">{a.carrier}</span></div>
                       <div className="text-xs text-neutral-600">{a.destinatario ?? ''}</div>
+                      {a.productos && <div className="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-800">📦 {a.productos}</div>}
                       <div className="mt-1 text-xs text-neutral-700">“{a.apartado_nota}”</div>
                       {conInventario && a.venta && (
                         <a href={`/ventas?venta=${encodeURIComponent(a.venta)}`} className="mt-1 inline-block text-xs font-medium text-sky-700 hover:underline"
@@ -221,6 +224,7 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
     <section className="space-y-3 rounded-lg border border-neutral-200 p-3">
       <h3 className="font-semibold">Apartar {e.venta ?? 'envío'}</h3>
       <p className="text-xs text-neutral-500">{e.destinatario ?? ''} · guía {e.guia_ver ?? '—'} · {ETAPA[e.etapa]}</p>
+      {e.productos && <p className="text-xs font-medium text-neutral-800">📦 {e.productos}</p>}
       <div className="space-y-1.5">
         {([['espera', 'Todavía no sale', 'Queda en espera; sale en el próximo manifiesto cuando lo liberes.'], ['cancelado', 'No se enviará', 'Desistió, pago mal o error: nunca se despacha ni se reporta.']] as const).map(([v, t, d]) => (
           <label key={v} className={`flex cursor-pointer gap-2 rounded-lg border px-3 py-2 ${tipo === v ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'}`}>

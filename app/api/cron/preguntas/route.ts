@@ -6,6 +6,7 @@ import { limpiarDespachos } from '@/lib/limpiezaDespachos'
 import { sincronizarEmpresa } from '@/lib/preguntas'
 import { calificarAutomatico, noConcretadasAutomaticas } from '@/lib/calificacionesAuto'
 import { recordarPagos } from '@/lib/recordatoriosPago'
+import { mensajeAlComprar } from '@/lib/mensajeAlComprar'
 import { responderAutomaticas } from '@/lib/automaticasPreguntas'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
@@ -129,6 +130,15 @@ export async function GET(req: NextRequest) {
         if (r) console.log('[recordatorios pago]', e.id, r)
       } catch (err) {
         console.error('[recordatorios pago]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Mensaje al comprar (lib/mensajeAlComprar.ts, mig 118): solo las empresas que lo prendieron; una vez por venta.
+    for (const e of sincronizadas) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => mensajeAlComprar(db))
+        if (r) console.log('[mensaje al comprar]', e.id, r)
+      } catch (err) {
+        console.error('[mensaje al comprar]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Contexto de la IA (lib/catalogoML.ts, lib/fichasIA.ts): catálogo cada 6 h por cuenta, el

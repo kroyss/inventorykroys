@@ -17,7 +17,13 @@ import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
 
 const COLUMNAS = `e.id, e.venta, e.guia, COALESCE(e.guia_final, e.guia) AS guia_ver, e.carrier, e.destinatario, e.remitente, e.impresa,
   e.apartado, e.apartado_nota, e.apartado_at, u.username AS apartado_por, l.status AS lote_status, j.status AS jornada_status,
-  CASE WHEN NOT e.impresa THEN 'sin_imprimir' WHEN j.status = 'CERRADA' THEN 'por_reportar' ELSE 'impresa' END AS etapa`
+  CASE WHEN NOT e.impresa THEN 'sin_imprimir' WHEN j.status = 'CERRADA' THEN 'por_reportar' ELSE 'impresa' END AS etapa,
+  -- Qué lleva (23-10, pedido de un Fundador: "si no, no sé cuál es cuál"): la venta cargada o, sin inventario, la de ML.
+  COALESCE((SELECT string_agg(si.quantity || ' × ' || p.name, ' · ' ORDER BY si.id)
+            FROM sales s JOIN sale_items si ON si.sale_id = s.id JOIN products p ON p.id = si.product_id
+            WHERE s.ml_order_number = e.venta),
+           (SELECT o.productos FROM ml_ordenes o WHERE e.venta ~ '^[0-9]{1,18}$' AND (o.id = e.venta::bigint OR o.pack_id = e.venta::bigint)
+            ORDER BY (o.id = e.venta::bigint) DESC LIMIT 1)) AS productos`
 const DESDE = `FROM despacho_etiquetas e
   JOIN despacho_lotes l ON l.id = e.lote_id
   LEFT JOIN despacho_jornadas j ON j.id = l.jornada_id

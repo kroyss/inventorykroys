@@ -14,6 +14,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
+import MensajeAlComprar from '@/components/preguntas/MensajeAlComprar'
 import PedirCalificacion from '@/components/preguntas/PedirCalificacion'
 
 export interface Conversacion {
@@ -37,7 +38,7 @@ function hace(fecha: string | null) {
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
 export default function MensajesClient({ pack: packPedido = null }: { pack?: string | null }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios'>(packPedido ? 'todas' : 'sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar'>(packPedido ? 'todas' : 'sin_leer')
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [conRecordatorios, setConRecordatorios] = useState(false)
@@ -114,9 +115,10 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         { value: 'todas', label: 'Atendidas' },
         { value: 'pedir', label: 'Pedir calificación', count: pedir },
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
+        { value: 'al_comprar' as const, label: 'Al comprar' },
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
       ]} />
-      {vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'rapidas' ? (
+      {vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
