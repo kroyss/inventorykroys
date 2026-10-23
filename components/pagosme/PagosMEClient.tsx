@@ -503,7 +503,13 @@ function PrimerosPasos({ isAdmin, onConectar, programaListo }: { isAdmin: boolea
           guías. Tu contraseña nunca sale de tu PC. Si se va la luz no se pierde nada: al prenderla trae lo que faltaba.
         </p>
       </div>
-      {isAdmin ? (
+      {isAdmin ? (<>
+        {/* Paso 0 (23-10, pedido del dueño): lo que tiene que haber antes, para que todo fluya. */}
+        <div className="rounded-lg bg-white/70 px-3 py-2 text-xs text-neutral-600 ring-1 ring-inset ring-emerald-200">
+          <b className="text-neutral-800">Antes de empezar:</b> una <b>PC con Windows</b> (la misma donde imprimes las guías) con{' '}
+          <b>Google Chrome</b>, y en Chrome <b>la sesión de MercadoEnvíos iniciada</b> con tu cuenta de MercadoLibre (un perfil de
+          Chrome por cada cuenta). Ser administrador de tu empresa aquí.
+        </div>
         <ol className="space-y-2.5">
           <li className={paso}><span className={num(programaListo)}>{programaListo ? '✓' : '1'}</span>
             <span><a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">Descarga el programa</a> en la PC donde imprimes las guías e instálalo (Siguiente → Instalar).
@@ -516,9 +522,10 @@ function PrimerosPasos({ isAdmin, onConectar, programaListo }: { isAdmin: boolea
               Al terminar deja marcadas las dos casillas y toca <b>Finalizar</b>.
               {programaListo && <span className="block text-xs font-medium text-emerald-700 mt-0.5">✓ El programa ya está conectado.</span>}</span></li>
           <li className={paso}><span className={num(false, programaListo)}>3</span>
-            <span>Abre Chrome <b>en el perfil donde entras a tu cuenta de MercadoLibre</b> y{' '}
-              <a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">agrega el Asistente de envíos</a> → <b>Añadir a Chrome</b> → <b>Añadir extensión</b>.
-              <span className={sub}>Fíjate en qué perfil se abre la tienda: si no es el de tu cuenta, cámbiate de perfil y ábrela ahí. No hace falta «Iniciar sesión en Chrome».</span></span></li>
+            <span><b>Agrega el Asistente de envíos a Chrome:</b> al finalizar la instalación se abre solo en la tienda de Chrome → <b>Añadir a Chrome</b> → <b>Añadir extensión</b>.
+              <span className={sub}><b>Asegúrate de que esa ventana de Chrome sea la del perfil donde tienes iniciada la sesión de MercadoEnvíos.</b> Si se
+                abrió en otro perfil, no se abrió o quieres agregarlo a mano: en el perfil correcto entra a{' '}
+                <a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">app.elcomerciantedigital.com/extension</a>. No hace falta «Iniciar sesión en Chrome».</span></span></li>
           <li className={paso}><span className={num(false, programaListo)}>4</span>
             <span><b>Conecta el Asistente:</b> toca la <b>pieza de rompecabezas</b> (arriba a la derecha de Chrome) → 📌 fija «Asistente de envíos» →
               ábrelo, <b>pega el mismo código</b> y toca <b>Conectar</b>. Debe decir <b>«Conectado al sistema»</b>.
@@ -527,7 +534,7 @@ function PrimerosPasos({ isAdmin, onConectar, programaListo }: { isAdmin: boolea
           <li className={paso}><span className={num(false)}>5</span>
             <span>Listo: toca <b>Traer pagos y guías</b> y espera el aviso verde <b>✅ Listo</b>. Chrome se abre solo, trabaja y se cierra: no lo toques.</span></li>
         </ol>
-      ) : (
+      </>) : (
         <p className="text-xs">Pídele a un administrador de tu empresa que conecte la PC.</p>
       )}
     </div>

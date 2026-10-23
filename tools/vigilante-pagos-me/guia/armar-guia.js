@@ -69,7 +69,7 @@ const contenido = [
 
   h1('Antes de empezar'),
   vineta(b('Una PC con Windows'), ': la misma donde imprimes las guías. Debe quedar prendida en los horarios en que quieres traer (si se apaga, al prenderla trae lo que faltaba).'),
-  vineta(b('Google Chrome'), ' con ', b('un perfil por cada cuenta de MercadoLibre'), ', y la sesión de MercadoLibre abierta en cada perfil.'),
+  vineta(b('Google Chrome'), ' con ', b('un perfil por cada cuenta de MercadoLibre'), ', y en cada perfil ', b('la sesión de MercadoEnvíos iniciada'), ' (entra una vez al portal de MercadoEnvíos con tu cuenta y déjala abierta).'),
   vineta('Ser ', b('administrador'), ' de tu empresa en El Comerciante Digital.'),
   vineta('Que te activemos ', b('Pagos ME'), ' (y Despachos). Pídelo por Telegram y te avisamos cuando esté.'),
 
@@ -100,8 +100,8 @@ const contenido = [
   foto('05-finalizar-instalacion.png', 360),
 
   paso(5, 'Agrega el Asistente de envíos a Chrome, en el perfil de tu cuenta'),
-  p('Se abre la tienda de Chrome. ', b('Antes de seguir, fíjate en qué perfil de Chrome se abrió'), ' (la foto de arriba a la derecha): tiene que ser el perfil donde entras a ',
-    b('tu cuenta de MercadoLibre'), '. Si no lo es, cámbiate a ese perfil y abre ahí ', b('app.elcomerciantedigital.com/extension'), '.'),
+  p('Al finalizar la instalación se abre solo Chrome en la tienda. ', b('Antes de seguir, asegúrate de que esa ventana sea la del perfil donde tienes iniciada la sesión de MercadoEnvíos'),
+    ' (mira la foto de arriba a la derecha). Si se abrió en otro perfil, no se abrió o quieres agregarla a mano: cámbiate a ese perfil y entra a ', b('app.elcomerciantedigital.com/extension'), '.'),
   p('Toca ', b('Añadir a Chrome'), '.'),
   foto('06-tienda-chrome.png'),
   p('Confirma con ', b('Añadir extensión'), '.'),
