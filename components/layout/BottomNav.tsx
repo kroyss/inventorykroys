@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
-import { rutaHabilitada } from '@/lib/modulos'
+import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
@@ -74,6 +74,8 @@ const PRIMARY_AUTO: NavItem[] = [
   { href: '/alertas-stock',    label: 'Stock',      icon: 'stock',      countries: ['VE', 'CO'] },
 ]
 const MORE_AUTO: NavItem[] = [
+  // Pagos ME primero, antes que Despachos (23-10); solo con las ventas de ML (como en el menú de arriba).
+  { href: '/pagos-me',         label: 'Pagos ME',   icon: 'pagos',      countries: ['VE'] },
   { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  countries: ['VE'] },
   { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
@@ -109,7 +111,8 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
 
   const visible = (items: NavItem[]) =>
     items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos)
-      && !(i.href === '/vincular-ml' && puede(u, 'ver_productos')))   // quien ve Productos entra desde ahí
+      && !(i.href === '/vincular-ml' && puede(u, 'ver_productos'))   // quien ve Productos entra desde ahí
+      && !(i.href === '/pagos-me' && !ventasDesdeML({ modulos })))
 
   const auto    = espacioActual(pathname, modulos) === 'automatizaciones'
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador') || modulos.includes('preguntas')

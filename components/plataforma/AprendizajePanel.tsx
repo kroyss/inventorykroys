@@ -2,11 +2,11 @@
 import { useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
-type Serie = 'automatizaciones' | 'inventario'
+type Serie = 'automatizaciones' | 'mercadoenvios' | 'inventario'
 interface Video { id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string; activo: boolean; serie: Serie; duracion_seg: number | null }
 interface Alumno {
   id: number; full_name: string | null; username: string; empresas: string; ultima: string | null
-  completados: number; completados_inv: number; inventario: boolean
+  completados: number; completados_inv: number; inventario: boolean; completados_me?: number; pagos_me?: boolean
   ingreso: string | null; en_linea: boolean; viendo: { serie: Serie; numero: number; pct: number | null } | null
 }
 interface EnLinea { id: number; nombre: string; username: string; ultima_actividad: string; empresas: string | null; usando: boolean; ultimo_uso: string | null }
@@ -23,6 +23,7 @@ interface Uso {
 
 const SERIES: Record<Serie, { nombre: string; quien: string }> = {
   automatizaciones: { nombre: 'Automatiza', quien: 'todas las empresas' },
+  mercadoenvios:    { nombre: 'MercadoEnvíos', quien: 'solo empresas con el módulo Pagos ME' },
   inventario:       { nombre: 'Inventario', quien: 'solo empresas con el módulo Inventario' },
 }
 const reloj = (seg: number | null) => seg ? `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}` : ''
@@ -77,6 +78,7 @@ export default function AprendizajePanel() {
   const activos = datos.videos.filter(v => v.activo).length
   const activosAuto = datos.videos.filter(v => v.activo && v.serie === 'automatizaciones').length
   const activosInv = datos.videos.filter(v => v.activo && v.serie === 'inventario').length
+  const activosMe = datos.videos.filter(v => v.activo && v.serie === 'mercadoenvios').length
   // Dos trabajos distintos: vigilar a los clientes (lo de todos los días) y armar el curso.
   const deSerie = (v: Video) => datos.videos.filter(x => x.serie === v.serie)
 
@@ -216,6 +218,7 @@ export default function AprendizajePanel() {
               <thead className="bg-neutral-50 text-xs text-neutral-500">
                 <tr><th className="px-4 py-2 text-left">Usuario</th><th className="px-4 py-2 text-left">Empresa</th>
                   <th className="px-4 py-2 text-left">Automatiza</th>
+                  {activosMe > 0 && <th className="px-4 py-2 text-left">MercadoEnvíos</th>}
                   {activosInv > 0 && <th className="px-4 py-2 text-left">Inventario</th>}<th className="px-4 py-2 text-left">Último video</th>
                   <th className="px-4 py-2 text-left">Último ingreso</th></tr>
               </thead>
@@ -234,10 +237,15 @@ export default function AprendizajePanel() {
                         </div>
                         {a.viendo && (
                           <div className="mt-0.5 text-[11px] text-sky-700">
-                            viendo el {a.viendo.numero}º{a.viendo.serie === 'inventario' ? ' de Inventario' : ''}{a.viendo.pct != null ? ` (${a.viendo.pct}%)` : ''}
+                            viendo el {a.viendo.numero}º{a.viendo.serie !== 'automatizaciones' ? ` de ${SERIES[a.viendo.serie].nombre}` : ''}{a.viendo.pct != null ? ` (${a.viendo.pct}%)` : ''}
                           </div>
                         )}
                       </td>
+                      {activosMe > 0 && (
+                        <td className="px-4 py-2 text-xs num text-neutral-600">
+                          {a.pagos_me ? `${a.completados_me ?? 0}/${activosMe}` : <span className="text-neutral-400">no lo tiene</span>}
+                        </td>
+                      )}
                       {activosInv > 0 && (
                         <td className="px-4 py-2 text-xs num text-neutral-600">
                           {a.inventario ? `${a.completados_inv}/${activosInv}` : <span className="text-neutral-400">no lo lleva</span>}

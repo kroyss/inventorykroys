@@ -16,7 +16,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return unauthorized()
   try {
-    const [videos, agendar, sinCuentas, { rows: [u] }] = await Promise.all([videosDeUsuario(session.user.id, llevaInventario(session.user)), linkAgendar(),
+    const [videos, agendar, sinCuentas, { rows: [u] }] = await Promise.all([videosDeUsuario(session.user.id, llevaInventario(session.user), tieneModulo(session.user, 'pagos_me')), linkAgendar(),
       session.user.empresaId && tieneModulo(session.user, 'preguntas') ? sinCuentasML(session).catch(() => false) : false,
       // Días desde que el usuario empezó: el botón de la barra se achica al 5º (AprendizajeNav).
       dbGlobal().query(`SELECT FLOOR(EXTRACT(EPOCH FROM NOW() - created_at) / 86400)::int AS dias FROM users WHERE id = $1`, [session.user.id])])

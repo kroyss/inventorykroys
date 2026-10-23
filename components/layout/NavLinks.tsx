@@ -22,9 +22,10 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/despachos',        label: 'Despachos',  countries: ['VE'],       espacio: 'automatizaciones' },
-  // Pagos ME junto a Despachos solo con las ventas de ML; con ventas cargadas va en el menú de la cuenta.
+  // Pagos ME primero, antes que Despachos (23-10, pedido del dueño: se verifica el pago antes de despachar). Solo con las
+  // ventas de ML; con ventas cargadas va en el menú de la cuenta.
   { href: '/pagos-me',         label: 'Pagos ME',   countries: ['VE'],       espacio: 'automatizaciones', soloDesdeML: true },
+  { href: '/despachos',        label: 'Despachos',  countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/reportador',       label: 'Reportador', countries: ['VE'],       espacio: 'automatizaciones' },
   { href: '/preguntas',        label: 'Preguntas',  countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },

@@ -24,6 +24,8 @@ export async function GET() {
                 string_agg(DISTINCT e.nombre, ', ') AS empresas,
                 COUNT(p.completado_at) FILTER (WHERE v.activo AND v.serie = 'automatizaciones')::int AS completados,
                 COUNT(p.completado_at) FILTER (WHERE v.activo AND v.serie = 'inventario')::int AS completados_inv,
+                COUNT(p.completado_at) FILTER (WHERE v.activo AND v.serie = 'mercadoenvios')::int AS completados_me,
+                bool_or('pagos_me' = ANY(e.modulos)) AS pagos_me,
                 bool_or('inventario' = ANY(e.modulos)) AS inventario,
                 MAX(p.updated_at) AS ultima,
                 GREATEST(u.ultima_actividad, u.last_login) AS ingreso,
@@ -84,7 +86,7 @@ const Nuevo = z.object({
   titulo: z.string().trim().min(2, 'Falta el título').max(120),
   descripcion: z.string().trim().max(500).optional(),
   url: z.string().trim().min(5, 'Falta el link de YouTube'),
-  serie: z.enum(['automatizaciones', 'inventario']).default('automatizaciones'),
+  serie: z.enum(['automatizaciones', 'mercadoenvios', 'inventario']).default('automatizaciones'),
   duracion: z.string().trim().max(10).optional(),   // "6:12"
 })
 

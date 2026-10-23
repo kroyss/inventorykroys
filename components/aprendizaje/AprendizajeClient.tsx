@@ -4,11 +4,12 @@ import { PageHeader } from '@/components/ui'
 
 export interface Video {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string
-  serie: 'automatizaciones' | 'inventario'; duracion_video: number | null
+  serie: 'automatizaciones' | 'mercadoenvios' | 'inventario'; duracion_video: number | null
+  nuevo?: boolean
   visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
 }
 
-const NOMBRE_SERIE: Record<Video['serie'], string> = { automatizaciones: 'Automatiza', inventario: 'Inventario' }
+const NOMBRE_SERIE: Record<Video['serie'], string> = { automatizaciones: 'Automatiza', mercadoenvios: 'MercadoEnvíos', inventario: 'Inventario' }
 /** Duración a mostrar: la cargada en Plataforma o, si falta, la que reportó el reproductor. */
 const duracionDe = (v: Video) => v.duracion_video ?? (v.duracion_seg > 0 ? v.duracion_seg : null)
 const reloj = (seg: number) => `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
@@ -189,6 +190,7 @@ export default function AprendizajeClient() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2">
                       <span className="text-sm font-medium text-neutral-900 truncate">{x.titulo}</span>
+                      {x.nuevo && !x.completado && <span className="shrink-0 rounded-full bg-lime-100 px-1.5 py-px text-[10px] font-semibold uppercase text-lime-800">Nuevo</span>}
                       {dur && <span className="ml-auto shrink-0 text-xs text-neutral-400 num">{reloj(dur)}</span>}
                     </span>
                     {!x.completado && x.visto_seg > 0 && (

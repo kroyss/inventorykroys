@@ -11,7 +11,7 @@ const Cambio = z.object({
   url: z.string().trim().optional(),
   activo: z.boolean().optional(),
   mover: z.enum(['arriba', 'abajo']).optional(),
-  serie: z.enum(['automatizaciones', 'inventario']).optional(),
+  serie: z.enum(['automatizaciones', 'mercadoenvios', 'inventario']).optional(),
   duracion: z.string().trim().max(10).optional(),   // "6:12"; vacío = sin duración
 })
 
