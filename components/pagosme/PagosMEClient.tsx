@@ -121,7 +121,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   }
   // Nombre a mostrar de cada perfil: la cuenta de MercadoEnvíos (si ya la dijo) o el nombre técnico.
   const nombre = (perfil: string) => datos?.vigilante.latidos.find(l => l.perfil === perfil)?.cuenta ?? perfil
-  const sinConectar = !!datos && !datos.vigilante.clave && datos.vigilante.latidos.length === 0
+  // Los pasos se ven hasta que hay al menos un perfil de Chrome conectado (23-10: antes desaparecían apenas se
+  // conectaba el programa, y si faltaba el Asistente nadie sabía qué faltaba).
+  const sinConectar = !!datos && perfiles.length === 0
 
   const pagos = datos?.pagos ?? []
   const todos = pagos.length > 0 && pagos.every(p => marcados.has(p.id))
@@ -136,7 +138,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           </button>
         } />
 
-      {sinConectar && <PrimerosPasos isAdmin={isAdmin} onConectar={conectar} />}
+      {sinConectar && <PrimerosPasos isAdmin={isAdmin} onConectar={conectar} programaListo={!!despertador} />}
 
       {/* Vigilante */}
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
@@ -191,7 +193,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
-      {pedido && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML} />}
+      {pedido && <EstadoTraida pedido={pedido} perfiles={perfiles.map(l => l.perfil)} nombre={nombre} trabajando={trabajando} desdeML={!!datos?.desdeML}
+        pcPrendida={!!despertador?.conectado} />}
 
       {datos && <TraerAutomatico horario={datos.horario} ahora={datos.ahora} isAdmin={isAdmin} onGuardado={cargar} />}
 
@@ -352,9 +355,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
 
 /** Pagos ME → Configuración: a qué horas y qué días el despertador trae solo (además del botón). */
 /** Cómo terminó la última traída, bien a la vista: trayendo / listo (ya puede despachar) / con problemas. */
-function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML }: {
+function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML, pcPrendida }: {
   pedido: NonNullable<Datos['vigilante']['pedido']>; perfiles: string[]; nombre: (perfil: string) => string
-  trabajando: boolean; desdeML: boolean
+  trabajando: boolean; desdeML: boolean; pcPrendida: boolean
 }) {
   const res = Object.entries(pedido.resultados)
   const faltan = perfiles.filter(p => !pedido.resultados[p])
@@ -380,6 +383,10 @@ function EstadoTraida({ pedido, perfiles, nombre, trabajando, desdeML }: {
   if (trabajando) return caja('bg-sky-50 border-sky-200 text-sky-900',
     <>⏳ Trayendo pagos y guías ({origen}, {cuando})… no apagues la PC.</>,
     <>{detalle}{faltan.map(p => <span key={p} className="mr-3 whitespace-nowrap"><b>{nombre(p)}</b> trabajando…</span>)}</>)
+  // La PC responde pero ningún perfil de Chrome tiene el Asistente conectado: no es la luz (23-10).
+  if (res.length === 0 && pcPrendida && perfiles.length === 0) return caja('bg-amber-50 border-amber-200 text-amber-900',
+    <>⚠️ La PC está prendida, pero ningún perfil de Chrome tiene el Asistente de envíos conectado.</>,
+    'Abre Chrome en el perfil de tu cuenta de MercadoLibre, agrega el Asistente y escribe el código (pasos 3 y 4 de arriba). Después toca "Traer pagos y guías".')
   if (res.length === 0) return caja('bg-amber-50 border-amber-200 text-amber-900',
     <>⚠️ La traída {origen} de {cuando} no se hizo: la PC no respondió (¿apagada o sin luz?).</>,
     'No se pierde nada: cuando la prendas, dale a "Traer pagos y guías" y trae todo lo que faltaba.')
@@ -470,10 +477,14 @@ function TraerAutomatico({ horario, ahora, isAdmin, onGuardado }: {
   )
 }
 
-/** Primera vez: qué es y cómo se conecta, en tres pasos. */
-function PrimerosPasos({ isAdmin, onConectar }: { isAdmin: boolean; onConectar: () => void }) {
+/** Primera vez: qué es y cómo se conecta. Es LA guía de los Fundadores (23-10): cada paso una sola acción, y los
+ *  pasos 1-2 (programa) y 3-4 (Asistente en Chrome) se marcan solos cuando el sistema los ve conectados. Se ve hasta
+ *  que hay un perfil de Chrome conectado. Mismo texto que tools/vigilante-pagos-me/guia (PDF). */
+function PrimerosPasos({ isAdmin, onConectar, programaListo }: { isAdmin: boolean; onConectar: () => void; programaListo: boolean }) {
   const paso = 'flex gap-3 items-start'
-  const num = 'shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center'
+  const num = (listo: boolean, falta = false) => `shrink-0 w-6 h-6 rounded-full text-white text-xs font-semibold flex items-center justify-center ${
+    listo ? 'bg-emerald-600' : falta ? 'bg-amber-500 ring-4 ring-amber-200' : 'bg-emerald-600/70'}`
+  const sub = 'block text-xs text-neutral-500 mt-0.5'
   return (
     <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 space-y-3 text-sm text-neutral-700">
       <div>
@@ -484,20 +495,28 @@ function PrimerosPasos({ isAdmin, onConectar }: { isAdmin: boolean; onConectar: 
         </p>
       </div>
       {isAdmin ? (
-        <ol className="space-y-2">
-          <li className={paso}><span className={num}>1</span>
+        <ol className="space-y-2.5">
+          <li className={paso}><span className={num(programaListo)}>{programaListo ? '✓' : '1'}</span>
             <span><a href={DESCARGA_PROGRAMA} className="font-medium text-emerald-700 underline">Descarga el programa</a> en la PC donde imprimes las guías e instálalo (Siguiente → Instalar).
-              <span className="block text-xs text-neutral-500 mt-0.5">
+              <span className={sub}>
                 Si Windows muestra «Windows protegió su PC», toca <b>Más información</b> → <b>Ejecutar de todas formas</b>. Sale porque el
                 programa es nuevo y no tiene firma comprada; es el nuestro.
               </span></span></li>
-          <li className={paso}><span className={num}>2</span>
-            <span><button onClick={onConectar} className="font-medium text-emerald-700 underline">Genera tu código</button> y escríbelo cuando el programa lo pida.</span></li>
-          <li className={paso}><span className={num}>3</span>
-            <span><a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">Agrega el Asistente de envíos</a> a Chrome
-              en cada cuenta donde abres MercadoEnvíos, y escribe el mismo código.</span></li>
-          <li className={paso}><span className={num}>4</span>
-            <span>Listo: toca <b>Traer pagos y guías</b> y espera el aviso verde.</span></li>
+          <li className={paso}><span className={num(programaListo)}>{programaListo ? '✓' : '2'}</span>
+            <span>Cuando el programa pida el código: toca <button onClick={onConectar} className="font-medium text-emerald-700 underline">Genera tu código</button> → <b>Copiar</b> y pégalo ahí.
+              Al terminar deja marcadas las dos casillas y toca <b>Finalizar</b>.
+              {programaListo && <span className="block text-xs font-medium text-emerald-700 mt-0.5">✓ El programa ya está conectado.</span>}</span></li>
+          <li className={paso}><span className={num(false, programaListo)}>3</span>
+            <span>Abre Chrome <b>en el perfil donde entras a tu cuenta de MercadoLibre</b> y{' '}
+              <a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">agrega el Asistente de envíos</a> → <b>Añadir a Chrome</b> → <b>Añadir extensión</b>.
+              <span className={sub}>Fíjate en qué perfil se abre la tienda: si no es el de tu cuenta, cámbiate de perfil y ábrela ahí. No hace falta «Iniciar sesión en Chrome».</span></span></li>
+          <li className={paso}><span className={num(false, programaListo)}>4</span>
+            <span><b>Conecta el Asistente:</b> toca la <b>pieza de rompecabezas</b> (arriba a la derecha de Chrome) → 📌 fija «Asistente de envíos» →
+              ábrelo, <b>pega el mismo código</b> y toca <b>Conectar</b>. Debe decir <b>«Conectado al sistema»</b>.
+              <span className={sub}>¿Otra cuenta de MercadoLibre en otro perfil de Chrome? Repite los pasos 3 y 4 ahí. Si el código venció, genera otro: lo ya conectado sigue funcionando.</span>
+              {programaListo && <span className="block text-xs font-medium text-amber-700 mt-0.5">Falta este paso: ningún perfil de Chrome tiene el Asistente conectado todavía.</span>}</span></li>
+          <li className={paso}><span className={num(false)}>5</span>
+            <span>Listo: toca <b>Traer pagos y guías</b> y espera el aviso verde <b>✅ Listo</b>. Chrome se abre solo, trabaja y se cierra: no lo toques.</span></li>
         </ol>
       ) : (
         <p className="text-xs">Pídele a un administrador de tu empresa que conecte la PC.</p>
