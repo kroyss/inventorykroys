@@ -68,7 +68,9 @@ export function armarTexto(plantilla: string, nombre: string | null, producto: s
   const n = primerNombre(nombre)
   let prod = (producto ?? 'tu producto').trim()
   const armar = () => plantilla.replaceAll('{nombre}', n).replaceAll('{producto}', prod)
-    .replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ').trim()
+    .replace(/[ \t]+,/g, ',').replace(/[ \t]{2,}/g, ' ')
+    // Los saltos de línea se respetan (24-10, pedido del dueño): sin espacios alrededor y como mucho un renglón en blanco.
+    .replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
   let t = armar()
   while (t.length > MAX_TEXTO && prod.length > 20) { prod = prod.slice(0, prod.length - 10).trimEnd() + '…'; t = armar() }
   return t.slice(0, MAX_TEXTO)
