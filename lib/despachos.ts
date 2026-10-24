@@ -240,6 +240,8 @@ export interface EtiquetaValidada {
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
   /** Sin inventario: la venta se marcó "No se concretó" en Por confirmar (mig 115). */
   no_concretada?: boolean
+  /** Sin inventario: marcada "Ya la despaché por fuera" en Pagos ME (mig 120): no se vuelve a despachar. */
+  fuera?: boolean
   estado: EstadoEtiqueta
   detalle: string | null
 }
@@ -261,7 +263,7 @@ const SQL_DESDE_ML = `
          -- Nombre real del comprador (migración 080, o el de la mensajería); customer_name es su apodo de ML.
          COALESCE(NULLIF(o.comprador_nombre, ''), (SELECT NULLIF(TRIM(c.comprador_nombre), '') FROM ml_conversaciones c
            WHERE c.pack_id = COALESCE(o.pack_id, o.id) LIMIT 1)) AS comprador_nombre,
-         o.id::text AS orden_ml, o.no_concretada_at IS NOT NULL AS no_concretada,
+         o.id::text AS orden_ml, o.no_concretada_at IS NOT NULL AS no_concretada, o.fuera_at IS NOT NULL AS fuera,
          COALESCE((
            SELECT JSON_AGG(JSON_BUILD_OBJECT(
                     'product_name', (d->>'titulo') || COALESCE(' (' || (d->>'variante') || ')', ''),
@@ -280,7 +282,7 @@ const SQL_DESDE_ML = `
            WHERE d.lote_id = e.lote_id AND d.guia = e.guia) AS primera_con_guia
   FROM despacho_etiquetas e
   LEFT JOIN LATERAL (
-    SELECT id, pack_id, estado, comprador, comprador_nombre, notas, detalle, no_concretada_at FROM ml_ordenes
+    SELECT id, pack_id, estado, comprador, comprador_nombre, notas, detalle, no_concretada_at, fuera_at FROM ml_ordenes
     WHERE id = ${VENTA_NUM} OR pack_id = ${VENTA_NUM}
     ORDER BY (id = ${VENTA_NUM}) DESC LIMIT 1
   ) o ON TRUE
@@ -403,6 +405,8 @@ async function validarConInventario(db: Pool, loteId: number): Promise<EtiquetaV
     else if (r.primera_con_guia !== r.id)      { estado = 'DUPLICADA';   detalle = 'La misma guía está dos veces en este lote' }
     else if (!r.sale_id)                       { estado = 'SIN_VENTA';   detalle = `La venta ${r.venta} no está cargada en el sistema` }
     else if (!ESTADOS_IMPRIMIBLES.has(r.sale_status)) { estado = 'ESTADO'; detalle = `La venta está en ${r.sale_status}; debe estar PROCESADA` }
+    // 24-10: marcada "Ya la despaché por fuera" en Pagos ME: ya se envió, no se despacha dos veces.
+    else if (r.fuera)                          { estado = 'ESTADO';      detalle = 'Marcada «Ya la despaché por fuera» en Pagos ME: ya se envió. Si fue un error, deshazlo allá' }
     else if (r.items.length === 0)             { estado = 'SIN_PRODUCTOS'; detalle = 'La venta no tiene productos' }
     else if (r.sale_status === 'DESCARGADA')   { estado = 'REIMPRESION'; detalle = 'La venta ya estaba DESCARGADA' }
 
