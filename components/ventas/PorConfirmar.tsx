@@ -357,7 +357,7 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
         </button>
       )}
       <NoSeConcreto f={f} />
-      {sinInventario && !f.despacho && <DespacheFuera f={f} />}
+      {sinInventario && f.despacho !== 'impresa' && <DespacheFuera f={f} />}
       </div>
     </li>
   )
@@ -527,16 +527,16 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const cargadas = (datos.cargadas ?? []).filter(c => !q || [c.numero, c.cliente, ...c.productos.map(p => p.nombre)].some(t => (t ?? '').toLowerCase().includes(q)))
   const listos = conPago.filter(f => f.pago!.verificacion === 'valido'
     && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
-  // "Limpiar la lista" (24-10, sin inventario): para arrancar de cero. Las de ANTES DE HOY sin pago traído y sin guía en
-  // Despachos se marcan "despachadas por fuera" de una vez (las que tienen un pago por verificar no se tocan).
+  // "Limpiar la lista" (24-10, sin inventario): para arrancar de cero. TODAS las de antes de hoy que no salieron impresas
+  // por el sistema se marcan "despachadas por fuera" de una vez (pedido del dueño: lo resuelto por fuera tiene que poder salir).
   const diaVE = (s: string | Date) => new Date(s).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
   const aLimpiar = sinInventario
-    ? datos.filas.filter(f => (!f.pago || f.pago.verificacion === 'invalido') && !f.despacho && diaVE(f.fecha) < diaVE(new Date()))
+    ? datos.filas.filter(f => f.despacho !== 'impresa' && diaVE(f.fecha) < diaVE(new Date()))
     : []
   const limpiar = async () => {
     const ok = await confirmar({
       title: 'Limpiar la lista',
-      message: `Se marcan como «despachadas por fuera» las ${aLimpiar.length} ventas de antes de hoy que no tienen pago traído ni guía en Despachos.\n\n`
+      message: `Se marcan como «despachadas por fuera» las ${aLimpiar.length} ventas de antes de hoy que no se despacharon por el sistema.\n\n`
         + 'Salen de la lista y en Calificaciones cuentan como concretadas. Las que no se concretaron, márcalas antes con «No se concretó». Se puede deshacer una por una.',
       confirmText: `Limpiar ${aLimpiar.length}`, cancelText: 'Cancelar',
     })
@@ -614,7 +614,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
       {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
       {aLimpiar.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-          <span><b className="text-neutral-800">{aLimpiar.length}</b> {aLimpiar.length === 1 ? 'venta' : 'ventas'} de antes de hoy sin pago ni guía. ¿Las despachaste por fuera del sistema?</span>
+          <span><b className="text-neutral-800">{aLimpiar.length}</b> {aLimpiar.length === 1 ? 'venta' : 'ventas'} de antes de hoy sin despachar por el sistema. ¿Ya las resolviste por fuera?</span>
           <button type="button" onClick={limpiar} disabled={limpiando} className="btn-secondary text-xs whitespace-nowrap">
             {limpiando ? 'Limpiando…' : 'Limpiar la lista'}
           </button>
