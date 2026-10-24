@@ -185,7 +185,8 @@ const SQL_GUIA = `
     EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos) m`
 // La guía cuenta como despachada: impresa y, si la empresa tiene Reportador, también reportada.
 const GUIA_OK = `(g.impresa AND (NOT m.con_reportador OR g.reportada_at IS NOT NULL))`
-const BASE = `CASE WHEN m.con_reportador AND g.reportada_at IS NOT NULL THEN g.reportada_at ELSE o.fecha END AS base,
+const BASE = `CASE WHEN o.fuera_at IS NOT NULL THEN o.fuera_at
+              WHEN m.con_reportador AND g.reportada_at IS NOT NULL THEN g.reportada_at ELSE o.fecha END AS base,
          COALESCE(g.impresa, FALSE) AS guia_impresa, g.reportada_at, m.usa_despachos`
 const PAGO_ME = `EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')`
 
@@ -223,10 +224,12 @@ export const SQL_BANDEJA_ML = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
          o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
          x.nickname AS cuenta,
-         CASE WHEN g.reportada_at IS NOT NULL THEN 'REPORTADA' WHEN g.impresa THEN 'DESPACHADA' END AS sistema_estado,
+         CASE WHEN g.reportada_at IS NOT NULL THEN 'REPORTADA' WHEN g.impresa THEN 'DESPACHADA' WHEN o.fuera_at IS NOT NULL THEN 'POR_FUERA' END AS sistema_estado,
          FALSE AS facturada, ${BASE},
          CASE
            WHEN ${GUIA_OK} THEN 'concretada'
+           -- "Ya la despaché por fuera" (mig 120): se cumplió sin pasar por el sistema. La red de seguridad no la toca.
+           WHEN o.fuera_at IS NOT NULL AND o.no_concretada_at IS NULL AND COALESCE(o.estado, '') <> 'cancelled' THEN 'concretada'
            WHEN g.impresa AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
            WHEN g.impresa THEN 'esperar'                                                         -- impresa, falta reportarla
            -- Marcada "No se concretó" (mig 115) o cancelada en ML: antes que el pago (23-10, ver SQL_BANDEJA).

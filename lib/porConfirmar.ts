@@ -87,7 +87,7 @@ export async function ventasPorConfirmar(db: Pool) {
      WHERE o.fecha > NOW() - make_interval(days => GREATEST($2::int, $3::int))
        AND (o.fecha > NOW() - make_interval(days => $2)
             OR (p.verificacion <> 'invalido' AND o.fecha > NOW() - make_interval(days => $3)))
-       AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL
+       AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
      ORDER BY o.fecha DESC`, [dias, DIAS_MAX, DIAS_CON_PAGO])
@@ -167,6 +167,32 @@ export async function noConcretadas(db: Pool): Promise<NoConcretada[]> {
      WHERE o.no_concretada_at IS NOT NULL AND o.fecha > NOW() - make_interval(days => $1)
      ORDER BY COALESCE(o.pack_id, o.id), o.fecha DESC`, [DIAS_CON_PAGO])
   return rows.sort((a, b) => +new Date(b.at) - +new Date(a.at))
+}
+
+/** Las marcadas "Ya la despaché por fuera" (mig 120, sin inventario), para ver y deshacer. */
+export interface DespachadaFuera { numero: string; fecha: string; comprador: string | null; nick: string | null; productos: string | null
+                                   at: string; por: string | null }
+
+export async function despachadasFuera(db: Pool): Promise<DespachadaFuera[]> {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (COALESCE(o.pack_id, o.id)) COALESCE(o.pack_id, o.id)::text AS numero, o.fecha,
+            NULLIF(o.comprador_nombre, '') AS comprador, o.comprador AS nick, o.productos, o.fuera_at AS at, u.username AS por
+     FROM ml_ordenes o LEFT JOIN users u ON u.id = o.fuera_por
+     WHERE o.fuera_at IS NOT NULL AND o.fecha > NOW() - make_interval(days => $1)
+     ORDER BY COALESCE(o.pack_id, o.id), o.fecha DESC`, [DIAS_CON_PAGO])
+  return rows.sort((a, b) => +new Date(b.at) - +new Date(a.at))
+}
+
+/** "Ya la despaché por fuera" (mig 120): marca (o desmarca) TODAS las órdenes de esos números (la orden o su pack).
+ *  Una sola o varias ("Limpiar la lista"). No toca las no concretadas ni las cargadas en Ventas. Devuelve cuántas. */
+export async function marcarFuera(db: Pool, numeros: string[], userId: number, fuera: boolean) {
+  const { rowCount } = await db.query(
+    `UPDATE ml_ordenes SET fuera_at = CASE WHEN $2 THEN NOW() END, fuera_por = CASE WHEN $2 THEN $3::int END
+     WHERE (id::text = ANY($1::text[]) OR pack_id::text = ANY($1::text[]))
+       AND ($2 = FALSE OR (fuera_at IS NULL AND no_concretada_at IS NULL))
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (ml_ordenes.id::text, ml_ordenes.pack_id::text))`,
+    [numeros, fuera, userId])
+  return rowCount ?? 0
 }
 
 /** Marca (o desmarca con motivo null) "No se concretó" en todas las órdenes del número (la orden o su pack). */

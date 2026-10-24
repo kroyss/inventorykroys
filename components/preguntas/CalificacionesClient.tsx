@@ -324,6 +324,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                       <td className="px-3 py-2 text-neutral-700 max-w-[28rem]"><span className="line-clamp-2">{o.productos}</span></td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {o.sistema_estado === 'REPORTADA' ? <span className="text-xs font-medium text-emerald-700">Guía reportada</span>
+                          : o.sistema_estado === 'POR_FUERA' ? <span className="text-xs font-medium text-emerald-700" title="Marcada en Pagos ME: se despachó sin pasar por el sistema">Despachada por fuera</span>
                           : o.sistema_estado === 'DESPACHADA' ? <span className={`text-xs font-medium ${datos.conReportador ? 'text-sky-700' : 'text-emerald-700'}`}>Guía impresa</span>
                           : o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={(despachaVE && ESTADOS_VENTA_VE[o.sistema_estado]) || STATUS_LABELS[o.sistema_estado]} />
                           : <span className="text-xs text-amber-700">{datos.desdeML ? 'Sin despachar' : 'No cargada'}</span>}

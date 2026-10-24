@@ -6,7 +6,8 @@
 // se verifica en la fila (✓ / ✗) y la guía ya está en Despachos. Al activar inventario, gana esos dos pasos.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { CargadaConPago, NoConcretada, PorConfirmar as Fila } from '@/lib/porConfirmar'
+import type { CargadaConPago, DespachadaFuera, NoConcretada, PorConfirmar as Fila } from '@/lib/porConfirmar'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { MOTIVOS_NO_CONCRETADA, type MotivoNoConcretada } from '@/lib/noConcretada'
 import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
 import { borrarMemoria, leerMemoria, recruzarMemoria, type EstadoGuardado } from '@/lib/bancoMemoria'
@@ -44,7 +45,9 @@ interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pa
   /** Ya cargadas en borrador cuyo pago trajo Pagos ME (22-10, solo con inventario). */
   cargadas?: CargadaConPago[]
   /** Marcadas "No se concretó" (mig 115), para ver y deshacer. */
-  noConcretadas?: NoConcretada[] }
+  noConcretadas?: NoConcretada[]
+  /** Marcadas "Ya la despaché por fuera" (mig 120, sin inventario), para ver y deshacer. */
+  despachadasFuera?: DespachadaFuera[] }
 /** Recargar la lista desde cualquier fila (lo da PorConfirmar). */
 const Recargar = createContext<() => Promise<void>>(async () => {})
 
@@ -53,6 +56,68 @@ async function pedirNoConcretada(numero: string, motivo: MotivoNoConcretada | nu
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ numero, motivo, nota }),
   })
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'No se pudo')
+}
+
+async function pedirFuera(numeros: string[], deshacer = false) {
+  const r = await fetch('/api/sales/por-confirmar', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fuera: numeros, deshacer }),
+  })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error ?? 'No se pudo')
+  return Number(j.n) || 0
+}
+
+/** "Ya la despaché por fuera" (24-10, sin inventario): se cumplió sin pasar por el sistema. Sale de la lista y en
+ *  Calificaciones cuenta como concretada (la red de seguridad del día 6 ya no la toma por no concretada). */
+function DespacheFuera({ f }: { f: Fila }) {
+  const recargar = useContext(Recargar)
+  const [haciendo, setHaciendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <span className="text-[11px]">
+      <button type="button" disabled={haciendo} title="La despachaste sin usar el sistema: sale de esta lista y se califica como concretada"
+        className="text-neutral-400 underline hover:text-emerald-700"
+        onClick={async () => {
+          setHaciendo(true); setError(null)
+          try { await pedirFuera([f.numero]); await recargar() }
+          catch (e) { setError(e instanceof Error ? e.message : 'No se pudo'); setHaciendo(false) }
+        }}>Ya la despaché por fuera</button>
+      {error && <span className="ml-1 text-red-700">{error}</span>}
+    </span>
+  )
+}
+
+function ListaFuera({ filas }: { filas: DespachadaFuera[] }) {
+  const recargar = useContext(Recargar)
+  const [ver, setVer] = useState(false)
+  const [haciendo, setHaciendo] = useState<string | null>(null)
+  if (!filas.length) return null
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-neutral-50/60">
+      <button type="button" onClick={() => setVer(v => !v)} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left">
+        <span className="text-sm font-medium text-neutral-600">Despachadas por fuera <span className="text-neutral-400">{filas.length}</span></span>
+        <span className="text-xs text-neutral-400">Se califican como concretadas · {ver ? 'Ocultar' : 'Ver'}</span>
+      </button>
+      {ver && (
+        <ul className="divide-y divide-neutral-100 border-t border-neutral-200 bg-white">
+          {filas.map(n => (
+            <li key={n.numero} className="flex flex-col gap-1 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <span className="font-medium text-neutral-900">{n.comprador ?? n.nick ?? 'Sin nombre'}</span>
+                <span className="ml-2 font-mono text-[11px] text-neutral-400">{n.numero}</span>
+                {n.productos && <div className="truncate text-xs text-neutral-500">{n.productos}</div>}
+                <div className="text-xs text-neutral-400">{n.por ?? '—'} · {hora(n.at)}</div>
+              </div>
+              <button type="button" disabled={haciendo === n.numero} className="self-start text-xs text-neutral-500 underline hover:text-neutral-800 sm:self-center"
+                onClick={async () => { setHaciendo(n.numero); try { await pedirFuera([n.numero], true); await recargar() } finally { setHaciendo(null) } }}>
+                Deshacer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 /** "No se concretó" (23-10): se pagó pero no se pudo cumplir y se devolvió. ML no avisa la cancelación hasta calificar,
@@ -292,6 +357,7 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
         </button>
       )}
       <NoSeConcreto f={f} />
+      {sinInventario && !f.despacho && <DespacheFuera f={f} />}
       </div>
     </li>
   )
@@ -378,6 +444,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const [error, setError] = useState<string | null>(null)
   const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
   const [verVencidas, setVerVencidas] = useState(false)
+  const confirmar = useConfirm()
+  const [limpiando, setLimpiando] = useState(false)
   // Buscador (20-10): nombre, apodo de ML, número de venta, producto o cuenta.
   const [buscar, setBuscar] = useState('')
   // "Traer ME" (2026-10-12; Pagos ME salió del menú de los usuarios): le pide a la PC del vigilante que traiga
@@ -459,6 +527,25 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const cargadas = (datos.cargadas ?? []).filter(c => !q || [c.numero, c.cliente, ...c.productos.map(p => p.nombre)].some(t => (t ?? '').toLowerCase().includes(q)))
   const listos = conPago.filter(f => f.pago!.verificacion === 'valido'
     && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
+  // "Limpiar la lista" (24-10, sin inventario): para arrancar de cero. Las de ANTES DE HOY sin pago traído y sin guía en
+  // Despachos se marcan "despachadas por fuera" de una vez (las que tienen un pago por verificar no se tocan).
+  const diaVE = (s: string | Date) => new Date(s).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
+  const aLimpiar = sinInventario
+    ? datos.filas.filter(f => (!f.pago || f.pago.verificacion === 'invalido') && !f.despacho && diaVE(f.fecha) < diaVE(new Date()))
+    : []
+  const limpiar = async () => {
+    const ok = await confirmar({
+      title: 'Limpiar la lista',
+      message: `Se marcan como «despachadas por fuera» las ${aLimpiar.length} ventas de antes de hoy que no tienen pago traído ni guía en Despachos.\n\n`
+        + 'Salen de la lista y en Calificaciones cuentan como concretadas. Las que no se concretaron, márcalas antes con «No se concretó». Se puede deshacer una por una.',
+      confirmText: `Limpiar ${aLimpiar.length}`, cancelText: 'Cancelar',
+    })
+    if (!ok) return
+    setLimpiando(true); setError(null)
+    try { await pedirFuera(aLimpiar.map(f => f.numero)); await onRecargar() }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo limpiar') }
+    finally { setLimpiando(false) }
+  }
 
   return (
     <Recargar.Provider value={onRecargar}>
@@ -525,6 +612,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           </div>
         </div>, document.body)}
       {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
+      {aLimpiar.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+          <span><b className="text-neutral-800">{aLimpiar.length}</b> {aLimpiar.length === 1 ? 'venta' : 'ventas'} de antes de hoy sin pago ni guía. ¿Las despachaste por fuera del sistema?</span>
+          <button type="button" onClick={limpiar} disabled={limpiando} className="btn-secondary text-xs whitespace-nowrap">
+            {limpiando ? 'Limpiando…' : 'Limpiar la lista'}
+          </button>
+        </div>
+      )}
       {datos.filas.length > 0 && (
         <div className="flex items-center gap-2">
           <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por nombre, apodo, número de venta o producto…"
@@ -600,6 +695,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
         </div>
       )}
       <ListaNoConcretadas filas={datos.noConcretadas ?? []} />
+      <ListaFuera filas={datos.despachadasFuera ?? []} />
     </div>
     </Recargar.Provider>
   )
