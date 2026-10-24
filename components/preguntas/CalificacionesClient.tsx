@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS, ESTADOS_VENTA_VE } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
@@ -396,110 +396,100 @@ function Configuracion({ plantillas, desdeML, onGuardado }: { plantillas: Planti
     })
     setMsg(r.ok ? 'Guardado' : 'No se pudo guardar'); if (r.ok) onGuardado()
   }
-  const sel = 'border border-neutral-300 rounded-lg px-2 py-1.5 text-sm'
+  const sel = 'border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
+  const num = 'w-16 border border-neutral-300 rounded-lg bg-white px-2 py-1.5 text-sm'
+  const horas = Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)
+  const ratings = <><option value="positive">Positiva</option><option value="neutral">Neutral</option><option value="negative">Negativa</option></>
+  // 24-10 (pedido del dueño: "hasta para mí es enredado"): UN cuadro por caso con todo lo suyo, en el orden en que
+  // pasa: con qué texto → cuándo → si se hace sola. Antes eran 5 cuadros y los días de espera parecían de los dos.
+  const paso = (n: number, titulo: string, cuerpo: ReactNode) => (
+    <div className="flex gap-3">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[11px] font-semibold text-white">{n}</span>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="text-sm font-medium text-neutral-900">{titulo}</p>
+        {cuerpo}
+      </div>
+    </div>
+  )
+  const caja = (verde: boolean) => `rounded-xl border shadow-sm p-4 space-y-4 ${verde ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <section className={`lg:col-span-2 rounded-xl border shadow-sm p-4 space-y-2 ${p.auto ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input type="checkbox" checked={p.auto} onChange={e => setP({ ...p, auto: e.target.checked })} className="mt-1 w-4 h-4" />
-          <span>
-            <span className="font-semibold text-neutral-900">Calificar automáticamente las concretadas</span>
-            <span className="block text-sm text-neutral-600">
-              Una vez al día el sistema califica solo, con el texto de &quot;Venta concretada&quot;, las ventas <b>concretadas</b> que
-              {' '}pasaron los días de espera: las que despachaste con <b>Despachos</b> y reportaste con <b>Reportador</b> (la espera
-              {' '}cuenta desde el reporte){desdeML ? '' : ', o que están en el sistema sin guía'}. Las de <b>revisar nunca</b> se califican solas; las <b>no concretadas</b>, solo con la opción de abajo.
-              {' '}<span className="text-neutral-500">Sin Despachos y Reportador el sistema no puede saber qué ventas se concretaron y no califica nada solo.</span>
-            </span>
-          </span>
-        </label>
-        {/* Desde qué hora (del país). Fuera del label: tocar la hora no prende/apaga el automático. */}
-        <div className="flex flex-wrap items-center gap-2 pl-7 text-sm text-neutral-700">
-          Calificar todos los días desde las
-          <select value={p.hora ?? 10} onChange={e => setP({ ...p, hora: Number(e.target.value) })}
-            className="border border-neutral-300 rounded-lg bg-white px-2 py-1 text-sm font-medium">
-            {Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)}
-          </select>
-          <span className="text-xs text-neutral-500">
-            Si eliges una hora que ya pasó y hoy todavía no corrió, califica en el próximo minuto; si ya corrió hoy, la nueva hora vale desde mañana.
-          </span>
+      <section className={caja(p.auto)}>
+        <div>
+          <h2 className="font-semibold text-neutral-900">✅ Ventas concretadas</h2>
+          <p className="text-xs text-neutral-500">Las que despachaste con <b>Despachos</b> y reportaste con <b>Reportador</b>{desdeML ? '' : ' (o que están en el sistema sin guía)'}.</p>
         </div>
-        <p className="pl-7 text-xs text-neutral-500">
-          Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prenderlo aceptas que se publiquen sin revisarlas una por una.
-        </p>
+        {paso(1, 'Calificación', <>
+          <select value={p.concretada.rating} onChange={e => setP({ ...p, concretada: { ...p.concretada, rating: e.target.value } })} className={sel}>{ratings}</select>
+          <input value={p.concretada.mensaje} maxLength={160} onChange={e => setP({ ...p, concretada: { ...p.concretada, mensaje: e.target.value } })}
+            className="w-full border border-neutral-300 rounded-lg bg-white px-3 py-2 text-sm" />
+        </>)}
+        {paso(2, 'Cuándo', <>
+          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+            <input type="number" min={0} max={60} value={p.esperaDias}
+              onChange={e => setP({ ...p, esperaDias: Math.max(0, Math.min(60, Math.round(Number(e.target.value) || 0))) })} className={num} />
+            días después de <b>reportar la guía</b>
+          </label>
+          <p className="text-xs text-neutral-500">
+            Ej.: con 2, una guía reportada el lunes se califica el miércoles (cuando ya le llegó). 0 = el mismo día del reporte.
+            {' '}Las ventas sin guía (retiro en tienda) cuentan desde la compra. A los 10 días de la compra se califica igual.
+          </p>
+        </>)}
+        {paso(3, 'Calificarlas solas', <>
+          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+            <input type="checkbox" checked={p.auto} onChange={e => setP({ ...p, auto: e.target.checked })} className="w-4 h-4" />
+            Todos los días a las
+            <select value={p.hora ?? 10} onChange={e => setP({ ...p, hora: Number(e.target.value) })} className={sel}>{horas}</select>
+          </label>
+          <p className="text-xs text-neutral-500">
+            Sin Despachos y Reportador el sistema no sabe cuáles se concretaron y no califica nada solo. Las de <b>revisar</b> nunca se califican solas.
+            {' '}Si eliges una hora que ya pasó y hoy no corrió, califica en el próximo minuto.
+          </p>
+        </>)}
       </section>
-      {/* 23-10: red de seguridad, igual que la de las concretadas. ML concreta sola a los 7 días y cobra la comisión. */}
-      <section className={`lg:col-span-2 rounded-xl border shadow-sm p-4 space-y-2 ${p.autoNoConcretada ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200'}`}>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input type="checkbox" checked={!!p.autoNoConcretada} onChange={e => setP({ ...p, autoNoConcretada: e.target.checked })} className="mt-1 w-4 h-4" />
-          <span>
-            <span className="font-semibold text-neutral-900">Calificar automáticamente las no concretadas (red de seguridad)</span>
-            <span className="block text-sm text-neutral-600">
-              MercadoLibre da la venta por <b>concretada sola a los {ML_CONCRETA_SOLA_DIAS} días</b> de la compra y te cobra la comisión, aunque
-              {' '}nunca te hayan pagado. Con esto, <b>el día {DIA_AUTO_NO_CONCRETADA} desde la compra</b> el sistema marca <b>no concretada</b> (con el
-              {' '}texto de &quot;Venta no concretada&quot;) las que se te pasaron: <b>sin pago traído, sin {desdeML ? 'guía en Despachos' : 'registrar en Ventas ni guía en Despachos'}</b>.
-            </span>
-          </span>
-        </label>
-        <div className="flex flex-wrap items-center gap-2 pl-7 text-sm text-neutral-700">
-          Calificar el día {DIA_AUTO_NO_CONCRETADA} desde las
-          <select value={p.horaNc ?? 10} onChange={e => setP({ ...p, horaNc: Number(e.target.value) })}
-            className="border border-neutral-300 rounded-lg bg-white px-2 py-1 text-sm font-medium">
-            {Array.from({ length: 17 }, (_, i) => i + 6).map(h => <option key={h} value={h}>{horaTxt(h)}</option>)}
-          </select>
-          <span className="text-xs text-neutral-500">
-            Ej.: una compra del 14 se califica sola el 20 desde esa hora, al menos medio día antes de que ML la concrete. Las que marques tú antes no las toca.
-          </span>
+
+      <section className={caja(!!p.autoNoConcretada)}>
+        <div>
+          <h2 className="font-semibold text-neutral-900">⛔ Ventas no concretadas</h2>
+          <p className="text-xs text-neutral-500">Las que nunca {desdeML ? 'despachaste' : 'cargaste en Ventas'}: el comprador no pagó o no se hizo.</p>
         </div>
-        <p className="pl-7 text-xs text-neutral-500">
-          Ojo: una venta que se cobró por fuera del sistema (cobro a destino, una venta personal) también quedaría como no concretada.
-          {' '}Las calificaciones son públicas en MercadoLibre y salen a tu nombre.
-        </p>
-      </section>
-      <section className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-1">
-        <h2 className="font-semibold text-neutral-900">Días de espera</h2>
-        <label className="text-sm text-neutral-700 flex flex-wrap items-center gap-2">
-          Esperar
-          <input type="number" min={0} max={60} value={p.esperaDias}
-            onChange={e => setP({ ...p, esperaDias: Math.max(0, Math.min(60, Math.round(Number(e.target.value) || 0))) })}
-            className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
-          días desde que <b>reportas la guía</b> (Reportador) antes de calificar
-        </label>
-        <p className="text-xs text-neutral-500">
-          Ej.: con 2, una guía reportada el lunes se califica desde el miércoles (cuando ya le llegó al comprador). 0 = el mismo día del reporte.
-          Las ventas sin guía (retiro en tienda, locales) cuentan desde la compra. A los 10 días de la compra se califica igual, para no
-          pasarse del plazo de MercadoLibre.
-        </p>
-      </section>
-      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-2">
-        <h2 className="font-semibold text-neutral-900">Venta concretada</h2>
-        <select value={p.concretada.rating} onChange={e => setP({ ...p, concretada: { ...p.concretada, rating: e.target.value } })} className={sel}>
-          <option value="positive">Positiva</option><option value="neutral">Neutral</option><option value="negative">Negativa</option>
-        </select>
-        <input value={p.concretada.mensaje} maxLength={160} onChange={e => setP({ ...p, concretada: { ...p.concretada, mensaje: e.target.value } })}
-          className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm" />
-      </section>
-      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-2">
-        <h2 className="font-semibold text-neutral-900">Venta no concretada</h2>
-        <div className="flex flex-wrap gap-2">
-          <select value={p.noConcretada.rating} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, rating: e.target.value } })} className={sel}>
-            <option value="positive">Positiva</option><option value="neutral">Neutral</option><option value="negative">Negativa</option>
-          </select>
-          <select value={p.noConcretada.motivo} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, motivo: e.target.value } })} className={sel}>
-            {Object.entries(MOTIVOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          <label className="text-sm text-neutral-600 flex items-center gap-1">a los
+        {paso(1, 'Calificación', <>
+          <div className="flex flex-wrap gap-2">
+            <select value={p.noConcretada.rating} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, rating: e.target.value } })} className={sel}>{ratings}</select>
+            <select value={p.noConcretada.motivo} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, motivo: e.target.value } })} className={sel}>
+              {Object.entries(MOTIVOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+          <input value={p.noConcretada.mensaje} maxLength={160} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, mensaje: e.target.value } })}
+            className="w-full border border-neutral-300 rounded-lg bg-white px-3 py-2 text-sm" />
+        </>)}
+        {paso(2, 'Cuándo', <>
+          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+            Aparecen en tu lista a los
             <input type="number" min={1} max={MAX_DIAS_NO_CONCRETADA} value={p.noConcretada.dias}
               onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, dias: Math.max(1, Math.min(MAX_DIAS_NO_CONCRETADA, Math.round(Number(e.target.value) || 3))) } })}
-              className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" /> días {desdeML ? 'sin despachar en Despachos' : 'sin cargar en Ventas'}
+              className={num} />
+            días {desdeML ? 'sin despachar' : 'sin cargar en Ventas'}
           </label>
-        </div>
-        <p className={`text-xs ${p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? 'text-red-700 font-medium' : 'text-neutral-500'}`}>
-          MercadoLibre la concreta sola a los {ML_CONCRETA_SOLA_DIAS} días y cobra la comisión: máximo {MAX_DIAS_NO_CONCRETADA}.
-          {p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? ` Con ${MAX_DIAS_NO_CONCRETADA} te quedan ${ML_CONCRETA_SOLA_DIAS - MAX_DIAS_NO_CONCRETADA} días para marcarlas: mejor 3 o 4.` : ' Recomendado: 3 o 4.'}
-        </p>
-        <input value={p.noConcretada.mensaje} maxLength={160} onChange={e => setP({ ...p, noConcretada: { ...p.noConcretada, mensaje: e.target.value } })}
-          className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm" />
+          <p className={`text-xs ${p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? 'text-red-700 font-medium' : 'text-neutral-500'}`}>
+            Ahí <b>no se califican solas</b>: las revisas tú en «Por calificar». Máximo {MAX_DIAS_NO_CONCRETADA};
+            {p.noConcretada.dias >= MAX_DIAS_NO_CONCRETADA ? ` con ${MAX_DIAS_NO_CONCRETADA} te queda muy poco tiempo para revisarlas: mejor 3 o 4.` : ' recomendado: 3 o 4.'}
+          </p>
+        </>)}
+        {paso(3, 'Red de seguridad', <>
+          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+            <input type="checkbox" checked={!!p.autoNoConcretada} onChange={e => setP({ ...p, autoNoConcretada: e.target.checked })} className="w-4 h-4" />
+            Las que nadie calificó, calificarlas solas el <b>día {DIA_AUTO_NO_CONCRETADA}</b> a las
+            <select value={p.horaNc ?? 10} onChange={e => setP({ ...p, horaNc: Number(e.target.value) })} className={sel}>{horas}</select>
+          </label>
+          <p className="text-xs text-neutral-500">
+            MercadoLibre las da por <b>concretadas solas el día {ML_CONCRETA_SOLA_DIAS}</b> y cobra la comisión. Solo toca las que no tienen pago traído ni
+            {' '}{desdeML ? 'guía en Despachos' : 'venta cargada ni guía en Despachos'}. Ojo: una venta cobrada por fuera del sistema (cobro a destino, una venta personal) también quedaría como no concretada.
+          </p>
+        </>)}
       </section>
+
+      <p className="lg:col-span-2 text-xs text-neutral-500">Las calificaciones son públicas en MercadoLibre y salen a tu nombre: al prender lo automático aceptas que se publiquen sin revisarlas una por una.</p>
       <div className="lg:col-span-2 flex items-center justify-end gap-3">
         {msg && <span className="text-xs text-neutral-600">{msg}</span>}
         <button onClick={guardar} className="btn-primary text-sm">Guardar configuración</button>
