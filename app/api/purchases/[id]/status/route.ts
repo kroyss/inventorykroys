@@ -257,7 +257,21 @@ export async function PUT(
         // FINALIZADA/INCONSISTENTE → RECIBIDA (revierte carga, conserva cantidades para re-finalizar)
         // RECIBIDA → EN_CAMINO (sin inventario que revertir, limpia cantidades)
         // PARCIAL  → EN_CAMINO (revierte inventario cargado en parciales, limpia cantidades)
-        if (['FINALIZADA', 'INCONSISTENTE'].includes(order.status)) {
+        // 24-10: también EN_CAMINO → PAGADA y PAGADA → PENDIENTE (solo el admin; el usuario normal, solo recepción).
+        const recepcion = ['FINALIZADA', 'INCONSISTENTE', 'RECIBIDA', 'PARCIAL'].includes(order.status)
+        if (!recepcion && !puede(session.user, 'compras_editar')) {
+          await db.query('ROLLBACK')
+          return forbidden()
+        }
+        if (order.status === 'EN_CAMINO') {
+          await db.query(`UPDATE purchase_orders SET status = 'PAGADA' WHERE id = $1`, [id])
+        } else if (order.status === 'PAGADA') {
+          // Al marcar pagada se anota el total como pagado si estaba en 0: al volver se quita solo ese caso
+          // (un pago parcial cargado a mano se respeta).
+          await db.query(
+            `UPDATE purchase_orders SET status = 'PENDIENTE',
+                    total_paid = CASE WHEN total_paid = total_usd THEN 0 ELSE total_paid END WHERE id = $1`, [id])
+        } else if (['FINALIZADA', 'INCONSISTENTE'].includes(order.status)) {
           await revertLoadedInventory(db, id, order.order_number, 'Deshacer finalización', userId)
           // conserva received_qty/total_received_qty para poder re-finalizar
           await db.query(

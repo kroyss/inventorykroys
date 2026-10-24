@@ -89,8 +89,29 @@ export async function PUT(
         return NextResponse.json({ ok: true, message: 'Recepción reabierta (EN_CAMINO)' })
 
       } else if (newStatus === 'UNDO') {
-        // Deshacer último: un estado atrás.
-        if (['FINALIZADA', 'INCONSISTENTE'].includes(current)) {
+        // Deshacer último: un estado atrás. Desde el 24-10 en CADA paso (el admin; el usuario normal solo en recepción).
+        // Solo cambia el paso: tracking, fotos, envío y cajas quedan guardados. Si se deshace un pago, se desmarca.
+        const recepcion = ['FINALIZADA', 'INCONSISTENTE', 'RECIBIDA', 'PARCIAL'].includes(current)
+        if (!recepcion && !puede(session.user, 'compras_editar')) {
+          await db.query('ROLLBACK')
+          return forbidden()
+        }
+        const ATRAS: Record<string, string> = {
+          EN_CAMINO: 'EN_IMPORTADOR_PAGAR', EN_IMPORTADOR_PAGAR: 'ADUANA', ADUANA: 'EN_TRANSITO',
+          EN_TRANSITO: 'PAGADA', ESPERANDO_FOTOS: 'PAGO_PARCIAL',
+        }
+        if (ATRAS[current]) {
+          await db.query(`UPDATE import_orders SET status=$1, updated_at=NOW() WHERE id=$2`, [ATRAS[current], id])
+        } else if (current === 'PAGADA') {
+          // Se deshace el pago del 100%: vuelve a esperar fotos (si hubo 50%) o a pendiente.
+          await db.query(
+            `UPDATE import_orders SET status = CASE WHEN paid_50_done THEN 'ESPERANDO_FOTOS' ELSE 'PENDIENTE' END,
+                    paid_100_done=FALSE, paid_100_at=NULL, paid_100_amount=NULL, updated_at=NOW() WHERE id=$1`, [id])
+        } else if (current === 'PAGO_PARCIAL') {
+          await db.query(
+            `UPDATE import_orders SET status='PENDIENTE', paid_50_done=FALSE, paid_50_at=NULL, paid_50_amount=NULL,
+                    updated_at=NOW() WHERE id=$1`, [id])
+        } else if (['FINALIZADA', 'INCONSISTENTE'].includes(current)) {
           await revertImportInventory(db, id, 'Deshacer finalización', userId)
           await db.query(`UPDATE import_orders SET status='RECIBIDA', updated_at=NOW() WHERE id=$1`, [id])
         } else if (current === 'RECIBIDA') {

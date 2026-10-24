@@ -468,12 +468,17 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
   // Recepción: deshacer último paso (vuelve un estado atrás)
   async function undoLast() {
     if (!selected) return
-    const msg = selected.status === 'PARCIAL'
-      ? 'Se revertirán TODAS las recepciones parciales y el inventario cargado, volviendo a EN CAMINO. ¿Continuar?'
-      : selected.status === 'RECIBIDA'
-        ? 'Se anularán las cantidades recibidas, volviendo a EN CAMINO. ¿Continuar?'
-        : 'Se revertirá la finalización (y su inventario), volviendo a RECIBIDA. ¿Continuar?'
-    if (!await confirm({ title: 'Deshacer último cambio', message: msg, confirmText: 'Deshacer' })) return
+    // Un paso atrás en cada estado (24-10).
+    const MSG: Record<string, string> = {
+      PARCIAL: 'Se revertirán TODAS las recepciones parciales y el inventario cargado, volviendo a EN CAMINO.',
+      RECIBIDA: 'Se anularán las cantidades recibidas (no se había cargado inventario), volviendo a EN CAMINO.',
+      FINALIZADA: 'Se revertirá la finalización (y su inventario), volviendo a RECIBIDA.',
+      INCONSISTENTE: 'Se revertirá la finalización (y su inventario), volviendo a RECIBIDA.',
+      EN_CAMINO: 'Vuelve a PAGADA.',
+      PAGADA: 'Vuelve a PENDIENTE (si el pago anotado era el total de la orden, queda en 0).',
+    }
+    if (!MSG[selected.status]) return
+    if (!await confirm({ title: 'Volver al paso anterior', message: `${MSG[selected.status]} ¿Continuar?`, confirmText: 'Volver' })) return
     await doAction('undo')
   }
 
@@ -872,8 +877,12 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                     <button onClick={() => doAction('finalize')} disabled={saving} className="btn-secondary text-sm">Finalizar</button>
                   </>
                 )}
+                {/* Un paso atrás en cada estado (24-10): el de abajo es reabrir desde cero. */}
+                {['PAGADA','EN_CAMINO','RECIBIDA','PARCIAL','FINALIZADA','INCONSISTENTE'].includes(selected.status) && (
+                  <button onClick={undoLast} disabled={saving} className="btn-secondary text-sm">↩ Volver al paso anterior</button>
+                )}
                 {['FINALIZADA','INCONSISTENTE','RECIBIDA','PARCIAL','PAGADA','EN_CAMINO','REABIERTA'].includes(selected.status) && (
-                  <button onClick={() => doAction('reopen')} disabled={saving} className="btn-warning text-sm">Reabrir</button>
+                  <button onClick={() => doAction('reopen')} disabled={saving} className="btn-warning text-sm">Reabrir orden desde cero</button>
                 )}
               </div>
             )}
@@ -908,7 +917,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
             )}
             {isAdmin && historyMode && ['FINALIZADA','INCONSISTENTE'].includes(selected.status) && (
               <div className="mt-4 flex flex-wrap gap-2">
-                <button onClick={() => doAction('reopen')} disabled={saving} className="btn-warning text-sm">Reabrir</button>
+                <button onClick={undoLast} disabled={saving} className="btn-secondary text-sm">↩ Volver al paso anterior</button>
+                <button onClick={() => doAction('reopen')} disabled={saving} className="btn-warning text-sm">Reabrir orden desde cero</button>
               </div>
             )}
           </div>

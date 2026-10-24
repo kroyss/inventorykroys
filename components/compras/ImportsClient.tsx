@@ -458,19 +458,29 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
 
   const reopen = async () => {
     if (!selected) return
-    if (!await confirm({ title: 'Reabrir importación', message: 'Se revertirán archivos, pagos e inventario cargado. ¿Continuar?', confirmText: 'Reabrir' })) return
+    if (!await confirm({ title: 'Reabrir orden desde cero', message: 'Vuelve a PENDIENTE: se borran los pagos, el envío y las cajas, y se revierte el inventario cargado (las fotos quedan). Para un solo paso atrás usa «Volver al paso anterior». ¿Continuar?', confirmText: 'Reabrir desde cero' })) return
     await callStatus({ status: 'REABIERTA' })
   }
 
   // Recepción: deshacer último paso (un estado atrás)
   const undoLast = async () => {
     if (!selected) return
-    const msg = selected.status === 'PARCIAL'
-      ? 'Se revertirán TODAS las recepciones parciales y el inventario cargado, volviendo a EN CAMINO. ¿Continuar?'
-      : selected.status === 'RECIBIDA'
-        ? 'Se anularán las cantidades recibidas, volviendo a EN CAMINO. ¿Continuar?'
-        : 'Se revertirá la finalización (y su inventario), volviendo a RECIBIDA. ¿Continuar?'
-    if (!await confirm({ title: 'Deshacer último cambio', message: msg, confirmText: 'Deshacer' })) return
+    // Un paso atrás en cada estado (24-10): solo cambia el paso; tracking, fotos, envío y cajas quedan guardados.
+    const MSG: Record<string, string> = {
+      PARCIAL: 'Se revertirán TODAS las recepciones parciales y el inventario cargado, volviendo a EN CAMINO.',
+      RECIBIDA: 'Se anularán las cantidades recibidas (no se había cargado inventario), volviendo a EN CAMINO.',
+      FINALIZADA: 'Se revertirá la finalización (y su inventario), volviendo a RECIBIDA.',
+      INCONSISTENTE: 'Se revertirá la finalización (y su inventario), volviendo a RECIBIDA.',
+      EN_CAMINO: 'Vuelve a IMPORTADOR POR PAGAR. El costo de envío y las cajas quedan guardados.',
+      EN_IMPORTADOR_PAGAR: 'Vuelve a ADUANA.',
+      ADUANA: 'Vuelve a EN TRÁNSITO.',
+      EN_TRANSITO: 'Vuelve a PAGADA. Tracking, contenedor y transportista quedan guardados.',
+      PAGADA: `Se desmarca el pago del 100% y vuelve a ${selected.paid_50_done ? 'ESPERANDO FOTOS' : 'PENDIENTE'}. Las fotos quedan.`,
+      ESPERANDO_FOTOS: 'Vuelve a PAGO 50%. Las fotos quedan.',
+      PAGO_PARCIAL: 'Se desmarca el pago del 50% y vuelve a PENDIENTE.',
+    }
+    if (!MSG[selected.status]) return
+    if (!await confirm({ title: 'Volver al paso anterior', message: `${MSG[selected.status]} ¿Continuar?`, confirmText: 'Volver' })) return
     await callStatus({ status: 'UNDO' })
   }
 
@@ -998,8 +1008,12 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                         <button onClick={() => finalize('FINALIZADA')} disabled={busy} className="btn-secondary text-sm">Finalizar</button>
                       </>
                     )}
+                    {/* Un paso atrás en cada estado (24-10): sin borrar datos; el de abajo es reabrir desde cero. */}
+                    {selected.status !== 'PENDIENTE' && (
+                      <button onClick={undoLast} disabled={busy} className="btn-secondary text-sm">↩ Volver al paso anterior</button>
+                    )}
                     {['PAGADA','ESPERANDO_FOTOS','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR','EN_CAMINO','RECIBIDA','PARCIAL','FINALIZADA','INCONSISTENTE'].includes(selected.status) && (
-                      <button onClick={reopen} disabled={busy} className="btn-warning text-sm">Reabrir</button>
+                      <button onClick={reopen} disabled={busy} className="btn-warning text-sm" title="Vuelve a PENDIENTE y borra pagos, envío e inventario cargado">Reabrir orden desde cero</button>
                     )}
                   </div>
                 </div>
@@ -1045,7 +1059,10 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
               {isAdmin && historyMode && ['FINALIZADA','INCONSISTENTE'].includes(selected.status) && (
                 <div className="bg-white rounded-lg border shadow-sm p-4">
                   <div className="text-xs text-neutral-500 mb-2">Recepción</div>
-                  <button onClick={reopen} disabled={busy} className="btn-warning text-sm">Reabrir</button>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={undoLast} disabled={busy} className="btn-secondary text-sm">↩ Volver al paso anterior</button>
+                    <button onClick={reopen} disabled={busy} className="btn-warning text-sm" title="Vuelve a PENDIENTE y borra pagos, envío e inventario cargado">Reabrir orden desde cero</button>
+                  </div>
                 </div>
               )}
 
