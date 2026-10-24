@@ -115,7 +115,6 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
   // Receive modal
   const [showReceive, setShowReceive]   = useState(false)
   const [recvItems, setRecvItems]       = useState<RecvItem[]>([])
-  const [recvPartial, setRecvPartial]   = useState(false)
 
   // Inconsistente modal
   const [showIncNote, setShowIncNote]   = useState(false)
@@ -514,26 +513,27 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
       received_qty: i.quantity - (i.total_received_qty ?? 0),
       already_received: i.total_received_qty ?? 0,
     })))
-    setRecvPartial(false)
     setShowReceive(true)
   }
 
-  // Todo lo que faltaba llega justo (sin parcial ni diferencias) → "Recibir y finalizar".
-  const recibeTodo = !recvPartial && recvItems.length > 0 && recvItems.every(i => i.received_qty === i.expected - i.already_received)
+  // Sin casilla "Recepción parcial" (24-10, pedido del dueño): lo decide lo que se pone.
+  //   llegó TODO lo que faltaba (o más) → se recibe y se finaliza (carga el inventario y cierra la orden);
+  //   llegó MENOS → parcial: lo recibido entra YA al inventario y se puede recibir el resto después.
+  const recvFaltan = recvItems.reduce((s, i) => s + Math.max(0, i.expected - i.already_received - i.received_qty), 0)
+  const recvTotal = recvItems.reduce((s, i) => s + i.received_qty, 0)
+  const recvPend = recvItems.reduce((s, i) => s + Math.max(0, i.expected - i.already_received), 0)
+  const recvPartial = recvFaltan > 0
+  const recibeTodo = recvItems.length > 0 && recvTotal > 0 && !recvPartial
 
   async function submitReceive() {
     if (!selected) return
 
-    // Advertir solo si difiere de lo que FALTA (esperado − ya recibido), no del
-    // total: al "recibir más" de una parcial, recibir lo que resta NO es discrepancia.
-    const diffs = recvPartial ? [] : recvItems
-      .filter(i => i.received_qty > 0)
+    if (recvTotal === 0) { setError('Indica las cantidades que llegaron'); return }
+    // Avisar solo lo que llega DE MÁS (lo que falta es parcial y se muestra en el botón).
+    const diffs = recvItems
       .map(i => ({ i, rem: i.expected - i.already_received }))
-      .filter(({ i, rem }) => i.received_qty !== rem)
-      .map(({ i, rem }) => {
-        const d = i.received_qty - rem
-        return `· ${i.product_name}: esperado ${rem}, recibes ${i.received_qty} (${d > 0 ? '+' : ''}${d})`
-      })
+      .filter(({ i, rem }) => i.received_qty > rem)
+      .map(({ i, rem }) => `· ${i.product_name}: esperado ${rem}, recibes ${i.received_qty} (+${i.received_qty - rem})`)
     if (diffs.length > 0) {
       const ok = await confirm({
         title: 'Cantidades distintas a lo esperado',
@@ -1178,25 +1178,16 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 </tbody>
               </table>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={recvPartial}
-                  onChange={e => setRecvPartial(e.target.checked)}
-                  className="rounded"
-                />
-                <span>Recepción parcial (carga inventario ahora, permite recibir más después)</span>
-              </label>
-              {!recvPartial && <p className="text-xs text-neutral-500">
-                {recibeTodo
-                  ? 'Llegó todo lo esperado: queda finalizada y se carga al inventario.'
-                  : 'Con cantidades distintas queda «Recibida» para revisarla antes de finalizar.'}
-              </p>}
+              <p className={`text-xs ${recvPartial ? 'text-amber-800' : 'text-neutral-500'}`}>
+                {recvTotal === 0 ? 'Pon las cantidades que llegaron.'
+                  : recvPartial ? `Faltan ${recvFaltan} por llegar: lo recibido entra ya al inventario y la orden queda Parcial para recibir el resto (o Finalizar si no llega más).`
+                  : 'Llegó todo lo esperado: queda finalizada y se carga al inventario.'}
+              </p>
             </div>
             <div className="p-5 border-t flex justify-end gap-3">
               <button onClick={() => setShowReceive(false)} className="btn-secondary">Cancelar</button>
               <button onClick={submitReceive} disabled={saving} className="btn-primary">
-                {saving ? 'Guardando...' : recibeTodo ? 'Recibir y finalizar' : 'Confirmar Recepción'}
+                {saving ? 'Guardando...' : recibeTodo ? 'Recibir y finalizar' : recvPartial ? `Recibir ${recvTotal} de ${recvPend}` : 'Confirmar Recepción'}
               </button>
             </div>
           </div>
