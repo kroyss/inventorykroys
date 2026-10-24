@@ -89,10 +89,11 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
     }, 5000)
     return () => clearInterval(t)
   }, [esperandoTraida, pedidoEn, cargar, recargarVentas])
-  // Cuando llega, se recarga una vez más la lista de Ventas (los pagos nuevos) y se deja de esperar.
+  // Cuando llega, trae también las ventas nuevas de MercadoLibre (24-10: un solo botón para todo, como «Traer ME» de
+  // Por confirmar; antes el pago llegaba y la venta recién a la hora) y recarga la lista de Ventas.
   useEffect(() => {
     if (!llego) return
-    recargarVentas()
+    fetch('/api/sales/por-confirmar', { method: 'POST' }).catch(() => null).finally(() => { recargarVentas() })
     const t = setTimeout(() => setPedidoEn(null), 0)
     return () => clearTimeout(t)
   }, [llego, recargarVentas])

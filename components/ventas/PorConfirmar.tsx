@@ -474,7 +474,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             </p>
           )}
           <p>
-            <b className="text-neutral-700">Traer ML</b>: ventas nuevas de MercadoLibre (solas cada hora) · {revisado
+            {/* En Pagos ME (sin inventario) no hay botón aparte: «Traer pagos y guías» trae también las ventas (24-10). */}
+            <b className="text-neutral-700">{sinInventario ? 'Ventas de ML' : 'Traer ML'}</b>: {sinInventario ? 'se traen con «Traer pagos y guías» y solas cada hora' : 'ventas nuevas de MercadoLibre (solas cada hora)'} · {revisado
               ? <>recién {hora(revisado.at)}: <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
                   {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'nueva' : 'nuevas'}` : 'nada nuevo'}</b></>
               : <>última <b className="text-neutral-700">{datos.sincronizadas_at ? hora(datos.sincronizadas_at) : '—'}</b></>}
@@ -494,11 +495,11 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
               {buscandoME ? 'Buscando pagos…' : 'Traer ME'}
             </button>
           )}
-          <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
+          {!sinInventario && <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
             className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
             <IconoActualizar girando={actualizando} />
             {actualizando ? 'Trayendo…' : 'Traer ML'}
-          </button>
+          </button>}
         </div>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
