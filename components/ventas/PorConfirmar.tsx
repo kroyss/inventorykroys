@@ -531,6 +531,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
       <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Una línea por botón: qué trae y cuándo fue la última vez. */}
         <div className="space-y-0.5 text-xs text-neutral-500">
+          {/* Pagos ME sin inventario (24-10, pedido del dueño): UN mensaje sencillo, con el nombre del botón de arriba. */}
+          {sinInventario ? (
+            <p>
+              <b className="text-neutral-700">«Traer pagos y guías»</b> trae tus pagos, guías y ventas nuevas (tarda 1 a 3 min) · {buscandoME
+                ? <b className="text-violet-700">trayendo…</b>
+                : <>última vez <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
+            </p>
+          ) : <>
           {datos.pagosME && (
             <p>
               <b className="text-neutral-700">Traer ME</b>: pagos y guías de MercadoEnvíos (tarda 1 a 3 min; al terminar trae también las ventas) · {buscandoME
@@ -539,12 +547,12 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             </p>
           )}
           <p>
-            {/* En Pagos ME (sin inventario) no hay botón aparte: «Traer pagos y guías» trae también las ventas (24-10). */}
-            <b className="text-neutral-700">{sinInventario ? 'Ventas de ML' : 'Traer ML'}</b>: {sinInventario ? 'se traen con «Traer pagos y guías» y solas cada hora' : 'ventas nuevas de MercadoLibre (solas cada hora)'} · {revisado
+            <b className="text-neutral-700">Traer ML</b>: ventas nuevas de MercadoLibre (solas cada hora) · {revisado
               ? <>recién {hora(revisado.at)}: <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
                   {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'nueva' : 'nuevas'}` : 'nada nuevo'}</b></>
               : <>última <b className="text-neutral-700">{datos.sincronizadas_at ? hora(datos.sincronizadas_at) : '—'}</b></>}
           </p>
+          </>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {datos.pagosME && (
