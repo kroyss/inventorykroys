@@ -7,7 +7,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CargadaConPago, DespachadaFuera, NoConcretada, PorConfirmar as Fila } from '@/lib/porConfirmar'
-import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { MOTIVOS_NO_CONCRETADA, type MotivoNoConcretada } from '@/lib/noConcretada'
 import ComprobarBanco from '@/components/pagosme/ComprobarBanco'
 import { borrarMemoria, leerMemoria, recruzarMemoria, type EstadoGuardado } from '@/lib/bancoMemoria'
@@ -444,8 +443,6 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const [error, setError] = useState<string | null>(null)
   const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
   const [verVencidas, setVerVencidas] = useState(false)
-  const confirmar = useConfirm()
-  const [limpiando, setLimpiando] = useState(false)
   // Buscador (20-10): nombre, apodo de ML, número de venta, producto o cuenta.
   const [buscar, setBuscar] = useState('')
   // "Traer ME" (2026-10-12; Pagos ME salió del menú de los usuarios): le pide a la PC del vigilante que traiga
@@ -527,25 +524,6 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const cargadas = (datos.cargadas ?? []).filter(c => !q || [c.numero, c.cliente, ...c.productos.map(p => p.nombre)].some(t => (t ?? '').toLowerCase().includes(q)))
   const listos = conPago.filter(f => f.pago!.verificacion === 'valido'
     && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
-  // "Limpiar la lista" (24-10, sin inventario): para arrancar de cero. TODAS las de antes de hoy que no salieron impresas
-  // por el sistema se marcan "despachadas por fuera" de una vez (pedido del dueño: lo resuelto por fuera tiene que poder salir).
-  const diaVE = (s: string | Date) => new Date(s).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
-  const aLimpiar = sinInventario
-    ? datos.filas.filter(f => f.despacho !== 'impresa' && diaVE(f.fecha) < diaVE(new Date()))
-    : []
-  const limpiar = async () => {
-    const ok = await confirmar({
-      title: 'Limpiar la lista',
-      message: `Se marcan como «despachadas por fuera» las ${aLimpiar.length} ventas de antes de hoy que no se despacharon por el sistema.\n\n`
-        + 'Salen de la lista y en Calificaciones cuentan como concretadas. Las que no se concretaron, márcalas antes con «No se concretó». Se puede deshacer una por una.',
-      confirmText: `Limpiar ${aLimpiar.length}`, cancelText: 'Cancelar',
-    })
-    if (!ok) return
-    setLimpiando(true); setError(null)
-    try { await pedirFuera(aLimpiar.map(f => f.numero)); await onRecargar() }
-    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo limpiar') }
-    finally { setLimpiando(false) }
-  }
 
   return (
     <Recargar.Provider value={onRecargar}>
@@ -612,14 +590,6 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           </div>
         </div>, document.body)}
       {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
-      {aLimpiar.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-          <span><b className="text-neutral-800">{aLimpiar.length}</b> {aLimpiar.length === 1 ? 'venta' : 'ventas'} de antes de hoy sin despachar por el sistema. ¿Ya las resolviste por fuera?</span>
-          <button type="button" onClick={limpiar} disabled={limpiando} className="btn-secondary text-xs whitespace-nowrap">
-            {limpiando ? 'Limpiando…' : 'Limpiar la lista'}
-          </button>
-        </div>
-      )}
       {datos.filas.length > 0 && (
         <div className="flex items-center gap-2">
           <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por nombre, apodo, número de venta o producto…"
