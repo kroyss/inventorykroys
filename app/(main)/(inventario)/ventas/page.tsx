@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth'
-import { facturasHabilitadas, tieneModulo } from '@/lib/modulos'
+import { facturasHabilitadas, tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import VentasClient from '@/components/ventas/VentasClient'
@@ -37,6 +37,8 @@ export default async function VentasPage() {
       facturas={facturasHabilitadas(session!.user)}
       porConfirmar={tieneModulo(session!.user, 'preguntas')}
       verificarPagos={tieneModulo(session!.user, 'verificar_pagos')}
+      // 25-10: donde las guías van solas a Despachos al verificar (clientes), el pago también se verifica aquí.
+      pagoEnFila={ventasDesdeML(session!.user) && tieneModulo(session!.user, 'pagos_me') && puede(session!.user, 'ver_pagos_me')}
     />
   )
 }

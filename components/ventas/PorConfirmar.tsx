@@ -257,13 +257,19 @@ function estadoPago(f: Fila, ultima: string | null): { tono: Tono; texto: string
 
 const METODO: Record<string, string> = { mobile_payment: 'Pago móvil', transfer: 'Transferencia', zelle: 'Zelle' }
 
-function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onConfirmar: (numero: string) => void; onVerificar?: Verificar }) {
+function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
+  f: Fila; d: Datos; onConfirmar: (numero: string) => void; onVerificar?: Verificar
+  /** Con inventario en un cliente (25-10): también se verifica el pago en la fila, además de registrar la venta. */
+  onPago?: Verificar
+}) {
   const sinInventario = !!onVerificar
+  const verPago = sinInventario || !!onPago   // monto, comprobante y datos del pago a la vista
   const [haciendo, setHaciendo] = useState(false)
   const verificar = async (v: 'valido' | 'invalido' | 'pendiente') => {
-    if (!onVerificar || !f.pago) return
+    const fn = onVerificar ?? onPago
+    if (!fn || !f.pago) return
     setHaciendo(true)
-    try { await onVerificar(f.pago.id, v) } finally { setHaciendo(false) }
+    try { await fn(f.pago.id, v) } finally { setHaciendo(false) }
   }
   const prod = estadoProductos(f)
   const pago = d.pagosME ? estadoPago(f, d.ultimaBusqueda) : null
@@ -289,7 +295,7 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           {!sinInventario && <Etiqueta tono={prod.tono} title={prod.title}>{prod.texto}</Etiqueta>}
           {pago && <Etiqueta tono={pago.tono} title={pago.title}>{pago.texto}</Etiqueta>}
-          {sinInventario && f.pago && f.pago.verificacion === 'pendiente' && f.pago.monto != null && (
+          {verPago && f.pago && f.pago.verificacion === 'pendiente' && f.pago.monto != null && (
             <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} />
           )}
           {f.pago?.retiro && <Etiqueta tono="ambar" title="El comprador pasa a buscarlo: no lleva guía ni pasa por Despachos">🏪 Retiro en tienda</Etiqueta>}
@@ -309,14 +315,14 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
               {f.despacho === 'impresa' ? '✓ Guía ya impresa' : 'Guía en Despachos'}
             </Etiqueta>
           )}
-          {sinInventario && f.pago?.comprobante && (
+          {verPago && f.pago?.comprobante && (
             <BotonComprobante pagoId={f.pago.id} venta={f.numero}
               datos={{ monto: f.pago.monto, totalOrden: f.pago.totalOrden, banco: f.pago.banco, referencia: f.pago.referencia, metodo: f.pago.metodo }} />
           )}
         </div>
         {/* Lo que dijo el banco (20-10, "Comprobar con el banco"): para verificar sabiendo qué llegó de verdad. */}
         {f.pago?.bancoRes && f.pago.verificacion !== 'invalido' && <LineaBanco b={f.pago.bancoRes} />}
-        {sinInventario && f.pago && (
+        {verPago && f.pago && (
           <div className="text-[11px] text-neutral-500">
             {[METODO[f.pago.metodo ?? ''] ?? f.pago.metodo, f.pago.banco, f.pago.referencia && `ref. ${f.pago.referencia}`,
               f.pago.guiaNum && `${f.pago.carrier ? f.pago.carrier.toUpperCase() + ' ' : 'guía '}${f.pago.guiaNum}`].filter(Boolean).join(' · ')}
@@ -348,12 +354,29 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
           <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo}
             className="text-xs text-neutral-500 underline self-start sm:self-center">Volver a revisar</button>
         ) : null
+      ) : onPago && f.pago?.verificacion === 'pendiente' ? (
+        // Cliente con inventario (25-10): primero el pago (como en Pagos ME), y se puede registrar igual.
+        <div className="flex flex-col items-end gap-1 self-start sm:self-center">
+          <div className="flex gap-2">
+            <button type="button" onClick={() => verificar('valido')} disabled={haciendo} className="btn-primary text-sm whitespace-nowrap">✓ Pago correcto</button>
+            <button type="button" onClick={() => verificar('invalido')} disabled={haciendo} className="btn-secondary text-sm whitespace-nowrap text-red-700">✗ Inválido</button>
+          </div>
+          <button type="button" onClick={() => onConfirmar(f.numero)} className="text-[11px] text-neutral-500 underline hover:text-neutral-800">Registrar venta</button>
+        </div>
       ) : (
-        <button type="button" onClick={() => onConfirmar(f.numero)}
-          className="btn-primary text-sm whitespace-nowrap self-start sm:self-center">
-          {/* "Verificar" (22-10, pedido del dueño): abre la venta para revisarla; recién adentro se confirma y procesa. */}
-          Verificar
-        </button>
+        <div className="flex flex-col items-end gap-1 self-start sm:self-center">
+          {/* "Verificar" (22-10, pedido del dueño): abre la venta para revisarla; recién adentro se confirma y procesa.
+              25-10: con el pago ya verificado lo que falta es registrarla → "Registrar venta". */}
+          <button type="button" onClick={() => onConfirmar(f.numero)} className="btn-primary text-sm whitespace-nowrap">
+            {f.pago?.verificacion === 'valido' ? 'Registrar venta' : 'Verificar'}
+          </button>
+          {onPago && f.pago?.verificacion === 'valido' && (
+            <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo} className="text-[11px] text-neutral-400 underline hover:text-neutral-700">deshacer pago</button>
+          )}
+          {onPago && f.pago?.verificacion === 'invalido' && (
+            <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo} className="text-[11px] text-neutral-500 underline">Volver a revisar el pago</button>
+          )}
+        </div>
       )}
       <NoSeConcreto f={f} />
       {sinInventario && f.despacho !== 'impresa' && <DespacheFuera f={f} />}
@@ -362,8 +385,8 @@ function FilaVenta({ f, d, onConfirmar, onVerificar }: { f: Fila; d: Datos; onCo
   )
 }
 
-function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar }: {
-  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void; plegable?: boolean; onVerificar?: Verificar
+function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar, onPago }: {
+  titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void; plegable?: boolean; onVerificar?: Verificar; onPago?: Verificar
 }) {
   const [abierto, setAbierto] = useState(!plegable)
   if (!filas.length) return null
@@ -384,7 +407,7 @@ function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar }: {
       </button>
       {abierto && (
         <ul className="divide-y divide-neutral-100">
-          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} onVerificar={onVerificar} />)}
+          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onPago} />)}
         </ul>
       )}
     </section>
@@ -429,7 +452,7 @@ function FilaCargada({ c, onVerificar }: { c: CargadaConPago; onVerificar: (sale
   )
 }
 
-export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada }: {
+export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada, onVerificarPago }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
   onConfirmar: (numero: string) => void
@@ -437,6 +460,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   onVerificarCargada?: (saleId: number) => void
   /** Sin inventario (Pagos ME de los Fundadores): se verifica el pago en la fila, sin "Confirmar". */
   onVerificar?: Verificar
+  /** Con inventario en un cliente (25-10): ✓ / ✗ del pago en la fila, como en Pagos ME (es el mismo pago). */
+  onVerificarPago?: Verificar
 }) {
   const sinInventario = !!onVerificar
   const [actualizando, setActualizando] = useState(false)
@@ -632,14 +657,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             <Grupo titulo="Listos para despachar" nota="Pago verificado: sus guías están en Despachos" filas={listos} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
             <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha traído" filas={sinPago} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
           </> : datos.pagosME ? <>
-            <Grupo titulo="Con pago" nota="Listas para revisar y confirmar" filas={conPago} d={datos} onConfirmar={onConfirmar} />
+            <Grupo titulo="Con pago" nota="Listas para revisar y confirmar" filas={conPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} />
             {!conPago.length && (
               <div className="px-4 py-6 text-center border-b border-neutral-100">
                 <p className="text-sm font-medium text-neutral-700">Nada con pago por confirmar</p>
                 <p className="mt-1 text-xs text-neutral-400">Cuando un cliente pague, su venta aparece aquí después de buscar los pagos.</p>
               </div>
             )}
-            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} plegable />
+            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} plegable />
           </> : (
             <ul className="divide-y divide-neutral-100">
               {vigentes.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} />)}
@@ -667,7 +692,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           </button>
           {verVencidas && (
             <ul className="divide-y divide-neutral-100 border-t border-neutral-200 bg-white">
-              {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} />)}
+              {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />)}
             </ul>
           )}
         </div>

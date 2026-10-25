@@ -70,6 +70,7 @@ interface Props {
   country: Country
   facturas: boolean   // módulo Facturas (solo VE): sin él no se muestra el cuadro de factura
   porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
+  pagoEnFila?: boolean   // cliente con inventario y Pagos ME (25-10): ✓ / ✗ del pago también en Por confirmar
   verificarPagos?: boolean   // VE: paso "Pago verificado" antes de procesar (módulo verificar_pagos; apagado = Inventario simple)
 }
 
@@ -80,7 +81,7 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false }: Props) {
   // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
   const directoVE = country === 'VE' && !verificarPagos
   // VE con el flujo completo: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE); CO y VE simple quedan igual.
@@ -511,6 +512,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       {vistaPC && (
         <PorConfirmar datos={pc.datos} onRecargar={pc.cargar}
           onConfirmar={n => { setNumeroNuevo(n); setEditing(null); setShowForm(true) }}
+          onVerificarPago={pagoEnFila ? async (id, v) => {
+            const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
+            if (!r?.ok) setError('No se pudo guardar la verificación del pago')
+            await pc.cargar()
+          } : undefined}
           onVerificarCargada={async id => {
             // Ya cargada con pago (22-10): la MISMA venta en Editar venta (no se crea otra), con su pago para verificar.
             const fresh: Sale = await fetch(`/api/sales/${id}`).then(r => r.json()).catch(() => null)
