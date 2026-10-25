@@ -50,6 +50,7 @@ const Prefs = z.object({
   mensaje: z.boolean(), mensaje_min: z.number().int().refine(v => (MINUTOS_OPCIONES as readonly number[]).includes(v)),
   negativa: z.boolean(), neutral: z.boolean(),
   contradictoria: z.boolean(),
+  concreta_sola: z.boolean(),
   agotada: z.boolean(), bajo: z.boolean(),
   promos: z.boolean(),
   cierre: z.boolean(), cierre_hora: hora,
