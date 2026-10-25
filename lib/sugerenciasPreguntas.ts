@@ -10,7 +10,7 @@ export const normalizar = (t: string) =>
 
 /** Temas que reconoce el sistema y las palabras que los delatan (raíces: "envi" = envío, envían…). */
 export const TEMAS: Record<string, { nombre: string; palabras: string[] }> = {
-  disponible: { nombre: 'Disponibilidad', palabras: ['disponib', 'tiene', 'tienen', 'tienes', 'hay', 'queda', 'existencia', 'stock', 'en venta'] },
+  disponible: { nombre: 'Disponibilidad', palabras: ['disponib', 'dispon', 'tiene', 'tienen', 'tienes', 'hay', 'queda', 'existencia', 'stock', 'en venta'] },
   envio:      { nombre: 'Envío', palabras: ['envi', 'mandan', 'manda', 'despach', 'zoom', 'tealca', 'mrw', 'llega', 'nacional', 'formulario'] },
   precio:     { nombre: 'Precio', palabras: ['precio', 'cuanto', 'cuesta', 'costo', 'bcv', 'dolar', 'tasa', 'bs'] },
   retiro:     { nombre: 'Retiro / entrega', palabras: ['retir', 'entrega', 'personal', 'ubic', 'direccion', 'donde estan', 'local', 'tienda fisica', 'delivery'] },
@@ -98,8 +98,10 @@ export function sugerir(pregunta: string, item: ItemDatos,
   // La más justa: la que menos "temas especiales" (retiro, factura, garantía) agrega sin que los
   // pregunten; a igualdad, la que cubre menos temas de más. Disponible/envío/precio van juntos en la
   // respuesta estándar y no cuentan como de más.
+  // El tema de sus palabras propias o aprendidas ("p:<id>") no es un tema especial: si la pregunta no las trae, no
+  // castiga (25-10: con las palabras aprendidas, "Disponible + envío gratis" quedaba fuera en casi todo, 0,6% sugeridas).
   const costo = (cubre: string[]) =>
-    cubre.filter(t => !temas.includes(t) && !['disponible', 'envio', 'precio'].includes(t)).length * 10 + cubre.length
+    cubre.filter(t => !temas.includes(t) && !t.startsWith('p:') && !['disponible', 'envio', 'precio'].includes(t)).length * 10 + cubre.length
       - cubre.filter(t => t.startsWith('p:') && temas.includes(t)).length * 5   // la de palabras propias que activó, primero
   conStock.sort((a, b) => costo(a.cubre) - costo(b.cubre))
   // Una respuesta que agrega un tema especial que NO preguntaron (p. ej. "Retiro" para "¿precio?")

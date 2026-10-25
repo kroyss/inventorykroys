@@ -10,6 +10,8 @@ import { fueEditada } from '@/lib/respuestasOrigen'
 
 const HISTORIAL = 3000           // preguntas respondidas con las que se calibra
 const CACHE_HORAS = 24
+/** Sube cuando cambia cómo se sugiere: la calibración guardada se recalcula al momento (25-10: 2). */
+const VERSION_CAL = 2
 
 export interface SugeridaPregunta {
   plantilla: string; titulo: string; texto: string
@@ -46,7 +48,7 @@ export const quitadasDe = (db: Pool) => leerJSON<Quitadas>(db, CLAVE_QUITADAS, {
 export async function calibracionDe(db: Pool, _plantillas?: Plantilla[]): Promise<Calibracion> {
   const base = await plantillasBase(db)
   const quitadas = await quitadasDe(db)
-  const firma = createHash('sha1').update(JSON.stringify([base, quitadas])).digest('hex').slice(0, 12)
+  const firma = createHash('sha1').update(JSON.stringify([VERSION_CAL, base, quitadas])).digest('hex').slice(0, 12)
   const { rows: [c] } = await db.query(
     `SELECT value, updated_at > NOW() - make_interval(hours => $1) AS fresca FROM app_settings WHERE key = 'preguntas_calibracion'`,
     [CACHE_HORAS])
