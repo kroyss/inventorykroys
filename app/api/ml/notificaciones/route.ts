@@ -1,11 +1,11 @@
 import { after, NextRequest, NextResponse } from 'next/server'
 import { dbGlobal } from '@/lib/db'
-import { leerMensajeNotificado } from '@/lib/notificacionesML'
+import { leerMensajeNotificado, procesarVentaNotificada } from '@/lib/notificacionesML'
 
 // Notificaciones de MercadoLibre (DevCenter → "Notificaciones callbacks URL"). ML exige un 200 rápido o reintenta.
-// Paso 1 (23-10, mig 119): se GUARDAN tal como llegan para compararlas con la consulta de cada minuto (cobertura y
-// demora por tema) antes de confiar en ellas. Todavía no disparan nada: las preguntas, mensajes y ventas siguen
-// entrando por el cron. Nunca falla hacia ML (si no se pudo guardar, igual responde 200).
+// Paso 1 (23-10, mig 119): se GUARDAN tal como llegan (cobertura y demora por tema). Paso 2a (25-10): los avisos de
+// VENTA traen esa venta al momento (lib/notificacionesML.ts); preguntas y mensajes siguen entrando por el cron.
+// Nunca falla hacia ML (si no se pudo guardar, igual responde 200).
 export async function POST(req: NextRequest) {
   try {
     const n = await req.json().catch(() => null) as {
@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
       if (n.topic === 'messages' && fila?.id) {
         const id = Number(fila.id), usuario = /^\d+$/.test(String(n.user_id ?? '')) ? String(n.user_id) : null
         after(() => leerMensajeNotificado(id, usuario, n.resource ? String(n.resource) : null))
+      }
+      // Paso 2a (25-10): la venta avisada entra al momento.
+      if (n.topic === 'orders_v2' && fila?.id) {
+        const id = Number(fila.id), usuario = /^\d+$/.test(String(n.user_id ?? '')) ? String(n.user_id) : null
+        after(() => procesarVentaNotificada(id, usuario, n.resource ? String(n.resource) : null))
       }
     }
   } catch (e) {

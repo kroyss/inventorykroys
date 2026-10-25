@@ -61,7 +61,7 @@ export default function MensajeAlComprar() {
           <span>
             <span className="font-semibold text-neutral-900">Mandar un mensaje a cada comprador nuevo</span>
             <span className="block text-sm text-neutral-600">
-              Unos <b>{d.esperaMin} a 8 minutos</b> después de la compra, después de los dos mensajes automáticos de MercadoLibre, le llega
+              A <b>1 o 2 minutos</b> de la compra, después de los dos mensajes automáticos de MercadoLibre, le llega
               {' '}este mensaje tuyo. <b>Una sola vez por venta.</b> Solo a las ventas que entren desde que lo prendes.
             </span>
             <span className="block text-xs text-neutral-500 mt-1">

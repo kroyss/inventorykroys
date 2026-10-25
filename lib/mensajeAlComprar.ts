@@ -6,19 +6,22 @@
 //   - solo las ventas hechas DESDE que se prendió (prenderlo no le escribe a las ventas viejas) y de las últimas 24 h;
 //   - no se manda si la venta se canceló o el comprador ya escribió (no se pisa la conversación);
 //   - justo antes de mandar se relee la orden y la conversación en ML.
-// Para que llegue "a los pocos minutos", mientras está prendido se traen de ML las ventas del último día cada
-// SYNC_MIN minutos (la sincronización normal es cada hora).
+// Para que llegue "al minuto" (25-10, paso 2a de notificaciones): la venta entra por el aviso de ML en segundos
+// (lib/notificacionesML.ts) y el cron de cada minuto la manda pasado ESPERA_MIN. Solo si los avisos dejaron de llegar
+// (avisosCaidos) se vuelve a lo de antes: traer de ML las ventas del último día cada SYNC_MIN minutos. Un aviso suelto
+// perdido lo trae la sincronización de cada hora (llega más tarde, con las mismas reglas).
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { leerHilo } from '@/lib/mensajesML'
 import { registrarOrigen } from '@/lib/respuestasOrigen'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { armarTexto, MAX_TEXTO } from '@/lib/recordatoriosPago'
+import { avisosCaidos } from '@/lib/notificacionesML'
 
 export const CLAVE_CONFIG = 'mensaje_al_comprar'
 const CLAVE_SYNC = 'mensaje_al_comprar_sync'
-/** Minutos que se espera después de la compra (que primero lleguen los dos mensajes de ML). */
-export const ESPERA_MIN = 3
+/** Minutos que se espera después de la compra (que primero lleguen los dos mensajes de ML; 25-10: 3 → 1). */
+export const ESPERA_MIN = 1
 const SYNC_MIN = 5
 const MAX_POR_PASADA = 30
 export { MAX_TEXTO }
@@ -69,8 +72,8 @@ interface Candidato {
 export async function mensajeAlComprar(db: Pool) {
   const cfg = await leerConfigDb(db)
   if (!cfg.activo || !cfg.desde) return null
-  // Ventas del último día cada SYNC_MIN minutos (una pasada del cron toma el turno).
-  const { rows: [toca] } = await db.query(
+  // Ventas del último día cada SYNC_MIN minutos (una pasada del cron toma el turno), solo si los avisos no llegan.
+  const { rows: [toca] } = !await avisosCaidos() ? { rows: [] as { value: string }[] } : await db.query(
     `INSERT INTO app_settings (key, value) VALUES ($1, NOW()::text)
      ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
      WHERE app_settings.value::timestamptz < NOW() - make_interval(mins => ${SYNC_MIN})
