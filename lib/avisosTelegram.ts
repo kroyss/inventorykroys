@@ -29,6 +29,22 @@ import {
 } from '@/lib/telegram'
 import type { Country, UserRole } from '@/lib/types'
 
+// ── Mensajes de cierre (25-10) ─────────────────────────────────────────────
+/** Sin texto = mandó solo un archivo: casi siempre el comprobante del pago. */
+const SIN_TEXTO = '📎 <b>Envió una imagen o archivo</b> (¿comprobante de pago?)'
+/** Palabras de puro cierre o cortesía: si el mensaje es SOLO esto, no hay nada que responder. */
+const CIERRE = new Set(('gracias muchas mil ok okey okay oki vale perfecto listo bueno buena buenas buenos excelente '
+  + 'entendido entiendo acuerdo de muy amable amables bendiciones saludos saludo tardes noches dias dia feliz igualmente '
+  + 'orden a la el al quedo atento atenta estoy estamos pendiente pendientes del envio chevere genial dale si claro amigo amiga '
+  + 'senor senora hermano bien esta todo y que tenga tengan buen bendecido bendecida dios le les bendiga gusto un placer super').split(' '))
+export function esCierre(texto: string | null): boolean {
+  if (!texto) return false                                   // solo adjunto: se avisa (puede ser el pago)
+  const t = texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  if (t.length > 90 || /[?¿\d]/.test(t)) return false        // pregunta algo o trae números → se avisa
+  const palabras = t.replace(/[^a-zñ\s]/g, ' ').split(/\s+/).filter(Boolean)
+  return palabras.length > 0 && palabras.every(w => CIERRE.has(w) || /^(gra+cias+|o+k+|j+a+|j+e+)$/.test(w))
+}
+
 // ── Preferencias ───────────────────────────────────────────────────────────
 
 export interface PrefsAvisos {
@@ -295,16 +311,19 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
        WHERE c.ultimo_de_comprador AND c.sin_leer > 0 AND c.ultimo_at < NOW() - make_interval(mins => $1) AND c.ultimo_at > NOW() - INTERVAL '24 hours'
          AND ${SQL_MENSAJE_VIGENTE.replace(/ultimo_at/g, 'c.ultimo_at')}
        ORDER BY c.ultimo_at LIMIT 30`, [p.mensaje_min])
-    const nuevas = await pendientes(d, e, 'mensaje', rows.map(r => r.ref))
-    const lista = rows.filter(r => nuevas.has(r.ref))
+    // Los de puro cierre ("gracias", "ok perfecto", "muy amable") no avisan (25-10): no hay nada que responder.
+    // Siguen en Mensajes como siempre; si el comprador escribe algo más, ese mensaje nuevo sí avisa.
+    const conRespuesta = rows.filter(r => !esCierre(r.ultimo_texto))
+    const nuevas = await pendientes(d, e, 'mensaje', conRespuesta.map(r => r.ref))
+    const lista = conRespuesta.filter(r => nuevas.has(r.ref))
     if (lista.length) {
       const r0 = lista[0]
       const html = lista.length === 1
         ? `${cab}✉️ <b>${p.mensaje_min ? 'Mensaje sin responder' : 'Mensaje nuevo'}</b> · ${esc(r0.cuenta)} · ${hace(r0.ultimo_at)}\n`
           + `👤 ${esc(r0.comprador ?? 'Comprador')}${r0.productos ? ` · 📦 ${esc(corto(r0.productos, 70))}` : ''}\n\n`
-          + `💬 <i>“${esc(corto(r0.ultimo_texto || '(adjunto)', 400))}”</i>`
+          + (r0.ultimo_texto ? `💬 <i>“${esc(corto(r0.ultimo_texto, 400))}”</i>` : SIN_TEXTO)
         : `${cab}✉️ <b>${lista.length} mensajes de compradores ${p.mensaje_min ? 'sin responder' : 'nuevos'}</b>${p.mensaje_min ? ` (más de ${p.mensaje_min} min)` : ''}\n\n`
-          + lista.slice(0, 6).map(r => `• <b>${esc(r.comprador ?? 'Comprador')}</b> · ${esc(r.cuenta)} · ${hace(r.ultimo_at)}\n   <i>“${esc(corto(r.ultimo_texto || '(adjunto)', 110))}”</i>`).join('\n')
+          + lista.slice(0, 6).map(r => `• <b>${esc(r.comprador ?? 'Comprador')}</b> · ${esc(r.cuenta)} · ${hace(r.ultimo_at)}\n   ${r.ultimo_texto ? `<i>“${esc(corto(r.ultimo_texto, 110))}”</i>` : SIN_TEXTO}`).join('\n')
           + (lista.length > 6 ? `\n… y ${lista.length - 6} más` : '')
       if (await mandar(d, e, 'mensaje', lista.map(r => r.ref), html,
         [[lista.length === 1
