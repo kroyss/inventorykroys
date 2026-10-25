@@ -516,6 +516,12 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     <div className="space-y-4">
       <PageHeader title="Productos" subtitle="Catálogo, precios y margen neto de cada producto" actions={<>
         {importarML && (
+          <Link href="/productos/importar-ml" className="btn-secondary text-sm whitespace-nowrap"
+            title="Crear productos a partir de tus publicaciones de MercadoLibre (cada una, o cada color/modelo, queda vinculada)">
+            Importar desde ML
+          </Link>
+        )}
+        {importarML && (
           <Link href="/vincular-ml" className="btn-secondary text-sm whitespace-nowrap"
             title="Unir cada publicación (o color/modelo) de MercadoLibre con su producto; ver las dudas del equipo y crear productos nuevos">
             Vincular con ML
@@ -538,6 +544,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         )}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nuevo producto</button>
       </>} />
+
+      {/* Catálogo vacío (25-10): el primer paso de quien recién prende inventario es traer sus publicaciones. */}
+      {importarML && products.length === 0 && (
+        <div className="rounded-xl border border-lime-300 bg-lime-50 p-5 sm:flex sm:items-center sm:gap-6">
+          <div className="flex-1">
+            <div className="text-lg font-semibold text-neutral-900">Empieza trayendo tus publicaciones de MercadoLibre</div>
+            <p className="mt-1 text-sm text-neutral-600">
+              Cada publicación (o cada color/modelo) queda como un producto, ya vinculado: así cada venta de ML descuenta
+              el producto correcto. Después solo revisas el stock y el costo.
+            </p>
+          </div>
+          <Link href="/productos/importar-ml" className="btn-primary mt-3 inline-block whitespace-nowrap sm:mt-0">Importar desde MercadoLibre</Link>
+        </div>
+      )}
 
       {/* KPI header */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

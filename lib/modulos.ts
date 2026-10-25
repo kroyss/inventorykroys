@@ -30,6 +30,9 @@ export const MODULOS = {
   // inventario). Apagadas = el Inventario simple de los Fundadores. Lo de siempre, sin pantallas aparte.
   // Promociones de ML (2026-10-16, migración 094): Fase 1 solo lectura. Campañas de ML, en cuáles está
   // cada publicación y hasta dónde puede bajar el precio sin perder el envío gratis (ZOOM / TEALCA).
+  // Etiquetas de productos (25-10, migración 122): imprimir etiquetas con código de barras desde Inventario.
+  // Solo SolucionesMC (inventario completo); a un cliente se le prende en Plataforma si lo pide.
+  etiquetas:      'Etiquetas de productos: imprimir etiquetas con código, nombre y código de barras desde Inventario',
   promociones:    'Promociones de MercadoLibre: campañas, publicaciones adentro o candidatas y envío gratis por transportista (VE, con inventario)',
   verificar_pagos:    'Ventas: verificar el pago antes de procesar (Borrador → Pago verificado → Procesada). Apagado: se procesa directo (VE; CO ya trabaja así)',
   despachos_ventas:   'Despachos y Calificaciones con las ventas CARGADAS en Ventas. Apagado: con las ventas de MercadoLibre, aunque lleve inventario',

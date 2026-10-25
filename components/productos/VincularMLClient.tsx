@@ -1,7 +1,7 @@
 'use client'
 // Vincular publicaciones de ML (20-10, migración 109; API /api/vincular-ml). Una tarjeta por publicación, de la que
 // más vende a la que menos; dentro, una fila por variante (cada color/modelo es un producto aparte). Cada vínculo lo
-// hace una persona con un clic: el sistema solo sugiere. "No sé, para Marcos" deja la duda con su nota.
+// hace una persona con un clic: el sistema solo sugiere. "No sé, para Marcos" (en clientes, "para el administrador") deja la duda con su nota.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
@@ -39,7 +39,7 @@ function buscarProductos(productos: Producto[], q: string) {
 }
 const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
 
-export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }) {
+export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador' }: { conCuentas: boolean; paraQuien?: string }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filtro>('pendientes')
@@ -82,6 +82,7 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
   const dudas = datos.filas.filter(f => f.duda).length
   const pendientes = datos.filas.filter(f => f.estado !== 'vinculada' && !f.duda).length
   const cuentas = [...new Set(datos.filas.map(f => f.cuenta))].sort()
+  const sinProductos = datos.productos.length === 0
 
   // Después de una acción: se actualiza la fila en pantalla (sin recargar todo el catálogo).
   const cambiarFila = (codigo: string, c: Partial<Fila>) =>
@@ -98,7 +99,22 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
     <div className="space-y-4">
       <PageHeader title="Vincular con MercadoLibre"
         subtitle="Une cada publicación (o cada color/modelo) con su producto. Así las ventas de ML descuentan el producto correcto."
-        actions={datos.esDueno ? <Link href="/productos/importar-ml" className="btn-secondary text-sm" title="Crear productos nuevos a partir de publicaciones">Crear productos desde ML</Link> : undefined} />
+        actions={datos.esDueno ? <Link href="/productos/importar-ml" className={`${sinProductos ? 'btn-primary' : 'btn-secondary'} text-sm`} title="Crear productos nuevos a partir de publicaciones">Crear productos desde ML</Link> : undefined} />
+
+      {/* Sin productos todavía (25-10): no hay con qué vincular; el paso es crearlos desde las publicaciones. */}
+      {sinProductos && (
+        <div className="rounded-xl border border-lime-300 bg-lime-50 p-5 sm:flex sm:items-center sm:gap-6">
+          <div className="flex-1">
+            <div className="text-lg font-semibold text-neutral-900">Todavía no tienes productos</div>
+            <p className="mt-1 text-sm text-neutral-600">
+              {datos.esDueno
+                ? 'Créalos desde tus publicaciones: cada una (o cada color/modelo) queda como un producto ya vinculado. Después aquí solo vinculas lo que quede suelto.'
+                : `Primero ${paraQuien} tiene que crear los productos desde las publicaciones; después aquí se vinculan.`}
+            </p>
+          </div>
+          {datos.esDueno && <Link href="/productos/importar-ml" className="btn-primary mt-3 inline-block whitespace-nowrap sm:mt-0">Importar desde MercadoLibre</Link>}
+        </div>
+      )}
 
       {/* Avance */}
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
@@ -160,7 +176,7 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
               </div>
               <ul className="divide-y divide-neutral-100">
                 {g.visibles.map(f => (
-                  <FilaVariante key={f.codigo} f={f} productos={datos.productos} esDueno={datos.esDueno} pedir={pedir}
+                  <FilaVariante key={f.codigo} f={f} productos={datos.productos} esDueno={datos.esDueno} paraQuien={paraQuien} pedir={pedir}
                     onCambio={(c, sumaHoy) => { cambiarFila(f.codigo, c); if (sumaHoy) setHechosHoy(n => n + sumaHoy) }} />
                 ))}
               </ul>
@@ -175,8 +191,8 @@ export default function VincularMLClient({ conCuentas }: { conCuentas: boolean }
   )
 }
 
-function FilaVariante({ f, productos, esDueno, pedir, onCambio }: {
-  f: Fila; productos: Producto[]; esDueno: boolean
+function FilaVariante({ f, productos, esDueno, paraQuien, pedir, onCambio }: {
+  f: Fila; productos: Producto[]; esDueno: boolean; paraQuien: string
   pedir: (b: Record<string, unknown>) => Promise<boolean>
   onCambio: (c: Partial<Fila>, sumaHoy?: number) => void
 }) {
@@ -253,8 +269,8 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
                 }}>Sí, es este</button>
               </>
             )}
-            <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary w-full text-xs sm:w-auto">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>
-            {!f.duda && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="py-1 text-xs text-neutral-500 underline sm:py-0">No sé, para Marcos</button>}
+            {productos.length > 0 && <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary w-full text-xs sm:w-auto">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>}
+            {!f.duda && productos.length > 0 && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="py-1 text-xs text-neutral-500 underline sm:py-0">No sé, para {paraQuien}</button>}
           </div>
         )}
       </div>

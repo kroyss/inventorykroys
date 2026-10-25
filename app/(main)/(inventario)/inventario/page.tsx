@@ -4,6 +4,7 @@ import { dbDeSesion } from '@/lib/session'
 import InventarioClient from '@/components/inventario/InventarioClient'
 import type { InventoryItem } from '@/lib/types'
 import { puede } from '@/lib/permisos'
+import { tieneModulo } from '@/lib/modulos'
 import { redirect } from 'next/navigation'
 
 export const metadata = { title: 'Inventario' }
@@ -67,6 +68,7 @@ export default async function InventarioPage() {
       initialItems={rows as InventoryItem[]}
       acceso={{ config: puede(session!.user, 'inventario_config'), costos: puede(session!.user, 'costos') }}
       country={session!.user.country}
+      etiquetas={tieneModulo(session!.user, 'etiquetas')}
     />
   )
 }
