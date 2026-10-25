@@ -125,9 +125,10 @@ interface Props {
   initialItems: InventoryItem[]
   acceso:       { config: boolean; costos: boolean }   // lib/permisos.ts
   country:      Country
+  etiquetas?:   boolean   // módulo "etiquetas" (25-10): solo SolucionesMC
 }
 
-export default function InventarioClient({ initialItems, acceso, country }: Props) {
+export default function InventarioClient({ initialItems, acceso, country, etiquetas: conEtiquetas = false }: Props) {
   // "Configurar inventario" (mín/máx, recomendados, ventas 6m) y "Ver costos" van por separado.
   const isAdmin = acceso.config
   const verCostos = acceso.costos
@@ -403,10 +404,12 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
   return (
     <div className="space-y-4">
       <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
-        <button onClick={() => setEtiquetas(0)} className="btn-secondary text-sm whitespace-nowrap"
-          title="Etiquetas con código, nombre y código de barras para estantes y cajas">
-          🏷 Imprimir etiquetas
-        </button>
+        {conEtiquetas && (
+          <button onClick={() => setEtiquetas(0)} className="btn-secondary text-sm whitespace-nowrap"
+            title="Etiquetas con código, nombre y código de barras para estantes y cajas">
+            🏷 Imprimir etiquetas
+          </button>
+        )}
         {isAdmin && sinConfigurar > 0 && (
           <button onClick={usarRecomendados} disabled={aplicandoRec} className="btn-secondary text-sm whitespace-nowrap"
             title="Guarda el mínimo y máximo recomendado en los productos que no lo tienen configurado">
@@ -505,7 +508,7 @@ export default function InventarioClient({ initialItems, acceso, country }: Prop
                     <StatusBadge status={item.status} label={STATUS_LABEL[item.status]} />
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    {item.is_active && (
+                    {item.is_active && conEtiquetas && (
                       <button onClick={e => { e.stopPropagation(); setEtiquetas(item.product_id) }}
                         className="btn-secondary text-xs px-2 py-1 mr-1.5" title="Imprimir la etiqueta de este producto" aria-label="Etiqueta">🏷</button>
                     )}
