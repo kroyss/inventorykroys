@@ -32,6 +32,23 @@ interface Empresa {
   pausa_fecha: string | null
   creada: string
   cuentas: string | null      // cuentas de MercadoLibre conectadas (null = ninguna)
+  inventario?: UsoInventario | null   // solo con el módulo inventario (25-10)
+}
+interface UsoInventario { ultima: string | null; sin_registrar: number; sin_registrar_con_pago: number }
+
+/** ¿Usa el inventario? (25-10) Última venta registrada y ventas de ML de los últimos 7 días sin registrar. */
+function LineaInventario({ u, conPagos }: { u: UsoInventario; conPagos: boolean }) {
+  // Con Pagos ME se cuentan solo las que trajeron pago (en VE muchas compras nunca se pagan).
+  const n = conPagos ? u.sin_registrar_con_pago : u.sin_registrar
+  const dias = u.ultima ? Math.floor((Date.now() - new Date(u.ultima).getTime()) / 86_400_000) : null
+  const tono = dias == null || dias > 7 ? 'text-red-600' : dias > 2 || n > 5 ? 'text-amber-700' : 'text-emerald-700'
+  const punto = dias == null || dias > 7 ? '🔴' : dias > 2 || n > 5 ? '🟡' : '🟢'
+  return (
+    <div className={`text-[11px] ${tono}`} title={`Ventas de MercadoLibre de los últimos 7 días${conPagos ? ' con pago' : ''} que no se registraron en Ventas: su stock no está al día`}>
+      {punto} Inventario: {dias == null ? 'nunca registró una venta' : `última venta registrada ${dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`}`}
+      {' · '}<b>{n}</b> {conPagos ? 'con pago ' : ''}sin registrar (7 días)
+    </div>
+  )
 }
 
 // Clientes (20-10, "los inactivos me hacen ruido"): a la vista solo los que PUEDEN ENTRAR (en prueba o pagando);
@@ -243,6 +260,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
           porVencer: e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5,
           detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.admins ? ` · ${e.admins}` : ''}`,
           cuenta: <FraseCuenta e={e} hoy={hoy} />,
+          extra: e.inventario ? <LineaInventario u={e.inventario} conPagos={e.modulos.includes('pagos_me')} /> : undefined,
         }))} />
 
       {/* Inactivos: guardados, fuera de la vista rápida. Con la búsqueda se abren solos si hay coincidencias. */}

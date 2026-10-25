@@ -104,7 +104,7 @@ function siguiente(e: Empresa, n: Nivel) {
 
 /** Una empresa de la lista de Plataforma (búsqueda y estado de la cuenta los pone PlataformaClient; 20-10 aquí
  *  solo llegan las que pueden entrar: las inactivas van plegadas aparte). porVencer = le quedan ≤ 5 días. */
-export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean }
+export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean; extra?: ReactNode }
 
 export const CEROS = {
   propia: false, cuentas: null, ventas: 0, preguntas: 0, preguntas_sistema: 0, guias: 0, reportadas: 0, calificadas: 0,
@@ -228,6 +228,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
                     <div className="font-medium text-neutral-900">{b.nombre}{e.propia && <span className="ml-1.5 rounded bg-neutral-900 px-1.5 py-px text-[10px] font-semibold text-white">TÚ</span>}</div>
                     <div className="text-[11px] text-neutral-400">{b.detalle}</div>
                     <div className="max-w-[14rem] truncate text-[11px] text-neutral-400" title={e.cuentas ?? ''}>{e.cuentas ?? 'sin cuenta de ML'}</div>
+                    {b.extra}
                   </td>
                   <td className="px-3 py-2.5">{b.cuenta}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-xs">

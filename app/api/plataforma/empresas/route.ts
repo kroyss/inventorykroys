@@ -21,6 +21,20 @@ async function soloDueno() {
   return { session }
 }
 
+const SQL_USO_INVENTARIO = `
+  SELECT (SELECT MAX(created_at) FROM sales) AS ultima, COUNT(*)::int AS sin_registrar,
+         -- En VE muchas compras nunca se pagan: con Pagos ME lo que importa son las que SÍ trajeron pago.
+         COUNT(*) FILTER (WHERE con_pago)::int AS sin_registrar_con_pago
+  FROM (SELECT DISTINCT ON (COALESCE(o.pack_id, o.id))
+               EXISTS (SELECT 1 FROM me_pagos p WHERE (p.venta = o.id::text OR p.venta = o.pack_id::text)
+                         AND p.verificacion <> 'invalido') AS con_pago
+        FROM ml_ordenes o
+        WHERE o.fecha > NOW() - interval '7 days'
+          AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
+          AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
+        ORDER BY COALESCE(o.pack_id, o.id), con_pago DESC) v`
+
 /** GET /api/plataforma/empresas — todas las empresas con su organización y cuántos usuarios. */
 export async function GET() {
   const { error } = await soloDueno()
@@ -39,6 +53,12 @@ export async function GET() {
        FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
        LEFT JOIN plataforma_uso_clientes() u ON u.empresa_id = e.id
        ORDER BY o.nombre, e.id`)
+    // Uso del inventario (25-10): ¿lo usa o lo abandonó? Última venta registrada y ventas de ML de 7 días sin registrar.
+    // De a una empresa (son pocas con inventario) para no ocupar varias conexiones a la vez.
+    for (const e of rows) {
+      if (!e.is_active || !(e.modulos as string[]).includes('inventario')) continue
+      e.inventario = await conEmpresa(e.id, e.country, db => db.query(SQL_USO_INVENTARIO).then(r => r.rows[0])).catch(() => null)
+    }
     return NextResponse.json({ empresas: rows, modulos: MODULOS, hoy: currentDate() })
   } catch (err) {
     return apiError(err)
