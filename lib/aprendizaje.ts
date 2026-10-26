@@ -1,13 +1,14 @@
 // Aprendizaje (migración 051): videos de YouTube no listados que se ven dentro del sistema, en
-// orden. Un video cuenta como visto al reproducir el 80% (lo saltado no suma; se puede ver a 2x). El siguiente se
+// orden. Un video cuenta como visto al reproducir el 50% (26-10, antes 80%; lo saltado no suma; se puede ver a 2x). El siguiente se
 // habilita al completar el anterior. Al terminar todos: "Agenda tu configuración".
 // Dos series (migración 072): Automatizaciones (todas las empresas) e Inventario (solo con el módulo
 // inventario). El orden obligatorio es dentro de cada serie.
 import { dbGlobal } from '@/lib/db'
 
-export const PORCENTAJE_COMPLETO = 0.8
+export const PORCENTAJE_COMPLETO = 0.5
 
-// MercadoEnvíos (mig 117, 23-10): solo las empresas con el módulo pagos_me.
+// MercadoEnvíos (mig 117, 23-10): solo las empresas con el módulo pagos_me. Se habilita después de terminar
+// toda la serie Automatizaciones (26-10, pedido del dueño): primero lo básico.
 export const SERIES = { automatizaciones: 'Automatiza', mercadoenvios: 'MercadoEnvíos', inventario: 'Inventario' } as const
 export type Serie = keyof typeof SERIES
 /** Orden SQL de las series (Automatizaciones primero). */

@@ -72,7 +72,9 @@ export default function AprendizajeClient() {
   const hechos = videos.filter(v => v.completado).length
   const total = videos.length
   // En orden DENTRO de cada serie: se habilita si todos los anteriores de su serie están completos.
-  const habilitado = (i: number) => videos.slice(0, i).every(x => x.serie !== videos[i].serie || x.completado)
+  // MercadoEnvíos además espera a que termine toda la serie Automatizaciones (26-10).
+  const cuenta = (x: Video, de: Video) => x.serie === de.serie || (de.serie === 'mercadoenvios' && x.serie === 'automatizaciones')
+  const habilitado = (i: number) => videos.slice(0, i).every(x => !cuenta(x, videos[i]) || x.completado)
   const v = videos.find(x => x.id === actual) ?? videos[0]
   const idx = videos.indexOf(v)
   const siguiente = videos[idx + 1]

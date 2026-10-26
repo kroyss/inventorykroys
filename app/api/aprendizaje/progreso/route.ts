@@ -14,7 +14,7 @@ const Body = z.object({
   posicion_seg: z.number().int().min(0).max(36000).default(0),
 })
 
-// POST /api/aprendizaje/progreso → guarda cuánto se vio (nunca baja) y dónde quedó. Al llegar al 80%
+// POST /api/aprendizaje/progreso → guarda cuánto se vio (nunca baja) y dónde quedó. Al llegar al 50%
 // queda completado. También llega por navigator.sendBeacon al cerrar o recargar la página.
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -26,10 +26,13 @@ export async function POST(req: NextRequest) {
       `INSERT INTO aprendizaje_progreso (user_id, video_id, visto_seg, duracion_seg, posicion_seg, completado_at)
        SELECT $1::int, v.id, $3::int, $4::int, $6::int, CASE WHEN $3::int >= $4::int * $5::numeric THEN NOW() END
        FROM aprendizaje_videos v WHERE v.id = $2::int AND v.activo
-         -- en orden: no cuenta si hay un video ANTERIOR de la misma serie sin completar
+         -- en orden: no cuenta si hay un video ANTERIOR de la misma serie sin completar; MercadoEnvíos, además,
+         -- si falta alguno de Automatizaciones (26-10)
          AND NOT EXISTS (SELECT 1 FROM aprendizaje_videos a
                          LEFT JOIN aprendizaje_progreso pa ON pa.video_id = a.id AND pa.user_id = $1::int
-                         WHERE a.activo AND a.serie = v.serie AND (a.orden, a.id) < (v.orden, v.id) AND pa.completado_at IS NULL)
+                         WHERE a.activo AND pa.completado_at IS NULL
+                           AND ((a.serie = v.serie AND (a.orden, a.id) < (v.orden, v.id))
+                                OR (v.serie = 'mercadoenvios' AND a.serie = 'automatizaciones')))
        ON CONFLICT (user_id, video_id) DO UPDATE SET
          visto_seg     = GREATEST(aprendizaje_progreso.visto_seg, EXCLUDED.visto_seg),
          duracion_seg  = EXCLUDED.duracion_seg,
