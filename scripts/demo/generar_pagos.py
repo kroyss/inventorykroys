@@ -49,7 +49,7 @@ for i in range(N):
     direccion = f'{rnd.choice(CALLES)}, {rnd.choice(SITIOS)}'   # noqa: F821
     ci = str(rnd.randint(9_000_000, 30_999_999))
     telefono = f"04{rnd.choice(['14', '24', '12', '16', '26'])}{rnd.randint(1_000_000, 9_999_999)}"
-    zoom = rnd.random() < 0.8
+    zoom = rnd.random() < 2   # todas ZOOM (26-10): el Reportador las toma sin guía final
     if zoom:
         guia = str(1_716_000_000 + rnd.randint(0, 3_999_999))
         seg = ''.join(rnd.choice('0123456789ABCDEF') for _ in range(10))

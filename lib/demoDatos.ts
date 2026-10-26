@@ -549,10 +549,10 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
     const comprador = real?.comprador ?? azar
     ordenes.push({ id: venta, conexion: cx[c.nickname], horas, comprador, items })
     const totalBs = Math.round(usd * t.bcv * 100) / 100
-    // Uno de ayer quedó inválido (la referencia no apareció). Los de hoy, completos y verificados (26-10): la demo
-    // es para grabar el ciclo Traer → Despachos → Reportador sin trabas.
-    const pagado = totalBs
-    const zoom = real ? real.carrier === 'ZOOM' : r() < 0.8
+    // Uno de hoy pagó de menos (para mostrar "no coincide"); uno de ayer quedó inválido (la referencia no apareció).
+    const pagado = i === 5 ? Math.round(totalBs * 0.9 * 100) / 100 : totalBs
+    // Todas ZOOM (26-10): el Reportador las toma sin cargar guía final (TEALCA la pide).
+    const zoom = true
     const fecha = new Date(Date.now() - horas * 3_600_000)
     pagos.push({
       venta, hoy, cuenta: c.remitente, estado_me: 'pending', horas, total_orden: totalBs, total_orden_usd: usd,
@@ -561,7 +561,7 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
       monto_pagado: pagado,
       envio_metodo: 'Envío Gratis', envio_opcion: r() < 0.8 ? 'Retiro en agencia' : 'Entrega a domicilio',
       carrier: zoom ? 'ZOOM' : 'Tealca', guia: real?.guia ?? (zoom ? String(1_100_000_000 + Math.floor(r() * 99_999_999)) : String(500_000 + Math.floor(r() * 499_999))),
-      verificacion: i === HOY + 4 ? 'invalido' : 'valido',
+      verificacion: hoy ? 'pendiente' : i === HOY + 4 ? 'invalido' : 'valido',
       nota: i === HOY + 4 ? 'La referencia no aparece en el banco: se le escribió al comprador.' : null,
     })
   }
@@ -595,7 +595,7 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
        envio_opcion text, carrier text, guia text, guia_path text, verificacion text, nota text)`,
     [JSON.stringify(pagos), adm?.id ?? null])
 
-  // Despachos: las de hoy, en el lote pendiente (pago verificado: listas para Generar PDF); las de ayer, ya despachadas.
+  // Despachos: las de hoy, en el lote pendiente ("Pago sin verificar" hasta verificarlas en Pagos ME); las de ayer, ya despachadas.
   type P = { venta: string; hoy: boolean; guia: string; carrier: string; cuenta: string; verificacion: string; guia_path: string; sha: string }
   const ps = pagos as P[]
   const compradorDe = (venta: string) => ordenes.find(o => o.id === venta)!.comprador
