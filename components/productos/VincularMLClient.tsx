@@ -21,7 +21,7 @@ interface Fila {
   conflicto?: ConflictoPesos | null                       // …de distinto peso y el envío gratis cambia según cuál
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
-type Filtro = 'pendientes' | 'dudas' | 'vinculadas' | 'todas'
+type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'todas'
 
 const POR_PAGINA = 25
 
@@ -40,19 +40,21 @@ function buscarProductos(productos: Producto[], q: string) {
 /** Buscador de la lista (26-10): la publicación (título, MLV, variante) y también el producto vinculado (código, nombre). */
 const textoFila = (f: Fila) => sinAcentos([f.titulo, f.item_id, f.codigo, f.variante, f.producto?.code, f.producto?.name,
   ...(f.otros ?? []).flatMap(o => [o.code, o.name])].filter(Boolean).join(' '))
+/** Activa y con unidades en ML, sin producto: se vende sin descontar del inventario (lo primero a vincular). */
+const activaSinVincular = (f: Fila) => f.estado !== 'vinculada' && f.estado_ml === 'active' && f.disponible > 0
 const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
 const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return true; const t = textoFila(f); return palabras.every(w => t.includes(w)) }
 /** ¿Ve la pestaña Stock? (para el atajo «ver stock» de cada vínculo) */
 const ConStock = createContext(false)
 const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
 
-export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador', buscarInicial = '', conStock = false }: {
-  conCuentas: boolean; paraQuien?: string; buscarInicial?: string; conStock?: boolean
+export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador', buscarInicial = '', vistaInicial, conStock = false }: {
+  conCuentas: boolean; paraQuien?: string; buscarInicial?: string; vistaInicial?: Filtro; conStock?: boolean
 }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Desde Stock («Revisar vínculos») llega ?buscar=COD-…: se abre en Todas con ese producto.
-  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : 'pendientes')
+  const [filtro, setFiltro] = useState<Filtro>(vistaInicial ?? (buscarInicial ? 'todas' : 'pendientes'))
   const [cuenta, setCuenta] = useState('')
   const [buscar, setBuscar] = useState(buscarInicial)
   const [ver, setVer] = useState(POR_PAGINA)
@@ -76,6 +78,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
       m.get(k)!.filas.push(f)
     }
     const pasa = (f: Fila) => filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
+      : filtro === 'activas' ? activaSinVincular(f)
       : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda
     return [...m.values()]
       .map(g => ({ ...g, ventas: g.filas.reduce((s, f) => s + f.ventas60, 0), visibles: g.filas.filter(f => pasa(f) && coincide(f, palabras)) }))
@@ -97,6 +100,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     vinculadas: encontradas.filter(f => f.estado === 'vinculada').length,
     dudas: encontradas.filter(f => f.duda).length,
     pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda).length,
+    activas: encontradas.filter(activaSinVincular).length,
   }
   const cuentas = [...new Set(datos.filas.map(f => f.cuenta))].sort()
   const sinProductos = datos.productos.length === 0
@@ -148,7 +152,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
+        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>

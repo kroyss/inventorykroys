@@ -35,11 +35,12 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false 
   const [actualizando, setActualizando] = useState(false)
   const [reserva, setReserva] = useState<number | null>(null)
   const [puedeReserva, setPuedeReserva] = useState(false)
+  const [sinVincular, setSinVincular] = useState(0)
 
   const cargar = () => fetch('/api/stock-en-ml', { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
-    setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setError(null)
+    setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
   })
   useEffect(() => { cargar() }, [])
 
@@ -111,6 +112,13 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false 
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
         <p><b>Disponible</b> = stock del sistema − ventas de MercadoLibre que todavía no se registraron (ML ya las descontó de su publicación).
           Al igualar, cada publicación queda con el disponible; si <b>trae varias unidades</b> (pack o combo), con el disponible ÷ las que trae.</p>
+        {sinVincular > 0 && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+            <b>{sinVincular} publicaci{sinVincular === 1 ? 'ón activa' : 'ones activas'} con stock en ML no {sinVincular === 1 ? 'está vinculada' : 'están vinculadas'}</b>: sus ventas
+            no descuentan nada del inventario.{' '}
+            {conVincular ? <Link href="/vincular-ml?vista=activas" className="font-medium underline">Vincularlas →</Link> : 'Avísale a quien vincula.'}
+          </p>
+        )}
         <p><b>Reserva de seguridad</b>: {reserva ?? '…'} u. por producto quedan sin publicar por si hay un error. Lo demás se reparte
           en partes iguales entre las publicaciones (lo que sobra, a la que más vende). Con {reserva ?? '…'} o menos el producto
           queda <b>en reserva</b>: tú decides a qué cuenta va cada unidad.
