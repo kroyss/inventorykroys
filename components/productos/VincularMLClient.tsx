@@ -12,7 +12,7 @@ import type { ConflictoPesos } from '@/lib/mlShipping'
 interface Producto { id: number; code: string; name: string; stock: number }
 interface Fila {
   codigo: string; item_id: string; cuenta: string; titulo: string; variante: string | null; disponible: number
-  estado_ml: string | null; thumbnail: string | null; permalink: string | null
+  estado_ml: string | null; thumbnail: string | null; permalink: string | null; sin_movimiento?: boolean
   estado: 'vinculada' | 'parecida' | 'nueva'
   producto: { id: number; code: string; name: string; toda: boolean } | null
   ventas60: number; vinculado_por: string | null; vinculado_at: string | null; propio: boolean
@@ -43,6 +43,8 @@ const textoFila = (f: Fila) => sinAcentos([f.titulo, f.item_id, f.codigo, f.vari
   ...(f.otros ?? []).flatMap(o => [o.code, o.name])].filter(Boolean).join(' '))
 /** Activa y con unidades en ML, sin producto: se vende sin descontar del inventario (lo primero a vincular). */
 const activaSinVincular = (f: Fila) => f.estado !== 'vinculada' && f.estado_ml === 'active' && f.disponible > 0
+// Pausada sin ventas ni preguntas en 90 días y sin vincular (migración 127): solo al buscar o en "Todas".
+const quieta = (f: Fila) => f.estado !== 'vinculada' && !!f.sin_movimiento
 const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
 const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return true; const t = textoFila(f); return palabras.every(w => t.includes(w)) }
 /** ¿Ve la pestaña Stock? (para el atajo «ver stock» de cada vínculo) */
@@ -72,16 +74,16 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   const grupos = useMemo(() => {
     if (!datos) return []
     const palabras = palabrasDe(buscar)
-    const m = new Map<string, { item_id: string; cuenta: string; titulo: string; thumbnail: string | null; permalink: string | null; estado_ml: string | null; filas: Fila[] }>()
+    const m = new Map<string, { item_id: string; cuenta: string; titulo: string; thumbnail: string | null; permalink: string | null; estado_ml: string | null; quieta: boolean; filas: Fila[] }>()
     for (const f of datos.filas) {
       const k = `${f.cuenta}|${f.item_id}`
-      if (!m.has(k)) m.set(k, { item_id: f.item_id, cuenta: f.cuenta, titulo: f.titulo, thumbnail: f.thumbnail, permalink: f.permalink, estado_ml: f.estado_ml, filas: [] })
+      if (!m.has(k)) m.set(k, { item_id: f.item_id, cuenta: f.cuenta, titulo: f.titulo, thumbnail: f.thumbnail, permalink: f.permalink, estado_ml: f.estado_ml, quieta: !!f.sin_movimiento, filas: [] })
       m.get(k)!.filas.push(f)
     }
     const pasa = (f: Fila) => filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
       : filtro === 'activas' ? activaSinVincular(f)
       : filtro === 'no_usa' ? f.estado !== 'vinculada' && !!f.no_usa
-      : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda && !f.no_usa
+      : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)
     return [...m.values()]
       .map(g => ({ ...g, ventas: g.filas.reduce((s, f) => s + f.ventas60, 0), visibles: g.filas.filter(f => pasa(f) && coincide(f, palabras)) }))
       .filter(g => g.visibles.length && (!cuenta || g.cuenta === cuenta))
@@ -94,14 +96,14 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   // Con algo escrito en el buscador, los botones cuentan lo encontrado (para saltar a donde está).
   const palabras = palabrasDe(buscar)
   const encontradas = palabras.length ? datos.filas.filter(f => coincide(f, palabras)) : datos.filas
-  const total = datos.filas.length
+  const total = datos.filas.filter(f => !quieta(f)).length
   const vinculadas = datos.filas.filter(f => f.estado === 'vinculada').length
   const dudas = datos.filas.filter(f => f.duda).length
   const n = {
     todas: encontradas.length,
     vinculadas: encontradas.filter(f => f.estado === 'vinculada').length,
     dudas: encontradas.filter(f => f.duda).length,
-    pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa).length,
+    pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)).length,
     activas: encontradas.filter(activaSinVincular).length,
     no_usa: encontradas.filter(f => f.estado !== 'vinculada' && f.no_usa).length,
   }
@@ -195,7 +197,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
                   <div className="font-medium text-neutral-900">{g.titulo}</div>
                   <div className="text-xs text-neutral-500">
                     {g.cuenta} · {g.permalink ? <a href={g.permalink} target="_blank" rel="noreferrer" className="font-mono underline">{g.item_id}</a> : <span className="font-mono">{g.item_id}</span>}
-                    {g.estado_ml && g.estado_ml !== 'active' && <span className="ml-1 text-amber-700">· pausada</span>}
+                    {g.estado_ml && g.estado_ml !== 'active' && <span className="ml-1 text-amber-700">· pausada{g.quieta ? ' sin movimiento (90 días)' : ''}</span>}
                   </div>
                 </div>
                 <div className="shrink-0 text-right text-xs text-neutral-500"><b className="text-base tabular-nums text-neutral-900">{g.ventas}</b><div>vendidas 60 d</div></div>

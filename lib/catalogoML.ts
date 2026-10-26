@@ -1,9 +1,9 @@
 // Catálogo del vendedor e historial completo de preguntas (migración 059): más contexto para la IA.
 //
-//   - Catálogo: las publicaciones CON MOVIMIENTO de cada cuenta, con su ficha resumida: todas las
-//     activas + las pausadas que tuvieron una venta o una pregunta en los últimos DIAS_MOVIMIENTO
-//     días (las pausadas viejas son "basura": en la cuenta del dueño 650 de 1.176). Si una vuelve
-//     a activarse, entra sola en el siguiente refresco.
+//   - Catálogo: TODAS las publicaciones activas y pausadas de cada cuenta, con su ficha resumida. Las pausadas sin
+//     venta ni pregunta en los últimos DIAS_MOVIMIENTO días quedan marcadas `sin_movimiento` (en la cuenta del dueño
+//     650 de 1.176): la IA no trae su historial y Vincular solo las muestra al buscar o en "Todas". Hasta el 26-10
+//     se borraban, y Vincular / Stock en ML no veían una pausada vieja que podía venir en camino (migración 127).
 //     Sirve para que la IA recomiende OTRO modelo del vendedor cuando el de la pregunta no cumple
 //     (el dueño lo hace a mano: "este no se empareja; el PRO sí: <link>"). Cada 6 h por cuenta.
 //   - Historial: la búsqueda general de ML corta en 1.000 preguntas por cuenta; por publicación
@@ -84,15 +84,15 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
       n++
     }
   }
-  // Sale del catálogo lo que ya no está activo ni pausado (finalizado, borrado) y lo pausado sin
-  // movimiento (ni ventas ni preguntas en DIAS_MOVIMIENTO días).
+  // Sale del catálogo lo que ya no está activo ni pausado (finalizado, borrado). Lo pausado sin movimiento
+  // (ni ventas ni preguntas en DIAS_MOVIMIENTO días) se queda, marcado.
   await db.query(`DELETE FROM ml_catalogo WHERE conexion_id = $1 AND actualizado_at < $2`, [conexionId, inicio])
-  const { rowCount: quietas } = await db.query(
-    `DELETE FROM ml_catalogo c WHERE c.conexion_id = $1 AND c.estado = 'paused'
+  await db.query(
+    `UPDATE ml_catalogo c SET sin_movimiento = (c.estado = 'paused'
        AND NOT EXISTS (SELECT 1 FROM ml_preguntas q WHERE q.item_id = c.item_id AND q.fecha > NOW() - make_interval(days => $2))
        AND NOT EXISTS (SELECT 1 FROM ml_ordenes o WHERE o.conexion_id = c.conexion_id AND o.fecha > NOW() - make_interval(days => $2)
-                         AND c.item_id = ANY(o.items))`, [conexionId, DIAS_MOVIMIENTO])
-  n -= quietas ?? 0
+                         AND c.item_id = ANY(o.items)))
+     WHERE c.conexion_id = $1`, [conexionId, DIAS_MOVIMIENTO])
   return n
 }
 
@@ -102,7 +102,7 @@ export async function importarHistorial(db: Pool) {
   const { rows } = await db.query(
     `UPDATE ml_catalogo SET historial_at = NOW()
      WHERE (empresa_id, item_id) IN (
-       SELECT empresa_id, item_id FROM ml_catalogo WHERE historial_at IS NULL
+       SELECT empresa_id, item_id FROM ml_catalogo WHERE historial_at IS NULL AND NOT sin_movimiento
        ORDER BY actualizado_at LIMIT ${HISTORIAL_POR_PASADA} FOR UPDATE SKIP LOCKED)
      RETURNING item_id, conexion_id`)
   let guardadas = 0

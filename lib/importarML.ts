@@ -28,6 +28,7 @@ export interface FilaImportar {
   moneda: string | null
   disponible: number
   estado_ml: string | null       // active / paused
+  sin_movimiento?: boolean       // pausada sin ventas ni preguntas en 90 días (migración 127)
   thumbnail: string | null
   permalink: string | null
   estado: EstadoImportar
@@ -55,14 +56,14 @@ function similitud(a: Set<string>, b: Set<string>) {
 export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
   const { rows: cat } = await db.query(
     `SELECT c.item_id, c.titulo, c.precio::float AS precio, c.moneda, c.disponible, c.estado, c.permalink,
-            c.thumbnail, c.sku, c.variantes, UPPER(x.nickname) AS cuenta   -- como lib/mlCuentas (ficha del producto)
+            c.thumbnail, c.sku, c.variantes, c.sin_movimiento, UPPER(x.nickname) AS cuenta   -- como lib/mlCuentas (ficha del producto)
      FROM ml_catalogo c JOIN ml_conexiones x ON x.id = c.conexion_id
      ORDER BY c.estado = 'active' DESC, c.titulo`)
   const filas: (FilaImportar & { sku: string | null })[] = []
   for (const c of cat) {
     const pub = String(c.item_id).replace(/^[A-Z]{3}/, '')
     const base = { item_id: c.item_id, cuenta: c.cuenta, titulo: c.titulo, precio: c.precio, moneda: c.moneda,
-      estado_ml: c.estado, thumbnail: c.thumbnail, permalink: c.permalink, estado: 'nueva' as EstadoImportar, producto: null }
+      estado_ml: c.estado, sin_movimiento: !!c.sin_movimiento, thumbnail: c.thumbnail, permalink: c.permalink, estado: 'nueva' as EstadoImportar, producto: null }
     const vars = (c.variantes as VarianteCatalogo[] | null) ?? []
     if (vars.length) {
       for (const v of vars) filas.push({ ...base, codigo: `${pub}:${v.id}`, variante: v.nombre, disponible: v.disponible, sku: v.sku ?? c.sku })
