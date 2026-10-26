@@ -12,6 +12,7 @@ interface Fila {
   pausada_desde?: string | null   // migración 101: pausada a mano (con stock)
   sub_status?: string | null      // migración 111: motivo de ML (vacío = la pausó el vendedor)
   caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
+  inventario?: number | null      // 26-10, Pausadas: lo que hay en el inventario del producto vinculado
 }
 interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
@@ -177,13 +178,15 @@ export default function AlertasStockClient() {
     const d = vista === 'agotadas' ? f.agotada_desde : f.bajo_desde
     return !!d && Date.now() - new Date(d).getTime() < 7 * 86_400_000
   }
+  // Pausada por ML al quedar en 0 (con stock en el inventario): no se reactiva sin poner stock, solo con ✎.
+  const sinStockML = (f: Fila) => vista === 'pausadas' && f.estado === 'paused' && f.disponible <= 0
   const fila = (f: Fila) => (
     // Celular: dos líneas (arriba foto, título y estado; abajo casilla, stock nuevo y botón); antes todo en una
     // línea y el estado se salía del margen. Desde sm: una sola línea en el orden del código (sm:order-none).
     <li key={`${f.item_id}-${f.variante_id}`} className="px-4 py-2.5 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2">
       {datos?.puedeStock && vista === 'pausadas' && (
-        <input type="checkbox" checked={selP.has(clave(f))} onChange={() => alternarP(f)} disabled={frenadaPorML(f)}
-          title={frenadaPorML(f) ? 'MercadoLibre la frenó: revísala en MercadoLibre' : 'Marcar para reactivar'}
+        <input type="checkbox" checked={selP.has(clave(f))} onChange={() => alternarP(f)} disabled={frenadaPorML(f) || sinStockML(f)}
+          title={frenadaPorML(f) ? 'MercadoLibre la frenó: revísala en MercadoLibre' : sinStockML(f) ? 'Tiene 0 en ML: ponle stock con ✎' : 'Marcar para reactivar'}
           className="order-5 sm:order-none w-4 h-4 accent-neutral-900 shrink-0" />
       )}
       {datos?.puedeStock && vista !== 'pausadas' && (
@@ -210,7 +213,7 @@ export default function AlertasStockClient() {
         )}
         <p className="text-xs text-neutral-500 truncate">
           {f.cuenta} · {f.item_id}
-          {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML</span>}
+          {f.estado === 'paused' && <span className="text-amber-700"> · pausada por ML{sinStockML(f) ? ' al quedar en 0' : ''}</span>}
           {vista === 'pausadas' && frenadaPorML(f) && <span className="text-red-600"> · MercadoLibre la frenó (en revisión): revísala en ML</span>}
         </p>
         {resultado[clave(f)] && !resultado[clave(f)].ok && <p className="text-xs text-red-600">{resultado[clave(f)].error}</p>}
@@ -225,11 +228,12 @@ export default function AlertasStockClient() {
       <div className={`order-7 sm:order-none ml-auto sm:ml-0 shrink-0 flex items-center justify-end gap-1.5 ${vista === 'pausadas' && datos?.puedeStock ? 'sm:w-64' : 'sm:w-32'}`}>
         {vista === 'pausadas' && datos?.puedeStock && !frenadaPorML(f) && <>
           <button type="button" onClick={() => setStockDe(f)} title="Cambiar el stock (y reactivar) en MercadoLibre" aria-label="Cambiar stock"
-            className="inline-flex items-center rounded-full border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:border-neutral-500">✎</button>
-          <button type="button" onClick={() => reactivar([f])} disabled={!!reactivando}
+            className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${sinStockML(f) ? 'border-emerald-300 font-medium text-emerald-700 hover:bg-emerald-50' : 'border-neutral-300 text-neutral-600 hover:border-neutral-500'}`}>
+            ✎{sinStockML(f) && ' Poner stock'}</button>
+          {!sinStockML(f) && <button type="button" onClick={() => reactivar([f])} disabled={!!reactivando}
             className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-300 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
             ▶ Reactivar
-          </button>
+          </button>}
         </>}
         {(f.caliente || (f.descartada_at && reciente(f))) && <button type="button" onClick={() => descartar(f, f.caliente)} disabled={quitando === clave(f)}
           title={vista === 'pausadas' ? (f.caliente ? 'Ya la revisaste: sale de la lista (vuelve si la reactivas y la pausas de nuevo)' : 'Vuelve a la lista')
@@ -247,8 +251,9 @@ export default function AlertasStockClient() {
         <p className={`text-sm font-semibold num ${vista === 'pausadas' ? 'text-amber-700' : f.disponible <= 0 ? 'text-red-600' : f.disponible < (datos?.umbral ?? 3) ? 'text-amber-600' : 'text-emerald-700'}`}>
           {vista === 'pausadas' ? `⏸ Pausada · ${f.disponible} u.` : f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
+        {sinStockML(f) && f.inventario != null && <p className="text-[11px] font-medium text-emerald-700 whitespace-nowrap">en inventario: {f.inventario} u.</p>}
         <p className="text-[11px] text-neutral-400 whitespace-nowrap">
-          {vista === 'pausadas' ? `pausada ${hace(f.pausada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
+          {vista === 'pausadas' ? `pausada ${hace(f.pausada_desde ?? f.agotada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
         </p>
       </div>
       {/* Corte de línea solo en celular (con algo abajo que mostrar). */}

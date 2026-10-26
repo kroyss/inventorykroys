@@ -12,8 +12,14 @@ import { puede } from '@/lib/permisos'
 const FRESCA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND a.estado <> 'pausada' AND ${SQL_VENDIDA}`
 // Pausadas a mano (migración 101): todas las que el sistema ve pausadas con stock, vendidas o no. "En la lista"
 // = sin quitar con "Quitar de la lista" después de pausarse; al reactivarla en ML sale sola.
-const PAUSADA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND a.estado = 'pausada'`
-const PAUSADA_EN_LISTA = `(a.descartada_at IS NULL OR a.descartada_at < a.pausada_desde)`
+// 26-10: también las que ML pausó al quedar en 0 cuando el inventario SÍ tiene (publicación sin variantes vinculada
+// a un producto con stock): tienes en el depósito y la publicación está apagada sin avisar. Desde = cuando se agotó.
+const SQL_INVENTARIO = `(SELECT MAX(i.quantity)::int FROM product_ml_codes m
+    JOIN products p ON p.id = m.product_id AND p.is_active JOIN inventory i ON i.product_id = p.id
+   WHERE m.is_active AND split_part(m.ml_code, ':', 1) = substring(a.item_id FROM 4))`
+const PAUSADA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND (a.estado = 'pausada'
+  OR (a.estado = 'paused' AND a.disponible <= 0 AND a.variante_id = 0 AND ${SQL_INVENTARIO} > 0))`
+const PAUSADA_EN_LISTA = `(a.descartada_at IS NULL OR a.descartada_at < COALESCE(a.pausada_desde, a.agotada_desde))`
 
 export async function GET(req: NextRequest) {
   const s = await sesionStock()
@@ -23,13 +29,13 @@ export async function GET(req: NextRequest) {
     const umbral = await umbralStock(s.db)
     const filtro = vista === 'pausadas' ? PAUSADA
       : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
-    const orden = vista === 'pausadas' ? 'a.pausada_desde DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
+    const orden = vista === 'pausadas' ? 'COALESCE(a.pausada_desde, a.agotada_desde) DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
     const caliente = vista === 'pausadas' ? PAUSADA_EN_LISTA : vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
     const [{ rows }, { rows: [n] }, { rows: [rev] }] = await Promise.all([
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
                 a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
-                ${caliente} AS caliente, a.descartada_at
+                ${caliente} AS caliente, a.descartada_at${vista === 'pausadas' ? `, ${SQL_INVENTARIO} AS inventario` : ''}
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
