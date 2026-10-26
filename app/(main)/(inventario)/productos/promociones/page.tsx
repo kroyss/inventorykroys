@@ -6,6 +6,7 @@ import { dbDeSesion } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import type { FotoPromociones } from '@/lib/promocionesML'
+import PublicacionesMLTabs from '@/components/productos/PublicacionesMLTabs'
 import PromocionesClient, { type CampanaVista, type FilaPromo, type AccionHecha } from '@/components/productos/PromocionesClient'
 
 export const metadata = { title: 'Promociones' }
@@ -86,7 +87,8 @@ export default async function PromocionesPage() {
     }
   }
 
-  return (
+  return (<>
+    <PublicacionesMLTabs user={session.user} actual="promociones" />
     <PromocionesClient
       filas={filas}
       campanas={[...campanas.values()]}
@@ -95,5 +97,5 @@ export default async function PromocionesPage() {
       conPagosME={tieneModulo(session.user, 'pagos_me')}
       historial={acciones.slice(0, 60) as AccionHecha[]}
     />
-  )
+  </>)
 }

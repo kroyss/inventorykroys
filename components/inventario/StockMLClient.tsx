@@ -20,13 +20,14 @@ const ENVIO: Record<string, { t: string; c: string; title: string }> = {
   sin_peso: { t: 'Sin peso', c: 'bg-neutral-100 text-neutral-600 ring-neutral-200', title: 'Falta el peso del producto: no se sabe si tiene envío gratis' },
 }
 
-export default function StockMLClient() {
+export default function StockMLClient({ buscarInicial = '', conVincular = false }: { buscarInicial?: string; conVincular?: boolean }) {
   const [filas, setFilas] = useState<FilaStockML[] | null>(null)
   const [puedeCambiar, setPuedeCambiar] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filtro, setFiltro] = useState<Filtro>('diferencias')
+  // Desde Vincular («ver stock») llega ?buscar=COD-…: se abre en Todos con ese producto.
+  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : 'diferencias')
   const [cuenta, setCuenta] = useState('')
-  const [buscar, setBuscar] = useState('')
+  const [buscar, setBuscar] = useState(buscarInicial)
   const [ver, setVer] = useState(POR_PAGINA)
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
   const [trabajando, setTrabajando] = useState<{ hechos: number; total: number } | null>(null)
@@ -162,7 +163,7 @@ export default function StockMLClient() {
             </label>
           )}
           {visibles.slice(0, ver).map(f => (
-            <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} marcable={accionables(f).length > 0}
+            <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} conVincular={conVincular} marcable={accionables(f).length > 0}
               marcado={marcados.has(f.product_id)} resultados={resultados}
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
@@ -223,8 +224,8 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, marcable, marcado, resultados, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir }: {
-  f: FilaStockML; puedeCambiar: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir }: {
+  f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
   onCorregir: (cantidad: number) => Promise<boolean>
@@ -246,6 +247,8 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, onMarcar, on
           title={marcable ? 'Marcar para igualar' : 'Nada que igualar'} className="h-4 w-4" />}
         <div className="min-w-0 flex-1">
           <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
+          {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
+            title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
         </div>
         <div className="flex flex-wrap gap-x-3 text-xs text-neutral-500">
           {corrigiendo == null ? (

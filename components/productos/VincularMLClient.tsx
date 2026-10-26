@@ -2,7 +2,7 @@
 // Vincular publicaciones de ML (20-10, migración 109; API /api/vincular-ml). Una tarjeta por publicación, de la que
 // más vende a la que menos; dentro, una fila por variante (cada color/modelo es un producto aparte). Cada vínculo lo
 // hace una persona con un clic: el sistema solo sugiere. "No sé, para Marcos" (en clientes, "para el administrador") deja la duda con su nota.
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -42,14 +42,19 @@ const textoFila = (f: Fila) => sinAcentos([f.titulo, f.item_id, f.codigo, f.vari
   ...(f.otros ?? []).flatMap(o => [o.code, o.name])].filter(Boolean).join(' '))
 const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
 const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return true; const t = textoFila(f); return palabras.every(w => t.includes(w)) }
+/** ¿Ve la pestaña Stock? (para el atajo «ver stock» de cada vínculo) */
+const ConStock = createContext(false)
 const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
 
-export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador' }: { conCuentas: boolean; paraQuien?: string }) {
+export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador', buscarInicial = '', conStock = false }: {
+  conCuentas: boolean; paraQuien?: string; buscarInicial?: string; conStock?: boolean
+}) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [filtro, setFiltro] = useState<Filtro>('pendientes')
+  // Desde Stock («Revisar vínculos») llega ?buscar=COD-…: se abre en Todas con ese producto.
+  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : 'pendientes')
   const [cuenta, setCuenta] = useState('')
-  const [buscar, setBuscar] = useState('')
+  const [buscar, setBuscar] = useState(buscarInicial)
   const [ver, setVer] = useState(POR_PAGINA)
   const [hechosHoy, setHechosHoy] = useState(0)
 
@@ -108,6 +113,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   }
 
   return (
+    <ConStock.Provider value={conStock}>
     <div className="space-y-4">
       <PageHeader title="Vincular con MercadoLibre"
         subtitle="Une cada publicación (o cada color/modelo) con su producto. Así las ventas de ML descuentan el producto correcto."
@@ -200,6 +206,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
         </div>
       )}
     </div>
+    </ConStock.Provider>
   )
 }
 
@@ -210,6 +217,7 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, onCambio }: {
 }) {
   const confirm = useConfirm()
   const celular = useCelular()
+  const conStock = useContext(ConStock)
   const [modo, setModo] = useState<'nada' | 'elegir' | 'duda'>('nada')
   const [texto, setTexto] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -235,6 +243,8 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, onCambio }: {
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">✓ {f.producto.code} · {f.producto.name}</span>
             {f.producto.toda && <span className="text-neutral-400" title="Vinculada por la publicación entera, no por esta variante">(toda la publicación)</span>}
             {f.vinculado_por && <span className="text-neutral-400">{f.vinculado_por}{f.vinculado_at ? ` · ${fecha(f.vinculado_at)}` : ''}</span>}
+            {conStock && <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.producto.code)}`} className="text-neutral-500 underline hover:text-neutral-800"
+              title="Cuántas muestra cada publicación de este producto y cuántas debería mostrar">ver stock</Link>}
             {!f.producto.toda && (esDueno || f.propio) && (
               <button disabled={ocupado} className="text-neutral-500 underline hover:text-red-600" onClick={async () => {
                 if (!await confirm({ title: 'Deshacer el vínculo', message: `Se separa "${f.variante ?? f.titulo}" de ${f.producto!.name}.`, confirmText: 'Deshacer' })) return

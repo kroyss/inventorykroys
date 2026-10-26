@@ -521,10 +521,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             Importar desde ML
           </Link>
         )}
-        {importarML && (
-          <Link href="/vincular-ml" className="btn-secondary text-sm whitespace-nowrap"
-            title="Unir cada publicación (o color/modelo) de MercadoLibre con su producto; ver las dudas del equipo y crear productos nuevos">
-            Vincular con ML
+        {/* Publicaciones ML (26-10): Vincular, Stock y Promociones en un lugar, con pestañas (PublicacionesMLTabs). */}
+        {(importarML || (country === 'VE' && promociones)) && (
+          <Link href={importarML ? '/vincular-ml' : '/productos/promociones'} className="btn-secondary text-sm whitespace-nowrap"
+            title="Tus productos en MercadoLibre: vincular cada publicación, el stock que muestra cada cuenta y las promociones">
+            Publicaciones ML
           </Link>
         )}
         {country === 'VE' && descuento && (
@@ -534,12 +535,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           <Link href="/productos/margenes" className="btn-secondary text-sm whitespace-nowrap"
             title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría">
             Márgenes &lt; $5
-          </Link>
-        )}
-        {country === 'VE' && promociones && (
-          <Link href="/productos/promociones" className="btn-secondary text-sm whitespace-nowrap"
-            title="Campañas de MercadoLibre y envío gratis por transportista (ZOOM / TEALCA)">
-            Promociones
           </Link>
         )}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nuevo producto</button>
