@@ -116,7 +116,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
                 <input id="telegram" name="telegram" placeholder="@usuario" maxLength={33} autoCapitalize="none" spellCheck={false} className={campo} />
               </div>
             </div>
-            <p className="-mt-2 text-xs text-neutral-400">WhatsApp o Telegram: al menos uno, para ayudarte a empezar.</p>
+            <p className="-mt-2 text-xs text-neutral-400">WhatsApp o Telegram: al menos uno.</p>
             <div>
               <label htmlFor="correo" className={etiqueta}>Correo</label>
               <input id="correo" name="correo" type="email" required maxLength={120} autoComplete="email" className={campo} />
