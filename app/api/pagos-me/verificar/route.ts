@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { conectarVenta, sesionPagosME } from '@/lib/pagosME'
+import { esDemo } from '@/lib/demo'
+import { aprobarDemo } from '@/lib/demoDatos'
 
 const Body = z.object({
   ids: z.array(z.coerce.number().int().positive()).min(1).max(300),   // me_pagos.id es BIGINT: pg lo entrega como texto
@@ -24,6 +26,8 @@ export async function PUT(req: NextRequest) {
       [b.ids, b.verificacion, s.userId, b.nota ?? null])
     // Las ventas ya registradas pasan a PAGO_VERIFICADO (si estaban en BORRADOR).
     let verificadas = 0
+    // Demo: la guía del pago aprobado recién ahí entra a Despachos (Pagos ME → Despachos → Reportador).
+    if (b.verificacion === 'valido' && await esDemo(s.db)) await aprobarDemo(s.db, rows.map(r => r.venta as string))
     if (b.verificacion === 'valido') {
       for (const r of rows) {
         const c = await conectarVenta(s.db, r.venta, s.userId, s.desdeML)

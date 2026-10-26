@@ -100,6 +100,7 @@ export interface OpcionesDemo { preguntas?: number; mensajes?: number; pagosVaci
 /** Pagos ME «vacío para grabar Traer» (26-10): cuántas ventas de hoy llegan al tocar Traer, y a los cuántos segundos
  *  termina cada cuenta (la primera, la segunda…). */
 export const DEMO_TRAER = { ventas: 20, segundos: [3, 5] } as const
+const POR_APROBAR = 'demo_guias_por_aprobar'   // app_settings: guías de hoy que entran a Despachos al aprobar su pago
 const RETENIDOS = 'demo_pagos_retenidos:'   // app_settings: lo que «trae» cada perfil al tocar Traer (por perfil)
 
 const RANGO: Record<string, string> = {
@@ -641,6 +642,12 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
     }
     await db.query(`DELETE FROM despacho_lotes l WHERE l.id = $1 AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.lote_id = l.id)`, [lote.id])
   }
+  // Pagos ME → Despachos (26-10): la guía de hoy entra a Despachos recién al aprobar su pago (aprobarDemo), ya lista
+  // para Generar PDF; las no aprobadas no aparecen allá (sin «con problema» en el video).
+  const { rows: [g] } = await db.query(`SELECT jsonb_agg(to_jsonb(e)) AS v FROM despacho_etiquetas e WHERE e.lote_id = $1`, [lote.id])
+  await porAprobar(db, g.v ?? [], true)
+  await db.query(`DELETE FROM despacho_etiquetas WHERE lote_id = $1`, [lote.id])
+  await db.query(`DELETE FROM despacho_lotes WHERE id = $1`, [lote.id])
 }
 
 /** Demo sin Pagos ME sembrado (nunca se restauró esa sección, 26-10): se arma solo, «vacío para grabar Traer»,
@@ -674,15 +681,33 @@ export async function entregarDemo(db: Pool) {
       await db.query(`INSERT INTO me_pagos SELECT * FROM jsonb_populate_recordset(NULL::me_pagos, $1::jsonb)`, [JSON.stringify(r.pagos)])
       await db.query(`UPDATE me_pagos SET creado_at = NOW() WHERE venta = ANY($1)`, [(r.pagos as { venta: string }[]).map(x => x.venta)])
     }
-    if (r?.etiquetas?.length) {
-      const { rows: [l] } = await db.query(`SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' ORDER BY id DESC LIMIT 1`)
-      const lote = l?.id ?? (await db.query(`INSERT INTO despacho_lotes (created_by) VALUES (NULL) RETURNING id`)).rows[0].id
-      await db.query(`INSERT INTO despacho_etiquetas SELECT * FROM jsonb_populate_recordset(NULL::despacho_etiquetas, $1::jsonb)`,
-        [JSON.stringify((r.etiquetas as Record<string, unknown>[]).map(e => ({ ...e, lote_id: lote, created_at: new Date().toISOString() })))])
-    }
+    if (r?.etiquetas?.length) await porAprobar(db, r.etiquetas)
     await db.query(`UPDATE me_pedidos SET resultados = resultados || jsonb_build_object($2::text, $3::jsonb) WHERE id = $1`,
       [p.id, pf.perfil, JSON.stringify({ at: new Date().toISOString(), ok: true, error: null, cuenta: pf.cuenta, nuevas: r?.pagos?.length ?? 0, vistas: 120 + k * 37 })])
   }
+}
+
+/** Guías de hoy que esperan la aprobación del pago (reemplazar = al restaurar; si no, se suman). */
+async function porAprobar(db: Pool, etiquetas: unknown[], reemplazar = false) {
+  await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+                  ON CONFLICT (empresa_id, key) DO UPDATE SET updated_at = NOW(),
+                    value = CASE WHEN $3 THEN EXCLUDED.value ELSE (app_settings.value::jsonb || EXCLUDED.value::jsonb)::text END`,
+    [POR_APROBAR, JSON.stringify(etiquetas), reemplazar])
+}
+
+/** Pago aprobado en Pagos ME (demo): su guía pasa al lote pendiente de Despachos, lista para Generar PDF. */
+export async function aprobarDemo(db: Pool, ventas: string[]) {
+  const { rows: [h] } = await db.query(
+    `WITH s AS (SELECT value::jsonb AS v FROM app_settings WHERE key = $1),
+          u AS (UPDATE app_settings SET updated_at = NOW(), value = (SELECT COALESCE(jsonb_agg(x), '[]'::jsonb)
+                  FROM s, jsonb_array_elements(s.v) x WHERE NOT (x->>'venta' = ANY($2)))::text WHERE key = $1 RETURNING 1)
+     SELECT jsonb_agg(x) AS v FROM s, jsonb_array_elements(s.v) x WHERE x->>'venta' = ANY($2)`, [POR_APROBAR, ventas])
+  const etiquetas = h?.v as Record<string, unknown>[] | null
+  if (!etiquetas?.length) return
+  const { rows: [l] } = await db.query(`SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' ORDER BY id DESC LIMIT 1`)
+  const lote = l?.id ?? (await db.query(`INSERT INTO despacho_lotes (created_by) VALUES (NULL) RETURNING id`)).rows[0].id
+  await db.query(`INSERT INTO despacho_etiquetas SELECT * FROM jsonb_populate_recordset(NULL::despacho_etiquetas, $1::jsonb)`,
+    [JSON.stringify(etiquetas.map(e => ({ ...e, lote_id: lote, created_at: new Date().toISOString() })))])
 }
 
 /** "Traer pagos y guías" en la demo: la PC "responde" al momento (no hay PC de verdad). */
