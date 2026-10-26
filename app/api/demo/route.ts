@@ -32,8 +32,9 @@ export async function GET() {
          (SELECT COUNT(*) FROM ml_conversaciones WHERE sin_leer > 0 AND ${SQL_MENSAJE_VIGENTE})::int AS mensajes,
          (SELECT COUNT(*) FROM (${SQL_BANDEJA_ML}) b WHERE b.sugerencia <> 'esperar')::int AS calificaciones,
          (SELECT COUNT(*) FROM ml_stock_alertas WHERE disponible < 3 AND actualizado_at > NOW() - INTERVAL '1 day')::int AS stock,
-         (SELECT COUNT(*) FROM me_pagos WHERE verificacion = 'pendiente')::int AS pagos`, [3])
-    return NextResponse.json({ secciones: SECCIONES_DEMO.map(x => ({ ...x, pendientes: n[x.id] as number })), esAdmin: s.session.user.role === 'admin', max: MAX_DEMO })
+         (SELECT COUNT(*) FROM me_pagos WHERE verificacion = 'pendiente')::int AS pagos,
+         EXISTS (SELECT 1 FROM app_settings WHERE key LIKE 'demo_pagos_retenidos:%') AS pagos_vacio`, [3])
+    return NextResponse.json({ secciones: SECCIONES_DEMO.map(x => ({ ...x, pendientes: n[x.id] as number })), esAdmin: s.session.user.role === 'admin', max: MAX_DEMO, pagosVacio: !!n.pagos_vacio })
   } catch (err) {
     return apiError(err)
   }
@@ -45,15 +46,17 @@ const Body = z.object({
   // Cuántas preguntas / conversaciones sin leer (por defecto, todas).
   preguntas: z.number().int().min(1).max(MAX_DEMO.preguntas).optional(),
   mensajes: z.number().int().min(1).max(MAX_DEMO.mensajes).optional(),
+  // Pagos ME vacío: las ventas de hoy llegan al tocar «Traer pagos y guías» (para grabarlo).
+  pagosVacio: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
   const s = await sesionDemo(true)
   if ('error' in s) return s.error
   try {
-    const { secciones, preguntas, mensajes } = Body.parse(await req.json())
+    const { secciones, preguntas, mensajes, pagosVacio } = Body.parse(await req.json())
     // En el orden de SECCIONES_DEMO: Despachos primero (borra lo hecho en vivo en Despachos).
-    await restaurarDemo(s.db, ids.filter(x => secciones.includes(x)), { preguntas, mensajes })
+    await restaurarDemo(s.db, ids.filter(x => secciones.includes(x)), { preguntas, mensajes, pagosVacio })
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

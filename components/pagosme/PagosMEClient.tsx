@@ -77,6 +77,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   // Después de "Traer pagos y guías" (23-10): la pantalla se refresca sola hasta que llega el resultado de ESE pedido,
   // aunque al abrirla no hubiera ningún perfil conectado (antes quedaba mostrando la traída vieja y parecía que no trajo).
   const [pedidoEn, setPedidoEn] = useState<number | null>(null)
+  const [demo, setDemo] = useState(false)   // cuenta Demo: la traída termina en segundos, se mira cada 1 s
   const recargarVentas = pc.cargar
   const llego = !!pedidoEn && !!pedido && new Date(pedido.pedido_at).getTime() >= pedidoEn - 60_000
     && Object.keys(pedido.resultados).length > 0 && !trabajando
@@ -86,9 +87,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
     const t = setInterval(() => {
       if (Date.now() - pedidoEn > 5 * 60_000) { setPedidoEn(null); return }   // a los 5 min deja de insistir
       cargar(); recargarVentas()
-    }, 5000)
+    }, demo ? 1000 : 5000)
     return () => clearInterval(t)
-  }, [esperandoTraida, pedidoEn, cargar, recargarVentas])
+  }, [esperandoTraida, pedidoEn, cargar, recargarVentas, demo])
   // Cuando llega, trae también las ventas nuevas de MercadoLibre (24-10: un solo botón para todo, como «Traer ME» de
   // Por confirmar; antes el pago llegaba y la venta recién a la hora) y recarga la lista de Ventas.
   useEffect(() => {
@@ -103,7 +104,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
     const r = await fetch('/api/pagos-me/traer', { method: 'POST' })
     setBusy(null)
     if (!r.ok) { setError('No se pudo pedir'); return }
-    setAviso('Pedido enviado: el vigilante lo toma en menos de 1 minuto. Esta pantalla se actualiza sola.')
+    const d = await r.json().catch(() => ({}))
+    setDemo(!!d.demo)
+    if (!d.demo) setAviso('Pedido enviado: el vigilante lo toma en menos de 1 minuto. Esta pantalla se actualiza sola.')
     setPedidoEn(Date.now())
     cargar()
   }

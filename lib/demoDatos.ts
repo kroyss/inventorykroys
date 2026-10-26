@@ -93,7 +93,11 @@ export type SeccionDemo = typeof SECCIONES_DEMO[number]['id']
 
 /** Cuántas preguntas sin responder y conversaciones sin leer se siembran (para videos más cortos). */
 export const MAX_DEMO = { preguntas: 15, mensajes: 10 } as const
-export interface OpcionesDemo { preguntas?: number; mensajes?: number }
+export interface OpcionesDemo { preguntas?: number; mensajes?: number; pagosVacio?: boolean }
+/** Pagos ME «vacío para grabar Traer» (26-10): cuántas ventas de hoy llegan al tocar Traer, y a los cuántos segundos
+ *  termina cada cuenta (la primera, la segunda…). */
+export const DEMO_TRAER = { ventas: 20, segundos: [3, 5] } as const
+const RETENIDOS = 'demo_pagos_retenidos:'   // app_settings: lo que «trae» cada perfil al tocar Traer (por perfil)
 
 const RANGO: Record<string, string> = {
   despachos: '20000999910', reportador: '20000999920', calificaciones: '20000999930', mensajes: '20000999940', stock: '20000999950',
@@ -496,8 +500,9 @@ async function mensajes(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
 // Como lo ve un Fundador con Pagos ME: la PC conectada con sus 2 cuentas, la traída automática de hace un rato
 // y los pagos de hoy por verificar contra el banco (uno que no coincide), más los de ayer ya verificados.
 const BANCOS = ['Banesco', 'Venezuela', 'Mercantil', 'BBVA Provincial', 'BNC']
-async function pagosME(db: Pool, cx: Cuentas) {
+async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   const r = azar(96)
+  await db.query(`DELETE FROM app_settings WHERE key LIKE '${RETENIDOS}%'`)
   await db.query(`DELETE FROM me_pagos WHERE venta BETWEEN '${RANGO.pagos}00001' AND '${RANGO.pagos}99999'`)
   // Sus guías en Despachos: las del lote pendiente y la jornada de ayer sembrada.
   await db.query(`DELETE FROM despacho_etiquetas WHERE venta BETWEEN '${RANGO.pagos}00001' AND '${RANGO.pagos}99999'`)
@@ -525,12 +530,13 @@ async function pagosME(db: Pool, cx: Cuentas) {
 
   const ordenes: Orden[] = []
   const pagos: Record<string, unknown>[] = []
-  const N = 23
+  const HOY = op.pagosVacio ? DEMO_TRAER.ventas : 14   // las de hoy (sin verificar); después, 9 de ayer
+  const N = HOY + 9
   for (let i = 0; i < N; i++) {
     const venta = `${RANGO.pagos}${String(i + 1).padStart(5, '0')}`
     const c = cuentaDe(cx, i)
-    const hoy = i < 14
-    const horas = hoy ? 0.4 + i * 0.6 : 20 + (i - 14) * 1.3
+    const hoy = i < HOY
+    const horas = hoy ? 0.4 + i * 0.6 * 14 / HOY : 20 + (i - HOY) * 1.3
     const items = itemsAzar(r, r() < 0.2 ? 2 : 1)
     const usd = totalDe(items)
     const comprador = elegir(r, D.compradores)
@@ -547,8 +553,8 @@ async function pagosME(db: Pool, cx: Cuentas) {
       monto_pagado: pagado,
       envio_metodo: 'Envío Gratis', envio_opcion: r() < 0.8 ? 'Retiro en agencia' : 'Entrega a domicilio',
       carrier: zoom ? 'ZOOM' : 'Tealca', guia: zoom ? String(1_100_000_000 + Math.floor(r() * 99_999_999)) : String(500_000 + Math.floor(r() * 499_999)),
-      verificacion: hoy ? 'pendiente' : i === 18 ? 'invalido' : 'valido',
-      nota: i === 18 ? 'La referencia no aparece en el banco: se le escribió al comprador.' : null,
+      verificacion: hoy ? 'pendiente' : i === HOY + 4 ? 'invalido' : 'valido',
+      nota: i === HOY + 4 ? 'La referencia no aparece en el banco: se le escribió al comprador.' : null,
     })
   }
   await insertarOrdenes(db, ordenes)
@@ -601,12 +607,72 @@ async function pagosME(db: Pool, cx: Cuentas) {
     [JSON.stringify(Object.fromEntries(perfiles.map((p, k) => [p.perfil, {
       at: new Date(Date.now() - 23 * 60_000).toISOString(), ok: true, error: null, cuenta: p.cuenta,
       nuevas: k === 0 ? 3 : 2, vistas: vistas(k) }])))])
+
+  // «Vacío para grabar Traer»: las de hoy se guardan aparte (venta, pago y guía, por perfil) y salen de la pantalla;
+  // las «trae» entregarDemo al tocar Traer pagos y guías.
+  if (op.pagosVacio) {
+    for (const pf of perfiles) {
+      const ventas = ps.filter(x => x.verificacion === 'pendiente' && x.cuenta === pf.cuenta).map(x => x.venta)
+      if (!ventas.length) continue
+      const { rows: [h] } = await db.query(
+        `SELECT (SELECT jsonb_agg(to_jsonb(o)) FROM ml_ordenes o WHERE o.id::text = ANY($1)) AS ordenes,
+                (SELECT jsonb_agg(to_jsonb(p)) FROM me_pagos p WHERE p.venta = ANY($1)) AS pagos,
+                (SELECT jsonb_agg(to_jsonb(e)) FROM despacho_etiquetas e WHERE e.venta = ANY($1)) AS etiquetas`, [ventas])
+      await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+                      ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [RETENIDOS + pf.perfil, JSON.stringify(h)])
+      await db.query(`DELETE FROM despacho_etiquetas WHERE venta = ANY($1)`, [ventas])
+      await db.query(`DELETE FROM me_pagos WHERE venta = ANY($1)`, [ventas])
+      await db.query(`DELETE FROM ml_ordenes WHERE id::text = ANY($1)`, [ventas])
+    }
+    await db.query(`DELETE FROM despacho_lotes l WHERE l.id = $1 AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.lote_id = l.id)`, [lote.id])
+  }
+}
+
+/** ¿Quedó la demo «vacía para grabar Traer» (hay ventas guardadas para traer)? */
+async function hayRetenidos(db: Pool) {
+  const { rows: [r] } = await db.query(`SELECT EXISTS (SELECT 1 FROM app_settings WHERE key LIKE '${RETENIDOS}%') AS si`)
+  return !!r.si
+}
+
+/** Demo vacía para grabar: durante una traída, cada cuenta termina a sus DEMO_TRAER.segundos y deja sus ventas
+ *  (venta, pago con comprobante y guía en Despachos) como si las hubiera traído la PC. Lo llama GET /api/pagos-me. */
+export async function entregarDemo(db: Pool) {
+  const { rows: [p] } = await db.query(
+    `SELECT id, resultados, EXTRACT(EPOCH FROM NOW() - pedido_at)::float AS seg FROM me_pedidos
+     WHERE pedido_at > NOW() - INTERVAL '5 minutes' ORDER BY pedido_at DESC LIMIT 1`)
+  if (!p) return
+  const { rows: perfiles } = await db.query(`SELECT perfil, cuenta FROM me_latidos WHERE perfil <> 'DESPERTADOR' ORDER BY perfil`)
+  for (const [k, pf] of perfiles.entries()) {
+    if (p.resultados?.[pf.perfil] || p.seg < (DEMO_TRAER.segundos[k] ?? DEMO_TRAER.segundos.at(-1)!)) continue
+    // Lo toma UNA sola consulta (DELETE … RETURNING): dos recargas a la vez no lo traen dos veces.
+    const { rows: [h] } = await db.query(`DELETE FROM app_settings WHERE key = $1 RETURNING value`, [RETENIDOS + pf.perfil])
+    const r = h ? JSON.parse(h.value) as { ordenes: unknown[] | null; pagos: unknown[] | null; etiquetas: unknown[] | null } : null
+    if (r?.ordenes?.length) await db.query(`INSERT INTO ml_ordenes SELECT * FROM jsonb_populate_recordset(NULL::ml_ordenes, $1::jsonb)`, [JSON.stringify(r.ordenes)])
+    if (r?.pagos?.length) {
+      await db.query(`INSERT INTO me_pagos SELECT * FROM jsonb_populate_recordset(NULL::me_pagos, $1::jsonb)`, [JSON.stringify(r.pagos)])
+      await db.query(`UPDATE me_pagos SET creado_at = NOW() WHERE venta = ANY($1)`, [(r.pagos as { venta: string }[]).map(x => x.venta)])
+    }
+    if (r?.etiquetas?.length) {
+      const { rows: [l] } = await db.query(`SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' ORDER BY id DESC LIMIT 1`)
+      const lote = l?.id ?? (await db.query(`INSERT INTO despacho_lotes (created_by) VALUES (NULL) RETURNING id`)).rows[0].id
+      await db.query(`INSERT INTO despacho_etiquetas SELECT * FROM jsonb_populate_recordset(NULL::despacho_etiquetas, $1::jsonb)`,
+        [JSON.stringify((r.etiquetas as Record<string, unknown>[]).map(e => ({ ...e, lote_id: lote, created_at: new Date().toISOString() })))])
+    }
+    await db.query(`UPDATE me_pedidos SET resultados = resultados || jsonb_build_object($2::text, $3::jsonb) WHERE id = $1`,
+      [p.id, pf.perfil, JSON.stringify({ at: new Date().toISOString(), ok: true, error: null, cuenta: pf.cuenta, nuevas: r?.pagos?.length ?? 0, vistas: 120 + k * 37 })])
+  }
 }
 
 /** "Traer pagos y guías" en la demo: la PC "responde" al momento (no hay PC de verdad). */
 export async function traerDemo(db: Pool, userId: number) {
   const { rows: perfiles } = await db.query(`SELECT perfil, cuenta FROM me_latidos WHERE perfil <> 'DESPERTADOR'`)
   await db.query(`UPDATE me_latidos SET visto_at = NOW()`)
+  // Vacía para grabar: la traída queda «trabajando» y cada cuenta termina sola a los pocos segundos (entregarDemo).
+  if (await hayRetenidos(db)) {
+    const { rows: [v] } = await db.query(`INSERT INTO me_pedidos (pedido_por, resultados) VALUES ($1, '{}'::jsonb) RETURNING id`, [userId])
+    return v.id as number
+  }
   const ahora = new Date().toISOString()
   const { rows: [p] } = await db.query(
     `INSERT INTO me_pedidos (pedido_por, resultados) VALUES ($1, $2) RETURNING id`,
