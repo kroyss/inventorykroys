@@ -91,7 +91,13 @@ export async function POST(req: NextRequest) {
         const r = await eliminarVarianteML(s.db, b.codigo, userId)
         return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error }, { status: 409 })
       } catch (e) {
-        if (e instanceof ErrorML) return NextResponse.json({ error: e.message }, { status: 502 })
+        // 409 y no 502: Cloudflare cambia los 502 por su página y el mensaje de ML no llegaba a la pantalla.
+        if (e instanceof ErrorML) {
+          console.warn('[eliminar variante]', b.codigo, e.message, JSON.stringify(e.datos ?? null).slice(0, 500))
+          // ML suele explicar el motivo en cause[] (el message es genérico).
+          const causas = ((e.datos as { cause?: { message?: string }[] } | null)?.cause ?? []).map(c => c.message).filter(Boolean)
+          return NextResponse.json({ error: causas.length ? `${e.message} · ${causas.join(' · ')}` : e.message }, { status: 409 })
+        }
         throw e
       }
     }
