@@ -25,10 +25,11 @@ export async function avisarDuenoPlataforma(html: string) {
  *  las cuentas que crea el dueño en Plataforma conectan lo que él decida. */
 export async function pruebaYaUsada(organizacionId: number, mlUserId: number): Promise<string | null> {
   const { rows: [r] } = await dbGlobal().query(
-    `SELECT o2.nombre
+    // organizacion_id NULL = la cuenta que la usó ya se eliminó (mig 126): igual cuenta como prueba usada.
+    `SELECT COALESCE(o2.nombre, 'una cuenta ya eliminada') AS nombre
      FROM organizaciones o
-     JOIN ml_pruebas_usadas u ON u.ml_user_id = $2 AND u.organizacion_id <> o.id
-     JOIN organizaciones o2 ON o2.id = u.organizacion_id
+     JOIN ml_pruebas_usadas u ON u.ml_user_id = $2 AND u.organizacion_id IS DISTINCT FROM o.id
+     LEFT JOIN organizaciones o2 ON o2.id = u.organizacion_id
      WHERE o.id = $1 AND o.origen = 'autoregistro'`, [organizacionId, mlUserId])
   return r?.nombre ?? null
 }
