@@ -8,6 +8,10 @@
 //   - Envío gratis (VE): con el precio de la publicación y el peso, ¿por Zoom y Tealca, solo Tealca o cobro a destino?
 //     Una pausada que volvería SIN envío gratis no se reactiva (queda para revisarla a mano).
 //   - «No sincronizar» (migración 123): rifas, encargos o lo que se maneja aparte; esta pantalla no la toca.
+//   - Reserva de seguridad (26-10, regla del dueño; app_settings `stock_ml_reserva`, 2 por defecto): se guardan N
+//     unidades sin publicar por si hay un error. Lo publicable (disponible − reserva) se reparte en partes iguales
+//     entre las publicaciones; lo que sobra va a la que más vendió en 60 días. Con disponible ≤ reserva el producto
+//     queda «en reserva»: nada automático, se asigna a mano después de chequear (y no se puede asignar más de lo que hay).
 // Solo lee de la base; los cambios en ML los hace aplicarCambio (lib/stockML.ts), que relee ML antes y después.
 import type { Pool } from 'pg'
 import { envioPorTransportista, type EstadoEnvio } from '@/lib/mlShipping'
@@ -37,6 +41,8 @@ export interface PubStockML {
   reactivar: boolean
   /** Pausada con stock pero quedaría sin envío gratis: no se reactiva sola. */
   bloqueada_envio: boolean
+  /** Ventas de 60 días de esta publicación (desempata el reparto). */
+  ventas60: number
   actualizado_at: string | null
 }
 
@@ -47,27 +53,30 @@ export interface FilaStockML {
   stock: number
   comprometidas: number
   disponible: number
+  /** Disponible − reserva (lo que se reparte entre las publicaciones). */
+  publicable: number
+  /** Disponible ≤ reserva: no se iguala solo; se asigna a mano. */
+  en_reserva: boolean
+  /** ML muestra entre todas sus publicaciones más unidades de las que hay (en unidades del producto). */
+  excede: boolean
   peso: number | null
   pubs: PubStockML[]
   diferencia: boolean
+}
+
+export const RESERVA_DEFECTO = 2
+export async function leerReserva(db: Pick<Pool, 'query'>): Promise<number> {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = 'stock_ml_reserva'`)
+  const n = Number(r?.value)
+  return r && Number.isInteger(n) && n >= 0 && n <= 100 ? n : RESERVA_DEFECTO
 }
 
 // Solo para la lista «Revisar combos» (nunca cambia nada): "pack", "combo", "kit", "x2", "4 und", "par".
 // No cuenta medidas ("30cm X 50m", "X 2 Metros", "10w"): después de "x N" no puede venir una medida.
 const PARECE_COMBO = /\b(pack|combo|kit|paquete|lote|docena|pares?)\b|\bx\s?\d{1,3}\b(?![.,]\d)(?!\s*(metros?|mts?|m\b|cm|mm|kg|gr|gb|w\b))|\b\d{1,3}\s?(und|unds|unid|unidades|pzas|piezas|pcs|uds)\b/i
 
-/** Unidades de cada producto en ventas de ML sin registrar (por código de publicación o variante). */
-async function comprometidasPorCodigo(db: Pool): Promise<Map<string, number>> {
-  const { rows } = await db.query<{ items: string[] | null; detalle: { cantidad: number }[] | null }>(
-    `SELECT o.items, o.detalle
-     FROM ml_ordenes o
-     WHERE o.fecha > NOW() - make_interval(days => GREATEST($1::int, $2::int))
-       AND (o.fecha > NOW() - make_interval(days => $1)
-            OR (o.fecha > NOW() - make_interval(days => $2) AND EXISTS (
-                SELECT 1 FROM me_pagos p WHERE (p.venta = o.id::text OR p.venta = o.pack_id::text) AND p.verificacion <> 'invalido')))
-       AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
-       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
-       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)`, [DIAS_MAX, DIAS_CON_PAGO])
+/** Cantidades vendidas por código de publicación o variante ("768007052" / "768007052:180012345"). */
+function porCodigo(rows: { items: string[] | null; detalle: { cantidad: number }[] | null }[]): Map<string, number> {
   const m = new Map<string, number>()
   for (const r of rows) {
     // `items` es plano: por cada línea de la orden [item] o [item, item:variante] (lib/calificacionesML.ts).
@@ -86,8 +95,30 @@ async function comprometidasPorCodigo(db: Pool): Promise<Map<string, number>> {
   return m
 }
 
+/** Ventas de 60 días por código (para desempatar el reparto). */
+async function ventas60PorCodigo(db: Pool) {
+  const { rows } = await db.query(
+    `SELECT items, detalle FROM ml_ordenes WHERE fecha > NOW() - interval '60 days' AND COALESCE(estado, '') <> 'cancelled'`)
+  return porCodigo(rows)
+}
+
+/** Unidades de cada producto en ventas de ML sin registrar (por código de publicación o variante). */
+async function comprometidasPorCodigo(db: Pool): Promise<Map<string, number>> {
+  const { rows } = await db.query<{ items: string[] | null; detalle: { cantidad: number }[] | null }>(
+    `SELECT o.items, o.detalle
+     FROM ml_ordenes o
+     WHERE o.fecha > NOW() - make_interval(days => GREATEST($1::int, $2::int))
+       AND (o.fecha > NOW() - make_interval(days => $1)
+            OR (o.fecha > NOW() - make_interval(days => $2) AND EXISTS (
+                SELECT 1 FROM me_pagos p WHERE (p.venta = o.id::text OR p.venta = o.pack_id::text) AND p.verificacion <> 'invalido')))
+       AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)`, [DIAS_MAX, DIAS_CON_PAGO])
+  return porCodigo(rows)
+}
+
 export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[]> {
-  const [{ rows }, compromiso, tablas] = await Promise.all([
+  const [{ rows }, compromiso, tablas, ventas, reserva] = await Promise.all([
     db.query(
       `SELECT p.id AS product_id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, p.weight_kg::float AS peso,
               m.id AS codigo_id, m.ml_code, m.ml_account AS cuenta, COALESCE(m.unidades, 1)::int AS unidades,
@@ -102,6 +133,8 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
        ORDER BY p.name, m.ml_account, m.ml_code`),
     comprometidasPorCodigo(db),
     leerTablasEnvio(db),
+    ventas60PorCodigo(db),
+    leerReserva(db),
   ])
 
   const porProducto = new Map<number, FilaStockML & { codigos: string[] }>()
@@ -109,7 +142,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     let f = porProducto.get(r.product_id)
     if (!f) {
       f = { product_id: r.product_id, code: r.code, name: r.name, stock: r.stock, comprometidas: 0, disponible: r.stock,
-            peso: r.peso, pubs: [], diferencia: false, codigos: [] }
+            publicable: 0, en_reserva: false, excede: false, peso: r.peso, pubs: [], diferencia: false, codigos: [] }
       porProducto.set(r.product_id, f)
     }
     const [pub, varId] = String(r.ml_code).split(':')
@@ -131,6 +164,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       posible_combo: !r.combo_revisado && Math.max(1, r.unidades) === 1 && !r.sin_sincronizar && PARECE_COMBO.test(r.titulo ?? ''),
       entera_con_variantes: !varId && variantes.length > 0,
       envio: null, objetivo: null, reactivar: false, bloqueada_envio: false,
+      ventas60: ventas.get(String(r.ml_code)) ?? 0,
       actualizado_at: r.actualizado_at,
     })
   }
@@ -143,18 +177,33 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       f.comprometidas += (compromiso.get(codigo) ?? 0) * p.unidades
     }
     f.disponible = Math.max(0, f.stock - f.comprometidas)
+    f.publicable = Math.max(0, f.disponible - reserva)
     for (const p of f.pubs) {
       if (pais === 'VE' && p.precio != null && p.precio > 0) {
         p.envio = envioPorTransportista(f.peso != null ? f.peso * p.unidades : null, p.precio, tablas).estado
       }
-      if (p.sin_sincronizar || p.entera_con_variantes || p.estado == null || p.ml_disponible == null) continue
-      p.objetivo = Math.floor(f.disponible / p.unidades)
-      if (p.estado === 'paused' && p.objetivo > 0) {
-        if (p.envio === 'destino') p.bloqueada_envio = true
-        else p.reactivar = true
+    }
+    const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
+    f.excede = sincronizables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0) > f.disponible
+    f.en_reserva = sincronizables.length > 0 && f.disponible <= reserva
+    if (!f.en_reserva && sincronizables.length) {
+      // Partes iguales; lo que sobra, de a 1 a las que más venden.
+      const n = sincronizables.length
+      const base = Math.floor(f.publicable / n)
+      let resto = f.publicable - base * n
+      const orden = [...sincronizables].sort((a, b) => b.ventas60 - a.ventas60 || a.cuenta.localeCompare(b.cuenta))
+      for (const p of orden) {
+        const unidades = base + (resto > 0 ? 1 : 0)
+        if (resto > 0) resto--
+        p.objetivo = Math.floor(unidades / p.unidades)
+        if (p.estado === 'paused' && p.objetivo > 0) {
+          if (p.envio === 'destino') p.bloqueada_envio = true
+          else p.reactivar = true
+        }
       }
     }
     f.diferencia = f.pubs.some(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
+      || (f.en_reserva && f.excede)   // en reserva y ML muestra más de lo que hay: hay que asignar a mano
     const { codigos: _, ...fila } = f
     filas.push(fila)
   }
