@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
+import Link from 'next/link'
 import EtiquetasModal from './EtiquetasModal'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useEscape } from '@/components/ui/useEscape'
@@ -126,9 +127,10 @@ interface Props {
   acceso:       { config: boolean; costos: boolean }   // lib/permisos.ts
   country:      Country
   etiquetas?:   boolean   // módulo "etiquetas" (25-10): solo SolucionesMC
+  stockML?:     boolean   // cuentas de ML conectadas (26-10): botón «Stock en ML»
 }
 
-export default function InventarioClient({ initialItems, acceso, country, etiquetas: conEtiquetas = false }: Props) {
+export default function InventarioClient({ initialItems, acceso, country, etiquetas: conEtiquetas = false, stockML = false }: Props) {
   // "Configurar inventario" (mín/máx, recomendados, ventas 6m) y "Ver costos" van por separado.
   const isAdmin = acceso.config
   const verCostos = acceso.costos
@@ -404,6 +406,12 @@ export default function InventarioClient({ initialItems, acceso, country, etique
   return (
     <div className="space-y-4">
       <PageHeader title="Inventario" subtitle="Stock actual de cada producto y sus movimientos" actions={<>
+        {stockML && (
+          <Link href="/inventario/stock-ml" className="btn-secondary text-sm whitespace-nowrap"
+            title="Cada producto con todas sus publicaciones de MercadoLibre: iguala el stock y reactiva en todas tus cuentas de una vez">
+            Stock en ML
+          </Link>
+        )}
         {conEtiquetas && (
           <button onClick={() => setEtiquetas(0)} className="btn-secondary text-sm whitespace-nowrap"
             title="Etiquetas con código, nombre y código de barras para estantes y cajas">

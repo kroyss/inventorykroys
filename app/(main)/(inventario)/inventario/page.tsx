@@ -69,6 +69,7 @@ export default async function InventarioPage() {
       acceso={{ config: puede(session!.user, 'inventario_config'), costos: puede(session!.user, 'costos') }}
       country={session!.user.country}
       etiquetas={tieneModulo(session!.user, 'etiquetas')}
+      stockML={tieneModulo(session!.user, 'preguntas')}
     />
   )
 }
