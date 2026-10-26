@@ -9,8 +9,9 @@
 //     Una pausada que volvería SIN envío gratis no se reactiva (queda para revisarla a mano).
 //   - «No sincronizar» (migración 123): rifas, encargos o lo que se maneja aparte; esta pantalla no la toca.
 //   - Reserva de seguridad (26-10, regla del dueño; app_settings `stock_ml_reserva`, 2 por defecto): se guardan N
-//     unidades sin publicar por si hay un error. Lo publicable (disponible − reserva) se reparte en partes iguales
-//     entre las publicaciones; lo que sobra va a la que más vendió en 60 días. Con disponible ≤ reserva el producto
+//     unidades sin publicar por si hay un error. Lo publicable (disponible − reserva) se reparte por turnos, de a una
+//     publicación entera (1 suelta o 1 combo completo), empezando por la que más vendió en 60 días: con sueltas da
+//     partes iguales y lo que sobra a las que más venden; con combos ya no deja todo en 0 (26-10, COD-0297). Con disponible ≤ reserva el producto
 //     queda «en reserva»: nada automático, se asigna a mano después de chequear (y no se puede asignar más de lo que hay).
 // Solo lee de la base; los cambios en ML los hace aplicarCambio (lib/stockML.ts), que relee ML antes y después.
 import type { Pool } from 'pg'
@@ -187,16 +188,22 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     f.excede = sincronizables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0) > f.disponible
     f.en_reserva = sincronizables.length > 0 && f.disponible <= reserva
     if (!f.en_reserva && sincronizables.length) {
-      // Partes iguales; lo que sobra, de a 1 a las que más venden.
-      const n = sincronizables.length
-      const base = Math.floor(f.publicable / n)
-      let resto = f.publicable - base * n
+      // Por turnos: cada vuelta, a cada una (de la que más vende a la que menos) 1 publicación entera si todavía alcanza.
+      // Antes era partes iguales en unidades y después ÷ lo que trae: 10 entre combos de 5/4/6 daba 0 en todas.
       const orden = [...sincronizables].sort((a, b) => b.ventas60 - a.ventas60 || a.cuenta.localeCompare(b.cuenta))
+      for (const p of orden) p.objetivo = 0
+      let quedan = f.publicable
+      for (let dio = true; dio;) {
+        dio = false
+        for (const p of orden) {
+          if (p.unidades > quedan) continue
+          p.objetivo = (p.objetivo ?? 0) + 1
+          quedan -= p.unidades
+          dio = true
+        }
+      }
       for (const p of orden) {
-        const unidades = base + (resto > 0 ? 1 : 0)
-        if (resto > 0) resto--
-        p.objetivo = Math.floor(unidades / p.unidades)
-        if (p.estado === 'paused' && p.objetivo > 0) {
+        if (p.estado === 'paused' && (p.objetivo ?? 0) > 0) {
           if (p.envio === 'destino') p.bloqueada_envio = true
           else p.reactivar = true
         }
