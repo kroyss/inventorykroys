@@ -37,7 +37,7 @@ function cargarApiYoutube() {
   return apiYoutube
 }
 
-const COMPLETO = 0.8
+const COMPLETO = 0.5   // = PORCENTAJE_COMPLETO de lib/aprendizaje.ts (26-10, antes 0.8)
 const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto_seg / v.duracion_seg * 100)) : 0)
 
 /** Aprendizaje: videos en orden (el siguiente se habilita al completar el anterior), dentro de la web. */
