@@ -48,15 +48,17 @@ const Body = z.object({
   mensajes: z.number().int().min(1).max(MAX_DEMO.mensajes).optional(),
   // Pagos ME vacío: las ventas de hoy llegan al tocar «Traer pagos y guías» (para grabarlo).
   pagosVacio: z.boolean().optional(),
+  // Reportador en 0: para grabar el ciclo completo (lo que se despacha en el video es lo que se reporta).
+  reportadorVacio: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
   const s = await sesionDemo(true)
   if ('error' in s) return s.error
   try {
-    const { secciones, preguntas, mensajes, pagosVacio } = Body.parse(await req.json())
+    const { secciones, preguntas, mensajes, pagosVacio, reportadorVacio } = Body.parse(await req.json())
     // En el orden de SECCIONES_DEMO: Despachos primero (borra lo hecho en vivo en Despachos).
-    await restaurarDemo(s.db, ids.filter(x => secciones.includes(x)), { preguntas, mensajes, pagosVacio })
+    await restaurarDemo(s.db, ids.filter(x => secciones.includes(x)), { preguntas, mensajes, pagosVacio, reportadorVacio })
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

@@ -95,7 +95,7 @@ export type SeccionDemo = typeof SECCIONES_DEMO[number]['id']
 
 /** Cuántas preguntas sin responder y conversaciones sin leer se siembran (para videos más cortos). */
 export const MAX_DEMO = { preguntas: 15, mensajes: 10 } as const
-export interface OpcionesDemo { preguntas?: number; mensajes?: number; pagosVacio?: boolean }
+export interface OpcionesDemo { preguntas?: number; mensajes?: number; pagosVacio?: boolean; reportadorVacio?: boolean }
 /** Pagos ME «vacío para grabar Traer» (26-10): cuántas ventas de hoy llegan al tocar Traer, y a los cuántos segundos
  *  termina cada cuenta (la primera, la segunda…). */
 export const DEMO_TRAER = { ventas: 20, segundos: [3, 5] } as const
@@ -260,10 +260,12 @@ async function despachos(db: Pool, cx: Cuentas) {
 }
 
 // ── Reportador ──────────────────────────────────────────────────────────────
-async function reportador(db: Pool, cx: Cuentas) {
+async function reportador(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   await borrarJornadas(db, 'reportador')
   await db.query(`DELETE FROM reportador_corridas`)
   await db.query(`DELETE FROM ml_ordenes WHERE ${enRango('reportador')}`)
+  // En 0 (26-10): para grabar el ciclo Traer → Despachos → Reportador, sin las 24 de ayer.
+  if (op.reportadorVacio) return
   const r = azar(2)
   const ordenes: Orden[] = [], etiquetas: Etiqueta[] = []
   for (let i = 0; i < 24; i++) {

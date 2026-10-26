@@ -16,6 +16,8 @@ export default function DemoClient() {
   const [datos, setDatos] = useState<{ secciones: Seccion[]; esAdmin: boolean; max: Record<string, number>; pagosVacio?: boolean } | null>(null)
   // Pagos ME «vacío para grabar Traer» (26-10): las 20 de hoy llegan al tocar Traer pagos y guías.
   const [pagosVacio, setPagosVacio] = useState(false)
+  // Reportador en 0 (26-10): el ciclo Traer → Despachos → Reportador en un solo video.
+  const [reportadorVacio, setReportadorVacio] = useState(false)
   // Cuántas preguntas / conversaciones sin leer deja cada restauración (vacío = todas).
   const [cantidad, setCantidad] = useState<Record<string, number | null>>({ preguntas: null, mensajes: null })
   const [trabajando, setTrabajando] = useState<string | null>(null)
@@ -33,6 +35,7 @@ export default function DemoClient() {
       const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         secciones: ids, preguntas: cantidad.preguntas ?? undefined, mensajes: cantidad.mensajes ?? undefined,
         pagosVacio: ids.includes('pagos') && pagosVacio,
+        reportadorVacio: ids.includes('reportador') && reportadorVacio,
       }) })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error ?? 'No se pudo restaurar')
@@ -83,6 +86,12 @@ export default function DemoClient() {
                 <label className="mt-3 flex items-start gap-2 text-sm text-neutral-600">
                   <input type="checkbox" checked={pagosVacio} onChange={e => setPagosVacio(e.target.checked)} className="mt-0.5 h-4 w-4 accent-neutral-900" />
                   <span>Empezar vacío para grabar «Traer»: al tocar <b>Traer pagos y guías</b> llegan 20 ventas de hoy en unos 5 segundos.</span>
+                </label>
+              )}
+              {datos.esAdmin && s.id === 'reportador' && (
+                <label className="mt-3 flex items-start gap-2 text-sm text-neutral-600">
+                  <input type="checkbox" checked={reportadorVacio} onChange={e => setReportadorVacio(e.target.checked)} className="mt-0.5 h-4 w-4 accent-neutral-900" />
+                  <span>Empezar en 0 para grabar el ciclo: <b>Traer</b> en Pagos ME → despachar en Despachos → reportar aquí.</span>
                 </label>
               )}
               {s.id === 'pagos' && datos.pagosVacio && (
