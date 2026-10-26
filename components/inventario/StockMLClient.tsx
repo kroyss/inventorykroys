@@ -167,6 +167,14 @@ export default function StockMLClient() {
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
               onSincronizar={async (p, v) => { if (await pedir({ accion: 'sincronizar', codigo_id: p.codigo_id, sin_sincronizar: v })) await cargar() }}
+              onCorregir={async cantidad => {
+                // El mismo ajuste de Inventario (movimiento ADJUST con el delta); después se recalcula el reparto.
+                const r = await fetch(`/api/inventory/${f.product_id}/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ movement_type: 'ADJUST', quantity: cantidad, notes: 'corregido desde Stock en ML' }) })
+                const d = await r.json().catch(() => ({}))
+                if (!r.ok) { setError(d.error ?? 'No se pudo corregir el stock'); return false }
+                await cargar(); return true
+              }}
               onAsignar={async asignaciones => {
                 const d = await pedir({ accion: 'asignar', product_id: f.product_id, asignaciones })
                 if (!d) return false
@@ -215,11 +223,15 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, marcable, marcado, resultados, onMarcar, onUnidades, onSincronizar, onAsignar }: {
+function Producto({ f, puedeCambiar, marcable, marcado, resultados, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir }: {
   f: FilaStockML; puedeCambiar: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
+  onCorregir: (cantidad: number) => Promise<boolean>
 }) {
+  const [corrigiendo, setCorrigiendo] = useState<string | null>(null)
+  const [guardandoStock, setGuardandoStock] = useState(false)
+  const nuevoStock = corrigiendo == null ? NaN : Math.round(Number(corrigiendo))
   // En reserva: lo que la persona asigna a cada publicación (arranca con lo que muestra ML).
   const asignables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
   const [asig, setAsig] = useState<Record<string, string>>({})
@@ -236,7 +248,22 @@ function Producto({ f, puedeCambiar, marcable, marcado, resultados, onMarcar, on
           <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
         </div>
         <div className="flex flex-wrap gap-x-3 text-xs text-neutral-500">
-          <span>Stock <b className="text-neutral-800 tabular-nums">{f.stock}</b></span>
+          {corrigiendo == null ? (
+            <span>Stock <b className="text-neutral-800 tabular-nums">{f.stock}</b>
+              {puedeCambiar && <button type="button" onClick={() => setCorrigiendo(String(f.stock))}
+                title="Si contaste y el inventario está mal: se guarda como ajuste de inventario" className="ml-1.5 text-lime-700 underline">Corregir stock</button>}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              Contaste
+              <input type="number" min={0} max={99999} autoFocus value={corrigiendo} onChange={e => setCorrigiendo(e.target.value)}
+                className="w-16 rounded border border-lime-400 px-1 py-0.5 text-right text-sm tabular-nums" />
+              <button type="button" disabled={guardandoStock || !(nuevoStock >= 0) || nuevoStock === f.stock} className="btn-primary px-2 py-0.5 text-xs disabled:opacity-50"
+                onClick={async () => { setGuardandoStock(true); const ok = await onCorregir(nuevoStock); setGuardandoStock(false); if (ok) setCorrigiendo(null) }}>
+                {guardandoStock ? 'Guardando…' : 'Guardar'}</button>
+              <button type="button" onClick={() => setCorrigiendo(null)} className="text-neutral-500 underline">cancelar</button>
+            </span>
+          )}
           {f.comprometidas > 0 && <span title="Ventas de ML todavía sin registrar">− sin registrar <b className="text-neutral-800 tabular-nums">{f.comprometidas}</b></span>}
           <span>Disponible <b className="text-base text-neutral-900 tabular-nums">{f.disponible}</b></span>
           {!f.en_reserva && f.publicable !== f.disponible && <span title="Disponible menos la reserva de seguridad">Publicable <b className="text-neutral-800 tabular-nums">{f.publicable}</b></span>}
