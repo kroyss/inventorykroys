@@ -317,9 +317,11 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
               <button disabled={ocupado} title="Borra esta variante de la publicación en MercadoLibre"
                 className="py-1 text-xs text-red-600 underline disabled:opacity-50 sm:py-0" onClick={async () => {
                   if (!await confirm({ title: 'Eliminar variante en MercadoLibre', confirmText: 'Eliminar en ML', cancelText: 'Cancelar',
-                    message: `Se elimina «${f.variante}» de la publicación ${f.item_id} en ${f.cuenta}.\n\nLas demás variantes no cambian. No se puede deshacer.` })) return
+                    message: `Se elimina «${f.variante}» de la publicación ${f.item_id} en ${f.cuenta}.\n\n`
+                      + (f.disponible > 0 ? `⚠️ En ML muestra ${f.disponible} ${f.disponible === 1 ? 'unidad' : 'unidades'}: elimínala solo si de verdad no existen (si no, véndelas o vincúlala).\n\n` : '')
+                      + 'Las demás variantes no cambian. No se puede deshacer.' })) return
                   setOcupado(true)
-                  const ok = await pedir({ accion: 'eliminar_variante', codigo: f.codigo })
+                  const ok = await pedir({ accion: 'eliminar_variante', codigo: f.codigo, con_stock: f.disponible > 0 })
                   setOcupado(false)
                   if (ok) onQuitar()
                 }}>Eliminar en ML</button>
