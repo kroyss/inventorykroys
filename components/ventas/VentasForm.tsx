@@ -39,6 +39,7 @@ interface MlVenta {
     itemId: string; titulo: string; cantidad: number; variante?: string | null; imagen?: string | null
     producto: { id: number; code: string; name: string } | null   // solo si el código ML está en UN producto
     opciones?: { id: number; code: string; name: string }[]        // todos los productos con ese código
+    unidades?: number                                                // pack/combo: «trae N u.» (Stock en ML, 26-10)
   }[]
 }
 
@@ -199,7 +200,7 @@ export default function VentasForm({ editing, products, country, onClose, onSave
       const id = elegido ?? i.producto?.id
       const p = id != null && products.find(x => x.product_id === id)
       if (!p || items.some(x => x.product_id === p.product_id) || nuevos.some(x => x.product_id === p.product_id)) continue
-      nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad, unit_price: defaultPrice(p) })
+      nuevos.push({ product_id: p.product_id, product_name: p.name, product_code: p.code, quantity: i.cantidad * Math.max(1, i.unidades ?? 1), unit_price: defaultPrice(p) })
     }
     if (nuevos.length) setItems([...items, ...nuevos])
   }
@@ -465,6 +466,12 @@ Revísala en el detalle que se abre ahora.`)
                           {i.variante && <span className="mr-1 inline-block rounded-full bg-sky-50 px-1.5 py-px text-[11px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 align-middle">{i.variante}</span>}
                           {i.titulo}
                         </span>
+                        {(i.unidades ?? 1) > 1 && (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+                            title="Pack o combo: lo marcó una persona en Stock en ML. La cantidad del producto ya viene multiplicada; cámbiala si no corresponde">
+                            📦 trae {i.unidades} u. → {i.cantidad * i.unidades!} del producto
+                          </span>
+                        )}
                         {i.producto ? (ya
                           ? <span className="shrink-0 text-emerald-700">✓ {i.producto.code}</span>
                           : <button type="button" onClick={() => agregarDeMl([i])} className="shrink-0 underline underline-offset-2 text-sky-700">+ {i.producto.code}</button>)

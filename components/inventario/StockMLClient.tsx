@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
 import type { FilaStockML, PubStockML } from '@/lib/stockConML'
 
-type Filtro = 'diferencias' | 'reactivar' | 'bloqueadas' | 'todas'
+type Filtro = 'diferencias' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
 
 const POR_PAGINA = 40
@@ -51,7 +51,8 @@ export default function StockMLClient() {
   const visibles = useMemo(() => {
     const q = buscar.trim().toLowerCase()
     return (filas ?? []).filter(f =>
-      (filtro === 'todas' || (filtro === 'diferencias' ? f.diferencia : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar) : f.pubs.some(p => p.bloqueada_envio)))
+      (filtro === 'todas' || (filtro === 'diferencias' ? f.diferencia : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
+        : filtro === 'combos' ? f.pubs.some(p => p.posible_combo) : f.pubs.some(p => p.bloqueada_envio)))
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
       && (!q || `${f.code} ${f.name}`.toLowerCase().includes(q) || f.pubs.some(p => `${p.item_id} ${p.titulo ?? ''} ${p.variante ?? ''}`.toLowerCase().includes(q))))
   }, [filas, filtro, cuenta, buscar])
@@ -62,6 +63,7 @@ export default function StockMLClient() {
     diferencias: filas.filter(f => f.diferencia).length,
     reactivar: filas.filter(f => f.pubs.some(p => p.reactivar)).length,
     bloqueadas: filas.filter(f => f.pubs.some(p => p.bloqueada_envio)).length,
+    combos: filas.filter(f => f.pubs.some(p => p.posible_combo)).length,
     todas: filas.length,
   }
   const accionables = (f: FilaStockML) => f.pubs.filter(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
@@ -111,7 +113,7 @@ export default function StockMLClient() {
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-          {([['diferencias', 'Con diferencias'], ['reactivar', 'Pausadas para reactivar'], ['bloqueadas', 'Pausadas sin envío gratis'], ['todas', 'Todos']] as const).map(([k, t]) => (
+          {([['diferencias', 'Con diferencias'], ['reactivar', 'Pausadas para reactivar'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const).map(([k, t]) => (
             <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
               className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
               {t} <span className="opacity-60">{n[k]}</span>
@@ -141,7 +143,7 @@ export default function StockMLClient() {
         </p>
       ) : visibles.length === 0 ? (
         <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500">
-          {filtro === 'diferencias' ? '¡Todo igual que en el sistema! 🎉' : 'Nada en esta vista.'}
+          {filtro === 'diferencias' ? '¡Todo igual que en el sistema! 🎉' : filtro === 'combos' ? 'Ningún combo por revisar.' : 'Nada en esta vista.'}
         </p>
       ) : (
         <div className="space-y-3">
@@ -251,6 +253,13 @@ function FilaPub({ p, res, puedeCambiar, onUnidades, onSincronizar }: {
               {p.bloqueada_envio && <div className="font-normal text-red-700">pausada: sin envío gratis</div>}
             </div>}
       </div>
+      {p.posible_combo && puedeCambiar && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-200"
+          title="El título parece de un pack o combo. Si trae varias unidades, pon cuántas en «trae»; si no, toca «Es suelta» y no vuelve a aparecer">
+          ¿pack o combo?
+          <button type="button" onClick={() => onUnidades(1)} className="font-medium underline">Es suelta</button>
+        </span>
+      )}
       {envio && <span title={envio.title} className={`rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset ${envio.c}`}>{envio.t}</span>}
       {puedeCambiar && (
         <label className="flex items-center gap-1 text-[11px] text-neutral-500" title="Rifas, encargos o lo que manejas aparte: esta pantalla no la toca">

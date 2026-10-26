@@ -26,6 +26,8 @@ export interface PubStockML {
   precio: number | null
   unidades: number
   sin_sincronizar: boolean
+  /** El título dice pack/combo/kit/«x2»/«4 und» y sigue en 1 sin revisar: SOLO una lista para que alguien decida. */
+  posible_combo: boolean
   /** Vinculada la publicación entera pero tiene variantes: no se sabe cuál variante es este producto. */
   entera_con_variantes: boolean
   envio: EstadoEnvio | null        // null = no aplica (CO o sin precio)
@@ -49,6 +51,10 @@ export interface FilaStockML {
   pubs: PubStockML[]
   diferencia: boolean
 }
+
+// Solo para la lista «Revisar combos» (nunca cambia nada): "pack", "combo", "kit", "x2", "4 und", "par".
+// No cuenta medidas ("30cm X 50m", "X 2 Metros", "10w"): después de "x N" no puede venir una medida.
+const PARECE_COMBO = /\b(pack|combo|kit|paquete|lote|docena|pares?)\b|\bx\s?\d{1,3}\b(?![.,]\d)(?!\s*(metros?|mts?|m\b|cm|mm|kg|gr|gb|w\b))|\b\d{1,3}\s?(und|unds|unid|unidades|pzas|piezas|pcs|uds)\b/i
 
 /** Unidades de cada producto en ventas de ML sin registrar (por código de publicación o variante). */
 async function comprometidasPorCodigo(db: Pool): Promise<Map<string, number>> {
@@ -85,7 +91,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     db.query(
       `SELECT p.id AS product_id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, p.weight_kg::float AS peso,
               m.id AS codigo_id, m.ml_code, m.ml_account AS cuenta, COALESCE(m.unidades, 1)::int AS unidades,
-              COALESCE(m.sin_sincronizar, FALSE) AS sin_sincronizar,
+              COALESCE(m.sin_sincronizar, FALSE) AS sin_sincronizar, COALESCE(m.combo_revisado, FALSE) AS combo_revisado,
               c.item_id, c.titulo, c.estado, c.disponible::int AS disponible, c.precio::float AS precio, c.variantes,
               c.actualizado_at
        FROM products p
@@ -122,6 +128,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       precio: r.precio,
       unidades: Math.max(1, r.unidades),
       sin_sincronizar: r.sin_sincronizar,
+      posible_combo: !r.combo_revisado && Math.max(1, r.unidades) === 1 && !r.sin_sincronizar && PARECE_COMBO.test(r.titulo ?? ''),
       entera_con_variantes: !varId && variantes.length > 0,
       envio: null, objetivo: null, reactivar: false, bloqueada_envio: false,
       actualizado_at: r.actualizado_at,

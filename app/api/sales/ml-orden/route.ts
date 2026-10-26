@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
     const deVariante = (i: { itemId: string; variacionId: number | null }) => i.variacionId ? `${sinPrefijo(i.itemId)}:${i.variacionId}` : null
     const publicaciones = v.items.map(i => sinPrefijo(i.itemId))
     const { rows } = await db.query(
-      `SELECT DISTINCT m.ml_code, split_part(m.ml_code, ':', 1) AS publicacion, p.id AS product_id, p.code, p.name
+      `SELECT DISTINCT m.ml_code, split_part(m.ml_code, ':', 1) AS publicacion, p.id AS product_id, p.code, p.name,
+              COALESCE(m.unidades, 1)::int AS unidades
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id
        WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[])
        ORDER BY m.ml_code, p.code`, [publicaciones])
@@ -39,7 +40,11 @@ export async function GET(req: NextRequest) {
         .map(r => ({ id: r.product_id as number, code: r.code as string, name: r.name as string }))
       // De otra variante nunca se elige solo (aunque sea una): sería el color o la talla equivocada.
       const segura = exactas.length > 0 || dePublicacion.length > 0
-      return { ...i, producto: segura && opciones.length === 1 ? opciones[0] : null, opciones }
+      // Pack o combo (26-10, opción B del dueño): «trae N u.» lo puso una persona (Stock en ML); la cantidad viene ya
+      // multiplicada y se puede cambiar. Nunca se adivina por el título. Si los vínculos no coinciden, 1.
+      const us = [...new Set((exactas.length ? exactas : dePublicacion).map(r => r.unidades as number))]
+      const unidades = segura && us.length === 1 ? us[0] : 1
+      return { ...i, producto: segura && opciones.length === 1 ? opciones[0] : null, opciones, unidades }
     })
     return NextResponse.json({ cuenta: v.cuenta, comprador: v.comprador, fecha: v.fecha, items })
   } catch (err) {
