@@ -37,6 +37,11 @@ function buscarProductos(productos: Producto[], q: string) {
   if (!palabras.length) return []
   return productos.filter(p => { const t = sinAcentos(`${p.code} ${p.name}`); return palabras.every(w => t.includes(w)) }).slice(0, 15)
 }
+/** Buscador de la lista (26-10): la publicación (título, MLV, variante) y también el producto vinculado (código, nombre). */
+const textoFila = (f: Fila) => sinAcentos([f.titulo, f.item_id, f.codigo, f.variante, f.producto?.code, f.producto?.name,
+  ...(f.otros ?? []).flatMap(o => [o.code, o.name])].filter(Boolean).join(' '))
+const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
+const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return true; const t = textoFila(f); return palabras.every(w => t.includes(w)) }
 const fecha = (f: string) => new Date(f).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })
 
 export default function VincularMLClient({ conCuentas, paraQuien = 'el administrador' }: { conCuentas: boolean; paraQuien?: string }) {
@@ -58,7 +63,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   // Agrupado por publicación, ordenado por ventas de 60 días.
   const grupos = useMemo(() => {
     if (!datos) return []
-    const q = buscar.trim().toLowerCase()
+    const palabras = palabrasDe(buscar)
     const m = new Map<string, { item_id: string; cuenta: string; titulo: string; thumbnail: string | null; permalink: string | null; estado_ml: string | null; filas: Fila[] }>()
     for (const f of datos.filas) {
       const k = `${f.cuenta}|${f.item_id}`
@@ -68,19 +73,26 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     const pasa = (f: Fila) => filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
       : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda
     return [...m.values()]
-      .map(g => ({ ...g, ventas: g.filas.reduce((s, f) => s + f.ventas60, 0), visibles: g.filas.filter(pasa) }))
-      .filter(g => g.visibles.length && (!cuenta || g.cuenta === cuenta)
-        && (!q || g.titulo.toLowerCase().includes(q) || g.item_id.toLowerCase().includes(q) || g.filas.some(f => (f.variante ?? '').toLowerCase().includes(q))))
+      .map(g => ({ ...g, ventas: g.filas.reduce((s, f) => s + f.ventas60, 0), visibles: g.filas.filter(f => pasa(f) && coincide(f, palabras)) }))
+      .filter(g => g.visibles.length && (!cuenta || g.cuenta === cuenta))
       .sort((a, b) => b.ventas - a.ventas || (a.estado_ml === 'active' ? -1 : 1))
   }, [datos, filtro, cuenta, buscar])
 
   if (!conCuentas) return <p className="text-sm text-neutral-500">Primero hay que conectar las cuentas de MercadoLibre.</p>
   if (!datos) return <p className="text-sm text-neutral-400">{error ?? 'Cargando publicaciones…'}</p>
 
+  // Con algo escrito en el buscador, los botones cuentan lo encontrado (para saltar a donde está).
+  const palabras = palabrasDe(buscar)
+  const encontradas = palabras.length ? datos.filas.filter(f => coincide(f, palabras)) : datos.filas
   const total = datos.filas.length
   const vinculadas = datos.filas.filter(f => f.estado === 'vinculada').length
   const dudas = datos.filas.filter(f => f.duda).length
-  const pendientes = datos.filas.filter(f => f.estado !== 'vinculada' && !f.duda).length
+  const n = {
+    todas: encontradas.length,
+    vinculadas: encontradas.filter(f => f.estado === 'vinculada').length,
+    dudas: encontradas.filter(f => f.duda).length,
+    pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda).length,
+  }
   const cuentas = [...new Set(datos.filas.map(f => f.cuenta))].sort()
   const sinProductos = datos.productos.length === 0
 
@@ -130,7 +142,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([['pendientes', 'Por vincular', pendientes], ['dudas', 'Dudas', dudas], ['vinculadas', 'Vinculadas', vinculadas], ['todas', 'Todas', total]] as const).map(([k, t, n]) => (
+        {([['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
@@ -143,7 +155,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
             {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <input type="search" value={buscar} onChange={e => { setBuscar(e.target.value); setVer(POR_PAGINA) }} placeholder="Buscar publicación, variante o MLV…"
+        <input type="search" value={buscar} onChange={e => { setBuscar(e.target.value); setVer(POR_PAGINA) }} placeholder="Buscar publicación, MLV, código o producto…"
           className="ml-auto w-full rounded-lg border border-neutral-300 px-3 py-2 text-base sm:w-72 sm:py-1.5 sm:text-sm" />
       </div>
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
