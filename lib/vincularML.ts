@@ -8,7 +8,7 @@ import { filasImportar, vincularCodigo, type FilaImportar } from '@/lib/importar
 import { conflictoPesos, type ConflictoPesos, type PesoVinculado } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { sqlPesosVinculados } from '@/lib/promocionesSesion'
-import { mlFetch } from '@/lib/ml'
+import { ErrorML, mlFetch } from '@/lib/ml'
 
 export interface FilaVincular extends Omit<FilaImportar, 'precio' | 'moneda'> {
   precio?: number | null; moneda?: string | null
@@ -111,6 +111,34 @@ export async function marcarNoUsa(db: Pool, codigo: string, cuenta: string | nul
 }
 
 interface ItemVariantes { id: string; variations?: { id: number; available_quantity: number }[] }
+interface ItemConFotos { id: string; pictures?: { id: string }[]; variations?: { id: number; picture_ids?: string[] }[] }
+
+/** ¿ML rechazó por la cantidad de fotos de la publicación? ("Items in category X cannot exceeds 20 pictures") */
+const porFotos = (e: unknown) => e instanceof ErrorML && e.status === 400 && /pictures/i.test(JSON.stringify(e.datos ?? e.message))
+
+/** Plan B (26-10): el DELETE de la variante deja sus fotos en la publicación y, si la categoría ahora permite menos,
+ *  ML rechaza el cambio. Se hace como la web de ML: la publicación SIN esa variante y con SOLO las fotos que usan las
+ *  variantes que quedan (cada una con su id y sus fotos: stock, precio y atributos no se tocan). */
+async function eliminarConFotos(db: Pool, conexionId: number, itemId: string, vid: string) {
+  const it = await mlFetch<ItemConFotos>(db, conexionId, `/items/${itemId}?attributes=id,pictures,variations`)
+  const quedan = (it.variations ?? []).filter(v => String(v.id) !== vid)
+  const usadas = new Set(quedan.flatMap(v => v.picture_ids ?? []))
+  const fotos = (it.pictures ?? []).filter(f => usadas.has(f.id))
+  // Seguro: sin saber qué fotos usa cada variante que queda no se manda nada (podría dejar la publicación sin fotos).
+  if (!quedan.length || quedan.some(v => !v.picture_ids?.length) || !fotos.length) {
+    throw new ErrorML(400, null, 'MercadoLibre no la deja eliminar por las fotos de la publicación: elimínala desde la web de ML (el tacho de la variante)')
+  }
+  try {
+    await mlFetch(db, conexionId, `/items/${itemId}`, { method: 'PUT', body: {
+      variations: quedan.map(v => ({ id: v.id, picture_ids: v.picture_ids ?? [] })),
+      pictures: fotos.map(f => ({ id: f.id })),
+    } })
+  } catch (e) {
+    if (porFotos(e)) throw new ErrorML(400, null,
+      `La publicación sigue con ${fotos.length} fotos en las variantes que quedan y su categoría permite menos: quita fotos en MercadoLibre`)
+    throw e
+  }
+}
 
 /** Elimina UNA variante de la publicación en MercadoLibre. Se relee ML antes: solo si existe, tiene 0 unidades y no es
  *  la única (con unidades, solo si se confirmó la advertencia). Después se relee para confirmar y se saca del catálogo guardado (sin esperar la actualización de 6 h). */
@@ -133,7 +161,12 @@ export async function eliminarVarianteML(db: Pool, codigo: string, userId: numbe
   // Con unidades en ML solo si la persona lo confirmó viendo la advertencia (26-10: stock viejo que no existe).
   if (v.available_quantity > 0 && !conStock) return { ok: false, error: `En ML tiene ${v.available_quantity} unidades: confirma la advertencia para eliminarla igual` }
   if ((antes.variations?.length ?? 0) < 2) return { ok: false, error: 'Es la única variante de la publicación: MercadoLibre no deja eliminarla' }
-  await mlFetch(db, c.conexion_id, `/items/${c.item_id}/variations/${vid}`, { method: 'DELETE' })
+  try {
+    await mlFetch(db, c.conexion_id, `/items/${c.item_id}/variations/${vid}`, { method: 'DELETE' })
+  } catch (e) {
+    if (!porFotos(e)) throw e
+    await eliminarConFotos(db, c.conexion_id, c.item_id, vid)
+  }
   const despues = await mlFetch<ItemVariantes>(db, c.conexion_id, ruta)
   if (despues.variations?.some(x => String(x.id) === vid)) return { ok: false, error: 'MercadoLibre no la eliminó; prueba desde la web de ML' }
   await quitarDelCatalogo(db, c.item_id, vid)
