@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPagosME } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
-import { traerDemo } from '@/lib/demoDatos'
+import { asegurarPagosDemo, traerDemo } from '@/lib/demoDatos'
 
 /** POST /api/pagos-me/traer → "Traer pagos y guías": cada perfil del vigilante lo toma en su próximo latido (~1 min). */
 export async function POST() {
@@ -10,7 +10,10 @@ export async function POST() {
   if ('error' in s) return s.error
   try {
     // Demo: la PC sembrada "responde" al momento (lib/demoDatos.ts).
-    if (await esDemo(s.db)) return NextResponse.json({ ok: true, pedido: await traerDemo(s.db, s.userId), demo: true })
+    if (await esDemo(s.db)) {
+      await asegurarPagosDemo(s.db)
+      return NextResponse.json({ ok: true, pedido: await traerDemo(s.db, s.userId), demo: true })
+    }
     // Doble clic o dos personas a la vez: si hay uno de hace menos de 2 minutos, se reusa.
     const { rows: [ya] } = await s.db.query(
       `SELECT id FROM me_pedidos WHERE pedido_at > NOW() - INTERVAL '2 minutes' ORDER BY id DESC LIMIT 1`)

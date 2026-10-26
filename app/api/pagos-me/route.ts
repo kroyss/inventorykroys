@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
-import { entregarDemo } from '@/lib/demoDatos'
+import { asegurarPagosDemo, entregarDemo } from '@/lib/demoDatos'
 
 /**
  * GET /api/pagos-me?estado=pendiente|valido|invalido|todos  → pagos traídos por el vigilante + su estado
@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
     }
     // Demo (19-10): no hay PC de verdad; la sembrada se ve siempre con señal.
     // Vacía para grabar (26-10): durante la traída, cada cuenta «entrega» sus ventas a los pocos segundos.
-    if (await esDemo(s.db)) { await s.db.query(`UPDATE me_latidos SET visto_at = NOW()`); await entregarDemo(s.db) }
+    if (await esDemo(s.db)) {
+      await asegurarPagosDemo(s.db)
+      await s.db.query(`UPDATE me_latidos SET visto_at = NOW()`); await entregarDemo(s.db)
+    }
     const estado = req.nextUrl.searchParams.get('estado') ?? 'pendiente'
     const filtro = ['pendiente', 'valido', 'invalido'].includes(estado) ? estado : null
     const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }] = await Promise.all([

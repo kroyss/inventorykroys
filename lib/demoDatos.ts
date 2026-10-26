@@ -629,6 +629,13 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   }
 }
 
+/** Demo sin Pagos ME sembrado (nunca se restauró esa sección, 26-10): se arma solo, «vacío para grabar Traer»,
+ *  para que la pantalla se vea configurada y Traer funcione sin pasar por /demo. */
+export async function asegurarPagosDemo(db: Pool) {
+  const { rows: [r] } = await db.query(`SELECT EXISTS (SELECT 1 FROM me_vigilante) OR EXISTS (SELECT 1 FROM me_latidos) AS hay`)
+  if (!r.hay) await restaurarDemo(db, ['pagos'], { pagosVacio: true })
+}
+
 /** ¿Quedó la demo «vacía para grabar Traer» (hay ventas guardadas para traer)? */
 async function hayRetenidos(db: Pool) {
   const { rows: [r] } = await db.query(`SELECT EXISTS (SELECT 1 FROM app_settings WHERE key LIKE '${RETENIDOS}%') AS si`)
