@@ -113,8 +113,8 @@ export async function marcarNoUsa(db: Pool, codigo: string, cuenta: string | nul
 interface ItemVariantes { id: string; variations?: { id: number; available_quantity: number }[] }
 
 /** Elimina UNA variante de la publicación en MercadoLibre. Se relee ML antes: solo si existe, tiene 0 unidades y no es
- *  la única. Después se relee para confirmar y se saca del catálogo guardado (sin esperar la actualización de 6 h). */
-export async function eliminarVarianteML(db: Pool, codigo: string, userId: number): Promise<{ ok: true } | { ok: false; error: string }> {
+ *  la única (con unidades, solo si se confirmó la advertencia). Después se relee para confirmar y se saca del catálogo guardado (sin esperar la actualización de 6 h). */
+export async function eliminarVarianteML(db: Pool, codigo: string, userId: number, conStock = false): Promise<{ ok: true } | { ok: false; error: string }> {
   const [pub, vid] = codigo.split(':')
   if (!vid) return { ok: false, error: 'Solo se eliminan variantes, no la publicación entera' }
   const { rows: [c] } = await db.query(
@@ -130,7 +130,8 @@ export async function eliminarVarianteML(db: Pool, codigo: string, userId: numbe
     await quitarDelCatalogo(db, c.item_id, vid)
     return { ok: false, error: 'Esa variante ya no existe en MercadoLibre (se quitó de la lista)' }
   }
-  if (v.available_quantity > 0) return { ok: false, error: `En ML tiene ${v.available_quantity} unidades: primero ponla en 0` }
+  // Con unidades en ML solo si la persona lo confirmó viendo la advertencia (26-10: stock viejo que no existe).
+  if (v.available_quantity > 0 && !conStock) return { ok: false, error: `En ML tiene ${v.available_quantity} unidades: confirma la advertencia para eliminarla igual` }
   if ((antes.variations?.length ?? 0) < 2) return { ok: false, error: 'Es la única variante de la publicación: MercadoLibre no deja eliminarla' }
   await mlFetch(db, c.conexion_id, `/items/${c.item_id}/variations/${vid}`, { method: 'DELETE' })
   const despues = await mlFetch<ItemVariantes>(db, c.conexion_id, ruta)

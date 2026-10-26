@@ -313,8 +313,8 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
                   if (ok) onCambio({ no_usa: { por: 'tú', creada_at: new Date().toISOString() } })
                 }}>No se usa</button>
             )}
-            {esDueno && f.codigo.includes(':') && f.disponible === 0 && hermanas > 1 && (
-              <button disabled={ocupado} title="Borra esta variante de la publicación en MercadoLibre (solo con 0 unidades)"
+            {esDueno && f.codigo.includes(':') && hermanas > 1 && (
+              <button disabled={ocupado} title="Borra esta variante de la publicación en MercadoLibre"
                 className="py-1 text-xs text-red-600 underline disabled:opacity-50 sm:py-0" onClick={async () => {
                   if (!await confirm({ title: 'Eliminar variante en MercadoLibre', confirmText: 'Eliminar en ML', cancelText: 'Cancelar',
                     message: `Se elimina «${f.variante}» de la publicación ${f.item_id} en ${f.cuenta}.\n\nLas demás variantes no cambian. No se puede deshacer.` })) return

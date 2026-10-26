@@ -55,7 +55,7 @@ const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('ignorar'), id: z.number().int().positive() }),
   z.object({ accion: z.literal('no_usa'), codigo: Codigo, valor: z.boolean(), cuenta: z.string().max(50).optional(),
              titulo: z.string().max(300).optional(), variante: z.string().max(200).nullable().optional() }),
-  z.object({ accion: z.literal('eliminar_variante'), codigo: Codigo }),
+  z.object({ accion: z.literal('eliminar_variante'), codigo: Codigo, con_stock: z.boolean().optional() }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     if (b.accion === 'eliminar_variante') {
       if (!puede(s.session.user, 'ver_productos')) return forbidden()
       try {
-        const r = await eliminarVarianteML(s.db, b.codigo, userId)
+        const r = await eliminarVarianteML(s.db, b.codigo, userId, !!b.con_stock)
         return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error }, { status: 409 })
       } catch (e) {
         // 409 y no 502: Cloudflare cambia los 502 por su página y el mensaje de ML no llegaba a la pantalla.
