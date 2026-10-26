@@ -125,8 +125,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
        WHERE id = ANY($1) AND status = 'PROCESADA'`,
       [saleIds])
 
+    // Las que NO se imprimieron (pago sin verificar, destildadas, con error) pasan al lote pendiente (26-10): antes
+    // quedaban dentro de este lote ya generado y no se veían en ningún lado (BUYBOOK: 14 guías). Las apartadas siguen
+    // en "En espera", como siempre.
+    const impresas = aImprimir.map(e => e.id)
+    const { rows: [quedan] } = await client.query(
+      `SELECT COUNT(*)::int AS n FROM despacho_etiquetas
+       WHERE lote_id = $1 AND NOT impresa AND apartado IS NULL AND NOT (id = ANY($2))`, [lote.id, impresas])
+    let siguiente: number | null = null
+    if (quedan.n > 0) {
+      const { rows: [p] } = await client.query(
+        `SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' AND id <> $1 ORDER BY id DESC LIMIT 1 FOR UPDATE`, [lote.id])
+      siguiente = p?.id ?? (await client.query(
+        `INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [userId])).rows[0].id
+      await client.query(
+        `UPDATE despacho_etiquetas SET lote_id = $2
+         WHERE lote_id = $1 AND NOT impresa AND apartado IS NULL AND NOT (id = ANY($3))`, [lote.id, siguiente, impresas])
+    }
+
     await client.query('COMMIT')
-    return NextResponse.json({ ok: true, lote_id: lote.id, jornada_id: jornada.id, etiquetas: aImprimir.length, paginas })
+    return NextResponse.json({ ok: true, lote_id: lote.id, jornada_id: jornada.id, etiquetas: aImprimir.length, paginas,
+                               pasaron: quedan.n, lote_siguiente: siguiente })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
     if (outputPath) await unlink(outputPath).catch(() => {})

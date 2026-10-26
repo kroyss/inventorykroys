@@ -251,7 +251,9 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     setBusy(null)
     if (!res.ok) { setError(body.error ?? 'Error'); setFallas(body.fallas ?? []); cargar(); return }
     descargar(`/api/despachos/lotes/${lote.id}/pdf`)
-    setAviso('PDF generado y verificado. Ábrelo con tu visor de PDF e imprime a "Tamaño real" (100%), no "Ajustar a la página".')
+    const pasaron = (body as { pasaron?: number }).pasaron ?? 0
+    setAviso('PDF generado y verificado. Ábrelo con tu visor de PDF e imprime a "Tamaño real" (100%), no "Ajustar a la página".'
+      + (pasaron ? ` ${pasaron} guía${pasaron === 1 ? '' : 's'} que no se imprimi${pasaron === 1 ? 'ó' : 'eron'} (pago sin verificar o destildada${pasaron === 1 ? '' : 's'}) ${pasaron === 1 ? 'pasó' : 'pasaron'} al lote pendiente.` : ''))
     cargar()
   }
 
