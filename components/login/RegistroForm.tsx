@@ -109,13 +109,14 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <div>
                 <label htmlFor="whatsapp" className={etiqueta}>WhatsApp</label>
-                <input id="whatsapp" name="whatsapp" required inputMode="tel" placeholder="0414 1234567" maxLength={20} autoComplete="tel" className={campo} />
+                <input id="whatsapp" name="whatsapp" inputMode="tel" placeholder="0414 1234567" maxLength={20} autoComplete="tel" className={campo} />
               </div>
               <div>
-                <label htmlFor="telegram" className={etiqueta}>Telegram <span className="font-normal text-neutral-400">(opcional)</span></label>
+                <label htmlFor="telegram" className={etiqueta}>Telegram</label>
                 <input id="telegram" name="telegram" placeholder="@usuario" maxLength={33} autoCapitalize="none" spellCheck={false} className={campo} />
               </div>
             </div>
+            <p className="-mt-2 text-xs text-neutral-400">WhatsApp o Telegram: al menos uno, para ayudarte a empezar.</p>
             <div>
               <label htmlFor="correo" className={etiqueta}>Correo</label>
               <input id="correo" name="correo" type="email" required maxLength={120} autoComplete="email" className={campo} />

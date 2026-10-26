@@ -17,11 +17,12 @@ const Registro = z.object({
   nombre:   z.string().trim().min(2, 'Escribe tu nombre').max(100),
   usuario:  z.string().trim().toLowerCase().regex(USERNAME_RE, 'Usuario: 3 a 30 caracteres, solo letras, números, punto, guion o guion bajo (sin espacios)'),
   correo:   z.string().trim().toLowerCase().email('Revisa el correo').max(120),
-  whatsapp: z.string().trim().regex(/^[+\d\s()-]{7,20}$/, 'Revisa el número de WhatsApp').max(20),
+  // WhatsApp o Telegram: los dos opcionales, pero al menos uno (26-10, pedido del dueño).
+  whatsapp: z.string().trim().regex(/^([+\d\s()-]{7,20})?$/, 'Revisa el número de WhatsApp').max(20).optional(),
   telegram: z.string().trim().transform(t => t.replace(/^@/, '')).pipe(z.string().regex(/^[A-Za-z0-9_]{0,32}$/, 'Revisa tu usuario de Telegram')).optional(),
   clave:    z.string().min(PASSWORD_MIN, `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres`).max(PASSWORD_MAX),
   sitio:    z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena
-})
+}).refine(b => b.whatsapp || b.telegram, { message: 'Déjanos tu WhatsApp o tu Telegram (al menos uno) para ayudarte' })
 
 function ipDe(req: NextRequest) {
   // Detrás de Cloudflare: la IP real viene en cf-connecting-ip (igual que /api/fundadores).
@@ -59,14 +60,14 @@ export async function POST(req: NextRequest) {
       nombre: b.negocio, country: 'VE', modulos: [...MODULOS_PRUEBA], alta: 'prueba',
       admin: { username: b.usuario, full_name: b.nombre, password: b.clave, email: b.correo },
       origenOrgId: ORGANIZACION_PLATAFORMA, origen: 'autoregistro',
-      registro: { correo: b.correo, whatsapp: b.whatsapp, telegram: b.telegram || null, ip_hash: ipHash,
+      registro: { correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null, ip_hash: ipHash,
                   navegador: req.headers.get('user-agent')?.slice(0, 200) ?? null },
     })
     await client.query('COMMIT')
 
     avisarDuenoPlataforma(
       `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
-      + `WhatsApp ${esc(b.whatsapp)}${b.telegram ? ` · @${esc(b.telegram)}` : ''} · ${esc(b.correo)}\n`
+      + [b.whatsapp && `WhatsApp ${esc(b.whatsapp)}`, b.telegram && `@${esc(b.telegram)}`, esc(b.correo)].filter(Boolean).join(' · ') + '\n'
       + 'Los días arrancan cuando conecte MercadoLibre.')
       .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
     return NextResponse.json({ ok: true, empresa: c.empresaId }, { status: 201 })
