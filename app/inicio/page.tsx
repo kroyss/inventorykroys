@@ -10,11 +10,12 @@ export const metadata = {
 }
 
 // Página de inicio pública de elcomerciantedigital.com (21-10-2026; sin login, ver proxy.ts; nginx sirve la raíz con
-// esta página). Qué hacemos, el Programa Despegue con protagonismo y cómo contactarnos. Sin precios del sistema
-// (todavía no está abierto al público) ni correo: el contacto es por Telegram e Instagram (decisión del dueño).
+// esta página). Qué hacemos, la prueba gratis de 15 días (26-10, /registro), el Programa Despegue y cómo contactarnos.
+// Sin precios del sistema ni correo: el contacto es por Telegram e Instagram (decisión del dueño).
 
 const INSTAGRAM = 'https://www.instagram.com/comerciantedigital.ve/'
 const LOGIN = 'https://app.elcomerciantedigital.com/login'
+const REGISTRO = 'https://app.elcomerciantedigital.com/registro'   // prueba gratis de 15 días (26-10)
 
 // Íconos de trazo (24×24).
 const I = {
@@ -84,8 +85,11 @@ export default async function InicioPage() {
             Lo construimos para nuestras propias cuentas y hoy lo usan otros vendedores.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            <a href="/despegue" className="inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
-              <Icono d={I.cohete} className="h-4 w-4" /> Conocer el Programa Despegue
+            <a href={REGISTRO} className="inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
+              <Icono d={I.rayo} className="h-4 w-4" /> Prueba 15 días gratis
+            </a>
+            <a href="/despegue" className="inline-flex items-center gap-2 rounded-xl border border-lime-400/50 px-5 py-3 text-sm font-semibold text-lime-400 transition hover:border-lime-400 hover:bg-lime-400/10">
+              <Icono d={I.cohete} className="h-4 w-4" /> Programa Despegue
             </a>
             <a href={`https://t.me/${TELEGRAM_DESPEGUE}`} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-xl border border-lime-400/50 px-5 py-3 text-sm font-semibold text-lime-400 transition hover:border-lime-400 hover:bg-lime-400/10">
@@ -193,10 +197,14 @@ export default async function InicioPage() {
               <p className="mt-2 font-semibold text-neutral-900">Programa Despegue</p>
               <p className="mt-1 text-sm leading-relaxed text-neutral-600">8 semanas para empezar o reactivar tu cuenta, con el Radar cada domingo.</p>
             </li>
-            <li className="rounded-2xl border border-dashed border-neutral-300 bg-white p-5">
-              <p className="text-xs font-semibold text-neutral-500">Próximamente</p>
-              <p className="mt-2 font-semibold text-neutral-900">Apertura a nuevos vendedores</p>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-500">El sistema abrirá a más vendedores. Únete a la comunidad para enterarte primero.</p>
+            <li className="rounded-2xl border border-lime-300 bg-lime-50 p-5">
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-lime-800">
+                <span className="relative flex h-2 w-2" aria-hidden="true"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-500 opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-lime-500" /></span>
+                Abierto
+              </p>
+              <p className="mt-2 font-semibold text-neutral-900">Prueba gratis de 15 días</p>
+              <p className="mt-1 text-sm leading-relaxed text-neutral-600">Crea tu cuenta, conecta MercadoLibre y prueba todo con tus propias ventas.</p>
+              <a href={REGISTRO} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-lime-800 underline underline-offset-2">Empezar <span aria-hidden="true">→</span></a>
             </li>
           </ol>
         </section>

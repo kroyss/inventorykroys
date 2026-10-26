@@ -3,6 +3,8 @@ import { timingSafeEqual } from 'crypto'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { canjearCodigo, cifrar, usuarioML } from '@/lib/ml'
 import { dbGlobal } from '@/lib/db'
+import { anotarCuentaML, pruebaYaUsada } from '@/lib/registro'
+import { TELEGRAM_DESPEGUE } from '@/lib/despegue'
 
 // Paso 2 del OAuth: ML vuelve con ?code&state. Se canjea el código por los tokens y se
 // guarda la cuenta en la empresa de la sesión (cifrados). Siempre termina en /cuentas-ml.
@@ -34,6 +36,12 @@ export async function GET(req: NextRequest) {
   try {
     const t = await canjearCodigo(code)
     const u = await usuarioML(t.access_token)
+    // Autoregistro (26-10, migración 125): una cuenta de ML tiene UNA sola prueba gratis.
+    const otra = await pruebaYaUsada(s.session.user.organizacionId, u.id)
+    if (otra) {
+      console.warn('[ML callback] prueba ya usada', u.nickname, 'en', otra)
+      return volver({ ml_error: `La cuenta ${u.nickname} ya usó su prueba gratis. Escríbenos por Telegram (@${TELEGRAM_DESPEGUE}) para activar tu cuenta.` })
+    }
     try {
       await s.db.query(
         `INSERT INTO ml_conexiones (ml_user_id, nickname, site_id, access_token_enc, refresh_token_enc,
@@ -50,6 +58,8 @@ export async function GET(req: NextRequest) {
       // La fila existe pero es de OTRA empresa (RLS no deja actualizarla).
       return volver({ ml_error: `La cuenta ${u.nickname} ya está conectada en otra empresa` })
     }
+    await anotarCuentaML(s.session.user.organizacionId, u.id, u.nickname)
+      .catch(e => console.error('[ML callback] anotar', e instanceof Error ? e.message : e))
     // Primera cuenta conectada: arrancan los días de prueba (migración 067). LEAST: nunca pasa
     // del tope que se fijó al crear la cuenta; prueba_dias = NULL para no volver a hacerlo.
     await dbGlobal().query(

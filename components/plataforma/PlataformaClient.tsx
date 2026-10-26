@@ -27,6 +27,8 @@ interface Empresa {
   prueba_hasta: string | null
   prueba_dias: number | null
   fundador: boolean
+  origen?: string | null      // 'autoregistro' = se registró solo en /registro (26-10)
+  registro?: { correo?: string; whatsapp?: string; telegram?: string | null } | null
   ia_limite_mes: number | null
   motivo_pausa: string | null
   pausa_fecha: string | null
@@ -91,8 +93,16 @@ function FraseCuenta({ e, hoy }: { e: Empresa; hoy: string }) {
   const f = fraseCuenta(e, hoy)
   return (
     <div className="min-w-[10rem]">
-      <div className="whitespace-nowrap text-xs font-medium text-neutral-800">{f.icono} {f.texto}{e.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}</div>
+      <div className="whitespace-nowrap text-xs font-medium text-neutral-800">{f.icono} {f.texto}{e.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
+        {e.origen === 'autoregistro' && <span className="ml-1.5 rounded-full bg-sky-50 px-1.5 py-px text-[10px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-200" title="Se registró solo en /registro (prueba de 15 días)">Autoregistro</span>}</div>
       {f.extra && <div className={`text-[11px] ${f.alerta ? 'text-amber-700' : 'text-neutral-500'}`}>{f.extra}</div>}
+      {e.origen === 'autoregistro' && e.registro && (
+        <div className="text-[11px] text-neutral-500">
+          {e.registro.whatsapp && <a href={`https://wa.me/${e.registro.whatsapp.replace(/\D/g, '').replace(/^0/, '58')}`} target="_blank" rel="noreferrer" className="underline" onClick={ev => ev.stopPropagation()}>WhatsApp {e.registro.whatsapp}</a>}
+          {e.registro.telegram && <> · <a href={`https://t.me/${e.registro.telegram}`} target="_blank" rel="noreferrer" className="underline" onClick={ev => ev.stopPropagation()}>@{e.registro.telegram}</a></>}
+          {e.registro.correo && <> · {e.registro.correo}</>}
+        </div>
+      )}
     </div>
   )
 }
