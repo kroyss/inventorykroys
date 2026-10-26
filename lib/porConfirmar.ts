@@ -50,7 +50,7 @@ export interface PorConfirmar {
   // Algún producto vinculado no alcanza en stock (con inventario): "No se concretó" propone el motivo "Sin stock".
   sinStock: boolean
   // Su guía ya está en Despachos (23-10): para no trabajarla dos veces.
-  despacho: 'en_lote' | 'impresa' | null
+  despacho: 'en_lote' | 'impresa' | 'reportada' | null   // reportada = la guía ya se le escribió al comprador (26-10)
 }
 
 
@@ -73,7 +73,7 @@ export async function ventasPorConfirmar(db: Pool) {
             p.total_orden::float AS total_orden, p.banco_emisor, p.referencia, p.metodo_pago, p.carrier,
             p.comprobante_path IS NOT NULL AS tiene_comprobante, p.verificado_at,
             p.banco_nivel, p.banco_motivo, p.banco_mov, p.banco_at,
-            (SELECT CASE WHEN bool_or(e.impresa) THEN 'impresa' ELSE 'en_lote' END FROM despacho_etiquetas e
+            (SELECT CASE WHEN bool_or(e.reportado_at IS NOT NULL) THEN 'reportada' WHEN bool_or(e.impresa) THEN 'impresa' ELSE 'en_lote' END FROM despacho_etiquetas e
              WHERE e.venta IN (o.id::text, o.pack_id::text)) AS despacho,
             (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
      FROM ml_ordenes o

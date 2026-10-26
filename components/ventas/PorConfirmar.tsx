@@ -299,7 +299,8 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
             <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} />
           )}
           {f.pago?.retiro && <Etiqueta tono="ambar" title="El comprador pasa a buscarlo: no lleva guía ni pasa por Despachos">🏪 Retiro en tienda</Etiqueta>}
-          {!f.vencida && quedan <= 2 && <Etiqueta tono="rojo">{quedan <= 0 ? 'Vence hoy' : `Quedan ${quedan} día${quedan === 1 ? '' : 's'}`}</Etiqueta>}
+          {/* Solo vence la que no tiene pago (26-10: salía "Vence hoy" en una venta pagada y ya despachada). */}
+          {!f.vencida && quedan <= 2 && (!f.pago || f.pago.verificacion === 'invalido') && <Etiqueta tono="rojo">{quedan <= 0 ? 'Vence hoy' : `Quedan ${quedan} día${quedan === 1 ? '' : 's'}`}</Etiqueta>}
           <span className="text-[11px] text-neutral-400">
             compró {hace(f.fecha)}{f.pago?.at ? ` · pago traído ${hace(f.pago.at)}` : ''} · {f.cuenta}
           </span>
@@ -310,9 +311,10 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
             etiqueta={<>💬 {f.mensaje ? 'Escribió' : 'Conversación'} ›</>} />
           <ChipNota numero={f.numero} />
           {f.despacho && (
-            <Etiqueta tono={f.despacho === 'impresa' ? 'verde' : 'gris'}
-              title={f.despacho === 'impresa' ? 'Su guía ya salió impresa en Despachos' : 'Su guía ya está cargada en Despachos, todavía sin imprimir'}>
-              {f.despacho === 'impresa' ? '✓ Guía ya impresa' : 'Guía en Despachos'}
+            <Etiqueta tono={f.despacho === 'en_lote' ? 'gris' : 'verde'}
+              title={f.despacho === 'reportada' ? 'Su guía salió impresa y el Reportador ya se la escribió al comprador'
+                : f.despacho === 'impresa' ? 'Su guía ya salió impresa en Despachos' : 'Su guía ya está cargada en Despachos, todavía sin imprimir'}>
+              {f.despacho === 'reportada' ? '✓ Despachada y reportada' : f.despacho === 'impresa' ? '✓ Guía ya impresa' : 'Guía en Despachos'}
             </Etiqueta>
           )}
           {verPago && f.pago?.comprobante && (
@@ -379,7 +381,7 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
         </div>
       )}
       <NoSeConcreto f={f} />
-      {sinInventario && f.despacho !== 'impresa' && <DespacheFuera f={f} />}
+      {sinInventario && f.despacho !== 'impresa' && f.despacho !== 'reportada' && <DespacheFuera f={f} />}
       </div>
     </li>
   )
@@ -547,7 +549,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const porVerificar = conPago.filter(f => f.pago!.verificacion === 'pendiente')
   // Ya cargadas con pago por verificar (22-10): también entran en la búsqueda.
   const cargadas = (datos.cargadas ?? []).filter(c => !q || [c.numero, c.cliente, ...c.productos.map(p => p.nombre)].some(t => (t ?? '').toLowerCase().includes(q)))
-  const listos = conPago.filter(f => f.pago!.verificacion === 'valido'
+  // Con la guía ya impresa (o reportada) ya está despachada: sale de "Listos para despachar" (26-10).
+  const listos = conPago.filter(f => f.pago!.verificacion === 'valido' && f.despacho !== 'impresa' && f.despacho !== 'reportada'
     && (!f.pago!.verificadoAt || Date.now() - new Date(f.pago!.verificadoAt).getTime() < 3 * 86_400_000))
 
   return (
@@ -657,7 +660,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             <Grupo titulo="Listos para despachar" nota="Pago verificado: sus guías están en Despachos" filas={listos} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
             <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha traído" filas={sinPago} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
           </> : datos.pagosME ? <>
-            <Grupo titulo="Con pago" nota="Listas para revisar y confirmar" filas={conPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} />
+            <Grupo titulo="Con pago" nota="Falta descontarlas del inventario: revisa y registra cada una" filas={conPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} />
             {!conPago.length && (
               <div className="px-4 py-6 text-center border-b border-neutral-100">
                 <p className="text-sm font-medium text-neutral-700">Nada con pago por confirmar</p>
