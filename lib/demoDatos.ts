@@ -21,6 +21,7 @@ import { mkdir, writeFile } from 'fs/promises'
 import path from 'path'
 import { UPLOAD_DIR } from '@/lib/uploads'
 import { guiaDemo } from '@/lib/demoPagosME'
+import { sha256 } from '@/lib/despachos'
 // Guías ZOOM/TEALCA con el diseño real (scripts/demo/generar_pagos.py, 26-10): una por pago, en el orden de las ventas.
 import guiasReales from '@/lib/demo/guias-pagos.json'
 
@@ -568,11 +569,14 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   const { rows: [emp] } = await db.query(`SELECT NULLIF(current_setting('app.empresa_id', true), '')::int AS id`)
   const dir = path.join(UPLOAD_DIR, 'pagos-me', `demo-${emp.id}`)
   await mkdir(dir, { recursive: true })
-  for (const p of pagos as { venta: string; guia: string; carrier: string; envio_opcion: string; cuenta: string; guia_path?: string }[]) {
+  for (const p of pagos as { venta: string; guia: string; carrier: string; envio_opcion: string; cuenta: string; guia_path?: string; sha?: string }[]) {
     const f = path.join(dir, `${p.venta}.pdf`)
     const real = (guiasReales as { venta: string; pdf: string }[]).find(g => g.venta === p.venta)
-    await writeFile(f, real ? Buffer.from(real.pdf, 'base64') : (await guiaDemo({ venta: p.venta, guia: p.guia, carrier: p.carrier, envio_opcion: p.envio_opcion, cuenta: p.cuenta,
-      banco_emisor: null, banco_receptor: null, referencia: null, fecha_pago: null, monto_pagado: null, metodo_pago: null })).datos)
+    const pdf = real ? Buffer.from(real.pdf, 'base64') : (await guiaDemo({ venta: p.venta, guia: p.guia, carrier: p.carrier, envio_opcion: p.envio_opcion, cuenta: p.cuenta,
+      banco_emisor: null, banco_receptor: null, referencia: null, fecha_pago: null, monto_pagado: null, metodo_pago: null })).datos
+    await writeFile(f, pdf)
+    // Despachos confirma que el archivo es el que se subió (leerOriginal): sin el hash real, «Generar PDF» falla.
+    p.sha = sha256(pdf)
     p.guia_path = f
   }
   await db.query(
@@ -591,16 +595,16 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
     [JSON.stringify(pagos), adm?.id ?? null])
 
   // Despachos: las de hoy, en el lote pendiente ("Pago sin verificar" hasta verificarlas); las de ayer, ya despachadas.
-  type P = { venta: string; guia: string; carrier: string; cuenta: string; verificacion: string; guia_path: string }
+  type P = { venta: string; guia: string; carrier: string; cuenta: string; verificacion: string; guia_path: string; sha: string }
   const ps = pagos as P[]
   const compradorDe = (venta: string) => ordenes.find(o => o.id === venta)!.comprador
   const { rows: [lote] } = await db.query(`INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [adm?.id ?? null])
   await db.query(
     `INSERT INTO despacho_etiquetas (lote_id, original_name, file_path, sha256, page_count, venta, guia, remitente, remitente_limpio,
                                      destinatario, carrier)
-     SELECT $1, 'guide-' || x.venta || '.pdf', x.guia_path, repeat('0', 64), 1, x.venta, x.guia, x.cuenta, x.cuenta, x.destinatario,
+     SELECT $1, 'guide-' || x.venta || '.pdf', x.guia_path, x.sha, 1, x.venta, x.guia, x.cuenta, x.cuenta, x.destinatario,
             CASE WHEN x.carrier = 'ZOOM' THEN 'ZOOM' ELSE 'TEALCA' END
-     FROM jsonb_to_recordset($2::jsonb) AS x(venta text, guia_path text, guia text, cuenta text, destinatario text, carrier text)`,
+     FROM jsonb_to_recordset($2::jsonb) AS x(venta text, guia_path text, sha text, guia text, cuenta text, destinatario text, carrier text)`,
     [lote.id, JSON.stringify(ps.filter(p => p.verificacion === 'pendiente').map(p => ({ ...p, destinatario: compradorDe(p.venta) })))])
   await jornadaImpresa(db, 'pagos', 16, ps.filter(p => p.verificacion === 'valido').map(p => ({
     venta: p.venta, carrier: (p.carrier === 'ZOOM' ? 'ZOOM' : 'TEALCA') as 'ZOOM' | 'TEALCA', guia: p.guia,
