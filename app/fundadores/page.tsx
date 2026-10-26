@@ -76,15 +76,22 @@ function FundadoresConcluido() {
             Las postulaciones ya están cerradas.
           </p>
           <p className="mt-3 leading-relaxed text-neutral-400 lg:text-lg">
-            Vienen <b className="text-white">nuevas etapas y fases</b>. Para enterarte primero, únete a nuestra Comunidad de Vendedores en Telegram.
+            ¿Quieres probarlo? Ahora cualquier vendedor puede crear su cuenta y usarlo <b className="text-white">15 días gratis</b> con sus propias ventas.
           </p>
-          <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noreferrer"
-            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-6 py-4 text-base font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
-            </svg>
-            Únete a la Comunidad de Vendedores
-          </a>
+          {/* 26-10: quien llega con el link viejo de Fundadores va a la prueba gratis de 15 días (/registro). */}
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <a href="https://app.elcomerciantedigital.com/registro"
+              className="inline-flex items-center gap-2 rounded-xl bg-lime-400 px-6 py-4 text-base font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
+              Prueba 15 días gratis <span aria-hidden="true">→</span>
+            </a>
+            <a href="https://t.me/comerciantedigitalve" target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-lime-400/60 px-6 py-4 text-base font-semibold text-lime-400 transition hover:border-lime-400 hover:bg-lime-400/10">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+              Únete a la Comunidad de Vendedores
+            </a>
+          </div>
         </div>
       </section>
       <footer className="border-t border-white/10 py-6 text-center text-xs text-neutral-500">
