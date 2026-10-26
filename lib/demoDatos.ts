@@ -21,6 +21,8 @@ import { mkdir, writeFile } from 'fs/promises'
 import path from 'path'
 import { UPLOAD_DIR } from '@/lib/uploads'
 import { guiaDemo } from '@/lib/demoPagosME'
+// Guías ZOOM/TEALCA con el diseño real (scripts/demo/generar_pagos.py, 26-10): una por pago, en el orden de las ventas.
+import guiasReales from '@/lib/demo/guias-pagos.json'
 
 // ── Datos fijos ─────────────────────────────────────────────────────────────
 export interface ProductoDemo {
@@ -539,12 +541,14 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
     const horas = hoy ? 0.4 + i * 0.6 * 14 / HOY : 20 + (i - HOY) * 1.3
     const items = itemsAzar(r, r() < 0.2 ? 2 : 1)
     const usd = totalDe(items)
-    const comprador = elegir(r, D.compradores)
+    const real = (guiasReales as { venta: string; carrier: string; guia: string; comprador: string; pdf: string }[])[i]
+    const azar = elegir(r, D.compradores)
+    const comprador = real?.comprador ?? azar
     ordenes.push({ id: venta, conexion: cx[c.nickname], horas, comprador, items })
     const totalBs = Math.round(usd * t.bcv * 100) / 100
     // Uno de hoy pagó de menos (para mostrar "no coincide"); uno de ayer quedó inválido (la referencia no apareció).
     const pagado = i === 5 ? Math.round(totalBs * 0.9 * 100) / 100 : totalBs
-    const zoom = r() < 0.8
+    const zoom = real ? real.carrier === 'ZOOM' : r() < 0.8
     const fecha = new Date(Date.now() - horas * 3_600_000)
     pagos.push({
       venta, cuenta: c.remitente, estado_me: 'pending', horas, total_orden: totalBs, total_orden_usd: usd,
@@ -552,7 +556,7 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
       referencia: String(Math.floor(r() * 1e12)).padStart(12, '0'), fecha_pago: fecha.toISOString().slice(0, 10),
       monto_pagado: pagado,
       envio_metodo: 'Envío Gratis', envio_opcion: r() < 0.8 ? 'Retiro en agencia' : 'Entrega a domicilio',
-      carrier: zoom ? 'ZOOM' : 'Tealca', guia: zoom ? String(1_100_000_000 + Math.floor(r() * 99_999_999)) : String(500_000 + Math.floor(r() * 499_999)),
+      carrier: zoom ? 'ZOOM' : 'Tealca', guia: real?.guia ?? (zoom ? String(1_100_000_000 + Math.floor(r() * 99_999_999)) : String(500_000 + Math.floor(r() * 499_999))),
       verificacion: hoy ? 'pendiente' : i === HOY + 4 ? 'invalido' : 'valido',
       nota: i === HOY + 4 ? 'La referencia no aparece en el banco: se le escribió al comprador.' : null,
     })
@@ -564,7 +568,8 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   await mkdir(dir, { recursive: true })
   for (const p of pagos as { venta: string; guia: string; carrier: string; envio_opcion: string; cuenta: string; guia_path?: string }[]) {
     const f = path.join(dir, `${p.venta}.pdf`)
-    await writeFile(f, (await guiaDemo({ venta: p.venta, guia: p.guia, carrier: p.carrier, envio_opcion: p.envio_opcion, cuenta: p.cuenta,
+    const real = (guiasReales as { venta: string; pdf: string }[]).find(g => g.venta === p.venta)
+    await writeFile(f, real ? Buffer.from(real.pdf, 'base64') : (await guiaDemo({ venta: p.venta, guia: p.guia, carrier: p.carrier, envio_opcion: p.envio_opcion, cuenta: p.cuenta,
       banco_emisor: null, banco_receptor: null, referencia: null, fecha_pago: null, monto_pagado: null, metodo_pago: null })).datos)
     p.guia_path = f
   }
