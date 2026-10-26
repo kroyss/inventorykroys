@@ -4,13 +4,15 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
-import { desvincular, filasVincular, productosParaVincular, vincular } from '@/lib/vincularML'
+import { desvincular, eliminarVarianteML, filasVincular, marcarNoUsa, productosParaVincular, vincular } from '@/lib/vincularML'
+import { ErrorML } from '@/lib/ml'
 
 // Vincular publicaciones de ML (20-10, migración 109; lib/vincularML.ts). Permiso "vincular_ml" (empleados, sin ver
 // Productos). Precios solo para quien tiene "costos". Resolver dudas como "ignorada": quien ve Productos (el dueño).
 //   GET  → filas (publicación/variante) + productos para elegir + avance
 //   POST { accion: 'vincular', codigo, cuenta, product_id } · { accion: 'desvincular', codigo, product_id }
 //        { accion: 'duda', codigo, cuenta, titulo, variante, nota } · { accion: 'ignorar', id }
+//        { accion: 'no_usa', codigo, valor } (cualquiera que vincula) · { accion: 'eliminar_variante', codigo } (el dueño; borra en ML)
 async function sesion() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return { error: unauthorized() } as const
@@ -51,6 +53,9 @@ const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('duda'), codigo: Codigo, cuenta: z.string().max(50).optional(), titulo: z.string().max(300).optional(),
              variante: z.string().max(200).nullable().optional(), nota: z.string().trim().min(2, 'Escribe la duda (corto)').max(300) }),
   z.object({ accion: z.literal('ignorar'), id: z.number().int().positive() }),
+  z.object({ accion: z.literal('no_usa'), codigo: Codigo, valor: z.boolean(), cuenta: z.string().max(50).optional(),
+             titulo: z.string().max(300).optional(), variante: z.string().max(200).nullable().optional() }),
+  z.object({ accion: z.literal('eliminar_variante'), codigo: Codigo }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -75,6 +80,20 @@ export async function POST(req: NextRequest) {
         `INSERT INTO ml_vinculo_dudas (codigo, cuenta, titulo, variante, nota, por) VALUES ($1, $2, $3, $4, $5, $6)`,
         [b.codigo, b.cuenta ?? null, b.titulo ?? null, b.variante ?? null, b.nota, userId])
       return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'no_usa') {
+      await marcarNoUsa(s.db, b.codigo, b.cuenta ?? null, b.titulo ?? null, b.variante ?? null, b.valor, userId)
+      return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'eliminar_variante') {
+      if (!puede(s.session.user, 'ver_productos')) return forbidden()
+      try {
+        const r = await eliminarVarianteML(s.db, b.codigo, userId)
+        return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error }, { status: 409 })
+      } catch (e) {
+        if (e instanceof ErrorML) return NextResponse.json({ error: e.message }, { status: 502 })
+        throw e
+      }
     }
     // Ignorar una duda (no se vincula): solo el dueño.
     if (!puede(s.session.user, 'ver_productos')) return forbidden()

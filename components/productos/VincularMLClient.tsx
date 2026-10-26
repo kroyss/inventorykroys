@@ -19,9 +19,10 @@ interface Fila {
   duda: { id: number; nota: string; por: string | null; creada_at: string } | null
   otros?: { id: number; code: string; name: string }[]   // más productos con el mismo código (21-10)
   conflicto?: ConflictoPesos | null                       // …de distinto peso y el envío gratis cambia según cuál
+  no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
-type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'todas'
+type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'no_usa' | 'todas'
 
 const POR_PAGINA = 25
 
@@ -79,7 +80,8 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     }
     const pasa = (f: Fila) => filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
       : filtro === 'activas' ? activaSinVincular(f)
-      : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda
+      : filtro === 'no_usa' ? f.estado !== 'vinculada' && !!f.no_usa
+      : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda && !f.no_usa
     return [...m.values()]
       .map(g => ({ ...g, ventas: g.filas.reduce((s, f) => s + f.ventas60, 0), visibles: g.filas.filter(f => pasa(f) && coincide(f, palabras)) }))
       .filter(g => g.visibles.length && (!cuenta || g.cuenta === cuenta))
@@ -99,8 +101,9 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     todas: encontradas.length,
     vinculadas: encontradas.filter(f => f.estado === 'vinculada').length,
     dudas: encontradas.filter(f => f.duda).length,
-    pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda).length,
+    pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa).length,
     activas: encontradas.filter(activaSinVincular).length,
+    no_usa: encontradas.filter(f => f.estado !== 'vinculada' && f.no_usa).length,
   }
   const cuentas = [...new Set(datos.filas.map(f => f.cuenta))].sort()
   const sinProductos = datos.productos.length === 0
@@ -108,6 +111,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   // Después de una acción: se actualiza la fila en pantalla (sin recargar todo el catálogo).
   const cambiarFila = (codigo: string, c: Partial<Fila>) =>
     setDatos(d => d && { ...d, filas: d.filas.map(f => f.codigo === codigo ? { ...f, ...c } : f) })
+  const quitarFila = (codigo: string) => setDatos(d => d && { ...d, filas: d.filas.filter(f => f.codigo !== codigo) })
 
   const pedir = async (body: Record<string, unknown>) => {
     const r = await fetch('/api/vincular-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -152,7 +156,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
+        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
@@ -199,6 +203,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
               <ul className="divide-y divide-neutral-100">
                 {g.visibles.map(f => (
                   <FilaVariante key={f.codigo} f={f} productos={datos.productos} esDueno={datos.esDueno} paraQuien={paraQuien} pedir={pedir}
+                    hermanas={g.filas.length} onQuitar={() => quitarFila(f.codigo)}
                     onCambio={(c, sumaHoy) => { cambiarFila(f.codigo, c); if (sumaHoy) setHechosHoy(n => n + sumaHoy) }} />
                 ))}
               </ul>
@@ -214,9 +219,10 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   )
 }
 
-function FilaVariante({ f, productos, esDueno, paraQuien, pedir, onCambio }: {
+function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQuitar, onCambio }: {
   f: Fila; productos: Producto[]; esDueno: boolean; paraQuien: string
   pedir: (b: Record<string, unknown>) => Promise<boolean>
+  hermanas: number; onQuitar: () => void
   onCambio: (c: Partial<Fila>, sumaHoy?: number) => void
 }) {
   const confirm = useConfirm()
@@ -297,10 +303,42 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
             )}
             {productos.length > 0 && <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary w-full text-xs sm:w-auto">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>}
             {!f.duda && productos.length > 0 && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="py-1 text-xs text-neutral-500 underline sm:py-0">No sé, para {paraQuien}</button>}
+            {/* Variantes viejas (26-10): lo decide una persona, nunca solo. */}
+            {!f.no_usa && (
+              <button disabled={ocupado} title="Sale de «Por vincular» (no toca MercadoLibre). Se deshace en «No se usan»"
+                className="py-1 text-xs text-neutral-500 underline disabled:opacity-50 sm:py-0" onClick={async () => {
+                  setOcupado(true)
+                  const ok = await pedir({ accion: 'no_usa', codigo: f.codigo, valor: true, cuenta: f.cuenta, titulo: f.titulo, variante: f.variante })
+                  setOcupado(false)
+                  if (ok) onCambio({ no_usa: { por: 'tú', creada_at: new Date().toISOString() } })
+                }}>No se usa</button>
+            )}
+            {esDueno && f.codigo.includes(':') && f.disponible === 0 && hermanas > 1 && (
+              <button disabled={ocupado} title="Borra esta variante de la publicación en MercadoLibre (solo con 0 unidades)"
+                className="py-1 text-xs text-red-600 underline disabled:opacity-50 sm:py-0" onClick={async () => {
+                  if (!await confirm({ title: 'Eliminar variante en MercadoLibre', confirmText: 'Eliminar en ML', cancelText: 'Cancelar',
+                    message: `Se elimina «${f.variante}» de la publicación ${f.item_id} en ${f.cuenta}.\n\nLas demás variantes no cambian. No se puede deshacer.` })) return
+                  setOcupado(true)
+                  const ok = await pedir({ accion: 'eliminar_variante', codigo: f.codigo })
+                  setOcupado(false)
+                  if (ok) onQuitar()
+                }}>Eliminar en ML</button>
+            )}
           </div>
         )}
       </div>
 
+      {f.no_usa && f.estado !== 'vinculada' && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-600">
+          <span>No se usa{f.no_usa.por ? ` · ${f.no_usa.por}` : ''} · {fecha(f.no_usa.creada_at)}</span>
+          <button disabled={ocupado} className="underline disabled:opacity-50" onClick={async () => {
+            setOcupado(true)
+            const ok = await pedir({ accion: 'no_usa', codigo: f.codigo, valor: false })
+            setOcupado(false)
+            if (ok) onCambio({ no_usa: null })
+          }}>Deshacer</button>
+        </div>
+      )}
       {f.duda && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
           ❓ {f.duda.por ?? '—'}: “{f.duda.nota}”
