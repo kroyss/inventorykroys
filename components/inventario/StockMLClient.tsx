@@ -225,7 +225,7 @@ function FilaPub({ p, res, puedeCambiar, onUnidades, onSincronizar }: {
           <b className="text-neutral-700">{p.cuenta}</b> · <span className="font-mono">{p.item_id}</span>
           {p.variante && <span className="ml-1 rounded-full bg-sky-50 px-1.5 py-px text-[11px] text-sky-800 ring-1 ring-inset ring-sky-200">{p.variante}</span>}
         </div>
-        <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está en el catálogo guardado (pulsa «Actualizar desde ML»)</span>}</div>
+        <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está activa ni pausada en ML (cerrada o finalizada); si la acabas de crear, pulsa «Actualizar desde ML»</span>}</div>
       </div>
 
       <label className="flex items-center gap-1 text-xs text-neutral-500" title="Cuántas unidades del producto trae esta publicación (pack o combo). Lo pones tú; 1 = suelto">
