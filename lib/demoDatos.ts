@@ -549,18 +549,19 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
     const comprador = real?.comprador ?? azar
     ordenes.push({ id: venta, conexion: cx[c.nickname], horas, comprador, items })
     const totalBs = Math.round(usd * t.bcv * 100) / 100
-    // Uno de hoy pagó de menos (para mostrar "no coincide"); uno de ayer quedó inválido (la referencia no apareció).
-    const pagado = i === 5 ? Math.round(totalBs * 0.9 * 100) / 100 : totalBs
+    // Uno de ayer quedó inválido (la referencia no apareció). Los de hoy, completos y verificados (26-10): la demo
+    // es para grabar el ciclo Traer → Despachos → Reportador sin trabas.
+    const pagado = totalBs
     const zoom = real ? real.carrier === 'ZOOM' : r() < 0.8
     const fecha = new Date(Date.now() - horas * 3_600_000)
     pagos.push({
-      venta, cuenta: c.remitente, estado_me: 'pending', horas, total_orden: totalBs, total_orden_usd: usd,
+      venta, hoy, cuenta: c.remitente, estado_me: 'pending', horas, total_orden: totalBs, total_orden_usd: usd,
       metodo_pago: r() < 0.85 ? 'mobile_payment' : 'transfer', banco_emisor: elegir(r, BANCOS), banco_receptor: 'Bancamiga',
       referencia: String(Math.floor(r() * 1e12)).padStart(12, '0'), fecha_pago: fecha.toISOString().slice(0, 10),
       monto_pagado: pagado,
       envio_metodo: 'Envío Gratis', envio_opcion: r() < 0.8 ? 'Retiro en agencia' : 'Entrega a domicilio',
       carrier: zoom ? 'ZOOM' : 'Tealca', guia: real?.guia ?? (zoom ? String(1_100_000_000 + Math.floor(r() * 99_999_999)) : String(500_000 + Math.floor(r() * 499_999))),
-      verificacion: hoy ? 'pendiente' : i === HOY + 4 ? 'invalido' : 'valido',
+      verificacion: i === HOY + 4 ? 'invalido' : 'valido',
       nota: i === HOY + 4 ? 'La referencia no aparece en el banco: se le escribió al comprador.' : null,
     })
   }
@@ -587,26 +588,28 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
             x.banco_emisor, x.banco_receptor, x.referencia, x.fecha_pago, x.monto_pagado, x.envio_metodo, x.envio_opcion, x.carrier, x.guia,
             'demo:comprobante', x.guia_path, x.verificacion,
             CASE WHEN x.verificacion <> 'pendiente' THEN $2::int END,
-            CASE WHEN x.verificacion <> 'pendiente' THEN NOW() - make_interval(secs => (x.horas - 2) * 3600) END,
+            CASE WHEN x.verificacion <> 'pendiente' THEN NOW() - make_interval(secs => x.horas * 0.5 * 3600) END,
             x.nota, NOW() - make_interval(secs => (x.horas - 0.3) * 3600)
      FROM jsonb_to_recordset($1::jsonb) AS x(venta text, cuenta text, estado_me text, horas float, total_orden numeric, total_orden_usd numeric,
        metodo_pago text, banco_emisor text, banco_receptor text, referencia text, fecha_pago text, monto_pagado numeric, envio_metodo text,
        envio_opcion text, carrier text, guia text, guia_path text, verificacion text, nota text)`,
     [JSON.stringify(pagos), adm?.id ?? null])
 
-  // Despachos: las de hoy, en el lote pendiente ("Pago sin verificar" hasta verificarlas); las de ayer, ya despachadas.
-  type P = { venta: string; guia: string; carrier: string; cuenta: string; verificacion: string; guia_path: string; sha: string }
+  // Despachos: las de hoy, en el lote pendiente (pago verificado: listas para Generar PDF); las de ayer, ya despachadas.
+  type P = { venta: string; hoy: boolean; guia: string; carrier: string; cuenta: string; verificacion: string; guia_path: string; sha: string }
   const ps = pagos as P[]
   const compradorDe = (venta: string) => ordenes.find(o => o.id === venta)!.comprador
   const { rows: [lote] } = await db.query(`INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [adm?.id ?? null])
   await db.query(
     `INSERT INTO despacho_etiquetas (lote_id, original_name, file_path, sha256, page_count, venta, guia, remitente, remitente_limpio,
-                                     destinatario, carrier)
+                                     destinatario, carrier, guia_final)
      SELECT $1, 'guide-' || x.venta || '.pdf', x.guia_path, x.sha, 1, x.venta, x.guia, x.cuenta, x.cuenta, x.destinatario,
-            CASE WHEN x.carrier = 'ZOOM' THEN 'ZOOM' ELSE 'TEALCA' END
+            CASE WHEN x.carrier = 'ZOOM' THEN 'ZOOM' ELSE 'TEALCA' END,
+            -- TEALCA con su guía final ya puesta: el Reportador la toma sin pasos extra en el video.
+            CASE WHEN x.carrier <> 'ZOOM' THEN x.guia END
      FROM jsonb_to_recordset($2::jsonb) AS x(venta text, guia_path text, sha text, guia text, cuenta text, destinatario text, carrier text)`,
-    [lote.id, JSON.stringify(ps.filter(p => p.verificacion === 'pendiente').map(p => ({ ...p, destinatario: compradorDe(p.venta) })))])
-  await jornadaImpresa(db, 'pagos', 16, ps.filter(p => p.verificacion === 'valido').map(p => ({
+    [lote.id, JSON.stringify(ps.filter(p => p.hoy).map(p => ({ ...p, destinatario: compradorDe(p.venta) })))])
+  await jornadaImpresa(db, 'pagos', 16, ps.filter(p => !p.hoy && p.verificacion === 'valido').map(p => ({
     venta: p.venta, carrier: (p.carrier === 'ZOOM' ? 'ZOOM' : 'TEALCA') as 'ZOOM' | 'TEALCA', guia: p.guia,
     remitente: p.cuenta, destinatario: compradorDe(p.venta), reporte: 'ENVIADO',
   })))
@@ -623,7 +626,7 @@ async function pagosME(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
   // las «trae» entregarDemo al tocar Traer pagos y guías.
   if (op.pagosVacio) {
     for (const pf of perfiles) {
-      const ventas = ps.filter(x => x.verificacion === 'pendiente' && x.cuenta === pf.cuenta).map(x => x.venta)
+      const ventas = ps.filter(x => x.hoy && x.cuenta === pf.cuenta).map(x => x.venta)
       if (!ventas.length) continue
       const { rows: [h] } = await db.query(
         `SELECT (SELECT jsonb_agg(to_jsonb(o)) FROM ml_ordenes o WHERE o.id::text = ANY($1)) AS ordenes,
