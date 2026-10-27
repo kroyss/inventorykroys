@@ -559,7 +559,9 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
   const camp = campanas.find(c => `${c.conexionId}|${c.id}` === modal.campana) ?? null
   const propia = camp?.tipo === 'SELLER_CAMPAIGN'
   // ML no guarda publicaciones en una campaña que todavía no empezó (responde "ok" pero no queda).
-  const sinEmpezar = !!camp && camp.estado !== 'started'
+  // El estado guardado puede ser una foto de antes del inicio (27-10): si la fecha ya llegó, se deja intentar
+  // (el servidor le pregunta a ML en el momento y frena si de verdad no empezó).
+  const sinEmpezar = !!camp && camp.estado !== 'started' && (!camp.inicio || Date.parse(camp.inicio) > Date.now())
 
   const filasPrev = filas.map(f => {
     const seguro = conPierden ? { precio: precioConPiso(f.precio, modal.pct), ajustada: false, sinMargen: false }
