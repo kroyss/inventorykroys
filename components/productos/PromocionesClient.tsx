@@ -547,21 +547,29 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
   const [hechas, setHechas] = useState<{ clave: string; nombre: string; ok: number; mal: number; okIds: string[] }[]>([])
   const conexiones = [...new Set(filas.map(f => f.conexionId))]
   const mezcla = conexiones.length > 1
-  const conexionId = conexiones[0]
+  // Varias cuentas a la vez (27-10, pedido del dueño): las campañas son de cada cuenta, así que se juntan por
+  // tipo + nombre (las propias creadas «en 2 cuentas» y las de ML se llaman igual) y cada publicación va a la de SU cuenta.
+  const grupo = (c: CampanaVista) => `${c.tipo}|${c.nombre.trim().toLowerCase()}`
+  const vivas = campanas.filter(c => conexiones.includes(c.conexionId) && c.estado !== 'finished')
+  const campDeCon = (base: CampanaVista | null, con: number) =>
+    !base ? null : base.conexionId === con ? base : vivas.find(c => c.conexionId === con && grupo(c) === grupo(base)) ?? null
   // Solo las campañas donde alguna de las elegidas puede entrar: no está ya adentro y, si es de ML, ML se la ofrece.
   const puedenEntrar = (c: CampanaVista) => filas.filter(f => {
-    const p = f.promos.find(x => x.campana === c.id)
-    return p?.estado !== 'started' && (c.tipo === 'SELLER_CAMPAIGN' || p?.estado === 'candidate')
+    const cf = campDeCon(c, f.conexionId)
+    const p = cf && f.promos.find(x => x.campana === cf.id)
+    return !!cf && p?.estado !== 'started' && (cf.tipo === 'SELLER_CAMPAIGN' || p?.estado === 'candidate')
   }).length
-  const opciones = campanas.filter(c => c.conexionId === conexionId && c.estado !== 'finished')
-    .map(c => ({ c, n: puedenEntrar(c) }))
+  const opciones = vivas.filter((c, i) => vivas.findIndex(x => grupo(x) === grupo(c)) === i)
+    .map(c => ({ c, n: puedenEntrar(c), cuentas: [...new Set(vivas.filter(x => grupo(x) === grupo(c)).flatMap(x => x.cuentas))] }))
     .filter(o => (o.n > 0 || `${o.c.conexionId}|${o.c.id}` === modal.campana) && !hechas.some(h => h.clave === `${o.c.conexionId}|${o.c.id}`))
   const camp = campanas.find(c => `${c.conexionId}|${c.id}` === modal.campana) ?? null
+  const campDe = (con: number) => campDeCon(camp, con)
   const propia = camp?.tipo === 'SELLER_CAMPAIGN'
   // ML no guarda publicaciones en una campaña que todavía no empezó (responde "ok" pero no queda).
   // El estado guardado puede ser una foto de antes del inicio (27-10): si la fecha ya llegó, se deja intentar
   // (el servidor le pregunta a ML en el momento y frena si de verdad no empezó).
-  const sinEmpezar = !!camp && camp.estado !== 'started' && (!camp.inicio || Date.parse(camp.inicio) > Date.now())
+  const noEmpezo = (c: CampanaVista) => c.estado !== 'started' && (!c.inicio || Date.parse(c.inicio) > Date.now())
+  const sinEmpezar = !!camp && conexiones.every(con => { const c = campDe(con); return !c || noEmpezo(c) })
 
   const filasPrev = filas.map(f => {
     const seguro = conPierden ? { precio: precioConPiso(f.precio, modal.pct), ajustada: false, sinMargen: false }
@@ -570,11 +578,12 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const ajustada = seguro.ajustada
     const enPiso = !ajustada && f.precio > PISO_ML && precio === PISO_ML && redondear(f.precio * (1 - modal.pct / 100)) < PISO_ML
     const bajoPiso = f.precio <= PISO_ML
-    const cand = camp ? f.promos.find(p => p.campana === camp.id) : undefined
+    const cf = campDe(f.conexionId)
+    const cand = cf ? f.promos.find(p => p.campana === cf.id) : undefined
     const yaAdentro = cand?.estado === 'started'
     // Ya en una campaña PROPIA a otro precio: se le cambia el precio (de 10% a 15%, 17-10).
     const cambio = yaAdentro && propia && cand?.precio != null && Math.abs(cand.precio - precio) >= 0.011
-    const puede = !!camp && (cambio || (!yaAdentro && (propia || cand?.estado === 'candidate')))
+    const puede = !!cf && (cambio || (!yaAdentro && (propia || cand?.estado === 'candidate')))
     const bajoMin = cand?.minimo != null && precio < cand.minimo
     // Siempre contra el envío AL PRECIO PUBLICADO (no contra el de otra promo que ya le haya bajado el precio).
     const base = f.envioBase
@@ -589,7 +598,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     // Hasta qué % aguanta: con ZOOM (mínimo de ZOOM) y con algún envío gratis (mínimo de TEALCA).
     const topeZoom = base.estado === 'ambas' ? topeDescuento(f.precio, base.minZoom) : null
     const tope = base.estado === 'ambas' || base.estado === 'tealca' ? topeDescuento(f.precio, base.minTealca) : null
-    const motivo = !camp ? null : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
+    const motivo = !camp ? null : !cf ? `${f.cuenta} no tiene «${camp.nombre}»`
+      : mezcla && noEmpezo(cf) ? `En ${f.cuenta} empieza el ${fecha(cf.inicio)}` : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
       : bajoPiso ? `Bajo $${PISO_ML}: ML no la acepta` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
       : seguro.sinMargen ? 'Sin margen: perdería el envío gratis' : null
     const advertencia = motivo ? null
@@ -598,7 +608,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
       : sinGratis ? (hueco && despues.estado !== 'destino' ? `⚠ Comprando ${hueco.unidades}: sin envío gratis` : '⚠ Sin envío gratis')
       : base.estado === 'sin_peso' ? 'Sin peso: envío sin verificar' : null
     // Ya está en OTRA promoción: queda en las dos y ML cobra la más baja.
-    const otra = f.promos.find(p => p.estado === 'started' && p.campana !== camp?.id)
+    const otra = f.promos.find(p => p.estado === 'started' && p.campana !== cf?.id)
       ?? (() => { const h = [...hechas].reverse().find(x => x.okIds.includes(f.id)); return h ? { nombre: h.nombre, precio: null } : undefined })()
     return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
       cambio, antes: cambio ? cand!.precio! : null, ajustada }
@@ -617,36 +627,50 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     window.addEventListener('beforeunload', avisar)
     return () => window.removeEventListener('beforeunload', avisar)
   }, [enviando])
-  const enviar = async (items: { id: string; precio: number; precioAntes: number; cambio?: boolean }[]) => {
+  const enviar = async (items: { id: string; conexionId: number; precio: number; precioAntes: number; cambio?: boolean }[]) => {
     if (!camp || !items.length) return
     setEnviando(true); setEnCola(new Set(items.map(x => x.id)))
     type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean; porConfirmar?: boolean }
     const todos: Res[] = []
     const nuevos = { ...resultados }
-    for (let i = 0; i < items.length; i += TANDA) {
-      const tanda = items.slice(i, i + TANDA)
-      setAvance({ hechas: i, total: items.length })
-      const res: Res[] = []
-      for (const accion of ['agregar', 'cambiar'] as const) {
-        const parte = tanda.filter(x => !!x.cambio === (accion === 'cambiar')).map(({ cambio: _c, ...x }) => x)
-        if (!parte.length) continue
-        const r = await fetch('/api/promociones/acciones', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accion, conexionId, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre, estado: camp.estado }, items: parte }),
-        }).catch(() => null)
-        const d = r ? await r.json().catch(() => ({})) : {}
-        if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: no sigue
-          setEnviando(false); setAvance(null); setEnCola(new Set())
-          return onHecho('', d.error ?? `No se pudo agregar a «${camp.nombre}».`)
+    let listas = 0
+    // Cada cuenta a SU campaña (las de una cuenta van juntas, de a TANDA).
+    for (const con of [...new Set(items.map(x => x.conexionId))]) {
+      const c = campDe(con)!
+      const deCuenta = items.filter(x => x.conexionId === con)
+      for (let i = 0; i < deCuenta.length; i += TANDA) {
+        const tanda = deCuenta.slice(i, i + TANDA)
+        setAvance({ hechas: listas, total: items.length })
+        const res: Res[] = []
+        let frena: string | null = null
+        for (const accion of ['agregar', 'cambiar'] as const) {
+          const parte = tanda.filter(x => !!x.cambio === (accion === 'cambiar')).map(({ cambio: _c, conexionId: _k, ...x }) => x)
+          if (!parte.length) continue
+          const r = await fetch('/api/promociones/acciones', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accion, conexionId: con, campana: { id: c.id, tipo: c.tipo, nombre: c.nombre, estado: c.estado }, items: parte }),
+          }).catch(() => null)
+          const d = r ? await r.json().catch(() => ({})) : {}
+          if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: esa cuenta no sigue
+            if (!mezcla) {
+              setEnviando(false); setAvance(null); setEnCola(new Set())
+              return onHecho('', d.error ?? `No se pudo agregar a «${c.nombre}».`)
+            }
+            frena = d.error ?? `No se pudo agregar a «${c.nombre}».`
+            break
+          }
+          res.push(...(r?.ok ? d.resultados as Res[]
+            // Sin respuesta (se cortó la espera o la conexión): pudieron haber entrado; no se reintenta solo.
+            : parte.map(x => ({ id: x.id, ok: false, error: 'No llegó la respuesta: puede que haya entrado. Toca «Traer ME y ML» para confirmarlo antes de reintentar.' }))))
         }
-        res.push(...(r?.ok ? d.resultados as Res[]
-          // Sin respuesta (se cortó la espera o la conexión): pudieron haber entrado; no se reintenta solo.
-          : parte.map(x => ({ id: x.id, ok: false, error: 'No llegó la respuesta: puede que haya entrado. Toca «Traer ME y ML» para confirmarlo antes de reintentar.' }))))
+        if (frena) res.push(...deCuenta.slice(i).filter(x => !res.some(y => y.id === x.id)).map(x => ({ id: x.id, ok: false, error: frena! })))
+        for (const x of res) nuevos[x.id] = x
+        todos.push(...res)
+        setResultados({ ...nuevos })
+        listas += frena ? deCuenta.length - i : tanda.length
+        setAvance({ hechas: listas, total: items.length })
+        if (frena) break
       }
-      for (const x of res) nuevos[x.id] = x
-      todos.push(...res)
-      setResultados({ ...nuevos })
-      setAvance({ hechas: Math.min(i + TANDA, items.length), total: items.length })
     }
     // Las que ML aceptó pero todavía no reflejaba: se vuelven a mirar a los ~10 s y a los ~30 s (18-10).
     for (const [espera, final] of [[10_000, false], [20_000, true]] as const) {
@@ -654,18 +678,23 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
       if (!pend.length) break
       setAvance({ hechas: items.length, total: items.length, comprobando: pend.length })
       await new Promise(r => setTimeout(r, espera))
-      const r = await fetch('/api/promociones/acciones', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'verificar', conexionId, final, campana: { id: camp.id, tipo: camp.tipo, nombre: camp.nombre },
-          items: pend.map(x => ({ id: x.id, precio: x.precio ?? items.find(i => i.id === x.id)!.precio })) }),
-      }).catch(() => null)
-      const d = r?.ok ? await r.json().catch(() => null) : null
-      for (const v of (d?.resultados ?? []) as { id: string; estado: 'ok' | 'pendiente' | 'no' }[]) {
-        const x = todos.find(t => t.id === v.id)
-        if (!x) continue
-        if (v.estado === 'ok') x.porConfirmar = false
-        else if (v.estado === 'no') Object.assign(x, { ok: false, porConfirmar: false, error: 'MercadoLibre respondió que sí, pero el precio no apareció en la publicación: no entró a la campaña. Reintenta.' })
-        nuevos[x.id] = { ...x }
+      for (const con of [...new Set(items.map(x => x.conexionId))]) {
+        const c = campDe(con)!
+        const deCuenta = pend.filter(x => items.find(i => i.id === x.id)?.conexionId === con)
+        if (!deCuenta.length) continue
+        const r = await fetch('/api/promociones/acciones', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion: 'verificar', conexionId: con, final, campana: { id: c.id, tipo: c.tipo, nombre: c.nombre },
+            items: deCuenta.map(x => ({ id: x.id, precio: x.precio ?? items.find(i => i.id === x.id)!.precio })) }),
+        }).catch(() => null)
+        const d = r?.ok ? await r.json().catch(() => null) : null
+        for (const v of (d?.resultados ?? []) as { id: string; estado: 'ok' | 'pendiente' | 'no' }[]) {
+          const x = todos.find(t => t.id === v.id)
+          if (!x) continue
+          if (v.estado === 'ok') x.porConfirmar = false
+          else if (v.estado === 'no') Object.assign(x, { ok: false, porConfirmar: false, error: 'MercadoLibre respondió que sí, pero el precio no apareció en la publicación: no entró a la campaña. Reintenta.' })
+          nuevos[x.id] = { ...x }
+        }
       }
       // Sin respuesta de la comprobación: quedan "por confirmar" (Traer de ML lo aclara).
       setResultados({ ...nuevos })
@@ -697,7 +726,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
       message: `${avisos}\n\n¿Agregar las ${validas.length} igual?`,
       confirmText: `Agregar ${validas.length}`, cancelText: 'Volver a revisar',
     })) return
-    await enviar(validas.map(x => ({ id: x.f.id, precio: x.precio, precioAntes: x.f.precio, cambio: x.cambio })))
+    await enviar(validas.map(x => ({ id: x.f.id, conexionId: x.f.conexionId, precio: x.precio, precioAntes: x.f.precio, cambio: x.cambio })))
   }
   const reintentar = async (f: VistaModal) => {
     const p = reintento[f.id] ?? Math.min(80, modal.pct + 5)
@@ -709,7 +738,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
       ?? (e === 'tealca' && f.envioBase.estado === 'ambas' ? `Con ${p}% (${usd(precio)}) pierde ZOOM: queda solo TEALCA.` : null)
     if (aviso && !await confirmarAviso({ title: 'Revisa el envío antes de reintentar', message: `${aviso}\n\n¿Reintentar igual?`,
       confirmText: `Reintentar con ${p}%`, cancelText: 'Volver' })) return
-    await enviar([{ id: f.id, precio, precioAntes: f.precio, cambio: filasPrev.find(x => x.f.id === f.id)?.cambio }])
+    await enviar([{ id: f.id, conexionId: f.conexionId, precio, precioAntes: f.precio, cambio: filasPrev.find(x => x.f.id === f.id)?.cambio }])
   }
   const hayResultados = Object.keys(resultados).length > 0
   const hayAlgo = hayResultados || hechas.length > 0
@@ -730,15 +759,17 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
           <button onClick={() => { if (hayAlgo) onHecho(resumen()); else setModal(null) }} disabled={enviando}
             title={enviando ? 'Espera a que termine de agregar' : undefined} className="text-neutral-500 text-sm disabled:opacity-40">Cerrar ✕</button>
         </div>
-        {hechas.length > 0 && !mezcla && (
+        {hechas.length > 0 && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             <div>✓ {hechas.map(h => `«${h.nombre}»: ${h.ok} agregada${h.ok === 1 ? '' : 's'}${h.mal ? ` (${h.mal} no entr${h.mal === 1 ? 'ó' : 'aron'})` : ''}`).join(' · ')}</div>
             {!modal.campana && <div className="mt-0.5 text-xs">¿Agregar también a otra campaña? Elígela abajo. Si no, toca <b>Terminar</b>. Si quedan en varias, MercadoLibre cobra la más baja y las otras esperan.</div>}
           </div>
         )}
-        {mezcla ? (
-          <p className="text-sm text-red-700">Elegiste publicaciones de más de una cuenta. Las campañas son de cada cuenta: filtra por una cuenta y vuelve a seleccionar.</p>
-        ) : <>
+        <>
+          {mezcla && (
+            <p className="text-xs text-neutral-500">Elegiste publicaciones de {conexiones.length} cuentas: cada una entra a la campaña de <b>su</b> cuenta que se llama igual
+              (créala «en 2 cuentas» para que tenga el mismo nombre).</p>
+          )}
           <div className="flex flex-wrap items-end gap-3 text-sm">
             <label className="space-y-1"><span className="block text-xs text-neutral-500">Campaña</span>
               <select value={modal.campana} disabled={enviando} onChange={e => {
@@ -752,7 +783,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
                 setModal({ ...modal, campana: e.target.value, pct: c?.pctDefecto ?? modal.pct })
               }} className={`border rounded-lg px-2 py-1.5 min-w-[240px] ${hechas.length && !modal.campana ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-neutral-300'}`}>
                 <option value="">{hechas.length ? 'Elegir otra campaña…' : 'Elegir…'}</option>
-                {opciones.map(({ c, n }) => <option key={c.id} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'} · {n} de {filas.length}</option>)}
+                {opciones.map(({ c, n, cuentas }) => <option key={`${c.conexionId}|${c.id}`} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'}{mezcla ? ` · ${cuentas.join(' + ')}` : ''} · {n} de {filas.length}</option>)}
               </select>
             </label>
             {!opciones.length && (
@@ -816,7 +847,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
               <tbody>
                 {filasPrev.map(x => (
                   <tr key={x.f.id} className={`border-t border-neutral-100 ${x.motivo ? 'opacity-50' : ''}`}>
-                    <td className="px-2 py-1.5 max-w-[260px] truncate" title={x.f.titulo}>{x.f.titulo}</td>
+                    <td className="px-2 py-1.5 max-w-[260px] truncate" title={x.f.titulo}>{x.f.titulo}
+                      {mezcla && <span className="block text-[11px] text-neutral-400">{x.f.cuenta}</span>}</td>
                     <td className="px-2 py-1.5 text-right">{usd(x.f.precio)}</td>
                     <td className="px-2 py-1.5 text-right font-medium">{usd(x.precio)}
                       {x.ajustada && <span className="block text-[11px] font-normal text-emerald-700" title="Máximo descuento sin perder el envío gratis">máx. seguro · −{pct(pctReal(x.f.precio, x.precio))}</span>}
@@ -867,7 +899,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
               {enviando ? (avance && avance.total > TANDA ? `Agregando… ${avance.hechas} de ${avance.total}` : 'Agregando y comprobando…') : `Agregar ${validas.length} a la campaña`}
             </button>
           </div>
-        </>}
+        </>
       </div>
     </div>
   )
