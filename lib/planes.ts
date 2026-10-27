@@ -56,6 +56,6 @@ export const ESCALONES: { nombre?: string; ventas: string; precios: Record<Plan[
 export const PRECIO_DESDE = Math.min(...ESCALONES.flatMap(e => Object.values(e.precios)))
 export const CUENTAS_INCLUIDAS = 2
 export const CUENTA_EXTRA = 3
-export const RECARGA_IA = { creditos: 100, precio: 3 }
+export const RECARGA_IA = { creditos: 100, precio: 4 }
 export const DESCUENTO_TRIMESTRAL = 10
 export const DESCUENTO_ANUAL = 20
