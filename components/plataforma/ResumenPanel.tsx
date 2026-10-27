@@ -95,6 +95,8 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
         })()}
       </div>
 
+      <VisitasRegistro />
+
       {/* Requiere atención */}
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
         <h2 className="px-4 py-3 border-b border-neutral-100 text-sm font-semibold text-neutral-900">Requiere atención</h2>
@@ -162,5 +164,45 @@ function Numero({ titulo, valor, detalle, vivo }: { titulo: string; valor: numbe
       <div className="text-2xl font-semibold text-neutral-900 num">{valor}</div>
       <div className="text-xs text-neutral-400 truncate">{detalle}</div>
     </div>
+  )
+}
+
+interface Visitas {
+  visitas_hoy: number; personas_hoy: number; cuentas_hoy: number; visitas_7d: number; personas_7d: number; cuentas_7d: number
+  visitas_total: number; personas_total: number; cuentas_total: number; origenes: { origen: string; personas: number }[]
+}
+
+/** Visitas a /registro (27-10, migración 128): para medir la publicidad del link. Personas = navegadores distintos. */
+function VisitasRegistro() {
+  const [v, setV] = useState<Visitas | null>(null)
+  useEffect(() => {
+    let vivo = true
+    const cargar = () => fetch('/api/plataforma/visitas').then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setV(d) }).catch(() => {})
+    cargar()
+    const t = setInterval(cargar, 60_000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [])
+  if (!v) return null
+  const col = (t: string, vis: number, per: number, cue: number) => (
+    <div>
+      <div className="text-xs text-neutral-500">{t}</div>
+      <div className="text-xl font-semibold text-neutral-900 num">{per} <span className="text-sm font-normal text-neutral-500">personas</span></div>
+      <div className="text-xs text-neutral-500 num">{vis} visitas · <b className="text-emerald-700">{cue} cuenta{cue === 1 ? '' : 's'} creada{cue === 1 ? '' : 's'}</b>{per ? ` (${Math.round(cue / per * 100)}%)` : ''}</div>
+    </div>
+  )
+  return (
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-neutral-900">Visitas a /registro</h2>
+        {v.origenes.length > 0 && (
+          <span className="text-xs text-neutral-500">7 días: {v.origenes.map(o => `${o.origen} ${o.personas}`).join(' · ')}</span>
+        )}
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-3">
+        {col('Hoy', v.visitas_hoy, v.personas_hoy, v.cuentas_hoy)}
+        {col('7 días', v.visitas_7d, v.personas_7d, v.cuentas_7d)}
+        {col('Desde que se cuenta', v.visitas_total, v.personas_total, v.cuentas_total)}
+      </div>
+    </section>
   )
 }

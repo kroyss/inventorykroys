@@ -1,6 +1,6 @@
 'use client'
 import { signIn } from 'next-auth/react'
-import { useState, FormEvent } from 'react'
+import { useEffect, useState, FormEvent } from 'react'
 import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 import type { Marca } from '@/lib/marca'
 
@@ -24,6 +24,15 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
+
+  // Contador de visitas (27-10, migración 128): una por carga en el navegador; de dónde vino = utm_source o el sitio.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search)
+    let ref = ''
+    try { const h = document.referrer ? new URL(document.referrer).hostname : ''; ref = h && h !== location.hostname ? h.replace(/^(www|l|lm|m)\./, '') : '' } catch {}
+    const origen = q.get('utm_source') || (q.has('fbclid') ? 'facebook' : '') || ref
+    fetch('/api/registro/visita', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origen }), keepalive: true }).catch(() => {})
+  }, [])
 
   async function enviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
