@@ -1,7 +1,7 @@
 'use client'
 import type { Invoice } from '@/lib/invoices'
 
-export type Arreglo = 'mismo' | 'imprimir' | 'nueva'
+export type Arreglo = 'mismo' | 'imprimir' | 'nueva' | 'venta'
 
 /**
  * "¿Salió mal?" (18-10): antes de tocar nada, pregunta QUÉ pasó y lleva al arreglo correcto.
@@ -40,6 +40,9 @@ export default function SalioMal({ invoice: inv, onElegir, onCerrar }: {
         <Opcion a="nueva" tono="border-red-200 hover:border-red-400"
           titulo="Ya se imprimió en la hoja y salió mal, dañada o corrida"
           detalle={`Esa hoja ya se gastó. La #${inv.invoice_number} queda ANULADA y sale una nueva con el siguiente número, en la misma venta. Guarda la hoja vieja (original y copia) marcada ANULADA.`} />
+        <Opcion a="venta" tono="border-amber-200 hover:border-amber-400"
+          titulo="Se hizo en la venta equivocada"
+          detalle={`La factura está bien, pero quedó en otra venta (por ejemplo, el cliente compró dos veces). La #${inv.invoice_number} pasa a la venta correcta con el mismo número, y la otra queda libre para eliminarla.`} />
         <p className="text-[11px] text-neutral-400">Nunca hagas otra venta para volver a facturar: todo se arregla desde aquí.</p>
       </div>
     </div>

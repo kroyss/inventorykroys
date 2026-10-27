@@ -7,6 +7,7 @@ import NumberInput from '@/components/ui/NumberInput'
 import FacturaForm from './FacturaForm'
 import { useImprimirFactura } from './ImprimirAqui'
 import SalioMal from './SalioMal'
+import MoverFactura from './MoverFactura'
 import { PageHeader, chipCls } from '@/components/ui'
 import { DateField } from '@/components/ui/DateField'
 
@@ -30,6 +31,8 @@ export default function FacturasClient(_: { userRole: UserRole }) {
   const [reemit, setReemit]     = useState<Invoice | null>(null)
   // "¿Salió mal?" (18-10): primero pregunta qué pasó; "mismo número" edita la misma factura.
   const [salioMal, setSalioMal] = useState<Invoice | null>(null)
+  const [moviendo, setMoviendo] = useState<Invoice | null>(null)            // factura en la venta equivocada (27-10)
+  const [movida, setMovida] = useState<string | null>(null)
   const [editar, setEditar]     = useState<Invoice | null>(null)
   const { imprimir: verHoja, marco: marcoHoja } = useImprimirFactura()
   // Facturas a medio llenar (autoguardadas): por si se fue la luz o se cerró la ventana.
@@ -210,8 +213,25 @@ export default function FacturasClient(_: { userRole: UserRole }) {
           setSalioMal(null)
           if (a === 'mismo') setEditar(inv)
           else if (a === 'nueva') setReemit(inv)
+          else if (a === 'venta') setMoviendo(inv)
           else verHoja(inv.id)
         }} />
+      )}
+      {moviendo && (
+        <MoverFactura invoice={moviendo} onCerrar={() => setMoviendo(null)} onMovida={r => {
+          const inv = moviendo
+          setMoviendo(null)
+          setMovida(`La factura #${inv.invoice_number} pasó a la venta ${r.a}. La venta ${r.de ?? ''} quedó sin factura: si no se va a hacer, elimínala en Ventas.`)
+          load(); openDetail(inv.id)
+        }} />
+      )}
+      {movida && (
+        <div className="fixed bottom-4 left-1/2 z-[80] w-[min(92vw,32rem)] -translate-x-1/2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="flex-1">{movida}</span>
+            <button onClick={() => setMovida(null)} className="text-emerald-700 hover:text-emerald-900">×</button>
+          </div>
+        </div>
       )}
       {marcoHoja}
 
@@ -366,11 +386,11 @@ function InvoiceDetail({ invoice: inv, onClose, onChanged, onReemit, onOpen }: {
           )}
           {!!inv.correcciones?.length && (
             <div className="mt-2 text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded px-2 py-1.5 space-y-0.5">
-              <div className="font-medium">Corregida con el mismo número ({inv.correcciones.length}):</div>
+              <div className="font-medium">Cambios con el mismo número ({inv.correcciones.length}):</div>
               {inv.correcciones.map((c, i) => (
                 <div key={i}>
                   {new Date(c.fecha).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  {c.usuario ? ` · ${c.usuario}` : ''} · {c.motivo}
+                  {c.usuario ? ` · ${c.usuario}` : ''} · {c.tipo === 'mover' ? `pasó de la venta ${c.de_venta} a la ${c.a_venta}: ` : ''}{c.motivo}
                 </div>
               ))}
             </div>

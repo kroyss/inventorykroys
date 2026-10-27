@@ -64,7 +64,7 @@ export interface Invoice {
   created_by: string | null
   created_at: string
   /** Correcciones con el mismo número (hoja todavía en blanco), la más vieja primero. */
-  correcciones?: { fecha: string; usuario: string | null; motivo: string }[]
+  correcciones?: { fecha: string; usuario: string | null; motivo: string; tipo?: 'mover'; de_venta?: string; a_venta?: string }[]
   items: InvoiceItem[]
   files?: InvoiceFile[]
   /** Las demás ventas facturadas en esta misma hoja (la principal es sale_id). */

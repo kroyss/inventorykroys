@@ -8,6 +8,7 @@ import VentasForm from './VentasForm'
 import PorConfirmar, { usePorConfirmar, pendientesPorConfirmar, NumeroBoton } from './PorConfirmar'
 import FacturaForm from '@/components/facturas/FacturaForm'
 import SalioMal from '@/components/facturas/SalioMal'
+import MoverFactura from '@/components/facturas/MoverFactura'
 import { useImprimirFactura } from '@/components/facturas/ImprimirAqui'
 import { bs, type Invoice } from '@/lib/invoices'
 import { Pagination, PageHeader, StatusBadge, chipCls, ESTADOS_VENTA_VE } from '@/components/ui'
@@ -144,6 +145,8 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   // una venta LOCAL repetida para poder facturar de nuevo → factura doble y stock descontado dos veces).
   const [corrigiendo, setCorrigiendo] = useState<Invoice | null>(null)
   const [salioMal, setSalioMal] = useState<Invoice | null>(null)            // pregunta qué pasó
+  const [moviendo, setMoviendo] = useState<Invoice | null>(null)            // factura en la venta equivocada (27-10)
+  const [movida, setMovida] = useState<string | null>(null)
   const [editandoFactura, setEditandoFactura] = useState<Invoice | null>(null)   // mismo número
   const { imprimir: verFactura, marco: marcoFactura } = useImprimirFactura()
   // Borrador autoguardado de "Facturar venta" (se llenó a medias y se sigue después)
@@ -841,8 +844,25 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           setSalioMal(null)
           if (a === 'mismo') setEditandoFactura(inv)
           else if (a === 'nueva') setCorrigiendo(inv)
+          else if (a === 'venta') setMoviendo(inv)
           else verFactura(inv.id)
         }} />
+      )}
+      {moviendo && (
+        <MoverFactura invoice={moviendo} onCerrar={() => setMoviendo(null)} onMovida={r => {
+          setMoviendo(null)
+          setMovida(`La factura #${moviendo.invoice_number} pasó a la venta ${r.a}. La venta ${r.de ?? ''} quedó sin factura: si no se va a hacer, elimínala.`)
+          if (selected) loadSaleInvoices(selected.id)
+          fetchSales()
+        }} />
+      )}
+      {movida && (
+        <div className="fixed bottom-4 left-1/2 z-[80] w-[min(92vw,32rem)] -translate-x-1/2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg">
+          <div className="flex items-start gap-3">
+            <span className="flex-1">{movida}</span>
+            <button onClick={() => setMovida(null)} className="text-emerald-700 hover:text-emerald-900">×</button>
+          </div>
+        </div>
       )}
       {marcoFactura}
 
