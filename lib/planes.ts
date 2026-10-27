@@ -26,7 +26,6 @@ export const PLANES: Plan[] = [
     base: 'Todo lo de Esencial, más:',
     incluye: [
       'Pagos MercadoEnvíos: pagos y comprobantes llegan solos, listos para verificar',
-      'Vigilante en tu PC: trae del portal los pagos, comprobantes y guías de cada cuenta sin que lo abras',
       'Comprobación con el estado de cuenta de tu banco',
       'Las guías pasan directo a despachos',
     ],
