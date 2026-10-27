@@ -11,7 +11,7 @@ import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from 
 import { CREDITOS_TXT, CREDITOS_WEB_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
+import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, idPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 import { conflictoPesos, envioGratisAhora, huecoVariasUnidades, textoHueco, type PesoVinculado, type TablasEnvio } from '@/lib/mlShipping'
 import AvisoPesos from './AvisoPesos'
 
@@ -595,14 +595,17 @@ function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, 
           {/* En celular una sola línea que se desliza con el dedo (antes ocupaba media pantalla); en computadora, varias. */}
           <span className="text-xs text-neutral-400 shrink-0">Rápidas:</span>
           <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] md:flex-wrap md:overflow-visible">
-          {/* Sin sugerida segura: la más probable va primero y resaltada (un clic y listo). */}
-          {[...plantillas].sort((a, b) => Number(!sug && b.id === p.probable) - Number(!sug && a.id === p.probable)).map((pl, i) => {
+          {/* Orden (27-10, pedido del dueño): la recomendada (★ azul: la más probable, o la sugerida ya escrita),
+              luego las que aplican por precio (✓ verde), las demás, y al final las que no aplican a este precio. */}
+          {plantillas.map((pl, i) => {
             const aplica = plantillaAplica(pl, precioUSD(p))
             const condicionada = pl.precio_desde != null || pl.precio_hasta != null
-            const probable = !sug && !!p.probable && pl.id === p.probable
+            const probable = sug ? idPlantilla(pl) === sug.plantilla : !!p.probable && pl.id === p.probable
+            return { pl, i, aplica, condicionada, probable, grupo: probable ? 0 : aplica && condicionada ? 1 : aplica ? 2 : 3 }
+          }).sort((a, b) => a.grupo - b.grupo || a.i - b.i).map(({ pl, i, aplica, condicionada, probable }) => {
             return (
               <button key={pl.id ?? i} type="button" onClick={() => { usar(pl.texto, 'rapida', pl.id); setMeta({ confianza: null, falta: null, web: false }) }}
-                title={`${probable ? 'La más probable para esta pregunta, según tus respuestas anteriores.\n\n' : ''}${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
+                title={`${probable ? (sug ? 'Es la sugerida que ya está escrita en el cuadro.\n\n' : 'La más probable para esta pregunta, según tus respuestas anteriores.\n\n') : ''}${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
                 className={`shrink-0 whitespace-nowrap max-w-[12rem] truncate px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   probable ? 'bg-sky-50 border-sky-400 text-sky-900 ring-2 ring-sky-100 font-medium hover:bg-sky-100'
                   : aplica && condicionada ? 'bg-lime-50 border-lime-300 text-lime-900 hover:bg-lime-100'
