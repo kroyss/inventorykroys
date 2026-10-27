@@ -330,7 +330,13 @@ Cómo responder:
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
-function bloqueContexto(c: Contexto) {
+/** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
+ *  ACTUAL = lo de siempre. RECORTADO = la versión más barata en prueba (/api/cron/ia-comparar). */
+export interface Recorte { descripcion: number; mismo: number; parecidas: number; otras: number; fichaOtra: number }
+export const CONTEXTO_ACTUAL: Recorte = { descripcion: 4000, mismo: 12, parecidas: 10, otras: 12, fichaOtra: 250 }
+export const CONTEXTO_RECORTADO: Recorte = { descripcion: 2500, mismo: 8, parecidas: 6, otras: 6, fichaOtra: 150 }
+
+export function bloqueContexto(c: Contexto, r: Recorte = CONTEXTO_ACTUAL) {
   const L: string[] = []
   L.push(`PREGUNTA DEL COMPRADOR: "${c.pregunta.texto}"`)
   if (c.item) {
@@ -350,7 +356,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
     L.push(`PRECIO EN MERCADOLIBRE AHORA: ${pml.precio} ${pml.moneda}${bs}` + (pml.original ? ` (en promoción; antes ${pml.original})` : ''))
   }
   if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM o TEALCA, responde según esto.`)
-  if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, 4000)}`)
+  if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, r.descripcion)}`)
   if (c.producto) {
     L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)
   } else {
@@ -368,14 +374,14 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   if (c.ficha) L.push(`\nFICHA DE CONOCIMIENTO (lo que el vendedor ya respondió de esta publicación, resumido):\n${c.ficha.texto}`)
   if (c.otras.length) {
     L.push('\nOTRAS PUBLICACIONES DEL VENDEDOR (activas y con stock; solo para recomendar si esta no cumple):')
-    for (const o of c.otras) {
+    for (const o of c.otras.slice(0, r.otras)) {
       L.push(`- ${o.titulo} · ${o.precio ?? '?'} ${o.moneda ?? ''} · ${o.disponible} disp. · link: ${linkCorto(o.item_id)}` +
-        (o.ficha ? `\n  Ficha: ${o.ficha.slice(0, 250)}` : ''))
+        (o.ficha ? `\n  Ficha: ${o.ficha.slice(0, r.fichaOtra)}` : ''))
     }
   }
   const par = (xs: { p: string; r: string }[]) => xs.map(x => `P: ${x.p}\nR: ${x.r}`).join('\n\n')
-  if (c.mismoItem.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR EN ESTA MISMA PUBLICACIÓN:\n${par(c.mismoItem)}`)
-  if (c.parecidas.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR A PREGUNTAS PARECIDAS (otras publicaciones):\n${par(c.parecidas)}`)
+  if (c.mismoItem.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR EN ESTA MISMA PUBLICACIÓN:\n${par(c.mismoItem.slice(0, r.mismo))}`)
+  if (c.parecidas.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR A PREGUNTAS PARECIDAS (otras publicaciones):\n${par(c.parecidas.slice(0, r.parecidas))}`)
   return L.join('\n')
 }
 
@@ -408,11 +414,11 @@ export const esPreguntaSimple = (texto: string) =>
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
  *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
-export async function pedirBorrador(c: Contexto, web: boolean): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string }> {
+export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_ACTUAL): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string }> {
   const sistema = SISTEMA + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
     : '')
-  const contenido = bloqueContexto(c)
+  const contenido = bloqueContexto(c, recorte)
   const llamadas: LlamadaIA[] = []
   const pedir = async (modelo?: string) => {
     const { resultado: b, uso, modelo: m } = await llamarClaude<Borrador>({ sistema, contenido, herramienta: HERRAMIENTA, web, modelo })

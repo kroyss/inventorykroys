@@ -44,13 +44,15 @@ export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 
   const suma = (f: (u: UsoIA) => number) => llamadas.reduce((a, l) => a + f(l.uso), 0)
   try {
     await db.query(
-      `INSERT INTO ia_uso (modulo, modelo, entrada, salida, busquedas, costo, usuario_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO ia_uso (modulo, modelo, entrada, salida, busquedas, costo, usuario_id, cache_lectura, cache_escritura)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [modulo, [...new Set(llamadas.map(l => l.modelo + (l.lote ? ' (lote)' : '')))].join(' → '),
        suma(u => (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)),
        suma(u => u.output_tokens ?? 0), suma(u => u.server_tool_use?.web_search_requests ?? 0),
        llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
-       usuarioId ? Number(usuarioId) : null])
+       usuarioId ? Number(usuarioId) : null,
+       // Cuánto de la entrada salió de la caché (0,1×) y cuánto se escribió en ella (1,25×): migración 129.
+       suma(u => u.cache_read_input_tokens ?? 0), suma(u => u.cache_creation_input_tokens ?? 0)])
   } catch (e) { console.error('[ia_uso]', e) }
 }
 
