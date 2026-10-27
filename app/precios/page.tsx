@@ -92,9 +92,6 @@ export default function PreciosPage() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-4 border-t border-neutral-100 pt-3 text-sm text-neutral-600">
-                  <b className="text-neutral-900">{p.creditos} créditos de IA</b> al mes
-                </p>
               </li>
             ))}
           </ul>
@@ -106,11 +103,12 @@ export default function PreciosPage() {
           <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">Pagas según cuánto vendes.</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-600">Ventas al mes de todas tus cuentas, sin las canceladas. Precio en dólares, pagadero en bolívares a tasa BCV.</p>
           <div className="mt-5 overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
-            <table className="w-full min-w-[480px] text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-neutral-50 text-neutral-500">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Ventas al mes</th>
                   {PLANES.map(p => <th key={p.id} className={`px-4 py-3 text-right font-medium ${p.destacado ? 'text-lime-800' : ''}`}>{p.nombre}</th>)}
+                  <th className="px-4 py-3 text-right font-medium">Créditos IA/mes</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,11 +118,13 @@ export default function PreciosPage() {
                     {PLANES.map(p => (
                       <td key={p.id} className={`px-4 py-3 text-right font-semibold tabular-nums ${p.destacado ? 'bg-lime-50/60 text-neutral-900' : 'text-neutral-800'}`}>${e.precios[p.id]}</td>
                     ))}
+                    <td className="px-4 py-3 text-right tabular-nums text-neutral-700">{e.creditos}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <p className="mt-3 text-sm text-neutral-500">Los créditos de IA son iguales en los tres planes. Si necesitas más, recargas {RECARGA_IA.creditos} por ${RECARGA_IA.precio} y no vencen.</p>
         </section>
 
         {/* ── Incluido y extras ── */}
