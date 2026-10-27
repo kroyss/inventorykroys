@@ -49,8 +49,9 @@ export async function crearCuenta(client: PoolClient, d: DatosAlta) {
   // se ve "Créditos IA: N de 100", como lo ve un cliente; si hace falta se sube en la base).
   const demo = d.alta === 'demo'
   const { rows: [emp] } = await client.query(
-    `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, 100) RETURNING id`,
-    [org.id, d.nombre, d.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : d.modulos])
+    // Prueba de 15 días: 50 créditos (27-10, decisión del dueño); el resto, 100 (se ajusta en Plataforma según el plan).
+    `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [org.id, d.nombre, d.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : d.modulos, d.alta === 'prueba' ? 50 : 100])
   const { rows: [user] } = await client.query(
     `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active, email)
      VALUES ($1, $2, $3, 'admin', $4, TRUE, $5) RETURNING id`,
