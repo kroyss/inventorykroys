@@ -166,7 +166,8 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
             </button>
           </form>
 
-          <p className="text-sm text-neutral-500 mt-6">¿Ya tienes cuenta? <a href="/login" className="font-medium text-lime-700 underline underline-offset-2">Entrar</a></p>
+          <p className="text-sm text-neutral-500 mt-6">Al terminar la prueba eliges tu plan · <a href="/precios" className="font-medium text-lime-700 underline underline-offset-2">Ver planes</a></p>
+          <p className="text-sm text-neutral-500 mt-2">¿Ya tienes cuenta? <a href="/login" className="font-medium text-lime-700 underline underline-offset-2">Entrar</a></p>
           <p className="text-xs text-neutral-400 mt-2">¿Dudas? <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="underline">Escríbenos por Telegram</a>.</p>
           <p className="lg:hidden text-xs text-neutral-400 mt-10 text-center">
             © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados

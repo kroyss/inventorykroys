@@ -2,6 +2,7 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import { COMUNIDAD_TELEGRAM, RADAR_CIFRAS, TELEGRAM_DESPEGUE, fechaLarga, type GrupoDespegue } from '@/lib/despegue'
+import { ESCALONES, PLANES, PRECIO_DESDE } from '@/lib/planes'
 
 export const metadata = {
   title: { absolute: 'El Comerciante Digital · MercadoLibre Venezuela' },
@@ -11,11 +12,12 @@ export const metadata = {
 
 // Página de inicio pública de elcomerciantedigital.com (21-10-2026; sin login, ver proxy.ts; nginx sirve la raíz con
 // esta página). Qué hacemos, la prueba gratis de 15 días (26-10, /registro), el Programa Despegue y cómo contactarnos.
-// Sin precios del sistema ni correo: el contacto es por Telegram e Instagram (decisión del dueño).
+// Sin correo: el contacto es por Telegram e Instagram (decisión del dueño). Precios (27-10): cuadro corto → /precios.
 
 const INSTAGRAM = 'https://www.instagram.com/comerciantedigital.ve/'
 const LOGIN = 'https://app.elcomerciantedigital.com/login'
 const REGISTRO = 'https://app.elcomerciantedigital.com/registro'   // prueba gratis de 15 días (26-10)
+const PRECIOS = 'https://app.elcomerciantedigital.com/precios'     // planes (27-10; lib/planes.ts)
 
 // Íconos de trazo (24×24).
 const I = {
@@ -66,7 +68,10 @@ export default async function InicioPage() {
       <header className="absolute inset-x-0 top-0 z-10">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4 sm:px-8">
           <span className="text-sm font-semibold tracking-tight text-white">El Comerciante <span className="text-lime-400">Digital</span></span>
-          <a href={LOGIN} className="rounded-lg border border-white/20 px-3.5 py-1.5 text-sm font-medium text-white transition hover:border-white/40 hover:bg-white/5">Entrar</a>
+          <span className="flex items-center gap-4">
+            <a href={PRECIOS} className="text-sm font-medium text-neutral-300 transition hover:text-white">Precios</a>
+            <a href={LOGIN} className="rounded-lg border border-white/20 px-3.5 py-1.5 text-sm font-medium text-white transition hover:border-white/40 hover:bg-white/5">Entrar</a>
+          </span>
         </div>
       </header>
 
@@ -159,6 +164,31 @@ export default async function InicioPage() {
                     </li>
                   ))}
                 </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* ── Planes (27-10): lo corto; el detalle y la tabla por ventas, en /precios ── */}
+        <section className="rounded-3xl border border-neutral-200 bg-white p-6 sm:p-9">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">Planes</p>
+              <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">Desde ${PRECIO_DESDE} al mes.</h2>
+              <p className="mt-1 text-sm text-neutral-500">Precio fijo en bolívares a tasa BCV, sin porcentaje de tus ventas.</p>
+            </div>
+            <a href={PRECIOS} className="inline-flex items-center gap-2 rounded-xl bg-neutral-950 px-5 py-3 text-sm font-semibold text-lime-400 transition hover:bg-neutral-800">
+              Ver planes y precios <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+            {PLANES.map(p => (
+              <li key={p.id} className={`rounded-2xl border p-4 ${p.destacado ? 'border-lime-400 bg-lime-50' : 'border-neutral-200'}`}>
+                <p className="flex items-baseline justify-between gap-2">
+                  <span className="font-semibold text-neutral-900">{p.nombre}</span>
+                  <span className="text-sm text-neutral-500">desde <b className="text-neutral-900">${ESCALONES[0].precios[p.id]}</b></span>
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-neutral-500">{p.resumen}</p>
               </li>
             ))}
           </ul>
