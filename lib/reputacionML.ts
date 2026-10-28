@@ -14,6 +14,7 @@ const HORAS_REPUTACION = 6
 const POR_PASADA = 15
 const DIAS_BUSCAR = 60          // ventas más viejas no interesan (su aviso ya habría vencido)
 const HORAS_REVISAR = 3         // neutrales/negativas: cada cuánto se vuelven a mirar (¿la cambió? ¿se pidió el cambio?)
+const HORAS_OCULTA = 6          // calificada pero ML la esconde (hasta que calificamos): cada cuánto se vuelve a mirar
 
 export interface Reputacion {
   level_id: string | null                 // "5_green", "4_light_green", "3_yellow", "2_orange", "1_red"
@@ -106,6 +107,10 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
     `SELECT id::text, cal_recibida, cal_cambio_estado, cal_cambio_resultado FROM ml_ordenes
      WHERE conexion_id = $1 AND (
        (cal_comprador IS NOT NULL AND cal_recibida IS NULL AND fecha > NOW() - make_interval(days => $2))
+       -- 27-10: ML esconde la del comprador hasta que calificamos; leída antes, quedaba '' y no se volvía a mirar
+       -- (OLINERO: negativa invisible para el sistema). Se reintenta cada HORAS_OCULTA (o enseguida tras calificar).
+       OR (cal_comprador IS NOT NULL AND cal_recibida = '' AND fecha > NOW() - make_interval(days => $2)
+           AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - make_interval(hours => $6)))
        -- Contradictorias sin nuestra calificación leída (para mostrarla y poder corregirla), una vez al día.
        OR (cal_contradictoria AND cal_vendedor_msg IS NULL AND cal_recibida_at > NOW() - make_interval(days => $3)
            AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - INTERVAL '24 hours'))
@@ -117,7 +122,7 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
            AND (cal_recibida_revisada_at IS NULL OR cal_recibida_revisada_at < NOW() - make_interval(hours =>
                 CASE WHEN cal_recibida IN ('neutral', 'negative') THEN $5 ELSE 24 END))))
      ORDER BY cal_recibida IS NULL DESC, fecha DESC LIMIT $4`,
-    [conexionId, DIAS_BUSCAR, DIAS_AVISO, POR_PASADA, HORAS_REVISAR])
+    [conexionId, DIAS_BUSCAR, DIAS_AVISO, POR_PASADA, HORAS_REVISAR, HORAS_OCULTA])
   for (const o of rows) {
     const { recibida: cal, nuestra } = await leerCalificaciones(db, conexionId, o.id)
     const resultado = resultadoCambio({ rating: o.cal_recibida, pedido: !!o.cal_cambio_estado, resultado: o.cal_cambio_resultado }, cal)
@@ -126,6 +131,8 @@ export async function sincronizarReputacion(db: Pool, conexionId: number) {
          -- Si era neutral/negativa y ahora es otra: se guarda lo que era (la cambió).
          cal_recibida_antes = CASE WHEN cal_recibida IN ('neutral', 'negative') AND $2::text IS DISTINCT FROM cal_recibida
                                    THEN cal_recibida ELSE cal_recibida_antes END,
+         -- Cuándo la vimos por primera vez (avisos de Telegram: ML puede mostrarla días después de su fecha).
+         cal_recibida_detectada_at = CASE WHEN COALESCE(cal_recibida, '') = '' AND $2::text IS NOT NULL THEN NOW() ELSE cal_recibida_detectada_at END,
          cal_recibida = COALESCE($2, ''), cal_recibida_at = COALESCE($3::timestamptz, cal_recibida_at),
          cal_recibida_msg = COALESCE($4, cal_recibida_msg), cal_recibida_revisada_at = NOW(),
          cal_recibida_concretada = $5, cal_contradictoria = $6,

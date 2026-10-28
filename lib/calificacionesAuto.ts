@@ -36,8 +36,10 @@ export async function calificarUna(db: Pool, id: string, tipo: 'concretada' | 'n
     await mlFetch(db, fila.conexion_id, `/orders/${id}/feedback`, { method: 'POST', body: cuerpo })
     const v = await mlFetch<{ sale: { rating?: string; fulfilled?: boolean } | null }>(
       db, fila.conexion_id, `/orders/${id}/feedback`).catch(() => ({ sale: null }))
+    // Al calificar, ML deja ver la del comprador si estaba escondida: se relee en la próxima pasada (27-10).
     await db.query(
-      `UPDATE ml_ordenes SET cal_vendedor = $2, cal_concretada = $3, actualizada_at = NOW() WHERE id = $1`,
+      `UPDATE ml_ordenes SET cal_vendedor = $2, cal_concretada = $3, actualizada_at = NOW(),
+              cal_recibida_revisada_at = CASE WHEN cal_recibida = '' THEN NULL ELSE cal_recibida_revisada_at END WHERE id = $1`,
       [id, v.sale?.rating ?? cuerpo.rating, v.sale?.fulfilled ?? cuerpo.fulfilled])
     return { id, ok: !!v.sale, detalle: v.sale ? undefined : 'ML no la mostró al releer' }
   } catch (e) {

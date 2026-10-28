@@ -339,7 +339,9 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
       `SELECT o.id::text, o.cal_recibida, o.cal_recibida_msg, o.productos, COALESCE(o.comprador_nombre, o.comprador) AS comprador,
               x.nickname AS cuenta
        FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id
-       WHERE o.cal_recibida = ANY($1) AND o.cal_recibida_at > GREATEST(NOW() - INTERVAL '3 days', $2::timestamptz)
+       -- Detectada recién (27-10): ML puede mostrarla días después de su fecha (la esconde hasta que calificamos).
+       WHERE o.cal_recibida = ANY($1) AND o.cal_recibida_at > NOW() - INTERVAL '30 days'
+         AND COALESCE(o.cal_recibida_detectada_at, o.cal_recibida_at) > GREATEST(NOW() - INTERVAL '3 days', $2::timestamptz)
        ORDER BY o.cal_recibida_at LIMIT 10`, [tipos, d.vinculado_at])
     for (const r of rows) {
       const neg = r.cal_recibida === 'negative'
