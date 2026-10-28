@@ -45,6 +45,13 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
     if (r.ok) { setEstado(d); setError(null) } else setError(d.error ?? 'No se pudo cargar')
   }, [])
   useEffect(() => { cargar() }, [cargar])
+  // Lo pendiente cambia sin tocar esta sección (apartar una guía, guías nuevas): se relee cada 30 s y al volver a la pestaña.
+  useEffect(() => {
+    const t = setInterval(cargar, 30_000)
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
+  }, [cargar])
 
   // Mientras corre, se consulta el avance cada 2,5 s.
   const corriendo = estado?.corrida?.estado === 'corriendo'
@@ -88,6 +95,9 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
   const hechos = c?.procesados ?? []
   const cuenta = (r: Procesado['resultado']) => hechos.filter(h => h.resultado === r).length
   const ocupado = corriendo || pidiendo
+  // Vista previa vieja (28-10, Gerardo): después de hacerla se apartaron guías o entraron nuevas y decía "Se enviaría 11"
+  // con 10 pendientes. Si lo pendiente ya no coincide, no se muestra el resultado viejo: se pide repetirla.
+  const previaVieja = !!c?.simular && c.estado !== 'corriendo' && c.total !== estado.total
 
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
@@ -167,6 +177,11 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
               </div>
               <p className="text-xs text-neutral-400">Puedes salir de esta pantalla: sigue solo y aquí ves el resultado al volver.</p>
             </div>
+          ) : previaVieja ? (
+            <p className="text-sm text-amber-800">
+              La vista previa de las {hora(c.finished_at ?? c.started_at)} revisó <b className="num">{c.total}</b> guía(s) y ahora hay{' '}
+              <b className="num">{estado.total}</b> por reportar (se apartaron o entraron guías). Toca <b>Vista previa</b> para verla al día.
+            </p>
           ) : (
             <p className={`text-sm ${c.estado === 'terminada' ? 'text-neutral-700' : 'text-amber-800'}`}>
               {c.simular ? 'Vista previa' : 'Reporte'}{' '}
@@ -176,7 +191,7 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
             </p>
           )}
 
-          {hechos.length > 0 && <>
+          {hechos.length > 0 && !previaVieja && <>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-700">
               <span>
                 {(['ENVIADO', 'SIMULADO', 'YA_ENVIADO', 'SIN_CONEXION', 'SIN_CHAT', 'RECHAZADO', 'ERROR'] as const)
