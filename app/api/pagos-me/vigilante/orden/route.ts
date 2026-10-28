@@ -66,6 +66,15 @@ export async function POST(req: NextRequest) {
          FROM despacho_lotes l
          WHERE l.id = e.lote_id AND l.status = 'PENDIENTE' AND e.venta = $1 AND e.incluida AND NOT e.impresa AND e.apartado IS NULL`,
         [o.venta])
+      // Sin inventario: queda "Despachada por fuera" (mig 120; fuera_por NULL = la marcó el sistema), sale de Por
+      // confirmar y de "Por verificar". No si se imprimió aquí, ni si está marcada "No se concretó". Se deshace a mano.
+      if (a.desdeML) {
+        await a.db.query(
+          `UPDATE ml_ordenes o SET fuera_at = NOW(), fuera_por = NULL
+           WHERE (o.id::text = $1 OR o.pack_id::text = $1) AND o.fuera_at IS NULL AND o.no_concretada_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack_id::text) AND e.impresa)`,
+          [o.venta])
+      }
     }
 
     // Con las ventas de MercadoLibre (sin inventario, 2026-10-15): no hay venta que registrar, la guía

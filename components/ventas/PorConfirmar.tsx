@@ -105,7 +105,7 @@ function ListaFuera({ filas }: { filas: DespachadaFuera[] }) {
                 <span className="font-medium text-neutral-900">{n.comprador ?? n.nick ?? 'Sin nombre'}</span>
                 <span className="ml-2 font-mono text-[11px] text-neutral-400">{n.numero}</span>
                 {n.productos && <div className="truncate text-xs text-neutral-500">{n.productos}</div>}
-                <div className="text-xs text-neutral-400">{n.por ?? '—'} · {hora(n.at)}</div>
+                <div className="text-xs text-neutral-400">{n.por ?? 'Completada en MercadoEnvíos'} · {hora(n.at)}</div>
               </div>
               <button type="button" disabled={haciendo === n.numero} className="self-start text-xs text-neutral-500 underline hover:text-neutral-800 sm:self-center"
                 onClick={async () => { setHaciendo(n.numero); try { await pedirFuera([n.numero], true); await recargar() } finally { setHaciendo(null) } }}>

@@ -56,8 +56,11 @@ export async function GET(req: NextRequest) {
       s.db.query(
         `${SELECT_PAGOS}
          WHERE ($1::text IS NULL OR p.verificacion = $1) AND p.fecha_orden > NOW() - INTERVAL '30 days'
+           -- Completada en MercadoEnvíos (28-10): ya se despachó, no queda pago por revisar antes de imprimir.
+           AND NOT ($1::text IS NOT DISTINCT FROM 'pendiente' AND p.estado_me = 'completed')
          ORDER BY p.fecha_orden DESC NULLS LAST, p.id DESC LIMIT 300`, [filtro]),
-      s.db.query(`SELECT verificacion, COUNT(*)::int AS n FROM me_pagos
+      s.db.query(`SELECT CASE WHEN verificacion = 'pendiente' AND estado_me = 'completed' THEN 'completada' ELSE verificacion END AS verificacion,
+                         COUNT(*)::int AS n FROM me_pagos
                   WHERE fecha_orden > NOW() - INTERVAL '30 days' GROUP BY 1`),
       // Perfiles con señal en los últimos 3 días: uno que ya no se usa (extensión quitada, perfil viejo) no
       // queda para siempre como "no respondió".
