@@ -74,10 +74,13 @@ export async function filasVincular(db: Pool, conPrecios: boolean, userId: numbe
 /** Productos para elegir: solo código, nombre y stock (sin precios). */
 export async function productosParaVincular(db: Pool) {
   const { rows } = await db.query(
-    `SELECT p.id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock
+    `SELECT p.id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock,
+            (SELECT COALESCE(SUM(si.quantity), 0)::int FROM sales s JOIN sale_items si ON si.sale_id = s.id
+             WHERE si.product_id = p.id AND s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
+               AND s.created_at >= NOW() - INTERVAL '6 months') AS ventas6m
      FROM products p LEFT JOIN inventory i ON i.product_id = p.id
      WHERE p.is_active ORDER BY p.name`)
-  return rows as { id: number; code: string; name: string; stock: number }[]
+  return rows as { id: number; code: string; name: string; stock: number; ventas6m: number }[]
 }
 
 /** Vincula y deja registrado quién y cuándo; si había una duda de ese código, queda resuelta. */

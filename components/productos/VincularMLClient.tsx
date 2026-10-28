@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import AvisoPesos from '@/components/preguntas/AvisoPesos'
 import type { ConflictoPesos } from '@/lib/mlShipping'
 
-interface Producto { id: number; code: string; name: string; stock: number }
+interface Producto { id: number; code: string; name: string; stock: number; ventas6m: number }
 interface Fila {
   codigo: string; item_id: string; cuenta: string; titulo: string; variante: string | null; disponible: number
   estado_ml: string | null; thumbnail: string | null; permalink: string | null; sin_movimiento?: boolean
@@ -22,7 +22,7 @@ interface Fila {
   no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
-type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas'
+type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas' | 'sin_pub'
 
 const POR_PAGINA = 25
 
@@ -82,7 +82,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
       if (!m.has(k)) m.set(k, { item_id: f.item_id, cuenta: f.cuenta, titulo: f.titulo, thumbnail: f.thumbnail, permalink: f.permalink, estado_ml: f.estado_ml, quieta: !!f.sin_movimiento, filas: [] })
       m.get(k)!.filas.push(f)
     }
-    const pasa = (f: Fila) => filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
+    const pasa = (f: Fila) => filtro === 'sin_pub' ? false : filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
       : filtro === 'activas' ? activaSinVincular(f)
       : filtro === 'toda' ? porToda(f)
       : filtro === 'no_usa' ? f.estado !== 'vinculada' && !!f.no_usa
@@ -111,6 +111,11 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     toda: encontradas.filter(porToda).length,
     no_usa: encontradas.filter(f => f.estado !== 'vinculada' && f.no_usa).length,
   }
+  // Productos sin publicación (27-10): ningún código de ML (de las publicaciones de hoy) apunta a ellos. Los que se
+  // venden van primero: casi seguro tienen publicación, pero vinculada a otro producto.
+  const conPub = new Set(datos.filas.filter(f => f.estado === 'vinculada').flatMap(f => [f.producto!.id, ...(f.otros ?? []).map(o => o.id)]))
+  const sinPub = datos.productos.filter(p => !conPub.has(p.id) && (!palabras.length || palabras.every(w => sinAcentos(`${p.code} ${p.name}`).includes(w))))
+    .sort((a, b) => b.ventas6m - a.ventas6m || b.stock - a.stock || a.code.localeCompare(b.code))
   const cuentas = [...new Set(datos.filas.map(f => f.cuenta))].sort()
   const sinProductos = datos.productos.length === 0
 
@@ -162,7 +167,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
+        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas], ['sin_pub', 'Productos sin publicación', sinPub.length]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
@@ -184,7 +189,12 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
         {datos.productos.map(p => <option key={p.id} value={`${p.code} · ${p.name}`}>{`stock ${p.stock}`}</option>)}
       </datalist>
 
-      {grupos.length === 0 ? (
+      {filtro === 'sin_pub' ? (
+        <ProductosSinPub lista={sinPub.slice(0, ver)} quedan={Math.max(0, sinPub.length - ver)} onMas={() => setVer(v => v + POR_PAGINA)}
+          filas={datos.filas.filter(f => (f.estado !== 'vinculada' || f.producto?.toda) && (!cuenta || f.cuenta === cuenta))} pedir={pedir}
+          onVinculado={(f, p) => { cambiarFila(f.codigo, { estado: 'vinculada', producto: { id: p.id, code: p.code, name: p.name, toda: false }, otros: undefined,
+            conflicto: null, vinculado_por: 'tú', vinculado_at: new Date().toISOString(), propio: true, duda: null }); setHechosHoy(n => n + 1) }} />
+      ) : grupos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500">
           {filtro === 'pendientes' ? '¡No queda nada por vincular con este filtro! 🎉' : 'Nada en esta vista.'}
         </p>
@@ -482,6 +492,55 @@ function QuitarToda({ filas, item, pedir, onHecho }: {
         setOcupado(false)
         if (ok) onHecho()
       }}>{ocupado ? 'Quitando…' : 'Quitar de toda la publicación'}</button>
+    </div>
+  )
+}
+
+/** "Productos sin publicación" (27-10): el revés de la lista. Desde el producto se elige la publicación (o variante)
+ *  que le corresponde; solo se ofrecen las que no tienen su propio vínculo. */
+function ProductosSinPub({ lista, quedan, onMas, filas, pedir, onVinculado }: {
+  lista: Producto[]; quedan: number; onMas: () => void; filas: Fila[]
+  pedir: (b: Record<string, unknown>) => Promise<boolean>; onVinculado: (f: Fila, p: Producto) => void
+}) {
+  const [abierto, setAbierto] = useState<number | null>(null)
+  const [texto, setTexto] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const etiqueta = (f: Fila) => `${f.item_id}${f.variante ? ` · ${f.variante}` : ''} · ${f.titulo} (${f.cuenta})`
+  const elegida = filas.find(f => etiqueta(f) === texto)
+  if (!lista.length) return <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500">Todos tus productos tienen publicación. 🎉</p>
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-neutral-500">Productos activos a los que no apunta ninguna publicación. Los que se venden casi seguro tienen una, vinculada a otro producto
+        (mira «Por publicación entera»). Los que no tienen ni stock ni ventas puedes desactivarlos en Productos.</p>
+      <datalist id="vml-publicaciones">{filas.map(f => <option key={f.codigo} value={etiqueta(f)} />)}</datalist>
+      <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white shadow-sm">
+        {lista.map(p => (
+          <li key={p.id} className="px-4 py-2.5 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <div className="min-w-[12rem] flex-1">
+                <span className="font-mono text-xs text-neutral-500">{p.code}</span> <span className="font-medium text-neutral-800">{p.name}</span>
+              </div>
+              <span className="text-xs text-neutral-500">stock <b className="text-neutral-800">{p.stock}</b> · vendidas 6 m <b className="text-neutral-800">{p.ventas6m}</b></span>
+              <button onClick={() => { setAbierto(abierto === p.id ? null : p.id); setTexto('') }} className="btn-secondary text-xs">Vincular publicación…</button>
+            </div>
+            {abierto === p.id && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input list="vml-publicaciones" value={texto} onChange={e => setTexto(e.target.value)} autoFocus placeholder="MLV, título o variante…"
+                  className="min-w-[16rem] flex-1 rounded border border-neutral-300 px-2 py-2 text-base sm:py-1 sm:text-sm" />
+                <button disabled={!elegida || ocupado} className="btn-primary text-xs disabled:opacity-50" onClick={async () => {
+                  if (!elegida) return
+                  setOcupado(true)
+                  const ok = await pedir({ accion: 'vincular', codigo: elegida.codigo, cuenta: elegida.cuenta, product_id: p.id })
+                  setOcupado(false)
+                  if (ok) { onVinculado(elegida, p); setAbierto(null); setTexto('') }
+                }}>Vincular</button>
+                <button onClick={() => { setAbierto(null); setTexto('') }} className="btn-ghost text-xs">Cancelar</button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {quedan > 0 && <button onClick={onMas} className="btn-secondary w-full text-sm">Ver {Math.min(POR_PAGINA, quedan)} más ({quedan} quedan)</button>}
     </div>
   )
 }
