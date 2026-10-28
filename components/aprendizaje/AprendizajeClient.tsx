@@ -40,7 +40,8 @@ function cargarApiYoutube() {
 const COMPLETO = 0.5   // = PORCENTAJE_COMPLETO de lib/aprendizaje.ts (26-10, antes 0.8)
 const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto_seg / v.duracion_seg * 100)) : 0)
 
-/** Aprendizaje: videos en orden (el siguiente se habilita al completar el anterior), dentro de la web. */
+/** Aprendizaje: videos en el orden recomendado, dentro de la web. Todos libres (28-10): el cliente llega con una
+ *  necesidad concreta (p.ej. conectar MercadoEnvíos) y el candado lo frenaba; el orden queda como sugerencia. */
 export default function AprendizajeClient() {
   const [videos, setVideos] = useState<Video[] | null>(null)
   const [agendar, setAgendar] = useState<string | null>(null)
@@ -71,10 +72,8 @@ export default function AprendizajeClient() {
 
   const hechos = videos.filter(v => v.completado).length
   const total = videos.length
-  // En orden DENTRO de cada serie: se habilita si todos los anteriores de su serie están completos.
-  // MercadoEnvíos además espera a que termine toda la serie Automatizaciones (26-10).
-  const cuenta = (x: Video, de: Video) => x.serie === de.serie || (de.serie === 'mercadoenvios' && x.serie === 'automatizaciones')
-  const habilitado = (i: number) => videos.slice(0, i).every(x => !cuenta(x, videos[i]) || x.completado)
+  // Sugerencia (no candado): queda un video anterior de su serie sin terminar.
+  const saltado = (i: number) => videos.slice(0, i).some(x => x.serie === videos[i].serie && !x.completado)
   const v = videos.find(x => x.id === actual) ?? videos[0]
   const idx = videos.indexOf(v)
   const siguiente = videos[idx + 1]
@@ -158,9 +157,7 @@ export default function AprendizajeClient() {
               {v.completado ? '✓ Visto' : `Visto ${pct(v)}% · se completa al llegar al ${COMPLETO * 100}%`}
             </span>
             {siguiente && (
-              <button disabled={!v.completado} onClick={() => setActual(siguiente.id)}
-                title={v.completado ? undefined : 'Termina este video para pasar al siguiente'}
-                className="btn-primary text-sm disabled:opacity-40">Siguiente →</button>
+              <button onClick={() => setActual(siguiente.id)} className="btn-primary text-sm">Siguiente →</button>
             )}
           </div>
         </section>
@@ -168,7 +165,7 @@ export default function AprendizajeClient() {
         {/* Lista */}
         <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 self-start overflow-hidden">
           {videos.map((x, i) => {
-            const libre = habilitado(i)
+            const antes = saltado(i)
             const activo = x.id === v.id
             const dur = duracionDe(x)
             const titulo = series.length > 1 && (i === 0 || videos[i - 1].serie !== x.serie)
@@ -179,15 +176,14 @@ export default function AprendizajeClient() {
                     {NOMBRE_SERIE[x.serie]}
                   </p>
                 )}
-                <button disabled={!libre} onClick={() => setActual(x.id)}
-                  title={libre ? undefined : 'Primero termina el video anterior'}
-                  className={`w-full text-left px-4 py-3 flex items-center gap-3 ${activo ? 'bg-lime-50/70' : libre ? 'hover:bg-neutral-50' : 'opacity-50 cursor-not-allowed'}`}>
+                <button onClick={() => setActual(x.id)}
+                  title={antes && !x.completado ? 'Recomendado: mira antes el anterior' : undefined}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 ${activo ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
                   <span className={`grid place-items-center w-7 h-7 shrink-0 rounded-full text-xs font-semibold ${
                     x.completado ? 'bg-lime-500 text-white' : activo ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
                     {x.completado
                       ? <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M20 6 9 17l-5-5" /></svg>
-                      : libre ? numero(x)
-                      : <svg aria-label="Bloqueado" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-neutral-400"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>}
+                      : numero(x)}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2">
