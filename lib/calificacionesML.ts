@@ -1,7 +1,7 @@
 // Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema.
 //
 // Regla (decisión del dueño, 2026-10-01): si la venta de ML está en el sistema (cargada:
-// descargada / local / procesada) o facturada → se CONCRETÓ → positiva. Si a los N días no
+// descargada / local) → se CONCRETÓ → positiva. Si a los N días no
 // apareció en el sistema → NO se concretó → neutral con "No tenemos su compra registrada".
 // Mientras tanto (recién vendida, o en borrador) → esperar. Los textos son editables.
 import type { Pool } from 'pg'
@@ -196,11 +196,11 @@ export const SQL_BANDEJA = `
          o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
          x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE},
          CASE
-           -- En el sistema (procesada/descargada o facturada) y, si lleva guía en Despachos, despachada.
+           -- Descargada (o local) y, si lleva guía en Despachos, despachada. 28-10: procesada o facturada NO alcanza
+           -- (una venta facturada antes de pagar, sin guía, se calificó sola y el envío nunca se pudo agendar).
+           WHEN s.status IN ('DESCARGADA', 'DESCARGADA_LOCAL') AND (g.impresa IS NOT TRUE OR ${GUIA_OK}) THEN 'concretada'
            WHEN (f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'))
-                AND (g.impresa IS NOT TRUE OR ${GUIA_OK}) THEN 'concretada'
-           WHEN (f.id IS NOT NULL OR s.status IN ('PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'))
-                AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
+                AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa sin reportar, o sin descargar
            -- Sin cargar y marcada "No se concretó" (mig 115) o cancelada en ML: va antes que el pago (23-10: con pago
            -- verificado y reembolsada quedaba "esperar" para siempre).
            WHEN s.id IS NULL AND (o.no_concretada_at IS NOT NULL OR o.estado = 'cancelled') THEN 'no_concretada'
@@ -230,7 +230,7 @@ export const SQL_BANDEJA_ML = `
            WHEN ${GUIA_OK} THEN 'concretada'
            -- "Ya la despaché por fuera" (mig 120): se cumplió sin pasar por el sistema. La red de seguridad no la toca.
            WHEN o.fuera_at IS NOT NULL AND o.no_concretada_at IS NULL AND COALESCE(o.estado, '') <> 'cancelled' THEN 'concretada'
-           WHEN g.impresa AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa, nunca reportada
+           WHEN g.impresa AND o.fecha < NOW() - make_interval(days => ${TOPE_DIAS}) THEN 'revisar'   -- impresa sin reportar, o sin descargar
            WHEN g.impresa THEN 'esperar'                                                         -- impresa, falta reportarla
            -- Marcada "No se concretó" (mig 115) o cancelada en ML: antes que el pago (23-10, ver SQL_BANDEJA).
            WHEN o.no_concretada_at IS NOT NULL OR o.estado = 'cancelled' THEN 'no_concretada'
