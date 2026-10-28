@@ -22,7 +22,7 @@ interface Fila {
   no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
-type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'no_usa' | 'todas'
+type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas'
 
 const POR_PAGINA = 25
 
@@ -45,6 +45,8 @@ const textoFila = (f: Fila) => sinAcentos([f.titulo, f.item_id, f.codigo, f.vari
 const activaSinVincular = (f: Fila) => f.estado !== 'vinculada' && f.estado_ml === 'active' && f.disponible > 0
 // Pausada sin ventas ni preguntas en 90 días y sin vincular (migración 127): solo al buscar o en "Todas".
 const quieta = (f: Fila) => f.estado !== 'vinculada' && !!f.sin_movimiento
+/** Variante que hereda el vínculo viejo de la publicación entera (código cargado en la ficha, antes de vincular por variante). */
+const porToda = (f: Fila) => f.estado === 'vinculada' && !!f.producto?.toda
 const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
 const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return true; const t = textoFila(f); return palabras.every(w => t.includes(w)) }
 /** ¿Ve la pestaña Stock? (para el atajo «ver stock» de cada vínculo) */
@@ -82,6 +84,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     }
     const pasa = (f: Fila) => filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
       : filtro === 'activas' ? activaSinVincular(f)
+      : filtro === 'toda' ? porToda(f)
       : filtro === 'no_usa' ? f.estado !== 'vinculada' && !!f.no_usa
       : filtro === 'dudas' ? !!f.duda : f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)
     return [...m.values()]
@@ -105,6 +108,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     dudas: encontradas.filter(f => f.duda).length,
     pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)).length,
     activas: encontradas.filter(activaSinVincular).length,
+    toda: encontradas.filter(porToda).length,
     no_usa: encontradas.filter(f => f.estado !== 'vinculada' && f.no_usa).length,
   }
   const cuentas = [...new Set(datos.filas.map(f => f.cuenta))].sort()
@@ -158,7 +162,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
+        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
@@ -202,6 +206,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
                 </div>
                 <div className="shrink-0 text-right text-xs text-neutral-500"><b className="text-base tabular-nums text-neutral-900">{g.ventas}</b><div>vendidas 60 d</div></div>
               </div>
+              {datos.esDueno && <QuitarToda filas={g.filas} item={g.item_id} pedir={pedir} onHecho={cargar} />}
               <ul className="divide-y divide-neutral-100">
                 {g.visibles.map(f => (
                   <FilaVariante key={f.codigo} f={f} productos={datos.productos} esDueno={datos.esDueno} paraQuien={paraQuien} pedir={pedir}
@@ -239,7 +244,7 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
     setOcupado(true)
     const ok = await pedir({ accion: 'vincular', codigo: f.codigo, cuenta: f.cuenta, product_id: p.id })
     setOcupado(false)
-    if (ok) { onCambio({ estado: 'vinculada', producto: { ...p, toda: false }, vinculado_por: 'tú', vinculado_at: new Date().toISOString(), propio: true, duda: null }, 1); setModo('nada'); setTexto('') }
+    if (ok) { onCambio({ estado: 'vinculada', producto: { ...p, toda: false }, otros: undefined, conflicto: null, vinculado_por: 'tú', vinculado_at: new Date().toISOString(), propio: true, duda: null }, 1); setModo('nada'); setTexto('') }
   }
 
   return (
@@ -254,6 +259,11 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">✓ {f.producto.code} · {f.producto.name}</span>
             {f.producto.toda && <span className="text-neutral-400" title="Vinculada por la publicación entera, no por esta variante">(toda la publicación)</span>}
+            {/* 27-10: el vínculo viejo de la publicación entera no se podía corregir. Vincular la variante le gana (solo a esa). */}
+            {f.producto.toda && productos.length > 0 && (
+              <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="text-neutral-500 underline hover:text-neutral-800"
+                title="Vincula solo esta variante a su producto; las demás siguen como están">Es otro producto</button>
+            )}
             {f.vinculado_por && <span className="text-neutral-400">{f.vinculado_por}{f.vinculado_at ? ` · ${fecha(f.vinculado_at)}` : ''}</span>}
             {conStock && <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.producto.code)}`} className="text-neutral-500 underline hover:text-neutral-800"
               title="Cuántas muestra cada publicación de este producto y cuántas debería mostrar">ver stock</Link>}
@@ -440,6 +450,38 @@ function SelectorCelular({ f, productos, ocupado, onElegir, onCerrar }: {
             ))}
           </ul>)}
       {!q.trim() && <p className="px-1 text-xs text-neutral-500">Escribe parte del nombre (las palabras en cualquier orden) o el código.</p>}
+    </div>
+  )
+}
+
+/** "Quitar de toda la publicación" (27-10, solo el dueño): desactiva el vínculo viejo por la publicación entera
+ *  (todas sus variantes a la vez). Las variantes que ya tienen su propio vínculo no cambian. */
+function QuitarToda({ filas, item, pedir, onHecho }: {
+  filas: Fila[]; item: string; pedir: (b: Record<string, unknown>) => Promise<boolean>; onHecho: () => void
+}) {
+  const confirm = useConfirm()
+  const [ocupado, setOcupado] = useState(false)
+  const heredan = filas.filter(porToda)
+  if (!heredan.length) return null
+  const base = heredan[0].codigo.split(':')[0]
+  const prods = [heredan[0].producto!, ...(heredan[0].otros ?? [])]
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-xs text-neutral-600">
+      <span>{heredan.length === filas.length ? 'Todas las variantes' : `${heredan.length} de ${filas.length} variantes`} toman el producto
+        de la publicación entera: <b className="text-neutral-800">{prods.map(p => p.code).join(', ')}</b></span>
+      <button disabled={ocupado} className="ml-auto text-neutral-500 underline hover:text-red-600 disabled:opacity-50" onClick={async () => {
+        if (!await confirm({ title: 'Quitar de toda la publicación', confirmText: 'Quitar', cancelText: 'Cancelar',
+          message: `Se separa ${item} de ${prods.map(p => `${p.code} · ${p.name}`).join(', ')}.
+
+`
+            + `Afecta a ${heredan.length === 1 ? 'la variante' : `las ${heredan.length} variantes`} que no tienen su propio producto: quedan por vincular. `
+            + 'Las que ya vinculaste una por una no cambian.' })) return
+        setOcupado(true)
+        let ok = true
+        for (const p of prods) ok = await pedir({ accion: 'desvincular', codigo: base, product_id: p.id }) && ok
+        setOcupado(false)
+        if (ok) onHecho()
+      }}>{ocupado ? 'Quitando…' : 'Quitar de toda la publicación'}</button>
     </div>
   )
 }
