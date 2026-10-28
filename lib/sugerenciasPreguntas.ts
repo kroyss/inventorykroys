@@ -27,7 +27,9 @@ export const RIESGO = ['compatib', 'sirve', 'funciona', 'medida', 'talla', 'mode
   'mrw', 'cobro destino', 'cobro a destino', 'domesa', 'liberty',
   // preguntan si sirve para algo, o por OTRO producto ("¿de casualidad tienen un…?")
   'se puede', 'puedo', 'para que', 'sirve para', 'de casualidad', 'otro', 'otra', 'tienen un', 'tienen una',
-  'tienes un', 'tienes una', 'tendran', 'tendras', 'consigo', 'busco', 'necesito']
+  'tienes un', 'tienes una', 'tendran', 'tendras', 'consigo', 'busco', 'necesito',
+  // 28-10: "¿cuánto dura / mide / tarda…?" no es precio ("cuanto" lo marcaba) y salía "Disponible + envío gratis"
+  'dura', 'duracion', 'tiempo', 'autonom', 'mide', 'miden', 'tarda', 'demora', 'pesa', 'bateria', 'pila', 'mah']
 
 const tiene = (t: string, palabra: string) =>
   palabra.includes(' ') ? t.includes(palabra) : new RegExp(`(^|\\s)${palabra}`).test(t)
