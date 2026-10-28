@@ -360,12 +360,13 @@ Cómo responder:
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
- *  ACTUAL = lo de siempre. RECORTADO = la versión más barata en prueba (/api/cron/ia-comparar). */
+ *  ACTUAL = el de antes. RECORTADO = el que se usa desde el 28-10: probado con /api/cron/ia-comparar en preguntas
+ *  reales (misma calidad, ~29% más barato). La comparación sigue disponible con los dos. */
 export interface Recorte { descripcion: number; mismo: number; parecidas: number; otras: number; fichaOtra: number }
 export const CONTEXTO_ACTUAL: Recorte = { descripcion: 4000, mismo: 12, parecidas: 10, otras: 12, fichaOtra: 250 }
 export const CONTEXTO_RECORTADO: Recorte = { descripcion: 2500, mismo: 8, parecidas: 6, otras: 6, fichaOtra: 150 }
 
-export function bloqueContexto(c: Contexto, r: Recorte = CONTEXTO_ACTUAL) {
+export function bloqueContexto(c: Contexto, r: Recorte = CONTEXTO_RECORTADO) {
   const L: string[] = []
   L.push(`PREGUNTA DEL COMPRADOR: "${c.pregunta.texto}"`)
   if (c.item) {
@@ -443,7 +444,7 @@ export const esPreguntaSimple = (texto: string) =>
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
  *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
-export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_ACTUAL): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string }> {
+export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string }> {
   const sistema = SISTEMA + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
     : '')
