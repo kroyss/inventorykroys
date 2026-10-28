@@ -58,8 +58,10 @@ export async function POST(req: NextRequest) {
 
     // Con las ventas de MercadoLibre (sin inventario, 2026-10-15): no hay venta que registrar, la guía
     // entra sola al lote pendiente de Despachos (el pago se verifica igual en Pagos ME antes de imprimir).
+    // Salvo completada en MercadoEnvíos = ya despachada (28-10: al conectar, la extensión trae 7 días y un
+    // cliente que cierra sus órdenes en el portal recibió 280 guías viejas en Despachos). El pago se guarda igual.
     if (a.desdeML) {
-      await conectarVenta(a.db, o.venta, null, true)
+      if (o.estado_me !== 'completed') await conectarVenta(a.db, o.venta, null, true)
       return NextResponse.json({ ok: true })
     }
 
