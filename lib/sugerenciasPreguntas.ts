@@ -38,6 +38,30 @@ export function temasDe(texto: string): string[] {
   const t = normalizar(texto)
   return Object.entries(TEMAS).filter(([, v]) => v.palabras.some(p => tiene(t, p))).map(([k]) => k)
 }
+/** «¿Disponible N unidades?» (28-10, A2): la pregunta trae UNA cantidad y ningún otro número. Devuelve N y el texto
+ *  sin esa cantidad (para revisar el resto como cualquier pregunta), o null. Solo formas de cantidad: «disponible(s) 3»,
+ *  «tienes/hay/quedan 10», «quiero/necesito 2», «5 piezas», «2 unidades», «3 und»…; medidas o modelos no. */
+export const CANTIDAD_MAX = 10
+const UNIDAD = '(unidades|unidad|unid|unds|und|uds|u|piezas|pieza|pzas|pza|pcs)'
+const VERBO_CANTIDAD = '(disponibles?|tienes|tienen|tiene|hay|quedan|queda|quiero|necesito|ocupo|llevo|vendes|venden|compro)'
+export function cantidadPedida(texto: string): { n: number; resto: string } | null {
+  const t = normalizar(texto)
+  const formas = [new RegExp(`(^|\\s)(\\d{1,3})\\s?${UNIDAD}(?=\\s|$)`, 'g'), new RegExp(`(^|\\s)${VERBO_CANTIDAD}\\s(\\d{1,3})(?=\\s|$)`, 'g')]
+  const halladas: number[] = []
+  let resto = t
+  for (const f of formas) {
+    resto = resto.replace(f, (m, ...g) => {
+      const num = g.find(x => typeof x === 'string' && /^\d+$/.test(x))
+      if (num) halladas.push(Number(num))
+      // El verbo queda (aporta el tema: "disponible", "tienen"); la cantidad y la unidad salen.
+      return m.replace(/\d{1,3}\s?/, '').replace(new RegExp(`\\s${UNIDAD}$`), ' ')
+    })
+  }
+  if (!halladas.length || new Set(halladas).size > 1 || /\d/.test(resto)) return null
+  const n = halladas[0]
+  return n >= 1 ? { n, resto: resto.replace(/\s+/g, ' ').trim() } : null
+}
+
 export function riesgoDe(texto: string, permitidas: string[] = []): string | null {
   const t = normalizar(texto)
   if (/\d/.test(t)) return 'tiene números'
@@ -64,7 +88,8 @@ export const ofreceEnvioGratis = (p: Pick<Plantilla, 'texto'>) => {
 export const NIEGA_ENVIO = /(no tiene (opcion|opción) de env|por unidad no|no aplica (el )?env|no califica (para|al) env|no tiene env[ií]o gratis)/
 
 /** envioGratis: lo aprendido de ESA publicación (ml_item_hechos): true confirmado, false no tiene. */
-export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null }
+/** stock: lo que se puede vender de ESA publicación (ML y, si está vinculada, el inventario); variantes: cuántas tiene. */
+export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null; variantes?: number | null }
 export type Sugerencia =
   | { tipo: 'sugerida'; indice: number; plantilla: Plantilla; temas: string[]; sinConfirmar: boolean }
   | { tipo: 'humano'; motivo: string; temas: string[] }
@@ -84,8 +109,16 @@ export function sugerir(pregunta: string, item: ItemDatos,
   // "de riesgo" (una respuesta para "MRW, cobro a destino" se activa con "mrw").
   const propias = plantillas.filter(p => activaPropia(p, tn))
   const temas = [...temasDe(pregunta), ...propias.map(temaPropio)]
-  const r = riesgoDe(pregunta, propias.flatMap(p => p.palabras ?? []))
+  // «¿Disponible N?» (28-10): la cantidad sale del texto y el resto se revisa igual; se responde solo si hay N.
+  const cant = /\d/.test(tn) ? cantidadPedida(pregunta) : null
+  const r = riesgoDe(cant ? cant.resto : pregunta, propias.flatMap(p => p.palabras ?? []))
   if (r) return { tipo: 'humano', motivo: `depende del caso (${r})`, temas }
+  if (cant) {
+    if (cant.n > CANTIDAD_MAX) return { tipo: 'humano', motivo: `depende del caso (pide ${cant.n})`, temas }
+    if ((item.variantes ?? 0) > 1) return { tipo: 'humano', motivo: 'pide una cantidad y la publicación tiene variantes', temas }
+    if (item.stock === null) return { tipo: 'humano', motivo: 'pide una cantidad y no se sabe el stock', temas }
+    if (item.stock < cant.n) return { tipo: 'humano', motivo: `pide ${cant.n} y hay ${item.stock}`, temas }
+  }
   if (!temas.length) return { tipo: 'humano', motivo: 'no se reconoce el tema', temas }
   const candidatas = plantillas.map((p, indice) => ({ p, indice, cubre: temasDePlantilla(p) }))
     .filter(c => temas.every(t => c.cubre.includes(t)))

@@ -93,13 +93,26 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   const { rows: hechos } = await db.query(
     `SELECT item_id, envio_gratis, precio_ref::float FROM ml_item_hechos WHERE item_id = ANY($1::text[])`, [preguntas.map(p => p.item_id)])
   const envio = new Map(hechos.map(h => [h.item_id as string, h as { envio_gratis: boolean | null; precio_ref: number | null }]))
+  // «¿Disponible N?» (28-10): lo que se puede vender de la publicación = su stock en ML (leído con la pregunta) y, si
+  // está vinculada a un producto (sin variante), también el inventario en unidades de la publicación («trae N u.»).
+  const { rows: stocks } = await db.query(
+    `SELECT p.id::text, p.item_stock_ml, p.item_variantes,
+            (SELECT FLOOR(COALESCE(i.quantity, 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1))::int
+             FROM product_ml_codes m JOIN products pd ON pd.id = m.product_id AND pd.is_active
+             LEFT JOIN inventory i ON i.product_id = pd.id
+             WHERE m.is_active AND m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '') LIMIT 1) AS real
+     FROM ml_preguntas p WHERE p.id::text = ANY($1::text[])`, [preguntas.map(p => p.id)])
+  const stockDe = new Map(stocks.map(r => [r.id as string, {
+    stock: r.item_stock_ml === null ? null : r.real === null ? Number(r.item_stock_ml) : Math.min(Number(r.item_stock_ml), Number(r.real)),
+    variantes: r.item_variantes === null ? null : Number(r.item_variantes),
+  }]))
   for (const p of preguntas) {
     if (p.item_estado && p.item_estado !== 'active') continue      // pausada: ML no deja responder
     const precio = p.item_precio && (p.item_moneda ?? 'USD') === 'USD' ? Number(p.item_precio) : null
     // Confirmado con envío gratis, pero el precio bajó más de 20% desde entonces: se vuelve a confirmar.
     const h = envio.get(p.item_id)
     const envioGratis = h?.envio_gratis === true && h.precio_ref && precio !== null && precio < h.precio_ref * 0.8 ? null : h?.envio_gratis ?? null
-    const item = { precio, stock: null, item_id: p.item_id, envioGratis }
+    const item = { precio, stock: stockDe.get(p.id)?.stock ?? null, variantes: stockDe.get(p.id)?.variantes ?? null, item_id: p.item_id, envioGratis }
     const s = sugerir(p.texto, item, plantillas)
     if (s.tipo === 'sugerida') {
       const id = idPlantilla(s.plantilla)

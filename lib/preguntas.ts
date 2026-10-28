@@ -80,9 +80,9 @@ async function completarItems(db: Pool, conexionId: number) {
   let fallas = 0
   for (const { item_id } of rows) {
     try {
-      const it = await mlFetch<{ id: string; title: string; permalink: string; status: string
+      const it = await mlFetch<{ id: string; title: string; permalink: string; status: string; available_quantity?: number | null
                                  price: number | null; original_price: number | null; currency_id: string | null; thumbnail?: string | null; variations?: unknown[] }>(
-        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status,price,original_price,currency_id,thumbnail,variations`)
+        db, conexionId, `/items/${item_id}?attributes=id,title,permalink,status,price,original_price,currency_id,thumbnail,variations,available_quantity`)
       // El precio con la promoción vigente: /sale_price es la fuente nueva de ML; si no
       // responde (permiso / sitio), queda el price del ítem.
       let precio = it.price, original = it.original_price, moneda = it.currency_id
@@ -94,10 +94,11 @@ async function completarItems(db: Pool, conexionId: number) {
       await db.query(
         `UPDATE ml_preguntas SET item_titulo = $2, item_permalink = $3, item_estado = $4,
                 item_precio = $5, item_precio_original = $6, item_moneda = $7,
-                item_imagen = COALESCE($8, item_imagen), item_variantes = $9, item_actualizado_at = NOW()
+                item_imagen = COALESCE($8, item_imagen), item_variantes = $9, item_stock_ml = $10, item_actualizado_at = NOW()
          WHERE item_id = $1`,
         [item_id, it.title, it.permalink, it.status, precio, original && original > (precio ?? 0) ? original : null, moneda,
-         it.thumbnail ? it.thumbnail.replace(/^http:/, 'https:') : null, it.variations?.length ?? 0])
+         it.thumbnail ? it.thumbnail.replace(/^http:/, 'https:') : null, it.variations?.length ?? 0,
+         Number.isFinite(it.available_quantity) ? it.available_quantity : null])
     } catch {
       if (++fallas >= 3) break          // si ML bloquea a todas, no insistir en esta pasada
     }
