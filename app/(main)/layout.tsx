@@ -36,6 +36,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         </div>
       )}
       {session.user.verComo && <VerComoBarra nombre={session.user.verComo.nombre} />}
+      {session.user.soporte && <VerComoBarra nombre={session.user.soporte.nombre} empresa={session.user.soporte.empresaNombre} />}
       <Navbar />
       {esDuenoPlataforma(session.user) && <AvisoDisco />}
       <AvisoCuenta organizacionId={session.user.organizacionId} esAdmin={role === 'admin'} />

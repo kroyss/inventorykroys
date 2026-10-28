@@ -3,14 +3,15 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 
 /** Franja de "Ver como este usuario" (lib/auth.ts): arriba de todo, mientras el admin mira el sistema
- *  como otra persona. Solo lectura (proxy.ts). "Volver a mi cuenta" lo deja de nuevo en Usuarios. */
-export default function VerComoBarra({ nombre }: { nombre: string }) {
+ *  como otra persona. Solo lectura (proxy.ts). "Volver a mi cuenta" lo deja de nuevo en Usuarios.
+ *  Con `empresa` es "Ver como cliente" (Plataforma, 28-10): vuelve a su empresa y a Plataforma. */
+export default function VerComoBarra({ nombre, empresa }: { nombre: string; empresa?: string }) {
   const { update } = useSession()
   const [volviendo, setVolviendo] = useState(false)
   const volver = async () => {
     setVolviendo(true)
-    await update({ verComo: null })
-    window.location.assign('/usuarios')
+    await update(empresa ? { soporte: null } : { verComo: null })
+    window.location.assign(empresa ? '/plataforma' : '/usuarios')
   }
   return (
     <div className="bg-neutral-900 text-white">
@@ -21,7 +22,7 @@ export default function VerComoBarra({ nombre }: { nombre: string }) {
             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
           </svg>
           <span className="truncate">
-            Estás viendo como <b className="font-semibold">{nombre}</b>
+            Estás viendo como <b className="font-semibold">{nombre}</b>{empresa && <> en <b className="font-semibold">{empresa}</b></>}
             <span className="text-neutral-400"> · solo lectura: no se guarda ningún cambio</span>
           </span>
         </p>

@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import CuentasPanel from './CuentasPanel'
@@ -343,6 +344,13 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                   </details>
                 )}
               </section>
+
+              {sel.id !== empresaActual && sel.is_active && (
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Ver como cliente</h3>
+                  <VerComoCliente key={sel.id} empresaId={sel.id} />
+                </section>
+              )}
 
               {sel.estado !== 'propietario' && (
                 <section>
@@ -739,5 +747,52 @@ function Historia({ organizacionId }: { organizacionId: number }) {
       ))}
       {!d.conectada && <li className="text-neutral-400">Todavía no conecta MercadoLibre.</li>}
     </ol>
+  )
+}
+
+/** "Ver como cliente" (28-10): entrar a la empresa tal como la ve uno de sus usuarios, en solo lectura (lib/auth.ts,
+ *  proxy.ts). Cada entrada queda registrada; el registro solo se ve aquí (el cliente no lo ve). */
+function VerComoCliente({ empresaId }: { empresaId: number }) {
+  const { update } = useSession()
+  const [d, setD] = useState<{ usuarios: { id: number; username: string; nombre: string | null; role: string }[]
+                               accesos: { inicio_at: string; fin_at: string | null; como_nombre: string | null; quien: string }[] } | null>(null)
+  const [entrando, setEntrando] = useState<number | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/plataforma/soporte?empresa=${empresaId}`).then(r => r.ok ? r.json() : null).then(x => { if (vivo) setD(x) })
+    return () => { vivo = false }
+  }, [empresaId])
+  const entrar = async (usuarioId: number) => {
+    setEntrando(usuarioId)
+    await update({ soporte: { empresaId, usuarioId } })
+    window.location.assign('/')
+  }
+  if (!d) return <p className="text-xs text-neutral-400">Cargando…</p>
+  const cuando = (f: string) => new Date(f).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Caracas' })
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-neutral-500">Entras a su cuenta y ves lo mismo que esa persona, en <b>solo lectura</b> (no se guarda nada). Queda registrado; el cliente no lo ve.</p>
+      {d.usuarios.length === 0 ? <p className="text-xs text-neutral-400">No tiene usuarios activos.</p> : (
+        <div className="flex flex-wrap gap-2">
+          {d.usuarios.map(u => (
+            <button key={u.id} onClick={() => entrar(u.id)} disabled={entrando !== null} className="btn-secondary text-xs disabled:opacity-60"
+              title={`Ver el sistema como ${u.username} (${u.role === 'admin' ? 'administrador' : 'empleado'})`}>
+              {entrando === u.id ? 'Entrando…' : `👁 ${u.nombre ?? u.username}`}
+              <span className="ml-1 text-neutral-400">{u.role === 'admin' ? 'admin' : 'empleado'}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {d.accesos.length > 0 && (
+        <details className="text-xs text-neutral-500">
+          <summary className="cursor-pointer select-none">Últimas entradas ({d.accesos.length})</summary>
+          <ul className="mt-1 space-y-0.5">
+            {d.accesos.map((a, i) => (
+              <li key={i}>{cuando(a.inicio_at)}{a.fin_at ? ` – ${cuando(a.fin_at).slice(-5)}` : ''} · {a.quien} como {a.como_nombre ?? '—'}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   )
 }

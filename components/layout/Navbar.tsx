@@ -41,7 +41,7 @@ export default async function Navbar() {
         <div className="flex items-center gap-2 xl:gap-3 shrink-0 ml-auto">
           <AprendizajeNav />
           <NovedadesNav />
-          {session?.user.empresaId && (
+          {session?.user.empresaId && !session.user.soporte && (
             <CountrySwitcher actual={session.user.empresaId}
               empresas={empresas.map(e => ({ id: e.id, nombre: e.nombre, country: e.country }))} />
           )}

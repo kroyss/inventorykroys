@@ -1,7 +1,7 @@
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { dbGlobal } from '@/lib/db'
-import { empresasDeUsuario, type EmpresaAcceso } from '@/lib/empresa'
+import { empresasDeUsuario, ORGANIZACION_PLATAFORMA, type EmpresaAcceso } from '@/lib/empresa'
 import { CUENTA_VENCIDA } from '@/lib/cuenta'
 import type { NextAuthOptions } from 'next-auth'
 import type { Country, UserRole } from '@/lib/types'
@@ -131,16 +131,41 @@ export const authOptions: NextAuthOptions = {
 
       // Cambio de empresa en caliente, vía useSession().update({ empresaId }) — o
       // update({ country }), el selector VE/CO de siempre.
-      let actual = empresas.find(e => e.id === token.empresaId) ?? null
+      // Con "Ver como cliente" la empresa de la sesión es la del cliente: la propia (la real) es volverA.
+      let actual = empresas.find(e => e.id === (token.soporte?.volverA ?? token.empresaId)) ?? null
+      const duenoPlataforma = (e: EmpresaAcceso | null) => e?.role === 'admin' && e.organizacionId === ORGANIZACION_PLATAFORMA
       if (trigger === 'update') {
-        const pedido = session as { empresaId?: unknown; country?: unknown; verComo?: unknown } | undefined
+        const pedido = session as { empresaId?: unknown; country?: unknown; verComo?: unknown; soporte?: unknown } | undefined
+        // "Ver como cliente" (Plataforma, 28-10): { empresaId, usuarioId } entra; null vuelve. Queda registrado
+        // en soporte_accesos (solo lo ve Plataforma).
+        if (pedido && 'soporte' in pedido) {
+          const p = pedido.soporte as { empresaId?: unknown; usuarioId?: unknown } | null
+          if (token.soporte) {
+            await dbGlobal().query(`UPDATE soporte_accesos SET fin_at = NOW() WHERE id = $1 AND fin_at IS NULL`, [token.soporte.acceso]).catch(() => {})
+            token.soporte = null
+          }
+          const empresaId = Number(p?.empresaId), usuarioId = Number(p?.usuarioId)
+          if (p && empresaId > 0 && usuarioId > 0 && duenoPlataforma(actual)) {
+            const { rows: [c] } = await dbGlobal().query(
+              `SELECT e.nombre, COALESCE(NULLIF(u.full_name, ''), u.username) AS nombre_usuario
+               FROM empresas e JOIN usuario_empresas ue ON ue.empresa_id = e.id JOIN users u ON u.id = ue.user_id
+               WHERE e.id = $1 AND u.id = $2 AND e.is_active AND u.is_active`, [empresaId, usuarioId])
+            if (c) {
+              const { rows: [a] } = await dbGlobal().query(
+                `INSERT INTO soporte_accesos (user_id, empresa_id, como_user_id, como_nombre) VALUES ($1, $2, $3, $4) RETURNING id`,
+                [token.sub, empresaId, usuarioId, c.nombre_usuario])
+              token.soporte = { empresaId, empresaNombre: c.nombre, usuarioId, nombre: c.nombre_usuario, volverA: actual!.id, acceso: Number(a.id) }
+              token.verComo = null
+            }
+          }
+        }
         // "Ver como este usuario" (Usuarios): un admin ve el sistema con el rol y los permisos de otra
         // persona de la empresa, en solo lectura (proxy.ts). null = volver a su cuenta.
         if (pedido && 'verComo' in pedido) {
           const id = Number(pedido.verComo)
           token.verComo = pedido.verComo !== null && id > 0 && String(id) !== token.sub ? { id, nombre: '' } : null
         }
-        const otra = elegir(empresas, pedido?.empresaId, pedido?.country)
+        const otra = token.soporte ? null : elegir(empresas, pedido?.empresaId, pedido?.country)
         if (otra && (pedido?.empresaId !== undefined ? otra.id === Number(pedido.empresaId) : otra.country === pedido?.country)) {
           actual = otra
         }
@@ -152,6 +177,23 @@ export const authOptions: NextAuthOptions = {
       // empresa): si deja de ser admin, la persona ya no es de la empresa, está inactiva o es admin,
       // se termina solo. Lo que cambia es solo el rol y los permisos; la cuenta (token.sub) sigue
       // siendo la del admin.
+      // Ver como cliente: se revalida en CADA request (sigue siendo dueño de la plataforma, la empresa y la
+      // persona siguen activas); si no, vuelve solo a su empresa. Lo que se toma del cliente: empresa, país,
+      // módulos, rol y permisos. La cuenta (token.sub) sigue siendo la del dueño. Solo lectura (proxy.ts).
+      if (token.soporte) {
+        const { rows: [c] } = duenoPlataforma(actual) ? await dbGlobal().query(
+          `SELECT e.id, e.nombre, e.country, e.modulos, e.organizacion_id, ue.role, ue.permisos
+           FROM empresas e JOIN usuario_empresas ue ON ue.empresa_id = e.id JOIN users u ON u.id = ue.user_id
+           WHERE e.id = $1 AND u.id = $2 AND e.is_active AND u.is_active`, [token.soporte.empresaId, token.soporte.usuarioId]) : { rows: [] }
+        if (!c) {
+          await dbGlobal().query(`UPDATE soporte_accesos SET fin_at = NOW() WHERE id = $1 AND fin_at IS NULL`, [token.soporte.acceso]).catch(() => {})
+          token.soporte = null
+        } else {
+          Object.assign(datos, { empresaId: c.id, empresaNombre: c.nombre, country: c.country, modulos: c.modulos,
+            organizacionId: c.organizacion_id, role: c.role, permisos: permisosEfectivos(c.role, c.permisos) })
+          token.verComo = null
+        }
+      }
       if (token.verComo) {
         const { rows: [v] } = actual.role === 'admin' ? await dbGlobal().query(
           `SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) AS nombre, ue.role, ue.permisos
@@ -178,6 +220,7 @@ export const authOptions: NextAuthOptions = {
         session.user.modulos       = token.modulos
         session.user.organizacionId = token.organizacionId
         session.user.verComo       = token.verComo ?? null
+        session.user.soporte       = token.soporte ?? null
       }
       return session
     },

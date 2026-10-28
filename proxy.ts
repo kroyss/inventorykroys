@@ -20,7 +20,7 @@ async function api(req: NextRequest) {
   const marcaLeida = pathname.startsWith('/api/mensajes/') && searchParams.get('leida') === '1'
   if (lee && !marcaLeida && !GET_QUE_ESCRIBEN.some(r => r.test(pathname))) return NextResponse.next()
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
-  if (!token?.verComo) return NextResponse.next()
+  if (!token?.verComo && !token?.soporte) return NextResponse.next()   // soporte: "Ver como cliente" (Plataforma)
   if (marcaLeida) {
     const url = req.nextUrl.clone()
     url.searchParams.delete('leida')
