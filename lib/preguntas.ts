@@ -14,6 +14,7 @@ import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
 import { mlFetch, CuentaDesconectada } from '@/lib/ml'
 import { sincronizarMensajes } from '@/lib/mensajesML'
+import { avisosCaidos } from '@/lib/notificacionesML'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { completarNombres } from '@/lib/porConfirmar'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
@@ -106,6 +107,29 @@ async function completarItems(db: Pool, conexionId: number) {
 
 export interface ResultadoSync { cuenta: string; nuevas?: number; error?: string }
 
+/** Notificaciones paso 2b (28-10): la pregunta avisada por ML (topic questions: nueva o respondida) entra al momento,
+ *  con el título y el precio de su publicación. Devuelve su estado o null si ML la borró. */
+export async function guardarPreguntaNotificada(db: Pool, conexionId: number, preguntaId: string) {
+  try {
+    const q = await mlFetch<PreguntaML>(db, conexionId, `/questions/${preguntaId}?api_version=4`)
+    await guardarPregunta(db, conexionId, q)
+    await completarItems(db, conexionId)
+    return q.status
+  } catch (e) {
+    if ((e as { status?: number }).status === 404) {
+      await db.query(`UPDATE ml_preguntas SET estado = 'DELETED', sincronizada_at = NOW() WHERE id = $1`, [preguntaId])
+      return null
+    }
+    throw e
+  }
+}
+
+/** Con los avisos de ML llegando (paso 2b), la búsqueda de preguntas y de mensajes sin leer de cada cuenta es un
+ *  BARRIDO de seguridad cada BARRIDO_MIN (lo que un aviso perdido no trajo: ML pierde ~2-8%); si los avisos se caen
+ *  (avisosCaidos) o en staging, vuelve a cada minuto como antes. En memoria: al reiniciar barre enseguida. */
+export const BARRIDO_MIN = 15
+const barridoAt = new Map<number, number>()
+
 /**
  * Trae las preguntas de todas las cuentas activas de la empresa de `db`:
  *   - todas las sin responder (UNANSWERED);
@@ -114,15 +138,18 @@ export interface ResultadoSync { cuenta: string; nuevas?: number; error?: string
  *   - la primera vez, el histórico respondido (hasta el tope de 1000) para que la IA
  *     aprenda del tono y las políticas del vendedor.
  */
-export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
+export async function sincronizarEmpresa(db: Pool, forzar = false): Promise<ResultadoSync[]> {
   // Demostración: sus datos son los sembrados (lib/demoDatos.ts); no hay nada que traer.
   if (await esDemo(db)) return []
   const { rows: cuentas } = await db.query(
     `SELECT id, nickname, ultima_sync FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
+  const conAvisos = !forzar && !(await avisosCaidos())
   const res: ResultadoSync[] = []
   for (const c of cuentas) {
     try {
       const { rows: [{ n: antes }] } = await db.query(`SELECT COUNT(*)::int AS n FROM ml_preguntas WHERE conexion_id = $1`, [c.id])
+      const barrer = !conAvisos || !c.ultima_sync || (barridoAt.get(c.id) ?? 0) < Date.now() - BARRIDO_MIN * 60_000
+      if (barrer) {
       const pendientes = await buscar(db, c.id, 'UNANSWERED', 20)
       for (const q of pendientes) await guardarPregunta(db, c.id, q)
 
@@ -144,10 +171,12 @@ export async function sincronizarEmpresa(db: Pool): Promise<ResultadoSync[]> {
       if (!c.ultima_sync) {
         for (const q of await buscar(db, c.id, 'ANSWERED', 20)) await guardarPregunta(db, c.id, q)
       }
-      // Las preguntas ya quedaron al día: se marca antes de lo opcional (títulos).
+      barridoAt.set(c.id, Date.now())
+      }
+      // Las preguntas ya quedaron al día (por barrido o por aviso): se marca antes de lo opcional (títulos).
       await db.query(`UPDATE ml_conexiones SET ultima_sync = NOW(), ultimo_error = NULL WHERE id = $1`, [c.id])
-      // Mensajes post-venta sin leer (bandeja Mensajes). No corta la sync de preguntas.
-      try { await sincronizarMensajes(db, c.id) } catch (e) {
+      // Mensajes post-venta sin leer (bandeja Mensajes; entre barridos solo el relleno de notas e historia). No corta la sync de preguntas.
+      try { await sincronizarMensajes(db, c.id, barrer) } catch (e) {
         console.error('[ML mensajes]', c.nickname, e instanceof Error ? e.message : e)
       }
       // Ventas para calificar (cada SYNC_MINUTOS; adentro decide si toca).

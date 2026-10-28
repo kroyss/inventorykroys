@@ -9,7 +9,7 @@ export async function POST() {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   try {
-    return NextResponse.json({ resultado: await sincronizarEmpresa(s.db) })
+    return NextResponse.json({ resultado: await sincronizarEmpresa(s.db, true) })
   } catch (err) {
     return apiError(err)
   }

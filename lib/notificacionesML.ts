@@ -10,6 +10,8 @@
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { mlFetch } from '@/lib/ml'
 import { traerOrden } from '@/lib/calificacionesML'
+import { guardarPreguntaNotificada } from '@/lib/preguntas'
+import { mensajeNotificado } from '@/lib/mensajesML'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import type { Country } from '@/lib/types'
 
@@ -67,6 +69,42 @@ export async function procesarVentaNotificada(id: number, mlUserId: string | nul
     .catch(e => console.error('[ml notificaciones] venta', e instanceof Error ? e.message : e))
 }
 
+// ── Paso 2b: preguntas y mensajes (28-10) ──
+/** ML repite avisos del mismo recurso: el mismo no se vuelve a leer antes de REPETIDO_SEG. */
+const REPETIDO_SEG = 10
+const vistos = new Map<string, number>()
+function repetido(clave: string) {
+  const ahora = Date.now()
+  if ((vistos.get(clave) ?? 0) > ahora - REPETIDO_SEG * 1000) return true
+  vistos.set(clave, ahora)
+  if (vistos.size > 2000) for (const [k, t] of vistos) if (t < ahora - REPETIDO_SEG * 1000) vistos.delete(k)
+  return false
+}
+
+/** La pregunta avisada (nueva o respondida, también desde la web de ML) entra al momento: segundos en vez de la
+ *  búsqueda de cada minuto, que queda como barrido cada BARRIDO_MIN (lib/preguntas.ts). Nunca tira. */
+export async function procesarPreguntaNotificada(id: number, mlUserId: string | null, resource: string | null) {
+  const pregunta = resource?.match(/^\/questions\/(\d+)$/)?.[1]
+  if (process.env.APP_ENV === 'staging' || !mlUserId || !pregunta || repetido(`q${pregunta}`)) return
+  let detalle: Record<string, unknown>
+  try {
+    const c = await cuentaDe(mlUserId)
+    if (!c) detalle = { error: 'cuenta no conectada' }
+    else if (!c.sincroniza) detalle = { empresa: c.empresaId, omitida: 'no sincroniza' }
+    else {
+      detalle = await conEmpresa(c.empresaId, c.country, async db => {
+        const { rowCount: estaba } = await db.query(`SELECT 1 FROM ml_preguntas WHERE id = $1`, [pregunta])
+        const estado = await guardarPreguntaNotificada(db, c.conexionId, pregunta)
+        return { empresa: c.empresaId, nueva: !estaba, estado }
+      })
+    }
+  } catch (e) {
+    detalle = { error: (e instanceof Error ? e.message : String(e)).slice(0, 200) }
+  }
+  await dbGlobal().query(`UPDATE ml_notificaciones SET detalle = $2, leido_at = NOW() WHERE id = $1`, [id, JSON.stringify(detalle)])
+    .catch(e => console.error('[ml notificaciones] pregunta', e instanceof Error ? e.message : e))
+}
+
 /** Vigilante: ¿dejaron de llegar los avisos? De 7 a 22 h (hora Caracas) llegan varios por minuto (el hueco más largo
  *  medido de día fue ~8 min); 20 min sin NINGUNO = falla de ML o de nuestro lado. De noche los huecos son normales y
  *  queda la sincronización de cada hora. Staging no recibe avisos: siempre "caídos" (se comporta como antes). */
@@ -102,8 +140,18 @@ export async function leerMensajeNotificado(id: number, mlUserId: string | null,
       const de = String(msg.from?.user_id ?? '')
       const yaGuardado = await conEmpresa(c.empresaId, c.country, db =>
         db.query(`SELECT 1 FROM ml_mensajes WHERE msg_id = $1`, [mensajeId])).then(r => r.rowCount! > 0)
+      // Paso 2b: la conversación entra al momento a la bandeja. No las que mandó el propio sistema (al responder ya
+      // queda al día) ni si la empresa no sincroniza. Si falla, la trae el barrido.
+      const pack = msg.message_resources?.find(r => r.name === 'packs')?.id
+      const propia = msg.client_id != null && String(msg.client_id) === process.env.ML_CLIENT_ID && de === mlUserId
+      let bandeja: string | null = null
+      if (pack && c.sincroniza && !propia && !repetido(`m${pack}`)) {
+        bandeja = await conEmpresa(c.empresaId, c.country, db => mensajeNotificado(db, c.conexionId, String(pack)))
+          .then(() => 'ok', e => `error: ${(e instanceof Error ? e.message : String(e)).slice(0, 120)}`)
+      }
       detalle = {
         empresa: c.empresaId,
+        bandeja,
         quien: de === mlUserId ? 'vendedor' : de ? 'comprador' : null,
         pack: msg.message_resources?.find(r => r.name === 'packs')?.id ?? null,
         recursos: msg.message_resources?.map(r => r.name) ?? [],

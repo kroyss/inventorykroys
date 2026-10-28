@@ -118,47 +118,61 @@ async function guardarComprador(db: Pool, pack: string, nick: string | null, nom
 export const DIAS_MENSAJES = 60
 export const SQL_MENSAJE_VIGENTE = `(ultimo_at IS NULL OR ultimo_at > NOW() - INTERVAL '${DIAS_MENSAJES} days')`
 
-/** Sincroniza los sin leer de una cuenta. Las que ya no están sin leer pasan a 0. */
-export async function sincronizarMensajes(db: Pool, conexionId: number) {
-  const seller = await sellerDe(db, conexionId)
-  const r = await mlFetch<{ results?: { resource: string; count: number }[] }>(db, conexionId,
-    `/messages/unread?role=seller&tag=post_sale`)
-  const vistos: string[] = []
-  for (const x of r.results ?? []) {
-    const m = /\/packs\/(\d+)\//.exec(x.resource)
-    if (!m) continue
-    const pack = m[1]
-    vistos.push(pack)
-    const { rows: [prev] } = await db.query(
-      `SELECT sin_leer_ml, productos, comprador_nick FROM ml_conversaciones WHERE pack_id = $1`, [pack])
-    // Solo se relee el hilo si cambió la cantidad (ahorra llamadas a ML).
-    if (prev && prev.sin_leer_ml === x.count && prev.productos !== null) continue
-    const hilo = await leerHilo(db, conexionId, pack, seller, false)
-    // ML a veces cuenta un mensaje que no muestra (moderado): si no hay ninguno del comprador
-    // VISIBLE sin leer, la bandeja no lo cuenta (no se puede marcar y volvía cada minuto).
-    const visibles = hilo.mensajes.filter(m => !m.propio && !m.leido).length
-    const sinLeer = Math.min(x.count, visibles)
-    const ultimo = hilo.mensajes[hilo.mensajes.length - 1]
-    const venta = prev?.productos && prev.comprador_nick !== null ? null : await datosDeVenta(db, conexionId, pack)
-    const productos = prev?.productos ?? venta?.productos ?? null
-    await db.query(
-      `INSERT INTO ml_conversaciones (pack_id, conexion_id, sin_leer, ultimo_texto, ultimo_de_comprador, ultimo_at,
-                                      comprador_id, productos, sin_leer_ml, actualizada_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
-       ON CONFLICT (empresa_id, pack_id) DO UPDATE SET
-         sin_leer = EXCLUDED.sin_leer, sin_leer_ml = EXCLUDED.sin_leer_ml, ultimo_texto = EXCLUDED.ultimo_texto,
-         ultimo_de_comprador = EXCLUDED.ultimo_de_comprador, ultimo_at = EXCLUDED.ultimo_at,
-         comprador_id = COALESCE(EXCLUDED.comprador_id, ml_conversaciones.comprador_id),
-         productos = COALESCE(ml_conversaciones.productos, EXCLUDED.productos), actualizada_at = NOW()`,
-      [pack, conexionId, sinLeer, ultimo?.texto ?? null, ultimo ? !ultimo.propio : null, ultimo?.fecha ?? null,
-       hilo.comprador, productos, x.count])
-    if (venta) await guardarComprador(db, pack, venta.nick, venta.nombre)
-    // Copia de las notas de la venta (para la pestaña "Con nota"); si falla, no importa.
-    await leerNotas(db, conexionId, pack).then(r => copiarNotas(db, pack, r.notas)).catch(() => {})
-  }
+/** Deja al día una conversación en la bandeja. `contadoML` = sin leer según /messages/unread; null = vino por aviso
+ *  (notificaciones paso 2b, 28-10): se cuentan los del comprador visibles sin leer en el hilo. */
+async function actualizarConversacion(db: Pool, conexionId: number, pack: string, seller: number, contadoML: number | null) {
+  const { rows: [prev] } = await db.query(
+    `SELECT sin_leer_ml, productos, comprador_nick FROM ml_conversaciones WHERE pack_id = $1`, [pack])
+  // Solo se relee el hilo si cambió la cantidad (ahorra llamadas a ML).
+  if (contadoML !== null && prev && prev.sin_leer_ml === contadoML && prev.productos !== null) return
+  const hilo = await leerHilo(db, conexionId, pack, seller, false)
+  // ML a veces cuenta un mensaje que no muestra (moderado): si no hay ninguno del comprador
+  // VISIBLE sin leer, la bandeja no lo cuenta (no se puede marcar y volvía cada minuto).
+  const visibles = hilo.mensajes.filter(m => !m.propio && !m.leido).length
+  const x = { count: contadoML ?? visibles }
+  const sinLeer = Math.min(x.count, visibles)
+  const ultimo = hilo.mensajes[hilo.mensajes.length - 1]
+  const venta = prev?.productos && prev.comprador_nick !== null ? null : await datosDeVenta(db, conexionId, pack)
+  const productos = prev?.productos ?? venta?.productos ?? null
   await db.query(
-    `UPDATE ml_conversaciones SET sin_leer = 0, sin_leer_ml = 0, actualizada_at = NOW()
-     WHERE conexion_id = $1 AND (sin_leer > 0 OR sin_leer_ml > 0) AND NOT (pack_id::text = ANY($2::text[]))`, [conexionId, vistos])
+    `INSERT INTO ml_conversaciones (pack_id, conexion_id, sin_leer, ultimo_texto, ultimo_de_comprador, ultimo_at,
+                                    comprador_id, productos, sin_leer_ml, actualizada_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+     ON CONFLICT (empresa_id, pack_id) DO UPDATE SET
+       sin_leer = EXCLUDED.sin_leer, sin_leer_ml = EXCLUDED.sin_leer_ml, ultimo_texto = EXCLUDED.ultimo_texto,
+       ultimo_de_comprador = EXCLUDED.ultimo_de_comprador, ultimo_at = EXCLUDED.ultimo_at,
+       comprador_id = COALESCE(EXCLUDED.comprador_id, ml_conversaciones.comprador_id),
+       productos = COALESCE(ml_conversaciones.productos, EXCLUDED.productos), actualizada_at = NOW()`,
+    [pack, conexionId, sinLeer, ultimo?.texto ?? null, ultimo ? !ultimo.propio : null, ultimo?.fecha ?? null,
+     hilo.comprador, productos, x.count])
+  if (venta) await guardarComprador(db, pack, venta.nick, venta.nombre)
+  // Copia de las notas de la venta (para la pestaña "Con nota"); si falla, no importa.
+  await leerNotas(db, conexionId, pack).then(r => copiarNotas(db, pack, r.notas)).catch(() => {})
+}
+
+/** El mensaje avisado por ML (paso 2b): su conversación entra al momento a la bandeja. */
+export async function mensajeNotificado(db: Pool, conexionId: number, pack: string) {
+  await actualizarConversacion(db, conexionId, pack, await sellerDe(db, conexionId), null)
+}
+
+/** Sincroniza los sin leer de una cuenta (las que ya no están sin leer pasan a 0) y rellena notas, comprador e
+ *  historia de a poco. Con `sinLeer` false (avisos de ML funcionando, entre barridos) solo el relleno. */
+export async function sincronizarMensajes(db: Pool, conexionId: number, sinLeer = true) {
+  const seller = await sellerDe(db, conexionId)
+  const vistos: string[] = []
+  if (sinLeer) {
+    const r = await mlFetch<{ results?: { resource: string; count: number }[] }>(db, conexionId,
+      `/messages/unread?role=seller&tag=post_sale`)
+    for (const x of r.results ?? []) {
+      const m = /\/packs\/(\d+)\//.exec(x.resource)
+      if (!m) continue
+      vistos.push(m[1])
+      await actualizarConversacion(db, conexionId, m[1], seller, x.count)
+    }
+    await db.query(
+      `UPDATE ml_conversaciones SET sin_leer = 0, sin_leer_ml = 0, actualizada_at = NOW()
+       WHERE conexion_id = $1 AND (sin_leer > 0 OR sin_leer_ml > 0) AND NOT (pack_id::text = ANY($2::text[]))`, [conexionId, vistos])
+  }
   // Conversaciones cuyas notas nunca se miraron (las de antes de la pestaña "Con nota"): de a 10.
   const { rows: sinMirar } = await db.query(
     `SELECT pack_id::text FROM ml_conversaciones WHERE conexion_id = $1 AND notas_at IS NULL
