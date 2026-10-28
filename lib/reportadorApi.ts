@@ -13,7 +13,8 @@ import type { Pool } from 'pg'
 import { mlFetch, ErrorML, CuentaDesconectada } from '@/lib/ml'
 import { buscarOrden, mensajesDeOrden, type MensajeML } from '@/lib/ventasML'
 import { cuentaDe, cuentaPorVenta, leerConfig, mensajeEnvio, paginaML, problemasConfig, RESERVA_HORAS, SQL_CUENTA_VENTA, SQL_PENDIENTE, SQL_REPORTABLE } from '@/lib/reportador'
-import { remitenteConfigurado } from '@/lib/despachos'
+import { leerOriginal, remitenteConfigurado } from '@/lib/despachos'
+import { subirAdjunto } from '@/lib/mensajesML'
 import { ES_STAGING } from '@/lib/entorno'
 import { esDemo } from '@/lib/demo'
 import { registrarOrigen } from '@/lib/respuestasOrigen'
@@ -74,7 +75,8 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   const demo = await esDemo(db)
 
   const baseSql = `
-    SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, ${SQL_CUENTA_VENTA} AS cuenta_venta
+    SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, ${SQL_CUENTA_VENTA} AS cuenta_venta,
+           e.file_path, e.sha256, l.archivos_borrados_at
     FROM despacho_etiquetas e
     JOIN despacho_lotes l ON l.id = e.lote_id
     JOIN despacho_jornadas j ON j.id = l.jornada_id
@@ -91,7 +93,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         `UPDATE despacho_etiquetas t SET reporte_tomado_por = NULL, reporte_tomado_at = NOW()
          FROM (${baseSql} FOR UPDATE OF e SKIP LOCKED) s
          WHERE t.id = s.id
-         RETURNING t.id, s.venta, s.guia, s.carrier, s.remitente, s.cuenta_venta`,
+         RETURNING t.id, s.venta, s.guia, s.carrier, s.remitente, s.cuenta_venta, s.file_path, s.sha256, s.archivos_borrados_at`,
         [opciones.limite, RESERVA_HORAS, excluir])
 
   const procesados: EnvioProcesado[] = []
@@ -99,6 +101,13 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
   const elegirPlantilla = () => config.plantillas[Math.floor(Math.random() * config.plantillas.length)]
   // {pagina}: la de la cuenta configurada o, sin cuentas escritas, la página oficial de la cuenta de la venta.
   const paginaDe = (c: { pagina: string } | null, nick: string | null) => c?.pagina ?? (nick ? paginaML(nick) : '')
+  // Guía en PDF adjunta (28-10): el PDF original de MercadoEnvíos que ya está en Despachos. Solo ZOOM (TEALCA
+  // cambia la guía por otra en la oficina). Si no se puede adjuntar, el mensaje sale igual con el número de guía.
+  const conPdf = (e: { carrier: string }) => !!config.adjuntarGuia && e.carrier === 'ZOOM'
+  const pdfDe = async (e: { guia: string; file_path: string; sha256: string; archivos_borrados_at: string | null }) => {
+    if (e.archivos_borrados_at) throw new Error('el PDF ya se borró por antigüedad')
+    return new File([new Uint8Array(await leerOriginal(e.file_path, e.sha256))], `guia-${e.guia}.pdf`, { type: 'application/pdf' })
+  }
   for (const e of rows) {
     // Sin cuentas configuradas, la cuenta es la de la venta (la confirma buscarOrden al enviar).
     const cuenta = porVenta ? null : cuentaDe(e.remitente, config.cuentas, remitenteDefault)
@@ -151,13 +160,28 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         continue
       }
       if (simular) {
-        procesados.push({ ...base, resultado: 'SIMULADO', detalle: `Se enviaría desde ${orden.cuenta}`, mensaje })
+        // El PDF se lee igual (sin subirlo) para avisar desde ya si falta.
+        let adj = ''
+        if (conPdf(base)) adj = await pdfDe(e).then(() => ' · con la guía en PDF', err => ` · sin PDF: ${err instanceof Error ? err.message : err}`)
+        procesados.push({ ...base, resultado: 'SIMULADO', detalle: `Se enviaría desde ${orden.cuenta}${adj}`, mensaje })
         continue
       }
 
       const o = orden.orden
+      const adjuntos: string[] = []
+      let notaPdf = ''
+      if (conPdf(base)) {
+        try {
+          adjuntos.push(await subirAdjunto(db, orden.conexionId, await pdfDe(e)))
+          notaPdf = ' · con la guía en PDF'
+        } catch (err) {
+          if (err instanceof CuentaDesconectada) throw err
+          notaPdf = ` · sin PDF: ${err instanceof Error ? err.message : err}`
+        }
+      }
       await mlFetch(db, orden.conexionId, `/messages/packs/${o.pack_id ?? o.id}/sellers/${o.seller.id}?tag=post_sale`, {
-        method: 'POST', body: { from: { user_id: o.seller.id }, to: { user_id: o.buyer.id }, text: mensaje },
+        method: 'POST', body: { from: { user_id: o.seller.id }, to: { user_id: o.buyer.id }, text: mensaje,
+                                ...(adjuntos.length ? { attachments: adjuntos } : {}) },
       })
       // Relectura: la moderación de ML dice si el comprador lo recibe.
       const despues = await mensajesDeOrden(db, orden.conexionId, o).catch(() => [])
@@ -168,8 +192,8 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         procesados.push({ ...base, resultado: 'RECHAZADO', detalle: `MercadoLibre lo moderó (${mod})`, mensaje })
       } else {
         await registrarOrigen(db, { modulo: 'mensajes', ref: String(o.pack_id ?? o.id), fuente: 'automatica', base: mensaje, texto: mensaje })
-        await cerrar('ENVIADO', mod ? `moderación ${mod}` : null, mensaje)
-        procesados.push({ ...base, resultado: 'ENVIADO', detalle: `Desde ${orden.cuenta}`, mensaje })
+        await cerrar('ENVIADO', [mod ? `moderación ${mod}` : '', notaPdf.slice(3)].filter(Boolean).join(' · ') || null, mensaje)
+        procesados.push({ ...base, resultado: 'ENVIADO', detalle: `Desde ${orden.cuenta}${notaPdf}`, mensaje })
       }
       await pausa(1200)
     } catch (err) {

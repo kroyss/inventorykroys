@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface Cuenta { nombre: string; filtro: string; pagina: string }
-interface Config { cuentas: Cuenta[]; plantillas: string[]; bloque: string }
+interface Config { cuentas: Cuenta[]; plantillas: string[]; bloque: string; adjuntarGuia?: boolean }
 interface Orden {
   id: number; origen: 'WEB' | 'AUTO' | 'EQUIPO'
   estado: 'PENDIENTE' | 'EN_CURSO' | 'TERMINADA' | 'CANCELADA' | 'VENCIDA' | 'INTERRUMPIDA'
@@ -165,6 +165,19 @@ export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { is
             <button onClick={() => setEditando(structuredClone(config))} className="btn-secondary text-xs">Editar mensajes</button>
           )}
         </div>
+        {!sinMensajes && !editando && (
+          <label className={`mx-4 mb-3 flex items-start gap-2 rounded-lg border border-neutral-200 px-3 py-2 ${isAdmin ? 'cursor-pointer' : 'opacity-70'}`}>
+            <input type="checkbox" className="mt-0.5" checked={!!config.adjuntarGuia} disabled={!isAdmin || guardando}
+              onChange={e => guardar({ ...config, adjuntarGuia: e.target.checked })} />
+            <span className="text-sm">
+              <span className="font-medium text-neutral-800">Adjuntar la guía en PDF</span>
+              <span className="block text-xs text-neutral-500">
+                Junto con el número de guía, el comprador recibe el PDF de su guía. Solo envíos por ZOOM: TEALCA cambia la guía en la oficina,
+                así que a esos les llega solo el número. Si el PDF no se puede adjuntar, el mensaje sale igual.
+              </span>
+            </span>
+          </label>
+        )}
         {sinMensajes && !editando && (
           <div className="mx-4 mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 space-y-3">
             <div>

@@ -67,6 +67,7 @@ const Schema = z.object({
   })).max(5),   // vacío = la cuenta de cada envío sale de su venta (lib/reportador.ts cuentaPorVenta)
   plantillas: z.array(z.string().trim().min(1).max(LIMITE_CARACTERES)).min(1).max(10),
   bloque: z.string().max(LIMITE_CARACTERES),
+  adjuntarGuia: z.boolean().optional(),
 })
 
 /** PUT /api/despachos/reportador — guarda cuentas/plantillas (admin). Rechaza la config si
@@ -87,6 +88,7 @@ export async function PUT(req: NextRequest) {
       ['reportador_cuentas', JSON.stringify(config.cuentas)],
       ['reportador_plantillas', JSON.stringify(config.plantillas)],
       ['reportador_bloque', config.bloque],
+      ...(config.adjuntarGuia === undefined ? [] : [['reportador_adjuntar_guia', config.adjuntarGuia ? '1' : '0']]),
     ]) {
       await db.query(
         `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())

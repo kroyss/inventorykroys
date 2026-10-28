@@ -85,7 +85,11 @@ export async function autenticarEquipo(req: NextRequest):
 
 // ── Configuración de mensajes ───────────────────────────────────────────────
 export interface Cuenta { nombre: string; filtro: string; pagina: string }
-export interface ConfigReportador { cuentas: Cuenta[]; plantillas: string[]; bloque: string }
+export interface ConfigReportador {
+  cuentas: Cuenta[]; plantillas: string[]; bloque: string
+  /** Adjuntar el PDF de la guía al mensaje (28-10). Solo ZOOM: TEALCA cambia la guía en la oficina. Solo por API. */
+  adjuntarGuia?: boolean
+}
 
 function parse<T>(v: string | undefined, def: T): T {
   if (!v) return def
@@ -95,12 +99,13 @@ function parse<T>(v: string | undefined, def: T): T {
 export async function leerConfig(db: Pick<Pool, 'query'>): Promise<ConfigReportador> {
   const { rows } = await db.query(
     `SELECT key, value FROM app_settings
-     WHERE key IN ('reportador_cuentas', 'reportador_plantillas', 'reportador_bloque')`)
+     WHERE key IN ('reportador_cuentas', 'reportador_plantillas', 'reportador_bloque', 'reportador_adjuntar_guia')`)
   const kv = Object.fromEntries(rows.map(r => [r.key, r.value as string]))
   return {
     cuentas:    parse<Cuenta[]>(kv.reportador_cuentas, []),
     plantillas: parse<string[]>(kv.reportador_plantillas, []),
     bloque:     kv.reportador_bloque ?? '',
+    adjuntarGuia: kv.reportador_adjuntar_guia === '1',
   }
 }
 
