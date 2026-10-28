@@ -56,6 +56,18 @@ export async function POST(req: NextRequest) {
        o.banco_emisor, o.banco_receptor, o.referencia, o.fecha_pago, o.monto_pagado, o.envio_metodo,
        o.envio_opcion, o.carrier, o.guia, guiaPath, compPath])
 
+    // Completada en MercadoEnvíos y todavía sin imprimir aquí (28-10): se despachó por otro lado (Mercasist, guía
+    // impresa a mano en el portal…). Se destilda con una nota para que no se imprima ni se reporte dos veces; al
+    // generar no pasa al lote siguiente. Las ya impresas aquí no se tocan.
+    if (o.estado_me === 'completed') {
+      await a.db.query(
+        `UPDATE despacho_etiquetas e SET incluida = FALSE, nota_at = NOW(),
+                nota_despacho = CONCAT_WS(' · ', NULLIF(e.nota_despacho, ''), 'Despachada por otro lado (completada en MercadoEnvíos)')
+         FROM despacho_lotes l
+         WHERE l.id = e.lote_id AND l.status = 'PENDIENTE' AND e.venta = $1 AND e.incluida AND NOT e.impresa AND e.apartado IS NULL`,
+        [o.venta])
+    }
+
     // Con las ventas de MercadoLibre (sin inventario, 2026-10-15): no hay venta que registrar, la guía
     // entra sola al lote pendiente de Despachos (el pago se verifica igual en Pagos ME antes de imprimir).
     // Salvo completada en MercadoEnvíos = ya despachada (28-10: al conectar, la extensión trae 7 días y un

@@ -128,10 +128,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     // Las que NO se imprimieron (pago sin verificar, destildadas, con error) pasan al lote pendiente (26-10): antes
     // quedaban dentro de este lote ya generado y no se veían en ningún lado (BUYBOOK: 14 guías). Las apartadas siguen
     // en "En espera", como siempre.
+    // Las destildadas que ya se completaron en MercadoEnvíos (despachadas por otro lado, 28-10) se quedan en este lote.
     const impresas = aImprimir.map(e => e.id)
+    const otroLado = `NOT (NOT incluida AND EXISTS (SELECT 1 FROM me_pagos p WHERE p.venta = despacho_etiquetas.venta AND p.estado_me = 'completed'))`
     const { rows: [quedan] } = await client.query(
       `SELECT COUNT(*)::int AS n FROM despacho_etiquetas
-       WHERE lote_id = $1 AND NOT impresa AND apartado IS NULL AND NOT (id = ANY($2))`, [lote.id, impresas])
+       WHERE lote_id = $1 AND NOT impresa AND apartado IS NULL AND NOT (id = ANY($2)) AND ${otroLado}`, [lote.id, impresas])
     let siguiente: number | null = null
     if (quedan.n > 0) {
       const { rows: [p] } = await client.query(
@@ -140,7 +142,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         `INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [userId])).rows[0].id
       await client.query(
         `UPDATE despacho_etiquetas SET lote_id = $2
-         WHERE lote_id = $1 AND NOT impresa AND apartado IS NULL AND NOT (id = ANY($3))`, [lote.id, siguiente, impresas])
+         WHERE lote_id = $1 AND NOT impresa AND apartado IS NULL AND NOT (id = ANY($3)) AND ${otroLado}`, [lote.id, siguiente, impresas])
     }
 
     await client.query('COMMIT')
