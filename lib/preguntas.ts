@@ -20,6 +20,7 @@ import { completarNombres } from '@/lib/porConfirmar'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
 import { esDemo } from '@/lib/demo'
+import { riesgoDe } from '@/lib/sugerenciasPreguntas'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 export interface PreguntaML {
@@ -488,7 +489,8 @@ export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise
   const { rows } = await db.query(
     `WITH q AS (SELECT id, item_id, texto, item_titulo FROM ml_preguntas WHERE id = $1)
      SELECT p.texto AS pregunta, p.respuesta, similarity(p.texto, q.texto)::float AS parecido,
-            p.item_id = q.item_id AS "mismaPublicacion", p.item_titulo AS titulo, q.item_titulo AS "tituloActual"
+            p.item_id = q.item_id AS "mismaPublicacion", p.item_titulo AS titulo, q.item_titulo AS "tituloActual",
+            q.texto AS "textoActual", similarity(COALESCE(p.item_titulo, ''), COALESCE(q.item_titulo, ''))::float AS "parecidoTitulo"
      FROM ml_preguntas p, q
      WHERE p.id <> q.id AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
        AND (p.texto % q.texto OR (p.item_id = q.item_id AND similarity(p.texto, q.texto) > 0.15))
@@ -500,10 +502,14 @@ export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise
     // De OTRA publicación no sirve una respuesta sobre su presentación ("precio por el par", "kit de
     // 5 ruedas") si esta publicación no se vende así: la pregunta se escribe igual, la respuesta no.
     if (!x.mismaPublicacion && presentacionAjena(x.respuesta, x.tituloActual)) continue
+    // 29-10 (alarma de moto: salían respuestas de una silla gamer y de un dock de discos por "es compatible"): una
+    // pregunta del producto (compatible, medida, modelo, números…) solo toma respuestas de OTRA publicación si es del
+    // mismo tipo de producto (títulos parecidos). Las generales (disponible, envío) siguen igual.
+    if (!x.mismaPublicacion && x.parecidoTitulo < 0.2 && riesgoDe(x.textoActual)) continue
     const clave = x.respuesta.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/g, ' ').trim()
     if (vistas.has(clave)) continue
     vistas.add(clave)
-    delete x.tituloActual
+    delete x.tituloActual; delete x.textoActual; delete x.parecidoTitulo
     out.push(x)
     if (out.length === 3) break
   }
