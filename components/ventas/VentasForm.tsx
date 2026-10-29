@@ -238,6 +238,16 @@ export default function VentasForm({ editing, products, country, onClose, onSave
 
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx))
 
+  // 29-10 (LOCAL-000631: se cargó el precio de la factura, $20 en vez de $106, y bajó el bono): en una venta LOCAL,
+  // un precio (con el descuento) más de 30% por debajo del de inventario avisa. Solo avisa: si el descuento es real, se guarda.
+  const precioBajo = (it: FormItem) => {
+    if (!isLocal) return null
+    const p = products.find(x => x.product_id === it.product_id)
+    const ref = p ? defaultPrice(p) : 0
+    if (!(ref > 0) || !(it.unit_price > 0)) return null
+    const pct = Math.round((1 - it.unit_price * (1 - discount / 100) / ref) * 100)
+    return pct > 30 ? { pct, ref } : null
+  }
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0)
   const totalQty = items.reduce((s, i) => s + i.quantity, 0)
   const total    = discount > 0 ? subtotal * (1 - discount / 100) : subtotal
@@ -253,6 +263,12 @@ export default function VentasForm({ editing, products, country, onClose, onSave
     if (!customer.trim())    { setError('El nombre del cliente es obligatorio'); return }
     if (items.length === 0)  { setError('Agrega al menos un producto'); return }
     if (hasInvalidQty)       { setError('Hay productos con cantidad vacía o en 0'); return }
+    const bajos = items.filter(i => precioBajo(i))
+    if (bajos.length && !window.confirm(
+      `${bajos.map(i => `${i.product_name}: ${precioBajo(i)!.pct}% por debajo del precio de inventario ($${money(precioBajo(i)!.ref)})`).join('\n')}\n\n` +
+      'La venta debe llevar lo que REALMENTE se cobró: cuenta para el bono y la ganancia. ' +
+      'Si el precio más bajo es para la factura, cámbialo en la factura (sus precios se editan), no en la venta.\n\n' +
+      '¿Guardar igual? (solo si el descuento es real)')) return
 
     setBusy(true); setError(null)
     const body = {
@@ -578,6 +594,11 @@ Revísala en el detalle que se abre ahora.`)
                         <NumberInput step="0.01" min={0} value={it.unit_price}
                           onValueChange={n => updateItem(idx, { unit_price: n })}
                           className="w-full border rounded px-2 py-1 text-sm" />
+                        {precioBajo(it) && (
+                          <p className="text-[10px] text-amber-700 mt-0.5 leading-tight" title="La venta lleva lo que realmente se cobró (bono y ganancia). Para la factura, cambia el precio en la factura.">
+                            ⚠️ {precioBajo(it)!.pct}% bajo inventario (${money(precioBajo(it)!.ref)})
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right">${money(it.quantity * it.unit_price)}</td>
                       <td className="px-2 py-1 align-top">

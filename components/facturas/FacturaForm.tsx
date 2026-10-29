@@ -254,6 +254,9 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
     is_special: hasDoc && isSpecial, retention_percent: retPct,
   }), [lines, rate, withIva, ivaRate, hasDoc, isSpecial, retPct])
   const totalUsd = round2(lines.reduce((a, l) => a + l.quantity * l.unit_price_usd, 0))
+  // 29-10: la factura puede llevar otros precios que la venta (facturación); la venta no cambia y sigue contando
+  // para el bono y la ganancia. Se avisa la diferencia para que nadie baje el precio en la venta.
+  const totalVentas = sale && !fuente ? round2(juntarLineas(sale, otras).reduce((a, l) => a + l.quantity * l.unit_price_usd, 0)) : null
 
   const setLine = (k: number, patch: Partial<Line>) =>
     setLines(ls => ls.map((l, i) => i === k ? { ...l, ...patch } : l))
@@ -682,6 +685,13 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
                 </div>
                 <p className="text-[11px] text-neutral-400">
                   Los precios vienen de la venta (con su descuento aplicado). En la hoja se imprimen en Bs a la tasa indicada.
+                  {totalVentas != null && Math.abs(totalVentas - totalUsd) >= 0.01 && (
+                    <span className="block mt-1 text-amber-700 font-medium">
+                      La factura suma ${totalUsd.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} y
+                      la venta ${totalVentas.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
+                      La venta queda con su precio (bono y ganancia); solo la factura lleva estos montos.
+                    </span>
+                  )}
                 </p>
               </section>
 
