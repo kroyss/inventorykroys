@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     }
     const estado = req.nextUrl.searchParams.get('estado') ?? 'pendiente'
     const filtro = ['pendiente', 'valido', 'invalido'].includes(estado) ? estado : null
-    const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }] = await Promise.all([
+    const [{ rows: pagos }, { rows: conteo }, { rows: latidos }, { rows: [pedido] }, { rows: [clave] }, { rows: cuentasML }] = await Promise.all([
       s.db.query(
         `${SELECT_PAGOS}
          WHERE ($1::text IS NULL OR p.verificacion = $1) AND p.fecha_orden > NOW() - INTERVAL '30 days'
@@ -78,11 +78,19 @@ export async function GET(req: NextRequest) {
       s.db.query(`SELECT id, pedido_at, resultados, pedido_por IS NULL AS automatico, pedido_at > NOW() - make_interval(mins => $1) AS vigente
                   FROM me_pedidos ORDER BY pedido_at DESC LIMIT 1`, [TRAIDA_EN_CURSO_MIN]),
       s.db.query(`SELECT (SELECT creado_at FROM me_vigilante) AS creado_at, EXISTS (SELECT 1 FROM me_claves) AS con_codigo`),
+      // 29-10 (abc con una 2da cuenta): cada cuenta de ML de Venezuela y si ya tiene su Chrome (perfil con el Asistente)
+      // trayendo; las desconectadas, solo si se tocaron en los últimos 30 días (las viejas no molestan).
+      s.db.query(`SELECT x.nickname, x.estado,
+                         EXISTS (SELECT 1 FROM me_latidos l WHERE l.conexion_id = x.id AND l.visto_at > NOW() - INTERVAL '3 days') AS con_navegador
+                  FROM ml_conexiones x
+                  WHERE x.site_id = 'MLV' AND (x.estado = 'activa' OR x.updated_at > NOW() - INTERVAL '30 days')
+                  ORDER BY x.nickname`),
     ])
     return NextResponse.json({
       pagos,
       conteo: Object.fromEntries(conteo.map(c => [c.verificacion, c.n])),
       vigilante: { clave: !!clave?.creado_at || !!clave?.con_codigo, latidos, pedido: pedido ?? null },
+      cuentasML,
       desdeML: s.desdeML,
     })
   } catch (err) {

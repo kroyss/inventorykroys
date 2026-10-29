@@ -17,6 +17,8 @@ interface Datos {
   }
   /** Sin ventas cargadas: las guías van solas a Despachos con las ventas de MercadoLibre. */
   desdeML: boolean
+  /** Cuentas de ML (VE) y si ya tienen su Chrome trayendo (29-10). */
+  cuentasML?: { nickname: string; estado: string; con_navegador: boolean }[]
 }
 
 /** Programa para la PC (tools/vigilante-pagos-me/instalador → public/descargas). */
@@ -45,6 +47,8 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const [ver, setVer] = useState<PagoME | null>(null)
   const [clave, setClave] = useState<string | null>(null)
   const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
+  // "+ Agregar otra cuenta de MercadoEnvíos" (29-10): '' = sin cuenta elegida; el nombre = la que falta.
+  const [agregar, setAgregar] = useState<string | null>(null)
   // Sin inventario (Fundadores, 19-10): la lista por VENTA, como "Por confirmar"; la tabla queda como Historial.
   const [vista, setVista] = useState<'ventas' | 'historial'>('ventas')
   const pc = usePorConfirmar(!!datos?.desdeML)
@@ -198,6 +202,9 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           </>}
           {isAdmin && (
             <span className="ml-auto flex flex-wrap items-center gap-3">
+              {perfiles.length > 0 && (
+                <button onClick={() => { setAgregar(''); conectar() }} className="font-medium text-emerald-700 underline">+ Agregar otra cuenta de MercadoEnvíos</button>
+              )}
               <a href={DESCARGA_PROGRAMA} className="underline text-neutral-500 hover:text-neutral-800">Descargar programa</a>
               <a href="/extension" target="_blank" className="underline text-neutral-500 hover:text-neutral-800">Extensión de Chrome</a>
               <button onClick={conectar} className="underline text-neutral-500 hover:text-neutral-800">Conectar una PC</button>
@@ -218,7 +225,28 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
             cuenta de MercadoLibre conectada. No se trae nada de ella: entra al portal con la cuenta correcta en ese Chrome.
           </div>
         ))}
-        {codigo && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
+        {/* Cuentas de ML sin su Chrome (o desconectadas): no se traen sus pagos ni sus guías (29-10). */}
+        {!sinConectar && (datos?.cuentasML ?? []).some(c => c.estado !== 'activa' || !c.con_navegador) && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+            {(datos?.cuentasML ?? []).filter(c => c.estado !== 'activa' || !c.con_navegador).map(c => c.estado !== 'activa' ? (
+              <span key={c.nickname} className="text-red-700">
+                ⚠ <b>{c.nickname}</b> está desconectada de MercadoLibre: no se traen sus guías.{' '}
+                <a href="/cuentas-ml" className="font-medium underline">Conectarla</a>
+              </span>
+            ) : (
+              <span key={c.nickname} className="text-amber-700">
+                ○ <b>{c.nickname}</b> no tiene su Chrome conectado: no se traen sus pagos ni guías.{' '}
+                {isAdmin && <button onClick={() => { setAgregar(c.nickname); conectar() }} className="font-medium underline">Agregar</button>}
+              </span>
+            ))}
+          </div>
+        )}
+        {agregar !== null && (
+          <AgregarCuenta cuenta={agregar} codigo={codigo} onOtroCodigo={conectar}
+            desconectada={!!agregar && (datos?.cuentasML ?? []).some(c => c.nickname === agregar && c.estado !== 'activa')}
+            onCerrar={() => { setAgregar(null); setCodigo(null) }} />
+        )}
+        {codigo && agregar === null && <CodigoConexion codigo={codigo.codigo} vence={codigo.vence_at} onCerrar={() => setCodigo(null)} />}
         {clave && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900">
             Clave del vigilante (se muestra solo esta vez; cópiala en la extensión de cada perfil):
@@ -483,6 +511,65 @@ function PrimerosPasos({ isAdmin, onConectar, programaListo }: { isAdmin: boolea
       </>) : (
         <p className="text-xs">Pídele a un administrador de tu empresa que conecte la PC.</p>
       )}
+    </div>
+  )
+}
+
+/** Segunda (o tercera…) cuenta de MercadoEnvíos (29-10): cada cuenta va en su propio perfil de Chrome con el Asistente.
+ *  El programa de la PC encuentra solo el perfil nuevo: no se reinstala nada. El código ya viene generado. */
+function AgregarCuenta({ cuenta, codigo, desconectada, onOtroCodigo, onCerrar }: {
+  cuenta: string; codigo: { codigo: string; vence_at: string } | null; desconectada: boolean
+  onOtroCodigo: () => void; onCerrar: () => void
+}) {
+  const nombre = cuenta || 'la otra cuenta'
+  const paso = 'flex gap-3 items-start'
+  const num = 'shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center'
+  const sub = 'block text-xs text-neutral-500 mt-0.5'
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 space-y-3 text-sm text-neutral-700">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-neutral-900">Agregar {cuenta ? <b>{cuenta}</b> : 'otra cuenta de MercadoEnvíos'}</p>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Cada cuenta va en <b>su propio perfil de Chrome</b>, con su sesión de MercadoEnvíos. El programa de la PC encuentra solo el
+            perfil nuevo: no hay que reinstalar nada.
+          </p>
+        </div>
+        <button onClick={onCerrar} className="text-emerald-700 text-xs shrink-0">Cerrar ✕</button>
+      </div>
+      <ol className="space-y-2.5">
+        <li className={paso}><span className={num}>1</span>
+          <span>La cuenta tiene que estar conectada en <a href="/cuentas-ml" className="font-medium text-emerald-700 underline">Cuentas ML</a>.
+            {desconectada
+              ? <span className="block text-xs font-medium text-red-700 mt-0.5">⚠ {cuenta} está desconectada: conéctala primero, si no sus guías no entran.</span>
+              : <span className={sub}>Si no aparece ahí, conéctala primero.</span>}</span></li>
+        <li className={paso}><span className={num}>2</span>
+          <span>En la PC de las guías, abre Chrome y crea <b>otro perfil</b>: toca tu foto (arriba a la derecha) → <b>Agregar</b> →{' '}
+            <b>Continuar sin cuenta</b> → ponle de nombre {cuenta ? <b>{cuenta}</b> : 'el de la cuenta'}.
+            <span className={sub}>Se abre una ventana nueva: ese es el perfil de {nombre}. Los pasos 3 y 4 van en esa ventana.</span></span></li>
+        <li className={paso}><span className={num}>3</span>
+          <span>En esa ventana, entra a <b>MercadoEnvíos con la cuenta de {nombre}</b> y deja la sesión iniciada. Después agrega el
+            Asistente desde <a href="/extension" target="_blank" className="font-medium text-emerald-700 underline">app.elcomerciantedigital.com/extension</a>{' '}
+            → <b>Añadir a Chrome</b>.</span></li>
+        <li className={paso}><span className={num}>4</span>
+          <span>Toca la <b>pieza de rompecabezas</b> (arriba a la derecha) → abre <b>Asistente de envíos</b> → pega este código → <b>Conectar</b>.
+            Debe decir <b>«Conectado al sistema»</b>.
+            {codigo ? (
+              <span className="mt-1.5 flex flex-wrap items-center gap-3">
+                <code className="select-all rounded bg-white px-2 py-1 font-mono text-xl font-semibold tracking-widest ring-1 ring-emerald-200">{codigo.codigo}</code>
+                <button onClick={() => navigator.clipboard.writeText(codigo.codigo)} className="btn-secondary text-xs">Copiar</button>
+                <span className="text-xs text-neutral-500">
+                  Vale hasta las {new Date(codigo.vence_at).toLocaleTimeString('es-VE', { timeZone: 'America/Caracas', hour: 'numeric', minute: '2-digit' })}.{' '}
+                  <button onClick={onOtroCodigo} className="underline">Otro código</button>
+                </span>
+              </span>
+            ) : <span className={sub}>Generando el código…</span>}</span></li>
+        <li className={paso}><span className={num}>5</span>
+          <span>Listo: toca <b>Traer pagos y guías</b>. Se abre un Chrome por cuenta, trae lo suyo y se cierra. Arriba, {nombre} pasa a
+            «conectado».
+            <span className={sub}>No cierres sesión de MercadoEnvíos en ningún perfil. Si se vence, al traer queda abierta esa ventana para
+              que vuelvas a entrar.</span></span></li>
+      </ol>
     </div>
   )
 }
