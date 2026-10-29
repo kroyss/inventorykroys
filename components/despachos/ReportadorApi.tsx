@@ -115,7 +115,12 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
           <button onClick={() => correr(true)} disabled={ocupado || estado.total === 0 || sinMensajes} className="btn-secondary text-sm">
             {corriendo && c?.simular ? 'Revisando…' : 'Vista previa'}
           </button>
-          {!estado.soloSimula && (
+          {/* 29-10: sin mensaje guardado el botón gris no decía por qué y el aviso no se leía: el botón lleva al mensaje. */}
+          {!estado.soloSimula && sinMensajes && (
+            <button onClick={() => document.getElementById('mensaje-comprador')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="btn-primary text-sm">Primero revisa el mensaje ↓</button>
+          )}
+          {!estado.soloSimula && !sinMensajes && (
             <button onClick={() => correr(false)} disabled={ocupado || estado.total === 0 || estado.problemas.length > 0 || conectadas.length === 0}
               className="btn-primary text-sm">
               {corriendo && !c?.simular ? 'Reportando…' : `Reportar ${estado.total} por API`}
@@ -152,9 +157,9 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
         </p>
       )}
       {sinMensajes ? (
-        <p className="text-xs bg-sky-50 border border-sky-200 text-sky-800 rounded-lg px-3 py-2">
-          Antes de reportar, revisa el mensaje que recibirá tu comprador: está más abajo, en <b>Mensaje al comprador</b>
-          (te dejamos uno listo para que lo uses o lo cambies).
+        <p className="text-sm bg-amber-50 border border-amber-300 text-amber-900 rounded-lg px-3 py-2">
+          <b>Falta un paso para reportar:</b> revisa el mensaje que recibirá tu comprador, más abajo en <b>Mensaje al comprador</b>,
+          y toca <b>«Usar este mensaje»</b> (te dejamos uno listo). Después se habilita el botón de reportar.
         </p>
       ) : estado.problemas.length > 0 && (
         <p className="text-xs text-red-600">Configuración de mensajes incompleta: {estado.problemas.join(' · ')}</p>

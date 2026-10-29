@@ -47,7 +47,7 @@ const VARIABLES = ['{guia}', '{transportista}'] as const
 const GUIA_ZOOM = '1711920037', GUIA_TEALCA = '41234567'
 
 /** Cómo le llega el mensaje al comprador, por ZOOM y por TEALCA. */
-function VistaPrevia({ plantilla, bloque, pagina }: { plantilla: string; bloque: string; pagina: string }) {
+function VistaPrevia({ plantilla, bloque, pagina, pdf = false }: { plantilla: string; bloque: string; pagina: string; pdf?: boolean }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       {(['ZOOM', 'TEALCA'] as const).map(c => (
@@ -56,6 +56,7 @@ function VistaPrevia({ plantilla, bloque, pagina }: { plantilla: string; bloque:
           <pre className="text-xs bg-white border border-neutral-200 rounded p-2 whitespace-pre-wrap font-sans">
             {mensajeEnvio(plantilla, bloque, pagina, c === 'ZOOM' ? GUIA_ZOOM : GUIA_TEALCA, c)}
           </pre>
+          {pdf && c === 'ZOOM' && <p className="text-[11px] font-medium text-emerald-700 mt-0.5">+ 📎 PDF de la guía adjunto</p>}
         </div>
       ))}
     </div>
@@ -69,6 +70,8 @@ export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { is
   const [editando, setEditando] = useState<Config | null>(null)
   const [error, setError]     = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  // Primer mensaje: la casilla del PDF se elige en el recuadro y se guarda con "Usar este mensaje".
+  const [pdfInicial, setPdfInicial] = useState(false)
 
   const cargar = useCallback(() => fetch('/api/despachos/reportador').then(async r => {
     if (r.ok) setEstado(await r.json())
@@ -150,7 +153,7 @@ export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { is
   return (
     <>
       {/* Mensajes y cuentas: los usan la API y el programa de escritorio. */}
-      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
+      <section id="mensaje-comprador" className="scroll-mt-4 bg-white rounded-xl border border-neutral-200 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-neutral-800">Mensaje al comprador</h2>
@@ -192,14 +195,23 @@ export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { is
             </ul>
             <div>
               <p className="text-xs font-medium text-sky-900 mb-1">Así le llega a tu comprador:</p>
-              <VistaPrevia plantilla={sugeridas.plantillas[0]} bloque={sugeridas.bloque} pagina={paginaML(conectadas[0] ?? 'tutienda')} />
+              <VistaPrevia plantilla={sugeridas.plantillas[0]} bloque={sugeridas.bloque} pagina={paginaML(conectadas[0] ?? 'tutienda')} pdf={pdfInicial} />
             </div>
+            {isAdmin && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" className="mt-0.5" checked={pdfInicial} onChange={e => setPdfInicial(e.target.checked)} />
+                <span className="text-sm">
+                  <span className="font-medium text-sky-900">Adjuntar también la guía en PDF</span>
+                  <span className="block text-xs text-sky-800">Solo envíos por ZOOM (TEALCA cambia la guía en la oficina). Lo puedes cambiar cuando quieras.</span>
+                </span>
+              </label>
+            )}
             {isAdmin ? (
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => guardar({ ...config, ...sugeridas })} disabled={guardando} className="btn-primary text-sm">
+                <button onClick={() => guardar({ ...config, ...sugeridas, adjuntarGuia: pdfInicial })} disabled={guardando} className="btn-primary text-sm">
                   {guardando ? 'Guardando…' : 'Usar este mensaje'}
                 </button>
-                <button onClick={() => setEditando({ ...structuredClone(config), ...structuredClone(sugeridas) })} className="btn-secondary text-sm">
+                <button onClick={() => setEditando({ ...structuredClone(config), ...structuredClone(sugeridas), adjuntarGuia: pdfInicial })} className="btn-secondary text-sm">
                   Cambiarlo
                 </button>
               </div>
@@ -490,7 +502,7 @@ function EditorConfig({ config, original, sugerida, limite, conectadas, onChange
       {config.plantillas[0] && (
         <div>
           <h3 className="text-xs font-semibold text-neutral-600 mb-1">Vista previa (plantilla 1)</h3>
-          <VistaPrevia plantilla={config.plantillas[0]} bloque={config.bloque} pagina={paginaEjemplo} />
+          <VistaPrevia plantilla={config.plantillas[0]} bloque={config.bloque} pagina={paginaEjemplo} pdf={!!config.adjuntarGuia} />
         </div>
       )}
 
