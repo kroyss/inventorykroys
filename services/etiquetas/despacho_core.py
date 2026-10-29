@@ -29,7 +29,7 @@ TEXT_FONT = "helv"
 TEXT_SIZE = 9
 TEXT_MARGIN_LEFT_PT = 10
 TEXT_MARGIN_BOTTOM_PT = 55
-TEXT_MAX_CHARS = 70  # antes 55; lo que no cabe en el ancho lo resuelve ajustar_lineas
+TEXT_MAX_CHARS = 140  # antes 55 y 70; 29-10 hasta 2 líneas (envolver_lineas), lo que no cabe lo resuelve ajustar_lineas
 NOTE_LINE_OFFSET_PT = 12
 NOTE_TEXT_SIZE_DELTA = 1
 PRODUCT_LINE_STEP_PT = 11
@@ -155,6 +155,28 @@ def ajustar_lineas(lineas, ancho, fs=TEXT_SIZE, fs_min=TEXT_SIZE_MIN):
     return salida, fs
 
 
+def envolver_lineas(lineas, ancho, fs=TEXT_SIZE, max_lineas=MAX_PRODUCT_LINES):
+    """29-10 (TODOEPP2000, títulos largos con variante): la línea que no cabe a lo ancho pasa a una 2da línea,
+    cortando entre palabras y con sangría bajo el título ("1 - "). Si así hay más de max_lineas (venta con
+    varios productos), se devuelven las originales y sigue lo de antes (achicar y cortar con "...")."""
+    largo = lambda t: fitz.get_text_length(t, fontname=TEXT_FONT, fontsize=fs)
+    salida = []
+    for l in lineas:
+        if largo(l) <= ancho:
+            salida.append(l)
+            continue
+        m = re.match(r"^(\S+ - )", l)
+        sangria = " " * int(round(largo(m.group(1)) / largo(" "))) if m else ""
+        palabras, primera = l.split(" "), ""
+        while palabras and largo((primera + " " + palabras[0]).strip()) <= ancho:
+            primera = (primera + " " + palabras.pop(0)).strip()
+        if not primera or not palabras:   # una palabra sola más ancha que la etiqueta: como antes
+            salida.append(l)
+            continue
+        salida += [primera, sangria + " ".join(palabras)]
+    return salida if len(salida) <= max_lineas else list(lineas)
+
+
 # ===== API del servicio =====
 def leer_etiqueta(pdf_bytes, nombre=None):
     """Datos de una etiqueta (primera página, como el script). `nombre` es el del archivo:
@@ -222,8 +244,9 @@ def armar_pdf(etiquetas, sales_map, ventas=None):
             if tealca.es_tealca(sp):
                 hay_tealca = True
                 lineas_producto, linea_nota = sales_map[ventas[i - 1]]
+                # TEALCA igual que antes: hasta 70 caracteres (el largo de 2 líneas es solo para ZOOM).
                 tealca.celda(out_page, grid[cell_idx], etiquetas[i - 1],
-                             lineas_producto, linea_nota, fuentes)
+                             [clip_text(l, 70) for l in lineas_producto], linea_nota, fuentes)
                 continue
 
             clip = find_label_border_rect(sp)
@@ -244,7 +267,7 @@ def armar_pdf(etiquetas, sales_map, ventas=None):
                 ocultos = len(lineas) - (MAX_PRODUCT_LINES - 1)
                 lineas = lineas[:MAX_PRODUCT_LINES - 1]
                 lineas.append(f"... y {ocultos} producto(s) mas {OVERFLOW_HINT}")
-            lineas, fs = ajustar_lineas(lineas, ancho)
+            lineas, fs = ajustar_lineas(envolver_lineas(lineas, ancho), ancho)
 
             for k, linea in enumerate(lineas):
                 out_page.insert_text(
