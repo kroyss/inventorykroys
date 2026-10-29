@@ -28,12 +28,12 @@ SCALE_CAP = 0.80
 TEXT_FONT = "helv"
 TEXT_SIZE = 9
 TEXT_MARGIN_LEFT_PT = 10
-TEXT_MARGIN_BOTTOM_PT = 55
+TEXT_MARGIN_BOTTOM_PT = 65  # 29-10: antes 55; sube el texto para que quepa una línea más
 TEXT_MAX_CHARS = 140  # antes 55 y 70; 29-10 hasta 2 líneas (envolver_lineas), lo que no cabe lo resuelve ajustar_lineas
 NOTE_LINE_OFFSET_PT = 12
 NOTE_TEXT_SIZE_DELTA = 1
 PRODUCT_LINE_STEP_PT = 11
-MAX_PRODUCT_LINES = 4
+MAX_PRODUCT_LINES = 5  # 29-10: antes 4 (con TEXT_MARGIN_BOTTOM_PT 65)
 # Texto del producto/nota en ZOOM: si no cabe en el ancho de la etiqueta, se achica hasta
 # TEXT_SIZE_MIN y, si aun no cabe, se corta con "...". Solo texto: no toca los códigos.
 TEXT_SIZE_MIN = 6.5
