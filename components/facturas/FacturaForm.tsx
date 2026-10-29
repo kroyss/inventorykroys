@@ -423,6 +423,11 @@ export default function FacturaForm({ sale, replaces, edita, onClose, onSaved }:
               <div className="text-lg font-semibold">Factura #{saved.invoice_number} {edita ? 'corregida' : 'emitida'}</div>
               <div className="text-sm text-neutral-500">{saved.customer_name} · Bs {bs(saved.total_bs)}</div>
               {replaces && <div className="text-xs text-red-600 mt-1">La #{replaces.invoice_number} quedó ANULADA.</div>}
+              {!edita && saved.invoice_number !== number && (
+                <div className="text-sm font-medium text-amber-700 mt-1">
+                  Salió con el #{saved.invoice_number}: el #{number} lo usó otra factura emitida al mismo tiempo. Imprímela en la hoja del #{saved.invoice_number}.
+                </div>
+              )}
             </div>
             <p className="text-xs text-neutral-500 max-w-sm">
               Se abrió la vista previa: revisa la hoja y toca “Imprimir”. Si la cerraste, ábrela otra vez.

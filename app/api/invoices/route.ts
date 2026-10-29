@@ -157,7 +157,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const number = body.invoice_number ?? await nextInvoiceNumber(client)
+    // El formulario manda el número que le tocaba AL ABRIRSE. 29-10: dos personas facturando a la vez, la segunda
+    // recibía "El número 2093 ya existe": si ya lo usó otra factura, se emite con el siguiente libre (dentro del candado).
+    let number = body.invoice_number ?? await nextInvoiceNumber(client)
+    const { rows: [usado] } = await client.query(`SELECT 1 FROM invoices WHERE invoice_number = $1`, [number])
+    if (usado) number = await nextInvoiceNumber(client)
     const { rows: [taken] } = await client.query(`SELECT 1 FROM invoices WHERE invoice_number = $1`, [number])
     if (taken) {
       await client.query('ROLLBACK')
