@@ -113,6 +113,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
     if (!r.ok) { setError(d.error ?? 'No se pudo'); setHecho(null); return false }
     setHecho(aviso)
     onCambio(aviso)
+    window.dispatchEvent(new Event('reportador:pendientes'))   // el Reportador relee sus pendientes
     return true
   }
 

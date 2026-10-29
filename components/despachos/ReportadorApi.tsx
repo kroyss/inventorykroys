@@ -50,7 +50,9 @@ export default function ReportadorApi({ conEscritorio = false }: { conEscritorio
     const t = setInterval(cargar, 30_000)
     const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
     document.addEventListener('visibilitychange', alVolver)
-    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
+    // 29-10: al guardar guías de Tealca o apartar/liberar en esta misma pantalla, se relee al instante (antes, F5).
+    window.addEventListener('reportador:pendientes', cargar)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', alVolver); window.removeEventListener('reportador:pendientes', cargar) }
   }, [cargar])
 
   // Mientras corre, se consulta el avance cada 2,5 s.

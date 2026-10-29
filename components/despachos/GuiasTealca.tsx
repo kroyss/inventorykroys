@@ -84,6 +84,7 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
     }
     setAviso(`${body.guardadas} guía(s) guardada(s). Los envíos con guía ya están en la cola del Reportador.`)
     await cargar()
+    window.dispatchEvent(new Event('reportador:pendientes'))   // "Reportar por API" cuenta las nuevas sin F5
     onGuardado?.()
   }
 
