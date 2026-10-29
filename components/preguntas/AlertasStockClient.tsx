@@ -12,7 +12,7 @@ interface Fila {
   pausada_desde?: string | null   // migración 101: pausada a mano (con stock)
   sub_status?: string | null      // migración 111: motivo de ML (vacío = la pausó el vendedor)
   caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
-  inventario?: number | null      // 26-10, Pausadas: lo que hay en el inventario del producto vinculado
+  inventario?: number | null      // lo que hay en el inventario del producto vinculado (solo empresas con inventario; 28-10 en las 3 vistas)
 }
 interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
@@ -252,6 +252,14 @@ export default function AlertasStockClient() {
           {vista === 'pausadas' ? `⏸ Pausada · ${f.disponible} u.` : f.disponible <= 0 ? 'Agotada' : `${f.disponible} u.`}
         </p>
         {sinStockML(f) && f.inventario != null && <p className="text-[11px] font-medium text-emerald-700 whitespace-nowrap">en inventario: {f.inventario} u.</p>}
+        {/* 28-10, empresas con inventario: lo que hay en el depósito; con un clic queda escrito como stock nuevo. */}
+        {vista !== 'pausadas' && f.inventario != null && (
+          f.inventario > f.disponible && datos?.puedeStock
+            ? <button type="button" onClick={() => escribir(f, String(f.inventario))} title="Usar lo del inventario como stock nuevo"
+                className="text-[11px] font-medium text-emerald-700 whitespace-nowrap hover:underline underline-offset-2">en inventario: {f.inventario} u. · usar</button>
+            : <p className={`text-[11px] whitespace-nowrap ${f.inventario > 0 ? 'font-medium text-emerald-700' : 'text-neutral-500'}`}>
+                {f.inventario > 0 ? `en inventario: ${f.inventario} u.` : 'sin stock en inventario'}</p>
+        )}
         <p className="text-[11px] text-neutral-400 whitespace-nowrap">
           {vista === 'pausadas' ? `pausada ${hace(f.pausada_desde ?? f.agotada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
         </p>

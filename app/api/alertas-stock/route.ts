@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
 import { SQL_VENDIDA, sqlCaliente, umbralStock } from '@/lib/alertasStock'
 import { puede } from '@/lib/permisos'
+import { tieneModulo } from '@/lib/modulos'
 
 // GET /api/alertas-stock?vista=agotadas|bajas → publicaciones (y variantes) de ML vendidas en los
 // últimos 30 días que están agotadas o por agotarse (menos del límite). `caliente`: de los últimos 7 días y
@@ -19,6 +20,15 @@ const SQL_INVENTARIO = `(SELECT MAX(i.quantity)::int FROM product_ml_codes m
    WHERE m.is_active AND split_part(m.ml_code, ':', 1) = substring(a.item_id FROM 4))`
 const PAUSADA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND (a.estado = 'pausada'
   OR (a.estado = 'paused' AND a.disponible <= 0 AND a.variante_id = 0 AND ${SQL_INVENTARIO} > 0))`
+// 28-10: lo que hay en el inventario para CADA fila (Agotadas, Por agotarse y Pausadas), solo en empresas con el
+// módulo inventario (sin él la columna ni se calcula). La variante busca su vínculo propio ("item:variante") y, si no
+// tiene, el de la publicación; combos ("trae N u."): alcanza para inventario ÷ N publicaciones.
+const SQL_INVENTARIO_FILA = `(SELECT MAX(FLOOR(i.quantity / GREATEST(COALESCE(m.unidades, 1), 1)))::int FROM product_ml_codes m
+    JOIN products p ON p.id = m.product_id AND p.is_active JOIN inventory i ON i.product_id = p.id
+   WHERE m.is_active AND m.ml_code = CASE
+     WHEN a.variante_id <> 0 AND EXISTS (SELECT 1 FROM product_ml_codes v WHERE v.is_active
+            AND v.ml_code = substring(a.item_id FROM 4) || ':' || a.variante_id)
+     THEN substring(a.item_id FROM 4) || ':' || a.variante_id ELSE substring(a.item_id FROM 4) END)`
 const PAUSADA_EN_LISTA = `(a.descartada_at IS NULL OR a.descartada_at < COALESCE(a.pausada_desde, a.agotada_desde))`
 
 export async function GET(req: NextRequest) {
@@ -27,6 +37,7 @@ export async function GET(req: NextRequest) {
   const vista = new URL(req.url).searchParams.get('vista') ?? 'agotadas'
   try {
     const umbral = await umbralStock(s.db)
+    const conInventario = tieneModulo(s.session.user, 'inventario')
     const filtro = vista === 'pausadas' ? PAUSADA
       : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
     const orden = vista === 'pausadas' ? 'COALESCE(a.pausada_desde, a.agotada_desde) DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
@@ -35,7 +46,7 @@ export async function GET(req: NextRequest) {
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
                 a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
-                ${caliente} AS caliente, a.descartada_at${vista === 'pausadas' ? `, ${SQL_INVENTARIO} AS inventario` : ''}
+                ${caliente} AS caliente, a.descartada_at${conInventario ? `, ${SQL_INVENTARIO_FILA} AS inventario` : ''}
          FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE ${filtro} AND ($1::int IS NOT NULL) ORDER BY ${caliente} DESC, ${orden}, a.titulo LIMIT 500`, [umbral]),
       s.db.query(
@@ -46,7 +57,7 @@ export async function GET(req: NextRequest) {
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),
     ])
-    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock') })
+    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock'), conInventario })
   } catch (err) {
     return apiError(err)
   }
