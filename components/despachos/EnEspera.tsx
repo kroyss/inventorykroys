@@ -128,7 +128,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
           <button onClick={onCerrar} className="text-xl leading-none text-neutral-400 hover:text-neutral-700" aria-label="Cerrar">✕</button>
         </div>
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4 text-sm">
-          {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</div>}
+          {error && <div className="sticky top-0 z-10 rounded border border-red-200 bg-red-50 px-3 py-2 text-red-700 shadow-sm">{error}</div>}
           {hecho && !error && (
             <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-800">
               <b>✓ Listo.</b> {hecho} No tienes que hacer nada más ahora.

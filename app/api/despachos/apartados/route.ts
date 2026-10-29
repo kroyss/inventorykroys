@@ -114,12 +114,22 @@ export async function POST(req: NextRequest) {
       // Liberar ("Sale en el próximo manifiesto")
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }
       if (!e.impresa) {
+        // 28-10: su lote ya se imprimió sin ella (BUYBOOK: "no pasa nada" — antes pedía volver a subir el PDF y el aviso
+        // quedaba arriba del panel, sin verse). Su PDF sigue guardado: pasa sola al lote pendiente (se crea si no hay).
+        let lote = e.lote_id
         if (e.lote_status !== 'PENDIENTE') {
-          await db.query('ROLLBACK')
-          return NextResponse.json({ error: 'Su lote ya se imprimió sin esta guía: vuelve a subir su PDF en Despachos y sale en el lote nuevo. Aquí puedes marcarla "Ya no se envía" para quitarla de la lista.' }, { status: 409 })
+          const { rows: [p] } = await db.query(`SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' ORDER BY id DESC LIMIT 1 FOR UPDATE`)
+          lote = p?.id ?? (await db.query(`INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [userId])).rows[0].id
+          const { rows: [dup] } = await db.query(
+            `SELECT 1 FROM despacho_etiquetas x JOIN despacho_etiquetas e ON e.id = $1
+             WHERE x.lote_id = $2 AND x.id <> e.id AND (x.sha256 = e.sha256 OR (x.guia IS NOT NULL AND x.guia = e.guia))`, [b.id, lote])
+          if (dup) {
+            await db.query('ROLLBACK')
+            return NextResponse.json({ error: 'Esta guía ya está en el lote pendiente (se volvió a subir): sale desde ahí. Aquí márcala «Ya no se envía» para quitarla de la lista.' }, { status: 409 })
+          }
         }
-        await db.query(`UPDATE despacho_etiquetas SET apartado = NULL, apartado_por = $2, apartado_at = NOW(), incluida = TRUE
-                        WHERE ${MISMAS.replace('$9', '$3')}`, [b.id, userId, e.venta])
+        await db.query(`UPDATE despacho_etiquetas SET apartado = NULL, apartado_por = $2, apartado_at = NOW(), incluida = TRUE, lote_id = $4
+                        WHERE ${MISMAS.replace('$9', '$3')}`, [b.id, userId, e.venta, lote])
       } else if (e.jornada_status === 'CERRADA') {
         // Su jornada ya cerró: pasa a la jornada abierta (se abre si no hay), en un lote "ya impreso" sin PDF.
         let { rows: [jornada] } = await db.query(`SELECT id FROM despacho_jornadas WHERE status = 'ABIERTA' FOR UPDATE`)
