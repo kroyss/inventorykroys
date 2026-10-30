@@ -188,6 +188,9 @@ export default function BurbujaAyuda() {
           <div className="bg-neutral-900 text-white px-4 pt-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold">¿En qué te ayudo?</p>
+              {pestana === 'preguntar' && turnos.length > 0 && (
+                <button onClick={() => { setTurnos([]); setError(null) }} className="ml-auto mr-3 text-xs text-neutral-300 hover:text-white">↺ Empezar de nuevo</button>
+              )}
               <button onClick={() => setAbierta(false)} className="text-neutral-400 hover:text-white text-lg leading-none" aria-label="Cerrar">✕</button>
             </div>
             <div className="mt-2 flex gap-1">
@@ -233,10 +236,10 @@ export default function BurbujaAyuda() {
               {pensando && <p className="w-fit rounded-2xl bg-neutral-100 px-3 py-2 text-neutral-500">Buscando en el manual…</p>}
               {sugerencias.length > 0 && (
                 <div className="space-y-1.5 pt-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Preguntas frecuentes de esta pantalla</p>
-                  {sugerencias.filter(s => !turnos.some(t => t.pregunta === s.pregunta)).map(s => (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{turnos.length ? 'Otras preguntas frecuentes' : 'Preguntas frecuentes de esta pantalla'}</p>
+                  {sugerencias.map(s => (
                     <button key={s.pregunta} onClick={() => usarSugerencia(s)}
-                      className="block w-full text-left rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-700 hover:border-lime-400 hover:bg-lime-50">
+                      className={`block w-full text-left rounded-lg border border-neutral-200 px-3 py-1.5 hover:border-lime-400 hover:bg-lime-50 ${turnos.some(t => t.pregunta === s.pregunta) ? 'text-neutral-400' : 'text-neutral-700'}`}>
                       {s.pregunta}
                     </button>
                   ))}
@@ -315,10 +318,12 @@ export default function BurbujaAyuda() {
         </div>
       )}
 
-      <button onClick={() => setAbierta(a => !a)} aria-expanded={abierta}
-        className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 flex items-center gap-1.5 rounded-full border border-neutral-900 bg-neutral-900 px-3.5 h-11 text-sm font-semibold text-lime-400 shadow-lg hover:border-lime-400 ${abierta ? '' : '[body:has([data-barra-fija])_&]:hidden'}`}>
-        <span aria-hidden="true">{abierta ? '✕' : '?'}</span>
-        <span className="hidden sm:inline">{abierta ? 'Cerrar' : 'Ayuda'}</span>
+      {/* Solo un ícono de mensaje (menos invasivo); al pasar el cursor dice "Ayuda". */}
+      <button onClick={() => setAbierta(a => !a)} aria-expanded={abierta} title={abierta ? 'Cerrar' : 'Ayuda'} aria-label={abierta ? 'Cerrar ayuda' : 'Ayuda'}
+        className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 grid place-items-center h-12 w-12 rounded-full border border-neutral-900 bg-neutral-900 text-lime-400 shadow-lg hover:border-lime-400 ${abierta ? '' : '[body:has([data-barra-fija])_&]:hidden'}`}>
+        {abierta
+          ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          : <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>}
         {!abierta && nuevos > 0 && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />}
       </button>
     </>

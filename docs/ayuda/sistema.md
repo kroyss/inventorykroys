@@ -471,11 +471,13 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 
 *Cómo lo pregunta la gente:* hablar con alguien, ayuda, soporte, contacto, horario, Telegram del soporte, la burbuja, el botón de ayuda, mis casos.
 
-**Botón «Ayuda»** (abajo a la derecha, en todas las pantallas; en el celular, encima del menú de abajo):
+**Botón de Ayuda**: un globo de mensaje abajo a la derecha, en todas las pantallas (al pasar el cursor dice «Ayuda»;
+en el celular, encima del menú de abajo):
 - **Preguntar:** preguntas frecuentes de la pantalla donde estás (con su respuesta, al instante) y una caja para
   preguntar lo que quieras: responde un asistente con este manual y, si hay un video que lo explica, te deja el
   enlace. **No gasta tus créditos de IA.** Puede equivocarse: con 👍 / 👎 nos dices si te sirvió. Hay un máximo de
-  preguntas por persona al día.
+  preguntas por persona al día. Las preguntas frecuentes siguen debajo de la conversación, y **«↺ Empezar de nuevo»**
+  (arriba) borra la conversación y vuelve al inicio.
 - **Soporte:** escribe qué pasó y adjunta hasta **3 capturas** (imágenes PNG/JPG o PDF de hasta 5 MB; también se
   pegan con **Ctrl+V**). Nos llega con la pantalla donde estabas. La respuesta aparece ahí mismo (un punto rojo en
   el botón avisa que te respondimos) y, si conectaste tu Telegram en **Mis avisos**, también te llega por Telegram.

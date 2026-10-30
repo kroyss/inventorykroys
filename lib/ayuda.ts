@@ -15,12 +15,21 @@ export const MODELO_AYUDA = process.env.AYUDA_MODELO ?? MODELO_SIMPLE
 /** Tope por persona y por día (la IA la pagamos nosotros). */
 export const AYUDA_TOPE_DIA = Number(process.env.AYUDA_TOPE_DIA ?? 25)
 
-let manual: { texto: string; leido: number } | null = null
+/** De qué producto es la pregunta: cada uno con su manual (docs/ayuda/<origen>.md). El Radar pregunta por
+ *  /api/externo/ayuda (servidor a servidor): así todo queda en el mismo conteo de gasto y la misma bandeja. */
+export type OrigenAyuda = 'sistema' | 'radar'
+const PRODUCTO: Record<OrigenAyuda, string> = {
+  sistema: '"El Comerciante Digital", un sistema para vendedores de MercadoLibre (sobre todo Venezuela)',
+  radar: '"Radar de Oportunidades" de El Comerciante Digital, una herramienta para encontrar qué productos vender en MercadoLibre Venezuela',
+}
+
+const manuales: Partial<Record<OrigenAyuda, { texto: string; leido: number }>> = {}
 /** El manual (se relee cada 10 minutos: viaja dentro de la imagen, ver next.config outputFileTracingIncludes). */
-async function leerManual() {
-  if (manual && Date.now() - manual.leido < 10 * 60_000) return manual.texto
-  const texto = await readFile(path.join(process.cwd(), 'docs', 'ayuda', 'sistema.md'), 'utf8')
-  manual = { texto, leido: Date.now() }
+async function leerManual(origen: OrigenAyuda) {
+  const m = manuales[origen]
+  if (m && Date.now() - m.leido < 10 * 60_000) return m.texto
+  const texto = await readFile(path.join(process.cwd(), 'docs', 'ayuda', `${origen}.md`), 'utf8')
+  manuales[origen] = { texto, leido: Date.now() }
   return texto
 }
 
@@ -31,12 +40,13 @@ async function videosActivos(): Promise<VideoAyuda[]> {
   return rows
 }
 
-const INSTRUCCIONES = `Eres el asistente de ayuda de "El Comerciante Digital", un sistema para vendedores de MercadoLibre (sobre todo Venezuela).
+const INSTRUCCIONES = (origen: OrigenAyuda) => `Eres el asistente de ayuda de ${PRODUCTO[origen]}.
 Respondes a clientes y a su equipo, en español de Venezuela, de tú, claro y breve.
 
 REGLAS:
 - Responde SOLO con lo que dice el MANUAL de abajo. No inventes botones, pantallas, precios, plazos ni funciones.
 - Si el manual no lo cubre, o no estás seguro, dilo con honestidad (sabe=false) y sugiere escribir a Soporte. No adivines.
+- Para "qué vender" o "qué producto es bueno": explica cómo encontrarlo con las herramientas del manual; no recomiendes productos concretos.
 - Prioriza la sección de la pantalla donde está el usuario, pero usa cualquier sección que sirva (muchas preguntas cruzan dos).
 - Da los pasos concretos (dónde tocar, en qué orden). Máximo unas 120 palabras. Sin saludo ni despedida.
 - Formato: texto simple; listas con "1." o "-" si hay pasos; **negrita** solo para nombres de botones o secciones.
@@ -69,13 +79,16 @@ export async function consultasDeHoy(userId: number) {
 }
 
 export async function preguntarAyuda(o: {
-  pregunta: string; pantalla: string; userId: number; empresaId: number | null; origen?: string
+  pregunta: string; pantalla: string; userId: number; empresaId: number | null; origen?: OrigenAyuda
   historial?: { pregunta: string; respuesta: string }[]
 }): Promise<RespuestaAyuda> {
-  const [texto, videos] = await Promise.all([leerManual(), videosActivos()])
+  const origen = o.origen ?? 'sistema'
+  // Los videos de la Central de aprendizaje son del Sistema (el Radar no tiene).
+  const [texto, videos] = await Promise.all([leerManual(origen), origen === 'sistema' ? videosActivos() : Promise.resolve([] as VideoAyuda[])])
   // Todo lo fijo (instrucciones + manual + videos) en el sistema: el mismo prefijo para todos → caché.
-  const sistema = `${INSTRUCCIONES}\n\n===== VIDEOS DE LA CENTRAL DE APRENDIZAJE =====\n`
-    + videos.map(v => `id ${v.id} · ${v.titulo}${v.descripcion ? ` — ${v.descripcion}` : ''}`).join('\n')
+  const sistema = INSTRUCCIONES(origen)
+    + (videos.length ? `\n\n===== VIDEOS DE LA CENTRAL DE APRENDIZAJE =====\n`
+      + videos.map(v => `id ${v.id} · ${v.titulo}${v.descripcion ? ` — ${v.descripcion}` : ''}`).join('\n') : '')
     + `\n\n===== MANUAL =====\n${texto}`
   const previo = (o.historial ?? []).slice(-2)
     .map(h => `Pregunta anterior: ${h.pregunta.slice(0, 400)}\nTu respuesta anterior: ${h.respuesta.slice(0, 600)}`).join('\n\n')
@@ -90,7 +103,7 @@ export async function preguntarAyuda(o: {
     `INSERT INTO ayuda_consultas (origen, user_id, empresa_id, pantalla, pregunta, respuesta, sabia, video_id, modelo,
        entrada, salida, cache_lectura, cache_escritura, costo)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
-    [o.origen ?? 'sistema', o.userId, o.empresaId, o.pantalla.slice(0, 200), o.pregunta, resultado.respuesta,
+    [origen, o.userId, o.empresaId, o.pantalla.slice(0, 200), o.pregunta, resultado.respuesta,
      !!resultado.sabe, video?.id ?? null, modelo, entrada, uso.output_tokens ?? 0,
      uso.cache_read_input_tokens ?? 0, uso.cache_creation_input_tokens ?? 0, costoDe(modelo, uso)])
   return { id: Number(fila.id), respuesta: resultado.respuesta, sabe: !!resultado.sabe, video: video ? { id: video.id, titulo: video.titulo } : null }
