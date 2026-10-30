@@ -46,6 +46,31 @@ export async function enviarTelegram(chatId: number | string, html: string, boto
   })
 }
 
+/** Como enviarTelegram, pero devuelve el id del mensaje (Soporte: al "Responder" en Telegram se sabe a qué caso va). */
+export async function enviarTelegramId(chatId: number | string, html: string, botones: Boton[][] = []) {
+  const r = await api<{ message_id: number }>('sendMessage', {
+    chat_id: chatId, text: html, parse_mode: 'HTML', disable_web_page_preview: true,
+    ...(botones.length ? { reply_markup: { inline_keyboard: botones.map(f => f.map(b => ({ text: b.texto, url: b.url }))) } } : {}),
+  })
+  return r.message_id
+}
+
+/** Manda una foto (captura de Soporte) como respuesta a un mensaje. Devuelve su id. */
+export async function enviarFotoTelegram(chatId: number | string, foto: Buffer, nombreArchivo: string, tipo: string, responderA?: number) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) throw new Error('Telegram no está configurado')
+  const f = new FormData()
+  f.append('chat_id', String(chatId))
+  if (responderA) f.append('reply_to_message_id', String(responderA))
+  f.append(tipo === 'application/pdf' ? 'document' : 'photo', new Blob([new Uint8Array(foto)], { type: tipo }), nombreArchivo)
+  const r = await fetch(`https://api.telegram.org/bot${token}/${tipo === 'application/pdf' ? 'sendDocument' : 'sendPhoto'}`, {
+    method: 'POST', body: f, signal: AbortSignal.timeout(30_000), cache: 'no-store',
+  })
+  const d = await r.json().catch(() => null) as { ok?: boolean; result?: { message_id: number }; description?: string } | null
+  if (!d?.ok) throw new Error(`Telegram: ${d?.description ?? `HTTP ${r.status}`}`)
+  return d.result!.message_id
+}
+
 let nombre: string | null = null
 /** @usuario del bot (sin @), para armar el link de conexión. */
 export async function nombreBot() {
@@ -55,7 +80,9 @@ export async function nombreBot() {
 
 export interface ActualizacionTG {
   update_id: number
-  message?: { date: number; text?: string; chat: { id: number; type: string }; from?: { username?: string; first_name?: string; last_name?: string } }
+  message?: { message_id: number; date: number; text?: string; caption?: string; chat: { id: number; type: string }
+    from?: { username?: string; first_name?: string; last_name?: string }
+    reply_to_message?: { message_id: number } }
 }
 
 /** Lo que le escribieron al bot (sin confirmar: staging y producción leen la misma cola). */

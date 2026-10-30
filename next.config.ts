@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   // mientras se actualiza, Next compara la del navegador con la del server y, si cambió, recarga la
   // página al navegar (en vez de mezclar archivos viejos y nuevos). Ver scripts/rolling.sh.
   deploymentId: process.env.DEPLOYMENT_ID || undefined,
+  // El manual del Sistema (docs/ayuda/sistema.md) lo lee la ayuda con IA (lib/ayuda.ts) en tiempo de ejecución.
+  outputFileTracingIncludes: { '/api/ayuda/preguntar': ['./docs/ayuda/**/*'] },
 }
 
 export default nextConfig

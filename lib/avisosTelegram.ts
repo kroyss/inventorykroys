@@ -23,6 +23,7 @@ import { ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
 import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import { SQL_PENDIENTE as SQL_SIN_REPORTAR, SQL_REPORTABLE } from '@/lib/reportador'
 import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
+import { respuestaDesdeTelegram } from '@/lib/soporte'
 import {
   ENTORNO, TelegramBloqueado, corto, enviarTelegram, esc, leerActualizaciones, telegramConfigurado, urlSistema,
   type Boton,
@@ -135,7 +136,16 @@ export async function procesarActualizaciones() {
     if (up.update_id <= ultimo) continue
     mayor = Math.max(mayor, up.update_id)
     const m = up.message
-    if (!m?.text || m.chat.type !== 'private') continue
+    if (!m || m.chat.type !== 'private') continue
+    // Respuesta del dueño a un caso de Soporte ("Responder" sobre el aviso, lib/soporte.ts). Cada entorno solo
+    // conoce sus casos; si no es de este, no se contesta nada (lo toma el otro entorno).
+    if (m.reply_to_message) {
+      const texto = (m.text ?? m.caption ?? '').trim()
+      if (texto) await respuestaDesdeTelegram(m.chat.id, m.reply_to_message.message_id, texto)
+        .catch(e => console.error('[soporte telegram] respuesta', e instanceof Error ? e.message : e))
+      continue
+    }
+    if (!m.text) continue
     const codigo = /^\/start\s+([A-Za-z0-9_-]{8,64})$/.exec(m.text.trim())?.[1]
     if (codigo) {
       const nombreTG = [m.from?.first_name, m.from?.last_name].filter(Boolean).join(' ') || null

@@ -198,7 +198,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false 
       )}
 
       {puedeCambiar && (marcados.size > 0 || trabajando) && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+        <div data-barra-fija className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">
               {trabajando ? `Actualizando MercadoLibre… ${trabajando.hechos} de ${trabajando.total} publicaciones`

@@ -6,6 +6,8 @@ node_modules
 !.env.production.example
 README.md
 *.md
+# El manual lo lee la ayuda con IA (lib/ayuda.ts)
+!docs/ayuda/*.md
 .vscode
 .idea
 .DS_Store

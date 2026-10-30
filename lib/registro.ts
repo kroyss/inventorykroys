@@ -11,13 +11,18 @@ export const MODULOS_PRUEBA = ['despachos', 'reportador', 'preguntas', 'alertas_
 /** Telegram a los admins de la organización dueña de la plataforma (los que conectaron su Telegram en este entorno). */
 export async function avisarDuenoPlataforma(html: string) {
   if (!telegramConfigurado()) return
+  for (const chat of await chatsDuenoPlataforma()) await enviarTelegram(chat, html).catch(() => {})
+}
+
+/** Los chats de Telegram de los admins de la organización dueña de la plataforma (en este entorno). */
+export async function chatsDuenoPlataforma(): Promise<string[]> {
   const { rows } = await dbGlobal().query(
     `SELECT DISTINCT t.chat_id::text AS chat_id
      FROM telegram_usuarios t
      JOIN usuario_empresas ue ON ue.user_id = t.user_id AND ue.role = 'admin'
      JOIN empresas e ON e.id = ue.empresa_id AND e.organizacion_id = $1
      WHERE t.chat_id IS NOT NULL AND t.entorno = $2`, [ORGANIZACION_PLATAFORMA, ENTORNO])
-  for (const r of rows) await enviarTelegram(r.chat_id, html).catch(() => {})
+  return rows.map(r => r.chat_id)
 }
 
 /** Al conectar una cuenta de ML: ¿esta organización de autoregistro quiere usar una cuenta de ML que ya pasó por otra?

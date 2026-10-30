@@ -57,8 +57,9 @@ export default function AprendizajeClient() {
         if (!vivo || !d) return
         setVideos(d.videos); setAgendar(d.agendar); setConectar(!!d.sinCuentas && !!d.esAdmin)
         setInventario(!!d.inventario || !!d.exento)
-        // Abre en el primer video sin terminar.
-        setActual(a => a ?? (d.videos.find((v: Video) => !v.completado) ?? d.videos[0])?.id ?? null)
+        // ?video=ID (lo enlaza la ayuda) abre ese; si no, el primero sin terminar.
+        const pedido = Number(new URLSearchParams(window.location.search).get('video'))
+        setActual(a => a ?? (d.videos.find((v: Video) => v.id === pedido) ?? d.videos.find((v: Video) => !v.completado) ?? d.videos[0])?.id ?? null)
       })
       .catch(() => {})
     return () => { vivo = false }

@@ -342,7 +342,7 @@ export default function ImportarMLClient({ conCuentas }: { conCuentas: boolean }
       )}
 
       {aCrear.length > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 px-4 md:bottom-4">
+        <div data-barra-fija className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 px-4 md:bottom-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-lg">
             <p className="text-sm text-neutral-700">
               <b>{aCrear.length}</b> {aCrear.length === 1 ? 'nueva marcada' : 'nuevas marcadas'}
