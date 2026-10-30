@@ -140,9 +140,10 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
                 con tu usuario y tu contraseña.
               </p>
               <div className="rounded-xl border border-lime-200 bg-lime-50 px-4 py-3 space-y-3">
+                <p className="inline-flex rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">¡15 días gratis!</p>
                 <p className="text-sm text-neutral-800">
-                  <b>¿Tienes cuenta de vendedor en MercadoLibre Venezuela?</b> Si quieres activar ya las automatizaciones
-                  (preguntas con IA, mensajes, calificaciones, despachos y pagos de MercadoEnvíos), escríbenos y te las activamos.
+                  <b>¿Tienes cuenta de vendedor en MercadoLibre Venezuela?</b> Prueba <b>15 días gratis</b> las automatizaciones
+                  (preguntas con IA, mensajes, calificaciones, despachos y pagos de MercadoEnvíos): escríbenos y te las activamos.
                 </p>
                 <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center rounded-lg bg-[#229ED9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c8bc0]">
