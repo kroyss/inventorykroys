@@ -58,11 +58,14 @@ export function revisarTexto(t: string, tipo: 'pregunta' | 'mensaje' = 'pregunta
   const s = t.trim()
   if (!s) bloqueantes.push('La respuesta está vacía')
   if (s.length > 2000) bloqueantes.push('Pasa de 2000 caracteres (límite de MercadoLibre)')
-  const urls = s.match(URL_RE) ?? []
+  // Correos: en preguntas (públicas) ML los borra; en la mensajería postventa de MLV sí pasan (el dueño mandó uno
+  // el 30-10). En mensajes ni bloquean ni cuentan como link ("gmail.com").
+  const sinCorreos = tipo === 'mensaje' ? s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, ' ') : s
+  const urls = sinCorreos.match(URL_RE) ?? []
   // Sin los links ni los códigos de publicación: así MLV-1011813036 no parece un teléfono.
-  const sinUrls = s.replace(URL_RE, ' ').replace(/\bM[A-Z]{2}-?\d+\b/g, ' ')
+  const sinUrls = sinCorreos.replace(URL_RE, ' ').replace(/\bM[A-Z]{2}-?\d+\b/g, ' ')
   if (urls.some(u => !ES_ML.test(u))) avisos.push('Tiene un link que no es de MercadoLibre: puede que ML no lo deje publicar')
-  if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(s)) bloqueantes.push('Tiene un correo')
+  if (tipo === 'pregunta' && /[\w.+-]+@[\w-]+\.[\w.]+/.test(s)) bloqueantes.push('Tiene un correo')
   if (tipo === 'pregunta' && /(\+?\d[\d\s().-]{8,}\d)/.test(sinUrls.replace(/\b\d{1,3}([.,]\d{3})+([.,]\d+)?\b/g, ''))) bloqueantes.push('Parece tener un número de teléfono')
   // Redes sociales: en preguntas (públicas) se bloquea; en la mensajería postventa de MLV sí pasan
   // (p. ej. "al whatsapp 0414…"), así que solo se avisa (decisión del dueño, 2026-10-05).

@@ -182,8 +182,9 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   venta.
 
 **Problemas comunes:**
-- *«MercadoLibre moderó el mensaje»:* ML bloqueó el texto (suele pasar con teléfonos, correos, links externos o
-  palabras como «pago fuera»). Reescríbelo.
+- *«MercadoLibre moderó el mensaje»:* ML bloqueó el texto (puede pasar con links externos, redes sociales o
+  palabras como «pago fuera»). Reescríbelo. En los mensajes de una venta sí puedes poner un teléfono o un correo
+  (en Venezuela ML los deja pasar); en las **Preguntas**, que son públicas, no.
 - *Llegó al límite de MercadoLibre:* ML limita cuántos mensajes puedes mandar seguidos en una venta si el comprador
   no responde.
 
