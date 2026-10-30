@@ -20,10 +20,11 @@ const PASOS = [
   'Al terminar, escríbenos para seguir sin perder nada.',
 ]
 // Desde el Radar (?para=radar, 29-10): la misma cuenta, pero solo el Radar el día de prueba.
+// Mismos textos que la entrada del Radar (AnalisisMercadoML web/app/login/page.tsx, QUE_HACE).
 const INCLUYE_RADAR = [
-  { t: 'Productos que se venden',  d: 'Qué se está vendiendo en MercadoLibre Venezuela y a qué precio' },
-  { t: 'Oportunidades',            d: 'Productos con demanda y poca competencia para importar o revender' },
-  { t: 'Historial',                d: 'Cómo se movieron las ventas y los precios en el tiempo' },
+  { t: 'Lo más vendido, categoría por categoría', d: 'Productos de MercadoLibre Venezuela actualizados cada mes, con su actividad medida: si suben o se apagan' },
+  { t: 'Precio real y tu margen neto',            d: 'Con la brecha cambiaria, la comisión y el envío ya descontados' },
+  { t: 'Competencia y señales de demanda',        d: 'Quién vende más barato, qué sube y qué se sostiene, validado con Google Trends' },
 ]
 const PASOS_RADAR = [
   'Crea tu cuenta (1 minuto).',
