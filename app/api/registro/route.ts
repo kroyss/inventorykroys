@@ -36,7 +36,29 @@ function ipDe(req: NextRequest) {
 /** Más de esto desde la misma conexión en un día no se crea (en Venezuela mucha gente comparte IP: no se baja más). */
 const MAX_POR_IP_DIA = 3
 
+// 30-10: el Radar muestra su propio formulario (radar.elcomerciantedigital.com/registro, para que todo quede en su
+// dirección) y lo envía aquí desde el navegador. Solo ese sitio puede: CORS para su origen, y nada más.
+const ORIGENES = ['https://radar.elcomerciantedigital.com']
+function conCors(req: NextRequest, res: NextResponse) {
+  const origen = req.headers.get('origin')
+  if (origen && ORIGENES.includes(origen)) {
+    res.headers.set('Access-Control-Allow-Origin', origen)
+    res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+    res.headers.set('Vary', 'Origin')
+  }
+  return res
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return conCors(req, new NextResponse(null, { status: 204 }))
+}
+
 export async function POST(req: NextRequest) {
+  return conCors(req, await registrar(req))
+}
+
+async function registrar(req: NextRequest): Promise<NextResponse> {
   const r = Registro.safeParse(await req.json().catch(() => null))
   if (!r.success) return NextResponse.json({ error: r.error.issues[0]?.message ?? 'Datos inválidos' }, { status: 400 })
   const b = r.data

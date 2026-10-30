@@ -1,7 +1,7 @@
 'use client'
 import { signIn } from 'next-auth/react'
 import { useEffect, useState, FormEvent } from 'react'
-import { RADAR_PRUEBA_DIA, RADAR_URL, TELEGRAM_SOPORTE } from '@/lib/cuenta'
+import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 import type { Marca } from '@/lib/marca'
 
 // Prueba gratis de 15 días (26-10, app/registro/page.tsx → POST /api/registro). Mismo formato que la entrada:
@@ -19,25 +19,9 @@ const PASOS = [
   'Conecta tu cuenta de MercadoLibre: ahí arrancan tus 15 días.',
   'Al terminar, escríbenos para seguir sin perder nada.',
 ]
-// Desde el Radar (?para=radar, 29-10): la misma cuenta, pero solo el Radar el día de prueba.
-// Mismos textos que la entrada del Radar (AnalisisMercadoML web/app/login/page.tsx, QUE_HACE).
-const INCLUYE_RADAR = [
-  { t: 'Lo más vendido, categoría por categoría', d: 'Productos de MercadoLibre Venezuela actualizados cada mes, con su actividad medida: si suben o se apagan' },
-  { t: 'Precio real y tu margen neto',            d: 'Con la brecha cambiaria, la comisión y el envío ya descontados' },
-  { t: 'Competencia y señales de demanda',        d: 'Quién vende más barato, qué sube y qué se sostiene, validado con Google Trends' },
-]
-const PASOS_RADAR = [
-  'Crea tu cuenta (1 minuto).',
-  `Entra ${RADAR_PRUEBA_DIA} con tu usuario en ${RADAR_URL.replace('https://', '')}: ese día tienes el Radar completo.`,
-  'Tu cuenta queda guardada: si quieres volver o probar el Sistema, escríbenos.',
-]
 
-export default function RegistroForm({ marca, radar = false }: { marca: Marca; radar?: boolean }) {
+export default function RegistroForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
-  const [listoRadar, setListoRadar] = useState(false)
-  const incluye = radar ? INCLUYE_RADAR : INCLUYE
-  const pasos = radar ? PASOS_RADAR : PASOS
-  const sello = radar ? `Prueba del Radar · ${RADAR_PRUEBA_DIA.replace(/^el /, '')}` : '15 días gratis'
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
 
@@ -46,7 +30,7 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
     const q = new URLSearchParams(location.search)
     let ref = ''
     try { const h = document.referrer ? new URL(document.referrer).hostname : ''; ref = h && h !== location.hostname ? h.replace(/^(www|l|lm|m)\./, '') : '' } catch {}
-    const origen = q.get('utm_source') || (q.has('fbclid') ? 'facebook' : '') || ref || (q.get('para') === 'radar' ? 'radar' : '')
+    const origen = q.get('utm_source') || (q.has('fbclid') ? 'facebook' : '') || ref
     fetch('/api/registro/visita', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origen }), keepalive: true }).catch(() => {})
   }, [])
 
@@ -55,12 +39,9 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
     setLoading(true); setError('')
     const f = new FormData(e.currentTarget)
     const datos = Object.fromEntries(['negocio', 'nombre', 'usuario', 'correo', 'whatsapp', 'telegram', 'clave', 'sitio'].map(k => [k, String(f.get(k) ?? '')]))
-    const r = await fetch('/api/registro', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(radar ? { ...datos, para: 'radar' } : datos) })
+    const r = await fetch('/api/registro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo crear la cuenta. Intenta de nuevo.'); setLoading(false); return }
-    // Cuenta solo del Radar: no entra al Sistema (no tiene empresa); se le dice cuándo y dónde entrar.
-    if (radar) { setListoRadar(true); setLoading(false); return }
     const s = await signIn('credentials', { username: datos.usuario.trim().toLowerCase(), password: datos.clave, redirect: false })
     // Navegación completa (como la entrada): la sesión nueva se lee desde el servidor.
     window.location.assign(s?.ok ? '/' : '/login')
@@ -79,18 +60,13 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 w-[14rem] h-[14rem] rounded-full bg-lime-400/10 blur-2xl" />
 
         <div className="relative flex flex-col flex-1 justify-center max-w-md">
-          <p className="inline-flex w-fit rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">{sello}</p>
+          <p className="inline-flex w-fit rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">15 días gratis</p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight">
-            {radar
-              ? <>Mira qué se vende <span className="text-lime-400">en MercadoLibre.</span></>
-              : <>Prueba todo con <span className="text-lime-400">tus propias ventas.</span></>}
+            Prueba todo con <span className="text-lime-400">tus propias ventas.</span>
           </h1>
-          <p className="text-neutral-400 mt-3 text-sm leading-relaxed">
-            {/* Desde el Radar solo se habla del Radar (el lema nombra inventario y automatizaciones). */}
-            {radar ? `Radar de Oportunidades gratis ${RADAR_PRUEBA_DIA}, todo el día.` : `Sin tarjeta ni pago por adelantado. ${marca.lema}`}
-          </p>
+          <p className="text-neutral-400 mt-3 text-sm leading-relaxed">Sin tarjeta ni pago por adelantado. {marca.lema}</p>
           <ul className="mt-8 space-y-4">
-            {incluye.map(p => (
+            {INCLUYE.map(p => (
               <li key={p.t} className="flex gap-3">
                 <span className="mt-1.5 w-2 h-2 rounded-full bg-lime-400 shadow-[0_0_10px_2px_rgba(163,230,53,0.5)] shrink-0" />
                 <span>
@@ -101,7 +77,7 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
             ))}
           </ul>
           <ol className="mt-9 space-y-2 border-t border-white/10 pt-6">
-            {pasos.map((p, i) => (
+            {PASOS.map((p, i) => (
               <li key={p} className="flex gap-3 text-sm text-neutral-300">
                 <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-lime-400/60 text-[11px] font-semibold text-lime-400">{i + 1}</span>{p}
               </li>
@@ -117,45 +93,18 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
       {/* Celular: franja negra con lo esencial */}
       <header className="lg:hidden relative overflow-hidden bg-neutral-950 text-white px-6 py-6">
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 w-48 h-48 rounded-full border border-lime-400/20" />
-        <p className="relative text-[11px] uppercase tracking-[0.18em] text-lime-400">{sello}</p>
+        <p className="relative text-[11px] uppercase tracking-[0.18em] text-lime-400">15 días gratis</p>
         <p className="relative mt-1 text-xl font-semibold leading-snug tracking-tight">
-          {radar
-            ? <>Mira qué se vende <span className="text-lime-400">en MercadoLibre.</span></>
-            : <>Prueba todo con <span className="text-lime-400">tus propias ventas.</span></>}
+          Prueba todo con <span className="text-lime-400">tus propias ventas.</span>
         </p>
-        <p className="relative mt-1 text-xs text-neutral-400">
-          {radar ? `El Radar completo ${RADAR_PRUEBA_DIA}, todo el día.` : 'Los días arrancan cuando conectas MercadoLibre.'}
-        </p>
+        <p className="relative mt-1 text-xs text-neutral-400">Los días arrancan cuando conectas MercadoLibre.</p>
       </header>
 
       {/* Formulario */}
       <main className="flex flex-col items-center justify-center px-6 py-10 bg-neutral-50 lg:bg-white">
         <div className="w-full max-w-sm">
-          {listoRadar ? (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">¡Listo, ya tienes tu cuenta!</h2>
-              <p className="text-sm text-neutral-600">
-                Tu acceso al Radar estará activo <b>todo el día {RADAR_PRUEBA_DIA}</b> (de 00:00 a 23:59, hora de Venezuela). Ese día entra en{' '}
-                <a href={RADAR_URL} className="font-medium text-lime-700 underline underline-offset-2">{RADAR_URL.replace('https://', '')}</a>{' '}
-                con tu usuario y tu contraseña.
-              </p>
-              <div className="rounded-xl border border-lime-200 bg-lime-50 px-4 py-3 space-y-3">
-                <p className="inline-flex rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">¡15 días gratis!</p>
-                <p className="text-sm text-neutral-800">
-                  <b>¿Tienes cuenta de vendedor en MercadoLibre Venezuela?</b> Prueba <b>15 días gratis</b> las automatizaciones
-                  (preguntas con IA, mensajes, calificaciones, despachos y pagos de MercadoEnvíos): escríbenos y te las activamos.
-                </p>
-                <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center rounded-lg bg-[#229ED9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c8bc0]">
-                  Escribirnos por Telegram
-                </a>
-              </div>
-            </div>
-          ) : <>
           <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">Crea tu cuenta</h2>
-          <p className="text-sm text-neutral-500 mt-1 mb-6">
-            {radar ? `Radar de Oportunidades · prueba ${RADAR_PRUEBA_DIA}.` : 'MercadoLibre Venezuela · prueba de 15 días.'}
-          </p>
+          <p className="text-sm text-neutral-500 mt-1 mb-6">MercadoLibre Venezuela · prueba de 15 días.</p>
 
           <form onSubmit={enviar} className="space-y-3.5">
             <div>
@@ -213,15 +162,12 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
 
             <button type="submit" disabled={loading}
               className="w-full bg-lime-400 text-neutral-950 py-2.5 rounded-lg text-sm font-semibold hover:bg-lime-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {loading ? 'Creando tu cuenta…' : radar ? 'Crear mi cuenta' : 'Empezar mi prueba gratis'}
+              {loading ? 'Creando tu cuenta…' : 'Empezar mi prueba gratis'}
             </button>
           </form>
 
-          {!radar && <p className="text-sm text-neutral-500 mt-6">Al terminar la prueba eliges tu plan · <a href="/precios" className="font-medium text-lime-700 underline underline-offset-2">Ver planes</a></p>}
-          <p className={`text-sm text-neutral-500 ${radar ? 'mt-6' : 'mt-2'}`}>
-            ¿Ya tienes cuenta? <a href={radar ? RADAR_URL : '/login'} className="font-medium text-lime-700 underline underline-offset-2">Entrar</a>
-          </p>
-          </>}
+          <p className="text-sm text-neutral-500 mt-6">Al terminar la prueba eliges tu plan · <a href="/precios" className="font-medium text-lime-700 underline underline-offset-2">Ver planes</a></p>
+          <p className="text-sm text-neutral-500 mt-2">¿Ya tienes cuenta? <a href="/login" className="font-medium text-lime-700 underline underline-offset-2">Entrar</a></p>
           <p className="text-xs text-neutral-400 mt-2">¿Dudas? <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="underline">Escríbenos por Telegram</a>.</p>
           <p className="lg:hidden text-xs text-neutral-400 mt-10 text-center">
             © {new Date().getFullYear()} El Comerciante Digital · Todos los derechos reservados
