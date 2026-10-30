@@ -86,7 +86,8 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
               : <>Prueba todo con <span className="text-lime-400">tus propias ventas.</span></>}
           </h1>
           <p className="text-neutral-400 mt-3 text-sm leading-relaxed">
-            {radar ? `Radar de Oportunidades gratis ${RADAR_PRUEBA_DIA}, todo el día.` : 'Sin tarjeta ni pago por adelantado.'} {marca.lema}
+            {/* Desde el Radar solo se habla del Radar (el lema nombra inventario y automatizaciones). */}
+            {radar ? `Radar de Oportunidades gratis ${RADAR_PRUEBA_DIA}, todo el día.` : `Sin tarjeta ni pago por adelantado. ${marca.lema}`}
           </p>
           <ul className="mt-8 space-y-4">
             {incluye.map(p => (
@@ -134,13 +135,20 @@ export default function RegistroForm({ marca, radar = false }: { marca: Marca; r
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">¡Listo, ya tienes tu cuenta!</h2>
               <p className="text-sm text-neutral-600">
-                Entra <b>{RADAR_PRUEBA_DIA}</b> en <a href={RADAR_URL} className="font-medium text-lime-700 underline underline-offset-2">{RADAR_URL.replace('https://', '')}</a>{' '}
-                con tu usuario y tu contraseña. Ese día tienes el Radar completo.
+                Tu acceso al Radar estará activo <b>todo el día {RADAR_PRUEBA_DIA}</b> (de 00:00 a 23:59, hora de Venezuela). Ese día entra en{' '}
+                <a href={RADAR_URL} className="font-medium text-lime-700 underline underline-offset-2">{RADAR_URL.replace('https://', '')}</a>{' '}
+                con tu usuario y tu contraseña.
               </p>
-              <p className="text-sm text-neutral-500">
-                Tu cuenta queda guardada: si después quieres volver al Radar o probar el Sistema de automatizaciones,{' '}
-                <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="underline">escríbenos por Telegram</a>.
-              </p>
+              <div className="rounded-xl border border-lime-200 bg-lime-50 px-4 py-3 space-y-3">
+                <p className="text-sm text-neutral-800">
+                  <b>¿Tienes cuenta de vendedor en MercadoLibre Venezuela?</b> Si quieres activar ya las automatizaciones
+                  (preguntas con IA, mensajes, calificaciones, despachos y pagos de MercadoEnvíos), escríbenos y te las activamos.
+                </p>
+                <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center rounded-lg bg-[#229ED9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c8bc0]">
+                  Escribirnos por Telegram
+                </a>
+              </div>
             </div>
           ) : <>
           <h2 className="text-2xl font-semibold text-neutral-900 tracking-tight">Crea tu cuenta</h2>
