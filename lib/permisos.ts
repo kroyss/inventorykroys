@@ -40,6 +40,9 @@ export const PERMISOS = {
   // 20-10 (mig. 109): solo la pantalla de unir publicación/variante ↔ producto, SIN ver Productos ni precios.
   vincular_ml:        { tipo: 'seccion', nombre: 'Vincular publicaciones de ML', usuario: true, modulo: 'inventario',
                         detalle: 'Unir cada publicación (o variante) de MercadoLibre con su producto. No ve precios ni costos' },
+  // 29-10 (mig. 133): entrar al Radar de Oportunidades (otro sitio). El admin siempre; a un empleado se le marca aquí.
+  ver_radar:          { tipo: 'seccion', nombre: 'Radar de Oportunidades', usuario: false, modulo: 'radar',
+                        detalle: 'Entrar a radar.elcomerciantedigital.com con su mismo usuario' },
   // ── Acciones (dentro de las secciones) ──
   costos:                  { tipo: 'accion', nombre: 'Ver costos y ganancias', usuario: false, modulo: 'inventario',
                              detalle: 'Inicio completo (ventas, ganancia, bonos) y costos/totales en Compras e Importaciones' },
