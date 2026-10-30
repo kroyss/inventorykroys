@@ -6,11 +6,15 @@ export const PRODUCTOS = {
   inventario: 'Inventario (y automatizaciones de su empresa)',
   radar:      'Radar de Oportunidades',
   despegue:   'Programa Despegue (Radar solo los domingos del programa)',
+  // 29-10: se registró desde el Radar (/registro?para=radar). El Radar lo mete solo en su grupo de entrada vigente
+  // (la prueba del sábado 31-10) la primera vez que entra; siempre va con 'radar'.
+  radar_prueba: 'Prueba del Radar (solo los días del grupo de entrada)',
 } as const
 
 export type Producto = keyof typeof PRODUCTOS
 
-/** Despegue sin Radar no tiene sentido: el bono es el Radar. Se agrega solo. */
+/** Despegue o prueba del Radar sin Radar no tienen sentido. Se agrega solo. */
 export function conProductosImplicitos<T extends string>(productos: T[]): T[] {
-  return productos.includes('despegue' as T) && !productos.includes('radar' as T) ? [...productos, 'radar' as T] : productos
+  const conRadar = productos.includes('despegue' as T) || productos.includes('radar_prueba' as T)
+  return conRadar && !productos.includes('radar' as T) ? [...productos, 'radar' as T] : productos
 }

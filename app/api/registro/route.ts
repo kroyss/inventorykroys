@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
+import { hash } from 'bcryptjs'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
@@ -7,6 +8,8 @@ import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
 import { choqueAlta, crearCuenta } from '@/lib/altaCuenta'
 import { avisarDuenoPlataforma, MODULOS_PRUEBA } from '@/lib/registro'
+import { conProductosImplicitos } from '@/lib/productos'
+import { RADAR_PRUEBA_DIA } from '@/lib/cuenta'
 import { esc } from '@/lib/telegram'
 
 // POST /api/registro — autoregistro público (26-10, migración 125): crea la cuenta al instante en prueba de 15 días
@@ -22,6 +25,9 @@ const Registro = z.object({
   telegram: z.string().trim().transform(t => t.replace(/^@/, '')).pipe(z.string().regex(/^[A-Za-z0-9_]{0,32}$/, 'Revisa tu usuario de Telegram')).optional(),
   clave:    z.string().min(PASSWORD_MIN, `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres`).max(PASSWORD_MAX),
   sitio:    z.string().max(200).optional(),          // trampa para bots: un humano no lo ve ni lo llena
+  // 29-10 (migración 133): desde el Radar (radar.elcomerciantedigital.com/registro → /registro?para=radar). Misma cuenta
+  // única, pero SOLO con el Radar: sin empresa ni prueba del Sistema. Entra los días del grupo de entrada del Radar.
+  para:     z.enum(['radar']).optional(),
 }).refine(b => b.whatsapp || b.telegram, { message: 'Déjanos tu WhatsApp o tu Telegram (al menos uno) para ayudarte' })
 
 function ipDe(req: NextRequest) {
@@ -44,14 +50,34 @@ export async function POST(req: NextRequest) {
   try {
     if (ipHash) {
       const { rows: [n] } = await client.query(
-        `SELECT COUNT(*)::int AS n FROM organizaciones WHERE origen = 'autoregistro' AND registro->>'ip_hash' = $1
-           AND created_at > NOW() - INTERVAL '1 day'`, [ipHash])
+        `SELECT ((SELECT COUNT(*) FROM organizaciones WHERE origen = 'autoregistro' AND registro->>'ip_hash' = $1
+                    AND created_at > NOW() - INTERVAL '1 day')
+              + (SELECT COUNT(*) FROM users WHERE registro->>'ip_hash' = $1
+                    AND (registro->>'creado_at')::timestamptz > NOW() - INTERVAL '1 day'))::int AS n`, [ipHash])
       if (n.n >= MAX_POR_IP_DIA) {
         return NextResponse.json({ error: 'Ya se crearon varias cuentas desde esta conexión hoy. Escríbenos por Telegram y te ayudamos.' }, { status: 429 })
       }
     }
     const { rows: [mismoCorreo] } = await client.query(`SELECT 1 FROM users WHERE lower(email) = $1`, [b.correo])
     if (mismoCorreo) return NextResponse.json({ error: 'Ese correo ya tiene una cuenta. Entra con tu usuario o escríbenos si no lo recuerdas.' }, { status: 400 })
+
+    const contacto = [b.whatsapp && `WhatsApp ${esc(b.whatsapp)}`, b.telegram && `@${esc(b.telegram)}`, esc(b.correo)].filter(Boolean).join(' · ')
+    if (b.para === 'radar') {
+      // Solo la cuenta (users es global): el negocio y el contacto quedan en users.registro para crearle la empresa
+      // con esos datos si después pide el Sistema.
+      const { rows: [dupU] } = await client.query(`SELECT 1 FROM users WHERE username = $1`, [b.usuario])
+      if (dupU) return NextResponse.json({ error: `El usuario "${b.usuario}" ya existe. Elige otro.` }, { status: 400 })
+      await client.query(
+        `INSERT INTO users (username, email, password_hash, full_name, role, country_access, is_active, productos, registro)
+         VALUES ($1, $2, $3, $4, 'user', 'VE', TRUE, $5, $6)`,
+        [b.usuario, b.correo, await hash(b.clave, 10), b.nombre, conProductosImplicitos(['radar_prueba']),
+         { origen: 'radar', negocio: b.negocio, correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null,
+           ip_hash: ipHash, navegador: req.headers.get('user-agent')?.slice(0, 200) ?? null, creado_at: new Date().toISOString() }])
+      avisarDuenoPlataforma(
+        `📡 <b>Nuevo registro al Radar</b> (prueba ${esc(RADAR_PRUEBA_DIA)})\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`)
+        .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
+      return NextResponse.json({ ok: true, radar: true }, { status: 201 })
+    }
 
     await client.query('BEGIN')
     const choque = await choqueAlta(client, b.negocio, b.usuario)
@@ -67,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     avisarDuenoPlataforma(
       `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
-      + [b.whatsapp && `WhatsApp ${esc(b.whatsapp)}`, b.telegram && `@${esc(b.telegram)}`, esc(b.correo)].filter(Boolean).join(' · ') + '\n'
+      + contacto + '\n'
       + 'Los días arrancan cuando conecte MercadoLibre.')
       .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
     return NextResponse.json({ ok: true, empresa: c.empresaId }, { status: 201 })

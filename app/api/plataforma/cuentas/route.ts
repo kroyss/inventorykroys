@@ -16,7 +16,7 @@ export async function GET() {
   if (error) return error
   try {
     const { rows } = await dbGlobal().query(
-      `SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.productos, u.last_login,
+      `SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.productos, u.last_login, u.registro,
               COALESCE((SELECT json_agg(json_build_object('nombre', e.nombre, 'role', ue.role) ORDER BY e.id)
                           FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
                          WHERE ue.user_id = u.id), '[]'::json) AS empresas

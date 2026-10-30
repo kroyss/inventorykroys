@@ -10,6 +10,8 @@ interface Cuenta {
   productos: string[]
   last_login: string | null
   empresas: { nombre: string; role: string }[]
+  /** Se registró desde el Radar (migración 133): negocio y contacto que dejó en el formulario. */
+  registro: { origen?: string; negocio?: string; whatsapp?: string | null; telegram?: string | null } | null
 }
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
@@ -113,7 +115,15 @@ También sale de: ${c.empresas.map(e => e.nombre).join(', ')}.` : ''))) return
           <tbody>
             {visibles.map(c => (
               <tr key={c.id} className={`border-t border-neutral-100 align-top ${!c.is_active ? 'opacity-50' : ''}`}>
-                <td className="px-4 py-2 font-mono">{c.username}</td>
+                <td className="px-4 py-2">
+                  <span className="font-mono">{c.username}</span>
+                  {c.registro?.origen === 'radar' && (
+                    <span className="block text-xs text-neutral-500">
+                      📡 Registro Radar{c.registro.negocio ? ` · ${c.registro.negocio}` : ''}
+                      {c.registro.whatsapp ? ` · WhatsApp ${c.registro.whatsapp}` : ''}{c.registro.telegram ? ` · @${c.registro.telegram}` : ''}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   <button onClick={() => cambiarNombre(c)} className="hover:underline text-left" title="Cambiar el nombre">
                     {c.full_name ?? <span className="text-neutral-400">agregar…</span>} <span className="text-neutral-400 text-xs">✏️</span>

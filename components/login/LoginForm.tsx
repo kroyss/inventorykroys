@@ -1,6 +1,6 @@
 'use client'
 import { signIn } from 'next-auth/react'
-import { CUENTA_VENCIDA, TELEGRAM_SOPORTE, textoCuentaPausada } from '@/lib/cuenta'
+import { CUENTA_VENCIDA, RADAR_URL, SOLO_RADAR, TELEGRAM_SOPORTE, textoCuentaPausada } from '@/lib/cuenta'
 import { useState, FormEvent, KeyboardEvent } from 'react'
 
 import type { Marca } from '@/lib/marca'
@@ -45,6 +45,10 @@ export default function LoginForm({ marca }: { marca: Marca }) {
       // Cuenta pausada (19-10): recuadro con el motivo y el botón a Telegram, no la línea roja de clave mala.
       const [codigo, motivo, fecha] = (result?.error ?? '').split('|')
       if (codigo === CUENTA_VENCIDA) { setPausada(textoCuentaPausada(motivo ?? 'prueba', fecha)); setError('') }
+      else if (codigo === SOLO_RADAR) {
+        setPausada(`Tu cuenta es del Radar de Oportunidades: entra en ${RADAR_URL.replace('https://', '')}. Si quieres el Sistema de automatizaciones, escríbenos.`)
+        setError('')
+      }
       else { setPausada(null); setError('Usuario o contraseña incorrectos') }
       setLoading(false)
     }

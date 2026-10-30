@@ -40,6 +40,12 @@ export const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
 
 /** Mensaje del login (y error que lanza authorize) cuando la cuenta está vencida. */
 export const CUENTA_VENCIDA = 'CUENTA_VENCIDA'
+/** Error de authorize: la cuenta es solo del Radar (se registró desde el Radar, migración 133) y no tiene empresa. */
+export const SOLO_RADAR = 'SOLO_RADAR'
+export const RADAR_URL = 'https://radar.elcomerciantedigital.com'
+/** Registro desde el Radar (/registro?para=radar): entra los días del grupo de entrada que se arme en el Radar.
+ *  Cambiar este texto cuando cambie el día de prueba. */
+export const RADAR_PRUEBA_DIA = 'el sábado 31 de octubre'
 /** Contacto para reactivar una cuenta pausada (19-10). */
 export const TELEGRAM_SOPORTE = 'https://t.me/elcomerciantedigital'
 /** Qué decirle a quien intenta entrar con la cuenta pausada, según el motivo (migración 105). */

@@ -2,7 +2,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, ORGANIZACION_PLATAFORMA, type EmpresaAcceso } from '@/lib/empresa'
-import { CUENTA_VENCIDA } from '@/lib/cuenta'
+import { CUENTA_VENCIDA, SOLO_RADAR } from '@/lib/cuenta'
 import type { NextAuthOptions } from 'next-auth'
 import type { Country, UserRole } from '@/lib/types'
 import { permisosEfectivos } from '@/lib/permisos'
@@ -52,7 +52,7 @@ export const authOptions: NextAuthOptions = {
 
         const db = dbGlobal()
         const { rows: [user] } = await db.query(
-          `SELECT id, username, full_name, password_hash, is_active, session_version AS sv
+          `SELECT id, username, full_name, password_hash, is_active, session_version AS sv, productos
            FROM users WHERE username = $1`,
           [credentials.username.toLowerCase().trim()],
         )
@@ -65,6 +65,8 @@ export const authOptions: NextAuthOptions = {
           // Tiene empresas pero su cuenta venció (prueba terminada o sin pago): se le dice.
           // El motivo viaja en el error (CUENTA_VENCIDA|motivo|DD/MM): el login muestra el aviso que corresponde.
           if (todas.length) throw new Error(`${CUENTA_VENCIDA}|${todas[0].motivoPausa ?? 'prueba'}|${todas[0].pausaFecha ?? ''}`)
+          // Cuenta solo del Radar (sin empresa, migración 133): se le dice dónde entrar, no "clave incorrecta".
+          if ((user.productos ?? []).includes('radar')) throw new Error(SOLO_RADAR)
           return null   // usuario sin ninguna empresa activa
         }
 
