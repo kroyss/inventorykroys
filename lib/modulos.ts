@@ -42,6 +42,9 @@ export const MODULOS = {
   // (radar.elcomerciantedigital.com) para los usuarios de la empresa. El Radar lo lee en cuenta_para_login().
   // Una empresa con SOLO este módulo no entra al Sistema (lib/auth.ts): es la que se registró desde el Radar.
   radar:              'Radar de Oportunidades (radar.elcomerciantedigital.com): sus usuarios entran al Radar',
+  // 30-10 (migración 135): va JUNTO con 'radar' y lo limita al día de prueba: el Radar mete a sus usuarios en el
+  // grupo de prueba vigente (Radar → Admin → Grupos). En Plataforma no es un chip aparte: se elige al prender radar.
+  radar_dia:          'Radar solo el día de prueba (va con radar): sus usuarios entran al Radar únicamente los días del grupo de prueba vigente',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -72,7 +75,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
 
 /** Empresa que solo tiene el Radar: no tiene nada que ver en el Sistema. */
 export function soloRadar(modulos: string[]) {
-  return modulos.length > 0 && modulos.every(m => m === 'radar')
+  return modulos.length > 0 && modulos.every(m => m === 'radar' || m === 'radar_dia')
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {

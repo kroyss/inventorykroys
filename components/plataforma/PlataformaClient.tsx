@@ -147,6 +147,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
+  const [eligiendoRadar, setEligiendoRadar] = useState<number | null>(null)   // empresa a la que se le está prendiendo el Radar
   const [verInactivos, setVerInactivos] = useState(false)
   const [reactivar, setReactivar] = useState<Empresa | null>(null)
   const [buscar, setBuscar]     = useState('')
@@ -196,7 +197,16 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     if (m === 'inventario' && enciende && !await confirm({
       title: `Encender Inventario en ${e.nombre}`, message: AVISO_INVENTARIO, confirmText: 'Encender Inventario',
     })) return
+    // Radar: al prenderlo se elige si es acceso completo o solo el día de prueba (radar_dia); al apagarlo se va todo.
+    if (m === 'radar') {
+      if (!enciende) return actualizar(e, { modulos: e.modulos.filter(x => x !== 'radar' && x !== 'radar_dia') })
+      return setEligiendoRadar(e.id)
+    }
     actualizar(e, { modulos: enciende ? [...e.modulos, m] : e.modulos.filter(x => x !== m) })
+  }
+  const prenderRadar = (e: Empresa, soloDia: boolean) => {
+    setEligiendoRadar(null)
+    actualizar(e, { modulos: [...e.modulos.filter(x => x !== 'radar' && x !== 'radar_dia'), 'radar', ...(soloDia ? ['radar_dia'] : [])] })
   }
 
   const sel = empresas.find(e => e.id === abierta) ?? null
@@ -371,15 +381,26 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Módulos</h3>
                 <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(modulos).map(([m, desc]) => (
+                  {Object.entries(modulos).filter(([m]) => m !== 'radar_dia').map(([m, desc]) => (
                     <button key={m} onClick={() => alternarModulo(sel, m)} title={desc}
                       className={`px-2 py-0.5 rounded-full text-xs border ${
                         sel.modulos.includes(m) ? 'bg-green-100 border-green-200 text-green-800' : 'bg-white border-neutral-200 text-neutral-400'
                       }`}>
-                      {sel.modulos.includes(m) ? '✓ ' : ''}{m}
+                      {sel.modulos.includes(m) ? '✓ ' : ''}{m}{m === 'radar' && sel.modulos.includes('radar_dia') ? ' (solo día de prueba)' : ''}
                     </button>
                   ))}
                 </div>
+                {eligiendoRadar === sel.id && (
+                  <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 text-xs space-y-2">
+                    <p className="font-medium text-neutral-700">¿Cómo entra al Radar?</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => prenderRadar(sel, true)} className="btn-primary text-xs">Solo el día de prueba</button>
+                      <button onClick={() => prenderRadar(sel, false)} className="btn-secondary text-xs">Acceso completo (pagado)</button>
+                      <button onClick={() => setEligiendoRadar(null)} className="text-neutral-500 hover:text-neutral-800 px-2">Cancelar</button>
+                    </div>
+                    <p className="text-neutral-500">Día de prueba: sus usuarios entran solo los días del grupo de prueba vigente del Radar (Admin → Grupos). Para pasarlo a completo, apaga y vuelve a prender radar.</p>
+                  </div>
+                )}
                 <p className="text-xs text-neutral-400 mt-1.5">Tocar un módulo lo prende o lo apaga (pasa el mouse encima para ver qué es).</p>
               </section>
 
@@ -490,7 +511,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
         </label>
         <div className="text-xs text-neutral-600">Módulos
           <div className="mt-1 flex flex-wrap gap-1.5">
-            {Object.entries(modulos).map(([m, desc]) => (
+            {Object.entries(modulos).filter(([m]) => m !== 'radar_dia').map(([m, desc]) => (
               <label key={m} className="flex items-center gap-1 border border-neutral-200 rounded px-2 py-1" title={desc}>
                 <input type="checkbox" checked={f.modulos.includes(m)}
                   onChange={() => setF({ ...f, modulos: f.modulos.includes(m) ? f.modulos.filter(x => x !== m) : [...f.modulos, m] })} />
