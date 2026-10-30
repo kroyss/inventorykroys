@@ -5,7 +5,7 @@ import type { PoolClient } from 'pg'
 import { hash } from 'bcryptjs'
 import { DIAS_ESPERA_CONEXION, DIAS_PRUEBA } from '@/lib/cuenta'
 
-export type Alta = 'fundador' | 'prueba' | 'activo' | 'demo'
+export type Alta = 'fundador' | 'prueba' | 'activo' | 'demo' | 'radar'
 
 export interface DatosAlta {
   nombre: string
@@ -15,7 +15,7 @@ export interface DatosAlta {
   admin: { username: string; full_name: string; password: string; email?: string | null }
   /** Organización de la que se copian categorías y parámetros de ML (la de la plataforma). */
   origenOrgId: number
-  /** 'autoregistro' para /registro; NULL = la creó el dueño. */
+  /** 'autoregistro' para /registro, 'radar' para /registro?para=radar; NULL = la creó el dueño. */
   origen?: string | null
   registro?: Record<string, unknown> | null
 }
@@ -44,14 +44,16 @@ export async function crearCuenta(client: PoolClient, d: DatosAlta) {
     `INSERT INTO organizaciones (nombre, estado, prueba_hasta, prueba_dias, fundador, origen, registro)
      VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $5::int + $3::int END, $3, $4, $6, $7)
      RETURNING id`,
-    [d.nombre, dias ? 'prueba' : 'activo', dias, d.alta === 'fundador', DIAS_ESPERA_CONEXION, d.origen ?? null, d.registro ?? null])
+    // Radar (29-10): 'prueba' sin vencimiento: qué días entra lo decide su grupo en el Radar, no el Sistema.
+    [d.nombre, dias || d.alta === 'radar' ? 'prueba' : 'activo', dias, d.alta === 'fundador', DIAS_ESPERA_CONEXION, d.origen ?? null, d.registro ?? null])
   // Demo: los módulos de Automatizaciones de un Fundador y sus mismos 100 créditos de IA (en los videos
   // se ve "Créditos IA: N de 100", como lo ve un cliente; si hace falta se sube en la base).
   const demo = d.alta === 'demo'
   const { rows: [emp] } = await client.query(
     // Prueba de 15 días: 50 créditos (27-10, decisión del dueño); el resto, 100 (se ajusta en Plataforma según el plan).
     `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [org.id, d.nombre, d.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : d.modulos, d.alta === 'prueba' ? 50 : 100])
+    [org.id, d.nombre, d.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : d.modulos,
+     d.alta === 'radar' ? 0 : d.alta === 'prueba' ? 50 : 100])
   const { rows: [user] } = await client.query(
     `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active, email)
      VALUES ($1, $2, $3, 'admin', $4, TRUE, $5) RETURNING id`,

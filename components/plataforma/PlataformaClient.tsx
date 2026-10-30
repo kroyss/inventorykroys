@@ -28,7 +28,7 @@ interface Empresa {
   prueba_hasta: string | null
   prueba_dias: number | null
   fundador: boolean
-  origen?: string | null      // 'autoregistro' = se registró solo en /registro (26-10)
+  origen?: string | null      // 'autoregistro' = se registró solo en /registro (26-10); 'radar' = desde el Radar (29-10)
   registro?: { correo?: string; whatsapp?: string; telegram?: string | null } | null
   ia_limite_mes: number | null
   motivo_pausa: string | null
@@ -66,6 +66,8 @@ function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; e
   if (!e.is_active) return { icono: '⛔', texto: 'Apagada a mano', extra: 'nadie puede entrar' }
   if (est === 'propietario') return { icono: '🏠', texto: 'Tu empresa' }
   if (est === 'activo') return { icono: '✅', texto: 'Pagando', extra: e.cuentas ? 'ML conectado' : 'sin ML' }
+  // Se registró desde el Radar (29-10): solo el módulo Radar; qué días entra lo decide su grupo en el Radar.
+  if (e.origen === 'radar' && est === 'prueba') return { icono: '📡', texto: 'Solo Radar', extra: 'se registró desde el Radar' }
   if (est === 'vencido') {
     if (e.motivo_pausa === 'corte_fundadores') return { icono: '⏸', texto: 'Pausada', extra: `no conectó ML (corte ${e.pausa_fecha ? ddmm(e.pausa_fecha) : ''})` }
     if (e.motivo_pausa === 'plan') return { icono: '⏸', texto: 'Pausada', extra: 'venció su plan' }
@@ -97,7 +99,7 @@ function FraseCuenta({ e, hoy }: { e: Empresa; hoy: string }) {
       <div className="whitespace-nowrap text-xs font-medium text-neutral-800">{f.icono} {f.texto}{e.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
         {e.origen === 'autoregistro' && <span className="ml-1.5 rounded-full bg-sky-50 px-1.5 py-px text-[10px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-200" title="Se registró solo en /registro (prueba de 15 días)">Autoregistro</span>}</div>
       {f.extra && <div className={`text-[11px] ${f.alerta ? 'text-amber-700' : 'text-neutral-500'}`}>{f.extra}</div>}
-      {e.origen === 'autoregistro' && e.registro && (
+      {(e.origen === 'autoregistro' || e.origen === 'radar') && e.registro && (
         <div className="text-[11px] text-neutral-500">
           {e.registro.whatsapp && <a href={`https://wa.me/${e.registro.whatsapp.replace(/\D/g, '').replace(/^0/, '58')}`} target="_blank" rel="noreferrer" className="underline" onClick={ev => ev.stopPropagation()}>WhatsApp {e.registro.whatsapp}</a>}
           {e.registro.telegram && <> · <a href={`https://t.me/${e.registro.telegram}`} target="_blank" rel="noreferrer" className="underline" onClick={ev => ev.stopPropagation()}>@{e.registro.telegram}</a></>}

@@ -38,6 +38,10 @@ export const MODULOS = {
   despachos_ventas:   'Despachos y Calificaciones con las ventas CARGADAS en Ventas. Apagado: con las ventas de MercadoLibre, aunque lleve inventario',
   compras_etapas:     'Compras por etapas (pago, en camino, recepción, finalizar). Apagado: "Entró mercancía", en un paso',
   precios_categorias: 'Precios por categoría de ganancia y exceso ML. Apagado: el precio es lo publicado y el costo lo que se pagó',
+  // 29-10 (migración 133, decisión del dueño: se vende por módulos): acceso al Radar de Oportunidades
+  // (radar.elcomerciantedigital.com) para los usuarios de la empresa. El Radar lo lee en cuenta_para_login().
+  // Una empresa con SOLO este módulo no entra al Sistema (lib/auth.ts): es la que se registró desde el Radar.
+  radar:              'Radar de Oportunidades (radar.elcomerciantedigital.com): sus usuarios entran al Radar',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -64,6 +68,11 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
   '/productos/promociones':   'promociones',
+}
+
+/** Empresa que solo tiene el Radar: no tiene nada que ver en el Sistema. */
+export function soloRadar(modulos: string[]) {
+  return modulos.length > 0 && modulos.every(m => m === 'radar')
 }
 
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {

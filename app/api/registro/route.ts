@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { hash } from 'bcryptjs'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
@@ -8,7 +7,6 @@ import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
 import { choqueAlta, crearCuenta } from '@/lib/altaCuenta'
 import { avisarDuenoPlataforma, MODULOS_PRUEBA } from '@/lib/registro'
-import { conProductosImplicitos } from '@/lib/productos'
 import { RADAR_PRUEBA_DIA } from '@/lib/cuenta'
 import { esc } from '@/lib/telegram'
 
@@ -50,10 +48,8 @@ export async function POST(req: NextRequest) {
   try {
     if (ipHash) {
       const { rows: [n] } = await client.query(
-        `SELECT ((SELECT COUNT(*) FROM organizaciones WHERE origen = 'autoregistro' AND registro->>'ip_hash' = $1
-                    AND created_at > NOW() - INTERVAL '1 day')
-              + (SELECT COUNT(*) FROM users WHERE registro->>'ip_hash' = $1
-                    AND (registro->>'creado_at')::timestamptz > NOW() - INTERVAL '1 day'))::int AS n`, [ipHash])
+        `SELECT COUNT(*)::int AS n FROM organizaciones WHERE origen IN ('autoregistro', 'radar') AND registro->>'ip_hash' = $1
+           AND created_at > NOW() - INTERVAL '1 day'`, [ipHash])
       if (n.n >= MAX_POR_IP_DIA) {
         return NextResponse.json({ error: 'Ya se crearon varias cuentas desde esta conexión hoy. Escríbenos por Telegram y te ayudamos.' }, { status: 429 })
       }
@@ -62,41 +58,28 @@ export async function POST(req: NextRequest) {
     if (mismoCorreo) return NextResponse.json({ error: 'Ese correo ya tiene una cuenta. Entra con tu usuario o escríbenos si no lo recuerdas.' }, { status: 400 })
 
     const contacto = [b.whatsapp && `WhatsApp ${esc(b.whatsapp)}`, b.telegram && `@${esc(b.telegram)}`, esc(b.correo)].filter(Boolean).join(' · ')
-    if (b.para === 'radar') {
-      // Solo la cuenta (users es global): el negocio y el contacto quedan en users.registro para crearle la empresa
-      // con esos datos si después pide el Sistema.
-      const { rows: [dupU] } = await client.query(`SELECT 1 FROM users WHERE username = $1`, [b.usuario])
-      if (dupU) return NextResponse.json({ error: `El usuario "${b.usuario}" ya existe. Elige otro.` }, { status: 400 })
-      await client.query(
-        `INSERT INTO users (username, email, password_hash, full_name, role, country_access, is_active, productos, registro)
-         VALUES ($1, $2, $3, $4, 'user', 'VE', TRUE, $5, $6)`,
-        [b.usuario, b.correo, await hash(b.clave, 10), b.nombre, conProductosImplicitos(['radar_prueba']),
-         { origen: 'radar', negocio: b.negocio, correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null,
-           ip_hash: ipHash, navegador: req.headers.get('user-agent')?.slice(0, 200) ?? null, creado_at: new Date().toISOString() }])
-      avisarDuenoPlataforma(
-        `📡 <b>Nuevo registro al Radar</b> (prueba ${esc(RADAR_PRUEBA_DIA)})\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`)
-        .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
-      return NextResponse.json({ ok: true, radar: true }, { status: 201 })
-    }
-
     await client.query('BEGIN')
     const choque = await choqueAlta(client, b.negocio, b.usuario)
     if (choque) { await client.query('ROLLBACK'); return NextResponse.json({ error: choque }, { status: 400 }) }
+    const radar = b.para === 'radar'
+    // Desde el Radar: la misma empresa de siempre, pero con SOLO el módulo Radar (sin prueba del Sistema). Los demás
+    // módulos se prenden en Plataforma si los paga o se le incluyen.
     const c = await crearCuenta(client, {
-      nombre: b.negocio, country: 'VE', modulos: [...MODULOS_PRUEBA], alta: 'prueba',
+      nombre: b.negocio, country: 'VE', modulos: radar ? ['radar'] : [...MODULOS_PRUEBA], alta: radar ? 'radar' : 'prueba',
       admin: { username: b.usuario, full_name: b.nombre, password: b.clave, email: b.correo },
-      origenOrgId: ORGANIZACION_PLATAFORMA, origen: 'autoregistro',
+      origenOrgId: ORGANIZACION_PLATAFORMA, origen: radar ? 'radar' : 'autoregistro',
       registro: { correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null, ip_hash: ipHash,
                   navegador: req.headers.get('user-agent')?.slice(0, 200) ?? null },
     })
     await client.query('COMMIT')
 
-    avisarDuenoPlataforma(
-      `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
-      + contacto + '\n'
-      + 'Los días arrancan cuando conecte MercadoLibre.')
+    avisarDuenoPlataforma(radar
+      ? `📡 <b>Nuevo registro al Radar</b> (prueba ${esc(RADAR_PRUEBA_DIA)})\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`
+      : `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
+        + contacto + '\n'
+        + 'Los días arrancan cuando conecte MercadoLibre.')
       .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
-    return NextResponse.json({ ok: true, empresa: c.empresaId }, { status: 201 })
+    return NextResponse.json({ ok: true, empresa: c.empresaId, radar }, { status: 201 })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
     return apiError(err)

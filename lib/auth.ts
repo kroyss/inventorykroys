@@ -6,6 +6,7 @@ import { CUENTA_VENCIDA, SOLO_RADAR } from '@/lib/cuenta'
 import type { NextAuthOptions } from 'next-auth'
 import type { Country, UserRole } from '@/lib/types'
 import { permisosEfectivos } from '@/lib/permisos'
+import { soloRadar } from '@/lib/modulos'
 
 // Multiempresa: el usuario es uno solo (users es global) y entra a una de SUS empresas
 // (usuario_empresas). La sesión guarda esa empresa; su país y su rol salen de ahí.
@@ -52,21 +53,23 @@ export const authOptions: NextAuthOptions = {
 
         const db = dbGlobal()
         const { rows: [user] } = await db.query(
-          `SELECT id, username, full_name, password_hash, is_active, session_version AS sv, productos
+          `SELECT id, username, full_name, password_hash, is_active, session_version AS sv
            FROM users WHERE username = $1`,
           [credentials.username.toLowerCase().trim()],
         )
         if (!user || !user.is_active) return null
         if (!(await compare(credentials.password, user.password_hash))) return null
 
-        const todas = await empresasDeUsuario(user.id, { incluirVencidas: true })
+        // Empresas con SOLO el módulo Radar (registro desde el Radar, migración 133) no entran al Sistema.
+        const conRadar = await empresasDeUsuario(user.id, { incluirVencidas: true })
+        const todas = conRadar.filter(e => !soloRadar(e.modulos))
         const empresa = elegir(todas.filter(e => e.habilitada), credentials.empresa, credentials.country)
         if (!empresa) {
           // Tiene empresas pero su cuenta venció (prueba terminada o sin pago): se le dice.
           // El motivo viaja en el error (CUENTA_VENCIDA|motivo|DD/MM): el login muestra el aviso que corresponde.
           if (todas.length) throw new Error(`${CUENTA_VENCIDA}|${todas[0].motivoPausa ?? 'prueba'}|${todas[0].pausaFecha ?? ''}`)
-          // Cuenta solo del Radar (sin empresa, migración 133): se le dice dónde entrar, no "clave incorrecta".
-          if ((user.productos ?? []).includes('radar')) throw new Error(SOLO_RADAR)
+          // Cuenta solo del Radar: se le dice dónde entrar, no "clave incorrecta".
+          if (conRadar.length) throw new Error(SOLO_RADAR)
           return null   // usuario sin ninguna empresa activa
         }
 
