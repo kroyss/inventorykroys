@@ -81,6 +81,8 @@ const RESPUESTA_PRIVACIDAD = 'Tus datos son de tu cuenta y ningún otro cliente 
 const PREGUNTA_PRIVACIDAD = [
   /\b(ustedes|el\s+due[ñn]o|los\s+due[ñn]os|la\s+plataforma|el\s+comerciante\s+digital|la\s+empresa|el\s+equipo|alguien\s+de\s+ustedes|los\s+creadores|el\s+creador)\b[^?]{0,40}\b(ve[nr]?|pueden?\s+ver|revisan?|leen?|miran?|tienen?\s+acceso|acceden?|guardan?|venden?|comparten?|usan?)\b/i,
   /\b(venden|comparten|usan)\s+(mis|tus|los)\s+(datos|informaci[oó]n|b[uú]squedas|costos)\b/i,
+  // "administrador / dueño del sistema" (no el admin de su empresa, que sí lo explica la IA con Usuarios → Permisos)
+  /\b(administrador(es)?|admin|due[ñn]o(s)?|creador(es)?)\s+(del?|de\s+la)\s+(sistema|plataforma|radar|p[aá]gina|app|aplicaci[oó]n|programa)\b/i,
 ]
 export const esPreguntaInterna = (t: string) => PREGUNTA_INTERNA.some(r => r.test(t))
 /** Respuesta fija (sin IA) para lo que no se le explica a nadie, o null si la pregunta va a la IA. */
