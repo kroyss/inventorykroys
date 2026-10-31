@@ -43,7 +43,7 @@ La RESPUESTA PROPUESTA es una respuesta estándar del vendedor: lo que dice de p
    - Si pregunta por una talla, color o modelo (o por N unidades de uno) y hay tabla VARIANTES: solo si esa variante existe y sus disponibles alcanzan para lo que pide (1 si no dice cantidad), agrega la frase confirmándola ("en talla M negro sí tenemos"). Un "disponible" genérico NO contesta por una variante: aunque tenga stock, cubre_todo = false y va la frase. Si no existe, no alcanza, no queda claro cuál pide, o pide unidades sin decir de qué variante: texto_final vacío. Nunca sumes variantes distintas.
    - En cualquier otro caso texto_final vacío: el dato no está escrito, o la parte es sobre envíos, ciudades, tiempos, precios, pagos, descuentos, cantidades, ubicación, garantía, factura u otro producto. Eso lo contesta el vendedor.
    - Nunca inventes, supongas ni pidas datos al comprador. Ante la duda, texto_final vacío.
-5. Si la respuesta propuesta contradice la pregunta (por ejemplo, ofrece una agencia distinta a la que pide el comprador, o dice "disponible" cuando pregunta otra cosa), esa parte NO está contestada.
+5. Si la respuesta propuesta contradice la pregunta (por ejemplo, ofrece SOLO agencias distintas a la que pide el comprador, o dice "disponible" cuando pregunta otra cosa), esa parte NO está contestada. Nombrar más agencias de las que pidió está bien: si pregunta por Zoom y la respuesta dice "ZOOM y TEALCA", Zoom está contestado.
 
 Siempre termina llamando a la herramienta revisar_respuesta.`
 
