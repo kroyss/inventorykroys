@@ -250,9 +250,8 @@ Sin ver desde… | La última actualización NO volvió a encontrar esta publica
 Línea de visitas | Debajo de las ventas: visitas y preguntas de los últimos 30 días, medidas. El punto de color es el termómetro: verde = activo (100+ visitas o 3+ preguntas al mes), ámbar = tibio, rojo = muerto (casi sin visitas y sin preguntas en 3 meses). «↑ subiendo» / «↓ bajando» compara contra el período anterior. Solo aparece en los productos medidos.
 Triángulo arriba / abajo | Junto a las ventas o la calificación: subió o bajó respecto a la medición anterior.
 
-> El catálogo se mide con un **actualización mensual completa**
-Venezuela. Los sellos de movimiento (, , ) comparan la
-medición de hoy contra la de la actualización anterior, así que un producto recién
+> El catálogo se actualiza con una **actualización mensual completa** de Venezuela.
+Los sellos de movimiento comparan la actualización de hoy contra la anterior, así que un producto recién
 descubierto necesita **dos mediciones** para poder mostrarlos — si no los trae,
 muchas veces es porque todavía no hay con qué compararlo. Y lo que el último
 actualización ya no encontró se queda igual en el catálogo con el sello :
