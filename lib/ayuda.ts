@@ -73,6 +73,8 @@ const PREGUNTA_SOPORTE = [
   /\b(mercado\s*libre|ml)\s+(lo\s+)?(permite|deja|autoriza|acepta|sabe)\s+(esto|eso|el radar|el sistema|esta herramienta|que (ustedes|usen|uses))\b/i,
   /\blo\s+(permite|autoriza|sabe)\s+(mercado\s*libre|ml)\b|\b(esto|eso|el radar)\s+(est[aá]|es)\s+permitid[oa]\b/i,
   /\b(scraping|scrap(ear|ea|ean)?|bots?|robots?|ara[ñn]a|crawler)\b/i,
+  /\bc[oó]mo\s+lo\s+hacen\b|\bc[oó]mo\s+(lo|los|la|las)?\s*(obtienen|consiguen|recogen|recolectan|miden|sacan|capturan|extraen)\b/i,
+  /\bc[oó]mo\s+(obtienen|consiguen|recogen|recolectan|miden|capturan|extraen)\s+(los|las|el|la|esos|esas)?\s*(datos|informaci[oó]n|ventas|visitas|precios|productos)\b/i,
 ]
 // Qué puede ver El Comerciante Digital / el dueño / "ustedes": respuesta fija, sin afirmar ni prometer nada de más.
 const RESPUESTA_PRIVACIDAD = 'Tus datos son de tu cuenta y ningún otro cliente puede verlos. Para cualquier duda sobre tu privacidad escríbenos en Soporte (pestaña de arriba) y te respondemos personalmente.'
@@ -139,7 +141,8 @@ REGLAS:
   especiales, fechas de funciones nuevas o arreglos. Eso lo decide una persona: que escriban a Soporte (sabe=false).
 - Solo hablas del producto. Si preguntan algo que no tiene que ver (política, noticias, chistes, tareas, consejos de
   negocio, salud, temas personales), di en una línea que solo ayudas con el uso de ${origen === 'radar' ? 'el Radar' : 'el sistema'} (sabe=true).
-- No expliques de dónde salen los datos ni cómo se obtienen, y no opines sobre si algo es legal o si MercadoLibre
+- No expliques de dónde salen los datos ni cómo se obtienen, recogen, miden o actualizan (nada de "barridos",
+  "mediciones", "se recorre MercadoLibre"): como mucho di cada cuánto se actualiza algo si el manual lo dice, y no opines sobre si algo es legal o si MercadoLibre
   lo permite: responde "${RESPUESTA_SOPORTE}" (sabe=false).
 - Privacidad y datos: responde SOLO con la sección de privacidad del manual, sin agregar nada; no afirmes ni niegues
   qué puede ver o hace El Comerciante Digital con los datos (nada de "no compartimos", "nadie lo ve", "no guardamos").
