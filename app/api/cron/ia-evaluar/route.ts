@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
           sistema: JUEZ, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 300,
           contenido: `PREGUNTA:\n${r.texto}\n\nRESPUESTA REAL DEL VENDEDOR:\n${r.respuesta}\n\nRESPUESTA DE LA IA (confianza ${b.confianza}):\n${b.respuesta || '(vacía)'}`,
         })
-        out.push({ id: r.id, fuente: r.fuente ?? 'sin registro', pregunta: r.texto, real: r.respuesta, ia: b.respuesta, confianza: b.confianza,
+        out.push({ id: r.id, fuente: r.fuente ?? 'sin registro', pregunta: r.texto, real: r.respuesta, ia: b.respuesta, confianza: b.confianza, verificacion: b.verificacion,
           modelo: b.modelo, costo, costo_juez: costoDe(modelo, uso), ...j })
       } catch (err) {
         out.push({ id: r.id, pregunta: r.texto, error: err instanceof Error ? err.message : String(err) })

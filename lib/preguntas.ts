@@ -19,6 +19,7 @@ import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { completarNombres } from '@/lib/porConfirmar'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
+import { verificarBorrador } from '@/lib/verificadorIA'
 import { esDemo } from '@/lib/demo'
 import { riesgoDe } from '@/lib/sugerenciasPreguntas'
 import { variantesDe, textoVariantes, type Variante, type VariacionML } from '@/lib/variantesML'
@@ -376,6 +377,15 @@ Cómo responder:
 - "falta_dato": una frase corta (máximo 25 palabras) para el vendedor.
 - No prometas descuentos ni cosas fuera de las políticas.
 
+Reglas estrictas (una respuesta equivocada publicada sola le cuesta una venta o un reclamo al vendedor):
+- Colores, tallas, medidas, números técnicos (temperatura, voltaje, capacidad, autonomía) y qué incluye: SOLO si están escritos en el título, la ficha técnica, la descripción, la tabla VARIANTES o las notas del vendedor, y cópialos EXACTOS (mismo número, misma unidad). Nunca los deduzcas de las fotos, del nombre del modelo ni de otras publicaciones. Si preguntan "¿qué colores tienes?" y no hay VARIANTES ni color escrito, no nombres colores: confianza "baja".
+- Ubicación, retiro, garantía, factura, plazos de despacho y formas de pago: SOLO lo que dicen las POLÍTICAS o las RESPUESTAS RÁPIDAS. No nombres ciudades ni zonas que no estén ahí.
+- Envío gratis: SOLO según la línea "ENVÍO GRATIS A ESTE PRECIO" (si está) o las POLÍTICAS para el precio actual. Los montos y mínimos que digan las respuestas anteriores pueden estar viejos: no los copies.
+- Si pide una cantidad (2, 3…) y el stock alcanza, confírmala. Si no alcanza, no la afirmes ni lo mandes a otra publicación: confianza "baja".
+- Si la pregunta no se entiende sola ("¿pero hay esperanza?", "¿y el otro?", "¿entonces?") y las preguntas anteriores del comprador no la aclaran, deja confianza "baja".
+- Nunca menciones el "sistema", el stock interno, códigos de producto ni cómo sabes lo que sabes.
+- Confianza "alta" SOLO si cada cosa que afirmas está escrita en los datos de arriba y contestaste todas las partes. Ante cualquier duda, "baja": es mejor que lo responda una persona.
+
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
@@ -468,7 +478,7 @@ export const esPreguntaSimple = (texto: string) =>
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
  *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
-export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string }> {
+export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
   const sistema = SISTEMA + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
     : '')
@@ -484,11 +494,24 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
       web, modelo: m,
     }
   }
+  let b: Awaited<ReturnType<typeof pedir>> | null = null
   if (!web && esPreguntaSimple(c.pregunta.texto)) {
-    const b = await pedir(MODELO_SIMPLE).catch(() => null)
-    if (b && b.confianza === 'alta' && b.respuesta) return { ...b, llamadas }
+    b = await pedir(MODELO_SIMPLE).catch(() => null)
+    if (!(b && b.confianza === 'alta' && b.respuesta)) b = null
   }
-  return { ...(await pedir()), llamadas }
+  b ??= await pedir()
+  // Verificador (31-10): lo que la IA da por seguro se busca afirmación por afirmación en los datos; si algo no está
+  // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
+  let verificacion: string | null = null
+  if (!web && b.respuesta && b.confianza !== 'baja') {
+    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta).catch(() => null)
+    if (v) {
+      llamadas.push(v.llamada)
+      if (!v.ok) { verificacion = v.motivo; b = { ...b, confianza: 'baja', falta_dato: b.falta_dato ?? v.motivo } }
+      else verificacion = 'ok'
+    }
+  }
+  return { ...b, llamadas, verificacion }
 }
 
 // ── Sugerencias (gratis, sin IA): respuestas ya dadas a preguntas parecidas ──────────────────

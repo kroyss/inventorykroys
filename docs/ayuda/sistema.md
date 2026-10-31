@@ -125,6 +125,9 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
 2. Responde escribiendo, con una **respuesta rápida** (botón con un texto guardado) o con **Proponer con IA**: la
    IA lee la publicación, tus políticas y lo que el sistema aprendió de ese producto y propone una respuesta.
    **No se envía nada sin que la revises.**
+   Antes de mostrarla, una segunda revisión busca cada dato de la propuesta (colores, medidas, envío, ubicación,
+   garantía) en la publicación y en tus políticas: si algo no está escrito o falta contestar una parte, la propuesta
+   sale con **confianza baja** y te dice qué revisar.
 3. **Buscar en internet:** para dudas técnicas que la publicación no responde (cuesta créditos extra).
 4. Envía. La respuesta sale en MercadoLibre a tu nombre.
 
