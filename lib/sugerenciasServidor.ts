@@ -21,6 +21,7 @@ export interface SugeridaPregunta {
   por_palabras?: string[]        // la activaron sus palabras (aprendidas o propias), no la calibración por temas
   revisada?: boolean             // el revisor IA confirmó que contesta todas las partes (lib/revisorSugeridas.ts)
   agregado?: boolean             // el revisor le agregó una frase con un dato de la publicación: se lee antes de enviar
+  por_variante?: boolean         // pregunta por una talla/color/cantidad de una publicación con variantes: solo con revisor
 }
 
 async function leerJSON<T>(db: Pool, clave: string, vacio: T): Promise<T> {
@@ -126,7 +127,7 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
       const palabras = s.temas.includes(`p:${id}`) ? palabrasQueActivan(s.plantilla, p.texto) : []
       if (r !== null || palabras.length) {
         out.set(p.id, { plantilla: id, titulo: s.plantilla.titulo, texto: s.plantilla.texto, respaldo: r ?? 0,
-          sin_confirmar: s.sinConfirmar, ...(r === null ? { por_palabras: palabras } : {}) })
+          sin_confirmar: s.sinConfirmar, ...(r === null ? { por_palabras: palabras } : {}), ...(s.porVariante ? { por_variante: true } : {}) })
         continue
       }
     }
@@ -135,11 +136,13 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   }
   // Revisor IA (31-10): la pregunta puede traer otra parte que la respuesta no contesta ("¿disponible? ¿son rojos?").
   const revs = await revisarSugeridas(db, [...out].map(([id, s]) => ({ id, plantilla: s.plantilla, texto: s.texto, stock: stockDe.get(id)?.stock ?? null })))
-  for (const [id, rev] of revs) {
-    const s = out.get(id)!
-    if (rev.ok) s.revisada = true
-    else if (rev.texto) { s.texto = rev.texto; s.agregado = true }
-    else { out.delete(id); probables.set(id, s.plantilla) }   // queda para una persona, con el botón resaltado
+  for (const [id, s] of out) {
+    const rev = revs.get(id)
+    // De variante: solo con la frase del revisor que confirma ESA variante con su stock.
+    if (rev?.ok && !s.por_variante) s.revisada = true
+    else if (rev?.texto) { s.texto = rev.texto; s.agregado = true }
+    // Sin revisión las de variante no se muestran (nadie confirmó la talla/color); las demás quedan como antes.
+    else if (rev || s.por_variante) { out.delete(id); probables.set(id, s.plantilla) }   // queda para una persona, con el botón resaltado
   }
   return { sugeridas: out, probables }
 }

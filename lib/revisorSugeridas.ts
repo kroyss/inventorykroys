@@ -11,6 +11,7 @@ import { llamarClaude, registrarUso, iaConfigurada, MODELO_SIMPLE } from '@/lib/
 import { mlFetch } from '@/lib/ml'
 import { parecido } from '@/lib/sugerenciasPreguntas'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
+import { variantesDe, textoVariantes, type VariacionML } from '@/lib/variantesML'
 
 export interface Revision {
   plantilla: string
@@ -39,7 +40,8 @@ La RESPUESTA PROPUESTA es una respuesta estándar del vendedor: lo que dice de p
 3. Si contesta todas: cubre_todo = true y texto_final vacío.
 4. Si falta alguna parte:
    - Si esa parte es sobre el producto (color, material, medida, qué incluye, para qué sirve) y el dato está ESCRITO en el Título, la Ficha o la Descripción, escribe en texto_final la respuesta propuesta COPIADA IGUAL con UNA frase corta agregada que repite ese dato (máximo 20 palabras, mismo tono, sin saludo nuevo).
-   - En cualquier otro caso texto_final vacío: el dato no está escrito, o la parte es sobre envíos, ciudades, tiempos, precios, pagos, descuentos, cantidades, ubicación, garantía, factura, otro producto, o colores/tallas/modelos de una publicación con variantes. Eso lo contesta el vendedor.
+   - Si pregunta por una talla, color o modelo (o por N unidades de uno) y hay tabla VARIANTES: solo si esa variante existe y sus disponibles alcanzan para lo que pide (1 si no dice cantidad), agrega la frase confirmándola ("en talla M negro sí tenemos"). Un "disponible" genérico NO contesta por una variante: aunque tenga stock, cubre_todo = false y va la frase. Si no existe, no alcanza, no queda claro cuál pide, o pide unidades sin decir de qué variante: texto_final vacío. Nunca sumes variantes distintas.
+   - En cualquier otro caso texto_final vacío: el dato no está escrito, o la parte es sobre envíos, ciudades, tiempos, precios, pagos, descuentos, cantidades, ubicación, garantía, factura u otro producto. Eso lo contesta el vendedor.
    - Nunca inventes, supongas ni pidas datos al comprador. Ante la duda, texto_final vacío.
 5. Si la respuesta propuesta contradice la pregunta (por ejemplo, ofrece una agencia distinta a la que pide el comprador, o dice "disponible" cuando pregunta otra cosa), esa parte NO está contestada.
 
@@ -63,7 +65,7 @@ const HERRAMIENTA = {
   },
 }
 
-interface ItemML { title?: string; attributes?: { name: string; value_name: string | null }[]; variations?: unknown[] }
+interface ItemML { title?: string; attributes?: { name: string; value_name: string | null }[]; variations?: VariacionML[] }
 
 async function revisarUna(db: Pool, q: { id: string; texto: string; conexion_id: number; item_id: string; item_titulo: string | null },
   plantilla: string, propuesta: string, stock: number | null): Promise<Revision> {
@@ -75,13 +77,13 @@ async function revisarUna(db: Pool, q: { id: string; texto: string; conexion_id:
     descripcion = (await mlFetch<{ plain_text?: string }>(db, q.conexion_id, `/items/${q.item_id}/description`)).plain_text?.trim() || null
   } catch { /* sin descripción */ }
   const ficha = (item?.attributes ?? []).filter(a => a.value_name).slice(0, 40).map(a => `${a.name}: ${a.value_name}`)
-  const variantes = item?.variations?.length ?? 0
+  const variantes = await variantesDe(db, q.item_id, item?.variations).catch(() => [])
   const contenido = [
     `PREGUNTA DEL COMPRADOR:\n${q.texto}`,
     `\nRESPUESTA PROPUESTA:\n${propuesta}`,
     `\nDATOS DE LA PUBLICACIÓN:`,
     `Título: ${item?.title ?? q.item_titulo ?? '—'}`,
-    `Variantes: ${variantes > 1 ? `${variantes} (colores/tallas/modelos distintos)` : 'no tiene'}`,
+    variantes.length ? textoVariantes(variantes) : 'Variantes: no tiene',
     stock !== null ? `Stock: ${stock}` : '',
     ficha.length ? `Ficha:\n${ficha.join('\n')}` : 'Ficha: —',
     descripcion ? `Descripción:\n${descripcion.slice(0, 1500)}` : 'Descripción: —',

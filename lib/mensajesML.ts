@@ -62,6 +62,7 @@ type OrdenVenta = {
                  base_currency_id?: string | null; base_exchange_rate?: number | null }[]
   date_created?: string
   buyer?: { id: number; nickname?: string; first_name?: string; last_name?: string }
+  shipping?: { id?: number | null } | null
 }
 
 /** Las órdenes de una venta (orden suelta o pack). De paso se guardan en ml_ordenes (2026-10-13): una
@@ -324,7 +325,16 @@ export async function itemsDeVenta(db: Pool, conexionId: number, pack: string) {
     it.envio = e ? { estado: e.estado, texto: e.texto, conflicto }
       : { estado: 'sin_peso', texto: 'Sin peso: no está en el portal de MercadoEnvíos ni vinculada a un producto con peso' }
   }
-  return { items: items.map(({ varId, ...it }) => ({ ...it, variacion: varId })), comprador }
+  // Envío de MercadoEnvíos (31-10): la IA de Mensajes da la guía aunque la empresa no use Despachos.
+  const envioId = ordenes.find(o => o.shipping?.id)?.shipping?.id ?? null
+  return { items: items.map(({ varId, ...it }) => ({ ...it, variacion: varId })), comprador, envioId }
+}
+
+/** Guía y estado del envío en MercadoEnvíos (null si ML no lo da). */
+export async function envioML(db: Pool, conexionId: number, envioId: number) {
+  const e = await mlFetch<{ tracking_number?: string | null; status?: string | null; substatus?: string | null; tracking_method?: string | null }>(
+    db, conexionId, `/shipments/${envioId}`)
+  return e.tracking_number || e.status ? { guia: e.tracking_number ?? null, estado: e.status ?? null, transportista: e.tracking_method ?? null } : null
 }
 
 /** Foto del producto vendido: la de la variante (el color que compró) si la publicación tiene

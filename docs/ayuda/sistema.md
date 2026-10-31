@@ -145,6 +145,11 @@ responde sola**: siempre la envía una persona.
   en la publicación (color, material, qué incluye), puede agregar una frase: sale marcada «+ frase agregada por la IA ·
   revísala», no entra en «Enviar las sugeridas» y conviene leerla antes de enviar.
 - Esta revisión no gasta tus créditos de IA.
+- **Tallas y colores:** si la publicación tiene variantes y preguntan «¿tienes en talla M?» o «¿hay en rojo?», el
+  sistema revisa el stock de ESA variante en MercadoLibre (y en tu inventario, si la variante está vinculada). Solo la
+  confirma si alcanza para lo que piden; si no hay, no alcanza o no se entiende cuál piden, queda para que respondas tú.
+- La IA también tiene en cuenta lo que ese mismo comprador preguntó antes (si te pregunta «¿cuánto tarda?» y después
+  «sería a Valencia», entiende que es lo mismo).
 
 **Otras acciones:** reponer stock desde la pregunta («¿tienes disponible?» con la publicación agotada) y eliminar
 preguntas (spam, ofensivas).
@@ -172,7 +177,9 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   envía.
 - **Respuestas rápidas de mensajes:** botones con textos guardados; un clic pone el texto y lo puedes retocar.
   Si no tienes ninguna, el sistema ofrece unos ejemplos para empezar.
-- **Proponer con IA:** lee la conversación, la nota y la venta y propone una respuesta (no envía nada).
+- **Proponer con IA:** lee la conversación, la nota y la venta y propone una respuesta (no envía nada). Si la guía
+  no salió de Despachos, usa la de MercadoEnvíos. Si preguntan algo que depende de tu equipo (cuándo sale el paquete,
+  desde dónde se envía), no lo inventa: propone «lo verificamos con el equipo y te avisamos por aquí».
 - **Nota de la venta:** una nota interna que se guarda en MercadoLibre; **el comprador no la ve** (ej. «cambia a
   talla L», «garantía, espera fotos»).
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.

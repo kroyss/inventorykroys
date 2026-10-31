@@ -53,12 +53,17 @@ const RELLENO = new Set(`
 /** Colores: aunque estén en el título, "¿es negro?" pide una variante (va a una persona). */
 const COLOR = /^(negr|blanc|roj|azul|verde|amarill|gris|rosad|rosa$|morad|marron|dorad|plateado|naranja|beige|wengue|transparente)/
 
-/** Las palabras de la pregunta que el sistema NO entiende (vacío = se entiende toda). */
-export function sobrantes(pregunta: string, titulo: string | null | undefined, permitidas: string[] = []): string[] {
+/** Tallas sueltas ("M", "XL", "xxs"): con variantes las revisa el revisor IA contra el stock de cada una. */
+const TALLA = /^(x{0,3}[sl]|m|xx?l|talla|tallas|color|colores)$/
+
+/** Las palabras de la pregunta que el sistema NO entiende (vacío = se entiende toda). Con `variante` (la publicación
+ *  tiene variantes), los colores y tallas se entienden: los confirma el revisor con el stock de cada variante. */
+export function sobrantes(pregunta: string, titulo: string | null | undefined, permitidas: string[] = [], variante = false): string[] {
   const raices = [...Object.values(TEMAS).flatMap(t => t.palabras), ...permitidas.map(normalizar)].filter(r => !r.includes(' '))
   const delTitulo = new Set(normalizar(titulo ?? '').split(' ').filter(w => w.length > 2 && !COLOR.test(w)))
   return normalizar(pregunta).split(' ').filter(w =>
-    w === 'no' || (w.length > 2 && !RELLENO.has(w) && !delTitulo.has(w) && !raices.some(r => w.startsWith(r))))
+    w === 'no' || (w.length > 2 && !RELLENO.has(w) && !delTitulo.has(w) && !raices.some(r => w.startsWith(r))
+      && !(variante && (COLOR.test(w) || TALLA.test(w)))))
 }
 
 const tiene = (t: string, palabra: string) =>
@@ -121,7 +126,7 @@ export const NIEGA_ENVIO = /(no tiene (opcion|opción) de env|por unidad no|no a
 /** stock: lo que se puede vender de ESA publicación (ML y, si está vinculada, el inventario); variantes: cuántas tiene. */
 export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null; variantes?: number | null; titulo?: string | null }
 export type Sugerencia =
-  | { tipo: 'sugerida'; indice: number; plantilla: Plantilla; temas: string[]; sinConfirmar: boolean }
+  | { tipo: 'sugerida'; indice: number; plantilla: Plantilla; temas: string[]; sinConfirmar: boolean; porVariante?: boolean }
   | { tipo: 'humano'; motivo: string; temas: string[] }
 
 /**
@@ -141,16 +146,18 @@ export function sugerir(pregunta: string, item: ItemDatos,
   const temas = [...temasDe(pregunta), ...propias.map(temaPropio)]
   // «¿Disponible N?» (28-10): la cantidad sale del texto y el resto se revisa igual; se responde solo si hay N.
   const cant = /\d/.test(tn) ? cantidadPedida(pregunta) : null
-  const r = riesgoDe(cant ? cant.resto : pregunta, propias.flatMap(p => p.palabras ?? []))
+  // Con variantes (31-10): color/talla y cantidades no van directo a una persona: el revisor IA los confirma con el
+  // stock de cada variante (lib/variantesML.ts) o los deja para una persona.
+  const variante = (item.variantes ?? 0) > 1
+  const r = riesgoDe(cant ? cant.resto : pregunta, [...propias.flatMap(p => p.palabras ?? []), ...(variante ? ['color', 'talla'] : [])])
   if (r) return { tipo: 'humano', motivo: `depende del caso (${r})`, temas }
   if (cant) {
     if (cant.n > CANTIDAD_MAX) return { tipo: 'humano', motivo: `depende del caso (pide ${cant.n})`, temas }
-    if ((item.variantes ?? 0) > 1) return { tipo: 'humano', motivo: 'pide una cantidad y la publicación tiene variantes', temas }
     if (item.stock === null) return { tipo: 'humano', motivo: 'pide una cantidad y no se sabe el stock', temas }
     if (item.stock < cant.n) return { tipo: 'humano', motivo: `pide ${cant.n} y hay ${item.stock}`, temas }
   }
   if (!temas.length) return { tipo: 'humano', motivo: 'no se reconoce el tema', temas }
-  const sobra = sobrantes(cant ? cant.resto : pregunta, item.titulo, propias.flatMap(p => p.palabras ?? []))
+  const sobra = sobrantes(cant ? cant.resto : pregunta, item.titulo, propias.flatMap(p => p.palabras ?? []), variante)
   if (sobra.length) return { tipo: 'humano', motivo: `no se entiende toda la pregunta (${sobra.slice(0, 3).join(', ')})`, temas }
   const candidatas = plantillas.map((p, indice) => ({ p, indice, cubre: temasDePlantilla(p) }))
     .filter(c => temas.every(t => c.cubre.includes(t)))
@@ -177,8 +184,9 @@ export function sugerir(pregunta: string, item: ItemDatos,
   if (conStock.length > 1 && costo(conStock[0].cubre) === costo(conStock[1].cubre))
     return { tipo: 'humano', motivo: 'dos respuestas posibles', temas }
   const c = conStock[0]
+  const porVariante = variante && (!!cant || normalizar(pregunta).split(' ').some(w => COLOR.test(w) || TALLA.test(w)))
   return { tipo: 'sugerida', indice: c.indice, plantilla: c.p, temas,
-    sinConfirmar: ofreceEnvioGratis(c.p) && item.envioGratis !== true }
+    sinConfirmar: ofreceEnvioGratis(c.p) && item.envioGratis !== true, ...(porVariante ? { porVariante } : {}) }
 }
 
 // ── Calibración con el historial del vendedor ───────────────────────────────

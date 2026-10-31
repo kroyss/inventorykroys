@@ -5,7 +5,7 @@
 // mensajes parecidos (su voz). Solo propone: la persona revisa y envía.
 import type { Pool } from 'pg'
 import { llamarClaude, type UsoIA } from '@/lib/ia'
-import { itemsDeVenta, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
+import { itemsDeVenta, envioML, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
 import { leerNotas } from '@/lib/notasML'
 import { mlFetch } from '@/lib/ml'
 import { fichasActivas } from '@/lib/fichasIA'
@@ -30,6 +30,8 @@ Cómo responder:
 - Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
 - Usa SOLO los datos que te doy. Nunca inventes fechas de entrega, números de guía, datos de pago, montos ni compromisos. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
 - Si hay GUÍA de envío, puedes darla. Si no la hay, no digas que ya se envió.
+- Si pregunta algo que depende del equipo y no está en los datos (cuándo sale el paquete, desde qué oficina, un problema con el pago o el formulario), no lo inventes: responde que lo verifican con el equipo y le avisan por este chat, con confianza "baja" y el dato en "falta_dato".
+- Si el comprador solo manda un emoji o un "ok", no hace falta responder: deja la respuesta vacía con confianza "alta".
 - Si el comprador solo saluda o agradece, responde corto y amable.
 - Nada de correos, redes sociales ni links que no sean de MercadoLibre.
 
@@ -109,7 +111,10 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
       `SELECT e.carrier, COALESCE(e.guia_final, e.guia) AS guia, j.status AS jornada, j.closed_at
        FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id JOIN despacho_jornadas j ON j.id = l.jornada_id
        WHERE e.venta = $1 AND e.impresa AND l.status = 'GENERADO' ORDER BY e.id DESC LIMIT 1`, [pack])
+    // Sin Despachos: la guía y el estado que da MercadoEnvíos (31-10).
+    const ml = !g && venta?.envioId ? await envioML(db, conexionId, venta.envioId).catch(() => null) : null
     if (g) L.push(`ENVÍO: guía ${g.carrier} ${g.guia}` + (g.jornada === 'CERRADA' ? ' (paquete entregado al transportista)' : ' (etiqueta impresa, el paquete todavía no salió)'))
+    else if (ml?.guia) L.push(`ENVÍO (MercadoEnvíos): guía ${[ml.transportista, ml.guia].filter(Boolean).join(' ')}${ml.estado ? ` · estado en ML: ${ml.estado}` : ''}`)
     else L.push('ENVÍO: todavía no tiene guía impresa (no se ha despachado).')
   }
   const textoNotas = [...notas.notas.map(n => n.texto), s?.notes].filter((x): x is string => !!x?.trim())

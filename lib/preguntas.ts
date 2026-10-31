@@ -21,6 +21,7 @@ import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
 import { esDemo } from '@/lib/demo'
 import { riesgoDe } from '@/lib/sugerenciasPreguntas'
+import { variantesDe, textoVariantes, type Variante, type VariacionML } from '@/lib/variantesML'
 
 // ── Tipos de la API (lo que usamos) ────────────────────────────────────────
 export interface PreguntaML {
@@ -223,6 +224,7 @@ interface ItemML {
   attributes?: { name: string; value_name: string | null }[]
   shipping?: { free_shipping?: boolean }
   warranty?: string | null
+  variations?: VariacionML[]
 }
 
 export interface Contexto {
@@ -241,11 +243,13 @@ export interface Contexto {
   parecidas: { p: string; r: string }[]
   ficha: { texto: string; dudas: string | null } | null     // ficha de conocimiento de la publicación
   otras: OtraPublicacion[]                                   // otras publicaciones del vendedor
+  variantes?: Variante[]                                     // stock por variante (31-10)
+  delComprador?: { p: string; r: string | null; fecha: string }[]   // sus preguntas anteriores (31-10)
 }
 
 export async function armarContexto(db: Pool, preguntaId: number, country: string): Promise<Contexto & { conexionId: number }> {
   const { rows: [q] } = await db.query(
-    `SELECT id, conexion_id, item_id, item_titulo, item_precio::float, item_precio_original::float, item_moneda, texto, fecha FROM ml_preguntas WHERE id = $1`, [preguntaId])
+    `SELECT id, conexion_id, item_id, item_titulo, item_precio::float, item_precio_original::float, item_moneda, texto, fecha, comprador_id FROM ml_preguntas WHERE id = $1`, [preguntaId])
   if (!q) throw new Error('Pregunta no encontrada')
 
   let item: ItemML | null = null
@@ -253,7 +257,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Con `attributes=` explícito: el GET completo lo puede frenar el PolicyAgent de ML.
   try {
     item = await mlFetch<ItemML>(db, q.conexion_id, `/items/${q.item_id}?attributes=` +
-      'id,title,price,currency_id,available_quantity,condition,status,permalink,category_id,attributes,shipping,warranty')
+      'id,title,price,currency_id,available_quantity,condition,status,permalink,category_id,attributes,shipping,warranty,variations')
   } catch { /* sin datos de ML: la IA trabaja con el resto */ }
   try {
     const d = await mlFetch<{ plain_text?: string }>(db, q.conexion_id, `/items/${q.item_id}/description`)
@@ -310,6 +314,12 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Se pidió IA en esta publicación: desde ahora merece ficha (fichas POR USO, migración 063).
   await db.query(`UPDATE ml_catalogo SET ia_usada_at = NOW() WHERE item_id = $1`, [q.item_id]).catch(() => {})
   const otras = await otrasPublicaciones(db, q.item_id, item?.title ?? q.item_titulo ?? '', q.texto).catch(() => [])
+  const variantes = await variantesDe(db, q.item_id, item?.variations).catch(() => [])
+  // Lo que este comprador ya preguntó en los últimos 7 días (31-10): "Sería a El Tocuyo" contesta a "¿cuánto tarda Zoom?".
+  const { rows: delComprador } = q.comprador_id ? await db.query(
+    `SELECT p.texto AS p, p.respuesta AS r, to_char(p.fecha, 'DD-MM HH24:MI') AS fecha FROM ml_preguntas p
+     WHERE p.comprador_id = $1 AND p.id <> $2 AND p.fecha > NOW() - interval '7 days' ORDER BY p.fecha DESC LIMIT 5`,
+    [q.comprador_id, q.id]) : { rows: [] }
 
   return {
     conexionId: q.conexion_id,
@@ -324,6 +334,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     notas: notas.map(n => n.texto),
     mismoItem: mismo, parecidas,
     ficha: ficha ?? null, otras,
+    variantes, delComprador: delComprador.reverse(),
   }
 }
 
@@ -353,6 +364,8 @@ Cómo responder:
 - Copia el tono, las frases y las políticas de las RESPUESTAS ANTERIORES DEL VENDEDOR: son su voz real. Adáptalas, no las inventes de cero.
 - Usa SOLO los datos que te doy: ficha y descripción de la publicación, FICHA DE CONOCIMIENTO, stock, políticas y notas.
 - Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
+- Variantes (color, talla, modelo): usa la tabla VARIANTES. Confirma una variante solo si sus disponibles alcanzan para lo que pide (1 si no dice cantidad); si no alcanza o no existe, no la afirmes: di cuáles sí hay, o deja confianza "baja". Nunca sumes variantes distintas para llegar a una cantidad.
+- Si hay PREGUNTAS ANTERIORES DE ESTE MISMO COMPRADOR, úsalas para entender la pregunta (puede estar contestando algo que se le preguntó, como la ciudad).
 - Disponibilidad: si hay STOCK REAL del sistema, manda ese (si es 0, no digas que hay disponible). Si la publicación no está vinculada al sistema, guíate por la publicación: activa y con unidades = disponible (como responde siempre el vendedor); pausada o sin unidades = no lo afirmes.
 - Si la publicación no tiene lo que pide el comprador y en OTRAS PUBLICACIONES DEL VENDEDOR hay una que sí lo cumple (según su título o su ficha), recomiéndala como lo hace el vendedor: dile que esta no, que la otra sí, y pon el link de esa publicación tal cual. Si ninguna cumple con certeza, no recomiendes nada.
 - Nunca inventes medidas, compatibilidades, garantías, precios ni tiempos de envío. Si el dato no está, en la respuesta di con naturalidad que la publicación no lo especifica y, si ayuda, pregunta para qué lo necesita (por ejemplo "¿para qué equipo lo necesitas?"); anótalo en "falta_dato" y deja confianza "baja". Si ni eso sirve, deja la respuesta vacía.
@@ -396,6 +409,11 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
     L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)
   } else {
     L.push(`\nSTOCK REAL: esta publicación no está vinculada a un producto del sistema. En MercadoLibre: ${c.item ? `${c.item.status === 'active' ? 'activa' : c.item.status}, ${c.item.available_quantity} unidades` : 'no se pudo leer'}.`)
+  }
+  if (c.variantes?.length) L.push(textoVariantes(c.variantes))
+  if (c.delComprador?.length) {
+    L.push('\nPREGUNTAS ANTERIORES DE ESTE MISMO COMPRADOR (para entender a qué se refiere ahora):')
+    L.push(c.delComprador.map(x => `${x.fecha} P: ${x.p}${x.r ? `\n      R: ${x.r}` : ' (sin responder)'}`).join('\n'))
   }
   if (c.politicas.trim()) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${c.politicas.trim()}`)
   const precio = pml && pml.moneda === 'USD' ? pml.precio : null
