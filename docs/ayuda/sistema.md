@@ -425,7 +425,9 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   como ajuste.
 - **Compras:** «Entró mercancía» (en un paso: carga el inventario), o por etapas si la empresa lo usa.
 - **Promociones:** campañas de MercadoLibre, qué publicaciones pueden entrar y hasta dónde bajar el precio sin
-  perder el envío gratis.
+  perder el envío gratis. **Traer ME y ML** trae precios y campañas de MercadoLibre y los pesos del portal de
+  MercadoEnvíos (con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar sale un aviso verde con cuántas
+  publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
 - **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
 - **Ajustes:** tasa del dólar, costos de MercadoLibre (comisión, envío) y otras configuraciones del administrador.
 

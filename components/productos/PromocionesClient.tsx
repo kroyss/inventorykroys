@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
@@ -233,21 +233,49 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     }
     await actualizarML()
   }
+  // Pesos de antes de la traída: cuando llegan los nuevos (router.refresh → filas) se cuenta cuántos cambiaron
+  // y se avisa (31-10: al terminar solo desaparecía "trayendo…" y no se notaba que ya estaba).
+  const filasRef = useRef(filas)
+  useEffect(() => { filasRef.current = filas }, [filas])
+  const pesosAntes = useRef<Map<string, number | null> | null>(null)
   useEffect(() => {
     if (!pedidoME) return
-    const t = setInterval(async () => {
+    let listo = false
+    const revisar = async () => {
+      if (listo) return
       const r = await fetch(`/api/promociones/pesos?pedido=${pedidoME.id}`, { cache: 'no-store' }).catch(() => null)
       const d = await r?.json().catch(() => null) as { hechos: number; perfiles: number; errores: string[] } | null
+      if (listo) return
       const vencido = Date.now() - pedidoME.desde > 15 * 60_000
       if (d && d.hechos < d.perfiles && !vencido) { setEstadoPesos(`trayendo con la PC de Pagos ME… ${d.hechos} de ${d.perfiles} cuentas`); return }
+      listo = true
       clearInterval(t)
       setPedidoME(null)
-      setEstadoPesos(vencido && (!d || d.hechos < d.perfiles) ? 'la PC de Pagos ME no terminó en 15 min (¿está prendida?)'
+      const noTermino = vencido && (!d || d.hechos < d.perfiles)
+      setEstadoPesos(noTermino ? 'la PC de Pagos ME no terminó en 15 min (¿está prendida?)'
         : d?.errores.length ? `con errores: ${d.errores.join(' · ')}` : null)
+      if (!noTermino) pesosAntes.current = new Map(filasRef.current.map(f => [`${f.conexionId}|${f.id}`, f.peso]))
       router.refresh()
-    }, 10_000)
-    return () => clearInterval(t)
+    }
+    const t = setInterval(revisar, 10_000)
+    // Chrome frena los relojes de las pestañas en segundo plano (p. ej. mientras se mira el portal de
+    // MercadoEnvíos): al volver a esta pestaña se revisa enseguida.
+    const alVolver = () => { if (document.visibilityState === 'visible') revisar() }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => { listo = true; clearInterval(t); document.removeEventListener('visibilitychange', alVolver) }
   }, [pedidoME])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const antes = pesosAntes.current
+    if (!antes) return
+    pesosAntes.current = null
+    const n = filas.filter(f => {
+      const k = `${f.conexionId}|${f.id}`
+      return antes.has(k) && (antes.get(k) ?? null) !== (f.peso ?? null)
+    }).length
+    setError(null)
+    setAviso(`✓ Pesos del portal actualizados · ${n === 0 ? 'ningún peso cambió'
+      : n === 1 ? '1 publicación cambió de peso' : `${n} publicaciones cambiaron de peso`}`)
+  }, [filas])
   const sacar = async (v: Vista, p: PromoDeItem & { nombre: string }) => {
     const camp = campanas.find(c => c.conexionId === v.conexionId && c.id === p.campana)
     if (!await confirmar({
@@ -304,7 +332,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
         ))}
         <span>Pesos del portal: {estadoPesos
           ? <span className={pedidoME ? 'text-sky-700' : 'text-amber-700'}>{estadoPesos}</span>
-          : <>{cuando(pesosAl)}{conPagosME ? ' (se traen solos 1 vez al día)' : ''}</>}</span>
+          : <>{cuando(pesosAl)}{conPagosME ? ' (se actualizan con la primera traída de Pagos ME del día)' : ''}</>}</span>
         <label className="ml-auto flex items-center gap-1.5" title="Para las sugerencias y el filtro de margen bajo">
           Margen mínimo
           <input type="number" min={0} max={90} value={margenMin} onChange={e => guardarMargen(Math.max(0, Math.min(90, Number(e.target.value) || 0)))}
