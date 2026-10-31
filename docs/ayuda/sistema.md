@@ -221,8 +221,8 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 Trae **solos** los pagos de MercadoEnvíos (con su comprobante) y las **guías**, desde el portal de MercadoEnvíos,
 para que verifiques los pagos de corrido y despaches.
 
-**Cómo funciona:** un programa en tu PC (Windows) usa tu Google Chrome, con tu sesión de MercadoEnvíos ya
-iniciada, para leer el portal. **Tu contraseña nunca sale de tu PC.** Si se va la luz no se pierde nada: al prender
+**Cómo funciona:** un programa en tu PC (Windows) trae tus pagos y guías usando tu Google Chrome, con tu sesión de
+MercadoEnvíos ya iniciada. **Tu contraseña nunca sale de tu PC.** Si se va la luz no se pierde nada: al prender
 la PC trae lo que faltaba.
 
 **Antes de empezar:** PC con Windows, Google Chrome, y en Chrome la sesión de MercadoEnvíos iniciada con tu cuenta
@@ -302,7 +302,7 @@ Le escribe a cada comprador su **número de guía** por MercadoLibre, después d
    habilita el botón de reportar.
 2. Cierra la jornada en Despachos. Las guías entran a la cola del Reportador (las de TEALCA, cuando escribes la guía
    final).
-3. **Reportar por API:** el sistema le escribe a cada comprador desde el servidor. Puedes cerrar la pantalla o
+3. **Reportar por API:** el sistema le escribe a cada comprador solo. Puedes cerrar la pantalla o
    bloquear el teléfono. Antes de cada envío revisa la conversación para no repetirle la guía a nadie. Opción
    «Reportar solo al cerrar la jornada».
 
@@ -451,8 +451,8 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   | 7 · Calificaciones y Stock | Calificar en lote y mantener el stock al día | 7, 11, 12 |
   | 8 · Conéctate con Mercadoenvios (serie MercadoEnvíos) | Instalar y conectar el programa y la extensión para traer guías y pagos | 8 |
 
-  La lista viva de videos está en la base (`aprendizaje_videos`); el asistente la recibe al día y enlaza al video.
-  Si se agrega o cambia un video, actualizar también esta tabla.
+  <!-- INTERNO: la lista viva de videos está en la base (aprendizaje_videos); el asistente la recibe al día y enlaza
+  al video. Si se agrega o cambia un video, actualizar también esta tabla. -->
 - **Novedades:** lo nuevo del sistema, en orden de fecha.
 
 ---
@@ -461,8 +461,8 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 
 *Cómo lo pregunta la gente:* bloquear comprador, no se puede, límite, Facebook, mensaje cortado.
 
-- **No bloquea compradores:** MercadoLibre no lo permite por su API; se hace desde la web de ML.
-- **No saca guías de MercadoEnvíos por API** en Venezuela: por eso existe Pagos ME (lee el portal desde tu PC).
+- **No bloquea compradores:** MercadoLibre no lo permite desde otros sistemas; se hace desde la web de ML.
+- **No saca solo las guías de MercadoEnvíos** en Venezuela: para eso está **Pagos ME** (el programa en tu PC).
 - **No publica ni cambia precios solo.** Solo cambia stock o reactiva cuando tú lo pides.
 - **No ve tus guías si las imprimes directo en MercadoLibre** (sin pasar por Despachos).
 - **Links de Facebook** en mensajes: MercadoLibre los rechaza.

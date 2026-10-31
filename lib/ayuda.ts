@@ -10,10 +10,15 @@ import { readFile } from 'fs/promises'
 import path from 'path'
 import { dbGlobal } from '@/lib/db'
 import { costoDe, llamarClaude, MODELO_SIMPLE } from '@/lib/ia'
+import { chatsDuenoPlataforma } from '@/lib/registro'
+import { enviarTelegram } from '@/lib/telegram'
 
 export const MODELO_AYUDA = process.env.AYUDA_MODELO ?? MODELO_SIMPLE
 /** Tope por persona y por día (la IA la pagamos nosotros). */
 export const AYUDA_TOPE_DIA = Number(process.env.AYUDA_TOPE_DIA ?? 25)
+/** Tope de gasto de TODA la plataforma por día, en dólares (Sistema + Radar): pasado esto el chat manda a Soporte
+ *  hasta mañana y al dueño le llega un aviso por Telegram. Evita que muchas cuentas (registro gratis) disparen el gasto. */
+export const AYUDA_TOPE_GLOBAL_USD = Number(process.env.AYUDA_TOPE_GLOBAL_USD ?? 1)
 
 /** De qué producto es la pregunta: cada uno con su manual (docs/ayuda/<origen>.md). El Radar pregunta por
  *  /api/externo/ayuda (servidor a servidor): así todo queda en el mismo conteo de gasto y la misma bandeja. */
@@ -77,6 +82,34 @@ export function respuestaFija(t: string): { respuesta: string; sabe: boolean } |
   return null
 }
 
+/** Tacha lo que no debe guardarse ni viajar a la IA: contraseñas/claves escritas, tarjetas y cédulas. */
+export function ocultarSensibles(t: string) {
+  return t
+    .replace(/\b(contrase[ñn]as?|claves?|password|passwd|pass|pin|token)\b(\s*(es|era|ser[ií]a|qued[oó] como|:|=|->))\s*["'«]?[^\s"'»]{3,}/gi, '$1 [oculto]')
+    .replace(/\b(?:\d[ -]?){13,19}\b/g, '[tarjeta oculta]')
+    .replace(/\b([VEJGvejg])[-. ]?\d{1,2}\.?\d{3}\.?\d{3}\b/g, '[cédula oculta]')
+    .replace(/\b(c[eé]dula|ci|c\.i\.?|rif)\s*(n[°ºo.]*|:)?\s*\d[\d.]{5,10}\b/gi, '$1 [oculta]')
+}
+
+/** Gasto de IA de hoy en toda la plataforma (Sistema + Radar), en dólares. */
+async function gastoDeHoy() {
+  const { rows: [r] } = await dbGlobal().query(
+    `SELECT COALESCE(SUM(costo), 0)::float AS c FROM ayuda_consultas
+     WHERE created_at >= (date_trunc('day', NOW() AT TIME ZONE 'America/Caracas') AT TIME ZONE 'America/Caracas')`)
+  return r.c as number
+}
+let topeAvisado = ''   // fecha del último aviso al dueño (uno por día y por copia de la app)
+async function avisarTope(gasto: number) {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
+  if (topeAvisado === hoy) return
+  topeAvisado = hoy
+  const chats = await chatsDuenoPlataforma().catch(() => [] as string[])
+  await Promise.all(chats.map(c => enviarTelegram(c,
+    `⚠️ <b>Ayuda con IA: se llegó al tope del día</b> ($${gasto.toFixed(2)} de $${AYUDA_TOPE_GLOBAL_USD}). Hasta mañana el chat manda a Soporte. ` +
+    `Se cambia con AYUDA_TOPE_GLOBAL_USD.`).catch(() => {})))
+}
+const RESPUESTA_TOPE = 'Ahora mismo no puedo responder con el asistente. Escríbenos en Soporte (pestaña de arriba) y te contestamos.'
+
 const INSTRUCCIONES = (origen: OrigenAyuda) => `Eres el asistente de ayuda de ${PRODUCTO[origen]}.
 Respondes a clientes y a su equipo, en español de Venezuela, de tú, claro y breve.
 
@@ -95,6 +128,10 @@ REGLAS:
 - Nunca des datos, nombres, conteos ni estadísticas de otros clientes, usuarios, cuentas o empresas, ni de la plataforma
   (cuántos usan el sistema, quiénes, qué venden, cuánto usan). No los tienes y no se comparten: responde la frase de
   lo interno.
+- No prometas NADA en nombre de El Comerciante Digital: reembolsos, devoluciones, descuentos, días extra, precios
+  especiales, fechas de funciones nuevas o arreglos. Eso lo decide una persona: que escriban a Soporte (sabe=false).
+- Solo hablas del producto. Si preguntan algo que no tiene que ver (política, noticias, chistes, tareas, consejos de
+  negocio, salud, temas personales), di en una línea que solo ayudas con el uso de ${origen === 'radar' ? 'el Radar' : 'el sistema'} (sabe=true).
 - No expliques de dónde salen los datos ni cómo se obtienen, y no opines sobre si algo es legal o si MercadoLibre
   lo permite: responde "${RESPUESTA_SOPORTE}" (sabe=false).
 - Privacidad y datos: responde SOLO con la sección de privacidad del manual; no supongas qué puede ver el
@@ -128,17 +165,25 @@ export async function consultasDeHoy(userId: number) {
 
 export async function preguntarAyuda(o: {
   pregunta: string; pantalla: string; userId: number; empresaId: number | null; origen?: OrigenAyuda
-  historial?: { pregunta: string; respuesta: string }[]
+  /** ids de las consultas anteriores de ESTA conversación: el historial se lee de la base (no se confía en lo que
+   *  mande el navegador, que podría inventar "respuestas anteriores" para torcer al asistente). */
+  historialIds?: number[]
 }): Promise<RespuestaAyuda> {
   const origen = o.origen ?? 'sistema'
-  const fija = respuestaFija(o.pregunta)
+  const pregunta = ocultarSensibles(o.pregunta)
+  const fija = respuestaFija(pregunta)
   if (fija) {
     const { rows: [fila] } = await dbGlobal().query(
       `INSERT INTO ayuda_consultas (origen, user_id, empresa_id, pantalla, pregunta, respuesta, sabia, modelo, entrada, salida,
          cache_lectura, cache_escritura, costo)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'filtro', 0, 0, 0, 0, 0) RETURNING id`,
-      [origen, o.userId, o.empresaId, o.pantalla.slice(0, 200), o.pregunta, fija.respuesta, fija.sabe])
+      [origen, o.userId, o.empresaId, o.pantalla.slice(0, 200), pregunta, fija.respuesta, fija.sabe])
     return { id: Number(fila.id), respuesta: fija.respuesta, sabe: fija.sabe, video: null }
+  }
+  const gasto = await gastoDeHoy()
+  if (gasto >= AYUDA_TOPE_GLOBAL_USD) {
+    avisarTope(gasto).catch(() => {})
+    return { id: 0, respuesta: RESPUESTA_TOPE, sabe: false, video: null }
   }
   // Los videos de la Central de aprendizaje son del Sistema (el Radar no tiene).
   const [texto, videos] = await Promise.all([leerManual(origen), origen === 'sistema' ? videosActivos() : Promise.resolve([] as VideoAyuda[])])
@@ -147,9 +192,14 @@ export async function preguntarAyuda(o: {
     + (videos.length ? `\n\n===== VIDEOS DE LA CENTRAL DE APRENDIZAJE =====\n`
       + videos.map(v => `id ${v.id} · ${v.titulo}${v.descripcion ? ` — ${v.descripcion}` : ''}`).join('\n') : '')
     + `\n\n===== MANUAL =====\n${texto}`
-  const previo = (o.historial ?? []).slice(-2)
+  const ids = (o.historialIds ?? []).filter(n => Number.isInteger(n) && n > 0).slice(-2)
+  const { rows: antes } = ids.length ? await dbGlobal().query(
+    `SELECT pregunta, respuesta FROM ayuda_consultas
+     WHERE id = ANY($1::int[]) AND user_id = $2 AND origen = $3 AND created_at > NOW() - interval '1 day'
+     ORDER BY id`, [ids, o.userId, origen]) : { rows: [] as { pregunta: string; respuesta: string }[] }
+  const previo = antes
     .map(h => `Pregunta anterior: ${h.pregunta.slice(0, 400)}\nTu respuesta anterior: ${h.respuesta.slice(0, 600)}`).join('\n\n')
-  const contenido = `${previo ? previo + '\n\n' : ''}Pantalla donde está el usuario: ${o.pantalla || '(desconocida)'}\n\nPregunta: ${o.pregunta}`
+  const contenido = `${previo ? previo + '\n\n' : ''}Pantalla donde está el usuario: ${o.pantalla.slice(0, 80) || '(desconocida)'}\n\nPregunta: ${pregunta}`
 
   const { resultado, uso, modelo } = await llamarClaude<{ respuesta: string; sabe: boolean; video_id: number | null }>({
     sistema, contenido, herramienta: HERRAMIENTA, modelo: MODELO_AYUDA, maxTokens: 700,
@@ -160,7 +210,7 @@ export async function preguntarAyuda(o: {
     `INSERT INTO ayuda_consultas (origen, user_id, empresa_id, pantalla, pregunta, respuesta, sabia, video_id, modelo,
        entrada, salida, cache_lectura, cache_escritura, costo)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
-    [origen, o.userId, o.empresaId, o.pantalla.slice(0, 200), o.pregunta, resultado.respuesta,
+    [origen, o.userId, o.empresaId, o.pantalla.slice(0, 200), pregunta, resultado.respuesta,
      !!resultado.sabe, video?.id ?? null, modelo, entrada, uso.output_tokens ?? 0,
      uso.cache_read_input_tokens ?? 0, uso.cache_creation_input_tokens ?? 0, costoDe(modelo, uso)])
   return { id: Number(fila.id), respuesta: resultado.respuesta, sabe: !!resultado.sabe, video: video ? { id: video.id, titulo: video.titulo } : null }

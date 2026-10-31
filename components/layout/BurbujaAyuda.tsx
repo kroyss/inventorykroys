@@ -97,9 +97,10 @@ export default function BurbujaAyuda() {
     const q = pregunta.trim()
     if (q.length < 3 || pensando) return
     setPensando(true); setError(null); setPregunta('')
-    const historial = turnos.slice(-2).map(t => ({ pregunta: t.pregunta, respuesta: t.respuesta }))
+    // Solo los ids de lo que respondió la IA: el servidor lee el historial de la base.
+    const historial_ids = turnos.filter(t => t.ia && t.id).slice(-2).map(t => t.id!)
     const r = await fetch('/api/ayuda/preguntar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pregunta: q, pantalla, historial }) }).catch(() => null)
+      body: JSON.stringify({ pregunta: q, pantalla, historial_ids }) }).catch(() => null)
     const d = await r?.json().catch(() => null)
     setPensando(false)
     if (!r?.ok || !d) { setError(d?.error ?? 'No se pudo responder. Revisa tu conexión o escríbenos a Soporte.'); setPregunta(q); return }
@@ -311,7 +312,7 @@ export default function BurbujaAyuda() {
                 <button onClick={preguntar} disabled={pensando || pregunta.trim().length < 3} className="btn-primary text-sm">Preguntar</button>
               </div>
               <p className="text-[11px] text-neutral-400">
-                Responde con el manual y puede equivocarse. ¿No se resolvió? <button onClick={() => aSoporte()} className="underline underline-offset-2 hover:text-neutral-700">Escribe a Soporte</button>
+                No escribas contraseñas ni datos personales. Puede equivocarse: ¿no se resolvió? <button onClick={() => aSoporte()} className="underline underline-offset-2 hover:text-neutral-700">Escribe a Soporte</button>
               </p>
             </div>
           )}
