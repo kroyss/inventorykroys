@@ -22,7 +22,7 @@ interface Pregunta {
   borrador: string | null; borrador_confianza: 'alta' | 'media' | 'baja' | null; borrador_falta: string | null
   borrador_web: boolean; borrador_at: string | null
   /** Respuesta rápida que el sistema eligió (sin IA, probada en el historial): lib/sugerenciasServidor.ts */
-  sugerida?: { plantilla: string; titulo: string; texto: string; respaldo: number; sin_confirmar: boolean; por_palabras?: string[] } | null
+  sugerida?: { plantilla: string; titulo: string; texto: string; respaldo: number; sin_confirmar: boolean; por_palabras?: string[]; revisada?: boolean; agregado?: boolean } | null
   probable?: string | null      // sin sugerida: el botón más probable (se resalta)
   cuenta: string; respondida_por: string | null
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
@@ -366,7 +366,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, v
           ) : vista === 'pendientes' ? (
             <div className="space-y-3">
               {(() => {
-                const listas = datos.preguntas.filter(p => !p.borrador && p.sugerida && !editadas.has(p.id))
+                const listas = datos.preguntas.filter(p => !p.borrador && p.sugerida && !p.sugerida.agregado && !editadas.has(p.id))
                 if (!listas.length && !enviandoLote) return null
                 const enviarLote = async () => {
                   const ok = await confirmar({
@@ -561,6 +561,12 @@ function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, 
                 : 'El sistema eligió esta respuesta rápida: con tus respuestas anteriores a preguntas así, coincidió este porcentaje de las veces.'}>
               Sugerida: {sug.titulo} · {sug.por_palabras?.length ? <>por «{sug.por_palabras.join('», «')}»</> : <>coincidió {sug.respaldo}% en tu historial</>}
             </span>
+            {sug.agregado && (
+              <span className="rounded-full px-2 py-0.5 ring-1 ring-inset bg-amber-50 text-amber-800 ring-amber-200"
+                title="La pregunta traía otra parte. La IA le agregó una frase con un dato de la publicación: léela antes de enviar.">
+                + frase agregada por la IA · revísala
+              </span>
+            )}
             {sug.sin_confirmar && verAvisosInternos && (
               <span className="text-amber-700" title="Cuando la envíes sin cambios, el sistema aprende que este producto tiene envío gratis.">
                 envío gratis sin confirmar en este producto

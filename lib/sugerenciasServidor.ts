@@ -7,17 +7,20 @@ import { leerPlantillas, idPlantilla, type Plantilla } from '@/lib/preguntasText
 import { calibrar, respaldo, sugerir, probable, palabrasQueActivan, ofreceEnvioGratis, NIEGA_ENVIO, normalizar, type Calibracion } from '@/lib/sugerenciasPreguntas'
 import { aprender, conAprendidas, CLAVE_APRENDIDAS, CLAVE_QUITADAS, type Aprendidas, type Quitadas } from '@/lib/palabrasAprendidas'
 import { fueEditada } from '@/lib/respuestasOrigen'
+import { revisarSugeridas } from '@/lib/revisorSugeridas'
 
 const HISTORIAL = 3000           // preguntas respondidas con las que se calibra
 const CACHE_HORAS = 24
-/** Sube cuando cambia cómo se sugiere: la calibración guardada se recalcula al momento (25-10: 2). */
-const VERSION_CAL = 2
+/** Sube cuando cambia cómo se sugiere: la calibración guardada se recalcula al momento (25-10: 2; 31-10: 3, «lo que sobra»). */
+const VERSION_CAL = 3
 
 export interface SugeridaPregunta {
   plantilla: string; titulo: string; texto: string
   respaldo: number               // % de acierto en el historial de la empresa
   sin_confirmar: boolean         // promete envío gratis y el producto todavía no está confirmado
   por_palabras?: string[]        // la activaron sus palabras (aprendidas o propias), no la calibración por temas
+  revisada?: boolean             // el revisor IA confirmó que contesta todas las partes (lib/revisorSugeridas.ts)
+  agregado?: boolean             // el revisor le agregó una frase con un dato de la publicación: se lee antes de enviar
 }
 
 async function leerJSON<T>(db: Pool, clave: string, vacio: T): Promise<T> {
@@ -96,7 +99,7 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   // «¿Disponible N?» (28-10): lo que se puede vender de la publicación = su stock en ML (leído con la pregunta) y, si
   // está vinculada a un producto (sin variante), también el inventario en unidades de la publicación («trae N u.»).
   const { rows: stocks } = await db.query(
-    `SELECT p.id::text, p.item_stock_ml, p.item_variantes,
+    `SELECT p.id::text, p.item_stock_ml, p.item_variantes, p.item_titulo,
             (SELECT FLOOR(COALESCE(i.quantity, 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1))::int
              FROM product_ml_codes m JOIN products pd ON pd.id = m.product_id AND pd.is_active
              LEFT JOIN inventory i ON i.product_id = pd.id
@@ -105,6 +108,7 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   const stockDe = new Map(stocks.map(r => [r.id as string, {
     stock: r.item_stock_ml === null ? null : r.real === null ? Number(r.item_stock_ml) : Math.min(Number(r.item_stock_ml), Number(r.real)),
     variantes: r.item_variantes === null ? null : Number(r.item_variantes),
+    titulo: r.item_titulo as string | null,
   }]))
   for (const p of preguntas) {
     if (p.item_estado && p.item_estado !== 'active') continue      // pausada: ML no deja responder
@@ -112,7 +116,7 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
     // Confirmado con envío gratis, pero el precio bajó más de 20% desde entonces: se vuelve a confirmar.
     const h = envio.get(p.item_id)
     const envioGratis = h?.envio_gratis === true && h.precio_ref && precio !== null && precio < h.precio_ref * 0.8 ? null : h?.envio_gratis ?? null
-    const item = { precio, stock: stockDe.get(p.id)?.stock ?? null, variantes: stockDe.get(p.id)?.variantes ?? null, item_id: p.item_id, envioGratis }
+    const item = { precio, stock: stockDe.get(p.id)?.stock ?? null, variantes: stockDe.get(p.id)?.variantes ?? null, item_id: p.item_id, envioGratis, titulo: stockDe.get(p.id)?.titulo ?? null }
     const s = sugerir(p.texto, item, plantillas)
     if (s.tipo === 'sugerida') {
       const id = idPlantilla(s.plantilla)
@@ -128,6 +132,14 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
     }
     const pr = probable(p.texto, item, plantillas, cal)
     if (pr) probables.set(p.id, pr)
+  }
+  // Revisor IA (31-10): la pregunta puede traer otra parte que la respuesta no contesta ("¿disponible? ¿son rojos?").
+  const revs = await revisarSugeridas(db, [...out].map(([id, s]) => ({ id, plantilla: s.plantilla, texto: s.texto, stock: stockDe.get(id)?.stock ?? null })))
+  for (const [id, rev] of revs) {
+    const s = out.get(id)!
+    if (rev.ok) s.revisada = true
+    else if (rev.texto) { s.texto = rev.texto; s.agregado = true }
+    else { out.delete(id); probables.set(id, s.plantilla) }   // queda para una persona, con el botón resaltado
   }
   return { sugeridas: out, probables }
 }

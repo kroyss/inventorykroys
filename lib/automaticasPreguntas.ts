@@ -73,7 +73,8 @@ export async function responderAutomaticas(db: Pool) {
   for (const [id, s] of sug) {
     if (publicadas + fallas >= MAX_POR_PASADA) break
     // Solo las probadas en el historial: una palabra recién aprendida se sugiere, pero no se publica sola.
-    if (!autos.has(s.plantilla) || s.sin_confirmar || s.por_palabras) continue
+    // 31-10: y solo si el revisor IA confirmó que contesta todas las partes (sin frases agregadas).
+    if (!autos.has(s.plantilla) || s.sin_confirmar || s.por_palabras || !s.revisada || s.agregado) continue
     try {
       const r = await publicarRespuesta(db, id, s.texto, { fuente: 'automatica', base: s.texto, plantilla: s.plantilla })
       if (r.ok && r.publicada) publicadas++; else fallas++

@@ -139,6 +139,12 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
 **Respuesta sugerida:** cuando una pregunta se parece mucho a otra que ya respondiste, la respuesta aparece ya
 escrita; la revisas y la envías (también varias juntas con «Enviar las sugeridas»). Hoy **ninguna pregunta se
 responde sola**: siempre la envía una persona.
+- Solo aparece si el sistema entiende **toda** la pregunta. Si trae otra cosa («¿disponible? ¿son rojos?», «¿me lo
+  envías hoy?»), no aparece ya escrita y queda para que la respondas tú.
+- Antes de mostrarla, el sistema revisa que conteste **cada parte** de la pregunta. Si falta una parte y el dato está
+  en la publicación (color, material, qué incluye), puede agregar una frase: sale marcada «+ frase agregada por la IA ·
+  revísala», no entra en «Enviar las sugeridas» y conviene leerla antes de enviar.
+- Esta revisión no gasta tus créditos de IA.
 
 **Otras acciones:** reponer stock desde la pregunta («¿tienes disponible?» con la publicación agotada) y eliminar
 preguntas (spam, ofensivas).

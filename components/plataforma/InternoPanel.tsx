@@ -16,7 +16,7 @@ interface Detalle {
 interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null; creditos?: number | null }
 interface Datos { meses: string[]; filas: Fila[]; detalle: Detalle[]; empresas: EmpresaMeta[]; diasMes: number; diaHoy: number }
 
-const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Fichas (segundo plano)' }
+const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Fichas (segundo plano)', revisor: 'Revisor de sugeridas' }
 const modeloTxt = (m: string) => m
   .replace(/claude-haiku-[\w.-]+/g, 'Haiku').replace(/claude-sonnet-[\w.-]+/g, 'Sonnet').replace(/claude-opus-[\w.-]+/g, 'Opus')
 const tok = (n: number) => n >= 1e6 ? `${(n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M` : n >= 1e3 ? `${Math.round(n / 1e3).toLocaleString('de-DE')} mil` : String(n)
@@ -48,7 +48,7 @@ export default function InternoPanel() {
     // Borradores = lo pedido con el botón (Preguntas + Mensajes). Las fichas suman al costo, no acá.
     if (f.modulo === 'preguntas') { c.preguntas += f.borradores; c.borradores += f.borradores }
     if (f.modulo === 'mensajes') { c.mensajes += f.borradores; c.borradores += f.borradores }
-    if (f.modulo === 'fichas') c.fichas += f.costo
+    if (f.modulo === 'fichas' || f.modulo === 'revisor') c.fichas += f.costo   // gasto del sistema (fichas, revisor de sugeridas)
   }
   const meses = datos?.meses ?? []
   const mesActual = meses[meses.length - 1]
@@ -223,7 +223,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
       ) : metas.map(e => {
         const filas = datos.detalle.filter(d => d.empresa_id === e.id)
         const costo = filas.reduce((a, d) => a + d.costo, 0)
-        const deBoton = filas.filter(d => d.modulo !== 'fichas')
+        const deBoton = filas.filter(d => d.modulo !== 'fichas' && d.modulo !== 'revisor')
         const borradores = deBoton.reduce((a, d) => a + d.usos, 0)
         // Los que ve el cliente (cupoIA en la API); si no llegaron, desde el detalle del mes.
         const creditos = e.creditos ?? deBoton.reduce((a, d) => a + d.usos + d.busquedas, 0)
@@ -239,7 +239,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
           return [...m.entries()].sort((a, b) => b[1].costo - a[1].costo)
         }
         const porModelo = agrupar(d => `${MODULO_TXT[d.modulo] ?? d.modulo}|${modeloTxt(d.modelo)}`)
-        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.usuario))
+        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.usuario))
         const porDia = agrupar(d => d.dia).sort((a, b) => a[0].localeCompare(b[0]))
         const maxDia = Math.max(...porDia.map(([, g]) => g.costo), 0.0001)
         const cupo = e.limite

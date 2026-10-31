@@ -19,9 +19,10 @@ const cal: Calibracion = process.argv.includes('--recalibrar')
 const motivos = new Map<string, number>()
 let total = 0, sugeridas = 0, sugeridasOk = 0, sinCal = 0, probables = 0
 const ejemplos = new Map<string, string[]>()
-for (const p of d.preguntas as { texto: string; item_id: string; precio: number | null; respuesta: string }[]) {
+const malas: string[] = []
+for (const p of d.preguntas as { texto: string; item_id: string; precio: number | null; respuesta: string; item_titulo?: string | null }[]) {
   total++
-  const item = { precio: p.precio, stock: null, item_id: p.item_id, envioGratis: hechos.get(p.item_id) ?? null }
+  const item = { precio: p.precio, stock: null, item_id: p.item_id, envioGratis: hechos.get(p.item_id) ?? null, titulo: p.item_titulo ?? null }
   const s = sugerir(p.texto, item, plantillas)
   let motivo: string
   if (s.tipo === 'sugerida') {
@@ -31,6 +32,7 @@ for (const p of d.preguntas as { texto: string; item_id: string; precio: number 
     if (r !== null || palabras.length) {
       sugeridas++
       if (equivale(s.plantilla.texto, p.respuesta)) sugeridasOk++
+      else malas.push(`${p.texto.slice(0, 90)}  →  ${p.respuesta.slice(0, 90)}`)
       continue
     }
     sinCal++
@@ -49,3 +51,4 @@ console.log('--- motivos (sin sugerida) ---')
 for (const [m, n] of [...motivos].sort((a, b) => b[1] - a[1]).slice(0, 25)) {
   console.log(`${String(n).padStart(5)}  ${m}  ← ${ejemplos.get(m)!.join(' | ')}`)
 }
+if (process.argv.includes('--malas')) { console.log('--- sugeridas distintas a lo publicado ---'); malas.forEach(m => console.log('  ' + m)) }

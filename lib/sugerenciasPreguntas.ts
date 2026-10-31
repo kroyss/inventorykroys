@@ -31,6 +31,36 @@ export const RIESGO = ['compatib', 'sirve', 'funciona', 'medida', 'talla', 'mode
   // 28-10: "¿cuánto dura / mide / tarda…?" no es precio ("cuanto" lo marcaba) y salía "Disponible + envío gratis"
   'dura', 'duracion', 'tiempo', 'autonom', 'mide', 'miden', 'tarda', 'demora', 'pesa', 'bateria', 'pila', 'mah']
 
+/** «Lo que sobra» (31-10): la pregunta se sugiere solo si se entiende TODA. Estas palabras no cambian la respuesta
+ *  (saludos, relleno, "el producto publicado", destinos de envío); cualquier otra que no sea de un tema conocido, de las
+ *  palabras de la respuesta o del título de la publicación ("¿son rojos?", "¿me lo envías hoy?", "¿cuánto el embalaje?")
+ *  la deja para una persona. Antes se ignoraba y salía "Sí, disponible" a preguntas con dos partes. */
+const RELLENO = new Set(`
+  hola buenas buenos buen buena dia dias tardes tarde noches noche saludos saludo gracias muchas mil favor porfa porfavor
+  xfa xfavor amigo amiga amigos amigas hermano hermana estimado estimada estimados senor senora disculpe disculpa
+  bendiciones feliz cordiales atento atenta antemano ok okey perfecto excelente bien muy pana mi mis su sus tu tus
+  el la los las lo un una uno unos unas de del al en con por para y o u e que q se me te le les yo usted ustedes
+  es son esta estan este esto esa ese eso estos estas si ya aun todavia sigue siguen tambien pero como cual cuales
+  producto productos articulo articulos publicacion publicado publicada indicado indicada real aplica aplican hace hacen
+  realizan realiza ofertar oferto ofertarle comprar compra compro comprarlo comprarle pago pagar estoy soy interesado
+  interesada interesa quisiera quiero saber gustaria seria sale cuenta mercado libre mercadolibre gratis gratuito
+  bolivares bolivar llenando llenar agencia agencias oficina donde hasta via actualmente ahorita
+  venezuela pais nacional estado edo ciudad caracas ccs valencia maracay maracaibo barquisimeto bqto merida san cristobal
+  tachira zulia falcon anzoategui barcelona puerto ordaz guayana maturin cumana carupano barinas trujillo valera coro
+  miranda carabobo aragua lara cojedes yaracuy portuguesa guarico sucre monagas apure esparta margarita teques guatire
+  guarenas guaira cabimas acarigua guanare felipe calabozo tigre ojeda fijo tucupita ayacucho charallave cua ocumare
+  upata vigia ejido rubio`.split(/\s+/).filter(Boolean))
+/** Colores: aunque estén en el título, "¿es negro?" pide una variante (va a una persona). */
+const COLOR = /^(negr|blanc|roj|azul|verde|amarill|gris|rosad|rosa$|morad|marron|dorad|plateado|naranja|beige|wengue|transparente)/
+
+/** Las palabras de la pregunta que el sistema NO entiende (vacío = se entiende toda). */
+export function sobrantes(pregunta: string, titulo: string | null | undefined, permitidas: string[] = []): string[] {
+  const raices = [...Object.values(TEMAS).flatMap(t => t.palabras), ...permitidas.map(normalizar)].filter(r => !r.includes(' '))
+  const delTitulo = new Set(normalizar(titulo ?? '').split(' ').filter(w => w.length > 2 && !COLOR.test(w)))
+  return normalizar(pregunta).split(' ').filter(w =>
+    w === 'no' || (w.length > 2 && !RELLENO.has(w) && !delTitulo.has(w) && !raices.some(r => w.startsWith(r))))
+}
+
 const tiene = (t: string, palabra: string) =>
   palabra.includes(' ') ? t.includes(palabra) : new RegExp(`(^|\\s)${palabra}`).test(t)
 
@@ -89,7 +119,7 @@ export const NIEGA_ENVIO = /(no tiene (opcion|opción) de env|por unidad no|no a
 
 /** envioGratis: lo aprendido de ESA publicación (ml_item_hechos): true confirmado, false no tiene. */
 /** stock: lo que se puede vender de ESA publicación (ML y, si está vinculada, el inventario); variantes: cuántas tiene. */
-export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null; variantes?: number | null }
+export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null; variantes?: number | null; titulo?: string | null }
 export type Sugerencia =
   | { tipo: 'sugerida'; indice: number; plantilla: Plantilla; temas: string[]; sinConfirmar: boolean }
   | { tipo: 'humano'; motivo: string; temas: string[] }
@@ -120,6 +150,8 @@ export function sugerir(pregunta: string, item: ItemDatos,
     if (item.stock < cant.n) return { tipo: 'humano', motivo: `pide ${cant.n} y hay ${item.stock}`, temas }
   }
   if (!temas.length) return { tipo: 'humano', motivo: 'no se reconoce el tema', temas }
+  const sobra = sobrantes(cant ? cant.resto : pregunta, item.titulo, propias.flatMap(p => p.palabras ?? []))
+  if (sobra.length) return { tipo: 'humano', motivo: `no se entiende toda la pregunta (${sobra.slice(0, 3).join(', ')})`, temas }
   const candidatas = plantillas.map((p, indice) => ({ p, indice, cubre: temasDePlantilla(p) }))
     .filter(c => temas.every(t => c.cubre.includes(t)))
     .filter(c => !(c.p.excluidos ?? []).includes(item.item_id ?? ''))
@@ -178,11 +210,11 @@ export function equivale(sugerida: string, real: string) {
 export interface Calibracion { [clave: string]: { n: number; ok: number } }
 export const UMBRAL_CAL = { minimo: 5, pct: 0.8 }   // probado 11-10: 7% de las preguntas, 93% equivalentes
 
-export function calibrar(historial: { texto: string; respuesta: string; item_id: string; precio: number | null; envioGratis?: boolean | null }[],
+export function calibrar(historial: { texto: string; respuesta: string; item_id: string; precio: number | null; envioGratis?: boolean | null; item_titulo?: string | null }[],
   plantillas: Plantilla[]): Calibracion {
   const cal: Calibracion = {}
   for (const h of historial) {
-    const s = sugerir(h.texto, { precio: h.precio, stock: null, item_id: h.item_id, envioGratis: h.envioGratis ?? null }, plantillas)
+    const s = sugerir(h.texto, { precio: h.precio, stock: null, item_id: h.item_id, envioGratis: h.envioGratis ?? null, titulo: h.item_titulo }, plantillas)
     if (s.tipo !== 'sugerida') continue
     const k = claveCal(s.plantilla.id ?? s.plantilla.titulo, s.temas)
     const c = (cal[k] ??= { n: 0, ok: 0 })
