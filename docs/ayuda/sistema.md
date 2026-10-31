@@ -1,15 +1,17 @@
 # Manual del Sistema · El Comerciante Digital
 
-> **Para qué es este archivo.** Es la explicación completa del Sistema (app.elcomerciantedigital.com) para los
-> clientes y su equipo. Es la ÚNICA fuente del asistente de ayuda: lo que no esté aquí, el asistente no lo sabe
-> y manda a Soporte. **Regla:** cada cambio que el usuario vea (pantalla, botón, texto, flujo, módulo, permiso) se
-> actualiza aquí en el mismo commit. El Radar tiene su propio manual (radar.elcomerciantedigital.com/ayuda).
->
-> Cada sección trae una línea *«Cómo lo pregunta la gente»* con las palabras que usan los clientes, para que el
-> asistente encuentre la sección aunque no usen el nombre del menú. El asistente recibe además la pantalla donde está
-> el usuario y le da prioridad a esa sección.
->
-> Última revisión: 30-10-2026.
+<!-- INTERNO (se quita antes de mandarlo a la IA, lib/ayuda.ts):
+**Para qué es este archivo.** Es la explicación completa del Sistema (app.elcomerciantedigital.com) para los
+clientes y su equipo. Es la ÚNICA fuente del asistente de ayuda: lo que no esté aquí, el asistente no lo sabe
+y manda a Soporte. **Regla:** cada cambio que el usuario vea (pantalla, botón, texto, flujo, módulo, permiso) se
+actualiza aquí en el mismo commit. El Radar tiene su propio manual (radar.elcomerciantedigital.com/ayuda).
+
+Cada sección trae una línea *«Cómo lo pregunta la gente»* con las palabras que usan los clientes, para que el
+asistente encuentre la sección aunque no usen el nombre del menú. El asistente recibe además la pantalla donde está
+el usuario y le da prioridad a esa sección.
+
+Última revisión: 30-10-2026.
+-->
 
 ---
 
@@ -427,7 +429,7 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
 - **Ajustes:** tasa del dólar, costos de MercadoLibre (comisión, envío) y otras configuraciones del administrador.
 
-*[VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos]*
+<!-- VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos -->
 
 ---
 
@@ -489,3 +491,17 @@ en el celular, encima del menú de abajo):
 respondemos al volver. También por Telegram: t.me/elcomerciantedigital.
 
 Para ayudarte rápido: di qué pantalla, qué hiciste y qué esperabas; una captura de pantalla ayuda mucho.
+
+---
+
+## 19. Privacidad y tus datos
+
+*Cómo lo pregunta la gente:* privacidad, mis datos, quién ve mis ventas, el administrador ve lo que hago, ustedes ven
+mi información, es seguro, comparten mis datos, mi contraseña la ven.
+
+- **Tus datos son de tu empresa:** ninguna otra empresa puede verlos.
+- **Dentro de tu empresa**, el administrador decide qué ve y qué puede hacer cada persona (**Usuarios → Permisos**).
+- **Tu contraseña no la puede ver nadie.** Solo se puede poner una nueva (ver «Olvidé mi contraseña» en la sección 2).
+- **MercadoLibre:** el sistema usa la conexión que tú autorizaste para leer y responder en tu cuenta. La puedes
+  desconectar cuando quieras en **Cuentas de MercadoLibre**.
+- Cualquier otra duda sobre tus datos o la privacidad: escríbenos a **Soporte** y te respondemos personalmente.

@@ -1,8 +1,8 @@
 # Manual del Radar de Oportunidades · El Comerciante Digital
 
-> Fuente del asistente de ayuda del Radar (radar.elcomerciantedigital.com). Sale de la pestaña **Ayuda** del Radar
-> (AnalisisMercadoML/web/app/ayuda/page.tsx): si cambia esa página, actualizar este archivo en el mismo cambio.
-> Última revisión: 30-10-2026.
+<!-- INTERNO (se quita antes de mandarlo a la IA, lib/ayuda.ts): fuente del asistente de ayuda del Radar.
+Sale de la pestaña Ayuda del Radar (AnalisisMercadoML/web/app/ayuda/page.tsx): si cambia esa página, actualizar este
+archivo en el mismo cambio. Última revisión: 30-10-2026. -->
 
 **Qué es:** el Radar muestra los productos que más se venden en MercadoLibre Venezuela, categoría por categoría,
 con el **precio real** (pasado a dólar paralelo) y señales de demanda, para decidir qué importar o revender. Se
@@ -555,3 +555,11 @@ tu usuario.
   23:59 (hora de Venezuela). Los otros días no deja entrar y te dice cuándo abre. Lo que guardes en tu cabina queda.
 - **Automatizaciones para MercadoLibre** (otro producto de El Comerciante Digital: preguntas con IA, mensajes,
   guías, calificaciones): si vendes en MercadoLibre Venezuela y quieres probarlas, escríbenos (15 días gratis).
+
+## 14. Privacidad y tus datos
+
+*Cómo lo pregunta la gente:* privacidad, mis datos, quién ve mis costos, ven lo que busco, es seguro.
+
+- **Tu cabina es privada:** tus costos, envíos, estados y notas solo los ves tú. El catálogo es el mismo para todos.
+- **Tu contraseña no la puede ver nadie.** Solo se puede poner una nueva (escríbenos a Soporte).
+- Cualquier otra duda sobre tus datos o la privacidad: escríbenos a **Soporte** y te respondemos personalmente.
