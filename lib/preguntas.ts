@@ -318,8 +318,9 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Lo que este comprador ya preguntó en los últimos 7 días (31-10): "Sería a El Tocuyo" contesta a "¿cuánto tarda Zoom?".
   const { rows: delComprador } = q.comprador_id ? await db.query(
     `SELECT p.texto AS p, p.respuesta AS r, to_char(p.fecha, 'DD-MM HH24:MI') AS fecha FROM ml_preguntas p
-     WHERE p.comprador_id = $1 AND p.id <> $2 AND p.fecha > NOW() - interval '7 days' ORDER BY p.fecha DESC LIMIT 5`,
-    [q.comprador_id, q.id]) : { rows: [] }
+     WHERE p.comprador_id = $1 AND p.id <> $2 AND p.fecha < $3 AND p.fecha > $3::timestamptz - interval '7 days'
+     ORDER BY p.fecha DESC LIMIT 5`,
+    [q.comprador_id, q.id, q.fecha]) : { rows: [] }
 
   return {
     conexionId: q.conexion_id,
