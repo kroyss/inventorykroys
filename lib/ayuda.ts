@@ -68,7 +68,7 @@ const PREGUNTA_INTERNA = [
 const RESPUESTA_SOPORTE = 'Esa consulta la responde nuestro equipo personalmente: escríbenos en Soporte (pestaña de arriba) y te contestamos.'
 const PREGUNTA_SOPORTE = [
   /\bde\s+d[oó]nde\s+(sacan|sacas|traen|traes|obtienen|obtienes|toman|tomas)\b/i,
-  /\bde\s+d[oó]nde\s+(sale|salen|viene|vienen)\s+(los datos|esos datos|la informaci[oó]n|esa informaci[oó]n|esta informaci[oó]n|toda esa informaci[oó]n|las ventas|el cat[aá]logo|los productos)\b/i,
+  /\bde\s+d[oó]nde\s+(sale|salen|viene|vienen)\s+(los datos|esos datos|la informaci[oó]n|esa informaci[oó]n|esta informaci[oó]n|toda esa informaci[oó]n|las ventas|el cat[aá]logo|los productos|todo\s+eso|todo\s+esto|eso|esto)\b/i,
   /\b(es|ser[aá]|sea)\s+legal\b|\b(legalidad|ilegal|t[eé]rminos y condiciones)\b/i,
   /\b(mercado\s*libre|ml)\s+(lo\s+)?(permite|deja|autoriza|acepta|sabe)\s+(esto|eso|el radar|el sistema|esta herramienta|que (ustedes|usen|uses))\b/i,
   /\blo\s+(permite|autoriza|sabe)\s+(mercado\s*libre|ml)\b|\b(esto|eso|el radar)\s+(est[aá]|es)\s+permitid[oa]\b/i,

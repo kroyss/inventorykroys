@@ -51,8 +51,8 @@ una cotización.
 - **Marcar.** Ponle un estado (Ganador, Investigando, Descartado) para no
 volver a estudiar lo mismo el mes que viene.
 
-> El paso 2 es manual a propósito. Un bot contra Alibaba haría que marquen tu IP y
-te degraden la propia extensión Lens, que es la mejor herramienta que tienes.
+> El paso 2 es manual a propósito: así cuidas tu cuenta y tu extensión Lens, que es
+la mejor herramienta que tienes.
 
 ## 3. Configuraciones generales (botón Cálculo, arriba)
 
@@ -107,7 +107,7 @@ aguante, que lo busquen, que esté subiendo, que el precio se esté moviendo.
 
 ### Sostenido — Lo que aguanta, no lo que pica. Empieza por aquí.
 
-Productos que llevan **tres barridos seguidos** en el mercado y siguen
+Productos que llevan **tres actualizaciones seguidas** en el mercado y siguen
 vendiendo (+500). No aparecieron ayer ni dieron un salto: llevan meses
 funcionando.
 
@@ -168,9 +168,9 @@ Un selector con tres niveles, de más amplio a más exigente:
 
 - **Cualquiera**— sin filtro de demanda.
 
-- **Con tendencia**— el producto apareció por un término que ML destaca como tendencia en su categoría, ** y ML lo sigue destacando**en el último barrido. Cuando ML saca el término de sus tendencias, el sello se apaga solo.
+- **Con tendencia**— el producto apareció por un término que ML destaca como tendencia en su categoría, ** y ML lo sigue destacando**en la última actualización. Cuando ML saca el término de sus tendencias, el sello se apaga solo.
 
-- **Confirmada en Google**— además, ese término ** también sube en Google Trends Venezuela**. Doble señal: no es solo ruido interno de ML, la gente lo busca de verdad.
+- **Confirmada en Google**— además, ese término ** también sube en Google Trends Venezuela**. Doble señal: no es solo algo solo de ML, la gente lo busca de verdad.
 
 Es una escalera: cada nivel es un subconjunto del anterior, por eso es un
 selector y no casillas sueltas.
@@ -213,17 +213,17 @@ enormes (−80%), que suelen ser publicaciones carnada, no competencia.
 
 ### Solo vigentes — Esconde lo que ya no está.
 
-Cada barrido recorre el mercado y vuelve a ver los productos. Los que **ya no
+En cada actualización se vuelven a ver los productos. Los que **ya no
 aparecen**siguen guardados en el catálogo, pero su precio quedó congelado en
-el último barrido que sí los encontró. Este filtro los oculta.
+el última actualización que sí los encontró. Este filtro los oculta.
 
 > Importante para decidir compras: **el margen se calcula con el precio**. Si el
-precio es de un barrido anterior, el margen que ves puede no ser el real —
+precio es de una actualización anterior, el margen que ves puede no ser el real —
 y la publicación quizá ni siga publicada. Enciéndelo antes de sentarte a
 investigar proveedores, para no gastar trabajo en productos que ya no están.
 
 Si ya marcaste **Sostenido**, este se apaga solo: un producto sostenido
-estuvo en el último barrido por definición, así que ya es vigente.
+estuvo en la última actualización por definición, así que ya es vigente.
 
 Ordenar por
 
@@ -243,19 +243,19 @@ cuáles son.
 
 Fresco | Publicación nueva que ya vende bien para su antigüedad. Si un producto es fresco Y emergente, se muestra este, porque «es nuevo» es el dato menos obvio.
 Emergente | Subió de escalón de ventas o dio un salto grande de posición.
-Sostenido | Lleva tres barridos seguidos vendiendo. Demanda que aguanta, no un pico. La apuesta de menor riesgo para importar.
-En tendencia | Salió por un término que ML destaca y que lo sigue destacando en el último barrido (si ML lo quita, el sello se apaga). Si además trae , Google Trends confirma que sube; significa que las búsquedas están cayendo.
+Sostenido | Lleva tres actualizaciones seguidas vendiendo. Demanda que aguanta, no un pico. La apuesta de menor riesgo para importar.
+En tendencia | Salió por un término que ML destaca y que lo sigue destacando en la última actualización (si ML lo quita, el sello se apaga). Si además trae , Google Trends confirma que sube; significa que las búsquedas están cayendo.
 −15% | El precio bajó ese porcentaje desde la medición anterior.
-Sin ver desde… | El último barrido NO volvió a encontrar esta publicación. Puede estar dada de baja o haber caído del listado. Su precio (y el margen) son del mes que indica: confírmalos en ML antes de comprar. Es una advertencia, no una oportunidad — por eso va en gris.
+Sin ver desde… | La última actualización NO volvió a encontrar esta publicación. Puede estar dada de baja o haber caído del listado. Su precio (y el margen) son del mes que indica: confírmalos en ML antes de comprar. Es una advertencia, no una oportunidad — por eso va en gris.
 Línea de visitas | Debajo de las ventas: visitas y preguntas de los últimos 30 días, medidas. El punto de color es el termómetro: verde = activo (100+ visitas o 3+ preguntas al mes), ámbar = tibio, rojo = muerto (casi sin visitas y sin preguntas en 3 meses). «↑ subiendo» / «↓ bajando» compara contra el período anterior. Solo aparece en los productos medidos.
 Triángulo arriba / abajo | Junto a las ventas o la calificación: subió o bajó respecto a la medición anterior.
 
-> El catálogo se mide con un **barrido mensual completo** de MercadoLibre
+> El catálogo se mide con un **actualización mensual completa**
 Venezuela. Los sellos de movimiento (, , ) comparan la
-medición de hoy contra la del barrido anterior, así que un producto recién
+medición de hoy contra la de la actualización anterior, así que un producto recién
 descubierto necesita **dos mediciones** para poder mostrarlos — si no los trae,
 muchas veces es porque todavía no hay con qué compararlo. Y lo que el último
-barrido ya no encontró se queda igual en el catálogo con el sello :
+actualización ya no encontró se queda igual en el catálogo con el sello :
 **nunca se borra nada**, solo deja de actualizarse su precio.
 
 ## 6. La cabina: los cuatro estados
@@ -343,7 +343,7 @@ MercadoLibre y anótalo abajo con **¿Viste uno más barato allá?**.
 Ver todos en MercadoLibre
 
 El panel te muestra los competidores **que están en el catálogo**— los que el
-barrido alcanzó a capturar. En MercadoLibre están **todos**, incluidos los que
+catálogo alcanzó a incluir. En MercadoLibre están **todos**, incluidos los que
 venden poco: esos no te quitan volumen, pero **sí marcan el piso de precio**,
 porque el comprador los ve igual que a ti.
 
@@ -358,11 +358,11 @@ al catálogo.
 
 > Cuando usas ese botón, el Radar anota qué término necesitaste consultar afuera.
 No se comparte con nadie ni se muestra en ninguna parte: sirve para detectar en
-qué zonas el catálogo se queda corto y ampliarlas en los próximos barridos.
+qué zonas el catálogo se queda corto y ampliarlas en las próximas actualizaciones.
 
 Si el más barato no está en el catálogo
 
-Es lo normal cuando sales a mirar en MercadoLibre: el barrido no captura a
+Es lo normal cuando sales a mirar en MercadoLibre: el catálogo no incluye a
 todos, sobre todo a los que venden poco. Debajo del botón hay una línea para
 **anotarlo a mano**: el precio y, si quieres, el enlace.
 
@@ -373,7 +373,7 @@ que de verdad entran.
 
 Funciona igual que elegir uno del catálogo — el margen se recalcula contra ese
 precio — pero con una diferencia que conviene tener presente: **ese número no
-se actualiza nunca**. El del catálogo sí, porque el barrido vuelve a pasar por
+se actualiza nunca**. El del catálogo sí, porque la actualización vuelve a incluir
 esa publicación cada mes. El tuyo es una foto del día que lo anotaste.
 
 Por eso se muestra con su antigüedad (manual · hace 3 d) y, pasado un mes,
@@ -457,7 +457,7 @@ meses vendiendo, no modas. Si además le sumas **Demanda: Con tendencia**,
 tienes lo que aguanta y la gente sigue buscando.
 
 Marca **Solo vigentes** junto con el filtro que uses. Así no gastas horas
-de Lens en publicaciones que el último barrido ya no encontró y cuyo precio
+de Lens en publicaciones que la última actualización ya no encontró y cuyo precio
 quedó viejo.
 
 Marca los estados **Investigando** y **Ganador** y ordena por **Mejor margen**.
