@@ -211,7 +211,7 @@ significar que entró competencia y está peleando por precio.
 que calculaste con el precio viejo ya no es el real. Ojo también con caídas
 enormes (−80%), que suelen ser publicaciones carnada, no competencia.
 
-### ★ Mal calificados — Mercado con quejas.
+### ★ Bajo 4,3 — Mercado con quejas.
 
 Productos con **menos de 4,3 estrellas** que igual venden **+100**: hay gente comprándolos aunque no queden
 contentos. Lee las opiniones en MercadoLibre. Si la queja es de calidad o de atención, puede ser tu oportunidad con un proveedor
@@ -497,7 +497,7 @@ escribe por Telegram (t.me/elcomerciantedigital).
 | Techo de ganancia en cada tarjeta | — | Sí |
 | Tu cabina: costos, notas, estados | Sin límite | Sin límite |
 | Filtrar por ventas y ganancia posible · reordenar | — | Sí |
-| Candidatos · Sostenido · En alza · Demanda · Bajó de precio · Mal calificados · Vigentes | — | Sí |
+| Candidatos · Sostenido · En alza · Demanda · Bajó de precio · ★ Bajo 4,3 · Vigentes | — | Sí |
 | Visitas y preguntas al mes · Subiendo (medido) | — | Sí |
 | Competencia: quiénes son | Sí | Sí |
 | Competencia: a cuánto vende cada uno y tu margen | — | Sí |
