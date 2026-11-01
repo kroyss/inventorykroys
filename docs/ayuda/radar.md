@@ -475,10 +475,10 @@ Dentro de ese rubro, lo que la gente busca.
 
 ## 11. Planes: Gratis, PRO de fin de semana y solo lectura
 
-El Radar viene con los planes de **El Comerciante Digital**. La diferencia cabe en una frase: **en Gratis buscas tú;
+El Radar viene con los planes **Automatizaciones** y **Completo** de **El Comerciante Digital** (Esencial no lo trae). La diferencia cabe en una frase: **en Gratis buscas tú;
 en PRO el Radar busca por ti.**
 
-**Con cualquier plan vigente tienes el Radar Gratis todos los días:** el catálogo con el **precio real** a dólar
+**Con Automatizaciones o Completo vigente tienes el Radar Gratis todos los días:** el catálogo con el **precio real** a dólar
 paralelo, el **buscador**, las **categorías**, el filtro de precio y tu **cabina completa**, sin límite. Los productos
 salen ordenados por los que más venden.
 

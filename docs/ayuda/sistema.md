@@ -83,7 +83,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 
 - **Esencial:** Preguntas con IA, Mensajes, Calificaciones, Stock + avisos por Telegram, guías ZOOM/TEALCA
   (Despachos) y Reporte de guías (Reportador).
-- **Automatizaciones** (recomendado): lo de Esencial + Pagos MercadoEnvíos (programa en la PC y cruce con el banco).
+- **Automatizaciones** (recomendado): lo de Esencial + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
+  + Radar de Oportunidades.
 - **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios, Promociones y reportes.
 - Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%. Se
   puede pagar en bolívares a tasa BCV.
@@ -91,7 +92,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
   se renuevan el día 1 de cada mes (no se acumulan). Recarga: 100 créditos por $4 (estos no vencen). La prueba
   gratis trae 50 créditos.
-- **Radar de Oportunidades:** todo plan trae el **Radar Gratis todos los días** (catálogo con precio real, buscador
+- **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
   domingos** por **+$5 al mes**; el primer mes de PRO va de regalo al contratar el plan. Sin plan, el Radar queda en
   solo lectura (ve lo que guardó).

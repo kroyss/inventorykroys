@@ -4,12 +4,13 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { soloDueno } from '@/lib/plataforma'
-import { ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, RECARGA_IA, sumarMeses } from '@/lib/planes'
+import { ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, RECARGA_IA, planConRadar, sumarMeses } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
 
 // Plataforma → ficha del cliente → Plan y pagos (01-11-2026, migración 138).
 //   POST { tipo: 'plan' }: activa o renueva el plan (estado activo, pagado hasta, módulos del plan y créditos del escalón;
-//        el PRIMER plan trae 1 mes de Radar PRO de fin de semana de regalo, y todo plan da Radar Gratis).
+//        Automatizaciones y Completo traen el Radar Gratis y, el PRIMER plan con Radar, 1 mes de PRO de fin de semana
+//        de regalo; Esencial no trae Radar).
 //   POST { tipo: 'recarga' }: créditos de IA que no vencen (suman al tope del mes, lib/ia.ts cupoIA).
 //   POST { tipo: 'radar_pro' }: Radar PRO de fin de semana pagado ($5/mes) hasta una fecha.
 //   GET: el historial de pagos.
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const b = Body.parse(await req.json())
     const { rows: [o] } = await db.query(
-      `SELECT estado, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta,
+      `SELECT estado, plan, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta,
               EXISTS (SELECT 1 FROM organizacion_pagos p WHERE p.organizacion_id = o.id AND p.tipo = 'plan') AS pago_antes
        FROM organizaciones o WHERE id = $1`, [org])
     if (!o) return NextResponse.json({ error: 'Organización no encontrada' }, { status: 404 })
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (org === ORGANIZACION_PLATAFORMA) return NextResponse.json({ error: 'Tu organización es la propietaria: no tiene plan' }, { status: 400 })
 
     if (b.tipo === 'radar_pro') {
+      if (!planConRadar(o.plan)) return NextResponse.json({ error: 'El Radar viene con Automatizaciones o Completo: primero registra uno de esos planes' }, { status: 400 })
       const desde = o.radar_pro_hasta && o.radar_pro_hasta >= hoy ? o.radar_pro_hasta : hoy
       await db.query(`UPDATE organizaciones SET radar_pro_hasta = $2 WHERE id = $1`, [org, b.hasta])
       await db.query(
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Plan: desde el día siguiente al pagado (si sigue vigente) o desde hoy.
     if (b.hasta < hoy) return NextResponse.json({ error: 'La fecha "pagado hasta" ya pasó' }, { status: 400 })
     const desde = o.plan_hasta && o.plan_hasta >= hoy ? o.plan_hasta : hoy
-    const bienvenida = !o.pago_antes && !o.radar_pro_hasta    // primer plan: 1 mes de Radar PRO de regalo
+    const bienvenida = planConRadar(b.plan) && !o.radar_pro_hasta    // primer plan con Radar: 1 mes de PRO de regalo
     const client = await db.connect()
     try {
       await client.query('BEGIN')
@@ -76,11 +78,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
            prueba_dias = NULL, motivo_pausa = NULL, pausa_fecha = NULL,
            radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END
          WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1)])
-      // Módulos del plan (los demás no se tocan) + Radar Gratis (todo plan); créditos de IA del escalón.
+      // Módulos del plan (los demás no se tocan; el Radar solo en Automatizaciones y Completo); créditos del escalón.
       await client.query(
         `UPDATE empresas SET
            modulos = ARRAY(SELECT DISTINCT m FROM unnest(
-             ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[]) AND x <> 'radar_dia') || $3::text[] || ARRAY['radar']) m),
+             ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[])) || $3::text[]) m),
            ia_limite_mes = $4
          WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[b.plan]], ESCALONES[b.escalon].creditos])
       await client.query(

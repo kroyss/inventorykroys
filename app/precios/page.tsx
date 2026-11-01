@@ -37,7 +37,7 @@ const PREGUNTAS = [
   { p: '¿Qué son los créditos de IA?',
     r: `Cada respuesta que te propone la IA usa un crédito. Las respuestas rápidas y las parecidas no gastan. Si se te acaban, recargas ${RECARGA_IA.creditos} por $${RECARGA_IA.precio} y no vencen.` },
   { p: '¿Qué trae el Radar?',
-    r: `Con cualquier plan tienes el Radar de Oportunidades Gratis todos los días: los productos que más se venden en MercadoLibre con su precio real, buscador y tu lista de productos investigados. Radar PRO (sellos, filtros, productos nuevos del mes, competencia y tendencias) es los sábados y domingos por $${RADAR_PRO.precio} al mes, y el primer mes va de regalo al contratar tu plan.` },
+    r: `Con los planes Automatizaciones y Completo tienes el Radar de Oportunidades Gratis todos los días: los productos que más se venden en MercadoLibre con su precio real, buscador y tu lista de productos investigados. Radar PRO (sellos, filtros, productos nuevos del mes, competencia y tendencias) es los sábados y domingos por $${RADAR_PRO.precio} al mes, y el primer mes va de regalo al contratar tu plan.` },
   { p: '¿Cómo pago?',
     r: 'En bolívares a tasa BCV del día. Sin permanencia: si un mes no sigues, no pagas el siguiente.' },
   { p: '¿Qué incluye la prueba gratis?',
@@ -134,7 +134,7 @@ export default function PreciosPage() {
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
             <p className="font-semibold text-neutral-900">Incluido en todos los planes</p>
             <ul className="mt-3 space-y-2">
-              {[`${CUENTAS_INCLUIDAS} cuentas de MercadoLibre`, 'Usuarios ilimitados para tu equipo', 'Radar de Oportunidades Gratis todos los días', 'Prueba gratis de 15 días', 'Sin permanencia'].map(x => (
+              {[`${CUENTAS_INCLUIDAS} cuentas de MercadoLibre`, 'Usuarios ilimitados para tu equipo', 'Prueba gratis de 15 días', 'Sin permanencia'].map(x => (
                 <li key={x} className="flex gap-2 text-sm text-neutral-700"><Icono d={I.check} className="mt-0.5 h-4 w-4 shrink-0 text-lime-600" />{x}</li>
               ))}
             </ul>
@@ -144,7 +144,7 @@ export default function PreciosPage() {
             <ul className="mt-3 space-y-2 text-sm text-neutral-700">
               <li className="flex justify-between gap-4"><span>Cuenta de MercadoLibre adicional</span><b className="whitespace-nowrap text-neutral-900">+${CUENTA_EXTRA}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Recarga de {RECARGA_IA.creditos} créditos de IA (no vencen)</span><b className="whitespace-nowrap text-neutral-900">${RECARGA_IA.precio}</b></li>
-              <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos (1.<sup>er</sup> mes de regalo)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
+              <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos, con Automatizaciones o Completo (1.<sup>er</sup> mes de regalo)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Pago trimestral</span><b className="whitespace-nowrap text-lime-700">−{DESCUENTO_TRIMESTRAL}%</b></li>
             </ul>
           </div>

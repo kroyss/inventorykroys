@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, montoPlan, sumarMeses, type Plan } from '@/lib/planes'
+import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
 
 // Plataforma → ficha del cliente → Plan y pagos (01-11-2026, migración 138): activar o renovar el plan (módulos y
 // créditos del escalón salen solos), recargar créditos de IA, Radar PRO de fin de semana y el historial de pagos.
@@ -63,14 +63,14 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
           {d.plan_hasta && <div className={quedan !== null && quedan < 0 ? 'text-red-700' : quedan !== null && quedan <= 3 ? 'text-amber-700' : 'text-neutral-600'}>
             Pagado hasta el <b>{ddmmaa(d.plan_hasta)}</b>{quedan !== null && (quedan < 0 ? ' · vencido' : quedan === 0 ? ' · vence hoy' : ` · quedan ${quedan} días`)}
           </div>}
-          <div className="text-neutral-600">Radar: Gratis{radarVigente ? <> · <b>PRO fines de semana</b> hasta el {ddmmaa(d.radar_pro_hasta!)}</> : ''}</div>
+          <div className="text-neutral-600">{planConRadar(d.plan) ? <>Radar: Gratis{radarVigente ? <> · <b>PRO fines de semana</b> hasta el {ddmmaa(d.radar_pro_hasta!)}</> : ''}</> : 'Sin Radar (Esencial)'}</div>
         </div>
-      ) : <p className="text-xs text-neutral-500">Sin plan todavía. Al activarlo pasa a «Pagando», se prenden los módulos del plan y los créditos de su escalón, y se lleva 1 mes de Radar PRO de fin de semana de regalo.</p>}
+      ) : <p className="text-xs text-neutral-500">Sin plan todavía. Al activarlo pasa a «Pagando», se prenden los módulos del plan y los créditos de su escalón. Automatizaciones y Completo traen el Radar Gratis y 1 mes de Radar PRO de fin de semana de regalo; Esencial no trae Radar.</p>}
 
       <div className="flex flex-wrap gap-1.5">
         {d.estado !== 'propietario' && <button onClick={() => setAbierto(abierto === 'plan' ? null : 'plan')} className="btn-primary text-xs">{d.plan ? 'Registrar pago / renovar' : 'Activar plan'}</button>}
         <button onClick={() => setAbierto(abierto === 'recarga' ? null : 'recarga')} className="btn-secondary text-xs">Recargar créditos IA</button>
-        {d.estado !== 'propietario' && <button onClick={() => setAbierto(abierto === 'radar' ? null : 'radar')} className="btn-secondary text-xs">Radar PRO</button>}
+        {d.estado !== 'propietario' && planConRadar(d.plan) && <button onClick={() => setAbierto(abierto === 'radar' ? null : 'radar')} className="btn-secondary text-xs">Radar PRO</button>}
       </div>
 
       {abierto === 'plan' && (

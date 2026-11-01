@@ -28,6 +28,7 @@ export const PLANES: Plan[] = [
       'Pagos MercadoEnvíos: pagos y comprobantes llegan solos, listos para verificar',
       'Comprobación con el estado de cuenta de tu banco',
       'Las guías pasan directo a despachos',
+      'Radar de Oportunidades Gratis todos los días (PRO los fines de semana, +$5)',
     ],
   },
   {
@@ -60,14 +61,18 @@ export const RECARGA_IA = { creditos: 100, precio: 4 }
 export const DESCUENTO_TRIMESTRAL = 10
 
 // ── Asignar planes en Plataforma (01-11-2026, migración 138) ─────────────────────────────────────────────────────
-// Módulos que el plan prende o apaga. Lo demás (inventario, radar, ia_automatica, etiquetas…) no lo toca el plan:
+// Módulos que el plan prende o apaga. Lo demás (inventario, ia_automatica, etiquetas…) no lo toca el plan:
 // inventario se prende a mano mientras no esté listo para clientes (decisión del dueño, 01-11).
-export const MODULOS_CONTROLADOS = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'] as const
+// Radar: solo Automatizaciones y Completo (dueño, 01-11); Esencial no lo trae. radar_dia (solo el día de prueba) se
+// apaga siempre al pagar.
+export const MODULOS_CONTROLADOS = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar', 'radar_dia'] as const
 export const MODULOS_PLAN: Record<Plan['id'], readonly string[]> = {
   esencial: ['despachos', 'reportador', 'preguntas', 'alertas_stock'],
-  automatizaciones: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'],
-  completo: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'],
+  automatizaciones: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar'],
+  completo: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar'],
 }
+/** ¿El plan trae el Radar? */
+export const planConRadar = (plan: string | null | undefined) => !!plan && (MODULOS_PLAN[plan as Plan['id']] ?? []).includes('radar')
 export const DESCUENTO_FUNDADOR = 30
 export const RADAR_PRO = { precio: 5 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
 
