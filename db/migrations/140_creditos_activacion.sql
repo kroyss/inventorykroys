@@ -17,7 +17,9 @@
 -- Compatible con la versión anterior: solo agrega columnas.
 
 ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS creditos_desde TIMESTAMPTZ;
-UPDATE organizaciones SET creditos_desde = created_at
+-- Activas de hoy (sin pago de plan registrado todavía): su mes arranca el 01-11, el día en que ya se renovaron,
+-- para no darles OTRA renovación en su aniversario de alta. El resto: su alta (el piso del 01-11 manda igual).
+UPDATE organizaciones SET creditos_desde = CASE WHEN estado = 'activo' THEN '2026-11-01 00:00:00-04'::timestamptz ELSE created_at END
  WHERE creditos_desde IS NULL AND estado <> 'propietario';
 ALTER TABLE organizaciones ALTER COLUMN creditos_desde SET DEFAULT NOW();
 
