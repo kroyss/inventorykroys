@@ -9,6 +9,7 @@ import { recordarPagos } from '@/lib/recordatoriosPago'
 import { mensajeAlComprar } from '@/lib/mensajeAlComprar'
 import { responderAutomaticas } from '@/lib/automaticasPreguntas'
 import { procesarIAAutomatica } from '@/lib/iaAutomatica'
+import { vencerPlanes } from '@/lib/planesCuenta'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
@@ -82,6 +83,13 @@ export async function GET(req: NextRequest) {
       if (r) console.log('[corte fundadores]', r)
     } catch (err) {
       console.error('[corte fundadores]', err instanceof Error ? err.message : err)
+    }
+    // Planes pagados (lib/planesCuenta.ts): el día después de plan_hasta la cuenta queda pausada (motivo 'plan').
+    try {
+      const r = await vencerPlanes()
+      if (r) console.log('[planes vencidos]', r)
+    } catch (err) {
+      console.error('[planes vencidos]', err instanceof Error ? err.message : err)
     }
     for (const e of sincronizadas.filter(x => x.stock)) {
       try {

@@ -58,3 +58,30 @@ export const CUENTAS_INCLUIDAS = 2
 export const CUENTA_EXTRA = 3
 export const RECARGA_IA = { creditos: 100, precio: 4 }
 export const DESCUENTO_TRIMESTRAL = 10
+
+// ── Asignar planes en Plataforma (01-11-2026, migración 138) ─────────────────────────────────────────────────────
+// Módulos que el plan prende o apaga. Lo demás (inventario, radar, ia_automatica, etiquetas…) no lo toca el plan:
+// inventario se prende a mano mientras no esté listo para clientes (decisión del dueño, 01-11).
+export const MODULOS_CONTROLADOS = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'] as const
+export const MODULOS_PLAN: Record<Plan['id'], readonly string[]> = {
+  esencial: ['despachos', 'reportador', 'preguntas', 'alertas_stock'],
+  automatizaciones: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'],
+  completo: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'],
+}
+export const DESCUENTO_FUNDADOR = 30
+export const RADAR_PRO = { precio: 5 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
+
+/** Monto a cobrar: (precio del escalón + cuentas extra) × meses, con el mayor descuento (Fundador o trimestral, no se suman). */
+export function montoPlan(plan: Plan['id'], escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra = 0) {
+  const base = (ESCALONES[escalon]?.precios[plan] ?? 0) + Math.max(0, cuentasExtra) * CUENTA_EXTRA
+  const meses = ciclo === 'trimestral' ? 3 : 1
+  const descuento = Math.max(fundador ? DESCUENTO_FUNDADOR : 0, ciclo === 'trimestral' ? DESCUENTO_TRIMESTRAL : 0)
+  return { base, meses, descuento, total: Math.round(base * meses * (100 - descuento)) / 100 }
+}
+
+/** Suma meses a una fecha YYYY-MM-DD (el 31 pasa al último día del mes siguiente). */
+export function sumarMeses(fecha: string, meses: number) {
+  const [a, m, d] = fecha.split('-').map(Number)
+  const ultimo = new Date(Date.UTC(a, m - 1 + meses + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(a, m - 1 + meses, Math.min(d, ultimo))).toISOString().slice(0, 10)
+}

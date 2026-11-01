@@ -44,7 +44,7 @@ export async function GET() {
               o.id AS organizacion_id, o.nombre AS organizacion,
               o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.prueba_dias, o.fundador,
               o.origen, o.registro - 'ip_hash' - 'navegador' AS registro,
-              o.motivo_pausa, to_char(o.pausa_fecha, 'YYYY-MM-DD') AS pausa_fecha,
+              o.motivo_pausa, o.plan, o.escalon, o.ciclo, to_char(o.plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta, to_char(o.pausa_fecha, 'YYYY-MM-DD') AS pausa_fecha,
               to_char(o.created_at AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') AS creada, u.cuentas,
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
               (SELECT string_agg(u.username, ', ' ORDER BY u.username)

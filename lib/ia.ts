@@ -141,16 +141,31 @@ export const CREDITOS_WEB_MAX = 4
 
 export async function cupoIA(db: Pool, empresaId: number) {
   const { rows: [e] } = await dbGlobal().query(
-    `SELECT ia_limite_mes AS limite, ia_creditos_desde AS desde FROM empresas WHERE id = $1`, [empresaId])
+    `SELECT e.ia_limite_mes AS limite, e.ia_creditos_desde AS desde,
+            COALESCE(SUM(p.creditos), 0)::int AS recargas, MIN(p.fecha) AS primera
+     FROM empresas e LEFT JOIN organizacion_pagos p ON p.empresa_id = e.id AND p.tipo = 'recarga'
+     WHERE e.id = $1 GROUP BY e.id`, [empresaId])
   // Cuenta desde el día 1 del mes, o desde ia_creditos_desde si es más reciente (migración 066:
   // el dueño arrancó sus créditos a mitad de mes, sin descontarse lo de antes).
   const { rows: [u] } = await db.query(
     `SELECT (COUNT(*) + COALESCE(SUM(busquedas), 0))::int AS usados FROM ia_uso
      WHERE modulo IN ('preguntas', 'mensajes')
        AND fecha >= GREATEST(date_trunc('month', NOW()), COALESCE($1::timestamptz, '-infinity'))`, [e?.desde ?? null])
-  const limite: number | null = e?.limite ?? null
+  const base: number | null = e?.limite ?? null
+  // Recargas (migración 138): no vencen y se gastan después de los del mes. Lo que se pasó del tope en los meses
+  // anteriores (desde la primera recarga) salió de las recargas.
+  let recarga = 0
+  if (base !== null && e?.recargas > 0) {
+    const { rows: [g] } = await db.query(
+      `SELECT COALESCE(SUM(GREATEST(0, n - $2)), 0)::int AS gastado FROM (
+         SELECT date_trunc('month', fecha) AS mes, COUNT(*) + COALESCE(SUM(busquedas), 0) AS n FROM ia_uso
+         WHERE modulo IN ('preguntas', 'mensajes') AND fecha >= date_trunc('month', $1::timestamptz)
+           AND fecha < date_trunc('month', NOW()) GROUP BY 1) m`, [e.primera, base])
+    recarga = Math.max(0, e.recargas - g.gastado)
+  }
+  const limite = base === null ? null : base + recarga
   const usados = u.usados as number
-  return { usados, limite, quedan: limite === null ? null : Math.max(0, limite - usados), agotado: limite !== null && usados >= limite }
+  return { usados, limite, recarga, quedan: limite === null ? null : Math.max(0, limite - usados), agotado: limite !== null && usados >= limite }
 }
 
 export const mensajeCupoAgotado = (limite: number) =>

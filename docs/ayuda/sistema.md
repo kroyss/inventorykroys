@@ -91,6 +91,10 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
   se renuevan el día 1 de cada mes (no se acumulan). Recarga: 100 créditos por $4 (estos no vencen). La prueba
   gratis trae 50 créditos.
+- **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 3 días aparece un aviso arriba de
+  todas las pantallas (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
+  siguiente del vencimiento la cuenta se pausa: los datos se conservan y vuelve a funcionar apenas se renueva.
+  Para renovar o recargar créditos se escribe por Telegram; lo registra el equipo de El Comerciante Digital.
 
 ---
 

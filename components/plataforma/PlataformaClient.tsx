@@ -10,6 +10,7 @@ import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
 import ResumenPanel from './ResumenPanel'
 import AdopcionPanel from './AdopcionPanel'
+import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 import { corteDeAlta, corteISO } from '@/lib/fundadoresCortes'
@@ -34,6 +35,11 @@ interface Empresa {
   ia_limite_mes: number | null
   motivo_pausa: string | null
   pausa_fecha: string | null
+  plan: 'esencial' | 'automatizaciones' | 'completo' | null   // plan pagado (mig 138, Plataforma → Plan y pagos)
+  escalon: number | null
+  ciclo: 'mensual' | 'trimestral' | null
+  plan_hasta: string | null
+  radar_pro_hasta: string | null
   creada: string
   cuentas: string | null      // cuentas de MercadoLibre conectadas (null = ninguna)
   inventario?: UsoInventario | null   // solo con el módulo inventario (25-10)
@@ -66,7 +72,12 @@ function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; e
   const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
   if (!e.is_active) return { icono: '⛔', texto: 'Apagada a mano', extra: 'nadie puede entrar' }
   if (est === 'propietario') return { icono: '🏠', texto: 'Tu empresa' }
-  if (est === 'activo') return { icono: '✅', texto: 'Pagando', extra: e.cuentas ? 'ML conectado' : 'sin ML' }
+  if (est === 'activo') {
+    // Con plan registrado (mig 138): hasta cuándo pagó; al día siguiente del vencimiento el cron la pausa.
+    const d = e.plan_hasta ? diasHasta(e.plan_hasta, hoy) : null
+    const pago = e.plan_hasta ? `pagado hasta ${ddmm(e.plan_hasta)}${d! <= 3 ? ` · ${d! < 0 ? 'vencido' : d === 0 ? 'vence hoy' : `quedan ${d} día${d === 1 ? '' : 's'}`}` : ''}` : null
+    return { icono: d != null && d <= 3 ? '⚠️' : '✅', texto: 'Pagando', extra: [pago, e.cuentas ? 'ML conectado' : 'sin ML'].filter(Boolean).join(' · '), alerta: d != null && d <= 3 }
+  }
   // Se registró desde el Radar (29-10): solo el módulo Radar; qué días entra lo decide su grupo en el Radar.
   if (e.origen === 'radar' && est === 'prueba') return { icono: '📡', texto: 'Solo Radar', extra: 'se registró desde el Radar' }
   if (est === 'vencido') {
@@ -282,7 +293,8 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
       <AdopcionPanel abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
         base={activas.map(e => ({
           id: e.id, nombre: e.nombre, activa: true,
-          porVencer: e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5,
+          porVencer: (e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5)
+            || (e.estado === 'activo' && !!e.plan_hasta && diasHasta(e.plan_hasta, hoy) <= 3),
           detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.admins ? ` · ${e.admins}` : ''}`,
           cuenta: <FraseCuenta e={e} hoy={hoy} />,
           extra: e.inventario ? <LineaInventario u={e.inventario} conPagos={e.modulos.includes('pagos_me')} /> : undefined,
@@ -362,6 +374,15 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                     <div className="mt-2"><Cuenta e={sel} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} /></div>
                   </details>
                 )}
+              </section>
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Plan y pagos</h3>
+                <PlanCliente key={sel.organizacion_id} hoy={hoy}
+                  d={{ organizacion_id: sel.organizacion_id, fundador: sel.fundador, estado: sel.estado, plan: sel.plan, escalon: sel.escalon,
+                    ciclo: sel.ciclo, plan_hasta: sel.plan_hasta, radar_pro_hasta: sel.radar_pro_hasta,
+                    empresas: empresas.filter(x => x.organizacion_id === sel.organizacion_id).map(x => ({ id: x.id, nombre: x.nombre })) }}
+                  onCambio={msg => { setError(null); setAviso(msg); cargar() }} onError={msg => { setAviso(null); setError(msg) }} />
               </section>
 
               {sel.id !== empresaActual && sel.is_active && (
@@ -757,7 +778,8 @@ function Historia({ organizacionId }: { organizacionId: number }) {
   const texto = (t: string, det: string | null) =>
     t === 'pausada' ? `⏸ Pausada: ${MOTIVO[det ?? ''] ?? 'terminó su prueba'}`
     : t === 'reactivada' ? `▶️ Reactivada${det ? ` hasta el ${ddmm(det)}` : ''}`
-    : t === 'activa' ? '✅ Pasó a pagar'
+    : t === 'activa' ? `✅ Pasó a pagar${det ? `: ${det.replace(/(\d{4})-(\d{2})-(\d{2})$/, '$3/$2')}` : ''}`
+    : t === 'renovada' ? `🔁 Renovó${det ? `: ${det.replace(/(\d{4})-(\d{2})-(\d{2})$/, '$3/$2')}` : ''}`
     : t === 'fecha' ? `📅 Vencimiento cambiado al ${det ? ddmm(det) : '—'}`
     : t === 'apagada' ? `⛔ Apagada a mano${det ? ` (${det})` : ''}`
     : t === 'encendida' ? `🔌 Encendida de nuevo${det ? ` (${det})` : ''}`

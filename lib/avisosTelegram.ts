@@ -542,15 +542,19 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
  *  llega aunque no entre. Mismas cuentas que components/layout/AvisoCuenta.tsx (hora Caracas); mientras
  *  la prueba espera la conexión de ML no se avisa. */
 const AVISAR_FIN_PRUEBA_DIAS = 3
+/** Hasta cuándo puede entrar: la prueba o el plan pagado (mig 138). */
+const SQL_VENCE = `CASE o.estado WHEN 'prueba' THEN o.prueba_hasta WHEN 'activo' THEN o.plan_hasta END`
 async function finDePrueba(empresaId: number) {
   const { rows: [o] } = await dbGlobal().query(
-    `SELECT o.fundador, o.prueba_dias, to_char(o.prueba_hasta, 'DD/MM') AS hasta,
-            o.prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan
+    `SELECT o.estado, o.fundador, o.prueba_dias, to_char(${SQL_VENCE}, 'DD/MM') AS hasta,
+            ${SQL_VENCE} - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan
      FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
-     WHERE e.id = $1 AND o.estado = 'prueba' AND o.prueba_hasta IS NOT NULL`, [empresaId])
+     WHERE e.id = $1 AND ${SQL_VENCE} IS NOT NULL`, [empresaId])
   if (!o) return null
   const quedan = Number(o.quedan)
   if (quedan < 0 || quedan > AVISAR_FIN_PRUEBA_DIAS) return null
+  // Plan pagado (mig 138): al día siguiente del vencimiento la cuenta se pausa sola (lib/planesCuenta.ts).
+  if (o.estado === 'activo') return `⏳ <b>Tu plan vence ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: renuévalo para seguir sin cortes (escríbenos)`
   if (o.prueba_dias != null && quedan >= o.prueba_dias) return null
   const que = o.fundador ? 'Tu mes gratis de Fundador' : 'Tu prueba gratis'
   return `⏳ <b>${que} termina ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: escríbenos para seguir sin cortes`
@@ -559,23 +563,23 @@ async function finDePrueba(empresaId: number) {
 /** Para el dueño de la plataforma: pruebas que vencen en 3 días o vencieron hace 3 días o menos (hora Caracas). */
 async function clientesPorVencer() {
   const { rows } = await dbGlobal().query(
-    `SELECT o.nombre, o.fundador, to_char(o.prueba_hasta, 'DD/MM') AS hasta,
-            o.prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan,
+    `SELECT o.nombre, o.fundador, o.estado, to_char(${SQL_VENCE}, 'DD/MM') AS hasta,
+            ${SQL_VENCE} - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan,
             EXISTS (SELECT 1 FROM telegram_usuarios t
                     JOIN usuario_empresas ue ON ue.user_id = t.user_id AND ue.role = 'admin'
                     JOIN empresas e ON e.id = ue.empresa_id AND e.organizacion_id = o.id
                     WHERE t.chat_id IS NOT NULL AND t.entorno = $2
                       AND COALESCE((ue.avisos->>'resumen')::boolean, TRUE)) AS con_telegram
      FROM organizaciones o
-     WHERE o.id <> $1 AND o.estado = 'prueba' AND o.prueba_hasta IS NOT NULL
-       AND o.prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date BETWEEN -3 AND $3
-     ORDER BY o.prueba_hasta, o.nombre`, [ORGANIZACION_PLATAFORMA, ENTORNO, AVISAR_FIN_PRUEBA_DIAS])
+     WHERE o.id <> $1 AND o.estado IN ('prueba', 'activo') AND ${SQL_VENCE} IS NOT NULL
+       AND ${SQL_VENCE} - (NOW() AT TIME ZONE 'America/Caracas')::date BETWEEN -3 AND $3
+     ORDER BY ${SQL_VENCE}, o.nombre`, [ORGANIZACION_PLATAFORMA, ENTORNO, AVISAR_FIN_PRUEBA_DIAS])
   return rows.map(r => {
     const q = Number(r.quedan)
     const cuando = q < 0 ? `<b>venció ${q === -1 ? 'ayer' : `hace ${-q} días`}</b> (${r.hasta}) · ¿sigue o se cierra?`
       : q === 0 ? `<b>vence hoy</b> (${r.hasta})` : q === 1 ? `vence mañana (${r.hasta})` : `vence en ${q} días (${r.hasta})`
     const aviso = q < 0 ? '' : r.con_telegram ? ' · ✅ le llega el aviso por Telegram' : ' · ⚠️ sin Telegram: escríbele tú'
-    return `• ${esc(r.nombre)}${r.fundador ? ' (Fundador)' : ''} · ${cuando}${aviso}`
+    return `• ${esc(r.nombre)}${r.fundador ? ' (Fundador)' : ''}${r.estado === 'activo' ? ' · plan' : ''} · ${cuando}${aviso}`
   })
 }
 
