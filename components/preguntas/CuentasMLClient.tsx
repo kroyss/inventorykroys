@@ -64,8 +64,9 @@ export default function CuentasMLClient() {
               <ul className="divide-y divide-neutral-100">
                 {datos.cuentas.map(c => (
                   <li key={c.id} className="px-4 py-3 flex items-center gap-3 text-sm">
+                    {/* "Aviso:" (lib/preguntas.ts AVISO, 01-11) = la cuenta funciona, solo hay algo que mirar. */}
                     <StatusBadge status={c.estado === 'activa' ? (c.ultimo_error ? 'PARCIAL' : 'OK') : 'INCONSISTENTE'}
-                      label={c.estado === 'activa' ? (c.ultimo_error ? 'Con error' : 'Conectada') : 'Desconectada'} />
+                      label={c.estado === 'activa' ? (c.ultimo_error ? (c.ultimo_error.startsWith('Aviso:') ? 'Con aviso' : 'Con error') : 'Conectada') : 'Desconectada'} />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-neutral-900">{c.nickname}</p>
                       <p className="text-xs text-neutral-500 truncate">

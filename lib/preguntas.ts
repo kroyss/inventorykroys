@@ -70,18 +70,25 @@ async function buscar(db: Pool, conexionId: number, status: string, maxPaginas: 
  * el multiget (/items?ids=) responde 403 (PolicyAgent) y /items/{id}?attributes= no.
  * Primero las de preguntas pendientes; un tope por pasada para no gastar el cron entero.
  * Nunca corta la sincronización: si una falla, queda para la próxima.
+ *
+ * 01-11: publicaciones que ML no deja leer (cerradas, pausadas por ML o en revisión) se reintentaban en CADA pasada
+ * y la cuenta quedaba "Con error" aunque sus preguntas ya estuvieran respondidas. Ahora: un intento fallido marca
+ * item_actualizado_at y se reintenta cada 6 h (o al llegar una pregunta nueva en esa publicación, que viene sin la
+ * marca), y solo cuenta como aviso si la publicación tiene preguntas SIN responder.
  */
+/** Prefijo de un aviso que no es error (la cuenta funciona): Cuentas de ML lo muestra como "Con aviso". */
+export const AVISO = 'Aviso:'
+
 async function completarItems(db: Pool, conexionId: number) {
   // Sin título todavía, o pendiente con el precio de hace más de 30 min (las promociones cambian).
   const { rows } = await db.query(
-    `SELECT item_id FROM ml_preguntas
+    `SELECT item_id, bool_or(estado = 'UNANSWERED') AS pendiente FROM ml_preguntas
      WHERE conexion_id = $1
-       AND (item_titulo IS NULL
-            OR (estado = 'UNANSWERED' AND item_imagen IS NULL)
+       AND ((item_titulo IS NULL AND (item_actualizado_at IS NULL OR item_actualizado_at < NOW() - INTERVAL '6 hours'))
             OR (estado = 'UNANSWERED' AND (item_actualizado_at IS NULL OR item_actualizado_at < NOW() - INTERVAL '30 minutes')))
      GROUP BY item_id ORDER BY bool_or(estado = 'UNANSWERED') DESC, max(fecha) DESC LIMIT 40`, [conexionId])
-  let fallas = 0
-  for (const { item_id } of rows) {
+  let fallas = 0, seguidas = 0
+  for (const { item_id, pendiente } of rows) {
     try {
       const it = await mlFetch<{ id: string; title: string; permalink: string; status: string; available_quantity?: number | null
                                  price: number | null; original_price: number | null; currency_id: string | null; thumbnail?: string | null; variations?: unknown[] }>(
@@ -103,10 +110,14 @@ async function completarItems(db: Pool, conexionId: number) {
          it.thumbnail ? it.thumbnail.replace(/^http:/, 'https:') : null, it.variations?.length ?? 0,
          Number.isFinite(it.available_quantity) ? it.available_quantity : null])
     } catch {
-      if (++fallas >= 3) break          // si ML bloquea a todas, no insistir en esta pasada
+      await db.query(`UPDATE ml_preguntas SET item_actualizado_at = NOW() WHERE conexion_id = $1 AND item_id = $2`, [conexionId, item_id])
+      if (pendiente) fallas++
+      if (++seguidas >= 3) break          // si ML bloquea a todas, no insistir en esta pasada
+      continue
     }
+    seguidas = 0
   }
-  return fallas
+  return fallas   // solo las que afectan preguntas sin responder
 }
 
 export interface ResultadoSync { cuenta: string; nuevas?: number; error?: string }
@@ -194,7 +205,7 @@ export async function sincronizarEmpresa(db: Pool, forzar = false): Promise<Resu
       const fallas = await completarItems(db, c.id)
       if (fallas) {
         await db.query(`UPDATE ml_conexiones SET ultimo_error = $2 WHERE id = $1`,
-          [c.id, 'MercadoLibre no dejó leer algunas publicaciones (títulos). Las preguntas sí están al día.'])
+          [c.id, `${AVISO} hay preguntas sin responder en publicaciones que MercadoLibre no deja ver (cerradas o en revisión): se muestran sin título.`])
       }
       const { rows: [{ n: despues }] } = await db.query(`SELECT COUNT(*)::int AS n FROM ml_preguntas WHERE conexion_id = $1`, [c.id])
       res.push({ cuenta: c.nickname, nuevas: despues - antes })
