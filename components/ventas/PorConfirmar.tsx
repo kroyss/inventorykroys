@@ -19,7 +19,8 @@ import { NotasVenta } from '@/components/preguntas/MensajesClient'
 
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
 
-/** Nota de la venta en MercadoLibre, editable (la misma de Mensajes y de Ventas), en una ventanita (23-10). */
+/** Nota de la venta en MercadoLibre, editable (la misma de Mensajes y de Ventas), en una ventanita (23-10). Abre ya
+ *  escribiendo y se cierra sola al guardar con Enter (01-11). */
 function ChipNota({ numero }: { numero: string }) {
   const [abierta, setAbierta] = useState(false)
   return (
@@ -33,7 +34,7 @@ function ChipNota({ numero }: { numero: string }) {
               <h3 className="text-sm font-semibold text-neutral-900">Nota de la venta <span className="font-mono text-xs text-neutral-400">{numero}</span></h3>
               <button type="button" onClick={() => setAbierta(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Cerrar">✕</button>
             </div>
-            <NotasVenta pack={numero} onCambio={() => {}} />
+            <NotasVenta pack={numero} onCambio={() => {}} directo onListo={() => setAbierta(false)} />
           </div>
         </div>, document.body)}
     </>

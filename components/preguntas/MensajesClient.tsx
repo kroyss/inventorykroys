@@ -664,7 +664,11 @@ const unir = (notas: NotaML[]) => notas.map(n => n.texto.trim()).filter(Boolean)
 
 /** Notas de la venta en MercadoLibre (las mismas en Mensajes y en Ventas): se guardan al instante en ML.
  *  `onNotas`: el texto de todas juntas cada vez que cambian (Ventas lo usa como nota de la venta). */
-export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio: () => void; onNotas?: (texto: string) => void }) {
+/** `directo` (01-11, pedido de un cliente para Pagos ME): abre ya escribiendo (la nota que haya, o una nueva) y llama
+ *  `onListo` al guardar o cancelar, para cerrar la ventanita. En todas: Enter guarda (la nota sale corrida en la guía). */
+export function NotasVenta({ pack, onCambio, onNotas, directo, onListo }: {
+  pack: string; onCambio: () => void; onNotas?: (texto: string) => void; directo?: boolean; onListo?: () => void
+}) {
   const [datos, setDatos] = useState<{ notas: NotaML[]; error: string | null; pendiente?: boolean } | null>(null)
   const [editando, setEditando] = useState<{ id: string | null; texto: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -689,7 +693,15 @@ export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio
   useEffect(() => {
     let vivo = true
     // Al abrir, si ML no tiene notas no se pisa la que ya tenía la venta.
-    fetch(`/api/mensajes/${pack}/notas`).then(r => r.ok ? r.json() : null).then(d => { if (vivo) { setDatos(d); if (d && !d.error && unir(d.notas)) onNotas?.(unir(d.notas)) } })
+    fetch(`/api/mensajes/${pack}/notas`).then(r => r.ok ? r.json() : null).then(d => {
+      if (!vivo) return
+      setDatos(d)
+      if (d && !d.error && unir(d.notas)) onNotas?.(unir(d.notas))
+      if (directo && d) {
+        const n = (d.notas ?? []).find((x: NotaML) => x.id !== 'pendiente')
+        setEditando(n ? { id: n.id, texto: n.texto } : { id: null, texto: '' })
+      }
+    })
     return () => { vivo = false }
   }, [pack])
 
@@ -701,7 +713,7 @@ export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error ?? 'No se pudo guardar la nota'); return }
-      setDatos(d); setEditando(null); setGuardada(true); onCambio(); onNotas?.(unir(d.notas))
+      setDatos(d); setEditando(null); setGuardada(true); onCambio(); onNotas?.(unir(d.notas)); onListo?.()
     } finally { setGuardando(false) }
   }
   const guardar = () => {
@@ -718,12 +730,15 @@ export function NotasVenta({ pack, onCambio, onNotas }: { pack: string; onCambio
   if (!datos) return null
   const editor = editando && (
     <div className="space-y-2">
-      <textarea value={editando.texto} onChange={e => setEditando({ ...editando, texto: e.target.value })} rows={2} maxLength={300} autoFocus
+      <textarea value={editando.texto} rows={2} maxLength={300} autoFocus
+        // Sin saltos de línea (en la guía se imprime corrida): Enter guarda; lo pegado con saltos queda en una línea.
+        onChange={e => setEditando({ ...editando, texto: e.target.value.replace(/\s*\n\s*/g, ' ') })}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); if (!guardando && editando.texto.trim()) guardar() } }}
         placeholder="Ej.: el comprador cambia a la talla L · garantía, espera fotos…"
         className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white resize-y focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300" />
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-neutral-400">{editando.texto.length}/300 · el comprador no la ve</span>
-        <button onClick={() => setEditando(null)} className="ml-auto btn-ghost text-xs px-2.5 py-1">Cancelar</button>
+        <span className="text-[11px] text-neutral-400">{editando.texto.length}/300 · Enter guarda · el comprador no la ve</span>
+        <button onClick={() => { setEditando(null); onListo?.() }} className="ml-auto btn-ghost text-xs px-2.5 py-1">Cancelar</button>
         <button onClick={guardar} disabled={guardando || !editando.texto.trim()} className="btn-primary text-xs px-3 py-1">
           {guardando ? 'Guardando…' : 'Guardar en ML'}
         </button>

@@ -202,7 +202,8 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   no salió de Despachos, usa la de MercadoEnvíos. Si preguntan algo que depende de tu equipo (cuándo sale el paquete,
   desde dónde se envía), no lo inventa: propone «lo verificamos con el equipo y te avisamos por aquí».
 - **Nota de la venta:** una nota interna que se guarda en MercadoLibre; **el comprador no la ve** (ej. «cambia a
-  talla L», «garantía, espera fotos»).
+  talla L», «garantía, espera fotos»). Va en una sola línea (sale corrida en la guía): **Enter la guarda**. En Pagos ME,
+  «📝 Nota» abre directo para escribir y se cierra sola al guardar.
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
 **Pestañas extra:**
