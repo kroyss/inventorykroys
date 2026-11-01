@@ -482,7 +482,7 @@ en PRO el Radar busca por ti.**
 paralelo, el **buscador**, las **categorías**, el filtro de precio y tu **cabina completa**, sin límite. Los productos
 salen ordenados por los que más venden.
 
-**Radar PRO es los sábados y los domingos** (de 00:00 a 23:59, hora de Venezuela) y cuesta **$5 al mes** aparte del
+**Radar PRO es los sábados y los domingos** (de 00:00 a 23:59, hora de Venezuela) y cuesta **$8 al mes** aparte del
 plan. Al contratar el plan, el **primer mes de PRO va de regalo**. Ese día tienes todo: los **sellos**, el **techo de
 ganancia**, los filtros que arman la lista corta (Candidatos fuertes, Sostenido, En alza, Demanda, Bajó de precio,
 ventas, reordenar), los **productos nuevos del mes** (los que trajo la barrida de este mes), los precios del panel de
