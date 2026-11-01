@@ -347,7 +347,7 @@ type ConversacionVenta = { conversacion: Conversacion; rapidas: MensajeRapido[];
 
 /** `compacto` (2026-10-15): botón chico "Ver conversación" para listas (Mensajes → Pedir calificación).
  *  `chip` (2026-10-17): sin estilo de botón, el que llama pone el suyo (Calificaciones). */
-export function LoQueSeHablo({ numero, compacto, chip, className = '', etiqueta }: { numero: string; compacto?: boolean; chip?: boolean; className?: string; etiqueta?: ReactNode }) {
+export function LoQueSeHablo({ numero, compacto, chip, className = '', etiqueta, titulo }: { numero: string; compacto?: boolean; chip?: boolean; className?: string; etiqueta?: ReactNode; titulo?: string }) {
   const [abierto, setAbierto] = useState(false)
   const [conv, setConv] = useState<ConversacionVenta | string | undefined>(undefined)   // string = error; undefined = sin pedir
 
@@ -364,7 +364,7 @@ export function LoQueSeHablo({ numero, compacto, chip, className = '', etiqueta 
     <>
       {chip ? (
         <button type="button" onClick={abrir} className={className}
-          title="Ver lo que se habló con el comprador (mensajes, notas y preguntas)" aria-label="Ver conversación">
+          title={titulo ?? 'Ver lo que se habló con el comprador (mensajes, notas y preguntas)'} aria-label="Ver conversación">
           {etiqueta}
         </button>
       ) : compacto ? (

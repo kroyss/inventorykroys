@@ -20,13 +20,16 @@ import { NotasVenta } from '@/components/preguntas/MensajesClient'
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
 
 /** Nota de la venta en MercadoLibre, editable (la misma de Mensajes y de Ventas), en una ventanita (23-10). Abre ya
- *  escribiendo y se cierra sola al guardar con Enter (01-11). */
-function ChipNota({ numero }: { numero: string }) {
+ *  escribiendo y se cierra sola al guardar con Enter (01-11). Sombreada si la venta tiene nota (01-11). */
+function ChipNota({ numero, tiene }: { numero: string; tiene: boolean }) {
   const [abierta, setAbierta] = useState(false)
+  const [conNota, setConNota] = useState(tiene)
+  useEffect(() => setConNota(tiene), [tiene])
   return (
     <>
-      <button type="button" onClick={() => setAbierta(true)} title="Ver y editar la nota de la venta en MercadoLibre (el comprador no la ve)"
-        className={`${chipCls} bg-white text-neutral-600 ring-neutral-200 hover:bg-neutral-50`}>📝 Nota</button>
+      <button type="button" onClick={() => setAbierta(true)}
+        title={conNota ? 'Tiene nota: ver y editar (el comprador no la ve)' : 'Escribir una nota de la venta en MercadoLibre (el comprador no la ve)'}
+        className={`${chipCls} ${conNota ? 'bg-amber-50 text-amber-900 ring-amber-200 font-medium hover:bg-amber-100' : 'bg-white text-neutral-600 ring-neutral-200 hover:bg-neutral-50'}`}>📝 Nota</button>
       {abierta && createPortal(
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4" onClick={() => setAbierta(false)}>
           <div className="w-full max-w-lg space-y-3 rounded-xl bg-white p-4 shadow-xl" onClick={e => e.stopPropagation()}>
@@ -34,7 +37,7 @@ function ChipNota({ numero }: { numero: string }) {
               <h3 className="text-sm font-semibold text-neutral-900">Nota de la venta <span className="font-mono text-xs text-neutral-400">{numero}</span></h3>
               <button type="button" onClick={() => setAbierta(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Cerrar">✕</button>
             </div>
-            <NotasVenta pack={numero} onCambio={() => {}} directo onListo={() => setAbierta(false)} />
+            <NotasVenta pack={numero} onCambio={() => {}} onNotas={t => setConNota(!!t.trim())} directo onListo={() => setAbierta(false)} />
           </div>
         </div>, document.body)}
     </>
@@ -285,11 +288,17 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
         </div>
         <div className="text-sm text-neutral-700 space-y-0.5">
           {f.lineas.map((l, k) => (
-            <div key={k} className="truncate" title={l.titulo}>
-              {/* La variante va antes del título: en títulos largos quedaba cortada al final. */}
-              <span className="font-medium">{l.cantidad} ×</span>{' '}
-              {l.variante && <span className="mr-1 inline-block rounded-full bg-sky-50 px-1.5 py-px text-[11px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 align-middle">{l.variante}</span>}
-              {l.titulo}
+            <div key={k} className="flex min-w-0 items-center gap-2" title={l.titulo}>
+              {/* Foto (01-11): para reconocer el producto sin abrir la conversación. */}
+              {l.foto
+                ? <img src={l.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md bg-white object-contain ring-1 ring-neutral-200" />
+                : <span className="h-10 w-10 shrink-0 rounded-md bg-neutral-100 ring-1 ring-neutral-200" aria-hidden="true" />}
+              <span className="min-w-0 truncate">
+                {/* La variante va antes del título: en títulos largos quedaba cortada al final. */}
+                <span className="font-medium">{l.cantidad} ×</span>{' '}
+                {l.variante && <span className="mr-1 inline-block rounded-full bg-sky-50 px-1.5 py-px text-[11px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 align-middle">{l.variante}</span>}
+                {l.titulo}
+              </span>
             </div>
           ))}
         </div>
@@ -307,10 +316,13 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
           </span>
           {f.pago?.guia && <BotonGuia pagoId={f.pago.id} venta={f.numero} />}
           {/* 23-10: lo mismo que ve el equipo al verificar (Ventas): la conversación con el comprador y la nota de la venta. */}
+          {/* 01-11: sombreada si el comprador escribió algo después de comprar (aunque ya se le haya contestado); blanca =
+              no escribió nada, la venta es tal cual. Al pasar el mouse, sus últimos mensajes. */}
           <LoQueSeHablo numero={f.numero} chip
-            className={`${chipCls} ${f.mensaje ? 'bg-sky-50 text-sky-800 ring-sky-200 font-medium hover:bg-sky-100' : 'bg-white text-neutral-600 ring-neutral-200 hover:bg-neutral-50'}`}
+            titulo={f.escribio.length ? `Escribió:\n${f.escribio.map(t => `• ${t}`).join('\n')}` : 'El comprador no escribió después de comprar'}
+            className={`${chipCls} ${f.escribio.length ? 'bg-sky-50 text-sky-800 ring-sky-200 font-medium hover:bg-sky-100' : 'bg-white text-neutral-600 ring-neutral-200 hover:bg-neutral-50'}`}
             etiqueta={<>💬 {f.mensaje ? 'Escribió' : 'Conversación'} ›</>} />
-          <ChipNota numero={f.numero} />
+          <ChipNota numero={f.numero} tiene={f.nota} />
           {f.despacho && (
             <Etiqueta tono={f.despacho === 'en_lote' ? 'gris' : 'verde'}
               title={f.despacho === 'reportada' ? 'Su guía salió impresa y el Reportador ya se la escribió al comprador'

@@ -281,6 +281,10 @@ de MercadoLibre (**un perfil de Chrome por cada cuenta de ML**). Ser administrad
 lo toques. Luego verifica cada pago (Pago correcto / inválido). **Despachos no imprime guías con el pago sin
 verificar.**
 
+**En cada venta de la lista** ves la foto del producto y dos botones: **💬 Conversación** se marca en celeste si el
+comprador escribió algo después de comprar (al pasar el mouse ves sus últimos mensajes); en blanco, no escribió nada
+y la venta es tal cual. **📝 Nota** se marca en amarillo si la venta tiene nota.
+
 **Comprobar con el banco:** sube los estados de cuenta de tu banco (archivos descargados del banco) y el sistema
 cruza referencia, monto y fecha con los pagos: los que coinciden quedan como «Pago correcto». Muestra también los
 créditos del banco que no son de ninguna venta.
