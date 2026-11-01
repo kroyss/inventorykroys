@@ -318,6 +318,10 @@ y arma el **manifiesto** al final del día.
 - **Cancelar envío:** nunca sale ni se le manda la guía. No se puede deshacer.
 - Si la etiqueta ya estaba impresa, separa el paquete físico.
 
+**Si despachas algunas órdenes con otro programa:** no hace falta sacarlas del lote. Cuando MercadoEnvíos muestra la
+orden como completada, el sistema la deja sin tildar con la nota «Despachada por otro lado» y no la imprime. Mejor no
+descartar lotes para limpiar; si igual descartas uno, sus guías de Pagos ME vuelven a entrar al marcar «Pago correcto».
+
 **Guías Tealca:** TEALCA cambia la guía en la oficina; escribe la guía final de cada envío en «Guías Tealca» para
 que el Reportador se la mande al comprador.
 

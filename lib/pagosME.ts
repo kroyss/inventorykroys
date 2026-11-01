@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import path from 'path'
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { dbEmpresa, dbGlobal } from '@/lib/db'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
@@ -41,7 +41,8 @@ export const SELECT_PAGOS = `
          (p.comprobante_path IS NOT NULL) AS tiene_comprobante, (p.guia_path IS NOT NULL) AS tiene_guia,
          p.verificacion, u.username AS verificado_por, p.verificado_at, p.nota,
          s.id AS sale_id, s.status AS sale_status, s.total_amount::float AS sale_total,
-         EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta) AS en_despachos,
+         EXISTS (SELECT 1 FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
+                  WHERE e.venta = p.venta AND l.status <> 'DESCARTADO') AS en_despachos,
          EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.impresa) AS guia_impresa,
          (SELECT e.apartado FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.apartado IS NOT NULL LIMIT 1) AS apartado,
          (SELECT u.estado FROM ((SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num LIMIT 1)
@@ -137,10 +138,32 @@ export async function conectarVenta(db: Pool, venta: string, userId: number | nu
   return { pago: true, venta: true, verificada, guia }
 }
 
-/** La guía entra al lote PENDIENTE más reciente (o a uno nuevo), salvo que la venta ya esté en Despachos. */
+/**
+ * La guía entra al lote PENDIENTE más reciente (o a uno nuevo), salvo que la venta ya esté en Despachos.
+ * Si solo quedó en un lote DESCARTADO, esa etiqueta vuelve al lote pendiente (01-11: un cliente descartaba lotes y
+ * las guías no volvían a entrar nunca al verificar el pago).
+ */
 async function guiaALote(db: Pool, venta: string, guiaPath: string, userId: number | null) {
-  const { rows: [ya] } = await db.query(`SELECT 1 FROM despacho_etiquetas WHERE venta = $1 LIMIT 1`, [venta])
-  if (ya) return 'ya_estaba' as const
+  const { rows: [ya] } = await db.query(
+    `SELECT e.id, (l.status = 'DESCARTADO') AS descartada FROM despacho_etiquetas e
+     JOIN despacho_lotes l ON l.id = e.lote_id
+     WHERE e.venta = $1 ORDER BY (l.status = 'DESCARTADO'), e.id DESC LIMIT 1`, [venta])
+  if (ya && !ya.descartada) return 'ya_estaba' as const
+  if (ya) {
+    const client = await db.connect()
+    try {
+      await client.query('BEGIN')
+      const loteId = await lotePendiente(client, userId)
+      await client.query(`UPDATE despacho_etiquetas SET lote_id = $1, incluida = TRUE WHERE id = $2`, [loteId, ya.id])
+      await client.query('COMMIT')
+      return 'agregada' as const
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      client.release()
+    }
+  }
   const data = await readFile(guiaPath)
   // TEALCA solo trae la venta en el nombre del archivo (guide-2000….pdf).
   const nombre = `guide-${venta}.pdf`
@@ -148,10 +171,7 @@ async function guiaALote(db: Pool, venta: string, guiaPath: string, userId: numb
   const client = await db.connect()
   try {
     await client.query('BEGIN')
-    const { rows: [l] } = await client.query(
-      `SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' ORDER BY id DESC LIMIT 1 FOR UPDATE`)
-    const loteId = l?.id ?? (await client.query(
-      `INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [userId])).rows[0].id
+    const loteId = await lotePendiente(client, userId)
     await client.query(
       `INSERT INTO despacho_etiquetas
          (lote_id, original_name, file_path, sha256, page_count, venta, guia,
@@ -170,6 +190,14 @@ async function guiaALote(db: Pool, venta: string, guiaPath: string, userId: numb
   } finally {
     client.release()
   }
+}
+
+/** El lote PENDIENTE más reciente (bloqueado), o uno nuevo. */
+async function lotePendiente(client: PoolClient, userId: number | null): Promise<number> {
+  const { rows: [l] } = await client.query(
+    `SELECT id FROM despacho_lotes WHERE status = 'PENDIENTE' ORDER BY id DESC LIMIT 1 FOR UPDATE`)
+  return l?.id ?? (await client.query(
+    `INSERT INTO despacho_lotes (created_by) VALUES ($1) RETURNING id`, [userId])).rows[0].id
 }
 
 // ── ¿De qué cuenta de MercadoLibre es este perfil? (migración 096) ──────────
