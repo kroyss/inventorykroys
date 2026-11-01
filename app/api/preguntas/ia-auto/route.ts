@@ -4,12 +4,14 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { CLAVE_IA_AUTO, configIA } from '@/lib/iaAutomatica'
 import { cupoIA } from '@/lib/ia'
+import { tieneModulo } from '@/lib/modulos'
 
 // GET /api/preguntas/ia-auto → Preguntas → Configuración → Respuesta automática con IA: el modo, los créditos y las
 // últimas preguntas que procesó (qué decidió, la respuesta, la que se publicó y la marca bien/mal del vendedor).
 export async function GET() {
   const s = await sesionPreguntas('automatizaciones_config')
   if ('error' in s) return s.error
+  if (!tieneModulo(s.session.user, 'ia_automatica')) return NextResponse.json({ error: 'Tu empresa no tiene la respuesta automática con IA' }, { status: 403 })
   try {
     const cfg = await configIA(s.db)
     const { rows } = await s.db.query(
@@ -39,6 +41,7 @@ const Accion = z.discriminatedUnion('accion', [
 export async function POST(req: NextRequest) {
   const s = await sesionPreguntas('automatizaciones_config')
   if ('error' in s) return s.error
+  if (!tieneModulo(s.session.user, 'ia_automatica')) return NextResponse.json({ error: 'Tu empresa no tiene la respuesta automática con IA' }, { status: 403 })
   try {
     const b = Accion.parse(await req.json())
     if (b.accion === 'modo') {

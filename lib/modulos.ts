@@ -45,6 +45,9 @@ export const MODULOS = {
   // 30-10 (migración 135): va JUNTO con 'radar' y lo limita al día de prueba: el Radar mete a sus usuarios en el
   // grupo de prueba vigente (Radar → Admin → Grupos). En Plataforma no es un chip aparte: se elige al prender radar.
   radar_dia:          'Radar solo el día de prueba (va con radar): sus usuarios entran al Radar únicamente los días del grupo de prueba vigente',
+  // 01-11 (migración 137): respuesta automática con IA en Preguntas (modo prueba / activa). En prueba solo con
+  // SolucionesMC; a un cliente se le prende en Plataforma cuando el dueño lo decida.
+  ia_automatica:      'Preguntas: respuesta automática con IA (modo prueba y activa; cada pregunta procesada usa 1 crédito)',
 } as const
 
 export type Modulo = keyof typeof MODULOS

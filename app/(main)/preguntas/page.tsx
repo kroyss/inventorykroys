@@ -25,5 +25,6 @@ export default async function PreguntasPage({ searchParams }: { searchParams: Pr
   }
   return <PreguntasClient isAdmin={puede(session!.user, 'automatizaciones_config')}
     puedeCuentas={puede(session!.user, 'ml_cuentas')} puedeReponer={puede(session!.user, 'reponer_stock')}
+    iaAutomatica={tieneModulo(session!.user, 'ia_automatica')}
     verAvisosInternos={session!.user.organizacionId === ORGANIZACION_PLATAFORMA} />
 }

@@ -236,7 +236,7 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
 
 // isAdmin = "Configurar automatizaciones" (pestaña Configuración); conectar cuentas y reponer stock
 // son permisos aparte (lib/permisos.ts).
-export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, verAvisosInternos = false }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean
+export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, iaAutomatica = false, verAvisosInternos = false }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean; iaAutomatica?: boolean
   /** Solo la organización dueña de la plataforma (22-10): "envío gratis sin confirmar" confundía a los Fundadores. */
   verAvisosInternos?: boolean }) {
   // ?vista=cuentas abre Políticas y respuestas rápidas (las cuentas de ML están en /cuentas-ml).
@@ -336,7 +336,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, v
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Lo aprendido de cada producto']] as const).map(([k, t]) => (
+              {([['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Lo aprendido de cada producto']] as const).filter(([k]) => k !== 'ia_auto' || iaAutomatica).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
@@ -344,7 +344,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, v
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
             {subConfig === 'aprendido' && <><LoAprendido /><DatosProductos /></>}
             {subConfig === 'ia' && <CuentasYPoliticas />}
-            {subConfig === 'ia_auto' && <IaAutomatica />}
+            {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica />}
           </div>
         ) : <Cargando />
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (

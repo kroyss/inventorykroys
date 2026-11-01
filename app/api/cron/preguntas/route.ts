@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
     // Inactiva: ningún usuario suyo usó el sistema en DIAS_INACTIVA días (la plataforma nunca).
     `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario, 'pagos_me' = ANY(e.modulos) AS pagos_me,
-            'promociones' = ANY(e.modulos) AS promociones,
+            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto,
             o.estado <> 'propietario' AND COALESCE((
               SELECT MAX(GREATEST(u.ultima_actividad, u.last_login)) FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
               WHERE ue.empresa_id = e.id) < NOW() - INTERVAL '${DIAS_INACTIVA} days', TRUE) AS inactiva
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
     }
     // Respuesta automática con IA (lib/iaAutomatica.ts): solo empresas que la prendieron (prueba o real), después de
     // las respuestas rápidas automáticas, con las preguntas que quedaron sin responder.
-    for (const e of sincronizadas) {
+    for (const e of sincronizadas.filter(x => x.ia_auto)) {
       try {
         const r = await conEmpresa(e.id, e.country as Country, db => procesarIAAutomatica(db, e.id, e.country))
         if (r) console.log('[ia automatica]', e.id, r)
