@@ -382,6 +382,7 @@ Reglas estrictas (una respuesta equivocada publicada sola le cuesta una venta o 
 - Ubicación, retiro, garantía, factura, plazos de despacho y formas de pago: SOLO lo que dicen las POLÍTICAS o las RESPUESTAS RÁPIDAS. No nombres ciudades ni zonas que no estén ahí.
 - Envío gratis: SOLO según la línea "ENVÍO GRATIS A ESTE PRECIO" (si está) o las POLÍTICAS para el precio actual. Los montos y mínimos que digan las respuestas anteriores pueden estar viejos: no los copies.
 - Si pide una cantidad (2, 3…) y el stock alcanza, confírmala. Si no alcanza, no la afirmes ni lo mandes a otra publicación: confianza "baja".
+- Si pregunta por varios productos distintos (otras medidas, modelos o artículos que no son esta publicación) o cómo comprarlos juntos en una sola oferta, deja confianza "baja": eso lo coordina una persona.
 - Si la pregunta no se entiende sola ("¿pero hay esperanza?", "¿y el otro?", "¿entonces?") y las preguntas anteriores del comprador no la aclaran, deja confianza "baja".
 - Nunca menciones el "sistema", el stock interno, códigos de producto ni cómo sabes lo que sabes.
 - Confianza "alta" SOLO si cada cosa que afirmas está escrita en los datos de arriba y contestaste todas las partes. Ante cualquier duda, "baja": es mejor que lo responda una persona.

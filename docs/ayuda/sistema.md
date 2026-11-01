@@ -131,6 +131,15 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
 3. **Buscar en internet:** para dudas técnicas que la publicación no responde (cuesta créditos extra).
 4. Envía. La respuesta sale en MercadoLibre a tu nombre.
 
+**Respuesta automática con IA** (Configuración → Respuesta automática con IA):
+- **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
+- **Modo prueba:** la IA lee cada pregunta nueva y decide si habría salido sola, pero **no publica nada**. En la lista
+  «Habrían salido solas» marcas cada una ✓ Bien o ✗ Mal y ves el % de acierto.
+- **Activa:** se publican solas solo las de confianza alta que pasan todas las revisiones. Nunca sale sola una respuesta
+  que diga que no hay, que recomiende otra publicación o con datos que no están en la publicación o tus políticas. El
+  resto te queda con la respuesta ya escrita para revisar y enviar.
+- Cada pregunta que la IA procesa usa 1 crédito. La pausa de respuestas automáticas también la detiene.
+
 **Para que la IA responda mejor:**
 - **Políticas para la IA:** lo general de tu negocio (horarios, envíos, formas de pago, garantía, retiro en
   persona…). Se escriben una vez y la IA las usa en todas las respuestas.

@@ -8,6 +8,7 @@ import { calificarAutomatico, noConcretadasAutomaticas } from '@/lib/calificacio
 import { recordarPagos } from '@/lib/recordatoriosPago'
 import { mensajeAlComprar } from '@/lib/mensajeAlComprar'
 import { responderAutomaticas } from '@/lib/automaticasPreguntas'
+import { procesarIAAutomatica } from '@/lib/iaAutomatica'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
@@ -97,6 +98,16 @@ export async function GET(req: NextRequest) {
         if (r) console.log('[respuestas automaticas]', e.id, r)
       } catch (err) {
         console.error('[respuestas automaticas]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Respuesta automática con IA (lib/iaAutomatica.ts): solo empresas que la prendieron (prueba o real), después de
+    // las respuestas rápidas automáticas, con las preguntas que quedaron sin responder.
+    for (const e of sincronizadas) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => procesarIAAutomatica(db, e.id, e.country))
+        if (r) console.log('[ia automatica]', e.id, r)
+      } catch (err) {
+        console.error('[ia automatica]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Calificación automática de las concretadas (lib/calificacionesAuto.ts): solo empresas que la
