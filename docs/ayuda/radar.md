@@ -211,6 +211,14 @@ significar que entró competencia y está peleando por precio.
 que calculaste con el precio viejo ya no es el real. Ojo también con caídas
 enormes (−80%), que suelen ser publicaciones carnada, no competencia.
 
+### ★ Mal calificados — Mercado con quejas.
+
+Productos con **menos de 4,3 estrellas** que igual venden **+100**: hay gente comprándolos aunque no queden
+contentos. Lee las opiniones en MercadoLibre. Si la queja es de calidad o de atención, puede ser tu oportunidad con un proveedor
+mejor, o con un similar mejor calificado (míralo en Competencia). Es PRO.
+
+> Súmale ventas +500 para quedarte con los que más mercado tienen.
+
 ### Solo vigentes — Esconde lo que ya no está.
 
 En cada actualización se vuelven a ver los productos. Los que **ya no
@@ -489,7 +497,7 @@ escribe por Telegram (t.me/elcomerciantedigital).
 | Techo de ganancia en cada tarjeta | — | Sí |
 | Tu cabina: costos, notas, estados | Sin límite | Sin límite |
 | Filtrar por ventas y ganancia posible · reordenar | — | Sí |
-| Candidatos · Sostenido · En alza · Demanda · Bajó de precio · Vigentes | — | Sí |
+| Candidatos · Sostenido · En alza · Demanda · Bajó de precio · Mal calificados · Vigentes | — | Sí |
 | Visitas y preguntas al mes · Subiendo (medido) | — | Sí |
 | Competencia: quiénes son | Sí | Sí |
 | Competencia: a cuánto vende cada uno y tu margen | — | Sí |
