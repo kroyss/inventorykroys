@@ -80,7 +80,7 @@ sí. **Limpiar** los borra todos. En el **celular** el buscador queda siempre a
 la vista y el resto se abre con el botón **Filtros**, que muestra cuántos tienes
 activos.
 
-> **Qué tienes según tu plan.** En **Gratis** filtras con **Buscar**,
+> **Qué tienes según tu plan.** En **Gratis** (todos los días con tu plan) filtras con **Buscar**,
 **Precio desde / hasta**, ** Estado**y el ** árbol de categorías**— o sea,
 navegas el catálogo tú mismo. Todo lo demás de esta sección (acotar por ventas,
 reordenar, y el bloque **Señales** que arma la lista corta) es **Pro**. Los controles se ven apagados con la
@@ -465,67 +465,49 @@ Solo lo que ya investigaste, de mejor a peor.
 Elige la categoría en el panel izquierdo y pon **Demanda: Con tendencia**.
 Dentro de ese rubro, lo que la gente busca.
 
-## 11. Planes: Gratis y Pro
+## 11. Planes: Gratis, PRO de fin de semana y solo lectura
 
-La diferencia cabe en una frase: **en Gratis buscas tú; en Pro el Radar busca
-por ti.**
+El Radar viene con los planes de **El Comerciante Digital**. La diferencia cabe en una frase: **en Gratis buscas tú;
+en PRO el Radar busca por ti.**
 
-Con **Gratis** tienes el catálogo entero con el **precio real** a dólar
-paralelo, el **buscador**, las ** categorías**y tu ** cabina completa**.
-Los productos salen ordenados por los que más venden. Y los **sellos de las
-tarjetas**( ) se ven igual: cuando te encuentres un producto,
-sabes qué vio el Radar en él.
+**Con cualquier plan vigente tienes el Radar Gratis todos los días:** el catálogo con el **precio real** a dólar
+paralelo, el **buscador**, las **categorías**, el filtro de precio y tu **cabina completa**, sin límite. Los productos
+salen ordenados por los que más venden.
 
-**Y esto ya es muy distinto a buscar en MercadoLibre.** Allá te toca abrir
-publicación por publicación sin saber cuál vende: la mayoría de lo que ves está
-quieto, sin una sola venta. Acá **ese filtro ya está hecho**— el Radar solo
-trae productos con **ventas y rotación reales**, y encima con el precio pasado
-a dólar paralelo, que es la plata que de verdad te queda. Empiezas a trabajar
-sobre una lista que ya mueve, no sobre un catálogo lleno de ruido.
+**Radar PRO es los sábados y los domingos** (de 00:00 a 23:59, hora de Venezuela) y cuesta **$5 al mes** aparte del
+plan. Al contratar el plan, el **primer mes de PRO va de regalo**. Ese día tienes todo: los **sellos**, el **techo de
+ganancia**, los filtros que arman la lista corta (Candidatos fuertes, Sostenido, En alza, Demanda, Bajó de precio,
+ventas, reordenar), los **productos nuevos del mes** (los que trajo la barrida de este mes), los precios del panel de
+**Competencia** y la página de **Tendencias**. Arriba del catálogo se ve hasta cuándo lo tienes. Para contratarlo se
+escribe por Telegram (t.me/elcomerciantedigital).
 
-Lo que **Pro** agrega es la parte que te ahorra la tarde: poder **acotar y
-reordenar**el catálogo (ventas, precio, orden) y los ** ejes que arman la
-lista corta**— Candidatos fuertes, Sostenido, En alza, Demanda,
-Bajó de precio, Vigentes. Más los precios del **panel de Competencia** y
-la página de **Tendencias**.
+| | Gratis (todos los días) | PRO (sábado y domingo) |
+|---|---|---|
+| Catálogo con precio real | Sin los nuevos de este mes | Todo |
+| Buscador, categorías y filtro de precio | Sí | Sí |
+| Sellos de las tarjetas | — (solo el aviso Sin ver) | Sí |
+| Techo de ganancia en cada tarjeta | — | Sí |
+| Tu cabina: costos, notas, estados | Sin límite | Sin límite |
+| Filtrar por ventas y ganancia posible · reordenar | — | Sí |
+| Candidatos · Sostenido · En alza · Demanda · Bajó de precio · Vigentes | — | Sí |
+| Visitas y preguntas al mes · Subiendo (medido) | — | Sí |
+| Competencia: quiénes son | Sí | Sí |
+| Competencia: a cuánto vende cada uno y tu margen | — | Sí |
+| Página de Tendencias | — | Sí |
 
-Catálogo con precio real | Todo | Todo
-Buscador y categorías | Sí | Sí
-Sellos de las tarjetas () | Sí | Sí
-Techo de ganancia en cada tarjeta | Sí | Sí
-Tu cabina: costos, notas, estados | Sin límite | Sin límite
-Filtrar por precio | Sí | Sí
-Filtrar por ventas y ganancia posible · reordenar | — | Sí
-Candidatos · Sostenido · En alza · Demanda | — | Sí
-Bajó de precio · Solo vigentes | — | Sí
-Visitas y preguntas al mes · Subiendo (medido) · Más visitas | — | Sí
-Competencia: ver quiénes son | Sí | Sí
-Competencia: a cuánto vende cada uno y tu margen | — | Sí
-Página de Tendencias | — | Sí
-Tiempo de uso y búsquedas | Sin límite | Sin límite
+> **Tu trabajo nunca se toca.** Lo que guardas en la cabina es tuyo para siempre, sin límite. Lo que guardaste un
+sábado lo sigues viendo entre semana, aunque sea un producto nuevo del mes.
 
-> **Tu trabajo nunca se toca.** Los costos, las notas y los estados que
-guardes son tuyos para siempre, sin límite de cantidad y sin importar el plan
-que tengas. Si algún día pasas de Pro a Gratis, conservas todo: lo único que
-dejas de ver son las señales. Y como el filtro de **estado** es libre, sigues
-encontrando lo que ya investigaste con **Investigando** y **Ganador**.
+> **Sin plan (prueba terminada o plan vencido) el Radar queda en solo lectura:** entras y ves los productos que
+guardaste en tu cabina, con tus costos y notas, pero no puedes buscar en el catálogo ni modificarlos. Al activar o
+renovar el plan vuelve todo; si no se ve al instante, hay que salir y volver a entrar.
 
-> En Gratis, el panel de **Competencia** sí se abre y te dice **quiénes** te
-compiten y **qué palabras** comparten con tu producto. Lo que no ves es a
-cuánto venden ni el margen que te quedaría con ese precio — pero puedes abrir
-cada publicación, mirar el precio en MercadoLibre y anotarlo a mano ahí mismo.
-Con **Pro** tienes esos precios ahí mismo, junto al margen que te quedaría
-con cada uno: sin salir de la página ni buscar nada a mano.
+> **Programas y pruebas** (Programa Despegue, prueba de un día): el Radar abre **completo los días del programa o de
+la prueba**, de 00:00 a 23:59 (hora de Venezuela). Cuando ya no quedan días, se entra en solo lectura con la cabina
+guardada.
 
-> Se abrirá una **ventana** en la que el Radar queda completo para todos por
-unos días, y **se anunciará con anticipación en nuestra comunidad**. Se apaga
-sola. Es la forma de probarlo entero sin pagar.
-
-> **Si entraste por un programa o una prueba** (por ejemplo, el **Programa Despegue** o
-la **prueba de un día**), tu Radar abre ** solo los días de tu programa o tu prueba**: ese día, de 00:00 a 23:59 (hora de Venezuela),
-lo tienes **completo**, como Pro. Los demás días no se puede entrar; si lo intentas,
-te dice cuándo abre. Aprovecha el día: trae la lista de lo que te tocó buscar esa semana.
-Lo que guardes en tu cabina queda guardado para el siguiente día de Radar.
+> A veces se abre una **ventana** en la que el Radar queda PRO para todos por unos días; se anuncia antes en la
+comunidad y se apaga sola.
 
 ## 12. Tu cuenta: entrar con tu usuario
 

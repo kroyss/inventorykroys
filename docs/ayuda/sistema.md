@@ -91,6 +91,10 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
   se renuevan el día 1 de cada mes (no se acumulan). Recarga: 100 créditos por $4 (estos no vencen). La prueba
   gratis trae 50 créditos.
+- **Radar de Oportunidades:** todo plan trae el **Radar Gratis todos los días** (catálogo con precio real, buscador
+  y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
+  domingos** por **+$5 al mes**; el primer mes de PRO va de regalo al contratar el plan. Sin plan, el Radar queda en
+  solo lectura (ve lo que guardó).
 - **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 3 días aparece un aviso arriba de
   todas las pantallas (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
   siguiente del vencimiento la cuenta se pausa: los datos se conservan y vuelve a funcionar apenas se renueva.
