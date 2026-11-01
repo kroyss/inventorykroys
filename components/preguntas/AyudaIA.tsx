@@ -7,12 +7,15 @@ export const avisarUsoIA = () => window.dispatchEvent(new Event('uso-ia'))
 /** Lo que cuesta cada botón, en créditos (ver cupoIA en lib/ia.ts). */
 export const CREDITOS_TXT = '1 crédito'
 export const CREDITOS_WEB_TXT = 'hasta 4 créditos'
-const AYUDA_CREDITOS = 'Cada «Proponer con IA» usa 1 crédito, se use o no la respuesta. «Buscar en internet» usa 1 más 1 por cada búsqueda que haga (hasta 4). Las respuestas parecidas y las rápidas no gastan créditos. Se renuevan el día 1.'
+const AYUDA_CREDITOS = 'Cada «Proponer con IA» usa 1 crédito, se use o no la respuesta. «Buscar en internet» usa 1 más 1 por cada búsqueda que haga (hasta 4). Las respuestas parecidas y las rápidas no gastan créditos.'
+/** Cuándo vuelven (mig. 140): de la prueba, del mes de plan o recargas, que no vencen. */
+const ayuda = (u: { renueva?: string; recarga?: number }) =>
+  `${AYUDA_CREDITOS}${u.renueva ? ` Los incluidos ${u.renueva}; los que no uses no se acumulan.` : ''}${u.recarga ? ` Te quedan ${u.recarga} de recargas (no vencen).` : ''}`
 
-/** Créditos de IA usados este mes. El cliente ve "usados de su límite"; el dueño de la plataforma
- *  (sin límite) ve además lo que costaron. */
+/** Créditos de IA usados en el período (la prueba o el mes de plan, mig. 140). El cliente ve "usados de su límite";
+ *  el dueño de la plataforma (sin límite) ve además lo que costaron. */
 export function UsoIA() {
-  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null } | null>(null)
+  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null; renueva?: string; recarga?: number } | null>(null)
   useEffect(() => {
     let vivo = true
     const cargar = () => fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
@@ -25,7 +28,7 @@ export function UsoIA() {
     const quedan = Math.max(0, uso.limite - uso.creditos)
     return (
       <span className={`text-xs whitespace-nowrap ${quedan <= uso.limite * 0.1 ? 'text-amber-700' : 'text-neutral-500'}`}
-        title={AYUDA_CREDITOS}>
+        title={ayuda(uso)}>
         Créditos IA: <b className="num">{uso.creditos}</b> de {uso.limite} · te quedan <b className="num">{quedan}</b>
       </span>
     )
@@ -33,7 +36,7 @@ export function UsoIA() {
   // Sin límite y sin costo (el costo solo llega al dueño de la plataforma): solo los créditos usados.
   if (uso.total === undefined) {
     return (
-      <span className="text-xs text-neutral-500 whitespace-nowrap" title={AYUDA_CREDITOS}>
+      <span className="text-xs text-neutral-500 whitespace-nowrap" title={ayuda(uso)}>
         Créditos IA usados este mes: <b className="text-neutral-800 num">{uso.creditos}</b>
       </span>
     )

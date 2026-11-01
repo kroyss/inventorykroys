@@ -90,8 +90,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   puede pagar en bolívares a tasa BCV.
 - **Créditos de IA:** cada «Proponer con IA» usa 1 crédito; «Buscar en internet» usa 1 más 1 por cada búsqueda
   (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
-  se renuevan el día 1 de cada mes (no se acumulan). Recarga: 100 créditos por $4 (estos no vencen). La prueba
-  gratis trae 50 créditos.
+  del plan se renuevan **cada mes en el día en que se activó** (si se activó el 18, cada 18) y los que no uses no
+  se acumulan. La prueba gratis trae 50 créditos **para toda la prueba** (no se renuevan). Recarga: 100 créditos
+  por $4: **no vencen**, se usan después de los incluidos y lo que sobra sigue de un mes al otro.
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
   domingos** por **+$6 al mes**; el primer mes de PRO va de regalo al contratar el plan. Sin plan, el Radar queda en
@@ -177,7 +178,7 @@ preguntas (spam, ofensivas).
 
 **Problemas comunes:**
 - *No me aparecen preguntas:* revisa que la cuenta esté conectada (Cuentas de MercadoLibre).
-- *«No tienes créditos»:* se acabaron los del mes; puedes responder a mano o con respuestas rápidas (gratis), o
+- *«No tienes créditos»:* se acabaron los de la prueba o los del mes de plan; puedes responder a mano o con respuestas rápidas (gratis), o
   recargar.
 
 **Video:** «Preguntas con IA».

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const { web } = Body.parse(await req.json().catch(() => ({})))
     const cupo = await cupoIA(s.db, s.session.user.empresaId)
-    if (cupo.agotado) return NextResponse.json({ error: mensajeCupoAgotado(cupo.limite!), cupo }, { status: 429 })
+    if (cupo.agotado) return NextResponse.json({ error: mensajeCupoAgotado(cupo), cupo }, { status: 429 })
     if (web && cupo.quedan !== null && cupo.quedan < CREDITOS_WEB_MAX)
       return NextResponse.json({ error: mensajeSinCreditosWeb(cupo.quedan), cupo }, { status: 429 })
     const ctx = await armarContexto(s.db, Number(id), s.session.user.country)

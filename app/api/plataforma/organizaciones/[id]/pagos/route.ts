@@ -76,8 +76,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await client.query(
         `UPDATE organizaciones SET estado = 'activo', plan = $2, escalon = $3, ciclo = $4, plan_hasta = $5,
            prueba_dias = NULL, motivo_pausa = NULL, pausa_fecha = NULL,
-           radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END
-         WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1)])
+           radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END,
+           -- Créditos de IA (mig. 140): el primer plan o el que vuelve tras vencer arranca su mes hoy; renovar
+           -- un plan vigente sigue con el mismo día de renovación.
+           creditos_desde = CASE WHEN $8 THEN NOW() ELSE creditos_desde END
+         WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1),
+          !(o.estado === 'activo' && o.plan_hasta && o.plan_hasta >= hoy)])
       // Módulos del plan (los demás no se tocan; el Radar solo en Automatizaciones y Completo); créditos del escalón.
       await client.query(
         `UPDATE empresas SET

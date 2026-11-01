@@ -123,7 +123,7 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
             <label className="block">Cobrado ($)<input inputMode="decimal" value={recarga.monto} onChange={e => setRecarga({ ...recarga, monto: e.target.value })} className="mt-0.5 block w-20 border border-neutral-300 rounded px-2 py-1" /></label>
           </div>
           <input value={recarga.nota} onChange={e => setRecarga({ ...recarga, nota: e.target.value })} placeholder="Nota (opcional)" className="w-full border border-neutral-300 rounded px-2 py-1" />
-          <p className="text-neutral-500">No vencen: se suman a los del mes y se gastan después de esos. Precio de lista: {RECARGA_IA.creditos} créditos {usd(RECARGA_IA.precio)}.</p>
+          <p className="text-neutral-500">No vencen: se suman a los incluidos del plan, se gastan después de esos y lo que sobra sigue de un mes al otro. Precio de lista: {RECARGA_IA.creditos} créditos {usd(RECARGA_IA.precio)}.</p>
           <button disabled={guardando || !(num(recarga.creditos) > 0)} onClick={() => enviar({ tipo: 'recarga', empresa_id: recarga.empresa, creditos: Math.round(num(recarga.creditos)), monto: num(recarga.monto) || 0, nota: recarga.nota })}
             className="btn-primary text-xs">{guardando ? 'Guardando…' : 'Guardar recarga'}</button>
         </div>

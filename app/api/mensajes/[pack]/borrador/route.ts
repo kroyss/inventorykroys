@@ -14,7 +14,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ pa
   if (!/^\d+$/.test(pack)) return NextResponse.json({ error: 'Conversación inválida' }, { status: 400 })
   try {
     const cupo = await cupoIA(s.db, s.session.user.empresaId)
-    if (cupo.agotado) return NextResponse.json({ error: mensajeCupoAgotado(cupo.limite!), cupo }, { status: 429 })
+    if (cupo.agotado) return NextResponse.json({ error: mensajeCupoAgotado(cupo), cupo }, { status: 429 })
     const { rows: [c] } = await s.db.query(
       `SELECT c.conexion_id, x.ml_user_id FROM ml_conversaciones c JOIN ml_conexiones x ON x.id = c.conexion_id WHERE c.pack_id = $1`, [pack])
     if (!c) return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })

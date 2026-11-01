@@ -85,7 +85,7 @@ export function IaAutomatica() {
         </div>
         <p className="text-xs text-neutral-500">
           Cada pregunta que procesa usa 1 crédito de IA.
-          {info.cupo.limite !== null ? <> Te quedan <b>{info.cupo.quedan}</b> de {info.cupo.limite} este mes{info.cupo.agotado ? ' (sin créditos: no procesa hasta recargar)' : ''}.</> : ' Sin límite de créditos.'}
+          {info.cupo.limite !== null ? <> Te quedan <b>{info.cupo.quedan}</b> de {info.cupo.limite}{info.cupo.agotado ? ' (sin créditos: no procesa hasta recargar)' : ''}.</> : ' Sin límite de créditos.'}
           {info.desde && <> Procesa las preguntas que llegan desde el {hora(info.desde.slice(0, 19))}.</>}
         </p>
         {error && <p className="text-xs text-red-600">{error}</p>}

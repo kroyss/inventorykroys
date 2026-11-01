@@ -43,16 +43,29 @@ export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 
   if (!llamadas.length) return
   const suma = (f: (u: UsoIA) => number) => llamadas.reduce((a, l) => a + f(l.uso), 0)
   try {
+    // Créditos de este uso que salen de las RECARGAS (mig. 140): lo que no entra en los incluidos del período,
+    // hasta lo que quede de recargas. Así las recargas llevan su propio saldo y nunca vencen.
+    let deRecarga = 0
+    if (modulo === 'preguntas' || modulo === 'mensajes') {
+      const { rows: [x] } = await db.query(`SELECT NULLIF(current_setting('app.empresa_id', true), '')::int AS id`)
+      if (x?.id) {
+        const c = await cupoIA(db, x.id)
+        if (c.base !== null) {
+          const n = 1 + suma(u => u.server_tool_use?.web_search_requests ?? 0)
+          deRecarga = Math.min(c.recarga, Math.max(0, n - Math.max(0, c.base - c.incluidos)))
+        }
+      }
+    }
     await db.query(
-      `INSERT INTO ia_uso (modulo, modelo, entrada, salida, busquedas, costo, usuario_id, cache_lectura, cache_escritura)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO ia_uso (modulo, modelo, entrada, salida, busquedas, costo, usuario_id, cache_lectura, cache_escritura, creditos_recarga)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [modulo, [...new Set(llamadas.map(l => l.modelo + (l.lote ? ' (lote)' : '')))].join(' → '),
        suma(u => (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)),
        suma(u => u.output_tokens ?? 0), suma(u => u.server_tool_use?.web_search_requests ?? 0),
        llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
        usuarioId ? Number(usuarioId) : null,
        // Cuánto de la entrada salió de la caché (0,1×) y cuánto se escribió en ella (1,25×): migración 129.
-       suma(u => u.cache_read_input_tokens ?? 0), suma(u => u.cache_creation_input_tokens ?? 0)])
+       suma(u => u.cache_read_input_tokens ?? 0), suma(u => u.cache_creation_input_tokens ?? 0), deRecarga])
   } catch (e) { console.error('[ia_uso]', e) }
 }
 
@@ -139,37 +152,72 @@ export async function leerLote(id: string): Promise<ResultadoLote[] | null> {
  *  la migración 066 el dueño también tiene tope, por decisión propia). Las fichas no cuentan (apagadas, migración 063). */
 export const CREDITOS_WEB_MAX = 4
 
-export async function cupoIA(db: Pool, empresaId: number) {
-  const { rows: [e] } = await dbGlobal().query(
-    `SELECT e.ia_limite_mes AS limite, e.ia_creditos_desde AS desde,
-            COALESCE(SUM(p.creditos), 0)::int AS recargas, MIN(p.fecha) AS primera
-     FROM empresas e LEFT JOIN organizacion_pagos p ON p.empresa_id = e.id AND p.tipo = 'recarga'
-     WHERE e.id = $1 GROUP BY e.id`, [empresaId])
-  // Cuenta desde el día 1 del mes, o desde ia_creditos_desde si es más reciente (migración 066:
-  // el dueño arrancó sus créditos a mitad de mes, sin descontarse lo de antes).
-  const { rows: [u] } = await db.query(
-    `SELECT (COUNT(*) + COALESCE(SUM(busquedas), 0))::int AS usados FROM ia_uso
-     WHERE modulo IN ('preguntas', 'mensajes')
-       AND fecha >= GREATEST(date_trunc('month', NOW()), COALESCE($1::timestamptz, '-infinity'))`, [e?.desde ?? null])
-  const base: number | null = e?.limite ?? null
-  // Recargas (migración 138): no vencen y se gastan después de los del mes. Lo que se pasó del tope en los meses
-  // anteriores (desde la primera recarga) salió de las recargas.
-  let recarga = 0
-  if (base !== null && e?.recargas > 0) {
-    const { rows: [g] } = await db.query(
-      `SELECT COALESCE(SUM(GREATEST(0, n - $2)), 0)::int AS gastado FROM (
-         SELECT date_trunc('month', fecha) AS mes, COUNT(*) + COALESCE(SUM(busquedas), 0) AS n FROM ia_uso
-         WHERE modulo IN ('preguntas', 'mensajes') AND fecha >= date_trunc('month', $1::timestamptz)
-           AND fecha < date_trunc('month', NOW()) GROUP BY 1) m`, [e.primera, base])
-    recarga = Math.max(0, e.recargas - g.gastado)
-  }
-  const limite = base === null ? null : base + recarga
-  const usados = u.usados as number
-  return { usados, limite, recarga, quedan: limite === null ? null : Math.max(0, limite - usados), agotado: limite !== null && usados >= limite }
+/** De qué período son los créditos incluidos (migración 140, 01-11-2026; regla del dueño):
+ *   · 'prueba' → para TODA la prueba, desde que se activó o reactivó (no se renuevan);
+ *   · 'plan'   → por mes de plan desde el día de la activación (organizaciones.creditos_desde): renueva ese día;
+ *   · 'mes'    → la propietaria: mes calendario.
+ *  Los incluidos que no se usan desaparecen con su período. Las RECARGAS compradas no vencen: se gastan después
+ *  de los incluidos (ia_uso.creditos_recarga) y lo que sobra sigue de un período al otro. */
+export type PeriodoIA = 'prueba' | 'plan' | 'mes'
+export interface CupoIA {
+  usados: number; limite: number | null; quedan: number | null; agotado: boolean
+  /** Recargas compradas que quedan (no vencen). */
+  recarga: number
+  periodo: PeriodoIA
+  /** Cuándo se renuevan los incluidos (YYYY-MM-DD); null en prueba. */
+  renueva: string | null
+  /** Incluidos: el tope del período y lo usado de ellos (para repartir un uso entre incluidos y recargas). */
+  base: number | null; incluidos: number
 }
 
-export const mensajeCupoAgotado = (limite: number) =>
-  `Usaste los ${limite} créditos de IA de este mes. Las respuestas parecidas y las respuestas rápidas siguen funcionando; los créditos se renuevan el día 1.`
+export async function cupoIA(db: Pool, empresaId: number): Promise<CupoIA> {
+  // Inicio del período: plan = el último "aniversario" de la activación; prueba = la activación; propietaria = día 1.
+  // ia_creditos_desde (mig. 066/140) es un piso: nunca se cuenta antes de esa fecha.
+  const { rows: [e] } = await dbGlobal().query(
+    `WITH x AS (
+       SELECT e.ia_limite_mes AS limite, e.ia_creditos_desde,
+              CASE WHEN o.estado = 'propietario' OR o.creditos_desde IS NULL THEN 'mes'
+                   WHEN o.estado = 'prueba' THEN 'prueba' ELSE 'plan' END AS periodo,
+              o.creditos_desde AS ancla,
+              (SELECT COALESCE(SUM(p.creditos), 0) FROM organizacion_pagos p WHERE p.empresa_id = e.id AND p.tipo = 'recarga')::int AS recargas
+       FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id WHERE e.id = $1),
+     y AS (
+       SELECT x.*, CASE x.periodo
+                     WHEN 'mes' THEN date_trunc('month', NOW())
+                     WHEN 'prueba' THEN x.ancla
+                     ELSE x.ancla + make_interval(months => (EXTRACT(YEAR FROM age(NOW(), x.ancla)) * 12
+                                                             + EXTRACT(MONTH FROM age(NOW(), x.ancla)))::int) END AS inicio
+       FROM x)
+     SELECT limite, periodo, recargas, GREATEST(inicio, COALESCE(ia_creditos_desde, '-infinity')) AS desde,
+            CASE WHEN periodo = 'prueba' THEN NULL
+                 ELSE to_char((inicio + INTERVAL '1 month') AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') END AS renueva
+     FROM y`, [empresaId])
+  // Lo usado en el período (de los incluidos y de las recargas) y lo usado de las recargas desde siempre.
+  const { rows: [u] } = await db.query(
+    `SELECT COALESCE(SUM(1 + busquedas - creditos_recarga) FILTER (WHERE fecha >= $1), 0)::int AS incluidos,
+            COALESCE(SUM(creditos_recarga) FILTER (WHERE fecha >= $1), 0)::int AS recarga_periodo,
+            COALESCE(SUM(creditos_recarga), 0)::int AS recarga_total
+     FROM ia_uso WHERE modulo IN ('preguntas', 'mensajes')`, [e?.desde ?? null])
+  const base: number | null = e?.limite ?? null
+  const recarga = Math.max(0, (e?.recargas ?? 0) - u.recarga_total)
+  const usados = u.incluidos + u.recarga_periodo
+  const periodo = (e?.periodo ?? 'mes') as PeriodoIA
+  const renueva = e?.renueva ?? null
+  if (base === null) return { usados, limite: null, quedan: null, agotado: false, recarga, periodo, renueva, base, incluidos: u.incluidos }
+  const quedan = Math.max(0, base - u.incluidos) + recarga
+  return { usados, limite: usados + quedan, quedan, agotado: quedan <= 0, recarga, periodo, renueva, base, incluidos: u.incluidos }
+}
+
+const ddmm = (f: string) => f.split('-').reverse().slice(0, 2).join('/')
+
+/** Cuándo vuelven los créditos, en palabras (para avisos y ayudas). */
+export const renuevaTexto = (c: Pick<CupoIA, 'periodo' | 'renueva'>) =>
+  c.periodo === 'prueba' ? 'los de la prueba son para toda la prueba (no se renuevan)'
+    : c.renueva ? `se renuevan el ${ddmm(c.renueva)}` : 'se renuevan cada mes'
+
+export const mensajeCupoAgotado = (c: CupoIA) =>
+  `Usaste los ${c.limite} créditos de IA ${c.periodo === 'prueba' ? 'de tu prueba' : 'de este período'}. Las respuestas parecidas y las respuestas rápidas siguen funcionando; `
+  + (c.periodo === 'prueba' ? 'para seguir usando la IA, activa un plan o compra una recarga.' : `los créditos ${renuevaTexto(c)}, o puedes comprar una recarga.`)
 
 export const mensajeSinCreditosWeb = (quedan: number) =>
   `Buscar en internet usa hasta ${CREDITOS_WEB_MAX} créditos y te ${quedan === 1 ? 'queda 1' : `quedan ${quedan}`}. Puedes usar «Proponer con IA» (1 crédito) o anotar el dato del producto.`

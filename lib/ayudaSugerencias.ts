@@ -17,7 +17,7 @@ const S: Record<string, Sugerencia[]> = {
   ],
   '/preguntas': [
     { pregunta: '¿Cuánto gasta «Proponer con IA»?',
-      respuesta: 'Cada **Proponer con IA** usa 1 crédito. **Buscar en internet** usa 1 más 1 por búsqueda (hasta 4). Las respuestas rápidas, las parecidas y lo aprendido son gratis. Los créditos se renuevan el día 1.' },
+      respuesta: 'Cada **Proponer con IA** usa 1 crédito. **Buscar en internet** usa 1 más 1 por búsqueda (hasta 4). Las respuestas rápidas, las parecidas y lo aprendido son gratis. Los de la prueba son para toda la prueba; los del plan se renuevan cada mes en el día en que se activó, y los que no uses no se acumulan. Las recargas compradas no vencen.' },
     { pregunta: '¿Cómo hago que la IA responda mejor?', video: 'Preguntas con IA',
       respuesta: 'Escribe tus **Políticas para la IA** (envíos, pagos, garantía, horarios) y, cuando respondas algo que no sabía, usa **Anotar dato del producto**: la próxima vez lo usa.' },
     { pregunta: '¿Se responden solas?', respuesta: 'No. Cuando una pregunta se parece a otra ya respondida, la respuesta aparece escrita y tú la envías (también varias con «Enviar las sugeridas»). Siempre la envía una persona.' },
