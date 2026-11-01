@@ -12,7 +12,7 @@ import { currentDate } from '@/lib/tz'
 //        Automatizaciones y Completo traen el Radar Gratis y, el PRIMER plan con Radar, 1 mes de PRO de fin de semana
 //        de regalo; Esencial no trae Radar).
 //   POST { tipo: 'recarga' }: créditos de IA que no vencen (suman al tope del mes, lib/ia.ts cupoIA).
-//   POST { tipo: 'radar_pro' }: Radar PRO de fin de semana pagado ($8/mes) hasta una fecha.
+//   POST { tipo: 'radar_pro' }: Radar PRO de fin de semana pagado ($6/mes) hasta una fecha.
 //   GET: el historial de pagos.
 const Fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
 const Body = z.discriminatedUnion('tipo', [

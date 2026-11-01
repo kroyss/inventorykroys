@@ -28,7 +28,7 @@ export const PLANES: Plan[] = [
       'Pagos MercadoEnvíos: pagos y comprobantes llegan solos, listos para verificar',
       'Comprobación con el estado de cuenta de tu banco',
       'Las guías pasan directo a despachos',
-      'Radar de Oportunidades Gratis todos los días (PRO los fines de semana, +$8)',
+      'Radar de Oportunidades Gratis todos los días (PRO los fines de semana, +$6)',
     ],
   },
   {
@@ -74,7 +74,7 @@ export const MODULOS_PLAN: Record<Plan['id'], readonly string[]> = {
 /** ¿El plan trae el Radar? */
 export const planConRadar = (plan: string | null | undefined) => !!plan && (MODULOS_PLAN[plan as Plan['id']] ?? []).includes('radar')
 export const DESCUENTO_FUNDADOR = 30
-export const RADAR_PRO = { precio: 8 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
+export const RADAR_PRO = { precio: 6 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
 
 /** Monto a cobrar: (precio del escalón + cuentas extra) × meses, con el mayor descuento (Fundador o trimestral, no se suman). */
 export function montoPlan(plan: Plan['id'], escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra = 0) {
