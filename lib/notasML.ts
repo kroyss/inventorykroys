@@ -87,20 +87,24 @@ export async function conexionDeVenta(db: Pool, venta: string): Promise<number |
 
 /** Deja en ML el texto de la nota de la venta (lo que se escribió en Ventas, el último paso):
  *  queda UNA nota con ese texto (se cambia la más reciente y se borran las demás, cuyo texto
- *  ya venía incluido al traerlas a la venta); si no hay, se crea. Vacío = no toca nada. */
-export async function sincronizarNotaDeVenta(db: Pool, venta: string, texto: string) {
+ *  ya venía incluido al traerlas a la venta); si no hay, se crea. Vacío = no toca nada.
+ *  Devuelve si quedó en ML (false = venta de ninguna cuenta conectada). */
+export async function sincronizarNotaDeVenta(db: Pool, venta: string, texto: string, conexion?: number | null) {
   const t = texto.trim()
-  if (!t) return
-  const conexionId = await conexionDeVenta(db, venta)
-  if (!conexionId) return
-  const { notas } = await leerNotas(db, conexionId, venta)
-  if (unirNotas(notas) === t) return
+  if (!t) return false
+  const conexionId = conexion ?? await conexionDeVenta(db, venta)
+  if (!conexionId) return false
+  const { notas, error } = await leerNotas(db, conexionId, venta)
+  if (error) throw new Error(error)                 // sin leer, crear una nota podría duplicarla
+  if (unirNotas(notas) === t) return true
   const ultima = notas[notas.length - 1]
   if (ultima) {
     await editarNota(db, conexionId, venta, ultima, t)
     for (const n of notas.slice(0, -1)) await borrarNota(db, conexionId, venta, n)
   } else await crearNota(db, conexionId, venta, t)
-  await copiarNotas(db, venta, (await leerNotas(db, conexionId, venta)).notas)
+  // ML tarda unos segundos en mostrar el cambio: la copia de la bandeja queda con lo escrito.
+  await db.query(`UPDATE ml_conversaciones SET notas = $2, notas_at = NOW() WHERE pack_id::text = $1`, [venta, t])
+  return true
 }
 
 /** Las notas de ML de una venta, en un solo texto (para traerlas al cargar la venta). */

@@ -217,7 +217,16 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }).catch(() => null)
-    if (local && r?.ok) return
+    if (local && r?.ok) {
+      // Nota (01-11): con texto se guarda también en ML. Si quedó allí, la etiqueta muestra la de ML (sin ✎);
+      // si ML falló, queda solo en la etiqueta y se avisa.
+      if (body.nota) {
+        const d = await r.json().catch(() => ({})) as { ml?: boolean | null; aviso?: string }
+        if (d.ml) aplicar(x => ({ ...x, nota_despacho: null, nota_ml: body.nota, sale_notes: body.nota ?? null }))
+        if (d.aviso) setAviso(d.aviso)
+      }
+      return
+    }
     if (local) {
       aplicar(x => ({ ...x, ...(body.incluida !== undefined ? { incluida: antes.incluida } : {}),
         ...(body.nota !== undefined ? { nota_despacho: antes.nota_despacho, sale_notes: antes.sale_notes } : {}) }))
@@ -536,8 +545,9 @@ function Interruptor({ on, onChange, ayuda }: { on: boolean; onChange?: (v: bool
 }
 
 // ── Nota del paquete (sin inventario) ───────────────────────────────────────
-// La de ML viene precargada; un clic la edita o agrega. Lo escrito aquí manda sobre ML (✎) y se
-// puede volver a la de ML. Enter guarda, Esc cancela.
+// La de ML viene precargada; un clic la edita o agrega y se guarda también en MercadoLibre (01-11). Si ML
+// no la aceptó, queda solo aquí (✎) y se puede volver a la de ML. Vacía = sin nota en la etiqueta (ML no
+// se toca). Enter guarda, Esc cancela.
 function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string | null) => void }) {
   const actual = e.nota_despacho ?? e.nota_ml ?? ''
   const editada = e.nota_despacho != null
@@ -547,7 +557,7 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
     const guardar = () => { setEditando(false); if (texto.trim() !== actual) onGuardar(texto.trim()) }
     return (
       <div className="space-y-1 min-w-[12rem]">
-        <input autoFocus value={texto} maxLength={150} onChange={ev => setTexto(ev.target.value)}
+        <input autoFocus value={texto} maxLength={300} onChange={ev => setTexto(ev.target.value)}
           onKeyDown={ev => { if (ev.key === 'Enter') guardar(); if (ev.key === 'Escape') { setTexto(actual); setEditando(false) } }}
           onBlur={guardar} placeholder="Ej.: lleva el NEGRO, no el azul"
           className="w-full border border-neutral-300 rounded px-2 py-1 text-xs" />
@@ -561,7 +571,7 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
   }
   return (
     <button onClick={() => { setTexto(actual); setEditando(true) }} className="text-left w-full group"
-      title={editada ? 'Nota escrita en Despachos (manda sobre la de MercadoLibre). Clic para cambiarla' : 'Clic para escribir o corregir la nota de este paquete'}>
+      title={editada ? 'Nota solo de esta etiqueta (no quedó en MercadoLibre). Clic para cambiarla' : 'Clic para escribir o corregir la nota: se guarda también en MercadoLibre'}>
       {actual
         ? <span>{editada && <span className="text-sky-700 mr-1">✎</span>}{actual}</span>
         : <span className="text-neutral-300 group-hover:text-neutral-500">+ nota</span>}

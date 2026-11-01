@@ -312,7 +312,9 @@ y arma el **manifiesto** al final del día.
 1. Las guías entran solas desde Pagos ME, o **arrastra los PDFs** de MercadoEnvíos (o pégalos con Ctrl+V, o haz
    clic para elegirlos). Forman un **lote**.
 2. Revisa el lote: cada etiqueta muestra la venta, los productos y la nota. Puedes escribir o corregir la nota
-   del paquete (manda sobre la de MercadoLibre) y elegir si en la etiqueta se imprime el título y/o la nota.
+   del paquete: se guarda **también en MercadoLibre** (la misma nota en Despachos, Pagos ME, Mensajes y ML; hasta
+   300 caracteres). Si MercadoLibre no la acepta en ese momento, queda solo en la etiqueta (✎) y avisa. Dejarla
+   vacía la quita solo de la etiqueta (en ML no se borra). También puedes elegir si en la etiqueta se imprime el título y/o la nota.
 3. Genera el PDF y **imprime a «Tamaño real» (100%)**, no «Ajustar a la página».
 4. Al final del día: **Cerrar jornada → Manifiesto**. Se genera un manifiesto por transportista (ZOOM / TEALCA) con
    todos los envíos de la jornada. La jornada se abre sola con el primer lote.
