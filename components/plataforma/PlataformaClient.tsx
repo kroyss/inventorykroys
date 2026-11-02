@@ -12,6 +12,7 @@ import ResumenPanel from './ResumenPanel'
 import AdopcionPanel from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
+import CobrosPanel from './CobrosPanel'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 import { corteDeAlta, corteISO } from '@/lib/fundadoresCortes'
 
@@ -149,10 +150,12 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   // ven los clientes) · Interno (IA, Telegram, cuentas de personas).
   // ?soporte=ID (el botón del aviso de Telegram) abre la bandeja de Soporte en ese caso.
   const [casoSoporte, setCasoSoporte] = useState<number | null>(null)
-  const [vista, setVista]       = useState<'hoy' | 'clientes' | 'soporte' | 'fundadores' | 'contenido' | 'interno'>('hoy')
+  const [vista, setVista]       = useState<'hoy' | 'clientes' | 'cobros' | 'soporte' | 'fundadores' | 'contenido' | 'interno'>('hoy')
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('soporte'))
     if (id) { setCasoSoporte(id); setVista('soporte') }
+    // ?vista=cobros: el botón del aviso de Telegram de un pago reportado (mig. 141).
+    if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVista('cobros')
   }, [])
   const [interno, setInterno]   = useState<'ia' | 'personas'>('ia')
   const [hoy, setHoy]           = useState('')
@@ -248,7 +251,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {([['hoy', 'Hoy'], ['clientes', `Clientes${empresas.length ? ` (${clientesActivos})` : ''}`], ['soporte', 'Soporte'], ['fundadores', 'Fundadores'],
+        {([['hoy', 'Hoy'], ['clientes', `Clientes${empresas.length ? ` (${clientesActivos})` : ''}`], ['cobros', 'Cobros'], ['soporte', 'Soporte'], ['fundadores', 'Fundadores'],
            ['contenido', 'Contenido'], ['interno', 'Interno']] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
@@ -257,7 +260,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
         ))}
       </div>
 
-      {vista === 'hoy' ? <ResumenPanel onIr={setVista} /> : vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'fundadores' ? <FundadoresPanel />
+      {vista === 'hoy' ? <ResumenPanel onIr={setVista} /> : vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'cobros' ? <CobrosPanel /> : vista === 'fundadores' ? <FundadoresPanel />
         : vista === 'contenido' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
         : vista === 'interno' ? <>
           <div className="flex gap-1.5">

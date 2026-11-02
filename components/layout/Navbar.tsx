@@ -8,7 +8,7 @@ import NovedadesNav from './NovedadesNav'
 import EspacioSwitcher from './EspacioSwitcher'
 import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
-import { empresasDeUsuario, esDuenoPlataforma } from '@/lib/empresa'
+import { empresasDeUsuario, esDuenoPlataforma, ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { esDemoEmpresa } from '@/lib/demo'
 import { avisosHabilitados } from '@/lib/avisosTelegram'
 
@@ -48,7 +48,8 @@ export default async function Navbar() {
           {session?.user && (
             <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
               ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'}
-              pagosME={role === 'admin' && modulos.includes('pagos_me') && modulos.includes('despachos_ventas') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos} />
+              pagosME={role === 'admin' && modulos.includes('pagos_me') && modulos.includes('despachos_ventas') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos}
+              miPlan={role === 'admin' && !!session.user.organizacionId && session.user.organizacionId !== ORGANIZACION_PLATAFORMA} />
           )}
         </div>
 

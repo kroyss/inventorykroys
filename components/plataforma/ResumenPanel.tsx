@@ -13,7 +13,7 @@ interface Alumno { empresas: string; completados: number; en_linea: boolean; vie
 interface EnLinea { id: number; nombre: string; empresas: string | null; ultima_actividad: string; usando: boolean }
 interface Video { activo: boolean; serie: string }
 interface Datos { uso: Uso[]; alumnos: Alumno[]; enLinea: EnLinea[]; videos: Video[] }
-type Vista = 'clientes' | 'fundadores' | 'contenido'
+type Vista = 'clientes' | 'cobros' | 'fundadores' | 'contenido'
 
 const DIA = 864e5
 const hoyCaracas = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
@@ -35,15 +35,18 @@ interface Aviso { nivel: 0 | 1 | 2; texto: string; ir: Vista; boton: string }
 export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [porRevisar, setPorRevisar] = useState(0)
+  const [pagos, setPagos] = useState(0)   // pagos reportados en Mi plan por revisar (mig. 141)
 
   useEffect(() => {
     let vivo = true
     const cargar = () => Promise.all([
       fetch('/api/plataforma/aprendizaje').then(r => (r.ok ? r.json() : null)),
       fetch('/api/plataforma/fundadores').then(r => (r.ok ? r.json() : null)),
-    ]).then(([a, f]) => {
+      fetch('/api/plataforma/cobros').then(r => (r.ok ? r.json() : null)),
+    ]).then(([a, f, c]) => {
       if (!vivo) return
       if (a) setDatos(a)
+      if (c?.pendientes) setPagos(c.pendientes.length)
       if (f?.solicitudes) setPorRevisar(f.solicitudes.filter((s: { estado: string }) => s.estado === 'calificado').length)
     }).catch(() => {})
     cargar()
@@ -69,6 +72,9 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
     } else if (usos7(u) === 0) {
       avisos.push({ nivel: 1, texto: `${u.nombre}: conectó MercadoLibre pero no usó las herramientas en 7 días (último uso: ${hace(u.ultima_actividad)}).`, ir: 'clientes', boton: 'Ver uso' })
     }
+  }
+  if (pagos > 0) {
+    avisos.push({ nivel: 2, texto: `${pagos} pago${pagos === 1 ? '' : 's'} reportado${pagos === 1 ? '' : 's'} en Mi plan por revisar.`, ir: 'cobros', boton: 'Revisar' })
   }
   if (porRevisar > 0) {
     avisos.push({ nivel: 1, texto: `${porRevisar} postulación${porRevisar === 1 ? '' : 'es'} de Fundadores por revisar.`, ir: 'fundadores', boton: 'Revisar' })

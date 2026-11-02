@@ -1,0 +1,175 @@
+'use client'
+import { useCallback, useEffect, useState } from 'react'
+
+// Plataforma → Cobros (02-11-2026, migración 141): los pagos que los clientes reportan en Mi plan. Se confirma a mano
+// en el banco o en Binance y se aprueba (activa/renueva el plan como Plan y pagos) o se rechaza con un motivo que el
+// cliente ve. Abajo: quién vence en 7 días (y si ya reportó), lo último revisado y los datos de cobro.
+
+interface Pendiente {
+  id: number; organizacion_id: number; organizacion: string; persona: string | null; plan: string; escalon: number; ciclo: string
+  radar_pro: boolean; cuentas_extra: number; ventas_30d: number | null; monto_usd: number; metodo: string; tasa_bcv: number | null
+  monto_bs: number | null; referencia: string; fecha_pago: string; creado_at: string; tiene_comprobante: boolean
+  org_estado: string; vence: string | null; repetida: number
+}
+interface Vence { id: number; nombre: string; estado: string; plan: string | null; vence: string; ultimo_cobro: string | null }
+interface Reciente { id: number; organizacion: string; plan: string; monto_usd: number; metodo: string; referencia: string; estado: string; motivo: string | null; revisado_at: string; tiene_comprobante: boolean }
+interface DatosCobro { pago_movil: { banco: string; cedula: string; telefono: string }; binance: { id: string; nombre: string; correo: string; moneda: string } }
+interface Datos { pendientes: Pendiente[]; vencen: Vence[]; recientes: Reciente[]; datos: DatosCobro }
+
+const PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
+const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
+const ESCALON = ['hasta 50', '51–300', '301–1.000', '+1.000']
+const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
+const hora = (s: string) => new Date(s).toLocaleString('es-VE', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas' })
+const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
+const bs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+export default function CobrosPanel() {
+  const [d, setD] = useState<Datos | null>(null)
+  const [busy, setBusy] = useState<number | null>(null)
+  const [rechazo, setRechazo] = useState<{ id: number; motivo: string } | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [editarDatos, setEditarDatos] = useState<DatosCobro | null>(null)
+
+  const cargar = useCallback(() => {
+    fetch('/api/plataforma/cobros', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(x => x && setD(x)).catch(() => {})
+  }, [])
+  useEffect(() => { cargar() }, [cargar])
+
+  async function revisar(id: number, cuerpo: { accion: 'aprobar' } | { accion: 'rechazar'; motivo: string }) {
+    setBusy(id); setError(null); setAviso(null)
+    const r = await fetch(`/api/plataforma/cobros/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) }).catch(() => null)
+    const x = await r?.json().catch(() => null)
+    setBusy(null)
+    if (!r?.ok) { setError(x?.error ?? 'No se pudo guardar'); return }
+    setAviso(x?.mensaje ?? 'Listo'); setRechazo(null); cargar()
+  }
+
+  async function guardarDatos() {
+    if (!editarDatos) return
+    setError(null)
+    const r = await fetch('/api/plataforma/cobros', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editarDatos) }).catch(() => null)
+    const x = await r?.json().catch(() => null)
+    if (!r?.ok) { setError(x?.error ?? 'No se pudo guardar'); return }
+    setEditarDatos(null); setAviso('Datos de cobro guardados: los clientes ya los ven así.'); cargar()
+  }
+
+  if (!d) return <p className="text-sm text-neutral-500">Cargando…</p>
+  const campo = 'w-full border border-neutral-300 rounded px-2 py-1 text-sm'
+
+  return (
+    <div className="space-y-6">
+      {aviso && <p className="text-sm bg-lime-50 border border-lime-200 text-lime-900 rounded px-3 py-2">{aviso}</p>}
+      {error && <p className="text-sm bg-red-50 border border-red-200 text-red-800 rounded px-3 py-2">{error}</p>}
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-neutral-800">Por revisar ({d.pendientes.length})</h2>
+        {!d.pendientes.length && <p className="text-sm text-neutral-500">No hay pagos por revisar.</p>}
+        {d.pendientes.map(k => (
+          <div key={k.id} className="rounded-xl border border-amber-200 bg-white p-3 flex flex-col sm:flex-row gap-3">
+            {k.tiene_comprobante && (
+              <a href={`/api/mi-plan/comprobante/${k.id}`} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/mi-plan/comprobante/${k.id}`} alt="Captura del pago" className="h-32 w-32 object-cover rounded border border-neutral-200 bg-neutral-50"
+                  onError={e => { (e.currentTarget as HTMLImageElement).replaceWith(Object.assign(document.createElement('span'), { textContent: '📄 Ver PDF', className: 'text-sm text-sky-700' })) }} />
+              </a>
+            )}
+            <div className="flex-1 min-w-0 text-sm space-y-1">
+              <p><b>{k.organizacion}</b> <span className="text-neutral-500">· {k.persona ?? '—'} · {hora(k.creado_at)}</span></p>
+              <p>{PLAN[k.plan] ?? k.plan} · {k.ciclo}{k.radar_pro ? ' + Radar PRO' : ''} · escalón {ESCALON[k.escalon]}{k.ventas_30d != null ? ` (${k.ventas_30d} ventas en 30 días)` : ''}{k.cuentas_extra ? ` · ${k.cuentas_extra} cuenta(s) extra` : ''}</p>
+              <p className="text-base font-semibold">{usd(k.monto_usd)}{k.monto_bs ? <span className="font-normal text-neutral-600"> = {bs(k.monto_bs)} (BCV {k.tasa_bcv?.toLocaleString('de-DE', { maximumFractionDigits: 2 })})</span> : null}</p>
+              <p>{METODO[k.metodo]} · ref. <b>{k.referencia}</b> · pagado el {ddmm(k.fecha_pago)}</p>
+              {k.repetida > 0 && <p className="text-red-700">⚠️ Esa referencia ya se reportó {k.repetida} vez/veces antes.</p>}
+              <p className="text-xs text-neutral-500">Cuenta: {k.org_estado}{k.vence ? ` · vence ${ddmm(k.vence)}` : ''}</p>
+              {rechazo?.id === k.id ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <input autoFocus value={rechazo.motivo} onChange={e => setRechazo({ id: k.id, motivo: e.target.value })} maxLength={300}
+                    placeholder="Motivo (lo ve el cliente). Ej.: no aparece en el banco" className={`${campo} flex-1 min-w-[12rem]`} />
+                  <button disabled={busy === k.id} onClick={() => revisar(k.id, { accion: 'rechazar', motivo: rechazo.motivo })}
+                    className="rounded bg-red-600 px-3 py-1 text-sm text-white disabled:opacity-50">Rechazar</button>
+                  <button onClick={() => setRechazo(null)} className="text-sm text-neutral-500">Cancelar</button>
+                </div>
+              ) : (
+                <div className="flex gap-2 pt-1">
+                  <button disabled={busy === k.id} onClick={() => revisar(k.id, { accion: 'aprobar' })}
+                    className="rounded bg-lime-500 px-3 py-1 text-sm font-semibold text-neutral-950 hover:bg-lime-400 disabled:opacity-50">
+                    {busy === k.id ? 'Aprobando…' : 'Aprobar'}
+                  </button>
+                  <button onClick={() => setRechazo({ id: k.id, motivo: '' })} className="rounded border border-neutral-300 px-3 py-1 text-sm">Rechazar</button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-neutral-800">Vencen en los próximos 7 días ({d.vencen.length})</h2>
+        {!d.vencen.length ? <p className="text-sm text-neutral-500">Ninguna.</p> : (
+          <ul className="text-sm divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
+            {d.vencen.map(v => (
+              <li key={v.id} className="flex flex-wrap justify-between gap-2 px-3 py-1.5">
+                <span><b>{v.nombre}</b> <span className="text-neutral-500">· {v.estado === 'prueba' ? 'prueba' : PLAN[v.plan ?? ''] ?? v.plan}</span></span>
+                <span>{ddmm(v.vence)} · {v.ultimo_cobro === 'revision' ? <span className="text-amber-700">reportó (por revisar)</span>
+                  : v.ultimo_cobro === 'aprobado' && v.estado === 'activo' ? <span className="text-neutral-500">pagó antes</span>
+                  : <span className="text-neutral-500">no ha reportado</span>}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-neutral-800">Últimos revisados</h2>
+        {!d.recientes.length ? <p className="text-sm text-neutral-500">Todavía ninguno.</p> : (
+          <ul className="text-sm divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
+            {d.recientes.map(k => (
+              <li key={k.id} className="flex flex-wrap justify-between gap-2 px-3 py-1.5">
+                <span><b>{k.organizacion}</b> · {PLAN[k.plan] ?? k.plan} · {usd(k.monto_usd)} · {METODO[k.metodo]} ref. {k.referencia}
+                  {k.tiene_comprobante && <a href={`/api/mi-plan/comprobante/${k.id}`} target="_blank" rel="noopener noreferrer" className="ml-2 text-sky-700 hover:underline">captura</a>}</span>
+                <span className={k.estado === 'aprobado' ? 'text-lime-700' : 'text-red-700'} title={k.motivo ?? undefined}>
+                  {k.estado === 'aprobado' ? 'Aprobado' : `Rechazado${k.motivo ? `: ${k.motivo}` : ''}`} · {hora(k.revisado_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold text-neutral-800">Datos de cobro (los ve el cliente en Mi plan)</h2>
+          {!editarDatos && <button onClick={() => setEditarDatos(d.datos)} className="text-sm text-sky-700 hover:underline">Editar</button>}
+        </div>
+        {editarDatos ? (
+          <div className="grid gap-3 sm:grid-cols-2 rounded-xl border border-neutral-200 bg-white p-3 text-sm">
+            <div className="space-y-1">
+              <p className="font-medium">Pago Móvil</p>
+              {(['banco', 'telefono', 'cedula'] as const).map(c => (
+                <input key={c} value={editarDatos.pago_movil[c]} placeholder={c} className={campo}
+                  onChange={e => setEditarDatos({ ...editarDatos, pago_movil: { ...editarDatos.pago_movil, [c]: e.target.value } })} />
+              ))}
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium">Binance</p>
+              {(['id', 'nombre', 'correo', 'moneda'] as const).map(c => (
+                <input key={c} value={editarDatos.binance[c]} placeholder={c} className={campo}
+                  onChange={e => setEditarDatos({ ...editarDatos, binance: { ...editarDatos.binance, [c]: e.target.value } })} />
+              ))}
+            </div>
+            <div className="sm:col-span-2 flex gap-2">
+              <button onClick={guardarDatos} className="rounded bg-neutral-900 px-3 py-1 text-sm text-white">Guardar</button>
+              <button onClick={() => setEditarDatos(null)} className="text-sm text-neutral-500">Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-neutral-200 bg-white p-3 text-sm grid gap-1 sm:grid-cols-2">
+            <p><b>Pago Móvil:</b> {d.datos.pago_movil.banco} · {d.datos.pago_movil.telefono} · C.I. {d.datos.pago_movil.cedula}</p>
+            <p><b>Binance:</b> ID {d.datos.binance.id} ({d.datos.binance.nombre}) · {d.datos.binance.correo} · {d.datos.binance.moneda}</p>
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}

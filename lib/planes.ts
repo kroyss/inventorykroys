@@ -3,7 +3,7 @@
 // sin las canceladas); los créditos de IA van por escalón. Fundadores: 30% de por vida sobre su casilla (no se muestra en la página pública).
 // Reglas internas (no van en la página): margen del 10% sobre el tope del escalón; cambia de escalón tras 2 meses
 // seguidos por encima o por debajo; créditos de IA se renuevan cada mes en el día de la activación (mig. 140) y no se acumulan (subir de plan a mitad de
-// mes suma la diferencia; bajar aplica el mes siguiente); 5 días de gracia sin pago y datos guardados 60 días.
+// mes suma la diferencia; bajar aplica el mes siguiente); la cuenta se pausa al día siguiente del vencimiento (aviso 3 días antes; no se pausa si reportó su pago en Mi plan antes de vencer, mig. 141) y los datos se guardan 60 días.
 
 export interface Plan { id: 'esencial' | 'automatizaciones' | 'completo'; nombre: string; resumen: string; base?: string; incluye: string[]; destacado?: boolean }
 

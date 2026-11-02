@@ -4,7 +4,8 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { soloDueno } from '@/lib/plataforma'
-import { ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, RECARGA_IA, planConRadar, sumarMeses } from '@/lib/planes'
+import { ESCALONES, RECARGA_IA, planConRadar, sumarMeses } from '@/lib/planes'
+import { registrarPlan } from '@/lib/cobros'
 import { currentDate } from '@/lib/tz'
 
 // Plataforma → ficha del cliente → Plan y pagos (01-11-2026, migración 138).
@@ -66,35 +67,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: true, mensaje: `Radar PRO de fin de semana hasta el ${b.hasta.split('-').reverse().join('/')}.` })
     }
 
-    // Plan: desde el día siguiente al pagado (si sigue vigente) o desde hoy.
+    // Plan: desde el día siguiente al pagado (si sigue vigente) o desde hoy. Misma función que aprueba los pagos
+    // reportados en Mi plan (lib/cobros.ts registrarPlan, 02-11).
     if (b.hasta < hoy) return NextResponse.json({ error: 'La fecha "pagado hasta" ya pasó' }, { status: 400 })
-    const desde = o.plan_hasta && o.plan_hasta >= hoy ? o.plan_hasta : hoy
-    const bienvenida = planConRadar(b.plan) && !o.radar_pro_hasta    // primer plan con Radar: 1 mes de PRO de regalo
     const client = await db.connect()
+    let bienvenida = false
     try {
       await client.query('BEGIN')
-      await client.query(
-        `UPDATE organizaciones SET estado = 'activo', plan = $2, escalon = $3, ciclo = $4, plan_hasta = $5,
-           prueba_dias = NULL, motivo_pausa = NULL, pausa_fecha = NULL,
-           radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END,
-           -- Créditos de IA (mig. 140): el primer plan o el que vuelve tras vencer arranca su mes hoy; renovar
-           -- un plan vigente sigue con el mismo día de renovación.
-           creditos_desde = CASE WHEN $8 THEN NOW() ELSE creditos_desde END
-         WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1),
-          !(o.estado === 'activo' && o.plan_hasta && o.plan_hasta >= hoy)])
-      // Módulos del plan (los demás no se tocan; el Radar solo en Automatizaciones y Completo); créditos del escalón.
-      await client.query(
-        `UPDATE empresas SET
-           modulos = ARRAY(SELECT DISTINCT m FROM unnest(
-             ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[])) || $3::text[]) m),
-           ia_limite_mes = $4
-         WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[b.plan]], ESCALONES[b.escalon].creditos])
-      await client.query(
-        `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, plan, escalon, ciclo, desde, hasta, nota, por)
-         VALUES ($1, 'plan', $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [org, b.monto, b.plan, b.escalon, b.ciclo, desde, b.hasta, b.nota || null, por])
-      await client.query(`INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle, por) VALUES ($1, $2, $3, $4)`,
-        [org, o.estado === 'activo' ? 'renovada' : 'activa', `${b.plan} hasta ${b.hasta}`, por])
+      ;({ bienvenida } = await registrarPlan(client, org, b, Number(por)))
       await client.query('COMMIT')
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {})

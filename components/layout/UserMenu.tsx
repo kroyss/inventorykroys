@@ -15,11 +15,12 @@ interface Props {
   demo?: boolean
   pagosME?: boolean
   avisos?: boolean
+  miPlan?: boolean
 }
 
 // Menú de la cuenta (arriba a la derecha): lo que se toca poco (Ajustes, Usuarios,
 // Plataforma) y Cerrar sesión, para que la barra quede solo con el trabajo del día.
-export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false, avisos = false }: Props) {
+export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false, avisos = false, miPlan = false }: Props) {
   const pathname = usePathname()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -42,6 +43,8 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
     // Pagos ME (2026-10-12): se verifica desde Ventas; aquí queda el vigilante, el horario y el historial.
     // Sin "despachos_ventas" (ventas de ML) va en la barra de Automatizaciones, junto a Despachos.
     pagosME && espacioDe(pathname) === 'inventario' && { href: '/pagos-me', label: 'Pagos MercadoEnvíos' },
+    // Mi plan (02-11, mig. 141): el admin de un cliente ve su plan y reporta el pago.
+    miPlan     && { href: '/mi-plan',    label: 'Mi plan' },
     usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },
     demo       && { href: '/demo',       label: 'Demo · restaurar' },

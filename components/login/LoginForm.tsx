@@ -11,6 +11,9 @@ import type { Marca } from '@/lib/marca'
 export default function LoginForm({ marca }: { marca: Marca }) {
   const [error, setError]       = useState('')
   const [pausada, setPausada]   = useState<string | null>(null)   // cuenta pausada: motivo (lib/cuenta.ts)
+  // Cuenta vencida (prueba o plan, mig. 141): "Pagar mi plan" entra a /renovar con los mismos datos, sin volver a escribirlos.
+  const [renovar, setRenovar]   = useState<{ usuario: string; clave: string } | null>(null)
+  const [abriendo, setAbriendo] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [verClave, setVerClave] = useState(false)
   const [mayus, setMayus]       = useState(false)
@@ -44,7 +47,10 @@ export default function LoginForm({ marca }: { marca: Marca }) {
     } else {
       // Cuenta pausada (19-10): recuadro con el motivo y el botón a Telegram, no la línea roja de clave mala.
       const [codigo, motivo, fecha] = (result?.error ?? '').split('|')
-      if (codigo === CUENTA_VENCIDA) { setPausada(textoCuentaPausada(motivo ?? 'prueba', fecha)); setError('') }
+      if (codigo === CUENTA_VENCIDA) {
+        setPausada(textoCuentaPausada(motivo ?? 'prueba', fecha)); setError('')
+        setRenovar(motivo === 'corte_fundadores' ? null : { usuario: String(form.get('username') ?? ''), clave: String(form.get('password') ?? '') })
+      }
       else if (codigo === SOLO_RADAR) {
         setPausada(`Tu cuenta es del Radar de Oportunidades: entra en ${RADAR_URL.replace('https://', '')}. Si quieres el Sistema de automatizaciones, escríbenos.`)
         setError('')
@@ -52,6 +58,18 @@ export default function LoginForm({ marca }: { marca: Marca }) {
       else { setPausada(null); setError('Usuario o contraseña incorrectos') }
       setLoading(false)
     }
+  }
+
+  // Acceso de 2 h solo para Mi plan (lib/cobros.ts): queda en la pestaña y /renovar lo usa.
+  async function abrirRenovar() {
+    if (!renovar) return
+    setAbriendo(true)
+    const r = await fetch('/api/mi-plan/entrar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(renovar) }).catch(() => null)
+    const d = r ? await r.json().catch(() => ({})) : {}
+    if (!r?.ok || !d.acceso) { setAbriendo(false); setError(d.error ?? 'No se pudo abrir: vuelve a intentar'); return }
+    try { sessionStorage.setItem('renovar', d.acceso) } catch { /* sin storage: /renovar pide los datos */ }
+    window.location.assign('/renovar')
   }
 
   const revisarMayus = (e: KeyboardEvent<HTMLInputElement>) => setMayus(e.getModifierState('CapsLock'))
@@ -151,6 +169,12 @@ export default function LoginForm({ marca }: { marca: Marca }) {
               <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-3">
                 <p className="text-sm text-amber-950">{pausada}</p>
                 <p className="text-xs text-amber-800">Tus datos siguen guardados.</p>
+                {renovar && (
+                  <button type="button" disabled={abriendo} onClick={abrirRenovar}
+                    className="w-full rounded-lg bg-lime-400 px-4 py-2.5 text-sm font-semibold text-neutral-950 hover:bg-lime-300 disabled:opacity-50">
+                    {abriendo ? 'Abriendo…' : 'Pagar mi plan'}
+                  </button>
+                )}
                 <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 rounded-lg bg-[#229ED9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c8bc0]">
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">

@@ -554,10 +554,10 @@ async function finDePrueba(empresaId: number) {
   const quedan = Number(o.quedan)
   if (quedan < 0 || quedan > AVISAR_FIN_PRUEBA_DIAS) return null
   // Plan pagado (mig 138): al día siguiente del vencimiento la cuenta se pausa sola (lib/planesCuenta.ts).
-  if (o.estado === 'activo') return `⏳ <b>Tu plan vence ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: renuévalo para seguir sin cortes (escríbenos)`
+  if (o.estado === 'activo') return `⏳ <b>Tu plan vence ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: renuévalo en Menú → Mi plan para seguir sin cortes`
   if (o.prueba_dias != null && quedan >= o.prueba_dias) return null
   const que = o.fundador ? 'Tu mes gratis de Fundador' : 'Tu prueba gratis'
-  return `⏳ <b>${que} termina ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: escríbenos para seguir sin cortes`
+  return `⏳ <b>${que} termina ${quedan === 0 ? 'hoy' : quedan === 1 ? 'mañana' : `el ${o.hasta}`}</b>: elige tu plan y págalo en Menú → Mi plan para seguir sin cortes`
 }
 
 /** Para el dueño de la plataforma: pruebas que vencen en 3 días o vencieron hace 3 días o menos (hora Caracas). */

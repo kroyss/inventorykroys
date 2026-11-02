@@ -61,7 +61,8 @@ el portal de MercadoEnvíos de Venezuela.
   contacto: WhatsApp o Telegram).
 - **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **empiezan a contar
   cuando conectas tu primera cuenta de MercadoLibre**, no al registrarte. Cada cuenta de MercadoLibre puede usar
-  una sola prueba. Al terminar la prueba, para seguir hay que escribirnos (Telegram) y elegir un plan.
+  una sola prueba. Al terminar la prueba, para seguir se elige el plan y se paga en **Mi plan** (ver
+  [Planes](#3-planes-y-créditos-de-ia)).
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al
   Radar; si intentas entrar al Sistema te lo indica. Para usar el Sistema, escríbenos.
 
@@ -69,7 +70,7 @@ el portal de MercadoEnvíos de Venezuela.
 
 ## 3. Planes y créditos de IA
 
-*Cómo lo pregunta la gente:* precio, cuánto cuesta, plan, pagar, mensualidad, créditos, se me acabaron los créditos, recargar, IA.
+*Cómo lo pregunta la gente:* precio, cuánto cuesta, plan, pagar, mensualidad, cómo pago, pago móvil, binance, renovar, mi pago no aparece, créditos, se me acabaron los créditos, recargar, IA.
 
 Los precios están en app.elcomerciantedigital.com/precios. Hay tres planes, y el precio depende de cuántas
 ventas haces al mes (sumando todas tus cuentas, sin canceladas):
@@ -100,7 +101,22 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 3 días aparece un aviso arriba de
   todas las pantallas (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
   siguiente del vencimiento la cuenta se pausa: los datos se conservan y vuelve a funcionar apenas se renueva.
-  Para renovar o recargar créditos se escribe por Telegram; lo registra el equipo de El Comerciante Digital.
+- **Pagar o renovar: Mi plan** (menú de tu cuenta, arriba a la derecha → **Mi plan**; solo el administrador):
+  1. Ves tu estado y **lo que te toca pagar**: el sistema cuenta tus ventas de MercadoLibre de los últimos 30 días
+     (todas tus cuentas conectadas, también las que procesas por fuera del sistema) y te dice tu escalón y el precio.
+     El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
+     Puedes elegir mensual o trimestral (−10%) y, si ya tuviste el Radar PRO, agregarlo.
+  2. Pagas por **Pago Móvil** (en bolívares, a tasa BCV del día: el monto ya sale convertido) o **Binance** (USDT).
+     Los datos tienen botón de copiar.
+  3. Tocas **Ya pagué**: escribes la referencia (en Binance, el ID de la orden), la fecha y adjuntas la captura.
+  El pago queda **En revisión**: lo confirmamos a mano y, al aprobarlo, tu plan se activa o renueva solo y lo ves
+  como **Pago aprobado · activo hasta dd/mm** (y por Telegram, si lo tienes conectado). Si algo no cuadra, ves el
+  motivo y lo puedes volver a reportar. **Si lo reportas antes de que venza, tu cuenta no se pausa** mientras lo
+  revisamos. Pagar antes no hace perder días: el nuevo período arranca donde termina el actual.
+- **Cuenta ya vencida:** al intentar entrar aparece el aviso con el botón **Pagar mi plan**, que abre Mi plan sin
+  iniciar sesión (también en app.elcomerciantedigital.com/renovar con tu usuario y contraseña). Al aprobarse el
+  pago vuelves a entrar normal.
+- Recargas de créditos de IA: por ahora se piden escribiéndonos por Telegram.
 
 ---
 

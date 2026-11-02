@@ -11,9 +11,12 @@ export const DIAS_PRUEBA = { fundador: 30, normal: 15 } as const
 export const DIAS_ESPERA_CONEXION = 5
 
 /** Condición SQL (alias `o` = organizaciones): ¿sus usuarios pueden entrar hoy? Una prueba con la
- *  fecha ya pasada (hora Caracas) cuenta como vencida. */
+ *  fecha ya pasada (hora Caracas) cuenta como vencida, salvo que haya reportado su pago en Mi plan antes de
+ *  vencer y siga en revisión (mig. 141: no se corta a quien ya pagó mientras el dueño lo confirma). */
 export const SQL_CUENTA_HABILITADA = `(o.estado IN ('propietario', 'activo')
-  OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date)))`
+  OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date
+      OR EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision'
+                   AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= o.prueba_hasta))))`
 
 /** Días que se siguen trayendo los datos de MercadoLibre de una prueba vencida (margen para que pague
  *  sin notar nada). Pasado eso, el cron deja de sincronizarla; al reactivarla se retoma sola. */
@@ -51,6 +54,6 @@ export const TELEGRAM_SOPORTE = 'https://t.me/elcomerciantedigital'
 /** Qué decirle a quien intenta entrar con la cuenta pausada, según el motivo (migración 105). */
 export function textoCuentaPausada(motivo: string, fecha?: string) {
   if (motivo === 'corte_fundadores') return 'Tu cupo de Fundador se liberó porque no conectaste tu MercadoLibre a tiempo. Si todavía te interesa, escríbenos para revisar tu caso.'
-  if (motivo === 'plan') return `Tu plan venció${fecha ? ` el ${fecha}` : ''}. Renuévalo para seguir, escríbenos.`
-  return 'Tu prueba gratis terminó. Para seguir usando el sistema, escríbenos para revisar tu caso.'
+  if (motivo === 'plan') return `Tu plan venció${fecha ? ` el ${fecha}` : ''}. Renuévalo para seguir: tus datos se conservan.`
+  return 'Tu prueba gratis terminó. Elige tu plan y paga para seguir: tus datos se conservan.'
 }

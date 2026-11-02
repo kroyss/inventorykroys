@@ -33,7 +33,7 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
     const cuando = q === 0 ? <b>vence HOY</b> : q === 1 ? <b>vence mañana</b> : <>vence en <b>{q} días</b> (el {ddmm(o.plan_hasta)})</>
     return (
       <div className={`border-b text-center text-sm py-2 px-4 ${q <= 1 ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-        Tu plan {cuando}. Para seguir sin cortes, renuévalo escribiéndonos por Telegram: tus datos se conservan.
+        Tu plan {cuando}. Para seguir sin cortes, renuévalo{esAdmin ? <>: <Link href="/mi-plan" className="underline font-semibold whitespace-nowrap">Pagar mi plan →</Link></> : ' (lo hace el administrador de la cuenta).'}
       </div>
     )
   }
@@ -70,7 +70,7 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
   const cuando = quedan === 0 ? <b>vence HOY</b> : quedan === 1 ? <b>vence mañana</b> : <>vence en <b>{quedan} días</b> (el {ddmm(o.hasta)})</>
   return (
     <div className={`border-b text-center text-sm py-2 px-4 ${quedan <= 2 ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-      Tu prueba gratis {cuando}. Para seguir usando el sistema escríbenos por Telegram: tus datos se conservan.
+      Tu prueba gratis {cuando}. Para seguir, elige tu plan{esAdmin ? <>: <Link href="/mi-plan" className="underline font-semibold whitespace-nowrap">Pagar mi plan →</Link></> : ' (lo hace el administrador de la cuenta).'} Tus datos se conservan.
     </div>
   )
 }
