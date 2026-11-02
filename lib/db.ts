@@ -23,7 +23,10 @@ import type { Country } from '@/lib/types'
 // de quedarse esperando para siempre y colgar la app (13-10: el cron retenía todas las conexiones).
 // max 15 (13-10, antes 10 por defecto): Plataforma pide ~15 consultas a la vez. Producción: 3 contenedores
 // (inventory_ecd, inventory_ecd_b, inventory_next) × 15 = 45 de las 100 que acepta la base.
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 15, connectionTimeoutMillis: 20_000 })
+// jit=off (02-11): con consultas que Postgres cree grandes (subconsultas sobre ml_mensajes) compilaba JIT en cada
+// carga: Por confirmar tardaba 3 s y 2,7 eran solo de compilar. Las consultas de la app son cortas: JIT solo estorba.
+// Va en el arranque de la conexión, así RESET ALL lo conserva.
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 15, connectionTimeoutMillis: 20_000, options: '-c jit=off' })
 
 export function dbGlobal() {
   return pool

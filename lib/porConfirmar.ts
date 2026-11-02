@@ -76,9 +76,6 @@ export async function ventasPorConfirmar(db: Pool) {
             (p.envio_metodo ILIKE 'retiro en tienda%' OR p.carrier ILIKE 'retiro en tienda%') AS retiro,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_texto END AS msg_texto,
             CASE WHEN c.ultimo_de_comprador AND c.ultimo_at > o.fecha THEN c.ultimo_at END AS msg_at,
-            (SELECT array_agg(z.texto ORDER BY z.fecha DESC) FROM (SELECT m.texto, m.fecha FROM ml_mensajes m
-               WHERE m.pack_id = COALESCE(o.pack_id, o.id) AND NOT m.propio AND m.fecha > o.fecha
-               ORDER BY m.fecha DESC LIMIT 3) z) AS msgs_comprador,
             COALESCE(NULLIF(c.notas, ''), NULLIF(o.notas, '')) IS NOT NULL AS tiene_nota,
             p.creado_at AS pago_at, p.id AS pago_id, p.guia_path IS NOT NULL AS tiene_guia, p.guia AS guia_num,
             p.total_orden::float AS total_orden, p.banco_emisor, p.referencia, p.metodo_pago, p.carrier,
@@ -113,6 +110,16 @@ export async function ventasPorConfirmar(db: Pool) {
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id
      WHERE m.is_active AND p.is_active AND split_part(m.ml_code, ':', 1) = ANY($1::text[]) GROUP BY 1`, [publicaciones]) : { rows: [] }
   const productosDe = new Map(map.map(m => [m.ml_code as string, m.n as number]))
+  // Lo que escribió el comprador después de comprar (máx. 3 por venta), aparte (02-11): como subconsulta con
+  // COALESCE(o.pack_id, o.id) Postgres no usaba el índice por venta, recorría ~1.900 mensajes por fila y la
+  // carga tardaba 3 s. Así va directo por (empresa, venta, fecha).
+  const { rows: msgs } = rows.length ? await db.query(
+    `SELECT v.numero::text AS numero, z.textos FROM unnest($1::bigint[], $2::timestamptz[]) AS v(numero, desde)
+     CROSS JOIN LATERAL (SELECT array_agg(x.texto ORDER BY x.fecha DESC) AS textos FROM (
+       SELECT m.texto, m.fecha FROM ml_mensajes m WHERE m.pack_id = v.numero AND NOT m.propio AND m.fecha > v.desde
+       ORDER BY m.fecha DESC LIMIT 3) x) z
+     WHERE z.textos IS NOT NULL`, [rows.map(r => r.numero), rows.map(r => r.fecha)]) : { rows: [] }
+  const escribioDe = new Map(msgs.map(m => [m.numero as string, m.textos as string[]]))
   const codigosML = [...new Set(rows.flatMap(r => (r.items as string[] | null ?? []).filter(i => !i.includes(':'))))]
   const { rows: fotos } = codigosML.length ? await db.query(
     `SELECT item_id, thumbnail FROM ml_catalogo WHERE item_id = ANY($1::text[]) AND thumbnail IS NOT NULL`, [codigosML]) : { rows: [] }
@@ -165,7 +172,7 @@ export async function ventasPorConfirmar(db: Pool) {
                                verificadoAt: r.verificado_at ?? null,
                                bancoRes: r.banco_nivel ? { nivel: r.banco_nivel, motivo: r.banco_motivo ?? '', mov: r.banco_mov ?? null, at: r.banco_at } : null } : null,
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
-      escribio: (r.msgs_comprador as string[] | null) ?? [], nota: !!r.tiene_nota,
+      escribio: escribioDe.get(r.numero) ?? [], nota: !!r.tiene_nota,
       vencida: r.vencida, sinStock, despacho: r.despacho ?? null,
     }
   })
