@@ -3,17 +3,33 @@
 // pasó (hora de Caracas) queda 'vencido' con motivo 'plan'; al entrar ve "Tu plan venció el DD/MM" (lib/cuenta.ts).
 // Al registrar un pago nuevo en Plataforma vuelve a 'activo'. Las cuentas activas sin plan_hasta (las de antes) no vencen.
 // Con un pago reportado en Mi plan ANTES del vencimiento y todavía en revisión (mig. 141) no se pausa: espera la revisión.
+// El dueño (02-11): el Fundador que interrumpe su plan deja de serlo: al pausarse por no pagar pierde el 30% y vuelve
+// como usuario normal. Se avisa al dueño por Telegram.
 import { dbGlobal } from '@/lib/db'
+import { chatsDuenoPlataforma } from '@/lib/registro'
+import { enviarTelegram, esc } from '@/lib/telegram'
 
 export async function vencerPlanes() {
   const { rows } = await dbGlobal().query(
     `WITH v AS (
-       UPDATE organizaciones SET estado = 'vencido', motivo_pausa = 'plan', pausa_fecha = plan_hasta
-       WHERE estado = 'activo' AND plan_hasta IS NOT NULL AND plan_hasta < (NOW() AT TIME ZONE 'America/Caracas')::date
-         AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = organizaciones.id AND k.estado = 'revision'
-                           AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= organizaciones.plan_hasta)
-       RETURNING id, nombre, plan_hasta)
+       UPDATE organizaciones o SET estado = 'vencido', motivo_pausa = 'plan', pausa_fecha = o.plan_hasta, fundador = false
+       FROM organizaciones antes
+       WHERE antes.id = o.id AND o.estado = 'activo' AND o.plan_hasta IS NOT NULL
+         AND o.plan_hasta < (NOW() AT TIME ZONE 'America/Caracas')::date
+         AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision'
+                           AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= o.plan_hasta)
+       RETURNING o.id, o.nombre, antes.fundador AS era_fundador),
+     f AS (
+       INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle)
+       SELECT id, 'fundador_perdido', 'plan sin pagar' FROM v WHERE era_fundador)
      INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle)
-     SELECT id, 'pausada', 'plan' FROM v RETURNING organizacion_id`)
-  return rows.length ? { pausadas: rows.map(r => r.organizacion_id) } : null
+     SELECT id, 'pausada', 'plan' FROM v
+     RETURNING organizacion_id, (SELECT nombre FROM v WHERE v.id = organizacion_id AND v.era_fundador) AS fundador_perdido`)
+  if (!rows.length) return null
+  const perdidos = rows.filter(r => r.fundador_perdido).map(r => String(r.fundador_perdido))
+  if (perdidos.length) {
+    const html = `🏷️ Dejó de ser Fundador (plan vencido sin pago): <b>${perdidos.map(esc).join(', ')}</b>. Si vuelve, paga precio normal.`
+    for (const chat of await chatsDuenoPlataforma().catch(() => [])) await enviarTelegram(chat, html).catch(() => {})
+  }
+  return { pausadas: rows.map(r => r.organizacion_id), fundadorPerdido: perdidos }
 }
