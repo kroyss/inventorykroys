@@ -112,10 +112,11 @@ export async function ventasPorConfirmar(db: Pool) {
   const productosDe = new Map(map.map(m => [m.ml_code as string, m.n as number]))
   // Lo que escribió el comprador después de comprar (máx. 3 por venta), aparte (02-11): como subconsulta con
   // COALESCE(o.pack_id, o.id) Postgres no usaba el índice por venta, recorría ~1.900 mensajes por fila y la
-  // carga tardaba 3 s. Así va directo por (empresa, venta, fecha).
+  // carga tardaba 3 s. Así va directo por (empresa, venta, fecha). Los 3 últimos, en el orden en que llegaron
+  // (03-11: del más nuevo arriba parecían desordenados; se leen como un chat).
   const { rows: msgs } = rows.length ? await db.query(
     `SELECT v.numero::text AS numero, z.textos FROM unnest($1::bigint[], $2::timestamptz[]) AS v(numero, desde)
-     CROSS JOIN LATERAL (SELECT array_agg(x.texto ORDER BY x.fecha DESC) AS textos FROM (
+     CROSS JOIN LATERAL (SELECT array_agg(x.texto ORDER BY x.fecha) AS textos FROM (
        SELECT m.texto, m.fecha FROM ml_mensajes m WHERE m.pack_id = v.numero AND NOT m.propio AND m.fecha > v.desde
        ORDER BY m.fecha DESC LIMIT 3) x) z
      WHERE z.textos IS NOT NULL`, [rows.map(r => r.numero), rows.map(r => r.fecha)]) : { rows: [] }
