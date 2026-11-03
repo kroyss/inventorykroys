@@ -94,7 +94,7 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
             </label>
           </div>
           <p className="text-neutral-600">
-            {usd(calc.base)}/mes × {calc.meses}{calc.descuento ? ` − ${calc.descuento}%${d.fundador && calc.descuento === 30 ? ' Fundador' : ''}` : ''} = <b className="text-neutral-900">{usd(calc.total)}</b>
+            {usd(calc.base)}/mes × {calc.meses}{calc.descuento ? ` − ${calc.descuento}%${d.fundador && calc.descuento === 30 ? ' Fundador' : ''}` : ''}{calc.extras ? ` + ${usd(calc.extras)}/mes cuentas extra` : ''} = <b className="text-neutral-900">{usd(calc.total)}</b>
           </p>
           <div className="flex flex-wrap gap-3">
             <label className="block">Pagado hasta

@@ -78,10 +78,12 @@ export const RADAR_PRO = { precio: 6 }        // Radar PRO los fines de semana, 
 
 /** Monto a cobrar: (precio del escalón + cuentas extra) × meses, con el mayor descuento (Fundador o trimestral, no se suman). */
 export function montoPlan(plan: Plan['id'], escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra = 0) {
-  const base = (ESCALONES[escalon]?.precios[plan] ?? 0) + Math.max(0, cuentasExtra) * CUENTA_EXTRA
+  // El descuento (fundador o trimestral, no se suman) es solo del plan: cuentas extra, Radar PRO y recargas van completos.
+  const base = ESCALONES[escalon]?.precios[plan] ?? 0
+  const extras = Math.max(0, cuentasExtra) * CUENTA_EXTRA
   const meses = ciclo === 'trimestral' ? 3 : 1
   const descuento = Math.max(fundador ? DESCUENTO_FUNDADOR : 0, ciclo === 'trimestral' ? DESCUENTO_TRIMESTRAL : 0)
-  return { base, meses, descuento, total: Math.round(base * meses * (100 - descuento)) / 100 }
+  return { base, extras, meses, descuento, total: Math.round(base * meses * (100 - descuento) + extras * meses * 100) / 100 }
 }
 
 /** Suma meses a una fecha YYYY-MM-DD (el 31 pasa al último día del mes siguiente). */

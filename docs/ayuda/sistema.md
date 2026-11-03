@@ -87,8 +87,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Automatizaciones** (recomendado): lo de Esencial + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
   + Radar de Oportunidades.
 - **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios, Promociones y reportes.
-- Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%. Se
-  puede pagar en bolívares a tasa BCV.
+- Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%
+  (Fundadores: −30% mensual o trimestral, no se suman). El descuento es solo del plan: cuentas extra,
+  Radar PRO y recargas de IA van a precio completo. Se puede pagar en bolívares a tasa BCV.
 - **Créditos de IA:** cada «Proponer con IA» usa 1 crédito; «Buscar en internet» usa 1 más 1 por cada búsqueda
   (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
   del plan se renuevan **cada mes en el día en que se activó** (si se activó el 18, cada 18) y los que no uses no
