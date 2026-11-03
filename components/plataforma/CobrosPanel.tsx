@@ -77,7 +77,7 @@ export default function CobrosPanel() {
             )}
             <div className="flex-1 min-w-0 text-sm space-y-1">
               <p><b>{k.organizacion}</b> <span className="text-neutral-500">· {k.persona ?? '—'} · {hora(k.creado_at)}</span></p>
-              <p>{PLAN[k.plan] ?? k.plan} · {k.ciclo}{k.radar_pro ? ' + Radar PRO' : ''} · escalón {ESCALON[k.escalon]}{k.ventas_30d != null ? ` (${k.ventas_30d} ventas en 30 días)` : ''}{k.cuentas_extra ? ` · ${k.cuentas_extra} cuenta(s) extra` : ''}</p>
+              <p>{PLAN[k.plan] ?? k.plan} · {k.ciclo}{k.radar_pro ? ' + Radar PRO' : ''} · escalón {ESCALON[k.escalon]}{k.ventas_30d != null ? ` (${k.ventas_30d} ventas el mes pasado)` : ''}{k.cuentas_extra ? ` · ${k.cuentas_extra} cuenta(s) extra` : ''}</p>
               <p className="text-base font-semibold">{usd(k.monto_usd)}{k.monto_bs ? <span className="font-normal text-neutral-600"> = {bs(k.monto_bs)} (BCV {k.tasa_bcv?.toLocaleString('de-DE', { maximumFractionDigits: 2 })})</span> : null}</p>
               <p>{METODO[k.metodo]} · ref. <b>{k.referencia}</b> · pagado el {ddmm(k.fecha_pago)}</p>
               {k.repetida > 0 && <p className="text-red-700">⚠️ Esa referencia ya se reportó {k.repetida} vez/veces antes.</p>}

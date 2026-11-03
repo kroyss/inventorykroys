@@ -2,10 +2,12 @@
 // (Bs a tasa BCV) o Binance (USDT), adjunta la captura y la referencia; el dueño lo confirma a mano y lo aprueba en
 // Plataforma → Cobros. Nada automático: aprobar = lo mismo que registrar el plan en Plataforma → Plan y pagos.
 //
-// Escalón = ventas de MercadoLibre de los últimos 30 días de TODAS sus cuentas conectadas (ml_ordenes, sin canceladas),
-// incluidas las que procesa por fuera del sistema; margen del 10% sobre el tope (lib/planes.ts). Con plan activo el
-// escalón solo cambia si los DOS últimos períodos de 30 días quedan del mismo lado (regla de los 2 meses seguidos).
-// Sin ventas → el escalón más bajo.
+// Escalón = ventas de MercadoLibre del último MES CALENDARIO cerrado (del 1 al último día, igual para todos sin importar
+// cuándo se afilió) de TODAS sus cuentas conectadas (ml_ordenes, sin canceladas), incluidas las que procesa por fuera
+// del sistema; margen del 10% sobre el tope (lib/planes.ts). Al conectar ML se traen 90 días de ventas, así que una
+// cuenta recién llegada ya tiene sus meses anteriores. Con plan activo el escalón solo cambia si los DOS últimos meses
+// cerrados quedan del mismo lado (regla de los 2 meses seguidos). Sin ventas → el escalón más bajo. Para pagar tiene
+// que haber conectado al menos una cuenta de ML (03-11, el dueño).
 //
 // Vencido o en prueba vencida no puede iniciar sesión: entra a /renovar con su usuario y clave y recibe un acceso
 // firmado (2 h) que solo sirve para "Mi plan".
@@ -64,29 +66,40 @@ export function escalonPorVentas(ventas: number) {
 export async function ventasOrganizacion(orgId: number) {
   const { rows: empresas } = await dbGlobal().query(
     `SELECT id, country FROM empresas WHERE organizacion_id = $1 AND is_active ORDER BY id`, [orgId])
-  let v30 = 0, vAnt = 0, cuentas = 0
+  let vMes = 0, vAnt = 0, cuentas = 0, conectadas = 0
+  // Meses en la hora del país de cada empresa (conEmpresa fija la TimeZone): el mes pasado y el anterior.
   for (const e of empresas as { id: number; country: Country }[]) {
     const r = await conEmpresa(e.id, e.country, async db => {
       const { rows: [v] } = await db.query(
-        `SELECT COUNT(*) FILTER (WHERE fecha > NOW() - INTERVAL '30 days')::int AS v30,
-                COUNT(*) FILTER (WHERE fecha <= NOW() - INTERVAL '30 days')::int AS ant
-         FROM ml_ordenes WHERE fecha > NOW() - INTERVAL '60 days' AND COALESCE(estado, '') <> 'cancelled'`)
-      const { rows: [c] } = await db.query(`SELECT COUNT(*)::int AS n FROM ml_conexiones WHERE estado = 'activa'`)
-      return { v30: v.v30 as number, ant: v.ant as number, cuentas: c.n as number }
+        `SELECT COUNT(*) FILTER (WHERE fecha >= date_trunc('month', NOW()) - INTERVAL '1 month')::int AS mes,
+                COUNT(*) FILTER (WHERE fecha <  date_trunc('month', NOW()) - INTERVAL '1 month')::int AS ant
+         FROM ml_ordenes
+         WHERE fecha >= date_trunc('month', NOW()) - INTERVAL '2 months' AND fecha < date_trunc('month', NOW())
+           AND COALESCE(estado, '') <> 'cancelled'`)
+      const { rows: [c] } = await db.query(
+        `SELECT COUNT(*) FILTER (WHERE estado = 'activa')::int AS n, COUNT(*)::int AS total FROM ml_conexiones`)
+      return { mes: v.mes as number, ant: v.ant as number, cuentas: c.n as number, total: c.total as number }
     })
-    v30 += r.v30; vAnt += r.ant; cuentas += r.cuentas
+    vMes += r.mes; vAnt += r.ant; cuentas += r.cuentas; conectadas += r.total
   }
-  return { v30, vAnt, cuentas }
+  return { vMes, vAnt, cuentas, conectadas }
 }
 
-/** Escalón que le toca: sin plan → por los últimos 30 días; con plan, solo cambia si los dos períodos coinciden. */
-export function escalonSugerido(v30: number, vAnt: number, actual: number | null) {
-  const ultimo = escalonPorVentas(v30)
+/** Escalón que le toca: sin plan → por el último mes cerrado; con plan, solo cambia si los dos últimos meses coinciden. */
+export function escalonSugerido(vMes: number, vAnt: number, actual: number | null) {
+  const ultimo = escalonPorVentas(vMes)
   if (actual == null) return ultimo
   const anterior = escalonPorVentas(vAnt)
   if (ultimo > actual && anterior > actual) return Math.min(ultimo, anterior)
   if (ultimo < actual && anterior < actual) return Math.max(ultimo, anterior)
   return actual
+}
+
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+/** Nombre del último mes cerrado (hora de Caracas), el de las ventas que deciden el escalón. */
+function mesPasado() {
+  const m = Number(new Intl.DateTimeFormat('en', { timeZone: 'America/Caracas', month: 'numeric' }).format(new Date()))
+  return MESES[(m + 10) % 12]
 }
 
 export async function tasaBCV(): Promise<number | null> {
@@ -112,7 +125,7 @@ export interface SituacionPlan {
   plan: Plan['id'] | null; escalon: number | null; ciclo: string | null
   vence: string | null              // plan_hasta (activo) o prueba_hasta (prueba)
   radarProHasta: string | null
-  ventas30: number; ventasAnt: number; cuentas: number; cuentasExtra: number
+  ventasMes: number; ventasMesAnt: number; mes: string; cuentas: number; conectadas: number; cuentasExtra: number
   escalonSugerido: number; escalonNombre: string
   opciones: OpcionPlan[]; planSugerido: Plan['id']
   radarPro: { precio: number; disponible: boolean; regalo: boolean }   // regalo: el 1er plan con Radar trae 1 mes PRO
@@ -130,11 +143,11 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
   const hoy = currentDate()
   const estado = estadoEfectivo(o.estado, o.prueba_hasta, hoy)
   const conPlan = !!o.plan && o.escalon != null
-  const [{ v30, vAnt, cuentas }, tasa, datos, { rows: cobros }] = await Promise.all([
+  const [{ vMes, vAnt, cuentas, conectadas }, tasa, datos, { rows: cobros }] = await Promise.all([
     ventasOrganizacion(orgId), tasaBCV(), leerDatosCobro(),
     dbGlobal().query(`${SELECT_COBRO} WHERE k.organizacion_id = $1 ORDER BY k.creado_at DESC LIMIT 12`, [orgId]),
   ])
-  const escalon = escalonSugerido(v30, vAnt, conPlan ? Number(o.escalon) : null)
+  const escalon = escalonSugerido(vMes, vAnt, conPlan ? Number(o.escalon) : null)
   const cuentasExtra = Math.max(0, cuentas - CUENTAS_INCLUIDAS)
   const opciones = PLANES.map(p => ({
     id: p.id, nombre: p.nombre, resumen: p.resumen, radar: planConRadar(p.id),
@@ -147,7 +160,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     plan: conPlan ? o.plan : null, escalon: conPlan ? Number(o.escalon) : null, ciclo: o.ciclo ?? null,
     vence: estado === 'activo' ? o.plan_hasta : o.estado === 'prueba' ? o.prueba_hasta : o.plan_hasta,
     radarProHasta: o.radar_pro_hasta,
-    ventas30: v30, ventasAnt: vAnt, cuentas, cuentasExtra,
+    ventasMes: vMes, ventasMesAnt: vAnt, mes: mesPasado(), cuentas, conectadas, cuentasExtra,
     escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '',
     opciones, planSugerido,
     // PRO pagado: se ofrece a quien ya tuvo el de regalo (radar_pro_hasta). El primer plan con Radar lo trae 1 mes gratis.
@@ -177,6 +190,7 @@ export interface Reporte {
 export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
   const s = await situacionPlan(orgId)
   if (s.ultimo?.estado === 'revision') throw new ErrorCobro('Ya tienes un pago en revisión: te avisamos apenas lo confirmemos.')
+  if (!s.conectadas) throw new ErrorCobro('Primero conecta tu cuenta de MercadoLibre: el plan se calcula con sus ventas.')
   const m = montoCobro(s, r.plan, r.ciclo, r.radarPro)
   const tasa = r.metodo === 'pago_movil' ? s.tasaBcv : null
   if (r.metodo === 'pago_movil' && !tasa) throw new ErrorCobro('No hay tasa BCV cargada hoy: intenta más tarde o paga por Binance.')
@@ -184,7 +198,7 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
     `INSERT INTO organizacion_cobros (organizacion_id, user_id, plan, escalon, ciclo, radar_pro, cuentas_extra, ventas_30d,
                                       monto_usd, metodo, tasa_bcv, monto_bs, referencia, fecha_pago)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
-    [orgId, userId, r.plan, s.escalonSugerido, r.ciclo, m.pro, s.cuentasExtra, s.ventas30, m.usd, r.metodo,
+    [orgId, userId, r.plan, s.escalonSugerido, r.ciclo, m.pro, s.cuentasExtra, s.ventasMes, m.usd, r.metodo,
      tasa, tasa ? Math.round(m.usd * tasa * 100) / 100 : null, r.referencia.trim(), r.fechaPago])
   const id = Number(k.id)
   if (r.archivo) {

@@ -110,13 +110,20 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
         </section>
       ))}
 
-      {!enRevision && (
+      {!enRevision && !s.conectadas && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Primero conecta tu cuenta de MercadoLibre</p>
+          <p className="mt-1">Tu plan se calcula con las ventas de tus cuentas de ML.{acceso ? '' : <> Conéctala en <a href="/cuentas-ml" className="underline">Cuentas de ML</a> y vuelve aquí.</>}</p>
+        </section>
+      )}
+
+      {!enRevision && s.conectadas > 0 && (
         <>
           {/* 1 · Lo que te toca */}
           <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
             <h2 className="text-sm font-semibold text-neutral-800">1 · {s.estado === 'activo' ? 'Renueva tu plan' : 'Elige tu plan'}</h2>
             <p className="text-sm text-neutral-600">
-              Con tus <b className="num">{s.ventas30.toLocaleString('de-DE')}</b> ventas de los últimos 30 días en MercadoLibre (todas tus cuentas)
+              Con tus <b className="num">{s.ventasMes.toLocaleString('de-DE')}</b> ventas de {s.mes} en MercadoLibre (todas tus cuentas, del 1 al último día)
               te corresponde el escalón <b>{s.escalonNombre} ventas al mes</b>.
             </p>
             {!cambiarPlan ? (

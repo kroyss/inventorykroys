@@ -104,8 +104,11 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   todas las pantallas (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
   siguiente del vencimiento la cuenta se pausa: los datos se conservan y vuelve a funcionar apenas se renueva.
 - **Pagar o renovar: Mi plan** (menú de tu cuenta, arriba a la derecha → **Mi plan**; solo el administrador):
-  1. Ves tu estado y **lo que te toca pagar**: el sistema cuenta tus ventas de MercadoLibre de los últimos 30 días
-     (todas tus cuentas conectadas, también las que procesas por fuera del sistema) y te dice tu escalón y el precio.
+  1. Ves tu estado y **lo que te toca pagar**: el sistema cuenta tus ventas de MercadoLibre del **mes pasado**
+     (del 1 al último día; todas tus cuentas conectadas, también las que procesas por fuera del sistema) y te dice tu
+     escalón y el precio. Si ya tienes plan, el escalón solo sube o baja cuando tus dos últimos meses quedan en otro
+     escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
+     los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
      Puedes elegir mensual o trimestral (−10%) y, si ya tuviste el Radar PRO, agregarlo.
   2. Pagas por **Pago Móvil** (en bolívares, a tasa BCV del día: el monto ya sale convertido) o **Binance** (USDT).
