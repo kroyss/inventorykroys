@@ -37,16 +37,23 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
 // así que siempre lo ve una persona.
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
+// Modo prueba 01–04/11 (78 de 79 bien): el único error fue un monto inventado ("cobro destino por MRW aprox. 1.600 Bs").
+// Montos en bolívares, estimados y cobros a destino con cifra cambian a diario: siempre una persona.
+const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad|cobro (a |en )?destino[^.]*\d/i
+// Pedidos grandes (5 o más unidades, al mayor): se coordinan aparte ("oferte por el máximo disponible y coordinamos").
+const MUCHAS = /\b([5-9]|\d{2,})\s*(unidades|unds?\b|packs?|piezas|pares|cajas|docenas?)|al mayor|mayorista/i
 
 /** Por qué una respuesta de la IA NO saldría sola (vacío = saldría sola). */
 export function motivosRevisar(b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
-  itemEstado: string | null): string[] {
+  itemEstado: string | null, pregunta = ''): string[] {
   const m: string[] = []
   if (!b.respuesta) return ['La IA no propuso respuesta']
   if (b.confianza !== 'alta') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
   else if (b.verificacion && b.verificacion !== 'ok') m.push(b.verificacion)
   if (NEGATIVA.test(b.respuesta)) m.push('Dice que no hay: lo confirma una persona')
   if (OTRA_PUBLICACION.test(b.respuesta)) m.push('Recomienda otra publicación')
+  if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')
+  if (MUCHAS.test(pregunta)) m.push('Pide muchas unidades: lo coordina una persona')
   if (itemEstado && itemEstado !== 'active') m.push('La publicación no está activa')
   const p = problemasDelTexto(b.respuesta)
   if (p.length) m.push(`MercadoLibre la borraría: ${p.join(', ')}`)
@@ -77,7 +84,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false)
       await registrarUso(db, 'preguntas', b.llamadas, null)
-      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado)
+      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto)
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
