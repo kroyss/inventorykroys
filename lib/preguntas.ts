@@ -533,10 +533,15 @@ export const CONTEXTO_ECONOMICO: Recorte = { descripcion: 1200, mismo: 4, pareci
 const AFIRMA_DATOS = /\d|negr|blanc|roj|azul|verde|amarill|gris|rosad|dorad|platead|transparent|color|talla|medida|\bcm\b|\bmm\b|pulgad|volt|wat|mah|metro/i
 
 export async function pedirBorradorEconomico(c: Contexto): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
-  const contenido = bloqueContexto(c, CONTEXTO_ECONOMICO)
+  // 04-11: le faltaba decir el mínimo para envío gratis al confirmar disponibilidad (una de las marcadas mal).
+  const contenido = bloqueContexto(c, CONTEXTO_ECONOMICO) +
+    '\n\nRECUERDA: no digas cuántas unidades hay ni el precio con cifra ("el precio es el publicado BCV"). Si una respuesta rápida ' +
+    'que aplica pide un mínimo para el envío gratis, inclúyelo tal cual al confirmar disponibilidad.'
   const llamadas: LlamadaIA[] = []
+  // Un reintento si falla (04-11: 7 de 177 sin respuesta: corte de la IA o "no devolvió un borrador").
+  const llamar = (modelo?: string) => llamarClaude<Borrador>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo, maxTokens: 800 })
   const pedir = async (modelo?: string) => {
-    const { resultado: b, uso, modelo: m } = await llamarClaude<Borrador>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo, maxTokens: 500 })
+    const { resultado: b, uso, modelo: m } = await llamar(modelo).catch(() => llamar(modelo))
     llamadas.push({ modelo: m, uso })
     return {
       respuesta: String(b.respuesta ?? '').trim(),

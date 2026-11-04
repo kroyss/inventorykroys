@@ -23,6 +23,18 @@ export interface DecisionEco {
 // para no comparar contra un "gratis" que no es.
 const COSTO_REVISOR = 0.003
 
+// Lo que la receta barata hizo mal en la evaluación del dueño (04-11: 8 mal de 99). Si la respuesta cae en algo de
+// esto, va a revisar: atajaba 7 de los 8 errores y solo 12 de las 91 buenas.
+const STOCK_CIFRA = /(tenemos|hay|quedan|disponibles?:?)\s*\d+|\d+\s*(unidades|unds?)\s*(disponibles|en stock)|\d+\s+(azul|roj|verde|negr|blanc|gris|amarill|rosad)/i
+const PRECIO_CIFRA = /\$\s?\d|\d[\d.,]*\s?(usd|d[oó]lares)/i
+function motivosEco(r: string) {
+  const m: string[] = []
+  if (STOCK_CIFRA.test(r)) m.push('Dice cuántas unidades hay')
+  if (PRECIO_CIFRA.test(r)) m.push('Da el precio con cifra')
+  if (/env[ií]o/i.test(r) && /\d/.test(r)) m.push('Explica el envío gratis con cifras')
+  return m
+}
+
 export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string | null,
   motivosRevisar: (b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null }, estado: string | null, pregunta: string) => string[]): Promise<DecisionEco> {
   const t0 = Date.now()
@@ -35,14 +47,15 @@ export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string
     item_moneda: q.item_moneda, item_estado: q.item_estado }])
   const s = sugeridas.get(id)
   if (s?.revisada && !s.sin_confirmar) {
-    const motivos = motivosRevisar({ respuesta: s.texto, confianza: 'alta', falta_dato: null, verificacion: 'ok' }, itemEstado, c.pregunta.texto)
+    const motivos = [...motivosRevisar({ respuesta: s.texto, confianza: 'alta', falta_dato: null, verificacion: 'ok' }, itemEstado, c.pregunta.texto),
+      ...motivosEco(s.texto)]
     return { via: 'plantilla', decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: s.texto, confianza: 'alta',
       modelo: `respuesta rápida «${s.titulo}»`, costo: COSTO_REVISOR, entrada: 0, salida: 0, ms: Date.now() - t0, fecha: new Date().toISOString() }
   }
   // 2 · La IA con la receta económica.
   const b = await pedirBorradorEconomico(c)
   await registrarUso(db, 'simulacion', b.llamadas, null)
-  const motivos = motivosRevisar(b, itemEstado, c.pregunta.texto)
+  const motivos = b.respuesta ? [...motivosRevisar(b, itemEstado, c.pregunta.texto), ...motivosEco(b.respuesta)] : motivosRevisar(b, itemEstado, c.pregunta.texto)
   const suma = (f: (u: (typeof b.llamadas)[number]['uso']) => number) => b.llamadas.reduce((a, l) => a + f(l.uso), 0)
   return {
     via: 'ia', decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
