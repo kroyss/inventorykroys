@@ -47,6 +47,7 @@ const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad|cobr
 const MUCHAS = /\b([5-9]|\d{2,})\s*(unidades|unds?\b|packs?|piezas|pares|cajas|docenas?)|al mayor|mayorista/i
 
 /** Por qué una respuesta de la IA NO saldría sola (vacío = saldría sola). */
+const TERCERO = /(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (solo |no )?(indica|dice|especifica|menciona|muestra|aclara|detalla)|seg[uú]n (la|esta) (publicaci[oó]n|ficha|descripci[oó]n)|los datos (indican|dicen)/i
 export function motivosRevisar(b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
   itemEstado: string | null, pregunta = ''): string[] {
   const m: string[] = []
@@ -55,6 +56,8 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   else if (b.verificacion && b.verificacion !== 'ok') m.push(b.verificacion)
   if (NEGATIVA.test(b.respuesta)) m.push('Dice que no hay: lo confirma una persona')
   if (OTRA_PUBLICACION.test(b.respuesta)) m.push('Recomienda otra publicación')
+  // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
+  if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')
   if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')
   if (MUCHAS.test(pregunta)) m.push('Pide muchas unidades: lo coordina una persona')
   if (itemEstado && itemEstado !== 'active') m.push('La publicación no está activa')
