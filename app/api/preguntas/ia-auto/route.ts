@@ -28,6 +28,7 @@ export async function GET() {
         marcadas: marcadas.length, bien: marcadas.filter(r => r.ia_auto.marca === 'bien').length,
         costo: rows.reduce((a, r) => a + (Number(r.ia_auto.costo) || 0), 0),
       },
+      economica: resumenEco(rows),
       preguntas: rows,
     })
   } catch (err) { return apiError(err) }
@@ -36,7 +37,31 @@ export async function GET() {
 const Accion = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('modo'), modo: z.enum(['apagado', 'sombra', 'real']) }),
   z.object({ accion: z.literal('marcar'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable() }),
+  z.object({ accion: z.literal('marcar_eco'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable() }),
 ])
+
+// Versión económica en paralelo (04-11, lib/iaEconomica.ts): lo mismo que la real, medido sobre las mismas preguntas.
+type FilaIA = { ia_auto: { decision: string; costo?: number; entrada?: number; salida?: number; marca?: string | null
+  eco?: { estado?: string; decision?: string; via?: string; costo?: number; entrada?: number; salida?: number; marca?: string | null; error?: string } } }
+function resumenEco(rows: FilaIA[]) {
+  const con = rows.filter(r => r.ia_auto.eco?.decision)
+  const n = (f: (r: FilaIA) => number | undefined) => con.reduce((a, r) => a + (Number(f(r)) || 0), 0)
+  const ecoSola = con.filter(r => r.ia_auto.eco!.decision === 'sola')
+  const marcadas = ecoSola.filter(r => r.ia_auto.eco!.marca)
+  return {
+    comparadas: con.length, errores: rows.filter(r => r.ia_auto.eco?.error).length,
+    costoReal: n(r => r.ia_auto.costo), costoEco: n(r => r.ia_auto.eco!.costo),
+    // Tokens: solo donde la real los guardó (desde el 04-11; las del modo prueba no los tienen).
+    conTokens: con.filter(r => r.ia_auto.entrada).length,
+    tokensReal: con.filter(r => r.ia_auto.entrada).reduce((a, r) => a + (r.ia_auto.entrada ?? 0) + (r.ia_auto.salida ?? 0), 0),
+    tokensEco: con.filter(r => r.ia_auto.entrada).reduce((a, r) => a + (r.ia_auto.eco!.entrada ?? 0) + (r.ia_auto.eco!.salida ?? 0), 0),
+    tokensEcoTodas: n(r => (r.ia_auto.eco!.entrada ?? 0) + (r.ia_auto.eco!.salida ?? 0)),
+    solasReal: con.filter(r => r.ia_auto.decision === 'sola').length, solasEco: ecoSola.length,
+    sinIA: con.filter(r => r.ia_auto.eco!.via === 'plantilla').length,
+    ambasSolas: con.filter(r => r.ia_auto.decision === 'sola' && r.ia_auto.eco!.decision === 'sola').length,
+    marcadas: marcadas.length, bien: marcadas.filter(r => r.ia_auto.eco!.marca === 'bien').length,
+  }
+}
 
 export async function POST(req: NextRequest) {
   const s = await sesionPreguntas('automatizaciones_config')
@@ -52,6 +77,10 @@ export async function POST(req: NextRequest) {
         `INSERT INTO app_settings (key, value) VALUES ($1, $2)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
         [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde })])
+    } else if (b.accion === 'marcar_eco') {
+      await s.db.query(
+        `UPDATE ml_preguntas SET ia_auto = jsonb_set(ia_auto, '{eco,marca}', to_jsonb($2::text))
+         WHERE id = $1 AND ia_auto ? 'eco'`, [b.id, b.marca])
     } else {
       await s.db.query(
         `UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('marca', $2::text, 'marcada_at', NOW())

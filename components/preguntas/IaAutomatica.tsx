@@ -8,15 +8,26 @@ import { Cargando } from '@/components/ui'
 // acierto antes de activarla de verdad.
 
 type Modo = 'apagado' | 'sombra' | 'real'
+interface Eco {
+  via?: 'plantilla' | 'ia'; decision?: 'sola' | 'revisar'; motivos?: string[]; respuesta?: string; modelo?: string
+  costo?: number; entrada?: number; salida?: number; marca?: 'bien' | 'mal' | null; error?: string
+}
 interface Decision {
   modo: Modo; decision: 'sola' | 'revisar'; motivos: string[]; respuesta?: string; confianza?: string
   publicada?: boolean; error?: string; marca?: 'bien' | 'mal' | null; costo?: number
+  entrada?: number; salida?: number; eco?: Eco
+}
+interface ResumenEco {
+  comparadas: number; errores: number; costoReal: number; costoEco: number; tokensReal: number; tokensEco: number
+  conTokens: number; tokensEcoTodas: number
+  solasReal: number; solasEco: number; sinIA: number; ambasSolas: number; marcadas: number; bien: number
 }
 interface Fila { id: string; texto: string; item_titulo: string | null; item_permalink: string | null; fecha: string; estado: string; respuesta: string | null; ia_auto: Decision }
 interface Info {
   modo: Modo; desde: string | null
   cupo: { usados: number; limite: number | null; quedan: number | null; agotado: boolean }
   resumen: { procesadas: number; solas: number; revisar: number; marcadas: number; bien: number; costo: number }
+  economica: ResumenEco
   preguntas: Fila[]
 }
 
@@ -26,13 +37,15 @@ const MODOS: { v: Modo; t: string; d: string }[] = [
   { v: 'real', t: 'Activa', d: 'Las de confianza alta que pasan todas las revisiones se publican solas. El resto te queda con la respuesta ya escrita.' },
 ]
 
+const usd = (n: number, d = 2) => `$${n.toFixed(d)}`
+const miles = (n: number) => Math.round(n).toLocaleString('de-DE')
 const hora = (f: string) => new Date(`${f}Z`).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 export function IaAutomatica() {
   const confirm = useConfirm()
   const [info, setInfo] = useState<Info | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [ver, setVer] = useState<'sola' | 'revisar'>('sola')
+  const [ver, setVer] = useState<'sola' | 'revisar' | 'eco'>('sola')
   const cargar = useCallback(() => {
     fetch('/api/preguntas/ia-auto').then(async r => {
       const d = await r.json().catch(() => null)
@@ -58,11 +71,16 @@ export function IaAutomatica() {
     setInfo(i => i && { ...i, preguntas: i.preguntas.map(p => p.id === id ? { ...p, ia_auto: { ...p.ia_auto, marca } } : p) })
     post({ accion: 'marcar', id, marca })
   }
+  const marcarEco = (id: string, marca: 'bien' | 'mal' | null) => {
+    setInfo(i => i && { ...i, preguntas: i.preguntas.map(p => p.id === id && p.ia_auto.eco ? { ...p, ia_auto: { ...p.ia_auto, eco: { ...p.ia_auto.eco, marca } } } : p) })
+    post({ accion: 'marcar_eco', id, marca })
+  }
 
   if (error && !info) return <p className="text-sm text-red-600">{error}</p>
   if (!info) return <Cargando />
   const r = info.resumen
-  const filas = info.preguntas.filter(p => p.ia_auto.decision === ver)
+  const filas = ver === 'eco' ? [] : info.preguntas.filter(p => p.ia_auto.decision === ver)
+  const conEco = info.preguntas.filter(p => p.ia_auto.eco?.decision)
   const pct = r.marcadas ? Math.round((100 * r.bien) / r.marcadas) : null
 
   return (
@@ -99,13 +117,15 @@ export function IaAutomatica() {
           <span>Marcadas: <b>{r.marcadas}</b>{pct !== null && <> · <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien</b></>}</span>
         </div>
         <div className="flex gap-1.5">
-          {([['sola', `Habrían salido solas (${r.solas})`], ['revisar', `Para revisar (${r.revisar})`]] as const).map(([k, t]) => (
+          {([['sola', `${info.modo === 'real' ? 'Salieron' : 'Habrían salido'} solas (${r.solas})`], ['revisar', `Para revisar (${r.revisar})`],
+             ['eco', `Versión económica (${info.economica.comparadas})`]] as const).map(([k, t]) => (
             <button key={k} onClick={() => setVer(k)}
               className={`px-3 py-1.5 rounded-full text-sm border ${ver === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
           ))}
         </div>
         {ver === 'sola' && <p className="text-xs text-neutral-500">Marca cada una: ¿la habrías publicado tal cual? Con 95% de «bien» conviene activarla.</p>}
-        {!filas.length && <p className="text-sm text-neutral-500">Todavía no hay preguntas aquí.</p>}
+        {ver === 'eco' && <ComparacionEco e={info.economica} filas={conEco} marcar={marcarEco} />}
+        {ver !== 'eco' && !filas.length && <p className="text-sm text-neutral-500">Todavía no hay preguntas aquí.</p>}
         <ul className="divide-y divide-neutral-100">
           {filas.map(p => (
             <li key={p.id} className="py-3 space-y-1.5">
@@ -138,6 +158,100 @@ export function IaAutomatica() {
           ))}
         </ul>
       </section>
+    </div>
+  )
+}
+
+// Versión económica en paralelo (04-11-2026, lib/iaEconomica.ts): lo que habría hecho la receta barata con las mismas
+// preguntas, sin publicar nada. El dueño la compara con la real (costo, tokens, cuántas solas, acierto) para decidir.
+function Dato({ t, real, eco, bueno }: { t: string; real: string; eco: string; bueno?: boolean }) {
+  return (
+    <div className="rounded-lg border border-neutral-200 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-neutral-500">{t}</div>
+      <div className="text-sm"><span className="text-neutral-500">Actual </span><b>{real}</b></div>
+      <div className={`text-sm ${bueno ? 'text-emerald-700' : 'text-amber-700'}`}><span className="text-neutral-500">Económica </span><b>{eco}</b></div>
+    </div>
+  )
+}
+
+function ComparacionEco({ e, filas, marcar }: { e: ResumenEco; filas: Fila[]; marcar: (id: string, m: 'bien' | 'mal' | null) => void }) {
+  const [solo, setSolo] = useState<'todas' | 'distintas' | 'eco_sola'>('todas')
+  if (!e.comparadas) return <p className="text-sm text-neutral-500">Todavía no hay preguntas comparadas: se van sumando con cada pregunta nueva que procesa la IA.</p>
+  const ahorro = e.costoReal > 0 ? Math.round(100 * (1 - e.costoEco / e.costoReal)) : 0
+  const porPreg = (t: number) => t / e.comparadas
+  const pct = e.marcadas ? Math.round((100 * e.bien) / e.marcadas) : null
+  const ver = filas.filter(p => solo === 'todas' ? true
+    : solo === 'eco_sola' ? p.ia_auto.eco?.decision === 'sola'
+    : p.ia_auto.decision !== p.ia_auto.eco?.decision || (p.ia_auto.respuesta ?? '').trim() !== (p.ia_auto.eco?.respuesta ?? '').trim())
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-neutral-500">
+        Con cada pregunta, además de la IA actual, corre la <b>versión económica</b> (la respuesta rápida sin IA cuando alcanza; si no, el modelo
+        barato con menos datos) y se guarda lo que habría respondido. <b>No publica nada.</b> Marca las que habrían salido solas para medir su acierto.
+      </p>
+      <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+        <Dato t="Costo por pregunta" real={usd(porPreg(e.costoReal), 4)} eco={usd(porPreg(e.costoEco), 4)} bueno={e.costoEco <= e.costoReal} />
+        <Dato t={`Costo de las ${e.comparadas}`} real={usd(e.costoReal)} eco={`${usd(e.costoEco)} (−${ahorro}%)`} bueno={ahorro > 0} />
+        {e.conTokens
+          ? <Dato t="Tokens por pregunta" real={miles(e.tokensReal / e.conTokens)} eco={miles(e.tokensEco / e.conTokens)} bueno={e.tokensEco <= e.tokensReal} />
+          : <Dato t="Tokens por pregunta" real="—" eco={miles(porPreg(e.tokensEcoTodas))} bueno />}
+        <Dato t="Salen solas" real={`${e.solasReal} (${Math.round(100 * e.solasReal / e.comparadas)}%)`}
+          eco={`${e.solasEco} (${Math.round(100 * e.solasEco / e.comparadas)}%)`} bueno={e.solasEco >= e.solasReal} />
+      </div>
+      <p className="text-xs text-neutral-600">
+        <b>{e.sinIA}</b> respondidas con la respuesta rápida, sin IA · <b>{e.ambasSolas}</b> salen solas en las dos ·
+        acierto de la económica: {pct === null ? 'sin marcar todavía' : <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien ({e.bien} de {e.marcadas})</b>}
+        {e.errores > 0 && <> · <span className="text-red-600">{e.errores} con error</span></>}
+        {' '}· al mes (~1.600 preguntas): actual <b>{usd(porPreg(e.costoReal) * 1600, 0)}</b>, económica <b>{usd(porPreg(e.costoEco) * 1600, 0)}</b>
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {([['todas', 'Todas'], ['distintas', 'Solo donde difieren'], ['eco_sola', 'Económica sola']] as const).map(([k, t]) => (
+          <button key={k} onClick={() => setSolo(k)}
+            className={`px-2.5 py-1 rounded-full text-xs border ${solo === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
+        ))}
+      </div>
+      <ul className="divide-y divide-neutral-100">
+        {ver.map(p => {
+          const x = p.ia_auto.eco!
+          return (
+            <li key={p.id} className="py-3 space-y-1.5">
+              <p className="text-sm text-neutral-900"><span className="text-neutral-400 text-xs mr-1.5">{hora(p.fecha)}</span>{p.texto}</p>
+              {p.item_titulo && <p className="text-xs text-neutral-500 truncate">{p.item_titulo}</p>}
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-950">
+                  <div className="text-[11px] font-semibold text-sky-700 mb-0.5">
+                    ACTUAL · {p.ia_auto.decision === 'sola' ? 'sola' : 'revisar'} · {usd(p.ia_auto.costo ?? 0, 4)}
+                    {p.ia_auto.entrada ? ` · ${miles((p.ia_auto.entrada ?? 0) + (p.ia_auto.salida ?? 0))} tokens` : ''}
+                  </div>
+                  {p.ia_auto.respuesta || '(sin respuesta)'}
+                </div>
+                <div className={`rounded-lg px-3 py-2 text-sm ${x.decision === 'sola' ? 'bg-emerald-50 text-emerald-950' : 'bg-amber-50 text-amber-950'}`}>
+                  <div className={`text-[11px] font-semibold mb-0.5 ${x.decision === 'sola' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    ECONÓMICA · {x.decision === 'sola' ? 'sola' : 'revisar'} · {usd(x.costo ?? 0, 4)} · {x.via === 'plantilla' ? 'sin IA' : `${miles((x.entrada ?? 0) + (x.salida ?? 0))} tokens`}
+                  </div>
+                  {x.respuesta || '(sin respuesta)'}
+                  {x.decision === 'revisar' && !!x.motivos?.length && <div className="mt-1 text-xs opacity-80">{x.motivos.join(' · ')}</div>}
+                </div>
+              </div>
+              {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
+                <p className="text-xs text-neutral-600"><span className="font-semibold">Publicada:</span> {p.respuesta}</p>)}
+              {x.decision === 'sola' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-neutral-500">¿La económica estaba bien?</span>
+                  {(['bien', 'mal'] as const).map(m => (
+                    <button key={m} onClick={() => marcar(p.id, x.marca === m ? null : m)}
+                      className={`px-2.5 py-1 rounded-md text-xs border ${x.marca === m
+                        ? m === 'bien' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600'
+                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+                      {m === 'bien' ? '✓ Bien' : '✗ Mal'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

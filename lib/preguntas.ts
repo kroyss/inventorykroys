@@ -526,6 +526,39 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   return { ...b, llamadas, verificacion }
 }
 
+// Receta económica (04-11-2026, simulación en paralelo de lib/iaEconomica.ts): lo que usan los bots de ~$0,01 por
+// respuesta. Contexto chico (la publicación y pocas respuestas parecidas, no todo), Haiku para todas, Sonnet solo si
+// la pregunta es técnica y Haiku no quedó seguro, y el verificador solo si la respuesta afirma números, colores o medidas.
+export const CONTEXTO_ECONOMICO: Recorte = { descripcion: 1200, mismo: 4, parecidas: 3, otras: 2, fichaOtra: 80 }
+const AFIRMA_DATOS = /\d|negr|blanc|roj|azul|verde|amarill|gris|rosad|dorad|platead|transparent|color|talla|medida|\bcm\b|\bmm\b|pulgad|volt|wat|mah|metro/i
+
+export async function pedirBorradorEconomico(c: Contexto): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
+  const contenido = bloqueContexto(c, CONTEXTO_ECONOMICO)
+  const llamadas: LlamadaIA[] = []
+  const pedir = async (modelo?: string) => {
+    const { resultado: b, uso, modelo: m } = await llamarClaude<Borrador>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo, maxTokens: 500 })
+    llamadas.push({ modelo: m, uso })
+    return {
+      respuesta: String(b.respuesta ?? '').trim(),
+      confianza: (['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja') as Borrador['confianza'],
+      falta_dato: b.falta_dato || null,
+      web: false, modelo: m,
+    }
+  }
+  let b = await pedir(MODELO_SIMPLE)
+  if (!(b.confianza === 'alta' && b.respuesta) && TECNICO.test(c.pregunta.texto)) b = await pedir()
+  let verificacion: string | null = null
+  if (b.respuesta && b.confianza !== 'baja' && AFIRMA_DATOS.test(b.respuesta)) {
+    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta).catch(() => null)
+    if (v) {
+      llamadas.push(v.llamada)
+      if (!v.ok) { verificacion = v.motivo; b = { ...b, confianza: 'baja', falta_dato: b.falta_dato ?? v.motivo } }
+      else verificacion = 'ok'
+    }
+  }
+  return { ...b, llamadas, modelo: [...new Set(llamadas.map(l => l.modelo))].join(' → '), verificacion }
+}
+
 // ── Sugerencias (gratis, sin IA): respuestas ya dadas a preguntas parecidas ──────────────────
 
 // Palabras de PRESENTACIÓN (cómo se vende: por par, kit, combo…). Una respuesta que las nombra solo

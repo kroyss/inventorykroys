@@ -12,6 +12,7 @@ import { costoDe, cupoIA, registrarUso } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
 import { automaticasPausadas } from '@/lib/automaticasPreguntas'
+import { simularEconomica, type DecisionEco } from '@/lib/iaEconomica'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
 export interface ConfigIA { modo: ModoIA; desde: string | null }
@@ -19,6 +20,8 @@ export interface DecisionIA {
   modo: ModoIA; decision: 'sola' | 'revisar'; motivos: string[]; respuesta: string; confianza: string
   verificacion: string | null; modelo: string; costo: number; fecha: string; publicada?: boolean; error?: string
   marca?: 'bien' | 'mal' | null; marcada_at?: string
+  entrada?: number; salida?: number        // tokens (04-11, para comparar con la versión económica)
+  eco?: DecisionEco                         // la versión económica en paralelo (lib/iaEconomica.ts)
 }
 
 export const CLAVE_IA_AUTO = 'preguntas_ia_auto'
@@ -89,6 +92,8 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
         fecha: new Date().toISOString(),
+        entrada: b.llamadas.reduce((a, l) => a + (l.uso.input_tokens ?? 0) + (l.uso.cache_creation_input_tokens ?? 0) + (l.uso.cache_read_input_tokens ?? 0), 0),
+        salida: b.llamadas.reduce((a, l) => a + (l.uso.output_tokens ?? 0), 0),
       }
       if (d.decision === 'sola' && cfg.modo === 'real') {
         const r = await publicarRespuesta(db, q.id, b.respuesta, { fuente: 'ia_auto', base: b.respuesta })
@@ -108,6 +113,15 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
            borrador_at = CASE WHEN borrador IS NULL AND $6 THEN NOW() ELSE borrador_at END
          WHERE id = $1`,
         [q.id, JSON.stringify(d), b.respuesta || null, b.confianza, motivos.join(' · ') || null, cfg.modo === 'real'])
+      // Versión económica en paralelo (después de publicar la real, así no la demora). Si falla, la real no se entera.
+      try {
+        const eco = await simularEconomica(db, c, c.item?.status ?? q.item_estado, motivosRevisar)
+        await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`, [q.id, JSON.stringify(eco)])
+      } catch (e) {
+        console.error('[ia economica]', q.id, e instanceof Error ? e.message : e)
+        await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`,
+          [q.id, JSON.stringify({ error: (e instanceof Error ? e.message : String(e)).slice(0, 200) })]).catch(() => {})
+      }
     } catch (e) {
       fallas++
       const msg = e instanceof Error ? e.message : String(e)
@@ -116,5 +130,34 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         [q.id, JSON.stringify({ modo: cfg.modo, decision: 'revisar', motivos: ['Error de la IA'], error: msg.slice(0, 200), fecha: new Date().toISOString() })])
     }
   }
-  return rows.length ? { solas, revisar, publicadas, fallas } : null
+  // Sin preguntas nuevas: la versión económica repasa de a poco las ya procesadas desde el 01-11 (las del modo prueba,
+  // muchas marcadas por el dueño), así la comparación arranca con historial y no solo con lo que llegue hoy.
+  if (!rows.length) {
+    const r = await repasarEconomica(db, country).catch(e => { console.error('[ia economica repaso]', e instanceof Error ? e.message : e); return 0 })
+    return r ? { repasoEconomica: r } : null
+  }
+  return { solas, revisar, publicadas, fallas }
+}
+
+const REPASO_DESDE = '2026-11-01'
+const REPASO_POR_PASADA = 2
+
+async function repasarEconomica(db: Pool, country: string) {
+  const { rows } = await db.query(
+    `UPDATE ml_preguntas SET ia_auto = ia_auto || '{"eco":{"estado":"procesando"}}'::jsonb
+     WHERE id IN (SELECT id FROM ml_preguntas
+                  WHERE ia_auto ? 'decision' AND NOT ia_auto ? 'eco' AND fecha >= $1::date
+                  ORDER BY fecha DESC LIMIT $2 FOR UPDATE SKIP LOCKED)
+     RETURNING id::text, item_estado`, [REPASO_DESDE, REPASO_POR_PASADA])
+  for (const q of rows) {
+    try {
+      const c = await armarContexto(db, Number(q.id), country)
+      const eco = await simularEconomica(db, c, c.item?.status ?? q.item_estado, motivosRevisar)
+      await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`, [q.id, JSON.stringify(eco)])
+    } catch (e) {
+      await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`,
+        [q.id, JSON.stringify({ error: (e instanceof Error ? e.message : String(e)).slice(0, 200) })]).catch(() => {})
+    }
+  }
+  return rows.length
 }

@@ -39,7 +39,7 @@ export function costoDe(modelo: string, u: UsoIA, lote = false) {
 
 /** Guarda UN borrador (o una ficha) con todas sus llamadas sumadas: una fila = un borrador, que
  *  es lo que cuenta el límite del mes. No hace fallar nada si no se puede guardar. */
-export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 'fichas' | 'revisor', llamadas: LlamadaIA[], usuarioId?: number | string | null) {
+export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 'fichas' | 'revisor' | 'simulacion', llamadas: LlamadaIA[], usuarioId?: number | string | null) {
   if (!llamadas.length) return
   const suma = (f: (u: UsoIA) => number) => llamadas.reduce((a, l) => a + f(l.uso), 0)
   try {
@@ -228,5 +228,5 @@ export async function usoDelMes(db: Pool) {
     `SELECT modulo, COUNT(*)::int AS borradores, COALESCE(SUM(costo), 0)::float AS costo
      FROM ia_uso WHERE fecha >= date_trunc('month', NOW()) GROUP BY modulo`)
   const total = rows.reduce((a, r) => a + r.costo, 0)
-  return { total, borradores: rows.filter(r => !['fichas', 'revisor'].includes(r.modulo)).reduce((a, r) => a + r.borradores, 0), porModulo: rows }
+  return { total, borradores: rows.filter(r => !['fichas', 'revisor', 'simulacion'].includes(r.modulo)).reduce((a, r) => a + r.borradores, 0), porModulo: rows }
 }
