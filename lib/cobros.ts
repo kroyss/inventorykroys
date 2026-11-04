@@ -128,7 +128,7 @@ export interface SituacionPlan {
   ventasMes: number; ventasMesAnt: number; mes: string; cuentas: number; conectadas: number; cuentasExtra: number
   escalonSugerido: number; escalonNombre: string
   opciones: OpcionPlan[]; planSugerido: Plan['id']
-  radarPro: { precio: number; disponible: boolean; regalo: boolean }   // regalo: el 1er plan con Radar trae 1 mes PRO
+  radarPro: { precio: number; regalo: boolean }   // regalo: el 1er plan con Radar trae 1 mes PRO (una sola vez en la vida)
   tasaBcv: number | null
   datos: DatosCobro
   ultimo: CobroFila | null; anteriores: CobroFila[]
@@ -163,8 +163,10 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     ventasMes: vMes, ventasMesAnt: vAnt, mes: mesPasado(), cuentas, conectadas, cuentasExtra,
     escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '',
     opciones, planSugerido,
-    // PRO pagado: se ofrece a quien ya tuvo el de regalo (radar_pro_hasta). El primer plan con Radar lo trae 1 mes gratis.
-    radarPro: { precio: RADAR_PRO.precio, disponible: !!o.radar_pro_hasta, regalo: !o.radar_pro_hasta },
+    // 04-11 (el dueño): el mes de regalo es UNA vez, en el primer plan con Radar (radar_pro_hasta vacío = nunca lo tuvo).
+    // Suspender y volver, o renovar, ya no lo trae: se paga aparte a precio completo (sin descuento de Fundador ni
+    // trimestral) y siempre se ofrece al elegir o renovar el plan.
+    radarPro: { precio: RADAR_PRO.precio, regalo: !o.radar_pro_hasta },
     tasaBcv: tasa, datos,
     ultimo: (cobros[0] as CobroFila | undefined) ?? null, anteriores: cobros.slice(1) as CobroFila[],
   }
@@ -175,9 +177,14 @@ export function montoCobro(s: SituacionPlan, plan: Plan['id'], ciclo: 'mensual' 
   const op = s.opciones.find(x => x.id === plan)
   if (!op) throw new Error('Plan inválido')
   const meses = ciclo === 'trimestral' ? 3 : 1
-  const pro = radarPro && op.radar && s.radarPro.disponible ? RADAR_PRO.precio * meses : 0
+  const pro = radarPro && op.radar ? RADAR_PRO.precio * mesesRadarPro(s.radarPro.regalo, meses) : 0
   const usd = (ciclo === 'trimestral' ? op.trimestral : op.mensual) + pro
   return { usd: Math.round(usd * 100) / 100, pro: pro > 0, meses }
+}
+
+/** Meses de Radar PRO que se pagan: con el mes de regalo (primer plan) solo los que siguen (trimestral: 2). */
+export function mesesRadarPro(regalo: boolean, meses: number) {
+  return regalo ? meses - 1 : meses
 }
 
 // ── Reportar ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -294,14 +301,16 @@ export async function aprobarCobro(id: number, por: number) {
     const meses = k.ciclo === 'trimestral' ? 3 : 1
     const hasta = sumarMeses(k.plan_hasta && k.plan_hasta >= hoy ? k.plan_hasta : hoy, meses)
     const metodo = NOMBRE_METODO[k.metodo as Metodo]
-    const { pagoId } = await registrarPlan(client, k.organizacion_id, {
+    const { pagoId, bienvenida } = await registrarPlan(client, k.organizacion_id, {
       plan: k.plan, escalon: k.escalon, ciclo: k.ciclo, hasta, monto: k.usd,
       nota: `${metodo} ref. ${k.referencia}${k.radar_pro ? ' (incluye Radar PRO)' : ''} · reportado en Mi plan`,
     }, por)
-    if (k.radar_pro) {
+    // Con el mes de regalo (bienvenida) el PRO pagado va a continuación de ese mes.
+    const mesesPro = mesesRadarPro(bienvenida, meses)
+    if (k.radar_pro && mesesPro > 0) {
       const { rows: [o] } = await client.query(`SELECT to_char(radar_pro_hasta, 'YYYY-MM-DD') AS h FROM organizaciones WHERE id = $1`, [k.organizacion_id])
       const desde = o.h && o.h >= hoy ? o.h : hoy
-      const proHasta = sumarMeses(desde, meses)
+      const proHasta = sumarMeses(desde, mesesPro)
       await client.query(`UPDATE organizaciones SET radar_pro_hasta = $2 WHERE id = $1`, [k.organizacion_id, proHasta])
       await client.query(
         `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, desde, hasta, nota, por) VALUES ($1, 'radar_pro', 0, $2, $3, $4, $5)`,

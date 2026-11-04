@@ -49,6 +49,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     if (!r?.ok) { setError(r ? ((await r.json().catch(() => ({}))).error ?? 'No se pudo cargar tu plan') : 'Sin conexión'); return }
     const d = await r.json() as SituacionPlan
     setS(d); setPlan(d.planSugerido)
+    // Quien ya tiene Radar PRO vigente lo ve marcado al renovar (puede quitarlo).
+    setRadarPro(!!d.radarProHasta && d.radarProHasta >= new Date().toISOString().slice(0, 10))
   }, [headers])
   useEffect(() => { cargar() }, [cargar])
 
@@ -57,7 +59,9 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
 
   const op = s.opciones.find(o => o.id === plan) ?? s.opciones[0]
   const meses = ciclo === 'trimestral' ? 3 : 1
-  const pro = radarPro && op.radar && s.radarPro.disponible ? s.radarPro.precio * meses : 0
+  // El mes de regalo (solo el primer plan con Radar) no se cobra; el resto del PRO va a precio completo, sin descuento.
+  const mesesPro = s.radarPro.regalo ? meses - 1 : meses
+  const pro = radarPro && op.radar && mesesPro > 0 ? s.radarPro.precio * mesesPro : 0
   const total = Math.round(((ciclo === 'trimestral' ? op.trimestral : op.mensual) + pro) * 100) / 100
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
@@ -157,13 +161,22 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 </button>
               ))}
             </div>
-            {op.radar && s.radarPro.disponible && (
-              <label className="flex items-center gap-2 text-sm text-neutral-700">
-                <input type="checkbox" checked={radarPro} onChange={e => setRadarPro(e.target.checked)} />
-                Radar PRO los fines de semana (+{fmtUsd(s.radarPro.precio)}/mes)
+            {op.radar && s.radarPro.regalo && (
+              <p className="text-xs text-lime-700">
+                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Después cuesta {fmtUsd(s.radarPro.precio)}/mes y lo agregas al renovar.
+              </p>
+            )}
+            {op.radar && mesesPro > 0 && (
+              <label className="flex items-start gap-2 text-sm text-neutral-700">
+                <input type="checkbox" className="mt-1" checked={radarPro} onChange={e => setRadarPro(e.target.checked)} />
+                <span>
+                  {s.radarPro.regalo
+                    ? <>Agregar Radar PRO los meses 2 y 3 (+{fmtUsd(s.radarPro.precio * mesesPro)})</>
+                    : <>Agregar Radar PRO los fines de semana (+{fmtUsd(s.radarPro.precio)}/mes{meses > 1 ? ` × ${meses} = ${fmtUsd(s.radarPro.precio * meses)}` : ''})</>}
+                  <span className="block text-xs text-neutral-500">Sellos, filtros, productos nuevos, competencia y tendencias. Precio completo, sin descuento.</span>
+                </span>
               </label>
             )}
-            {op.radar && s.radarPro.regalo && <p className="text-xs text-lime-700">Incluye 1 mes de Radar PRO los fines de semana de regalo.</p>}
             {s.cuentasExtra > 0 && <p className="text-xs text-neutral-500">Incluye {s.cuentasExtra} cuenta(s) de MercadoLibre extra (tienes {s.cuentas}; el plan trae 2).</p>}
             <div className="flex items-baseline justify-between border-t border-neutral-100 pt-3">
               <span className="text-sm text-neutral-600">Total a pagar{ciclo === 'trimestral' ? ' (3 meses)' : ''}</span>

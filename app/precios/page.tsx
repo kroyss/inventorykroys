@@ -37,7 +37,7 @@ const PREGUNTAS = [
   { p: '¿Qué son los créditos de IA?',
     r: `Cada respuesta que te propone la IA usa un crédito. Las respuestas rápidas y las parecidas no gastan. Si se te acaban, recargas ${RECARGA_IA.creditos} por $${RECARGA_IA.precio} y no vencen.` },
   { p: '¿Qué trae el Radar?',
-    r: `Con los planes Automatizaciones y Completo tienes el Radar de Oportunidades Gratis todos los días: los productos que más se venden en MercadoLibre con su precio real, buscador y tu lista de productos investigados. Radar PRO (sellos, filtros, productos nuevos del mes, competencia y tendencias) es los sábados y domingos por $${RADAR_PRO.precio} al mes, y el primer mes va de regalo al contratar tu plan.` },
+    r: `Con los planes Automatizaciones y Completo tienes el Radar de Oportunidades Gratis todos los días: los productos que más se venden en MercadoLibre con su precio real, buscador y tu lista de productos investigados. Radar PRO (sellos, filtros, productos nuevos del mes, competencia y tendencias) es los sábados y domingos por $${RADAR_PRO.precio} al mes, y el primer mes va de regalo solo en tu primer plan: después se agrega al renovar a precio completo, sin descuento.` },
   { p: '¿Cómo pago?',
     r: 'En bolívares a tasa BCV del día. Sin permanencia: si un mes no sigues, no pagas el siguiente.' },
   { p: '¿Qué incluye la prueba gratis?',
@@ -144,7 +144,7 @@ export default function PreciosPage() {
             <ul className="mt-3 space-y-2 text-sm text-neutral-700">
               <li className="flex justify-between gap-4"><span>Cuenta de MercadoLibre adicional</span><b className="whitespace-nowrap text-neutral-900">+${CUENTA_EXTRA}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Recarga de {RECARGA_IA.creditos} créditos de IA (no vencen)</span><b className="whitespace-nowrap text-neutral-900">${RECARGA_IA.precio}</b></li>
-              <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos, con Automatizaciones o Completo (1.<sup>er</sup> mes de regalo)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
+              <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos, con Automatizaciones o Completo (1.<sup>er</sup> mes de regalo solo en tu primer plan, luego sin descuento)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Pago trimestral</span><b className="whitespace-nowrap text-lime-700">−{DESCUENTO_TRIMESTRAL}%</b></li>
             </ul>
           </div>

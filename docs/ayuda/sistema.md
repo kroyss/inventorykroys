@@ -98,7 +98,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   por $4: **no vencen**, se usan después de los incluidos y lo que sobra sigue de un mes al otro.
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
-  domingos** por **+$6 al mes**; el primer mes de PRO va de regalo al contratar el plan. Sin plan, el Radar queda en
+  domingos** por **+$6 al mes**; el primer mes de PRO va de regalo **solo una vez, en tu primer plan**
+  (si renuevas, o suspendes y vuelves, ya no: se agrega pagando, a precio completo, sin descuento). Sin plan, el Radar queda en
   solo lectura (ve lo que guardó).
 - **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 3 días aparece un aviso arriba de
   todas las pantallas (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
@@ -110,7 +111,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
-     Puedes elegir mensual o trimestral (−10%) y, si ya tuviste el Radar PRO, agregarlo.
+     Puedes elegir mensual o trimestral (−10%) y agregar el Radar PRO ($6/mes, sin descuento). En tu primer plan el
+     primer mes de PRO es de regalo (en trimestral pagas solo los meses 2 y 3 si lo quieres); si lo tienes vigente,
+     al renovar ya viene marcado.
   2. Pagas por **Pago Móvil** (en bolívares, a tasa BCV del día: el monto ya sale convertido) o **Binance** (USDT).
      Los datos tienen botón de copiar.
   3. Tocas **Ya pagué**: escribes la referencia (en Binance, el ID de la orden), la fecha y adjuntas la captura.
