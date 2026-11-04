@@ -64,6 +64,19 @@ const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('cancelar'), id: z.number().int(), nota: z.string().trim().max(200).optional() }),
 ])
 
+// 04-11 (BUYBOOK: una venta cancelada en Despachos, con pago y reintegro, no se calificó sola y ML la iba a concretar):
+// "Cancelado" en Despachos = la venta no se concretó. Se marca "No se concretó" (la marca de Por confirmar, mig 115),
+// que va por delante del pago en Calificaciones y la automática respeta. Solo si nadie la marcó ni la calificó antes.
+async function marcarCanceladaEnML(db: { query: (q: string, v?: unknown[]) => Promise<unknown> }, venta: string | null, userId: number, nota: string | null) {
+  if (!venta) return
+  await db.query(
+    `UPDATE ml_ordenes SET no_concretada_at = NOW(), no_concretada_motivo = 'otro', no_concretada_por = $2,
+            no_concretada_nota = $3
+     WHERE (id::text = $1 OR pack_id::text = $1) AND no_concretada_at IS NULL AND cal_vendedor IS NULL
+       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = $1)`,
+    [venta, userId, `Cancelada en Despachos${nota ? `: ${nota}` : ''}`.slice(0, 200)])
+}
+
 export async function POST(req: NextRequest) {
   const { session, db: pool } = await getSessionDb()
   if (!session || !pool) return unauthorized()
@@ -104,12 +117,14 @@ export async function POST(req: NextRequest) {
          FROM despacho_etiquetas e
          WHERE e.id = $1 AND x.lote_id = e.lote_id AND x.venta = e.venta AND x.id <> e.id AND x.apartado IS NULL`,
         [b.id, b.tipo, b.nota, userId])
+      if (b.tipo === 'cancelado') await marcarCanceladaEnML(db, e.venta, userId, b.nota)
     } else if (b.accion === 'cancelar') {
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }
       await db.query(
         `UPDATE despacho_etiquetas SET apartado = 'cancelado', apartado_por = $2, apartado_at = NOW(),
                 apartado_nota = COALESCE(NULLIF($3, ''), apartado_nota)
          WHERE ${MISMAS.replace('$9', '$4')}`, [b.id, userId, b.nota ?? null, e.venta])
+      await marcarCanceladaEnML(db, e.venta, userId, b.nota ?? null)
     } else {
       // Liberar ("Sale en el próximo manifiesto")
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }

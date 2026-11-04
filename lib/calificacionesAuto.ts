@@ -158,9 +158,12 @@ export async function noConcretadasAutomaticas(db: Pool, conInventario: boolean)
      WHERE b.sugerencia = 'no_concretada'
        AND o.fecha::date <= CURRENT_DATE - ${DIA_AUTO_NO_CONCRETADA}
        AND o.fecha > NOW() - make_interval(days => ${ML_CONCRETA_SOLA_DIAS})
-       AND NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
+       -- 04-11: marcada "No se concretó" a propósito (Por confirmar, o "Cancelado" en Despachos) vale aunque tenga pago o
+       -- guía (pagó y se le reintegró). Sin esa marca, las protecciones de siempre.
+       AND (o.no_concretada_at IS NOT NULL OR (
+         NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
+         AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack_id::text))))
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
-       AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack_id::text))
      ORDER BY b.fecha LIMIT ${MAX_POR_DIA}`, [p.noConcretada.dias])
   const demo = await esDemo(db)
   let calificadas = 0, errores = 0, quitadas = 0

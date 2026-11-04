@@ -179,7 +179,7 @@ export const TOPE_DIAS = 10
 const SQL_GUIA = `
   LEFT JOIN LATERAL (
     SELECT bool_or(e.impresa) AS impresa, max(e.reportado_at) AS reportada_at FROM despacho_etiquetas e
-    WHERE e.venta IN (o.id::text, o.pack_id::text)) g ON TRUE
+    WHERE e.venta IN (o.id::text, o.pack_id::text) AND e.apartado IS DISTINCT FROM 'cancelado') g ON TRUE   -- cancelada en Despachos: no salió (04-11)
   CROSS JOIN (SELECT
     COALESCE((SELECT 'reportador' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS con_reportador,
     EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos) m`
