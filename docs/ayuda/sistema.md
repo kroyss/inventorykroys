@@ -346,7 +346,8 @@ y arma el **manifiesto** al final del día.
 **Apartar un envío:** si una guía no debe salir todavía (el cliente pidió para el lunes, pagó mal…), apártala:
 - **En espera:** no sale en ningún manifiesto ni se le reporta la guía hasta que toques «Sale en el próximo
   manifiesto».
-- **Cancelar envío:** nunca sale ni se le manda la guía. No se puede deshacer.
+- **Cancelar envío:** nunca sale ni se le manda la guía. No se puede deshacer. La venta queda marcada «No se concretó»
+  (aunque tenga pago registrado): en Calificaciones sale como no concretada y la automática la califica.
 - Si la etiqueta ya estaba impresa, separa el paquete físico.
 
 **Si despachas algunas órdenes con otro programa:** no hace falta sacarlas del lote. Cuando MercadoEnvíos muestra la
@@ -400,7 +401,8 @@ Tus ventas de MercadoLibre **sin calificar**, cruzadas con el sistema para saber
 
 - **Concretada:** su guía salió en Despachos y (si lleva guía) ya la reportaste con el Reportador; o está en el
   sistema (procesada).
-- **No concretada:** cancelada en MercadoLibre, o nunca entró al sistema ni a Despachos.
+- **No concretada:** cancelada en MercadoLibre, marcada «No se concretó» (en Por confirmar o al cancelar el envío en
+  Despachos, aunque tenga pago), o nunca entró al sistema ni a Despachos.
 - **Revisar:** el sistema no puede saberlo (ej. guía impresa pero no reportada en 10 días): decide tú.
 
 Sin Despachos y Reportador el sistema no sabe cuáles se concretaron: decides tú cada una (solo las canceladas en ML
