@@ -101,8 +101,10 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   domingos** por **+$6 al mes**; el primer mes de PRO va de regalo **solo una vez, en tu primer plan**
   (si renuevas, o suspendes y vuelves, ya no: se agrega pagando, a precio completo, sin descuento). Sin plan, el Radar queda en
   solo lectura (ve lo que guardó).
-- **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 3 días aparece un aviso arriba de
-  todas las pantallas (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
+- **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 5 días aparece un aviso arriba de
+  todas las pantallas (en rojo el último día y el anterior; el mismo aviso que al terminar la prueba gratis, que
+  también sale los últimos 5 días). Si ya reportaste el pago y está en revisión, en vez del aviso sale «Recibimos tu
+  pago, lo estamos confirmando» (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
   siguiente del vencimiento la cuenta se pausa: los datos se conservan y vuelve a funcionar apenas se renueva.
 - **Pagar o renovar: Mi plan** (menú de tu cuenta, arriba a la derecha → **Mi plan**; solo el administrador):
   1. Ves tu estado y **lo que te toca pagar**: el sistema cuenta tus ventas de MercadoLibre del **mes pasado**

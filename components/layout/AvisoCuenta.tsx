@@ -10,11 +10,33 @@ import AvisoCorte from './AvisoCorte'
 //    los Fundadores; a una prueba normal no, así los videos sirven para todos);
 //  - prueba corriendo: el primer día, "¡tus días empezaron!"; después una línea discreta con lo que
 //    queda (así el cliente sabe que ya corren); desde AVISAR_DESDE días antes, el aviso de vencimiento.
-// Plan pagado (mig 138): "tu plan vence" los últimos AVISAR_PLAN días.
-const AVISAR_DESDE = 7
-const AVISAR_PLAN = 3
+// Plan pagado (mig 138): el mismo aviso de vencimiento, los mismos días (05-11, el dueño: unificar, 5 días, rojo los
+// últimos 2). Si ya reportó un pago que está en revisión (Mi plan → Plataforma → Cobros), en vez de "vence" un aviso
+// verde de que lo recibimos (la cuenta no se pausa mientras esté en revisión).
+const AVISAR_DESDE = 5
 
 function ddmm(f: string) { return `${f.slice(8, 10)}/${f.slice(5, 7)}` }
+function diaSiguiente(f: string) {
+  const d = new Date(`${f}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10)
+}
+
+function AvisoVence({ que, hasta, quedan, esAdmin }: { que: 'prueba' | 'plan'; hasta: string; quedan: number; esAdmin: boolean }) {
+  const cuando = quedan === 0 ? <b>vence HOY</b> : quedan === 1 ? <b>vence mañana</b> : <>vence en <b>{quedan} días</b> (el {ddmm(hasta)})</>
+  return (
+    <div className={`border-b text-center text-sm py-2 px-4 ${quedan <= 1 ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+      {que === 'prueba' ? 'Tu prueba gratis' : 'Tu plan'} {cuando}. Si no pagas, el {ddmm(diaSiguiente(hasta))} la cuenta se pausa; tus datos se conservan.{' '}
+      {esAdmin ? <Link href="/mi-plan" className="underline font-semibold whitespace-nowrap">Pagar mi plan →</Link> : '(El pago lo hace el administrador de la cuenta.)'}
+    </div>
+  )
+}
+
+function AvisoPagoEnRevision() {
+  return (
+    <div className="bg-lime-50 border-b border-lime-200 text-lime-900 text-center text-sm py-2 px-4">
+      ✓ Recibimos tu pago, lo estamos confirmando. Tu cuenta sigue activa.
+    </div>
+  )
+}
 
 export default async function AvisoCuenta({ organizacionId, esAdmin }: { organizacionId: number; esAdmin: boolean }) {
   // Plazo de su corte de Fundadores sin MercadoLibre (lib/fundadoresCortes.ts): reemplaza al aviso de abajo.
@@ -24,18 +46,15 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
   const { rows: [o] } = await dbGlobal().query(
     `SELECT estado, fundador, prueba_dias, to_char(prueba_hasta, 'YYYY-MM-DD') AS hasta,
             prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan,
-            to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, plan_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS plan_quedan
+            to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, plan_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS plan_quedan,
+            EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = organizaciones.id AND k.estado = 'revision') AS en_revision
      FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] }))
-  // Plan pagado (mig 138): aviso desde AVISAR_PLAN días antes; al día siguiente del vencimiento se pausa sola.
+  // Plan pagado (mig 138): aviso desde AVISAR_DESDE días antes; al día siguiente del vencimiento se pausa sola.
   if (o?.estado === 'activo' && o.plan_hasta) {
     const q = Number(o.plan_quedan)
-    if (q < 0 || q > AVISAR_PLAN) return null
-    const cuando = q === 0 ? <b>vence HOY</b> : q === 1 ? <b>vence mañana</b> : <>vence en <b>{q} días</b> (el {ddmm(o.plan_hasta)})</>
-    return (
-      <div className={`border-b text-center text-sm py-2 px-4 ${q <= 1 ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-        Tu plan {cuando}. Para seguir sin cortes, renuévalo{esAdmin ? <>: <Link href="/mi-plan" className="underline font-semibold whitespace-nowrap">Pagar mi plan →</Link></> : ' (lo hace el administrador de la cuenta).'}
-      </div>
-    )
+    if (q < 0 || q > AVISAR_DESDE) return null
+    if (o.en_revision) return <AvisoPagoEnRevision />
+    return <AvisoVence que="plan" hasta={o.plan_hasta} quedan={q} esAdmin={esAdmin} />
   }
   if (!o || o.estado !== 'prueba' || !o.hasta) return null
   const quedan = Number(o.quedan)
@@ -67,10 +86,6 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
       </div>
     )
   }
-  const cuando = quedan === 0 ? <b>vence HOY</b> : quedan === 1 ? <b>vence mañana</b> : <>vence en <b>{quedan} días</b> (el {ddmm(o.hasta)})</>
-  return (
-    <div className={`border-b text-center text-sm py-2 px-4 ${quedan <= 2 ? 'bg-red-50 border-red-200 text-red-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-      Tu prueba gratis {cuando}. Para seguir, elige tu plan{esAdmin ? <>: <Link href="/mi-plan" className="underline font-semibold whitespace-nowrap">Pagar mi plan →</Link></> : ' (lo hace el administrador de la cuenta).'} Tus datos se conservan.
-    </div>
-  )
+  if (o.en_revision) return <AvisoPagoEnRevision />
+  return <AvisoVence que="prueba" hasta={o.hasta} quedan={quedan} esAdmin={esAdmin} />
 }
