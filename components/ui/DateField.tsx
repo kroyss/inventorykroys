@@ -26,7 +26,7 @@ export function DateField({ value, onChange, min, max, title, placeholder = 'dd/
     try { el.showPicker() } catch { el.focus(); el.click() }
   }
   const base = className || 'border border-neutral-300 rounded-lg px-3 py-2 text-sm'
-  const ancho = /w-full/.test(base)
+  const ancho = /\bw-full\b/.test(base)
   return (
     <span className={`relative ${ancho ? 'flex w-full' : 'inline-flex'}`}>
       <button type="button" onClick={abrir} title={title}

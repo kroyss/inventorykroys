@@ -7,7 +7,7 @@
 // bien o mal) · real (publica las "sola"). La pausa de las respuestas automáticas (preguntas_auto_pausa) la frena igual.
 // Cada pregunta procesada usa 1 crédito de IA (ia_uso.modulo = 'preguntas'); sin créditos no procesa.
 import type { Pool } from 'pg'
-import { armarContexto, pedirBorrador, iaConfigurada } from '@/lib/preguntas'
+import { armarContexto, datosPublicacion, pedirBorrador, iaConfigurada } from '@/lib/preguntas'
 import { costoDe, cupoIA, registrarUso } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
@@ -46,10 +46,31 @@ const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad|cobr
 // Pedidos grandes (5 o más unidades, al mayor): se coordinan aparte ("oferte por el máximo disponible y coordinamos").
 const MUCHAS = /\b([5-9]|\d{2,})\s*(unidades|unds?\b|packs?|piezas|pares|cajas|docenas?)|al mayor|mayorista/i
 
-/** Por qué una respuesta de la IA NO saldría sola (vacío = saldría sola). */
-const TERCERO = /(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (solo |no )?(indica|dice|especifica|menciona|muestra|aclara|detalla)|seg[uú]n (la|esta) (publicaci[oó]n|ficha|descripci[oó]n)|los datos (indican|dicen)/i
+// 05-11 (evaluación del dueño de la económica): 4 casos que siempre ve una persona.
+// Precio en divisa / dólares / efectivo: "el publicado BCV" no contesta lo que preguntan (fallaron la real y la económica).
+const DIVISA = /divisas?|en d[oó]lares|precio en \$|en efectivo|\bverdes?\b|\busdt?\b/i
+// Medios de pago fuera de MercadoLibre (Cashea, Zelle, Binance...): la IA inventó "sí contamos con Cashea".
+const PAGO = /cashea|zelle|binance|paypal|zinli|wally|reserve|cripto|pago m[oó]vil|transferencia|efectivo|krece|lysto/i
+// Compatibilidad con un vehículo o modelo: la IA confirmó "sí para Kia Picanto" sin tenerlo.
+const VEHICULO = /\b(kia|toyota|chevrolet|chevy|ford|fiat|hyundai|mitsubishi|renault|nissan|mazda|honda|jeep|chery|volkswagen|vw|peugeot|suzuki|dodge|chrysler|daewoo|iveco|mercedes|bmw|audi|seat|jac|dongfeng|great wall|bera|empire|yamaha|bajaj|skygo|picanto|aveo|corolla|fiesta|optra|spark|cherokee|hilux|terios|yaris)\b|\b(modelo|año)\s+(19|20)\d{2}\b|\b(19|20)\d{2}\b.*\b(carro|camioneta|moto|veh[ií]culo)\b/i
+const SIN_CONFIRMAR = /no (lo )?(tenemos|est[aá]) confirmad|verific|consult|no (es|son) compatible|no (sirve|aplica|funciona)/i
+// Fabricante o marca: la IA inventó "fabricante nacional (Madecor)". Si nombra uno que no está en la publicación, revisar.
+const FABRICANTE = /fabric(ante|ado|ados|ada|adas|amos|an|ación)|\bmarca\b/i
+function fabricanteInventado(respuesta: string, datos: string) {
+  if (!FABRICANTE.test(respuesta)) return false
+  const d = datos.toLowerCase()
+  if (!d.trim()) return true
+  // Nombres propios de la respuesta (mayúscula inicial, no al comienzo de frase) que no aparecen en la publicación.
+  const nombres = [...respuesta.matchAll(/(?<![.!?¡¿]\s|^)\b([A-ZÁÉÍÓÚÑ][\wáéíóúñ-]{2,})/g)].map(x => x[1].toLowerCase())
+    .filter(n => !['buenas', 'buenos', 'hola', 'saludos', 'mercadolibre', 'mercado', 'libre', 'zoom', 'tealca', 'mrw', 'bcv', 'usd', 'quedo'].includes(n))
+  if (!nombres.length) return !/fabric|nacional|importad/i.test(d)
+  return nombres.some(n => !d.includes(n))
+}
+
+/** Por qué una respuesta de la IA NO saldría sola (vacío = saldría sola). `datos`: textos de la publicación. */
+const TERCERO = /\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (solo |no )?(indica|dice|especifica|menciona|muestra|aclara|detalla)|seg[uú]n (la|esta) (publicaci[oó]n|ficha|descripci[oó]n)|los datos (indican|dicen)/i
 export function motivosRevisar(b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
-  itemEstado: string | null, pregunta = ''): string[] {
+  itemEstado: string | null, pregunta = '', datos = ''): string[] {
   const m: string[] = []
   if (!b.respuesta) return ['La IA no propuso respuesta']
   if (b.confianza !== 'alta') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
@@ -60,6 +81,10 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')
   if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')
   if (MUCHAS.test(pregunta)) m.push('Pide muchas unidades: lo coordina una persona')
+  if (DIVISA.test(pregunta)) m.push('Pregunta precio en divisa: lo contesta una persona')
+  if (PAGO.test(pregunta)) m.push('Pregunta por un medio de pago: lo confirma una persona')
+  if (VEHICULO.test(pregunta) && !SIN_CONFIRMAR.test(b.respuesta)) m.push('Confirma compatibilidad con un vehículo o modelo')
+  if (fabricanteInventado(b.respuesta, datos)) m.push('Menciona un fabricante o marca no confirmada')
   if (itemEstado && itemEstado !== 'active') m.push('La publicación no está activa')
   const p = problemasDelTexto(b.respuesta)
   if (p.length) m.push(`MercadoLibre la borraría: ${p.join(', ')}`)
@@ -90,7 +115,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false)
       await registrarUso(db, 'preguntas', b.llamadas, null)
-      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto)
+      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c))
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),

@@ -9,7 +9,7 @@
 // Mismas reglas para salir sola que la real (motivosRevisar). Su gasto va a ia_uso con módulo 'simulacion' (no usa
 // créditos del cliente).
 import type { Pool } from 'pg'
-import { pedirBorradorEconomico, type Contexto } from '@/lib/preguntas'
+import { datosPublicacion, pedirBorradorEconomico, type Contexto } from '@/lib/preguntas'
 import { sugerenciasPara } from '@/lib/sugerenciasServidor'
 import { costoDe, registrarUso } from '@/lib/ia'
 
@@ -36,7 +36,7 @@ function motivosEco(r: string) {
 }
 
 export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string | null,
-  motivosRevisar: (b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null }, estado: string | null, pregunta: string) => string[]): Promise<DecisionEco> {
+  motivosRevisar: (b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null }, estado: string | null, pregunta: string, datos?: string) => string[]): Promise<DecisionEco> {
   const t0 = Date.now()
   const id = String(c.pregunta.id)
   const { rows: [q] } = await db.query(
@@ -47,7 +47,7 @@ export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string
     item_moneda: q.item_moneda, item_estado: q.item_estado }])
   const s = sugeridas.get(id)
   if (s?.revisada && !s.sin_confirmar) {
-    const motivos = [...motivosRevisar({ respuesta: s.texto, confianza: 'alta', falta_dato: null, verificacion: 'ok' }, itemEstado, c.pregunta.texto),
+    const motivos = [...motivosRevisar({ respuesta: s.texto, confianza: 'alta', falta_dato: null, verificacion: 'ok' }, itemEstado, c.pregunta.texto, datosPublicacion(c)),
       ...motivosEco(s.texto)]
     return { via: 'plantilla', decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: s.texto, confianza: 'alta',
       modelo: `respuesta rápida «${s.titulo}»`, costo: COSTO_REVISOR, entrada: 0, salida: 0, ms: Date.now() - t0, fecha: new Date().toISOString() }
@@ -55,7 +55,7 @@ export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string
   // 2 · La IA con la receta económica.
   const b = await pedirBorradorEconomico(c)
   await registrarUso(db, 'simulacion', b.llamadas, null)
-  const motivos = b.respuesta ? [...motivosRevisar(b, itemEstado, c.pregunta.texto), ...motivosEco(b.respuesta)] : motivosRevisar(b, itemEstado, c.pregunta.texto)
+  const motivos = b.respuesta ? [...motivosRevisar(b, itemEstado, c.pregunta.texto, datosPublicacion(c)), ...motivosEco(b.respuesta)] : motivosRevisar(b, itemEstado, c.pregunta.texto, datosPublicacion(c))
   const suma = (f: (u: (typeof b.llamadas)[number]['uso']) => number) => b.llamadas.reduce((a, l) => a + f(l.uso), 0)
   return {
     via: 'ia', decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,

@@ -239,6 +239,11 @@ interface ItemML {
   variations?: VariacionML[]
 }
 
+/** Textos de la publicación (título, descripción, ficha, producto) para comprobar lo que la IA afirma. */
+export function datosPublicacion(c: Contexto) {
+  return [c.item?.title, c.titulo, c.descripcion, c.ficha?.texto, c.producto?.name].filter(Boolean).join(' \n ')
+}
+
 export interface Contexto {
   pregunta: { id: number; texto: string; item_id: string; fecha: string }
   item: ItemML | null
