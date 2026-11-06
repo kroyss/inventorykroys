@@ -20,7 +20,7 @@ const PASOS: Paso[] = [
 ]
 
 const MEDIOS = ['Pago móvil', 'Transferencia', 'Efectivo en divisas', 'Zelle', 'Binance', 'Banesco Panamá']
-const AGENCIAS = ['ZOOM', 'TEALCA', 'MRW', 'Domesa', 'Liberty Express', 'Delivery propio']
+const AGENCIAS = ['MercadoEnvíos', 'ZOOM', 'TEALCA', 'MRW', 'Domesa', 'Liberty Express', 'PedidosYa', 'Yummy', 'Delivery propio']
 const PERSONA = ['Reclamos', 'Ventas al mayor', 'Cambios y devoluciones', 'Pagos con problemas', 'Factura a nombre de empresa', 'Pedidos de otros productos']
 const PASOS_PV = ['Llenar el formulario de MercadoLibre', 'Mandar el comprobante de pago por el chat', 'Confirmar el color o la talla']
 const DESC = { verificar: 'Decir "lo verificamos y te confirmamos"', preguntar: 'Preguntar el modelo o para qué lo necesita', recomendar: 'Recomendar otra publicación tuya que sí lo cumpla', persona: 'Dejarla para una persona' } as const

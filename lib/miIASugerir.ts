@@ -57,7 +57,7 @@ const SISTEMA = `Eres quien configura la IA de atención de un vendedor de Merca
 Reglas:
 - No inventes. Si un tema no aparece, déjalo fuera (no lo pongas vacío ni con un valor por defecto).
 - Saludo y despedida: los que más usa, tal cual (cortos, sin emojis). trato: "usted" si habla de usted (le, su, usted), "tu" si tutea.
-- Agencias: las que nombra; gratis=true si dice que el envío por esa agencia es gratis, false si es cobro a destino.
+- Agencias: las que nombra (MercadoEnvíos, ZOOM, TEALCA, MRW, Domesa, Liberty Express, PedidosYa, Yummy, delivery propio…), con ese nombre; gratis=true si dice que el envío por esa agencia es gratis, false si es cobro a destino.
 - medios de pago: nombres cortos (Pago móvil, Transferencia, Zelle, Binance, Efectivo en divisas…).
 - oferta: solo si repite SIEMPRE una frase comercial (un descuento, un regalo). Nunca teléfonos, correos ni links.
 - despacho.corte en formato HH:MM de 24 horas.
