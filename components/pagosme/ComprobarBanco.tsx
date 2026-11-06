@@ -113,7 +113,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
     setArchivos(as => [...as.filter(a => a.nombre !== BDV_NOMBRE),
       { nombre: BDV_NOMBRE, datos: null, banco: 'Venezuela', estado, error: estado.movimientos.length ? null : 'No hay créditos', at: new Date().toISOString() }])
     const f = (x: string) => x ? dm(x) : '—'
-    setBdv({ ok: true, texto: `Leí ${r.leidos} movimientos (${r.movimientos.length} créditos${previo ? `, ${nuevos} nuevos` : ''}), del ${f(estado.desde)} al ${f(estado.hasta)}${cortado}.` })
+    setBdv({ ok: true, texto: `Leí ${r.leidos} movimiento${r.leidos === 1 ? '' : 's'}: ${r.movimientos.length} ${r.movimientos.length === 1 ? 'es plata que entró' : 'son plata que entró'} (créditos)${previo ? `, ${nuevos} nuevo${nuevos === 1 ? '' : 's'}` : ''}, del ${f(estado.desde)} al ${f(estado.hasta)}. Los débitos (comisiones, pagos que hiciste) no se usan${cortado}.` })
   }
   const cambiarBanco = async (i: number, banco: string) => {
     const a = await leer({ ...archivos[i], banco })
@@ -157,7 +157,8 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-neutral-900">Sube los estados de cuenta</h2>
-            <p className="text-xs text-neutral-500">Bancamiga, Banesco, Mercantil, Provincial… ({nPend} pagos por verificar en los últimos 30 días). Los archivos no salen de tu computadora: quedan en ella hasta mañana.</p>
+            <p className="text-xs text-neutral-500">Bancos que se leen: <b>Bancamiga, Banesco, Mercantil, BBVA Provincial y Banco Plaza</b> (Banco de Venezuela, pegando sus movimientos al lado). Sube el archivo tal como lo descarga el banco: <b>Excel (.xls o .xlsx)</b>; también sirve .csv. PDF no.</p>
+            <p className="text-xs text-neutral-500">{nPend} pagos por verificar en los últimos 30 días. 🔒 El archivo se lee en tu navegador y no se sube a ningún lado; queda recordado en este navegador hasta mañana para que no tengas que volver a subirlo.</p>
           </div>
           <label className="btn-primary cursor-pointer text-sm">
             + Subir archivos
@@ -199,7 +200,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-neutral-900">Banco de Venezuela (BDV)</h2>
-          <p className="text-xs text-neutral-500">El BDV no deja descargar el estado de cuenta: copia los movimientos de su página y pégalos aquí. No se guardan en el sistema.</p>
+          <p className="text-xs text-neutral-500">El BDV no deja descargar el estado de cuenta: copia los movimientos de su página y pégalos aquí. Se leen en tu navegador y no se suben a ningún lado.</p>
         </div>
         <textarea rows={3} value="" readOnly={false} onChange={() => {}}
           onPaste={e => { e.preventDefault(); pegarBDV(e.clipboardData.getData('text')) }}

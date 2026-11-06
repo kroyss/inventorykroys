@@ -323,7 +323,10 @@ orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Si la **mi
 venta (últimos 90 días), debajo de la referencia sale **⚠️ También en …** con esas ventas: puede ser un pago de dos
 compras juntas (revisa que el monto alcance para todas) o el mismo comprobante usado dos veces. Solo avisa, no bloquea.
 
-**Comprobar con el banco:** sube los estados de cuenta de tu banco (archivos descargados del banco) y el sistema
+**Comprobar con el banco:** sube los estados de cuenta de tu banco tal como los descarga el banco, en Excel (.xls o
+.xlsx; también .csv, no PDF). Bancos que se leen: Bancamiga, Banesco, Mercantil, BBVA Provincial y Banco Plaza; el
+Banco de Venezuela, pegando sus movimientos (ver abajo). El archivo se lee en tu navegador y no se sube a ningún lado;
+queda recordado en ese navegador hasta el día siguiente. No usa IA. El sistema
 cruza referencia, monto y fecha con los pagos: los que coinciden quedan como «Pago correcto». Muestra también los
 créditos del banco que no son de ninguna venta.
 **Banco de Venezuela (BDV):** no deja descargar el estado de cuenta. En BDV en línea entra a «Consulta de
