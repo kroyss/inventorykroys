@@ -17,7 +17,7 @@ export async function GET() {
     const { rows } = await s.db.query(
       `SELECT id::text, texto, item_titulo, item_permalink, to_char(fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha, estado, respuesta, ia_auto
        FROM ml_preguntas WHERE ia_auto IS NOT NULL AND ia_auto->>'estado' IS DISTINCT FROM 'procesando'
-       ORDER BY fecha DESC LIMIT 200`)
+       ORDER BY fecha DESC LIMIT 400`)
     const sola = rows.filter(r => r.ia_auto.decision === 'sola')
     const marcadas = sola.filter(r => r.ia_auto.marca)
     return NextResponse.json({
@@ -29,6 +29,7 @@ export async function GET() {
         costo: rows.reduce((a, r) => a + (Number(r.ia_auto.costo) || 0), 0),
       },
       economica: resumenEco(rows),
+      haiku55: resumen55(rows),
       preguntas: rows,
     })
   } catch (err) { return apiError(err) }
@@ -37,12 +38,35 @@ export async function GET() {
 const Accion = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('modo'), modo: z.enum(['apagado', 'sombra', 'real']) }),
   z.object({ accion: z.literal('marcar'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable() }),
-  z.object({ accion: z.literal('marcar_eco'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable() }),
+  z.object({ accion: z.literal('marcar_eco'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable(),
+    campo: z.enum(['eco', 'eco55']).default('eco') }),
 ])
 
 // Versión económica en paralelo (04-11, lib/iaEconomica.ts): lo mismo que la real, medido sobre las mismas preguntas.
 type FilaIA = { ia_auto: { decision: string; costo?: number; entrada?: number; salida?: number; marca?: string | null
   eco?: { estado?: string; decision?: string; via?: string; costo?: number; entrada?: number; salida?: number; marca?: string | null; error?: string } } }
+type Eco = NonNullable<FilaIA['ia_auto']['eco']>
+// Haiku 5.5 vs Haiku 4.5 (06-11): las dos recetas económicas medidas sobre LAS MISMAS preguntas (las que tienen las dos).
+function resumen55(rows: FilaIA[]) {
+  const de = (r: FilaIA, k: 'eco' | 'eco55') => (r.ia_auto as { eco?: Eco; eco55?: Eco })[k]
+  const con = rows.filter(r => de(r, 'eco')?.decision && de(r, 'eco55')?.decision)
+  const lado = (k: 'eco' | 'eco55') => {
+    const solas = con.filter(r => de(r, k)!.decision === 'sola')
+    const marcadas = solas.filter(r => de(r, k)!.marca)
+    return {
+      costo: con.reduce((a, r) => a + (Number(de(r, k)!.costo) || 0), 0),
+      tokens: con.reduce((a, r) => a + (de(r, k)!.entrada ?? 0) + (de(r, k)!.salida ?? 0), 0),
+      solas: solas.length, marcadas: marcadas.length, bien: marcadas.filter(r => de(r, k)!.marca === 'bien').length,
+    }
+  }
+  return {
+    comparadas: con.length, errores: rows.filter(r => de(r, 'eco55')?.error).length,
+    costoReal: con.reduce((a, r) => a + (Number(r.ia_auto.costo) || 0), 0),
+    h45: lado('eco'), h55: lado('eco55'),
+    sinMarcar: con.filter(r => de(r, 'eco55')!.decision === 'sola' && !de(r, 'eco55')!.marca).length,
+  }
+}
+
 function resumenEco(rows: FilaIA[]) {
   const con = rows.filter(r => r.ia_auto.eco?.decision)
   const n = (f: (r: FilaIA) => number | undefined) => con.reduce((a, r) => a + (Number(f(r)) || 0), 0)
@@ -79,8 +103,8 @@ export async function POST(req: NextRequest) {
         [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde })])
     } else if (b.accion === 'marcar_eco') {
       await s.db.query(
-        `UPDATE ml_preguntas SET ia_auto = jsonb_set(ia_auto, '{eco,marca}', to_jsonb($2::text))
-         WHERE id = $1 AND ia_auto ? 'eco'`, [b.id, b.marca])
+        `UPDATE ml_preguntas SET ia_auto = jsonb_set(ia_auto, ARRAY[$3::text, 'marca'], to_jsonb($2::text))
+         WHERE id = $1 AND ia_auto ? $3`, [b.id, b.marca, b.campo])
     } else {
       await s.db.query(
         `UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('marca', $2::text, 'marcada_at', NOW())

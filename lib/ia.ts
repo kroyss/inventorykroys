@@ -14,11 +14,16 @@ import { dbGlobal } from '@/lib/db'
 
 export const MODELO_IA = process.env.PREGUNTAS_MODELO ?? 'claude-sonnet-5-5'
 export const MODELO_SIMPLE = process.env.PREGUNTAS_MODELO_SIMPLE ?? 'claude-haiku-4-5-20251001'
+// Haiku 5.5 (06-11): 10× más barato que Haiku 4.5; corre EN PARALELO como "eco55" (lib/iaEconomica.ts) para compararlo.
+export const MODELO_ECO55 = process.env.PREGUNTAS_MODELO_ECO55 ?? 'claude-haiku-5-5'
 export const iaConfigurada = () => !!process.env.ANTHROPIC_API_KEY
 
-const PRECIOS: Record<string, { entrada: number; salida: number }> = {
-  'claude-haiku-4-5-20251001': { entrada: 1, salida: 5 },
-  'claude-sonnet-5-5': { entrada: 3, salida: 15 },
+// USD por millón de tokens (página oficial, 06-11-2026). lectura = multiplicador de la entrada leída de la caché
+// (Sonnet 5.5: 0,05×; el resto 0,1×). Sonnet 5.5 estaba cargado a $3/$15: los gastos mostrados salían 50% de más.
+const PRECIOS: Record<string, { entrada: number; salida: number; lectura: number }> = {
+  'claude-haiku-4-5-20251001': { entrada: 1, salida: 5, lectura: 0.1 },
+  'claude-haiku-5-5': { entrada: 0.1, salida: 0.5, lectura: 0.1 },
+  'claude-sonnet-5-5': { entrada: 2, salida: 10, lectura: 0.05 },
 }
 
 export interface UsoIA {
@@ -32,7 +37,7 @@ export interface LlamadaIA { modelo: string; uso: UsoIA; lote?: boolean }
 
 export function costoDe(modelo: string, u: UsoIA, lote = false) {
   const p = PRECIOS[modelo] ?? PRECIOS['claude-sonnet-5-5']
-  const entrada = (u.input_tokens ?? 0) + 1.25 * (u.cache_creation_input_tokens ?? 0) + 0.1 * (u.cache_read_input_tokens ?? 0)
+  const entrada = (u.input_tokens ?? 0) + 1.25 * (u.cache_creation_input_tokens ?? 0) + p.lectura * (u.cache_read_input_tokens ?? 0)
   return ((entrada * p.entrada + (u.output_tokens ?? 0) * p.salida) / 1e6) * (lote ? 0.5 : 1)
     + 0.01 * (u.server_tool_use?.web_search_requests ?? 0)
 }

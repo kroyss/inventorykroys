@@ -538,7 +538,7 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
 export const CONTEXTO_ECONOMICO: Recorte = { descripcion: 1200, mismo: 4, parecidas: 3, otras: 2, fichaOtra: 80 }
 const AFIRMA_DATOS = /\d|negr|blanc|roj|azul|verde|amarill|gris|rosad|dorad|platead|transparent|color|talla|medida|\bcm\b|\bmm\b|pulgad|volt|wat|mah|metro/i
 
-export async function pedirBorradorEconomico(c: Contexto): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
+export async function pedirBorradorEconomico(c: Contexto, modeloSimple = MODELO_SIMPLE): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
   // 04-11: le faltaba decir el mínimo para envío gratis al confirmar disponibilidad (una de las marcadas mal).
   const contenido = bloqueContexto(c, CONTEXTO_ECONOMICO) +
     '\n\nRECUERDA: no digas cuántas unidades hay ni el precio con cifra ("el precio es el publicado BCV"). Si una respuesta rápida ' +
@@ -556,11 +556,11 @@ export async function pedirBorradorEconomico(c: Contexto): Promise<Borrador & { 
       web: false, modelo: m,
     }
   }
-  let b = await pedir(MODELO_SIMPLE)
+  let b = await pedir(modeloSimple)
   if (!(b.confianza === 'alta' && b.respuesta) && TECNICO.test(c.pregunta.texto)) b = await pedir()
   let verificacion: string | null = null
   if (b.respuesta && b.confianza !== 'baja' && AFIRMA_DATOS.test(b.respuesta)) {
-    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta).catch(() => null)
+    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta, modeloSimple).catch(() => null)
     if (v) {
       llamadas.push(v.llamada)
       if (!v.ok) { verificacion = v.motivo; b = { ...b, confianza: 'baja', falta_dato: b.falta_dato ?? v.motivo } }

@@ -11,7 +11,7 @@
 import type { Pool } from 'pg'
 import { datosPublicacion, pedirBorradorEconomico, type Contexto } from '@/lib/preguntas'
 import { sugerenciasPara } from '@/lib/sugerenciasServidor'
-import { costoDe, registrarUso } from '@/lib/ia'
+import { costoDe, registrarUso, MODELO_SIMPLE } from '@/lib/ia'
 
 export interface DecisionEco {
   via: 'plantilla' | 'ia'; decision: 'sola' | 'revisar'; motivos: string[]; respuesta: string; confianza: string
@@ -36,7 +36,7 @@ function motivosEco(r: string) {
 }
 
 export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string | null,
-  motivosRevisar: (b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null }, estado: string | null, pregunta: string, datos?: string) => string[]): Promise<DecisionEco> {
+  motivosRevisar: (b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null }, estado: string | null, pregunta: string, datos?: string) => string[], modelo = MODELO_SIMPLE): Promise<DecisionEco> {
   const t0 = Date.now()
   const id = String(c.pregunta.id)
   const { rows: [q] } = await db.query(
@@ -50,10 +50,10 @@ export async function simularEconomica(db: Pool, c: Contexto, itemEstado: string
     const motivos = [...motivosRevisar({ respuesta: s.texto, confianza: 'alta', falta_dato: null, verificacion: 'ok' }, itemEstado, c.pregunta.texto, datosPublicacion(c)),
       ...motivosEco(s.texto)]
     return { via: 'plantilla', decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: s.texto, confianza: 'alta',
-      modelo: `respuesta rápida «${s.titulo}»`, costo: COSTO_REVISOR, entrada: 0, salida: 0, ms: Date.now() - t0, fecha: new Date().toISOString() }
+      modelo: `respuesta rápida «${s.titulo}»`, costo: modelo.includes('haiku-5') ? COSTO_REVISOR / 10 : COSTO_REVISOR, entrada: 0, salida: 0, ms: Date.now() - t0, fecha: new Date().toISOString() }
   }
   // 2 · La IA con la receta económica.
-  const b = await pedirBorradorEconomico(c)
+  const b = await pedirBorradorEconomico(c, modelo)
   await registrarUso(db, 'simulacion', b.llamadas, null)
   const motivos = b.respuesta ? [...motivosRevisar(b, itemEstado, c.pregunta.texto, datosPublicacion(c)), ...motivosEco(b.respuesta)] : motivosRevisar(b, itemEstado, c.pregunta.texto, datosPublicacion(c))
   const suma = (f: (u: (typeof b.llamadas)[number]['uso']) => number) => b.llamadas.reduce((a, l) => a + f(l.uso), 0)
