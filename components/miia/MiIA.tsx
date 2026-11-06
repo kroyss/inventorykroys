@@ -184,8 +184,10 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
           <input inputMode="numeric" value={c.factura?.garantiaDias ?? ''} onChange={e => set(c => ({ ...c, factura: { ...c.factura, garantiaDias: e.target.value ? Math.round(num(e.target.value) ?? 0) : null } }))}
             className="w-20 rounded-lg border border-neutral-300 px-2 py-1" /> días
         </div>
+      </Pregunta>
+      <Pregunta t="¿Qué NO cubre la garantía?" ayuda="Lo que la IA aclara si preguntan por la garantía. Déjalo vacío si no hay excepciones.">
         <input value={c.factura?.garantiaNoCubre ?? ''} onChange={e => set(c => ({ ...c, factura: { ...c.factura, garantiaNoCubre: e.target.value } }))}
-          placeholder="¿Qué no cubre? Ej.: mal uso ni gastos de devolución" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          placeholder="Ej.: mal uso, golpes ni gastos de envío de la devolución" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
       </Pregunta>
     </>
     case 'desconocido': {
