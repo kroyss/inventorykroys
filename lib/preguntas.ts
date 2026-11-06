@@ -7,6 +7,7 @@
 //   - ML descarta textos con links externos o datos de contacto: se revisan antes;
 //   - las preguntas de publicaciones pausadas no salen en el panel de ML pero la API sí
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
+import { politicasIA } from '@/lib/miIA'
 import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { envioGratisAhora, huecoVariasUnidades, textoHueco } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
@@ -262,6 +263,7 @@ export interface Contexto {
   otras: OtraPublicacion[]                                   // otras publicaciones del vendedor
   variantes?: Variante[]                                     // stock por variante (31-10)
   delComprador?: { p: string; r: string | null; fecha: string }[]   // sus preguntas anteriores (31-10)
+  minimo?: { precioMenor: number; unidades: number } | null        // Mi IA (06-11): mínimo de unidades en productos baratos
 }
 
 export async function armarContexto(db: Pool, preguntaId: number, country: string): Promise<Contexto & { conexionId: number }> {
@@ -303,7 +305,8 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original, tablas)
     hueco = envio ? huecoVariasUnidades(peso?.kg, q.item_precio, q.item_precio_original, tablas) : null
   }
-  const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)
+  // Mi IA (06-11, lib/miIA.ts) + el texto libre de siempre. Sin Mi IA guardada, igual que antes.
+  const pol = await politicasIA(db, 'preguntas')
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
   const { rows: notas } = await db.query(
     `SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [q.item_id])
@@ -347,7 +350,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     envio: envio ? `${envio.texto}${envio.porPromo ? ' (es por la promoción vigente; al terminar vuelve a su envío normal)' : ''}${hueco ? `. OJO: ${textoHueco(hueco).replace(/ · la promo aguanta.*$/, '')}` : ''}` : null,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
-    politicas: pol?.value ?? '',
+    politicas: pol.texto, minimo: pol.miIA?.envio?.minimo ?? null,
     plantillas: leerPlantillas(pl?.value),
     notas: notas.map(n => n.texto),
     mismoItem: mismo, parecidas,
@@ -455,6 +458,8 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   // 06-11: con "¿tiene disponible 3?" en un producto de $2,19 respondió solo "sí, las 3" y se saltó el mínimo de 2 para
   // el envío gratis ("no agregues lo que no preguntó"). Si la respuesta rápida que aplica por precio pide un mínimo, va siempre.
   const minimo = aplican.find(p => p.precio_hasta != null && /m[ií]nimo/i.test(p.texto))
+  // Mi IA: el mismo aviso con el mínimo del cuestionario (si no lo dijo ya una respuesta rápida).
+  if (!minimo && c.minimo && precio !== null && precio < c.minimo.precioMenor) L.push(`\nOBLIGATORIO EN ESTE PRODUCTO (cuesta menos de ${c.minimo.precioMenor}): si confirmas disponibilidad, precio o envío, di SIEMPRE que el envío gratis se activa con mínimo ${c.minimo.unidades} unidades, aunque el comprador no lo pregunte o pida más unidades que el mínimo.`)
   if (minimo) L.push(`\nOBLIGATORIO EN ESTE PRODUCTO: si confirmas disponibilidad, precio o envío, di SIEMPRE el mínimo de compra para el envío gratis como en la respuesta rápida [${minimo.titulo}], aunque el comprador no lo pregunte o pida más unidades que el mínimo.`)
   if (c.notas.length) L.push(`\nDATOS QUE EL VENDEDOR ANOTÓ DE ESTA PUBLICACIÓN:\n- ${c.notas.join('\n- ')}`)
   if (c.ficha) L.push(`\nFICHA DE CONOCIMIENTO (lo que el vendedor ya respondió de esta publicación, resumido):\n${c.ficha.texto}`)

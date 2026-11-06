@@ -48,6 +48,9 @@ export const MODULOS = {
   // 01-11 (migración 137): respuesta automática con IA en Preguntas (modo prueba / activa). En prueba solo con
   // SolucionesMC; a un cliente se le prende en Plataforma cuando el dueño lo decida.
   ia_automatica:      'Preguntas: respuesta automática con IA (modo prueba y activa; cada pregunta procesada usa 1 crédito)',
+  // 06-11 (migración 144): Mi IA, el cuestionario de reglas del negocio para la IA de Preguntas y Mensajes (lib/miIA.ts).
+  // En prueba solo SolucionesMC.
+  mi_ia:              'Mi IA: cuestionario paso a paso con las reglas del negocio para la IA de Preguntas y Mensajes (en prueba)',
 } as const
 
 export type Modulo = keyof typeof MODULOS

@@ -3,6 +3,8 @@
 // La IA lee la conversación completa y los datos de la venta (productos y stock real, nota de
 // ML, estado en el sistema, guía si ya se despachó) más lo que el vendedor respondió antes a
 // mensajes parecidos (su voz). Solo propone: la persona revisa y envía.
+import { politicasIA } from '@/lib/miIA'
+import { leerMensajesRapidos } from '@/lib/mensajesRapidos'
 import type { Pool } from 'pg'
 import { llamarClaude, type UsoIA } from '@/lib/ia'
 import { itemsDeVenta, envioML, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
@@ -119,8 +121,13 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   }
   const textoNotas = [...notas.notas.map(n => n.texto), s?.notes].filter((x): x is string => !!x?.trim())
   if (textoNotas.length) L.push(`NOTA DE LA VENTA: ${[...new Set(textoNotas)].join(' · ')}`)
-  const { rows: [pol] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_politicas'`)
-  if (pol?.value?.trim()) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${pol.value.trim()}`)
+  // Mi IA (06-11, lib/miIA.ts, con la parte post-venta) + el texto libre de siempre.
+  const pol = await politicasIA(db, 'mensajes')
+  if (pol.texto) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${pol.texto}`)
+  // Respuestas rápidas de Mensajes (06-11): cómo escribe el vendedor post-venta. Las reglas mandan las POLÍTICAS.
+  const { rows: [mr] } = await db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
+  const rapidos = leerMensajesRapidos(mr?.value)
+  if (rapidos.length) L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR PARA MENSAJES (su forma de escribir; si alguna aplica a lo que pregunta, úsala casi tal cual; si un dato choca con las POLÍTICAS, mandan las POLÍTICAS):\n${rapidos.slice(0, 15).map(r => `- [${r.titulo}]: ${r.texto}`).join('\n')}`)
   if (ejemplos.sugerencias.length) {
     L.push('\nRESPUESTAS ANTERIORES DEL VENDEDOR A MENSAJES PARECIDOS (otras ventas):')
     L.push(ejemplos.sugerencias.map(x => `Comprador: ${x.pregunta}\nVendedor: ${x.respuesta}`).join('\n\n'))
