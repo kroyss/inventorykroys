@@ -51,6 +51,7 @@ export const MODULOS = {
   // 06-11 (migración 144): Mi IA, el cuestionario de reglas del negocio para la IA de Preguntas y Mensajes (lib/miIA.ts).
   // En prueba solo SolucionesMC.
   mi_ia:              'Mi IA: cuestionario paso a paso con las reglas del negocio para la IA de Preguntas y Mensajes (en prueba)',
+  mensajes_ia:        'Mensajes con IA en prueba: la IA deja escrito el borrador de cada mensaje nuevo y se marca Bien/Mal (no manda nada)',
 } as const
 
 export type Modulo = keyof typeof MODULOS

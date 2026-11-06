@@ -1,5 +1,6 @@
 'use client'
 import MiIA from '@/components/miia/MiIA'
+import MensajesIAPrueba from '@/components/preguntas/MensajesIAPrueba'
 import SituacionChip, { type Situacion } from './SituacionChip'
 import AvisoPesos from './AvisoPesos'
 import type { ConflictoPesos } from '@/lib/mlShipping'
@@ -38,8 +39,8 @@ function hace(fecha: string | null) {
 }
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
-export default function MensajesClient({ pack: packPedido = null, miIA = false }: { pack?: string | null; miIA?: boolean }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia'>(packPedido ? 'todas' : 'sin_leer')
+export default function MensajesClient({ pack: packPedido = null, miIA = false, iaPrueba = false }: { pack?: string | null; miIA?: boolean; iaPrueba?: boolean }) {
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia' | 'ia_prueba'>(packPedido ? 'todas' : 'sin_leer')
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [conRecordatorios, setConRecordatorios] = useState(false)
@@ -66,7 +67,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false }
   const ultimoPedido = useRef(0)
   const cargar = useCallback(async () => {
     const id = ++ultimoPedido.current
-    const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' || vista === 'mi_ia' ? 'sin_leer' : vista
+    const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' || vista === 'mi_ia' || vista === 'ia_prueba' ? 'sin_leer' : vista
     const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`).catch(() => null)
     if (id !== ultimoPedido.current) return
     if (!r) { setError('Sin conexión: no se pudo cargar'); return }
@@ -118,9 +119,10 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false }
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
         { value: 'al_comprar' as const, label: 'Al comprar' },
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
+        ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
         ...(miIA ? [{ value: 'mi_ia' as const, label: 'Mi IA' }] : []),
       ]} />
-      {vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
+      {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
@@ -238,6 +240,20 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
     if (!leida) return
     let vivo = true
     fetch(`/api/mensajes/${c.pack_id}/sugerencias`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setSugerencias(d.sugerencias) })
+    return () => { vivo = false }
+  }, [leida, ultimoEsComprador, c.pack_id])
+  // IA en prueba (mig 145): si la IA ya dejó escrito el borrador para el último mensaje del comprador, aparece en el cuadro.
+  const [dePrueba, setDePrueba] = useState<{ decision: string | null; motivos: string[] | null } | null>(null)
+  useEffect(() => {
+    if (!leida || !ultimoEsComprador) return
+    let vivo = true
+    fetch(`/api/mensajes/${c.pack_id}/borrador`).then(r => r.ok ? r.json() : null).then(d => {
+      const b = d?.borrador
+      if (!vivo || !b?.respuesta) return
+      setTexto(t => t || b.respuesta); setOrigen(o => o.base ? o : { fuente: 'ia', base: b.respuesta })
+      setMeta(m => m ?? { confianza: b.confianza, falta: b.falta_dato })
+      setDePrueba({ decision: b.decision, motivos: b.motivos })
+    })
     return () => { vivo = false }
   }, [leida, ultimoEsComprador, c.pack_id])
   const proponer = async () => {
@@ -490,6 +506,8 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             <span className={`rounded-full px-2 py-0.5 ring-1 ring-inset ${meta.confianza === 'alta' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
               : meta.confianza === 'media' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-red-50 text-red-700 ring-red-200'}`}>Confianza {meta.confianza}</span>
             {meta.falta && <span className="text-neutral-600">No encontré: <b>{meta.falta}</b></span>}
+            {dePrueba && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-800 ring-1 ring-inset ring-sky-200">
+              Borrador de la IA en prueba (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</span>}
           </div>
         )}
         {error && <p className="text-xs text-red-600 whitespace-pre-line">{error}</p>}

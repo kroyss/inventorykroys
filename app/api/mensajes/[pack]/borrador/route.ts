@@ -3,7 +3,19 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { cupoIA, iaConfigurada, mensajeCupoAgotado, registrarUso } from '@/lib/ia'
 import { borradorMensaje } from '@/lib/mensajesIA'
-import { llevaInventario } from '@/lib/modulos'
+import { llevaInventario, tieneModulo } from '@/lib/modulos'
+import { borradorPrueba } from '@/lib/mensajesIAPrueba'
+
+// GET → el borrador que dejó la IA en prueba (mig 145) para el último mensaje del comprador, si nadie contestó todavía.
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ pack: string }> }) {
+  const s = await sesionPreguntas()
+  if ('error' in s) return s.error
+  const { pack } = await params
+  if (!/^\d+$/.test(pack) || !tieneModulo(s.session.user, 'mensajes_ia')) return NextResponse.json({ borrador: null })
+  try {
+    return NextResponse.json({ borrador: await borradorPrueba(s.db, pack) })
+  } catch (err) { return apiError(err) }
+}
 
 // POST /api/mensajes/[pack]/borrador → la IA propone una respuesta para la conversación (no envía nada).
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ pack: string }> }) {

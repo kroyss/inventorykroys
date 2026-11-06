@@ -21,5 +21,6 @@ export default async function MensajesPage({ searchParams }: { searchParams: Pro
   }
   const { pack } = await searchParams
   return <MensajesClient pack={pack && /^\d{6,20}$/.test(pack) ? pack : null}
-    miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')} />
+    miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')}
+    iaPrueba={tieneModulo(session!.user, 'mensajes_ia')} />
 }

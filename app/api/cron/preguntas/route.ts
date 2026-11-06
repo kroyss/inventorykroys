@@ -9,6 +9,7 @@ import { recordarPagos } from '@/lib/recordatoriosPago'
 import { mensajeAlComprar } from '@/lib/mensajeAlComprar'
 import { responderAutomaticas } from '@/lib/automaticasPreguntas'
 import { procesarIAAutomatica } from '@/lib/iaAutomatica'
+import { procesarMensajesIA } from '@/lib/mensajesIAPrueba'
 import { vencerPlanes } from '@/lib/planesCuenta'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
 import { generarFichasPendientes } from '@/lib/fichasIA'
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
     // Inactiva: ningún usuario suyo usó el sistema en DIAS_INACTIVA días (la plataforma nunca).
     `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario, 'pagos_me' = ANY(e.modulos) AS pagos_me,
-            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto,
+            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto, 'mensajes_ia' = ANY(e.modulos) AS msg_ia,
             o.estado <> 'propietario' AND COALESCE((
               SELECT MAX(GREATEST(u.ultima_actividad, u.last_login)) FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
               WHERE ue.empresa_id = e.id) < NOW() - INTERVAL '${DIAS_INACTIVA} days', TRUE) AS inactiva
@@ -118,6 +119,15 @@ export async function GET(req: NextRequest) {
         console.error('[ia automatica]', e.id, err instanceof Error ? err.message : err)
       }
     }
+    // Mensajes con IA en prueba (lib/mensajesIAPrueba.ts, mig 145): borrador de cada mensaje nuevo, NO manda nada.
+    for (const e of sincronizadas.filter(x => x.msg_ia)) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => procesarMensajesIA(db, e.country, e.inventario))
+        if (r) console.log('[mensajes ia]', e.id, r)
+      } catch (err) {
+        console.error('[mensajes ia]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
     // Calificación automática de las concretadas (lib/calificacionesAuto.ts): solo empresas que la
     // prendieron, una vez al día desde las 10:00 de su país. Antes del contexto de la IA (que tarda).
     for (const e of sincronizadas) {
@@ -142,7 +152,7 @@ export async function GET(req: NextRequest) {
       }
     }
     // Recordatorios de pago (lib/recordatoriosPago.ts): solo empresas con Pagos ME que los prendieron;
-    // cada turno pide "Traer ME", espera que termine y recién ahí manda.
+    // 06-11: ya no pide nada a la PC; espera que el vendedor toque «Traer pagos y guías» y recién ahí manda.
     for (const e of sincronizadas.filter(x => x.pagos_me && x.country === 'VE')) {
       try {
         const r = await conEmpresa(e.id, e.country as Country, db => recordarPagos(db))
