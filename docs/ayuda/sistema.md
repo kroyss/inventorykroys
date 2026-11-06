@@ -246,7 +246,10 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   **350 caracteres** sin avisar. Lo configura un administrador.
 - **Recordatorios de pago:** le recuerda el pago a quien compró y no ha concretado (1 vez al día a las 10:00, o 2
   veces: 10:00 y 17:00). Puedes poner otro texto para el último aviso. Si ya pagó, toca **Ya pagó, no recordar**.
-  Se saltan las ventas donde el comprador ya escribió o se canceló.
+  Los recordatorios salen cuando tocas **Traer pagos y guías** (Pagos ME), desde 4 horas antes de cada turno: así no se
+  le recuerda a quien ya pagó. Si ese turno no traes los pagos, no se manda nada. Nada se trae solo.
+  Se saltan las ventas canceladas y las conversaciones abiertas: el comprador te escribió y todavía no le contestas, o
+  te escribió hace menos de 24 h. Si le contestaste y no volvió a escribir en 24 h, se le sigue recordando.
 - **Pedir calificación:** cuando calificaste una venta como concretada y positiva y el comprador no te calificó
   después de 2 días, aparece para pedírsela. **Nada se envía solo:** revisas el texto y lo envías, una vez por
   venta.
