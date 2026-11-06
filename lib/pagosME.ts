@@ -45,6 +45,12 @@ export const SELECT_PAGOS = `
                   WHERE e.venta = p.venta AND l.status <> 'DESCARTADO') AS en_despachos,
          EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.impresa) AS guia_impresa,
          (SELECT e.apartado FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.apartado IS NOT NULL LIMIT 1) AS apartado,
+         -- 06-11 (Gerardo): la misma referencia (solo dígitos, 6 o más) en OTRAS ventas de los últimos 90 días: aviso,
+         -- no bloquea (a veces un comprador paga dos compras juntas).
+         (SELECT array_agg(DISTINCT r.venta) FROM me_pagos r
+           WHERE r.empresa_id = p.empresa_id AND r.venta <> p.venta AND length(regexp_replace(p.referencia, '[^0-9]', '', 'g')) >= 6
+             AND regexp_replace(r.referencia, '[^0-9]', '', 'g') = regexp_replace(p.referencia, '[^0-9]', '', 'g')
+             AND r.creado_at > NOW() - INTERVAL '90 days') AS ref_en_otras,
          (SELECT u.estado FROM ((SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num LIMIT 1)
            UNION ALL (SELECT o.estado FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) u LIMIT 1) AS ml_estado
   FROM me_pagos p

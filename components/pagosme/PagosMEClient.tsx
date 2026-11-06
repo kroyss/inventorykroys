@@ -348,7 +348,11 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
                       <div className="text-neutral-500">{p.banco_emisor ?? '?'} → {p.banco_receptor ?? '?'}</div>
                       {p.fecha_pago && <div className="text-neutral-400">{p.fecha_pago}</div>}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs">{p.referencia ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{p.referencia ?? '—'}
+                      {!!p.ref_en_otras?.length && (
+                        <div className="mt-0.5 font-sans text-[11px] text-amber-700" title="La misma referencia de pago aparece en otra venta. Puede ser un pago de dos compras juntas: revisa que el monto alcance para todas.">
+                          ⚠️ También en {p.ref_en_otras.join(', ')}</div>)}
+                    </td>
                     <td className="px-3 py-2 text-right font-medium whitespace-nowrap">{bs(p.monto_pagado)}</td>
                     <td className="px-3 py-2"><Monto p={p} /></td>
                     <td className="px-3 py-2 text-xs">
@@ -400,6 +404,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <div className="text-xs text-neutral-600">
               {metodoPago(ver.metodo_pago)} · {ver.banco_emisor ?? '?'} → {ver.banco_receptor ?? '?'} · Ref {ver.referencia ?? '—'} · <b>{bs(ver.monto_pagado)}</b> · <Monto p={ver} />
+              {!!ver.ref_en_otras?.length && <span className="text-amber-700"> · ⚠️ Misma referencia en {ver.ref_en_otras.join(', ')}</span>}
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`/api/pagos-me/${ver.id}/archivo?tipo=comprobante`} alt="Comprobante de pago" className="w-full rounded border" />

@@ -106,6 +106,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   también sale los últimos 5 días). Si ya reportaste el pago y está en revisión, en vez del aviso sale «Recibimos tu
   pago, lo estamos confirmando» (y por Telegram en el resumen de la mañana, si lo tienes activo). Si no se renueva, al día
   siguiente del vencimiento la cuenta se pausa: los datos se conservan y vuelve a funcionar apenas se renueva.
+- **Si pagas durante la prueba gratis**, el plan empieza a contar cuando termina la prueba: no pierdes los días que
+  te quedaban.
 - **Pagar o renovar: Mi plan** (menú de tu cuenta, arriba a la derecha → **Mi plan**; solo el administrador):
   1. Ves tu estado y **lo que te toca pagar**: el sistema cuenta tus ventas de MercadoLibre del **mes pasado**
      (del 1 al último día; todas tus cuentas conectadas, también las que procesas por fuera del sistema) y te dice tu
@@ -311,6 +313,11 @@ verificar.**
 **En cada venta de la lista** ves la foto del producto y dos botones: **💬 Conversación** se marca en celeste si el
 comprador escribió algo después de comprar (al pasar el mouse ves sus últimos mensajes); en blanco, no escribió nada
 y la venta es tal cual. **📝 Nota** se marca en amarillo si la venta tiene nota.
+
+**Montos:** la columna **Pagado** es lo que pagó el comprador; al lado, **vs. orden** lo compara con el total de la
+orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Si la **misma referencia de pago** aparece en otra
+venta (últimos 90 días), debajo de la referencia sale **⚠️ También en …** con esas ventas: puede ser un pago de dos
+compras juntas (revisa que el monto alcance para todas) o el mismo comprobante usado dos veces. Solo avisa, no bloquea.
 
 **Comprobar con el banco:** sube los estados de cuenta de tu banco (archivos descargados del banco) y el sistema
 cruza referencia, monto y fecha con los pagos: los que coinciden quedan como «Pago correcto». Muestra también los

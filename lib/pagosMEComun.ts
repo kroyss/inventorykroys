@@ -22,6 +22,8 @@ export interface PagoME {
   banco_emisor: string | null
   banco_receptor: string | null
   referencia: string | null
+  /** Otras ventas con la misma referencia de pago (últimos 90 días). */
+  ref_en_otras?: string[] | null
   fecha_pago: string | null
   monto_pagado: number | null
   envio_metodo: string | null

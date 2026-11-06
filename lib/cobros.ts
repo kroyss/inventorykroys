@@ -292,6 +292,7 @@ export async function aprobarCobro(id: number, por: number) {
     await client.query('BEGIN')
     const { rows: [k] } = await client.query(
       `SELECT k.*, k.monto_usd::float AS usd, to_char(o.plan_hasta, 'YYYY-MM-DD') AS plan_hasta,
+              CASE WHEN o.estado = 'prueba' THEN to_char(o.prueba_hasta, 'YYYY-MM-DD') END AS prueba_hasta,
               to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta
        FROM organizacion_cobros k JOIN organizaciones o ON o.id = k.organizacion_id WHERE k.id = $1 FOR UPDATE OF k`, [id])
     if (!k) throw new ErrorCobro('Pago no encontrado')
@@ -299,7 +300,10 @@ export async function aprobarCobro(id: number, por: number) {
     if (k.organizacion_id === ORGANIZACION_PLATAFORMA) throw new ErrorCobro('Tu organización es la propietaria: no tiene plan')
     const hoy = currentDate()
     const meses = k.ciclo === 'trimestral' ? 3 : 1
-    const hasta = sumarMeses(k.plan_hasta && k.plan_hasta >= hoy ? k.plan_hasta : hoy, meses)
+    // 06-11 (Gerardo): si paga en la prueba, el plan arranca cuando ella termina (no pierde los días que le quedaban).
+    // La prueba vale hasta su último día inclusive: el plan cuenta desde ese día, igual que una renovación.
+    const base = [k.plan_hasta, k.prueba_hasta, hoy].filter((f): f is string => !!f && f >= hoy).sort().pop()!
+    const hasta = sumarMeses(base, meses)
     const metodo = NOMBRE_METODO[k.metodo as Metodo]
     const { pagoId, bienvenida } = await registrarPlan(client, k.organizacion_id, {
       plan: k.plan, escalon: k.escalon, ciclo: k.ciclo, hasta, monto: k.usd,
