@@ -242,17 +242,16 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
     fetch(`/api/mensajes/${c.pack_id}/sugerencias`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setSugerencias(d.sugerencias) })
     return () => { vivo = false }
   }, [leida, ultimoEsComprador, c.pack_id])
-  // IA en prueba (mig 145): si la IA ya dejó escrito el borrador para el último mensaje del comprador, aparece en el cuadro.
-  const [dePrueba, setDePrueba] = useState<{ decision: string | null; motivos: string[] | null } | null>(null)
+  // IA en prueba (mig 145): el borrador que dejó la IA para el último mensaje del comprador se ofrece como una opción más
+  // (con «Usar»), junto a las parecidas y las rápidas: el cuadro queda vacío como siempre.
+  const [dePrueba, setDePrueba] = useState<{ respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null; decision: string | null; motivos: string[] | null } | null>(null)
   useEffect(() => {
     if (!leida || !ultimoEsComprador) return
     let vivo = true
     fetch(`/api/mensajes/${c.pack_id}/borrador`).then(r => r.ok ? r.json() : null).then(d => {
       const b = d?.borrador
       if (!vivo || !b?.respuesta) return
-      setTexto(t => t || b.respuesta); setOrigen(o => o.base ? o : { fuente: 'ia', base: b.respuesta })
-      setMeta(m => m ?? { confianza: b.confianza, falta: b.falta_dato })
-      setDePrueba({ decision: b.decision, motivos: b.motivos })
+      setDePrueba(b)
     })
     return () => { vivo = false }
   }, [leida, ultimoEsComprador, c.pack_id])
@@ -470,6 +469,16 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
       {soloLectura ? (
         <p className="border-t border-neutral-100 px-4 py-2.5 text-xs text-neutral-400">Para responder desde aquí hace falta el permiso de Mensajes.</p>
       ) : <footer className="border-t border-neutral-100 p-3 space-y-2">
+        {ultimoEsComprador && !texto.trim() && dePrueba && (
+          <div className="flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs ring-1 ring-inset ring-sky-200">
+            <div className="min-w-0 flex-1">
+              <p className="text-sky-800">Borrador de la IA en prueba (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</p>
+              <p className="mt-0.5 text-neutral-800">{dePrueba.respuesta}</p>
+            </div>
+            <button type="button" className="shrink-0 rounded-full px-2.5 py-1 ring-1 ring-inset ring-sky-300 text-sky-800 hover:bg-sky-100"
+              onClick={() => { setTexto(dePrueba.respuesta); setOrigen({ fuente: 'ia', base: dePrueba.respuesta }); setMeta({ confianza: dePrueba.confianza, falta: dePrueba.falta_dato }) }}>Usar</button>
+          </div>
+        )}
         {ultimoEsComprador && !texto.trim() && (
           <Sugerencias lista={sugerencias} etiqueta="Parecidas:" onUsar={t => { setTexto(t); setOrigen({ fuente: 'parecida', base: t }); setMeta(null) }} />
         )}
@@ -506,7 +515,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             <span className={`rounded-full px-2 py-0.5 ring-1 ring-inset ${meta.confianza === 'alta' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
               : meta.confianza === 'media' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-red-50 text-red-700 ring-red-200'}`}>Confianza {meta.confianza}</span>
             {meta.falta && <span className="text-neutral-600">No encontré: <b>{meta.falta}</b></span>}
-            {dePrueba && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-800 ring-1 ring-inset ring-sky-200">
+            {dePrueba && origen.fuente === 'ia' && origen.base === dePrueba.respuesta && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-800 ring-1 ring-inset ring-sky-200">
               Borrador de la IA en prueba (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</span>}
           </div>
         )}
