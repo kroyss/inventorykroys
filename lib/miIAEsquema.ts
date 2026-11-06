@@ -19,6 +19,6 @@ export const EsquemaMiIA = z.object({
   factura: z.object({ tipo: z.enum(['fiscal', 'nota', 'no']).optional(), garantiaDias: z.number().int().min(0).max(3650).nullable().optional(), garantiaNoCubre: txt(150) }).optional(),
   desconocido: z.array(z.enum(['verificar', 'preguntar', 'recomendar', 'persona'])).max(4).optional(),
   persona: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
-  postventa: z.object({ pasos: z.array(z.string().trim().min(1).max(80)).max(6).optional(), datosPago: txt(400) }).optional(),
+  postventa: z.object({ pasos: z.array(z.string().trim().min(1).max(80)).max(6).optional(), datosPago: txt(400), noAplica: z.boolean().optional() }).optional(),
 })
 export type EntradaMiIA = z.infer<typeof EsquemaMiIA>

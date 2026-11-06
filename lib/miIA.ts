@@ -27,7 +27,7 @@ export interface MiIA {
   desconocido?: ('verificar' | 'preguntar' | 'recomendar' | 'persona')[]
   /** Temas que van siempre a una persona. */
   persona?: string[]
-  postventa?: { pasos?: string[]; datosPago?: string }
+  postventa?: { pasos?: string[]; datosPago?: string; noAplica?: boolean }   // noAplica: "no hace falta nada" (cuenta como completo)
 }
 
 export const MI_IA_KEY = 'mi_ia'

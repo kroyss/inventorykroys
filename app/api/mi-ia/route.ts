@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionMiIA } from '@/lib/miIASesion'
 import { configIA } from '@/lib/iaAutomatica'
+import { esDuenoPlataforma } from '@/lib/empresa'
 import { tieneModulo } from '@/lib/modulos'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
@@ -19,7 +20,8 @@ export async function GET() {
     const miIA = leerMiIA(c?.value)
     return NextResponse.json({
       miIA, pais: s.session.user.country, cuentas: n?.n ?? 0,
-      texto: miIA ? { preguntas: textoMiIA(miIA, 'preguntas'), mensajes: textoMiIA(miIA, 'mensajes') } : null,
+      // 06-11 (el dueño): cómo se lo pasamos a la IA solo lo ve el dueño de la plataforma (no a clientes: se puede copiar).
+      texto: miIA && esDuenoPlataforma(s.session.user) ? { preguntas: textoMiIA(miIA, 'preguntas'), mensajes: textoMiIA(miIA, 'mensajes') } : null,
       // Parte D: ¿puede encender la respuesta automática desde aquí? (módulo ia_automatica) y en qué modo está.
       iaAuto: tieneModulo(s.session.user, 'ia_automatica') ? (await configIA(s.db)).modo : null,
     })

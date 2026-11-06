@@ -16,8 +16,34 @@ const PASOS: Paso[] = [
   { id: 'factura', tema: 'Factura y garantía', titulo: 'Factura y garantía', lleno: c => !!(c.factura?.tipo || c.factura?.garantiaDias) },
   { id: 'desconocido', tema: 'Si no sabe algo', titulo: 'Si la IA no sabe un dato técnico, ¿qué hace?', lleno: c => !!c.desconocido?.length },
   { id: 'persona', tema: 'Siempre una persona', titulo: '¿Qué temas responde siempre una persona?', lleno: c => !!c.persona?.length },
-  { id: 'postventa', tema: 'Después de la compra', titulo: 'Después de la compra (Mensajes)', lleno: c => !!(c.postventa?.pasos?.length || c.postventa?.datosPago) },
+  { id: 'postventa', tema: 'Después de la compra', titulo: 'Después de la compra (Mensajes)', lleno: c => !!(c.postventa?.noAplica || c.postventa?.pasos?.length || c.postventa?.datosPago) },
 ]
+
+/** Lo guardado en una línea (la tarjeta lo muestra para verificar sin entrar). */
+const lista = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`
+const corto = (s: string, n = 60) => s.length > n ? s.slice(0, n - 1) + '…' : s
+function resumen(id: string, c: Config): string {
+  switch (id) {
+    case 'tono': return [c.tono?.saludo && `«${c.tono.saludo}»`, c.tono?.despedida && `«${c.tono.despedida}»`, c.tono?.trato === 'usted' ? 'de usted' : c.tono?.trato === 'tu' ? 'tuteo' : ''].filter(Boolean).join(' · ')
+    case 'oferta': return c.oferta?.texto?.trim() ? corto(c.oferta.texto.trim()) : c.oferta ? 'No tengo oferta fija' : ''
+    case 'pago': return [c.pago?.tasa, c.pago?.medios?.length ? corto(lista(c.pago.medios), 70) : '', c.pago?.divisas ? `${c.pago.divisas.pct}% menos en divisas` : ''].filter(Boolean).join(' · ')
+    case 'envio': {
+      const ags = c.envio?.agencias ?? []
+      const g = ags.filter(a => a.gratis).map(a => a.nombre), d = ags.filter(a => !a.gratis).map(a => a.nombre)
+      return [g.length ? `${lista(g)} gratis` : '', d.length ? `${lista(d)} cobro a destino` : '',
+        c.envio?.minimo ? `mínimo ${c.envio.minimo.unidades} u. bajo $${c.envio.minimo.precioMenor}` : ''].filter(Boolean).join(' · ')
+    }
+    case 'despacho': return [c.despacho?.dias, c.despacho?.corte ? `mismo día antes de las ${c.despacho.corte}` : ''].filter(Boolean).join(' · ')
+    case 'ubicacion': return [c.ubicacion?.zona, c.ubicacion?.decir === false ? 'no decirlo' : '',
+      c.ubicacion?.retiro === 'no' ? 'sin retiro' : c.ubicacion?.retiro === 'acuerdo' ? 'retiro previo acuerdo' : c.ubicacion?.retiro === 'horario' ? `retiro ${c.ubicacion.retiroHorario ?? ''}`.trim() : ''].filter(Boolean).join(' · ')
+    case 'factura': return [c.factura?.tipo === 'fiscal' ? 'Factura fiscal' : c.factura?.tipo === 'nota' ? 'Nota de entrega' : c.factura?.tipo === 'no' ? 'Sin factura' : '',
+      c.factura?.garantiaDias ? `${c.factura.garantiaDias} días de garantía${c.factura.garantiaNoCubre ? ` (no cubre ${corto(c.factura.garantiaNoCubre, 40)})` : ''}` : ''].filter(Boolean).join(' · ')
+    case 'desconocido': return (c.desconocido ?? []).map((k, i) => `${i + 1}. ${{ verificar: 'lo verificamos', preguntar: 'preguntar', recomendar: 'recomendar otra', persona: 'una persona' }[k]}`).join(' · ')
+    case 'persona': return corto(lista(c.persona ?? []), 90)
+    case 'postventa': return c.postventa?.noAplica ? 'No hace falta nada' : [c.postventa?.pasos?.length ? corto(lista(c.postventa.pasos), 70) : '', c.postventa?.datosPago ? 'con datos de pago' : ''].filter(Boolean).join(' · ')
+  }
+  return ''
+}
 
 const MEDIOS = ['Pago móvil', 'Transferencia', 'Efectivo en divisas', 'Zelle', 'Binance', 'Banesco Panamá']
 const AGENCIAS = ['MercadoEnvíos', 'ZOOM', 'TEALCA', 'MRW', 'Domesa', 'Liberty Express', 'PedidosYa', 'Yummy', 'Delivery propio']
@@ -28,6 +54,7 @@ type Desc = keyof typeof DESC
 
 const contacto = (s?: string) => !!s && (/\d[\d\s.-]{8,}\d/.test(s) || /@|https?:|www\.|\.com\b|wa\.me|whats?app|instagram|telegram/i.test(s))
 const lleno = (c: Config) => PASOS.filter(p => p.lleno(c)).length
+const TODOS = PASOS.map((_, i) => i)
 
 // ── piezas ───────────────────────────────────────────────────────────────────
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -90,7 +117,10 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
       </div></Pregunta>
     </>
     case 'oferta': return <>
-      <Pregunta t="Algo que quieras decir siempre" ayuda="Por ejemplo: 20% de descuento pagando en divisas. Déjalo vacío si no hay nada.">
+      <div className="flex gap-2">
+        <Chip activo={!!c.oferta && !c.oferta.texto?.trim()} onClick={() => set(c => ({ ...c, oferta: { texto: '' } }))}>No tengo oferta fija</Chip>
+      </div>
+      <Pregunta t="Algo que quieras decir siempre" ayuda="Por ejemplo: 20% de descuento pagando en divisas.">
         <textarea rows={2} value={c.oferta?.texto ?? ''} onChange={e => set(c => ({ ...c, oferta: { ...c.oferta, texto: e.target.value } }))}
           className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
         {contacto(c.oferta?.texto) && <p className="text-xs text-red-700">Tiene un teléfono, correo o link: MercadoLibre borra o sanciona esas respuestas. Quítalo.</p>}
@@ -208,13 +238,16 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
       <Varios valor={c.persona} opciones={PERSONA} otroPlaceholder="Otro tema" onChange={v => set(c => ({ ...c, persona: v }))} />
     </Pregunta>
     case 'postventa': return <>
-      <Pregunta t="Después de comprar, ¿qué tiene que hacer el comprador?">
+      <div className="flex gap-2">
+        <Chip activo={!!c.postventa?.noAplica} onClick={() => set(c => ({ ...c, postventa: c.postventa?.noAplica ? { ...c.postventa, noAplica: false } : { noAplica: true } }))}>No hace falta nada</Chip>
+      </div>
+      {!c.postventa?.noAplica && <Pregunta t="Después de comprar, ¿qué tiene que hacer el comprador?">
         <Varios valor={c.postventa?.pasos} opciones={PASOS_PV} otroPlaceholder="Otro paso" onChange={v => set(c => ({ ...c, postventa: { ...c.postventa, pasos: v } }))} />
-      </Pregunta>
-      <Pregunta t="Datos para pagar (si los das por el chat)" ayuda="La IA los copia exactos, sin cambiar nada. Déjalo vacío si el pago va por otro lado.">
+      </Pregunta>}
+      {!c.postventa?.noAplica && <Pregunta t="Datos para pagar (si los das por el chat)" ayuda="La IA los copia exactos, sin cambiar nada. Déjalo vacío si el pago va por otro lado.">
         <textarea rows={2} value={c.postventa?.datosPago ?? ''} onChange={e => set(c => ({ ...c, postventa: { ...c.postventa, datosPago: e.target.value } }))}
           placeholder="Ej.: Pago móvil: banco, cédula, teléfono" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-      </Pregunta>
+      </Pregunta>}
     </>
   }
   return null
@@ -283,8 +316,10 @@ function Prueba({ iaAuto, onEncendida }: { iaAuto: string | null; onEncendida: (
         <div key={x.id} className="rounded-lg border border-neutral-200 p-3 space-y-2 text-sm">
           <p className="text-xs text-neutral-500">{x.titulo ?? ''}</p>
           <p className="font-medium text-neutral-900">{x.pregunta}</p>
-          {x.tuya && <p className="text-neutral-600"><span className="text-xs text-neutral-400">Tu equipo: </span>{x.tuya}</p>}
-          <p className="text-neutral-900"><span className="text-xs text-sky-700">IA: </span>{x.ia || '—'}</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-lg bg-neutral-50 p-2"><p className="text-xs text-neutral-400">Tu equipo</p><p className="text-neutral-700">{x.tuya || '—'}</p></div>
+            <div className="rounded-lg bg-sky-50 p-2"><p className="text-xs text-sky-700">IA</p><p className="text-neutral-900">{x.ia || '—'}</p></div>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className={`text-xs px-2 py-0.5 rounded-full ${x.decision === 'sola' ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
               {x.decision === 'sola' ? 'Saldría sola' : `Iría a revisión: ${x.motivos.join(' · ')}`}</span>
@@ -326,10 +361,12 @@ export default function MiIA() {
     const { nueva, temas } = mezclar(c, d.sugerido ?? {})
     setSug(d); setC(nueva); setSugeridos(temas)
     // Arranca en el primer tema sugerido (o el primero que falte): revisar y dar Siguiente lo guarda.
-    const primero = PASOS.findIndex(p => temas.includes(p.id) || !p.lleno(nueva))
-    if (empezar || temas.length) { setUnaSola(false); setPaso(primero >= 0 ? primero : 0) }
+    const ruta1 = empezar ? TODOS : PASOS.map((p, i) => temas.includes(p.id) || !p.lleno(nueva) ? i : -1).filter(i => i >= 0)
+    if (empezar || temas.length) recorrer(ruta1.length ? ruta1 : TODOS)
   }
   const [paso, setPaso] = useState<number | null>(null)     // null = página; n = pantalla del cuestionario
+  const [ruta, setRuta] = useState<number[]>(TODOS)         // las pantallas de este recorrido (todas, o solo las que faltan)
+  const recorrer = (r: number[]) => { setRuta(r); setUnaSola(false); setPaso(r[0]) }
   const [unaSola, setUnaSola] = useState(false)              // editando una tarjeta (vuelve a la página al guardar)
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -359,7 +396,8 @@ export default function MiIA() {
   }
   const siguiente = async () => {
     if (!(await guardar())) return
-    if (unaSola || paso === PASOS.length - 1) { setPaso(null); setUnaSola(false); cargar() } else setPaso(p => (p ?? 0) + 1)
+    const pos = paso === null ? -1 : ruta.indexOf(paso)
+    if (unaSola || pos < 0 || pos === ruta.length - 1) { setPaso(null); setUnaSola(false); cargar() } else setPaso(ruta[pos + 1])
   }
 
   if (error && !datos) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
@@ -370,11 +408,12 @@ export default function MiIA() {
   // Cuestionario
   if (paso !== null) {
     const p = PASOS[paso]
+    const pos = Math.max(0, ruta.indexOf(paso)), ultimo = pos === ruta.length - 1
     return (
-      <div className="max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
-        {!unaSola && <div className="h-1 rounded bg-neutral-100"><div className="h-1 rounded bg-neutral-900" style={{ width: `${((paso + 1) / PASOS.length) * 100}%` }} /></div>}
+      <div className="max-w-2xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
+        {!unaSola && <div className="h-1 rounded bg-neutral-100"><div className="h-1 rounded bg-neutral-900" style={{ width: `${((pos + 1) / ruta.length) * 100}%` }} /></div>}
         <div>
-          <p className="text-xs text-neutral-500">{p.tema}{unaSola ? '' : ` · ${paso + 1} de ${PASOS.length}`}</p>
+          <p className="text-xs text-neutral-500">{p.tema}{unaSola ? '' : ` · ${pos + 1} de ${ruta.length}`}</p>
           <h2 className="text-lg font-semibold text-neutral-900">{p.titulo}</h2>
         </div>
         {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
@@ -383,13 +422,13 @@ export default function MiIA() {
         {error && <p className="text-sm text-red-700">{error}</p>}
         <div className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
-            {!unaSola && paso > 0 && <button type="button" onClick={() => setPaso(paso - 1)} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm">Atrás</button>}
-            <button type="button" onClick={() => { if (unaSola) { setPaso(null); setUnaSola(false); if (datos.miIA) setC(datos.miIA) } else setPaso(paso === PASOS.length - 1 ? null : paso + 1) }}
+            {!unaSola && pos > 0 && <button type="button" onClick={() => setPaso(ruta[pos - 1])} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm">Atrás</button>}
+            <button type="button" onClick={() => { if (unaSola) { setPaso(null); setUnaSola(false); if (datos.miIA) setC(datos.miIA) } else if (ultimo) { setPaso(null); cargar() } else setPaso(ruta[pos + 1]) }}
               className="px-3 py-2 rounded-lg text-sm text-neutral-500 hover:text-neutral-800">{unaSola ? 'Cancelar' : 'Saltar'}</button>
           </div>
           <button type="button" onClick={siguiente} disabled={guardando}
             className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
-            {guardando ? 'Guardando…' : unaSola ? 'Guardar' : paso === PASOS.length - 1 ? 'Terminar' : 'Siguiente →'}</button>
+            {guardando ? 'Guardando…' : unaSola ? 'Guardar' : ultimo ? 'Terminar' : 'Siguiente →'}</button>
         </div>
       </div>
     )
@@ -405,7 +444,7 @@ export default function MiIA() {
       <button type="button" onClick={() => sugerir(true)} disabled={sugiriendo} className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
         {sugiriendo ? 'Leyendo tus respuestas y descripciones… (unos segundos)' : 'Empezar con lo que ya respondo (recomendado)'}</button>
       <p className="text-xs text-neutral-500 -mt-1">Lee tus últimas respuestas y lo que repites en tus descripciones, y te propone cada tema. Tú lo revisas.</p>
-      <button type="button" onClick={() => setPaso(0)} disabled={sugiriendo} className="w-full px-4 py-2 rounded-lg border border-neutral-300 text-sm">Empezar vacío</button>
+      <button type="button" onClick={() => recorrer(TODOS)} disabled={sugiriendo} className="w-full px-4 py-2 rounded-lg border border-neutral-300 text-sm">Empezar vacío</button>
     </div>
   )
 
@@ -416,31 +455,41 @@ export default function MiIA() {
     </div>
   ) : null
 
-  // Página Mi IA
+  // Página Mi IA (el título lo pone la página o la pestaña: aquí no se repite)
   const n = lleno(c)
+  const faltan = PASOS.map((p, i) => p.lleno(c) ? -1 : i).filter(i => i >= 0)
   return (
-    <div className="space-y-4 max-w-3xl">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div><h2 className="text-lg font-semibold text-neutral-900">Mi IA</h2>{aviso}</div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {aviso}
         <span className={`text-xs px-2 py-1 rounded-full ${n === PASOS.length ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
           {Math.round((n / PASOS.length) * 100)}% completa</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      {faltan.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-900">Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{lista(faltan.map(i => PASOS[i].tema))}</b></p>
+          <button type="button" onClick={() => recorrer(faltan)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Continuar →</button>
+        </div>
+      )}
+      {avisosSug}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {PASOS.map((p, i) => {
-          const ok = p.lleno(c)
+          const ok = p.lleno(c), r = ok ? resumen(p.id, c) : ''
           return <button key={p.id} type="button" onClick={() => { setUnaSola(true); setPaso(i) }}
-            className={`text-left rounded-xl border px-4 py-3 hover:border-neutral-400 ${ok ? 'border-neutral-200 bg-white' : 'border-dashed border-neutral-300 bg-neutral-50'}`}>
+            className={`text-left rounded-xl border px-4 py-3 hover:border-neutral-400 ${ok ? 'border-neutral-200 bg-white' : 'border-dashed border-amber-300 bg-amber-50/40'}`}>
             <p className="text-sm font-medium text-neutral-900">{p.tema}</p>
-            <p className="text-xs text-neutral-500">{ok ? 'Toca para revisar o cambiar' : 'Falta: toca para completarlo'}</p>
+            <p className={`text-xs mt-0.5 ${ok ? 'text-neutral-600' : 'text-amber-800'}`}>{ok ? (r || 'Completo') : 'Falta: toca para completarlo'}</p>
           </button>
         })}
       </div>
-      {avisosSug}
-      {n < PASOS.length && <button type="button" onClick={() => sugerir(false)} disabled={sugiriendo} className="text-sm text-sky-700 disabled:opacity-50">
-        {sugiriendo ? 'Leyendo tus respuestas…' : 'Sugerir lo que falta desde mis respuestas'}</button>}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <button type="button" onClick={() => recorrer(TODOS)} className="text-sm text-sky-700">Revisar todo paso a paso</button>
+        {n < PASOS.length && <button type="button" onClick={() => sugerir(false)} disabled={sugiriendo} className="text-sm text-sky-700 disabled:opacity-50">
+          {sugiriendo ? 'Leyendo tus respuestas…' : 'Sugerir lo que falta desde mis respuestas'}</button>}
+        {datos.texto && <button type="button" onClick={() => setVerTexto(v => !v)} className="text-sm text-neutral-500">{verTexto ? 'Ocultar' : 'Ver'} cómo lo lee la IA (solo tú)</button>}
+      </div>
       {sug && !sugeridos.length && <p className="text-xs text-neutral-500">No encontré nada claro para los temas que faltan.</p>}
       {error && <p className="text-sm text-red-700">{error}</p>}
-      <button type="button" onClick={() => setVerTexto(v => !v)} className="block text-sm text-sky-700">{verTexto ? 'Ocultar' : 'Ver'} cómo lo lee la IA</button>
       {verTexto && datos.texto && <pre className="whitespace-pre-wrap rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">{datos.texto.mensajes}</pre>}
       <Prueba iaAuto={datos.iaAuto} onEncendida={cargar} />
     </div>
