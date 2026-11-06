@@ -218,10 +218,115 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
   return null
 }
 
+// ── Parte C: sugerencia (solo propone) ───────────────────────────────────────
+type Sugerencia = { sugerido: Partial<Config>; avisos: string[]; fuentes: { respuestas: number; descripciones: number; bloque: string | null; politicas: boolean }; fecha: string }
+const TEMA_DE_CAMPO: Record<string, string> = { tono: 'tono', oferta: 'oferta', pago: 'pago', envio: 'envio', despacho: 'despacho', ubicacion: 'ubicacion', factura: 'factura', desconocido: 'desconocido', persona: 'persona', postventa: 'postventa' }
+const ddmm = (iso: string) => { const d = new Date(iso); return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}` }
+
+/** Mezcla lo sugerido SOLO en los temas que están vacíos; devuelve la config y qué temas vinieron sugeridos. */
+function mezclar(c: Config, s: Partial<Config>) {
+  const nueva: Config = { ...c }
+  const temas: string[] = []
+  for (const p of PASOS) {
+    const campo = Object.keys(TEMA_DE_CAMPO).find(k => TEMA_DE_CAMPO[k] === p.id) as keyof Config | undefined
+    if (!campo || p.lleno(c) || s[campo] === undefined) continue
+    const prueba = { ...nueva, [campo]: s[campo] } as Config
+    if (!p.lleno(prueba)) continue
+    Object.assign(nueva, { [campo]: s[campo] })
+    temas.push(p.id)
+  }
+  return { nueva, temas }
+}
+
+// ── Parte D: prueba con preguntas reales ─────────────────────────────────────
+type Caso = { id: string; pregunta: string; titulo: string | null; permalink: string | null; tuya: string | null; ia: string; decision: 'sola' | 'revisar'; motivos: string[]; error?: string }
+
+function Prueba({ iaAuto, onEncendida }: { iaAuto: string | null; onEncendida: () => void }) {
+  const [casos, setCasos] = useState<Caso[] | null>(null)
+  const [cargando, setCargando] = useState(false)
+  const [marcas, setMarcas] = useState<Record<string, 'bien' | 'mal'>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [encendiendo, setEncendiendo] = useState(false)
+  const probar = async () => {
+    setCargando(true); setError(null); setMarcas({})
+    const r = await fetch('/api/mi-ia/probar', { method: 'POST' }); const d = await r.json().catch(() => ({}))
+    setCargando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo probar'); return }
+    setCasos(d.casos)
+  }
+  const encender = async () => {
+    setEncendiendo(true); setError(null)
+    const r = await fetch('/api/preguntas/ia-auto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'modo', modo: 'real' }) })
+    const d = await r.json().catch(() => ({}))
+    setEncendiendo(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo encender'); return }
+    onEncendida()
+  }
+  const marcadas = Object.values(marcas)
+  const bien = marcadas.filter(m => m === 'bien').length
+  const solas = casos?.filter(x => x.decision === 'sola').length ?? 0
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-neutral-900">Pruébala con {casos?.length || 10} preguntas reales</p>
+          <p className="text-xs text-neutral-500">Preguntas que tu equipo ya contestó. La IA responde con lo que configuraste. No se publica nada.</p>
+        </div>
+        <button type="button" onClick={probar} disabled={cargando} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
+          {cargando ? 'Probando… (puede tardar 1 minuto)' : casos ? 'Probar otra vez' : 'Probar'}</button>
+      </div>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+      {casos && !casos.length && <p className="text-sm text-neutral-500">No hay preguntas contestadas en los últimos 30 días para probar.</p>}
+      {casos?.map(x => (
+        <div key={x.id} className="rounded-lg border border-neutral-200 p-3 space-y-2 text-sm">
+          <p className="text-xs text-neutral-500">{x.titulo ?? ''}</p>
+          <p className="font-medium text-neutral-900">{x.pregunta}</p>
+          {x.tuya && <p className="text-neutral-600"><span className="text-xs text-neutral-400">Tu equipo: </span>{x.tuya}</p>}
+          <p className="text-neutral-900"><span className="text-xs text-sky-700">IA: </span>{x.ia || '—'}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={`text-xs px-2 py-0.5 rounded-full ${x.decision === 'sola' ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
+              {x.decision === 'sola' ? 'Saldría sola' : `Iría a revisión: ${x.motivos.join(' · ')}`}</span>
+            {x.ia && <div className="flex gap-1">
+              {(['bien', 'mal'] as const).map(m => <Chip key={m} activo={marcas[x.id] === m} onClick={() => setMarcas(v => ({ ...v, [x.id]: m }))}>{m === 'bien' ? 'Bien' : 'Mal'}</Chip>)}
+            </div>}
+          </div>
+        </div>
+      ))}
+      {casos && casos.length > 0 && (
+        <div className="rounded-lg bg-neutral-50 p-3 space-y-2">
+          <p className="text-sm text-neutral-700">{solas} de {casos.length} saldrían solas; el resto quedaría escrito para que una persona lo mande.
+            {marcadas.length > 0 && ` Marcaste ${bien} de ${marcadas.length} bien.`}</p>
+          {marcadas.some(m => m === 'mal') && <p className="text-xs text-neutral-500">Si alguna está mal, revisa el tema en las tarjetas de arriba (o en Lo aprendido) y prueba otra vez.</p>}
+          {iaAuto === 'real' ? <p className="text-sm text-green-800">Las respuestas automáticas ya están encendidas.</p>
+            : iaAuto !== null ? <button type="button" onClick={encender} disabled={encendiendo}
+                className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
+                {encendiendo ? 'Encendiendo…' : 'Encender respuestas automáticas'}</button>
+            : <p className="text-xs text-neutral-500">Para que respondan solas, pide que te activen la respuesta automática con IA.</p>}
+          {iaAuto !== null && iaAuto !== 'real' && <p className="text-xs text-neutral-500">Solo salen solas las que cumplen todas las reglas; las demás quedan escritas para revisar. Cada respuesta usa 1 crédito de IA.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA() {
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
+  const [sug, setSug] = useState<Sugerencia | null>(null)
+  const [sugeridos, setSugeridos] = useState<string[]>([])
+  const [sugiriendo, setSugiriendo] = useState(false)
+  const sugerir = async (empezar: boolean) => {
+    setSugiriendo(true); setError(null)
+    const r = await fetch('/api/mi-ia/sugerir', { method: 'POST' }); const d = await r.json().catch(() => ({}))
+    setSugiriendo(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo sugerir'); return }
+    const { nueva, temas } = mezclar(c, d.sugerido ?? {})
+    setSug(d); setC(nueva); setSugeridos(temas)
+    // Arranca en el primer tema sugerido (o el primero que falte): revisar y dar Siguiente lo guarda.
+    const primero = PASOS.findIndex(p => temas.includes(p.id) || !p.lleno(nueva))
+    if (empezar || temas.length) { setUnaSola(false); setPaso(primero >= 0 ? primero : 0) }
+  }
   const [paso, setPaso] = useState<number | null>(null)     // null = página; n = pantalla del cuestionario
   const [unaSola, setUnaSola] = useState(false)              // editando una tarjeta (vuelve a la página al guardar)
   const [error, setError] = useState<string | null>(null)
@@ -231,13 +336,20 @@ export default function MiIA() {
   const cargar = async () => {
     const r = await fetch('/api/mi-ia'); const d = await r.json()
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
-    setDatos(d); if (d.miIA) setC(d.miIA)
+    setDatos(d); if (d.miIA) setC(d.miIA); setSugeridos([])
   }
   useEffect(() => { cargar() }, [])
 
   const guardar = async () => {
     setGuardando(true); setError(null)
-    const r = await fetch('/api/mi-ia', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) })
+    // Lo sugerido de los temas por los que todavía no pasó (Siguiente/Guardar) NO se guarda: solo se propone.
+    const actual = paso !== null ? PASOS[paso].id : null
+    const pendientes = sugeridos.filter(t => t !== actual)
+    const cuerpo: Config = { ...c }
+    for (const t of pendientes) delete (cuerpo as unknown as Record<string, unknown>)[t]
+    if (datos?.miIA) for (const t of pendientes) if ((datos.miIA as unknown as Record<string, unknown>)[t] !== undefined) (cuerpo as unknown as Record<string, unknown>)[t] = (datos.miIA as unknown as Record<string, unknown>)[t]
+    const r = await fetch('/api/mi-ia', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
+    if (r.ok && actual) setSugeridos(s => s.filter(t => t !== actual))
     const d = await r.json().catch(() => ({}))
     setGuardando(false)
     if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return false }
@@ -263,6 +375,8 @@ export default function MiIA() {
           <p className="text-xs text-neutral-500">{p.tema}{unaSola ? '' : ` · ${paso + 1} de ${PASOS.length}`}</p>
           <h2 className="text-lg font-semibold text-neutral-900">{p.titulo}</h2>
         </div>
+        {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+          Sugerido de lo que ya respondes ({ddmm(sug.fecha)}). Revísalo y cámbialo si hace falta; se guarda al dar {unaSola ? 'Guardar' : 'Siguiente'}.</p>}
         <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
         {error && <p className="text-sm text-red-700">{error}</p>}
         <div className="flex items-center justify-between gap-2 pt-2">
@@ -285,9 +399,20 @@ export default function MiIA() {
       <h2 className="text-lg font-semibold text-neutral-900">Configura tu IA</h2>
       <p className="text-sm text-neutral-600">Unos 4 minutos: {PASOS.length} pantallas cortas sobre cómo trabajas (envío, pago, tono, límites). Con eso la IA responde como tú en Preguntas y en Mensajes.</p>
       <p className="text-xs text-neutral-500">Tus “Políticas para la IA” de texto siguen valiendo. Lo que contestes aquí manda si algo choca.</p>
-      <button type="button" onClick={() => setPaso(0)} className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Empezar</button>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+      <button type="button" onClick={() => sugerir(true)} disabled={sugiriendo} className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
+        {sugiriendo ? 'Leyendo tus respuestas y descripciones… (unos segundos)' : 'Empezar con lo que ya respondo (recomendado)'}</button>
+      <p className="text-xs text-neutral-500 -mt-1">Lee tus últimas respuestas y lo que repites en tus descripciones, y te propone cada tema. Tú lo revisas.</p>
+      <button type="button" onClick={() => setPaso(0)} disabled={sugiriendo} className="w-full px-4 py-2 rounded-lg border border-neutral-300 text-sm">Empezar vacío</button>
     </div>
   )
+
+  const avisosSug = sug?.avisos.length ? (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 space-y-1">
+      <p className="font-medium">Para confirmar (de tus respuestas y descripciones)</p>
+      <ul className="list-disc pl-5 space-y-0.5">{sug.avisos.map((a, i) => <li key={i}>{a}</li>)}</ul>
+    </div>
+  ) : null
 
   // Página Mi IA
   const n = lleno(c)
@@ -308,8 +433,14 @@ export default function MiIA() {
           </button>
         })}
       </div>
-      <button type="button" onClick={() => setVerTexto(v => !v)} className="text-sm text-sky-700">{verTexto ? 'Ocultar' : 'Ver'} cómo lo lee la IA</button>
+      {avisosSug}
+      {n < PASOS.length && <button type="button" onClick={() => sugerir(false)} disabled={sugiriendo} className="text-sm text-sky-700 disabled:opacity-50">
+        {sugiriendo ? 'Leyendo tus respuestas…' : 'Sugerir lo que falta desde mis respuestas'}</button>}
+      {sug && !sugeridos.length && <p className="text-xs text-neutral-500">No encontré nada claro para los temas que faltan.</p>}
+      {error && <p className="text-sm text-red-700">{error}</p>}
+      <button type="button" onClick={() => setVerTexto(v => !v)} className="block text-sm text-sky-700">{verTexto ? 'Ocultar' : 'Ver'} cómo lo lee la IA</button>
       {verTexto && datos.texto && <pre className="whitespace-pre-wrap rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">{datos.texto.mensajes}</pre>}
+      <Prueba iaAuto={datos.iaAuto} onEncendida={cargar} />
     </div>
   )
 }
