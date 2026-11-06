@@ -8,7 +8,7 @@
 // Cada pregunta procesada usa 1 crédito de IA (ia_uso.modulo = 'preguntas'); sin créditos no procesa.
 import type { Pool } from 'pg'
 import { armarContexto, datosPublicacion, pedirBorrador, iaConfigurada } from '@/lib/preguntas'
-import { costoDe, cupoIA, registrarUso } from '@/lib/ia'
+import { costoDe, cupoIA, registrarUso, MODELO_ECO55 } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
 import { automaticasPausadas } from '@/lib/automaticasPreguntas'
@@ -150,6 +150,8 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`,
           [q.id, JSON.stringify({ error: (e instanceof Error ? e.message : String(e)).slice(0, 200) })]).catch(() => {})
       }
+      // 06-11: la misma receta económica con Haiku 5.5 (10× más barato), también en paralelo y sin publicar.
+      await simularEco55(db, q.id, c, c.item?.status ?? q.item_estado)
     } catch (e) {
       fallas++
       const msg = e instanceof Error ? e.message : String(e)
@@ -165,6 +167,35 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
     return r ? { repasoEconomica: r } : null
   }
   return { solas, revisar, publicadas, fallas }
+}
+
+async function simularEco55(db: Pool, id: string, c: Awaited<ReturnType<typeof armarContexto>>, itemEstado: string | null) {
+  try {
+    const eco = await simularEconomica(db, c, itemEstado, motivosRevisar, MODELO_ECO55)
+    // Misma respuesta exacta que la económica con Haiku 4.5 ya marcada: hereda la marca (no hay nada nuevo que juzgar).
+    await db.query(
+      `UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco55', $2::jsonb ||
+         CASE WHEN ia_auto->'eco'->>'marca' IS NOT NULL AND btrim(ia_auto->'eco'->>'respuesta') = btrim($3)
+              THEN jsonb_build_object('marca', ia_auto->'eco'->>'marca', 'heredada', true) ELSE '{}'::jsonb END)
+       WHERE id = $1`, [id, JSON.stringify(eco), eco.respuesta ?? ''])
+  } catch (e) {
+    console.error('[ia eco55]', id, e instanceof Error ? e.message : e)
+    await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco55', $2::jsonb) WHERE id = $1`,
+      [id, JSON.stringify({ error: (e instanceof Error ? e.message : String(e)).slice(0, 200) })]).catch(() => {})
+  }
+}
+
+/** Prueba de Haiku 5.5 sobre lo ya procesado por la económica (primero las marcadas por el dueño). */
+export async function repasarEco55(db: Pool, country: string, n: number) {
+  const { rows } = await db.query(
+    `SELECT id::text, item_estado FROM ml_preguntas
+     WHERE ia_auto->'eco'->>'decision' IS NOT NULL AND NOT ia_auto ? 'eco55'
+     ORDER BY (ia_auto->'eco'->>'marca' IS NOT NULL) DESC, fecha DESC LIMIT $1`, [n])
+  for (const q of rows) {
+    const c = await armarContexto(db, Number(q.id), country).catch(() => null)
+    if (c) await simularEco55(db, q.id, c, c.item?.status ?? q.item_estado)
+  }
+  return rows.length
 }
 
 const REPASO_DESDE = '2026-11-01'

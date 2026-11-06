@@ -43,11 +43,11 @@ const HERRAMIENTA = {
 export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA }
 
 /** `datos` = el mismo bloque de contexto que recibió la IA del borrador. */
-export async function verificarBorrador(datos: string, pregunta: string, borrador: string): Promise<Verificacion> {
+export async function verificarBorrador(datos: string, pregunta: string, borrador: string, modeloV = MODELO_SIMPLE): Promise<Verificacion> {
   const { resultado: r, uso, modelo } = await llamarClaude<{
     afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean }[]; partes_sin_contestar?: string[]; mal_entendida?: boolean
   }>({
-    sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 700,
+    sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: modeloV, maxTokens: 700,
     contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
   })
   const sinRespaldo = (r.afirmaciones ?? []).filter(a => !a.respaldada || /^ninguna/i.test(a.donde ?? ''))

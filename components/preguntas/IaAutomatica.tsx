@@ -10,24 +10,27 @@ import { Cargando } from '@/components/ui'
 type Modo = 'apagado' | 'sombra' | 'real'
 interface Eco {
   via?: 'plantilla' | 'ia'; decision?: 'sola' | 'revisar'; motivos?: string[]; respuesta?: string; modelo?: string
-  costo?: number; entrada?: number; salida?: number; marca?: 'bien' | 'mal' | null; error?: string
+  costo?: number; entrada?: number; salida?: number; marca?: 'bien' | 'mal' | null; error?: string; heredada?: boolean
 }
 interface Decision {
   modo: Modo; decision: 'sola' | 'revisar'; motivos: string[]; respuesta?: string; confianza?: string
   publicada?: boolean; error?: string; marca?: 'bien' | 'mal' | null; costo?: number
-  entrada?: number; salida?: number; eco?: Eco
+  entrada?: number; salida?: number; eco?: Eco; eco55?: Eco
 }
 interface ResumenEco {
   comparadas: number; errores: number; costoReal: number; costoEco: number; tokensReal: number; tokensEco: number
   conTokens: number; tokensEcoTodas: number
   solasReal: number; solasEco: number; sinIA: number; ambasSolas: number; marcadas: number; bien: number
 }
+interface Lado55 { costo: number; tokens: number; solas: number; marcadas: number; bien: number }
+interface Resumen55 { comparadas: number; errores: number; costoReal: number; h45: Lado55; h55: Lado55; sinMarcar: number }
 interface Fila { id: string; texto: string; item_titulo: string | null; item_permalink: string | null; fecha: string; estado: string; respuesta: string | null; ia_auto: Decision }
 interface Info {
   modo: Modo; desde: string | null
   cupo: { usados: number; limite: number | null; quedan: number | null; agotado: boolean }
   resumen: { procesadas: number; solas: number; revisar: number; marcadas: number; bien: number; costo: number }
   economica: ResumenEco
+  haiku55: Resumen55
   preguntas: Fila[]
 }
 
@@ -45,7 +48,7 @@ export function IaAutomatica() {
   const confirm = useConfirm()
   const [info, setInfo] = useState<Info | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [ver, setVer] = useState<'sola' | 'revisar' | 'eco'>('sola')
+  const [ver, setVer] = useState<'sola' | 'revisar' | 'eco' | 'h55'>('sola')
   const cargar = useCallback(() => {
     fetch('/api/preguntas/ia-auto').then(async r => {
       const d = await r.json().catch(() => null)
@@ -71,15 +74,15 @@ export function IaAutomatica() {
     setInfo(i => i && { ...i, preguntas: i.preguntas.map(p => p.id === id ? { ...p, ia_auto: { ...p.ia_auto, marca } } : p) })
     post({ accion: 'marcar', id, marca })
   }
-  const marcarEco = (id: string, marca: 'bien' | 'mal' | null) => {
-    setInfo(i => i && { ...i, preguntas: i.preguntas.map(p => p.id === id && p.ia_auto.eco ? { ...p, ia_auto: { ...p.ia_auto, eco: { ...p.ia_auto.eco, marca } } } : p) })
-    post({ accion: 'marcar_eco', id, marca })
+  const marcarEco = (id: string, marca: 'bien' | 'mal' | null, campo: 'eco' | 'eco55' = 'eco') => {
+    setInfo(i => i && { ...i, preguntas: i.preguntas.map(p => p.id === id && p.ia_auto[campo] ? { ...p, ia_auto: { ...p.ia_auto, [campo]: { ...p.ia_auto[campo], marca, heredada: false } } } : p) })
+    post({ accion: 'marcar_eco', id, marca, campo })
   }
 
   if (error && !info) return <p className="text-sm text-red-600">{error}</p>
   if (!info) return <Cargando />
   const r = info.resumen
-  const filas = ver === 'eco' ? [] : info.preguntas.filter(p => p.ia_auto.decision === ver)
+  const filas = ver === 'eco' || ver === 'h55' ? [] : info.preguntas.filter(p => p.ia_auto.decision === ver)
   const conEco = info.preguntas.filter(p => p.ia_auto.eco?.decision)
   const pct = r.marcadas ? Math.round((100 * r.bien) / r.marcadas) : null
 
@@ -116,16 +119,18 @@ export function IaAutomatica() {
           <span className="text-amber-700"><b>{r.revisar}</b> para revisar</span>
           <span>Marcadas: <b>{r.marcadas}</b>{pct !== null && <> · <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien</b></>}</span>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {([['sola', `${info.modo === 'real' ? 'Salieron' : 'Habrían salido'} solas (${r.solas})`], ['revisar', `Para revisar (${r.revisar})`],
-             ['eco', `Versión económica (${info.economica.comparadas})`]] as const).map(([k, t]) => (
+             ['eco', `Versión económica (${info.economica.comparadas})`], ['h55', `Haiku 4.5 vs 5.5 (${info.haiku55.comparadas})`]] as const).map(([k, t]) => (
             <button key={k} onClick={() => setVer(k)}
               className={`px-3 py-1.5 rounded-full text-sm border ${ver === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
           ))}
         </div>
         {ver === 'sola' && <p className="text-xs text-neutral-500">Marca cada una: ¿la habrías publicado tal cual? Con 95% de «bien» conviene activarla.</p>}
         {ver === 'eco' && <ComparacionEco e={info.economica} filas={conEco} marcar={marcarEco} />}
-        {ver !== 'eco' && !filas.length && <p className="text-sm text-neutral-500">Todavía no hay preguntas aquí.</p>}
+        {ver === 'h55' && <Comparacion55 e={info.haiku55} filas={info.preguntas.filter(p => p.ia_auto.eco?.decision && p.ia_auto.eco55?.decision)}
+          marcar={(id, m) => marcarEco(id, m, 'eco55')} />}
+        {ver !== 'eco' && ver !== 'h55' && !filas.length && <p className="text-sm text-neutral-500">Todavía no hay preguntas aquí.</p>}
         <ul className="divide-y divide-neutral-100">
           {filas.map(p => (
             <li key={p.id} className="py-3 space-y-1.5">
@@ -241,6 +246,93 @@ function ComparacionEco({ e, filas, marcar }: { e: ResumenEco; filas: Fila[]; ma
                   {(['bien', 'mal'] as const).map(m => (
                     <button key={m} onClick={() => marcar(p.id, x.marca === m ? null : m)}
                       className={`px-2.5 py-1 rounded-md text-xs border ${x.marca === m
+                        ? m === 'bien' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600'
+                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+                      {m === 'bien' ? '✓ Bien' : '✗ Mal'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+// Haiku 4.5 vs Haiku 5.5 (06-11-2026): la misma receta económica con los dos modelos, sobre las mismas preguntas, sin
+// publicar. Haiku 5.5 cuesta 10× menos; el dueño marca las de 5.5 que habrían salido solas (las idénticas a una de 4.5
+// ya marcada heredan la marca) y decide si se cambia.
+function Lado({ t, l, n, pct, bueno }: { t: string; l: Lado55; n: number; pct: number | null; bueno?: boolean }) {
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-sm ${bueno ? 'border-emerald-300 bg-emerald-50/40' : 'border-neutral-200'}`}>
+      <div className="font-semibold text-neutral-900 mb-1">{t}</div>
+      <div>Costo por pregunta <b>{usd(l.costo / n, 4)}</b> · al mes (~1.600) <b>{usd((l.costo / n) * 1600, 2)}</b></div>
+      <div>Tokens por pregunta <b>{miles(l.tokens / n)}</b></div>
+      <div>Salen solas <b>{l.solas} ({Math.round((100 * l.solas) / n)}%)</b></div>
+      <div>Acierto {pct === null ? 'sin marcar' : <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien ({l.bien} de {l.marcadas})</b>}</div>
+    </div>
+  )
+}
+
+function Comparacion55({ e, filas, marcar }: { e: Resumen55; filas: Fila[]; marcar: (id: string, m: 'bien' | 'mal' | null) => void }) {
+  const [solo, setSolo] = useState<'pendientes' | 'distintas' | 'todas'>('pendientes')
+  if (!e.comparadas) return <p className="text-sm text-neutral-500">La prueba de Haiku 5.5 todavía no tiene preguntas: se van sumando.</p>
+  const pct = (l: Lado55) => l.marcadas ? Math.round((100 * l.bien) / l.marcadas) : null
+  const ver = filas.filter(p => {
+    const a = p.ia_auto.eco!, b = p.ia_auto.eco55!
+    return solo === 'todas' ? true
+      : solo === 'pendientes' ? b.decision === 'sola' && !b.marca
+      : a.decision !== b.decision || (a.respuesta ?? '').trim() !== (b.respuesta ?? '').trim()
+  })
+  const caja = (x: Eco, t: string) => (
+    <div className={`rounded-lg px-3 py-2 text-sm ${x.decision === 'sola' ? 'bg-emerald-50 text-emerald-950' : 'bg-amber-50 text-amber-950'}`}>
+      <div className={`text-[11px] font-semibold mb-0.5 ${x.decision === 'sola' ? 'text-emerald-700' : 'text-amber-700'}`}>
+        {t} · {x.decision === 'sola' ? 'sola' : 'revisar'} · {usd(x.costo ?? 0, 4)}{x.via === 'plantilla' ? ' · sin IA' : ''}
+        {x.marca ? ` · marcada ${x.marca === 'bien' ? '✓ bien' : '✗ mal'}${x.heredada ? ' (igual a 4.5)' : ''}` : ''}
+      </div>
+      {x.respuesta || '(sin respuesta)'}
+      {x.decision === 'revisar' && !!x.motivos?.length && <div className="mt-1 text-xs opacity-80">{x.motivos.join(' · ')}</div>}
+    </div>
+  )
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-neutral-500">
+        La misma versión económica con <b>Haiku 5.5</b> (10 veces más barato que Haiku 4.5), sobre las mismas {e.comparadas} preguntas. <b>No publica nada.</b>{' '}
+        Marca las de Haiku 5.5 que habrían salido solas; las que respondió igual que una de 4.5 ya marcada traen esa marca.
+      </p>
+      <div className="grid gap-2 md:grid-cols-2">
+        <Lado t="Haiku 4.5 (la económica de hoy)" l={e.h45} n={e.comparadas} pct={pct(e.h45)} />
+        <Lado t="Haiku 5.5" l={e.h55} n={e.comparadas} pct={pct(e.h55)} bueno />
+      </div>
+      <p className="text-xs text-neutral-600">
+        La IA actual (Sonnet) en estas mismas: <b>{usd(e.costoReal / e.comparadas, 4)}</b> por pregunta
+        {e.errores > 0 && <> · <span className="text-red-600">{e.errores} con error</span></>}
+        {e.sinMarcar > 0 && <> · <b>{e.sinMarcar}</b> de Haiku 5.5 sin marcar</>}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {([['pendientes', `Por marcar (${e.sinMarcar})`], ['distintas', 'Donde difieren'], ['todas', 'Todas']] as const).map(([k, t]) => (
+          <button key={k} onClick={() => setSolo(k)}
+            className={`px-2.5 py-1 rounded-full text-xs border ${solo === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
+        ))}
+      </div>
+      {!ver.length && <p className="text-sm text-neutral-500">Nada por aquí.</p>}
+      <ul className="divide-y divide-neutral-100">
+        {ver.map(p => {
+          const b = p.ia_auto.eco55!
+          return (
+            <li key={p.id} className="py-3 space-y-1.5">
+              <p className="text-sm text-neutral-900"><span className="text-neutral-400 text-xs mr-1.5">{hora(p.fecha)}</span>{p.texto}</p>
+              {p.item_titulo && <p className="text-xs text-neutral-500 truncate">{p.item_titulo}</p>}
+              <div className="grid gap-2 md:grid-cols-2">{caja(p.ia_auto.eco!, 'HAIKU 4.5')}{caja(b, 'HAIKU 5.5')}</div>
+              {p.respuesta && <p className="text-xs text-neutral-600"><span className="font-semibold">Publicada:</span> {p.respuesta}</p>}
+              {b.decision === 'sola' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-neutral-500">¿Haiku 5.5 estaba bien?</span>
+                  {(['bien', 'mal'] as const).map(m => (
+                    <button key={m} onClick={() => marcar(p.id, b.marca === m ? null : m)}
+                      className={`px-2.5 py-1 rounded-md text-xs border ${b.marca === m
                         ? m === 'bien' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-red-600 text-white border-red-600'
                         : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
                       {m === 'bien' ? '✓ Bien' : '✗ Mal'}
