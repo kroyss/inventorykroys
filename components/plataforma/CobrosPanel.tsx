@@ -10,9 +10,12 @@ interface Pendiente {
   radar_pro: boolean; cuentas_extra: number; ventas_30d: number | null; monto_usd: number; metodo: string; tasa_bcv: number | null
   monto_bs: number | null; referencia: string; fecha_pago: string; creado_at: string; tiene_comprobante: boolean
   org_estado: string; vence: string | null; repetida: number
+  // 06-11 (mig. 143): qué se paga, su desglose, qué fechas cubre y lo que la cuenta tiene vigente hoy.
+  tipo: 'plan' | 'radar_pro' | 'upgrade'; lineas: { texto: string; usd: number }[]; desde: string | null; hasta: string | null
+  radar_pro_hasta: string | null; estado: string; motivo: string | null; revisado_at: string
 }
 interface Vence { id: number; nombre: string; estado: string; plan: string | null; vence: string; ultimo_cobro: string | null }
-interface Reciente { id: number; organizacion: string; plan: string; monto_usd: number; metodo: string; referencia: string; estado: string; motivo: string | null; revisado_at: string; tiene_comprobante: boolean }
+type Reciente = Pendiente
 interface DatosCobro { pago_movil: { banco: string; cedula: string; telefono: string }; binance: { id: string; nombre: string; correo: string; moneda: string } }
 interface Datos { pendientes: Pendiente[]; vencen: Vence[]; recientes: Reciente[]; datos: DatosCobro }
 
@@ -22,6 +25,22 @@ const ESCALON = ['hasta 50', '51–300', '301–1.000', '+1.000']
 const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 const hora = (s: string) => new Date(s).toLocaleString('es-VE', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas' })
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
+const TIPO: Record<string, string> = { plan: 'Plan', radar_pro: 'Radar PRO aparte', upgrade: 'Mejora de plan' }
+
+/** Qué contrató: cada línea con su monto, el total y las fechas que cubre; abajo lo que tiene vigente la cuenta. */
+function Desglose({ k }: { k: Pendiente }) {
+  return (
+    <div className="rounded-lg bg-neutral-50 border border-neutral-100 px-2.5 py-1.5 text-xs space-y-0.5">
+      <p className="font-semibold text-neutral-800">{TIPO[k.tipo] ?? k.tipo}{k.tipo !== 'radar_pro' ? ` · ${PLAN[k.plan] ?? k.plan} · ${k.ciclo}` : ''}
+        {k.desde && k.hasta ? <span className="font-normal text-neutral-600"> · cubre del {ddmm(k.desde)} al {ddmm(k.hasta)}</span> : null}</p>
+      {k.lineas.map((l, i) => (
+        <p key={i} className="flex justify-between gap-3 text-neutral-700"><span>{l.texto}</span><span className="num whitespace-nowrap">{l.usd < 0 ? '−' : ''}{usd(Math.abs(l.usd))}</span></p>
+      ))}
+      <p className="flex justify-between gap-3 border-t border-neutral-200 pt-0.5 font-semibold"><span>Total</span><span className="num">{usd(k.monto_usd)}</span></p>
+      <p className="text-neutral-500">Vigente hoy: {k.org_estado}{k.vence ? ` hasta ${ddmm(k.vence)}` : ''} · Radar PRO {k.radar_pro_hasta ? `hasta ${ddmm(k.radar_pro_hasta)}` : 'no'}</p>
+    </div>
+  )
+}
 const bs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function CobrosPanel() {
@@ -77,11 +96,11 @@ export default function CobrosPanel() {
             )}
             <div className="flex-1 min-w-0 text-sm space-y-1">
               <p><b>{k.organizacion}</b> <span className="text-neutral-500">· {k.persona ?? '—'} · {hora(k.creado_at)}</span></p>
-              <p>{PLAN[k.plan] ?? k.plan} · {k.ciclo}{k.radar_pro ? ' + Radar PRO' : ''} · escalón {ESCALON[k.escalon]}{k.ventas_30d != null ? ` (${k.ventas_30d} ventas el mes pasado)` : ''}{k.cuentas_extra ? ` · ${k.cuentas_extra} cuenta(s) extra` : ''}</p>
+              <p className="text-xs text-neutral-600">Escalón {ESCALON[k.escalon]}{k.ventas_30d != null ? ` (${k.ventas_30d} ventas el mes pasado)` : ''}</p>
+              <Desglose k={k} />
               <p className="text-base font-semibold">{usd(k.monto_usd)}{k.monto_bs ? <span className="font-normal text-neutral-600"> = {bs(k.monto_bs)} (BCV {k.tasa_bcv?.toLocaleString('de-DE', { maximumFractionDigits: 2 })})</span> : null}</p>
               <p>{METODO[k.metodo]} · ref. <b>{k.referencia}</b> · pagado el {ddmm(k.fecha_pago)}</p>
               {k.repetida > 0 && <p className="text-red-700">⚠️ Esa referencia ya se reportó {k.repetida} vez/veces antes.</p>}
-              <p className="text-xs text-neutral-500">Cuenta: {k.org_estado}{k.vence ? ` · vence ${ddmm(k.vence)}` : ''}</p>
               {rechazo?.id === k.id ? (
                 <div className="flex flex-wrap gap-2 pt-1">
                   <input autoFocus value={rechazo.motivo} onChange={e => setRechazo({ id: k.id, motivo: e.target.value })} maxLength={300}
@@ -125,12 +144,22 @@ export default function CobrosPanel() {
         {!d.recientes.length ? <p className="text-sm text-neutral-500">Todavía ninguno.</p> : (
           <ul className="text-sm divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
             {d.recientes.map(k => (
-              <li key={k.id} className="flex flex-wrap justify-between gap-2 px-3 py-1.5">
-                <span><b>{k.organizacion}</b> · {PLAN[k.plan] ?? k.plan} · {usd(k.monto_usd)} · {METODO[k.metodo]} ref. {k.referencia}
-                  {k.tiene_comprobante && <a href={`/api/mi-plan/comprobante/${k.id}`} target="_blank" rel="noopener noreferrer" className="ml-2 text-sky-700 hover:underline">captura</a>}</span>
-                <span className={k.estado === 'aprobado' ? 'text-lime-700' : 'text-red-700'} title={k.motivo ?? undefined}>
-                  {k.estado === 'aprobado' ? 'Aprobado' : `Rechazado${k.motivo ? `: ${k.motivo}` : ''}`} · {hora(k.revisado_at)}
-                </span>
+              <li key={k.id} className="px-3 py-1.5">
+                <details>
+                  <summary className="flex flex-wrap justify-between gap-2 cursor-pointer list-none">
+                    <span><b>{k.organizacion}</b> · {k.tipo === 'plan' ? (PLAN[k.plan] ?? k.plan) : TIPO[k.tipo]} · {usd(k.monto_usd)}
+                      {k.desde && k.hasta ? <span className="text-neutral-500"> · {ddmm(k.desde)} → {ddmm(k.hasta)}</span> : null}
+                      <span className="text-neutral-400"> · ver detalle</span></span>
+                    <span className={k.estado === 'aprobado' ? 'text-lime-700' : 'text-red-700'} title={k.motivo ?? undefined}>
+                      {k.estado === 'aprobado' ? 'Aprobado' : `Rechazado${k.motivo ? `: ${k.motivo}` : ''}`} · {hora(k.revisado_at)}
+                    </span>
+                  </summary>
+                  <div className="mt-1.5 space-y-1">
+                    <Desglose k={k} />
+                    <p className="text-xs text-neutral-600">{METODO[k.metodo]} ref. {k.referencia} · pagado el {ddmm(k.fecha_pago)}{k.monto_bs ? ` · ${bs(k.monto_bs)}` : ''}
+                      {k.tiene_comprobante && <a href={`/api/mi-plan/comprobante/${k.id}`} target="_blank" rel="noopener noreferrer" className="ml-2 text-sky-700 hover:underline">captura</a>}</p>
+                  </div>
+                </details>
               </li>
             ))}
           </ul>

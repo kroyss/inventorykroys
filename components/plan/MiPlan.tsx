@@ -12,6 +12,7 @@ const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const NOMBRE_PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
 const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
+const titulo = (k: CobroFila) => k.tipo === 'radar_pro' ? 'Radar PRO (1 mes)' : k.tipo === 'upgrade' ? `Cambio a ${NOMBRE_PLAN[k.plan] ?? k.plan}` : (NOMBRE_PLAN[k.plan] ?? k.plan)
 
 function Copiar({ texto }: { texto: string }) {
   const [ok, setOk] = useState(false)
@@ -41,7 +42,9 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState<string>('automatizaciones')
   const [ciclo, setCiclo] = useState<'mensual' | 'trimestral'>('mensual')
-  const [radarPro, setRadarPro] = useState(false)
+  // 06-11 (Plan A/B): qué paga — renovar el plan, 1 mes de Radar PRO aparte o pasar a un plan mejor.
+  const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade'>('plan')
+  const [mejora, setMejora] = useState<string>('')
   const [metodo, setMetodo] = useState<'pago_movil' | 'binance'>('pago_movil')
   const [referencia, setReferencia] = useState('')
   const [fecha, setFecha] = useState(hoyLocal())
@@ -54,9 +57,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     const r = await fetch('/api/mi-plan', { headers, cache: 'no-store' }).catch(() => null)
     if (!r?.ok) { setError(r ? ((await r.json().catch(() => ({}))).error ?? 'No se pudo cargar tu plan') : 'Sin conexión'); return }
     const d = await r.json() as SituacionPlan
-    setS(d); setPlan(d.planSugerido)
-    // Quien ya tiene Radar PRO vigente lo ve marcado al renovar (puede quitarlo).
-    setRadarPro(!!d.radarProHasta && d.radarProHasta >= new Date().toISOString().slice(0, 10))
+    setS(d); setPlan(d.planSugerido); setMejora(d.mejoras[0]?.plan ?? '')
   }, [headers])
   useEffect(() => { cargar() }, [cargar])
 
@@ -64,11 +65,10 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   if (!s) return <p className="text-sm text-neutral-500">Cargando tu plan…</p>
 
   const op = s.opciones.find(o => o.id === plan) ?? s.opciones[0]
-  const meses = ciclo === 'trimestral' ? 3 : 1
-  // El mes de regalo (solo el primer plan con Radar) no se cobra; el resto del PRO va a precio completo, sin descuento.
-  const mesesPro = s.radarPro.regalo ? meses - 1 : meses
-  const pro = radarPro && op.radar && mesesPro > 0 ? s.radarPro.precio * mesesPro : 0
-  const total = Math.round(((ciclo === 'trimestral' ? op.trimestral : op.mensual) + pro) * 100) / 100
+  const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
+  const tipo = compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade' : 'plan'
+  const total = tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
+    : Math.round((ciclo === 'trimestral' ? op.trimestral : op.mensual) * 100) / 100
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
   const comprobante = (k: CobroFila) => `/api/mi-plan/comprobante/${k.id}${acceso ? `?acceso=${encodeURIComponent(acceso)}` : ''}`
@@ -79,7 +79,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     if (!archivo) { setError('Adjunta la captura del pago'); return }
     setEnviando(true)
     const f = new FormData()
-    f.set('plan', plan); f.set('ciclo', ciclo); f.set('radar_pro', pro ? '1' : '0'); f.set('metodo', metodo)
+    f.set('tipo', tipo); f.set('plan', tipo === 'upgrade' ? mej!.plan : plan); f.set('ciclo', ciclo); f.set('metodo', metodo)
     f.set('referencia', referencia.trim()); f.set('fecha_pago', fecha); f.set('archivo', archivo)
     const r = await fetch('/api/mi-plan', { method: 'POST', headers, body: f }).catch(() => null)
     setEnviando(false)
@@ -104,7 +104,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
       {s.ultimo && (s.ultimo.estado === 'revision' ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p className="font-semibold">⏳ Tu pago está en revisión</p>
-          <p className="mt-1">{NOMBRE_PLAN[s.ultimo.plan]} · {fmtUsd(s.ultimo.monto_usd)}{s.ultimo.monto_bs ? ` (${fmtBs(s.ultimo.monto_bs)})` : ''} · {METODO[s.ultimo.metodo]} ref. {s.ultimo.referencia}</p>
+          <p className="mt-1">{titulo(s.ultimo)} · {fmtUsd(s.ultimo.monto_usd)}{s.ultimo.monto_bs ? ` (${fmtBs(s.ultimo.monto_bs)})` : ''} · {METODO[s.ultimo.metodo]} ref. {s.ultimo.referencia}</p>
           <p className="mt-1 text-xs">Lo confirmamos a mano en el banco o en Binance y te avisamos. Mientras tanto tu cuenta sigue funcionando.</p>
         </section>
       ) : s.ultimo.estado === 'rechazado' ? (
@@ -116,7 +116,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
       ) : (
         <section className="rounded-xl border border-lime-200 bg-lime-50 px-4 py-3 text-sm text-lime-900">
           <p className="font-semibold">✓ Pago aprobado</p>
-          <p className="mt-1">{NOMBRE_PLAN[s.ultimo.plan]} · {fmtUsd(s.ultimo.monto_usd)} · {METODO[s.ultimo.metodo]} ref. {s.ultimo.referencia}{s.ultimo.hasta ? ` · activo hasta el ${ddmm(s.ultimo.hasta)}` : ''}</p>
+          <p className="mt-1">{titulo(s.ultimo)} · {fmtUsd(s.ultimo.monto_usd)} · {METODO[s.ultimo.metodo]} ref. {s.ultimo.referencia}{s.ultimo.hasta ? ` · activo hasta el ${ddmm(s.ultimo.hasta)}` : ''}</p>
         </section>
       ))}
 
@@ -132,7 +132,44 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
         <div className="grid gap-4 lg:grid-cols-2 items-start">
           {/* 1 · Lo que te toca */}
           <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-800">1 · {s.estado === 'activo' ? 'Renueva tu plan' : 'Elige tu plan'}</h2>
+            <h2 className="text-sm font-semibold text-neutral-800">1 · {s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</h2>
+            {(s.radarProCompra || s.mejoras.length > 0) && (
+              <div className="flex flex-wrap gap-2 text-sm">
+                {([['plan', 'Renovar plan'], ...(s.radarProCompra ? [['radar_pro', 'Agregar Radar PRO']] : []), ...(s.mejoras.length ? [['upgrade', 'Mejorar mi plan']] : [])] as [typeof compra, string][]).map(([c, t]) => (
+                  <button key={c} type="button" onClick={() => setCompra(c)}
+                    className={`rounded-full border px-3 py-1 ${tipo === c ? 'border-sky-400 bg-sky-50 text-sky-900' : 'border-neutral-200 text-neutral-600'}`}>{t}</button>
+                ))}
+              </div>
+            )}
+            {tipo === 'radar_pro' && s.radarProCompra && (
+              <div className="rounded-lg border border-lime-200 bg-lime-50 px-3 py-2 text-sm text-neutral-800 space-y-1">
+                <p><b>Radar PRO los fines de semana · 1 mes · {fmtUsd(s.radarProCompra.precio)}</b></p>
+                <p className="text-xs text-neutral-600">Sellos, filtros, productos nuevos, competencia y tendencias. Precio completo, sin descuento.</p>
+                <p className="text-xs text-neutral-600">Cubre del {ddmm(s.radarProCompra.desde)} al {ddmm(s.radarProCompra.hasta)}{s.radarProHasta && s.radarProHasta >= s.radarProCompra.desde && s.radarProHasta === s.radarProCompra.desde ? ' (a continuación del que ya tienes)' : ''}. Puedes agregar otro mes cuando quieras.</p>
+              </div>
+            )}
+            {tipo === 'upgrade' && mej && (
+              <div className="space-y-2">
+                {s.mejoras.length > 1 && (
+                  <div className="flex flex-wrap gap-2 text-sm">
+                    {s.mejoras.map(m => (
+                      <button key={m.plan} type="button" onClick={() => setMejora(m.plan)}
+                        className={`rounded-lg border px-3 py-1 ${mej.plan === m.plan ? 'border-sky-400 bg-sky-50' : 'border-neutral-200'}`}>{m.nombre}</button>
+                    ))}
+                  </div>
+                )}
+                <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm">
+                  <p className="font-semibold">Pasar a {mej.nombre} desde hoy</p>
+                  <ul className="mt-1 space-y-0.5 text-xs text-neutral-700">
+                    {mej.lineas.map((l, i) => (
+                      <li key={i} className="flex justify-between gap-3"><span>{l.texto}</span><span className="num whitespace-nowrap">{l.usd < 0 ? '−' : ''}{fmtUsd(Math.abs(l.usd))}</span></li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-xs text-neutral-600">Tu plan sigue venciendo el {ddmm(s.vence)}; ahí renuevas ya con {mej.nombre}. Para bajar de plan, elige el otro al renovar.</p>
+                </div>
+              </div>
+            )}
+            {tipo === 'plan' && <>
             <p className="text-sm text-neutral-600">
               Con tus <b className="num">{s.ventasMes.toLocaleString('de-DE')}</b> ventas de {s.mes} en MercadoLibre (todas tus cuentas, del 1 al último día)
               te corresponde el escalón <b>{s.escalonNombre} ventas al mes</b>.
@@ -151,7 +188,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             ) : (
               <div className="grid gap-2 sm:grid-cols-3">
                 {s.opciones.map(o => (
-                  <button key={o.id} type="button" onClick={() => { setPlan(o.id); if (!o.radar) setRadarPro(false) }}
+                  <button key={o.id} type="button" onClick={() => { setPlan(o.id) }}
                     className={`text-left rounded-lg border px-3 py-2 ${plan === o.id ? 'border-sky-400 bg-sky-50' : 'border-neutral-200 hover:border-neutral-300'}`}>
                     <p className="text-sm font-semibold">{o.nombre}{s.plan === o.id ? <span className="ml-1 text-xs font-normal text-neutral-500">(tu plan)</span> : null}</p>
                     <p className="text-sm num">{fmtUsd(o.mensual)}<span className="text-xs text-neutral-500">/mes</span></p>
@@ -170,23 +207,13 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             </div>
             {op.radar && s.radarPro.regalo && (
               <p className="text-xs text-lime-700">
-                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Después cuesta {fmtUsd(s.radarPro.precio)}/mes y lo agregas al renovar.
+                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Después cuesta {fmtUsd(s.radarPro.precio)} por mes y lo agregas cuando quieras desde aquí.
               </p>
             )}
-            {op.radar && mesesPro > 0 && (
-              <label className="flex items-start gap-2 text-sm text-neutral-700">
-                <input type="checkbox" className="mt-1" checked={radarPro} onChange={e => setRadarPro(e.target.checked)} />
-                <span>
-                  {s.radarPro.regalo
-                    ? <>Agregar Radar PRO los meses 2 y 3 (+{fmtUsd(s.radarPro.precio * mesesPro)})</>
-                    : <>Agregar Radar PRO los fines de semana (+{fmtUsd(s.radarPro.precio)}/mes{meses > 1 ? ` × ${meses} = ${fmtUsd(s.radarPro.precio * meses)}` : ''})</>}
-                  <span className="block text-xs text-neutral-500">Sellos, filtros, productos nuevos, competencia y tendencias. Precio completo, sin descuento.</span>
-                </span>
-              </label>
-            )}
             {s.cuentasExtra > 0 && <p className="text-xs text-neutral-500">Incluye {s.cuentasExtra} cuenta(s) de MercadoLibre extra (tienes {s.cuentas}; el plan trae 2).</p>}
+            </>}
             <div className="flex items-baseline justify-between border-t border-neutral-100 pt-3">
-              <span className="text-sm text-neutral-600">Total a pagar{ciclo === 'trimestral' ? ' (3 meses)' : ''}</span>
+              <span className="text-sm text-neutral-600">Total a pagar{tipo === 'plan' && ciclo === 'trimestral' ? ' (3 meses)' : ''}</span>
               <span className="text-lg font-semibold num">{fmtUsd(total)}</span>
             </div>
           </section>
@@ -262,7 +289,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
           <ul className="mt-2 space-y-1">
             {[...(s.ultimo ? [s.ultimo] : []), ...s.anteriores].map(k => (
               <li key={k.id} className="flex flex-wrap justify-between gap-2 border-b border-neutral-100 py-1 last:border-0">
-                <span>{ddmm(k.fecha_pago)} · {NOMBRE_PLAN[k.plan]} · {fmtUsd(k.monto_usd)} · {METODO[k.metodo]} ref. {k.referencia}</span>
+                <span>{ddmm(k.fecha_pago)} · {titulo(k)} · {fmtUsd(k.monto_usd)} · {METODO[k.metodo]} ref. {k.referencia}</span>
                 <span className={k.estado === 'aprobado' ? 'text-lime-700' : k.estado === 'rechazado' ? 'text-red-700' : 'text-amber-700'}>
                   {k.estado === 'aprobado' ? 'Aprobado' : k.estado === 'rechazado' ? 'Rechazado' : 'En revisión'}
                   {k.tiene_comprobante && <a href={comprobante(k)} target="_blank" rel="noopener noreferrer" className="ml-2 text-sky-700 hover:underline">captura</a>}

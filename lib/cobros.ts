@@ -19,7 +19,7 @@ import { compare } from 'bcryptjs'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
-import { CUENTAS_INCLUIDAS, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
+import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
 import { UPLOAD_DIR } from '@/lib/uploads'
 import { chatsDuenoPlataforma } from '@/lib/registro'
@@ -108,15 +108,62 @@ export async function tasaBCV(): Promise<number | null> {
   return r?.t ?? null
 }
 
+// ── Desglose (06-11, mig. 143) ───────────────────────────────────────────────────────────────────────────────────
+// Qué se paga: plan (elegir/renovar), Radar PRO (1 mes aparte, como una recarga) o mejora de plan a mitad de período.
+// El desglose (líneas con su monto y las fechas que cubre) se guarda en organizacion_cobros.detalle para que el dueño
+// vea en Plataforma → Cobros qué contrató cada cliente; los cobros viejos (sin detalle) se reconstruyen de sus columnas.
+export type TipoCobro = 'plan' | 'radar_pro' | 'upgrade'
+export interface Linea { texto: string; usd: number }
+export interface Detalle { lineas: Linea[]; desde: string | null; hasta: string | null }
+
+const r2 = (n: number) => Math.round(n * 100) / 100
+const fmt = (n: number) => `${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
+const nombrePlan = (p: string) => PLANES.find(x => x.id === p)?.nombre ?? p
+const ddmm = (f: string) => f.split('-').reverse().join('/')
+const diasEntre = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
+const descuentoDe = (fundador: boolean, ciclo: string | null) =>
+  Math.max(fundador ? DESCUENTO_FUNDADOR : 0, ciclo === 'trimestral' ? DESCUENTO_TRIMESTRAL : 0)
+const nombreDescuento = (fundador: boolean, d: number) => `Descuento ${fundador && d === DESCUENTO_FUNDADOR ? 'Fundador' : 'trimestral'} −${d}%`
+
+/** Líneas de un pago de plan: el plan por meses, el descuento (solo el plan), cuentas extra y Radar PRO (cobros viejos). */
+export function desglosePlan(plan: string, escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra: number, radarUsd = 0): Linea[] {
+  const m = montoPlan(plan as Plan['id'], escalon, ciclo, fundador, cuentasExtra)
+  const meses = `${m.meses} ${m.meses === 1 ? 'mes' : 'meses'}`
+  const l: Linea[] = [{ texto: `${nombrePlan(plan)} · escalón ${ESCALONES[escalon]?.ventas ?? escalon} ventas · ${fmt(m.base)}/mes × ${meses}`, usd: m.base * m.meses }]
+  if (m.descuento) l.push({ texto: `${nombreDescuento(fundador, m.descuento)} (solo el plan)`, usd: -r2(m.base * m.meses * m.descuento / 100) })
+  if (m.extras) l.push({ texto: `${cuentasExtra} cuenta(s) de ML extra · ${fmt(CUENTA_EXTRA)} × ${meses}`, usd: m.extras * m.meses })
+  if (radarUsd > 0) l.push({ texto: `Radar PRO · ${Math.round(radarUsd / RADAR_PRO.precio)} mes(es) × ${fmt(RADAR_PRO.precio)} (sin descuento)`, usd: r2(radarUsd) })
+  return l
+}
+
+export interface Mejora { plan: Plan['id']; nombre: string; monto: number; dias: number; lineas: Linea[] }
+
+/** Pasar a un plan más caro a mitad de período: diferencia por mes × días que quedan / 30, con el descuento del plan. */
+export function calcularMejora(actual: string, nuevo: Plan['id'], escalon: number, ciclo: string | null, fundador: boolean, hoy: string, hasta: string): Mejora | null {
+  const precios = ESCALONES[escalon]?.precios
+  if (!precios) return null
+  const pa = precios[actual as Plan['id']] ?? 0, pn = precios[nuevo]
+  const dias = diasEntre(hoy, hasta)
+  if (!(pn > pa) || dias < 1) return null
+  const dif = pn - pa
+  const d = descuentoDe(fundador, ciclo)
+  const mes = r2(dif * (100 - d) / 100)
+  const monto = Math.max(0.01, r2(mes * dias / 30))
+  const lineas: Linea[] = [{ texto: `Diferencia ${nombrePlan(actual)} → ${nombrePlan(nuevo)}: ${fmt(pn)} − ${fmt(pa)} = ${fmt(dif)}/mes`, usd: dif }]
+  if (d) lineas.push({ texto: nombreDescuento(fundador, d), usd: r2(mes - dif) })
+  lineas.push({ texto: `Solo los ${dias} días que le quedan al plan (hasta el ${ddmm(hasta)}) de 30`, usd: r2(monto - mes) })
+  return { plan: nuevo, nombre: nombrePlan(nuevo), monto, dias, lineas }
+}
+
 // ── Situación de la cuenta ("Mi plan") ───────────────────────────────────────────────────────────────────────────
 export interface CobroFila {
   id: number; plan: string; escalon: number; ciclo: string; radar_pro: boolean; monto_usd: number; metodo: Metodo
   tasa_bcv: number | null; monto_bs: number | null; referencia: string; fecha_pago: string; estado: 'revision' | 'aprobado' | 'rechazado'
-  motivo: string | null; creado_at: string; revisado_at: string | null; tiene_comprobante: boolean; hasta: string | null
+  motivo: string | null; creado_at: string; revisado_at: string | null; tiene_comprobante: boolean; hasta: string | null; tipo: TipoCobro
 }
-const SELECT_COBRO = `SELECT k.id, k.plan, k.escalon, k.ciclo, k.radar_pro, k.monto_usd::float, k.metodo, k.tasa_bcv::float,
+const SELECT_COBRO = `SELECT k.id, k.tipo, k.plan, k.escalon, k.ciclo, k.radar_pro, k.monto_usd::float, k.metodo, k.tasa_bcv::float,
   k.monto_bs::float, k.referencia, to_char(k.fecha_pago, 'YYYY-MM-DD') AS fecha_pago, k.estado, k.motivo, k.creado_at,
-  k.revisado_at, k.comprobante IS NOT NULL AS tiene_comprobante, to_char(p.hasta, 'YYYY-MM-DD') AS hasta
+  k.revisado_at, k.comprobante IS NOT NULL AS tiene_comprobante, COALESCE(k.detalle->>'hasta', to_char(p.hasta, 'YYYY-MM-DD')) AS hasta
   FROM organizacion_cobros k LEFT JOIN organizacion_pagos p ON p.id = k.pago_id`
 
 export interface OpcionPlan { id: Plan['id']; nombre: string; resumen: string; mensual: number; trimestral: number; radar: boolean }
@@ -129,6 +176,12 @@ export interface SituacionPlan {
   escalonSugerido: number; escalonNombre: string
   opciones: OpcionPlan[]; planSugerido: Plan['id']
   radarPro: { precio: number; regalo: boolean }   // regalo: el 1er plan con Radar trae 1 mes PRO (una sola vez en la vida)
+  /** Radar PRO aparte (06-11): 1 mes cuando quiera, con plan activo que traiga Radar. null = no se puede ahora. */
+  radarProCompra: { precio: number; desde: string; hasta: string } | null
+  /** Planes más caros a los que puede pasar ahora pagando la diferencia (plan activo). */
+  mejoras: Mejora[]
+  /** Desde qué día cuenta un plan pagado hoy (fin del plan vigente, de la prueba o hoy). */
+  inicioPlan: string
   tasaBcv: number | null
   datos: DatosCobro
   ultimo: CobroFila | null; anteriores: CobroFila[]
@@ -155,6 +208,10 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador, cuentasExtra).total,
   }))
   const planSugerido = (conPlan && PLANES.some(p => p.id === o.plan) ? o.plan : 'automatizaciones') as Plan['id']
+  const activo = estado === 'activo' && conPlan && !!o.plan_hasta && o.plan_hasta >= hoy
+  const proDesde = o.radar_pro_hasta && o.radar_pro_hasta >= hoy ? o.radar_pro_hasta : hoy
+  const inicioPlan = [o.plan_hasta, o.estado === 'prueba' ? o.prueba_hasta : null, hoy]
+    .filter((f): f is string => !!f && f >= hoy).sort().pop()!
   return {
     organizacion: o.nombre, estado, fundador: !!o.fundador,
     plan: conPlan ? o.plan : null, escalon: conPlan ? Number(o.escalon) : null, ciclo: o.ciclo ?? null,
@@ -167,6 +224,10 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     // Suspender y volver, o renovar, ya no lo trae: se paga aparte a precio completo (sin descuento de Fundador ni
     // trimestral) y siempre se ofrece al elegir o renovar el plan.
     radarPro: { precio: RADAR_PRO.precio, regalo: !o.radar_pro_hasta },
+    radarProCompra: activo && planConRadar(o.plan) ? { precio: RADAR_PRO.precio, desde: proDesde, hasta: sumarMeses(proDesde, 1) } : null,
+    mejoras: activo ? PLANES.map(p => calcularMejora(o.plan, p.id, Number(o.escalon), o.ciclo, !!o.fundador, hoy, o.plan_hasta))
+      .filter((m): m is Mejora => !!m) : [],
+    inicioPlan,
     tasaBcv: tasa, datos,
     ultimo: (cobros[0] as CobroFila | undefined) ?? null, anteriores: cobros.slice(1) as CobroFila[],
   }
@@ -189,7 +250,7 @@ export function mesesRadarPro(regalo: boolean, meses: number) {
 
 // ── Reportar ─────────────────────────────────────────────────────────────────────────────────────────────────────
 export interface Reporte {
-  plan: Plan['id']; ciclo: 'mensual' | 'trimestral'; radarPro: boolean; metodo: Metodo
+  tipo: TipoCobro; plan: Plan['id']; ciclo: 'mensual' | 'trimestral'; metodo: Metodo
   referencia: string; fechaPago: string
   archivo: { tipo: string; datos: Buffer } | null
 }
@@ -198,15 +259,32 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
   const s = await situacionPlan(orgId)
   if (s.ultimo?.estado === 'revision') throw new ErrorCobro('Ya tienes un pago en revisión: te avisamos apenas lo confirmemos.')
   if (!s.conectadas) throw new ErrorCobro('Primero conecta tu cuenta de MercadoLibre: el plan se calcula con sus ventas.')
-  const m = montoCobro(s, r.plan, r.ciclo, r.radarPro)
+  // El monto lo calcula el servidor (nunca el que manda la pantalla).
+  const cicloPlan = s.ciclo === 'trimestral' ? 'trimestral' : 'mensual'
+  let f: { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; radar: boolean; extras: number; usd: number; detalle: Detalle }
+  if (r.tipo === 'radar_pro') {
+    const c = s.radarProCompra
+    if (!c) throw new ErrorCobro('Radar PRO se agrega con un plan activo que incluya Radar.')
+    f = { plan: s.plan!, escalon: s.escalon!, ciclo: cicloPlan, radar: true, extras: 0, usd: c.precio,
+      detalle: { lineas: [{ texto: 'Radar PRO los fines de semana · 1 mes (sin descuento)', usd: c.precio }], desde: c.desde, hasta: c.hasta } }
+  } else if (r.tipo === 'upgrade') {
+    const u = s.mejoras.find(x => x.plan === r.plan)
+    if (!u) throw new ErrorCobro('Ese cambio de plan no está disponible ahora.')
+    f = { plan: u.plan, escalon: s.escalon!, ciclo: cicloPlan, radar: false, extras: 0, usd: u.monto,
+      detalle: { lineas: u.lineas, desde: currentDate(), hasta: s.vence } }
+  } else {
+    const m = montoCobro(s, r.plan, r.ciclo, false)
+    f = { plan: r.plan, escalon: s.escalonSugerido, ciclo: r.ciclo, radar: false, extras: s.cuentasExtra, usd: m.usd,
+      detalle: { lineas: desglosePlan(r.plan, s.escalonSugerido, r.ciclo, s.fundador, s.cuentasExtra), desde: s.inicioPlan, hasta: sumarMeses(s.inicioPlan, m.meses) } }
+  }
   const tasa = r.metodo === 'pago_movil' ? s.tasaBcv : null
   if (r.metodo === 'pago_movil' && !tasa) throw new ErrorCobro('No hay tasa BCV cargada hoy: intenta más tarde o paga por Binance.')
   const { rows: [k] } = await dbGlobal().query(
     `INSERT INTO organizacion_cobros (organizacion_id, user_id, plan, escalon, ciclo, radar_pro, cuentas_extra, ventas_30d,
-                                      monto_usd, metodo, tasa_bcv, monto_bs, referencia, fecha_pago)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
-    [orgId, userId, r.plan, s.escalonSugerido, r.ciclo, m.pro, s.cuentasExtra, s.ventasMes, m.usd, r.metodo,
-     tasa, tasa ? Math.round(m.usd * tasa * 100) / 100 : null, r.referencia.trim(), r.fechaPago])
+                                      monto_usd, metodo, tasa_bcv, monto_bs, referencia, fecha_pago, tipo, detalle)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+    [orgId, userId, f.plan, f.escalon, f.ciclo, f.radar, f.extras, s.ventasMes, f.usd, r.metodo,
+     tasa, tasa ? Math.round(f.usd * tasa * 100) / 100 : null, r.referencia.trim(), r.fechaPago, r.tipo, JSON.stringify(f.detalle)])
   const id = Number(k.id)
   if (r.archivo) {
     await mkdir(COBROS_DIR, { recursive: true })
@@ -224,6 +302,8 @@ export class ErrorCobro extends Error {}
 const SQL_REF_REPETIDA = `(SELECT COUNT(*)::int FROM organizacion_cobros r WHERE lower(r.referencia) = lower(k.referencia)
   AND r.id <> k.id AND r.estado <> 'rechazado')`
 
+export const TITULO_TIPO: Record<TipoCobro, string> = { plan: 'Plan', radar_pro: 'Radar PRO (1 mes)', upgrade: 'Mejora de plan' }
+
 async function avisarDueno(id: number, archivo: Reporte['archivo']) {
   if (!telegramConfigurado()) return
   const { rows: [k] } = await dbGlobal().query(
@@ -232,10 +312,12 @@ async function avisarDueno(id: number, archivo: Reporte['archivo']) {
      FROM organizacion_cobros k JOIN organizaciones o ON o.id = k.organizacion_id LEFT JOIN users u ON u.id = k.user_id
      WHERE k.id = $1`, [id])
   if (!k) return
-  const plan = PLANES.find(p => p.id === k.plan)?.nombre ?? k.plan
+  const d = k.detalle as Detalle | null
   const html = `💰 <b>Pago reportado</b>${ENTORNO === 'staging' ? ' · <i>staging</i>' : ''}\n`
     + `🏢 ${esc(k.org)} · 👤 ${esc(k.persona ?? '—')}\n`
-    + `${esc(plan)} · ${k.ciclo}${k.radar_pro ? ' + Radar PRO' : ''} · <b>$${k.usd}</b>`
+    + `<b>${esc(TITULO_TIPO[(k.tipo ?? 'plan') as TipoCobro])}</b>${d?.desde && d?.hasta ? ` · del ${ddmm(d.desde)} al ${ddmm(d.hasta)}` : ''}\n`
+    + (d?.lineas ?? []).map(l => `• ${esc(l.texto)}: ${l.usd < 0 ? '−' : ''}${fmt(Math.abs(l.usd))}`).join('\n') + '\n'
+    + `Total <b>${k.usd}</b>`
     + `${k.bs ? ` = Bs ${Number(k.bs).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` : ''}\n`
     + `${NOMBRE_METODO[k.metodo as Metodo]} · ref. <b>${esc(k.referencia)}</b>`
     + `${k.repetida ? `\n⚠️ Esa referencia ya se reportó ${k.repetida} vez/veces` : ''}`
@@ -255,13 +337,13 @@ async function avisarDueno(id: number, archivo: Reporte['archivo']) {
  * Créditos de IA (mig. 140): el primer plan o el que vuelve tras vencer arranca su mes hoy; renovar uno vigente no.
  */
 export async function registrarPlan(client: PoolClient, org: number, b: {
-  plan: Plan['id']; escalon: number; ciclo: 'mensual' | 'trimestral'; hasta: string; monto: number; nota?: string | null
+  plan: Plan['id']; escalon: number; ciclo: 'mensual' | 'trimestral'; hasta: string; monto: number; nota?: string | null; desde?: string
 }, por: number | null) {
   const { rows: [o] } = await client.query(
     `SELECT estado, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta
      FROM organizaciones WHERE id = $1 FOR UPDATE`, [org])
   const hoy = currentDate()
-  const desde = o.plan_hasta && o.plan_hasta >= hoy ? o.plan_hasta : hoy
+  const desde = b.desde ?? (o.plan_hasta && o.plan_hasta >= hoy ? o.plan_hasta : hoy)
   const bienvenida = planConRadar(b.plan) && !o.radar_pro_hasta
   await client.query(
     `UPDATE organizaciones SET estado = 'activo', plan = $2, escalon = $3, ciclo = $4, plan_hasta = $5,
@@ -270,12 +352,7 @@ export async function registrarPlan(client: PoolClient, org: number, b: {
        creditos_desde = CASE WHEN $8 THEN NOW() ELSE creditos_desde END
      WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1),
       !(o.estado === 'activo' && o.plan_hasta && o.plan_hasta >= hoy)])
-  await client.query(
-    `UPDATE empresas SET
-       modulos = ARRAY(SELECT DISTINCT m FROM unnest(
-         ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[])) || $3::text[]) m),
-       ia_limite_mes = $4
-     WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[b.plan]], ESCALONES[b.escalon].creditos])
+  await modulosDelPlan(client, org, b.plan, b.escalon)
   const { rows: [p] } = await client.query(
     `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, plan, escalon, ciclo, desde, hasta, nota, por)
      VALUES ($1, 'plan', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
@@ -285,9 +362,19 @@ export async function registrarPlan(client: PoolClient, org: number, b: {
   return { pagoId: Number(p.id), bienvenida }
 }
 
+/** Módulos del plan (los que controla el plan se reemplazan; los demás quedan) y créditos de IA del escalón. */
+async function modulosDelPlan(client: PoolClient, org: number, plan: Plan['id'], escalon: number) {
+  await client.query(
+    `UPDATE empresas SET
+       modulos = ARRAY(SELECT DISTINCT m FROM unnest(
+         ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[])) || $3::text[]) m),
+       ia_limite_mes = $4
+     WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[plan]], ESCALONES[escalon].creditos])
+}
+
 export async function aprobarCobro(id: number, por: number) {
   const client = await dbGlobal().connect()
-  let resultado: { org: number; userId: number | null; hasta: string; plan: string }
+  let resultado: { org: number; userId: number | null; hasta: string; plan: string; mensaje: string }
   try {
     await client.query('BEGIN')
     const { rows: [k] } = await client.query(
@@ -299,16 +386,67 @@ export async function aprobarCobro(id: number, por: number) {
     if (k.estado !== 'revision') throw new ErrorCobro('Ese pago ya se revisó')
     if (k.organizacion_id === ORGANIZACION_PLATAFORMA) throw new ErrorCobro('Tu organización es la propietaria: no tiene plan')
     const hoy = currentDate()
+    const metodoRef = `${NOMBRE_METODO[k.metodo as Metodo]} ref. ${k.referencia} · reportado en Mi plan`
+    const fechas = (desde: string, hasta: string) => client.query(
+      `UPDATE organizacion_cobros SET detalle = COALESCE(detalle, '{}'::jsonb) || jsonb_build_object('desde', $2::text, 'hasta', $3::text) WHERE id = $1`,
+      [id, desde, hasta])
+    const cerrar = async (pagoId: number) => client.query(
+      `UPDATE organizacion_cobros SET estado = 'aprobado', revisado_por = $2, revisado_at = NOW(), pago_id = $3 WHERE id = $1`, [id, por, pagoId])
+
+    // 06-11 (Plan A): Radar PRO aparte, 1 mes a continuación del que tenga vigente (o desde hoy).
+    if (k.tipo === 'radar_pro') {
+      const desde = k.radar_pro_hasta && k.radar_pro_hasta >= hoy ? k.radar_pro_hasta : hoy
+      const hasta = sumarMeses(desde, 1)
+      await client.query(`UPDATE organizaciones SET radar_pro_hasta = $2 WHERE id = $1`, [k.organizacion_id, hasta])
+      const { rows: [p] } = await client.query(
+        `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, desde, hasta, nota, por) VALUES ($1, 'radar_pro', $2, $3, $4, $5, $6) RETURNING id`,
+        [k.organizacion_id, k.usd, desde, hasta, metodoRef, por])
+      await client.query(`INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle, por) VALUES ($1, 'radar_pro', $2, $3)`,
+        [k.organizacion_id, `Radar PRO hasta ${hasta}`, por])
+      await fechas(desde, hasta); await cerrar(Number(p.id))
+      await client.query('COMMIT')
+      resultado = { org: k.organizacion_id, userId: k.user_id, hasta, plan: k.plan,
+        mensaje: `✅ <b>Pago aprobado</b>\nRadar PRO activo hasta el <b>${ddmm(hasta)}</b>. ¡Gracias!` }
+      avisarCliente(resultado.userId, resultado.mensaje)
+      return resultado
+    }
+
+    // 06-11 (Plan B): mejora de plan. Cambia plan y módulos desde hoy; el vencimiento no se mueve.
+    if (k.tipo === 'upgrade') {
+      const { rows: [o] } = await client.query(
+        `SELECT estado, plan, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta
+         FROM organizaciones WHERE id = $1 FOR UPDATE`, [k.organizacion_id])
+      if (o.estado !== 'activo' || !o.plan_hasta || o.plan_hasta < hoy)
+        throw new ErrorCobro('Ese plan ya no está vigente: rechaza este pago y que pague la renovación con el plan nuevo.')
+      const bienvenida = planConRadar(k.plan) && !o.radar_pro_hasta
+      await client.query(
+        `UPDATE organizaciones SET plan = $2, radar_pro_hasta = CASE WHEN $3 THEN $4::date ELSE radar_pro_hasta END WHERE id = $1`,
+        [k.organizacion_id, k.plan, bienvenida, sumarMeses(hoy, 1)])
+      await modulosDelPlan(client, k.organizacion_id, k.plan, k.escalon)
+      const { rows: [p] } = await client.query(
+        `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, plan, escalon, ciclo, desde, hasta, nota, por)
+         VALUES ($1, 'upgrade', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [k.organizacion_id, k.usd, k.plan, k.escalon, k.ciclo, hoy, o.plan_hasta, `${o.plan} → ${k.plan} · ${metodoRef}`, por])
+      await client.query(`INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle, por) VALUES ($1, 'cambio_plan', $2, $3)`,
+        [k.organizacion_id, `${o.plan} → ${k.plan} hasta ${o.plan_hasta}`, por])
+      await fechas(hoy, o.plan_hasta); await cerrar(Number(p.id))
+      await client.query('COMMIT')
+      resultado = { org: k.organizacion_id, userId: k.user_id, hasta: o.plan_hasta, plan: k.plan,
+        mensaje: `✅ <b>Pago aprobado</b>\nYa tienes el plan ${esc(nombrePlan(k.plan))}, activo hasta el <b>${ddmm(o.plan_hasta)}</b>. ¡Gracias!` }
+      avisarCliente(resultado.userId, resultado.mensaje)
+      return resultado
+    }
+
     const meses = k.ciclo === 'trimestral' ? 3 : 1
     // 06-11 (Gerardo): si paga en la prueba, el plan arranca cuando ella termina (no pierde los días que le quedaban).
     // La prueba vale hasta su último día inclusive: el plan cuenta desde ese día, igual que una renovación.
     const base = [k.plan_hasta, k.prueba_hasta, hoy].filter((f): f is string => !!f && f >= hoy).sort().pop()!
     const hasta = sumarMeses(base, meses)
-    const metodo = NOMBRE_METODO[k.metodo as Metodo]
     const { pagoId, bienvenida } = await registrarPlan(client, k.organizacion_id, {
-      plan: k.plan, escalon: k.escalon, ciclo: k.ciclo, hasta, monto: k.usd,
-      nota: `${metodo} ref. ${k.referencia}${k.radar_pro ? ' (incluye Radar PRO)' : ''} · reportado en Mi plan`,
+      plan: k.plan, escalon: k.escalon, ciclo: k.ciclo, hasta, monto: k.usd, desde: base,
+      nota: `${metodoRef}${k.radar_pro ? ' (incluye Radar PRO)' : ''}`,
     }, por)
+    await fechas(base, hasta)
     // Con el mes de regalo (bienvenida) el PRO pagado va a continuación de ese mes.
     const mesesPro = mesesRadarPro(bienvenida, meses)
     if (k.radar_pro && mesesPro > 0) {
@@ -320,16 +458,15 @@ export async function aprobarCobro(id: number, por: number) {
         `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, desde, hasta, nota, por) VALUES ($1, 'radar_pro', 0, $2, $3, $4, $5)`,
         [k.organizacion_id, desde, proHasta, `Incluido en el pago del plan (cobro #${id})`, por])
     }
-    await client.query(`UPDATE organizacion_cobros SET estado = 'aprobado', revisado_por = $2, revisado_at = NOW(), pago_id = $3 WHERE id = $1`,
-      [id, por, pagoId])
+    await cerrar(pagoId)
     await client.query('COMMIT')
-    resultado = { org: k.organizacion_id, userId: k.user_id, hasta, plan: k.plan }
+    resultado = { org: k.organizacion_id, userId: k.user_id, hasta, plan: k.plan,
+      mensaje: `✅ <b>Pago aprobado</b>\nTu plan ${esc(nombrePlan(k.plan))} está activo hasta el <b>${ddmm(hasta)}</b>. ¡Gracias!` }
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
     throw e
   } finally { client.release() }
-  const plan = PLANES.find(p => p.id === resultado.plan)?.nombre ?? resultado.plan
-  avisarCliente(resultado.userId, `✅ <b>Pago aprobado</b>\nTu plan ${esc(plan)} está activo hasta el <b>${resultado.hasta.split('-').reverse().join('/')}</b>. ¡Gracias!`)
+  avisarCliente(resultado.userId, resultado.mensaje)
   return resultado
 }
 
@@ -352,14 +489,20 @@ function avisarCliente(userId: number | null, html: string) {
 /** Lo que ve Plataforma → Cobros: por revisar, los que vencen pronto y lo último revisado. */
 export async function panelCobros() {
   const db = dbGlobal()
-  const [{ rows: pendientes }, { rows: vencen }, { rows: recientes }, datos] = await Promise.all([
-    db.query(`SELECT k.id, k.organizacion_id, o.nombre AS organizacion, COALESCE(u.full_name, u.username) AS persona, k.plan, k.escalon,
+  // 06-11 (el dueño): cada cobro con su desglose (plan, escalón, meses, descuento, Radar, cuentas extra) y las fechas
+  // que cubre, más lo que la cuenta tiene vigente hoy (plan y Radar PRO).
+  const SELECT_PANEL = `SELECT k.id, k.organizacion_id, o.nombre AS organizacion, COALESCE(u.full_name, u.username) AS persona, k.tipo, k.plan, k.escalon,
                      k.ciclo, k.radar_pro, k.cuentas_extra, k.ventas_30d, k.monto_usd::float, k.metodo, k.tasa_bcv::float, k.monto_bs::float,
                      k.referencia, to_char(k.fecha_pago, 'YYYY-MM-DD') AS fecha_pago, k.creado_at, k.comprobante IS NOT NULL AS tiene_comprobante,
+                     k.estado, k.motivo, k.revisado_at, k.detalle, o.fundador,
+                     to_char(p.desde, 'YYYY-MM-DD') AS p_desde, to_char(p.hasta, 'YYYY-MM-DD') AS p_hasta,
                      o.estado AS org_estado, to_char(COALESCE(o.plan_hasta, o.prueba_hasta), 'YYYY-MM-DD') AS vence,
+                     to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta,
                      ${SQL_REF_REPETIDA} AS repetida
               FROM organizacion_cobros k JOIN organizaciones o ON o.id = k.organizacion_id LEFT JOIN users u ON u.id = k.user_id
-              WHERE k.estado = 'revision' ORDER BY k.creado_at`),
+              LEFT JOIN organizacion_pagos p ON p.id = k.pago_id`
+  const [{ rows: pendientes }, { rows: vencen }, { rows: recientes }, datos] = await Promise.all([
+    db.query(`${SELECT_PANEL} WHERE k.estado = 'revision' ORDER BY k.creado_at`),
     db.query(`SELECT o.id, o.nombre, o.estado, o.plan, to_char(COALESCE(CASE WHEN o.estado = 'activo' THEN o.plan_hasta END, o.prueba_hasta, o.plan_hasta), 'YYYY-MM-DD') AS vence,
                      (SELECT k.estado FROM organizacion_cobros k WHERE k.organizacion_id = o.id ORDER BY k.creado_at DESC LIMIT 1) AS ultimo_cobro
               FROM organizaciones o
@@ -367,13 +510,22 @@ export async function panelCobros() {
                 AND COALESCE(CASE WHEN o.estado = 'activo' THEN o.plan_hasta END, o.prueba_hasta)
                     BETWEEN (NOW() AT TIME ZONE 'America/Caracas')::date AND (NOW() AT TIME ZONE 'America/Caracas')::date + 7
               ORDER BY 5, o.nombre`, [ORGANIZACION_PLATAFORMA]),
-    db.query(`SELECT k.id, o.nombre AS organizacion, k.plan, k.monto_usd::float, k.metodo, k.referencia, k.estado, k.motivo,
-                     k.revisado_at, k.comprobante IS NOT NULL AS tiene_comprobante
-              FROM organizacion_cobros k JOIN organizaciones o ON o.id = k.organizacion_id
-              WHERE k.estado <> 'revision' ORDER BY k.revisado_at DESC NULLS LAST LIMIT 20`),
+    db.query(`${SELECT_PANEL} WHERE k.estado <> 'revision' ORDER BY k.revisado_at DESC NULLS LAST LIMIT 20`),
     leerDatosCobro(),
   ])
-  return { pendientes, vencen, recientes, datos }
+  return { pendientes: pendientes.map(conDesglose), vencen, recientes: recientes.map(conDesglose), datos }
+}
+
+/** El desglose guardado, o reconstruido de las columnas para los cobros de antes de la mig. 143. */
+function conDesglose(k: Record<string, unknown>) {
+  const { detalle, fundador, p_desde, p_hasta, ...resto } = k as Record<string, unknown> & { detalle: Detalle | null; fundador: boolean; p_desde: string | null; p_hasta: string | null }
+  let lineas = detalle?.lineas
+  if (!lineas) {
+    const c = k as { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; cuentas_extra: number; radar_pro: boolean; monto_usd: number }
+    const plan = montoPlan(c.plan as Plan['id'], c.escalon, c.ciclo, !!fundador, c.cuentas_extra).total
+    lineas = desglosePlan(c.plan, c.escalon, c.ciclo, !!fundador, c.cuentas_extra, c.radar_pro ? r2(c.monto_usd - plan) : 0)
+  }
+  return { ...resto, lineas, desde: detalle?.desde ?? p_desde, hasta: detalle?.hasta ?? p_hasta }
 }
 
 // ── Comprobante ──────────────────────────────────────────────────────────────────────────────────────────────────

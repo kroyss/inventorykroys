@@ -12,7 +12,7 @@ export interface DatosPlan {
   empresas: { id: number; nombre: string }[]
 }
 interface Pago {
-  id: number; tipo: 'plan' | 'recarga' | 'radar_pro'; fecha: string; monto: number | null; plan: string | null; escalon: number | null
+  id: number; tipo: 'plan' | 'recarga' | 'radar_pro' | 'upgrade'; fecha: string; monto: number | null; plan: string | null; escalon: number | null
   ciclo: string | null; desde: string | null; hasta: string | null; creditos: number | null; nota: string | null; empresa: string | null; por: string | null
 }
 
@@ -153,7 +153,7 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
                   <span className="text-neutral-400">{new Date(p.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'America/Caracas' })}</span>{' '}
                   {p.tipo === 'plan' ? <>{nombrePlan(p.plan)} · {p.ciclo}{p.hasta ? ` · hasta ${ddmmaa(p.hasta)}` : ''}</>
                     : p.tipo === 'recarga' ? <>Recarga {p.creditos} créditos{p.empresa && d.empresas.length > 1 ? ` · ${p.empresa}` : ''}</>
-                    : <>Radar PRO{p.hasta ? ` hasta ${ddmmaa(p.hasta)}` : ''}</>}
+                    : p.tipo === 'upgrade' ? <>Cambio a {nombrePlan(p.plan)}{p.hasta ? ` · hasta ${ddmmaa(p.hasta)}` : ''}</> : <>Radar PRO{p.hasta ? ` hasta ${ddmmaa(p.hasta)}` : ''}</>}
                   {p.nota && <span className="text-neutral-400"> · {p.nota}</span>}
                 </span>
                 <span className="font-medium whitespace-nowrap">{p.monto != null ? usd(p.monto) : '—'}</span>

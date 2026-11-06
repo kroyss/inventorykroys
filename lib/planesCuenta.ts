@@ -16,7 +16,7 @@ export async function vencerPlanes() {
        FROM organizaciones antes
        WHERE antes.id = o.id AND o.estado = 'activo' AND o.plan_hasta IS NOT NULL
          AND o.plan_hasta < (NOW() AT TIME ZONE 'America/Caracas')::date
-         AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision'
+         AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision' AND k.tipo = 'plan'
                            AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= o.plan_hasta)
        RETURNING o.id, o.nombre, antes.fundador AS era_fundador),
      f AS (
@@ -31,7 +31,7 @@ export async function vencerPlanes() {
     `WITH v AS (
        UPDATE organizaciones o SET fundador = false
        WHERE o.fundador AND o.estado = 'prueba' AND o.prueba_hasta < (NOW() AT TIME ZONE 'America/Caracas')::date
-         AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision'
+         AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision' AND k.tipo = 'plan'
                            AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= o.prueba_hasta)
        RETURNING o.id, o.nombre)
      INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle)

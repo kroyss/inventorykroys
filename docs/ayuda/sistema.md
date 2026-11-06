@@ -99,7 +99,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
   domingos** por **+$6 al mes**; el primer mes de PRO va de regalo **solo una vez, en tu primer plan**
-  (si renuevas, o suspendes y vuelves, ya no: se agrega pagando, a precio completo, sin descuento). Sin plan, el Radar queda en
+  (si renuevas, o suspendes y vuelves, ya no). Después se compra **aparte, de a 1 mes (, sin descuento)**, cuando
+  quieras mientras tengas un plan activo con Radar: en **Mi plan → Agregar Radar PRO** (cada mes se suma a continuación
+  del que ya tengas). Ya no va dentro del pago del plan. Sin plan, el Radar queda en
   solo lectura (ve lo que guardó).
 - **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 5 días aparece un aviso arriba de
   todas las pantallas (en rojo el último día y el anterior; el mismo aviso que al terminar la prueba gratis, que
@@ -115,9 +117,11 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
-     Puedes elegir mensual o trimestral (−10%) y agregar el Radar PRO ($6/mes, sin descuento). En tu primer plan el
-     primer mes de PRO es de regalo (en trimestral pagas solo los meses 2 y 3 si lo quieres); si lo tienes vigente,
-     al renovar ya viene marcado.
+     Puedes elegir mensual o trimestral (−10%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo.
+     Con un plan activo, arriba eliges **qué pagar**: **Renovar plan**, **Agregar Radar PRO** (1 mes, $6) o
+     **Mejorar mi plan** (pasar a uno más caro desde hoy: pagas solo la diferencia por mes, con el mismo descuento que
+     tiene tu plan, por los días que le quedan; la fecha de vencimiento no cambia y ahí renuevas ya con el nuevo).
+     Para **bajar de plan**, elige el otro al renovar (no hay devolución de lo ya pagado).
   2. Pagas por **Pago Móvil** (en bolívares, a tasa BCV del día: el monto ya sale convertido) o **Binance** (USDT).
      Los datos tienen botón de copiar.
   3. Tocas **Ya pagué**: escribes la referencia (en Binance, el ID de la orden), la fecha y adjuntas la captura.

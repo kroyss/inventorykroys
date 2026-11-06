@@ -9,7 +9,8 @@ import { ErrorCobro, MAX_MB_COMPROBANTE, TIPOS_COMPROBANTE, reportarCobro, situa
 
 // Mi plan (02-11-2026, migración 141): lo que paga según sus ventas, los datos de pago y "Ya pagué".
 //   GET  → situación (estado, ventas y escalón, opciones, datos de cobro, último pago y anteriores)
-//   POST (multipart: plan, ciclo, radar_pro, metodo, referencia, fecha_pago, archivo) → reporta el pago
+//   POST (multipart: tipo, plan, ciclo, metodo, referencia, fecha_pago, archivo) → reporta el pago
+//     tipo (06-11, mig. 143): plan (elegir/renovar) · radar_pro (1 mes aparte) · upgrade (plan = el nuevo)
 // Quién: el admin de una organización cliente con sesión, o con el acceso firmado de /renovar (cuenta vencida,
 // header x-renovar). Nunca la organización propietaria (no paga plan).
 async function quien(req: NextRequest) {
@@ -32,9 +33,9 @@ export async function GET(req: NextRequest) {
 }
 
 const Reporte = z.object({
+  tipo: z.enum(['plan', 'radar_pro', 'upgrade']).catch('plan'),
   plan: z.enum(['esencial', 'automatizaciones', 'completo']),
   ciclo: z.enum(['mensual', 'trimestral']),
-  radar_pro: z.enum(['0', '1']).transform(v => v === '1'),
   metodo: z.enum(['pago_movil', 'binance']),
   referencia: z.string().trim().min(3, 'Escribe la referencia del pago').max(80),
   fecha_pago: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'),
@@ -46,14 +47,14 @@ export async function POST(req: NextRequest) {
   if (q.lectura) return NextResponse.json({ error: 'Estás viendo como otra persona: el pago lo reporta el cliente.' }, { status: 403 })
   try {
     const f = await req.formData()
-    const b = Reporte.parse(Object.fromEntries(['plan', 'ciclo', 'radar_pro', 'metodo', 'referencia', 'fecha_pago'].map(k => [k, String(f.get(k) ?? '')])))
+    const b = Reporte.parse(Object.fromEntries(['tipo', 'plan', 'ciclo', 'metodo', 'referencia', 'fecha_pago'].map(k => [k, String(f.get(k) ?? '')])))
     const a = f.get('archivo')
     const archivo = a && typeof a !== 'string' && a.size > 0 ? a : null
     if (!archivo) return NextResponse.json({ error: 'Adjunta la captura del pago' }, { status: 400 })
     if (!TIPOS_COMPROBANTE[archivo.type]) return NextResponse.json({ error: 'La captura debe ser una imagen (PNG, JPG) o un PDF' }, { status: 400 })
     if (archivo.size > MAX_MB_COMPROBANTE * 1024 * 1024) return NextResponse.json({ error: `La captura pesa más de ${MAX_MB_COMPROBANTE} MB` }, { status: 400 })
     const id = await reportarCobro(q.orgId, q.userId, {
-      plan: b.plan, ciclo: b.ciclo, radarPro: b.radar_pro, metodo: b.metodo, referencia: b.referencia, fechaPago: b.fecha_pago,
+      tipo: b.tipo, plan: b.plan, ciclo: b.ciclo, metodo: b.metodo, referencia: b.referencia, fechaPago: b.fecha_pago,
       archivo: { tipo: archivo.type, datos: Buffer.from(await archivo.arrayBuffer()) },
     })
     return NextResponse.json({ ok: true, id })
