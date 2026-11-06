@@ -39,6 +39,10 @@ export function leerMiIA(json: string | null | undefined): MiIA | null {
   } catch { return null }
 }
 
+/** Teléfono, correo o link (MercadoLibre borra o sanciona las respuestas que los tienen). */
+export const datoDeContacto = (s?: string | null) =>
+  !!s && (/\d[\d\s.-]{8,}\d/.test(s) || /@|https?:|www\.|\.com\b|wa\.me|whats?app|instagram|telegram/i.test(s))
+
 const lista = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}`
 const limpio = (s?: string | null) => (s ?? '').trim()
 

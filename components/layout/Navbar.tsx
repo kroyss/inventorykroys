@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import UserMenu from './UserMenu'
+import { puede } from '@/lib/permisos'
 import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
 import AprendizajeNav from './AprendizajeNav'
@@ -49,7 +50,8 @@ export default async function Navbar() {
             <UserMenu nombre={session.user.name ?? 'Cuenta'} rol={role} empresa={session.user.empresaNombre ?? null}
               ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'}
               pagosME={role === 'admin' && modulos.includes('pagos_me') && modulos.includes('despachos_ventas') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos}
-              miPlan={role === 'admin' && !!session.user.organizacionId && session.user.organizacionId !== ORGANIZACION_PLATAFORMA} />
+              miPlan={role === 'admin' && !!session.user.organizacionId && session.user.organizacionId !== ORGANIZACION_PLATAFORMA}
+              miIA={modulos.includes('mi_ia') && modulos.includes('preguntas') && puede(session.user, 'automatizaciones_config')} />
           )}
         </div>
 

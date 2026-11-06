@@ -20,5 +20,6 @@ export default async function MensajesPage({ searchParams }: { searchParams: Pro
         'La IA te propone la respuesta; tú la revisas y la envías.']} />
   }
   const { pack } = await searchParams
-  return <MensajesClient pack={pack && /^\d{6,20}$/.test(pack) ? pack : null} />
+  return <MensajesClient pack={pack && /^\d{6,20}$/.test(pack) ? pack : null}
+    miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')} />
 }

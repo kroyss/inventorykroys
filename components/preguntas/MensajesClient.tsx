@@ -1,4 +1,5 @@
 'use client'
+import MiIA from '@/components/miia/MiIA'
 import SituacionChip, { type Situacion } from './SituacionChip'
 import AvisoPesos from './AvisoPesos'
 import type { ConflictoPesos } from '@/lib/mlShipping'
@@ -37,8 +38,8 @@ function hace(fecha: string | null) {
 }
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
-export default function MensajesClient({ pack: packPedido = null }: { pack?: string | null }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar'>(packPedido ? 'todas' : 'sin_leer')
+export default function MensajesClient({ pack: packPedido = null, miIA = false }: { pack?: string | null; miIA?: boolean }) {
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia'>(packPedido ? 'todas' : 'sin_leer')
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [conRecordatorios, setConRecordatorios] = useState(false)
@@ -65,7 +66,7 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
   const ultimoPedido = useRef(0)
   const cargar = useCallback(async () => {
     const id = ++ultimoPedido.current
-    const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' ? 'sin_leer' : vista
+    const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' || vista === 'mi_ia' ? 'sin_leer' : vista
     const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`).catch(() => null)
     if (id !== ultimoPedido.current) return
     if (!r) { setError('Sin conexión: no se pudo cargar'); return }
@@ -117,8 +118,9 @@ export default function MensajesClient({ pack: packPedido = null }: { pack?: str
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
         { value: 'al_comprar' as const, label: 'Al comprar' },
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
+        ...(miIA ? [{ value: 'mi_ia' as const, label: 'Mi IA' }] : []),
       ]} />
-      {vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
+      {vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo
