@@ -452,6 +452,10 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
       `Si la pregunta es de disponibilidad, precio, envío o retiro, usa la que corresponda casi tal cual (solo ajusta lo mínimo):\n` +
       aplican.map(p => `- [${p.titulo}] (${condicionPlantilla(p)}): ${p.texto}`).join('\n'))
   }
+  // 06-11: con "¿tiene disponible 3?" en un producto de $2,19 respondió solo "sí, las 3" y se saltó el mínimo de 2 para
+  // el envío gratis ("no agregues lo que no preguntó"). Si la respuesta rápida que aplica por precio pide un mínimo, va siempre.
+  const minimo = aplican.find(p => p.precio_hasta != null && /m[ií]nimo/i.test(p.texto))
+  if (minimo) L.push(`\nOBLIGATORIO EN ESTE PRODUCTO: si confirmas disponibilidad, precio o envío, di SIEMPRE el mínimo de compra para el envío gratis como en la respuesta rápida [${minimo.titulo}], aunque el comprador no lo pregunte o pida más unidades que el mínimo.`)
   if (c.notas.length) L.push(`\nDATOS QUE EL VENDEDOR ANOTÓ DE ESTA PUBLICACIÓN:\n- ${c.notas.join('\n- ')}`)
   if (c.ficha) L.push(`\nFICHA DE CONOCIMIENTO (lo que el vendedor ya respondió de esta publicación, resumido):\n${c.ficha.texto}`)
   if (c.otras.length) {
