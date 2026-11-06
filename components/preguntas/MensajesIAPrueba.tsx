@@ -9,13 +9,14 @@ type Caso = {
   marca: 'bien' | 'mal' | null; comprador_nombre: string | null; comprador_nick: string | null; productos: string | null
   cuenta: string | null; equipo: string | null
 }
+type Contra = { item_id: string; titulo: string; permalink: string | null; contradicciones: string }
 type Resumen = { total: number; solas: number; revisar: number; nada: number; marcadas: number; bien: number; solasMarcadas: number; solasBien: number }
 
 const fecha = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0)
 
 export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string) => void }) {
-  const [d, setD] = useState<{ casos: Caso[]; resumen: Resumen } | null>(null)
+  const [d, setD] = useState<{ casos: Caso[]; contradicciones?: Contra[]; resumen: Resumen } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<'todas' | 'sola' | 'revisar' | 'sin_marcar'>('todas')
   const cargar = () => fetch('/api/mensajes/ia-prueba').then(async r => {
@@ -53,6 +54,20 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
           </div>
         ))}
       </div>
+      {!!d.contradicciones?.length && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
+          <p className="font-medium">Publicaciones que se contradicen ({d.contradicciones.length})</p>
+          <p className="text-xs">Al leer las fotos, la ficha y la descripción, la IA encontró datos que no coinciden. Corrígelos en MercadoLibre: mientras tanto la IA no responde sola sobre eso.</p>
+          <ul className="space-y-1.5">
+            {d.contradicciones.map(x => (
+              <li key={x.item_id} className="text-xs">
+                {x.permalink ? <a href={x.permalink} target="_blank" rel="noreferrer" className="font-medium underline">{x.titulo}</a> : <span className="font-medium">{x.titulo}</span>}
+                <span className="text-amber-800"> · {x.contradicciones}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {([['todas', 'Todas'], ['sola', 'Saldrían solas'], ['revisar', 'A revisión'], ['sin_marcar', 'Sin marcar']] as const).map(([k, t]) => (
           <button key={k} type="button" onClick={() => setFiltro(k)}

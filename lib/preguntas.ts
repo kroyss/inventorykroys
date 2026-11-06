@@ -20,6 +20,7 @@ import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { completarNombres } from '@/lib/porConfirmar'
 import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
+import { contextoFotos, fichaDeAtributos, lineasFotos, type ContextoFotos, type FotoML } from '@/lib/fotosIA'
 import { verificarBorrador } from '@/lib/verificadorIA'
 import { esDemo } from '@/lib/demo'
 import { riesgoDe } from '@/lib/sugerenciasPreguntas'
@@ -238,6 +239,7 @@ interface ItemML {
   shipping?: { free_shipping?: boolean }
   warranty?: string | null
   variations?: VariacionML[]
+  pictures?: FotoML[]
 }
 
 /** Textos de la publicación (título, descripción, ficha, producto) para comprobar lo que la IA afirma. */
@@ -260,6 +262,7 @@ export interface Contexto {
   mismoItem: { p: string; r: string }[]
   parecidas: { p: string; r: string }[]
   ficha: { texto: string; dudas: string | null } | null     // ficha de conocimiento de la publicación
+  fotos?: ContextoFotos | null                               // lo que se ve en las fotos (mig 146)
   otras: OtraPublicacion[]                                   // otras publicaciones del vendedor
   variantes?: Variante[]                                     // stock por variante (31-10)
   delComprador?: { p: string; r: string | null; fecha: string }[]   // sus preguntas anteriores (31-10)
@@ -276,7 +279,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Con `attributes=` explícito: el GET completo lo puede frenar el PolicyAgent de ML.
   try {
     item = await mlFetch<ItemML>(db, q.conexion_id, `/items/${q.item_id}?attributes=` +
-      'id,title,price,currency_id,available_quantity,condition,status,permalink,category_id,attributes,shipping,warranty,variations')
+      'id,title,price,currency_id,available_quantity,condition,status,permalink,category_id,attributes,shipping,warranty,variations,pictures')
   } catch { /* sin datos de ML: la IA trabaja con el resto */ }
   try {
     const d = await mlFetch<{ plain_text?: string }>(db, q.conexion_id, `/items/${q.item_id}/description`)
@@ -334,6 +337,9 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Se pidió IA en esta publicación: desde ahora merece ficha (fichas POR USO, migración 063).
   await db.query(`UPDATE ml_catalogo SET ia_usada_at = NOW() WHERE item_id = $1`, [q.item_id]).catch(() => {})
   const otras = await otrasPublicaciones(db, q.item_id, item?.title ?? q.item_titulo ?? '', q.texto).catch(() => [])
+  // Fotos (mig 146): leídas una vez por publicación; se releen solo si cambió la publicación.
+  const fotos = item ? await contextoFotos(db, q.conexion_id, q.item_id,
+    { titulo: item.title, ficha: fichaDeAtributos(item.attributes), descripcion, fotos: item.pictures ?? [] }) : null
   const variantes = await variantesDe(db, q.item_id, item?.variations).catch(() => [])
   // Lo que este comprador ya preguntó en los últimos 7 días (31-10): "Sería a El Tocuyo" contesta a "¿cuánto tarda Zoom?".
   const { rows: delComprador } = q.comprador_id ? await db.query(
@@ -354,7 +360,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     plantillas: leerPlantillas(pl?.value),
     notas: notas.map(n => n.texto),
     mismoItem: mismo, parecidas,
-    ficha: ficha ?? null, otras,
+    ficha: ficha ?? null, otras, fotos,
     variantes, delComprador: delComprador.reverse(),
   }
 }
@@ -397,7 +403,7 @@ Cómo responder:
 - No prometas descuentos ni cosas fuera de las políticas.
 
 Reglas estrictas (una respuesta equivocada publicada sola le cuesta una venta o un reclamo al vendedor):
-- Colores, tallas, medidas, números técnicos (temperatura, voltaje, capacidad, autonomía) y qué incluye: SOLO si están escritos en el título, la ficha técnica, la descripción, la tabla VARIANTES o las notas del vendedor, y cópialos EXACTOS (mismo número, misma unidad). Nunca los deduzcas de las fotos, del nombre del modelo ni de otras publicaciones. Si preguntan "¿qué colores tienes?" y no hay VARIANTES ni color escrito, no nombres colores: confianza "baja".
+- Colores, tallas, medidas, números técnicos (temperatura, voltaje, capacidad, autonomía) y qué incluye: SOLO si están escritos en el título, la ficha técnica, la descripción, la tabla VARIANTES, las notas del vendedor o LO QUE SE VE EN LAS FOTOS (cuando es texto impreso en la caja o la etiqueta, o lo que trae el paquete), y cópialos EXACTOS (mismo número, misma unidad). Nunca los deduzcas por tu cuenta de las fotos, del nombre del modelo ni de otras publicaciones. Si preguntan "¿qué colores tienes?" y no hay VARIANTES ni color escrito, no nombres colores: confianza "baja".
 - Ubicación, retiro, garantía, factura, plazos de despacho y formas de pago: SOLO lo que dicen las POLÍTICAS o las RESPUESTAS RÁPIDAS. No nombres ciudades ni zonas que no estén ahí.
 - Envío gratis: SOLO según la línea "ENVÍO GRATIS A ESTE PRECIO" (si está) o las POLÍTICAS para el precio actual. Los montos y mínimos que digan las respuestas anteriores pueden estar viejos: no los copies.
 - Si pide una cantidad (2, 3…) y el stock alcanza, confírmala. Si no alcanza, no la afirmes ni lo mandes a otra publicación: confianza "baja".
@@ -437,6 +443,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   }
   if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM o TEALCA, responde según esto.`)
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, r.descripcion)}`)
+  for (const l of lineasFotos(c.fotos ?? null)) L.push(`\n${l}`)
   if (c.producto) {
     L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)
   } else {

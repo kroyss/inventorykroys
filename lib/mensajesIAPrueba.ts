@@ -112,11 +112,16 @@ export async function listaPrueba(db: Pool) {
      LEFT JOIN ml_conversaciones c ON c.pack_id = i.pack_id
      LEFT JOIN ml_conexiones x ON x.id = i.conexion_id
      ORDER BY i.mensaje_at DESC LIMIT 300`)
+  // Publicaciones que se contradicen (fotos / ficha / descripción, mig 146): para corregirlas en ML.
+  const { rows: contradicciones } = await db.query(
+    `SELECT f.item_id, COALESCE(c.titulo, f.item_id) AS titulo, c.permalink, f.contradicciones, f.leido_at
+     FROM ml_item_fotos_ia f LEFT JOIN ml_catalogo c ON c.item_id = f.item_id
+     WHERE f.contradicciones IS NOT NULL ORDER BY f.leido_at DESC LIMIT 50`).catch(() => ({ rows: [] }))
   const listos = rows.filter(r => r.estado === 'listo')
   const solas = listos.filter(r => r.decision === 'sola')
   const marcadas = listos.filter(r => r.marca)
   return {
-    casos: rows,
+    casos: rows, contradicciones,
     resumen: {
       total: listos.length, solas: solas.length, revisar: listos.filter(r => r.decision === 'revisar').length,
       nada: listos.filter(r => r.decision === 'nada').length,

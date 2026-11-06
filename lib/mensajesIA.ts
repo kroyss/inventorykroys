@@ -11,6 +11,7 @@ import { itemsDeVenta, envioML, leerHilo, sugerenciasMensaje, textoPlano } from 
 import { leerNotas } from '@/lib/notasML'
 import { mlFetch } from '@/lib/ml'
 import { fichasActivas } from '@/lib/fichasIA'
+import { contextoFotos, fichaDeAtributos, lineasFotos, type FotoML } from '@/lib/fotosIA'
 
 const ESTADO_VENTA: Record<string, string> = {
   BORRADOR: 'cargada en el sistema, pago todavía sin verificar',
@@ -27,11 +28,12 @@ Cómo responder:
 - Responde a lo ÚLTIMO que escribió el comprador, teniendo en cuenta toda la conversación, la nota de la venta y su estado.
 - Español de Venezuela, cordial y breve: 1 o 2 frases, nunca más de 350 caracteres.
 - Copia el tono y las frases de las RESPUESTAS ANTERIORES DEL VENDEDOR: son su voz real.
-- Para dudas del producto (cómo se usa, qué incluye, compatibilidad) usa su FICHA, DESCRIPCIÓN y FICHA DE CONOCIMIENTO.
+- Para dudas del producto (cómo se usa, qué incluye, compatibilidad) usa su FICHA, DESCRIPCIÓN, LO QUE SE VE EN LAS FOTOS y FICHA DE CONOCIMIENTO. Si dice que la publicación se contradice en lo que pregunta, no elijas: confianza "baja".
 - En Venezuela MercadoLibre no tiene carrito de compras: no lo menciones.
 - Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
 - Usa SOLO los datos que te doy. Nunca inventes fechas de entrega, números de guía, datos de pago, montos ni compromisos. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
 - Si hay GUÍA de envío, puedes darla. Si no la hay, no digas que ya se envió.
+- Si dice "PAGO: ya pagó en MercadoEnvíos", la compra YA está pagada: nunca digas que el pago no aparece ni que lo van a verificar. Si el comprador habla de un pago APARTE (embalaje, diferencia, un adicional), ese sí lo verifica el equipo: confirma que la compra ya está pagada (y la guía si la hay) y di que verifican ese pago aparte y le confirman por este chat.
 - Si pregunta algo que depende del equipo y no está en los datos (cuándo sale el paquete, desde qué oficina, un problema con el pago o el formulario), no lo inventes: responde que lo verifican con el equipo y le avisan por este chat, con confianza "baja" y el dato en "falta_dato".
 - Si el comprador solo manda un emoji o un "ok", no hace falta responder: deja la respuesta vacía con confianza "alta".
 - Si el comprador solo saluda o agradece, responde corto y amable.
@@ -94,30 +96,50 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     await db.query(`UPDATE ml_catalogo SET ia_usada_at = NOW() WHERE item_id = $1`, [it.id]).catch(() => {})
     const desc = await mlFetch<{ plain_text?: string }>(db, conexionId, `/items/${it.id}/description`)
       .then(d => d.plain_text?.trim() || null).catch(() => null)
-    if (!cat?.ficha && !fc?.texto && !desc) continue
+    // Fotos (mig 146): una vez por publicación; misma huella que Preguntas (ficha de los atributos en vivo).
+    const pub = await mlFetch<{ attributes?: { name: string; value_name: string | null }[]; pictures?: FotoML[] }>(
+      db, conexionId, `/items/${it.id}?attributes=attributes,pictures`).catch(() => null)
+    const fotos = pub ? await contextoFotos(db, conexionId, it.id,
+      { titulo: it.titulo, ficha: fichaDeAtributos(pub.attributes), descripcion: desc, fotos: pub.pictures ?? [] }) : null
+    const lf = lineasFotos(fotos)
+    if (!cat?.ficha && !fc?.texto && !desc && !lf.length) continue
     L.push(`\nPRODUCTO "${it.titulo}":`)
     if (cat?.ficha) L.push(`Ficha: ${cat.ficha}`)
     if (desc) L.push(`Descripción: ${desc.slice(0, 2500)}`)
+    L.push(...lf)
     if (fc?.texto) L.push(`Ficha de conocimiento (lo que el vendedor ya respondió de este producto):\n${fc.texto}`)
   }
   if (venta?.comprador.nombre || venta?.comprador.nick) L.push(`COMPRADOR: ${[venta.comprador.nombre, venta.comprador.nick].filter(Boolean).join(' · ')}`)
   const { rows: [s] } = await db.query(`SELECT status, notes FROM sales WHERE ml_order_number = $1`, [pack])
+  // Guía y pago (06-11): en MLV la guía de MercadoEnvíos sale cuando el comprador COMPLETA el pago en
+  // checkout.mercadoenvios; ML lo avisa con un mensaje automático en el chat. Fuente: el envío en ML;
+  // respaldo: ese aviso. Que la venta no esté cargada en Ventas NO quiere decir que no pagó.
+  const avisoGuia = [...hilo.mensajes].reverse()
+    .map(m => /n[uú]mero de gu[ií]a para tu env[ií]o es:?\s*([A-Z0-9-]{5,})/i.exec(textoPlano(m.texto))?.[1]).find(Boolean) ?? null
+  let g: { carrier?: string; guia?: string; jornada?: string } | undefined
+  let ml: Awaited<ReturnType<typeof envioML>> = null
+  if (country === 'VE') {
+    ({ rows: [g] } = await db.query(
+      `SELECT e.carrier, COALESCE(e.guia_final, e.guia) AS guia, j.status AS jornada, j.closed_at
+       FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id JOIN despacho_jornadas j ON j.id = l.jornada_id
+       WHERE e.venta = $1 AND e.impresa AND l.status = 'GENERADO' ORDER BY e.id DESC LIMIT 1`, [pack]))
+    // Sin Despachos: la guía y el estado que da MercadoEnvíos (31-10).
+    ml = venta?.envioId ? await envioML(db, conexionId, venta.envioId).catch(() => null) : null
+  }
+  const guiaME = ml?.guia || avisoGuia
+  const pagadoME = !!(g || guiaME)
+  const lineaPago = pagadoME ? `PAGO: ya pagó en MercadoEnvíos (la compra está pagada${guiaME ? `, guía ${guiaME}` : ''}). Si habla de un pago aparte (embalaje, diferencia), ese lo verifica el equipo.` : null
   if (conInventario) {
-    L.push(s ? `ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada (el pago no se ha registrado).')
+    L.push(s ? `ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada en el sistema.')
   } else {
     const { rows: [o] } = await db.query(`SELECT estado FROM ml_ordenes WHERE id::text = $1 OR pack_id::text = $1 LIMIT 1`, [pack])
     if (o?.estado === 'cancelled') L.push('ESTADO DE LA VENTA: cancelada en MercadoLibre.')
   }
+  if (lineaPago) L.push(lineaPago)
   if (country === 'VE') {
-    const { rows: [g] } = await db.query(
-      `SELECT e.carrier, COALESCE(e.guia_final, e.guia) AS guia, j.status AS jornada, j.closed_at
-       FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id JOIN despacho_jornadas j ON j.id = l.jornada_id
-       WHERE e.venta = $1 AND e.impresa AND l.status = 'GENERADO' ORDER BY e.id DESC LIMIT 1`, [pack])
-    // Sin Despachos: la guía y el estado que da MercadoEnvíos (31-10).
-    const ml = !g && venta?.envioId ? await envioML(db, conexionId, venta.envioId).catch(() => null) : null
     if (g) L.push(`ENVÍO: guía ${g.carrier} ${g.guia}` + (g.jornada === 'CERRADA' ? ' (paquete entregado al transportista)' : ' (etiqueta impresa, el paquete todavía no salió)'))
-    else if (ml?.guia) L.push(`ENVÍO (MercadoEnvíos): guía ${[ml.transportista, ml.guia].filter(Boolean).join(' ')}${ml.estado ? ` · estado en ML: ${ml.estado}` : ''}`)
-    else L.push('ENVÍO: todavía no tiene guía impresa (no se ha despachado).')
+    else if (guiaME) L.push(`ENVÍO (MercadoEnvíos): guía ${ml?.guia ? [ml.transportista, ml.guia].filter(Boolean).join(' ') : guiaME}${ml?.estado ? ` · estado en ML: ${ml.estado}` : ''} (guía generada; el paquete todavía no se despachó si no dice lo contrario)`)
+    else L.push('ENVÍO: todavía no tiene guía (no se ha despachado).')
   }
   const textoNotas = [...notas.notas.map(n => n.texto), s?.notes].filter((x): x is string => !!x?.trim())
   if (textoNotas.length) L.push(`NOTA DE LA VENTA: ${[...new Set(textoNotas)].join(' · ')}`)

@@ -79,7 +79,7 @@ export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 
 }
 
 type Herramienta = { name: string; description: string; input_schema: object }
-interface Pedido { sistema: string; contenido: string; herramienta: Herramienta; web?: boolean; maxTokens?: number; modelo?: string }
+interface Pedido { sistema: string; contenido: string | unknown[]; herramienta: Herramienta; web?: boolean; maxTokens?: number; modelo?: string }
 
 const CABECERAS = () => ({
   'x-api-key': process.env.ANTHROPIC_API_KEY!,
