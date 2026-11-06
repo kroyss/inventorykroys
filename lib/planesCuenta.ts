@@ -37,11 +37,25 @@ export async function vencerPlanes() {
      INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle)
      SELECT id, 'fundador_perdido', 'prueba sin pagar' FROM v
      RETURNING organizacion_id, (SELECT nombre FROM v WHERE v.id = organizacion_id) AS fundador_perdido`)
-  if (!rows.length && !prueba.length) return null
+  // El dueño (06-11): pausada por LO QUE SEA (corte de Fundadores por no conectar ML, pausa a mano, plan) deja de ser
+  // Fundador; si vuelve, vuelve como usuario normal. Los cortes y la pausa manual no la quitaban.
+  const { rows: pausadas } = await dbGlobal().query(
+    `WITH v AS (
+       UPDATE organizaciones o SET fundador = false WHERE o.fundador AND o.estado = 'vencido'
+       RETURNING o.id, o.nombre, o.motivo_pausa)
+     INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle)
+     SELECT id, 'fundador_perdido', 'pausada (' || COALESCE(motivo_pausa, 'sin motivo') || ')' FROM v
+     RETURNING organizacion_id, (SELECT nombre FROM v WHERE v.id = organizacion_id) AS fundador_perdido`)
+  if (!rows.length && !prueba.length && !pausadas.length) return null
   const perdidos = [...rows, ...prueba].filter(r => r.fundador_perdido).map(r => String(r.fundador_perdido))
+  const perdidosPausa = pausadas.map(r => String(r.fundador_perdido))
+  if (perdidosPausa.length) {
+    const html = `🏷️ Dejó de ser Fundador (cuenta pausada): <b>${perdidosPausa.map(esc).join(', ')}</b>. Si vuelve, paga precio normal.`
+    for (const chat of await chatsDuenoPlataforma().catch(() => [])) await enviarTelegram(chat, html).catch(() => {})
+  }
   if (perdidos.length) {
     const html = `🏷️ Dejó de ser Fundador (venció sin pago): <b>${perdidos.map(esc).join(', ')}</b>. Si vuelve, paga precio normal.`
     for (const chat of await chatsDuenoPlataforma().catch(() => [])) await enviarTelegram(chat, html).catch(() => {})
   }
-  return { pausadas: rows.map(r => r.organizacion_id), fundadorPerdido: perdidos }
+  return { pausadas: rows.map(r => r.organizacion_id), fundadorPerdido: [...perdidos, ...perdidosPausa] }
 }
