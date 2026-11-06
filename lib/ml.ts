@@ -198,3 +198,31 @@ export async function usuarioML(accessToken: string) {
   if (!r.ok) throw new Error(`ML /users/me ${r.status}`)
   return r.json() as Promise<{ id: number; nickname: string; site_id: string }>
 }
+
+/** Resultado de leerItems: code -1 = no se pudo leer (ni en grupo ni de a una): NO es "ya no existe", no se borra. */
+export type ItemLeido<T> = { id: string; code: number; body: T | null }
+
+/** Lee publicaciones de a 20 (multiget /items?ids=). 06-11: en MLV el multiget responde a veces 403 "Resource deprecated"
+ *  (en una cuenta de 3.500 publicaciones, 6 de 176 grupos al azar) y UN grupo caído cortaba la revisión entera: lo que
+ *  venía después (las pausadas, justo las que se quedan sin stock) no se actualizaba. Ahora: el grupo que falla se
+ *  reintenta una vez y, si vuelve a fallar, se lee de a una (/items/{id}?attributes=, que no da ese error). Nunca corta. */
+export async function leerItems<T = unknown>(db: Pool, conexionId: number, ids: string[], attributes: string): Promise<ItemLeido<T>[]> {
+  const out: ItemLeido<T>[] = []
+  for (let i = 0; i < ids.length; i += 20) {
+    const lote = ids.slice(i, i + 20)
+    let r: { code: number; body: T & { id?: string } }[] | null = null
+    for (let intento = 0; intento < 2 && !r; intento++) {
+      try { r = await mlFetch(db, conexionId, `/items?ids=${lote.join(',')}&attributes=${attributes}`) }
+      catch (e) { if (intento === 0) await espera(1500); else console.error('[leerItems] grupo', conexionId, e instanceof Error ? e.message : e) }
+    }
+    if (r) {
+      lote.forEach((id, k) => { const x = r![k]; out.push({ id, code: x?.code ?? -1, body: x?.code === 200 ? x.body : null }) })
+      continue
+    }
+    for (const id of lote) {
+      try { out.push({ id, code: 200, body: await mlFetch<T>(db, conexionId, `/items/${id}?attributes=${attributes}`) }) }
+      catch (e) { out.push({ id, code: e instanceof ErrorML && e.status === 404 ? 404 : -1, body: null }) }
+    }
+  }
+  return out
+}

@@ -8,7 +8,7 @@
 // (la variante, o la publicación si no tiene variantes), según las ventas que ya se traen de ML
 // para Calificaciones (ml_ordenes.items). Lo que no se vende hace rato ya "murió" hasta reponerlo.
 import type { Pool } from 'pg'
-import { mlFetch } from '@/lib/ml'
+import { mlFetch, leerItems } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
 
 export const UMBRAL_DEFAULT = 3            // "por agotarse" = menos de esto (por empresa en Ajustes del módulo)
@@ -70,10 +70,11 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
   const ids = [...new Set([...await idsDe(db, conexionId, seller, 'active'), ...await idsDe(db, conexionId, seller, 'paused')])]
 
   let publicaciones = 0
+  const sinLeer: string[] = []          // ML no dejó leerlas en esta pasada: se quedan como estaban (no se borran)
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
-    const lote = ids.slice(i, i + POR_MULTIGET)
-    const r = await mlFetch<{ code: number; body: ItemML }[]>(db, conexionId,
-      `/items?ids=${lote.join(',')}&attributes=id,title,status,sub_status,available_quantity,permalink,thumbnail,variations`)
+    const r = await leerItems<ItemML>(db, conexionId, ids.slice(i, i + POR_MULTIGET),
+      'id,title,status,sub_status,available_quantity,permalink,thumbnail,variations')
+    sinLeer.push(...r.filter(x => x.code === -1).map(x => x.id))
     const filas: { item: string; var: number; titulo: string; variante: string | null; disp: number; estado: string; link: string | null; img: string | null; sub: string | null }[] = []
     for (const x of r) {
       const it = x.code === 200 ? x.body : null
@@ -124,7 +125,9 @@ export async function revisarStockCuenta(db: Pool, conexionId: number) {
        filas.map(f => f.disp), filas.map(f => f.estado), filas.map(f => f.link), filas.map(f => f.img), filas.map(f => f.sub)])
   }
   // Lo que ya no está publicado (cerrado, borrado): fuera. Las pausadas a mano se quedan (estado 'pausada').
-  await db.query(`DELETE FROM ml_stock_alertas WHERE conexion_id = $1 AND actualizado_at < $2`, [conexionId, inicio])
+  await db.query(`DELETE FROM ml_stock_alertas WHERE conexion_id = $1 AND actualizado_at < $2 AND NOT (item_id = ANY($3::text[]))`,
+    [conexionId, inicio, sinLeer])
+  if (sinLeer.length) console.error('[alertas stock] sin leer', conexionId, sinLeer.length)
   return { publicaciones }
 }
 

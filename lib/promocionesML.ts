@@ -9,7 +9,7 @@
 // Lo que esta versión NO ve: el descuento individual del vendedor (PRICE_DISCOUNT) ya aplicado; ML solo
 // lo da publicación por publicación (una consulta por publicación). Queda para la Fase 2.
 import type { Pool } from 'pg'
-import { mlFetch } from '@/lib/ml'
+import { mlFetch, leerItems } from '@/lib/ml'
 
 export interface CampanaML {
   id: string
@@ -58,9 +58,8 @@ export async function actualizarPromociones(db: Pool, conexionId: number): Promi
     if (offset + 100 >= r.paging.total || r.results.length === 0) break
   }
   const items = new Map<string, ItemML>()
-  for (let i = 0; i < ids.length; i += 20) {
-    const lote = await mlFetch<{ code: number; body: { id: string; title: string; price: number; status: string } }[]>(
-      db, conexionId, `/items?ids=${ids.slice(i, i + 20).join(',')}&attributes=id,title,price,status`)
+  {
+    const lote = await leerItems<{ id: string; title: string; price: number; status: string }>(db, conexionId, ids, 'id,title,price,status')
     for (const x of lote) if (x.code === 200 && x.body) {
       items.set(x.body.id, { id: x.body.id, titulo: x.body.title, precio: Number(x.body.price), estado: x.body.status, promos: [] })
     }

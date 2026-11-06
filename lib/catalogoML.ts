@@ -10,7 +10,7 @@
 //     (/questions/search?item=) se llega a TODAS. Una vez por publicación, de a pocas por pasada.
 // Solo LEE de MercadoLibre. Lo corre el cron de preguntas en segundo plano.
 import type { Pool } from 'pg'
-import { mlFetch } from '@/lib/ml'
+import { mlFetch, leerItems } from '@/lib/ml'
 import { idsDe } from '@/lib/alertasStock'
 import { guardarPregunta, type PreguntaML } from '@/lib/preguntas'
 
@@ -61,10 +61,11 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
   const ids = [...new Set([...await idsDe(db, conexionId, seller, 'active'), ...await idsDe(db, conexionId, seller, 'paused')])]
   const inicio = new Date()
   let n = 0
+  const sinLeer: string[] = []
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
-    const r = await mlFetch<{ code: number; body: ItemCatalogo }[]>(db, conexionId,
-      `/items?ids=${ids.slice(i, i + POR_MULTIGET).join(',')}` +
-      '&attributes=id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations')
+    const r = await leerItems<ItemCatalogo>(db, conexionId, ids.slice(i, i + POR_MULTIGET),
+      'id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations')
+    sinLeer.push(...r.filter(x => x.code === -1).map(x => x.id))
     for (const x of r) {
       const it = x.code === 200 ? x.body : null
       if (!it || (it.status !== 'active' && it.status !== 'paused')) continue
@@ -86,7 +87,8 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
   }
   // Sale del catálogo lo que ya no está activo ni pausado (finalizado, borrado). Lo pausado sin movimiento
   // (ni ventas ni preguntas en DIAS_MOVIMIENTO días) se queda, marcado.
-  await db.query(`DELETE FROM ml_catalogo WHERE conexion_id = $1 AND actualizado_at < $2`, [conexionId, inicio])
+  await db.query(`DELETE FROM ml_catalogo WHERE conexion_id = $1 AND actualizado_at < $2 AND NOT (item_id = ANY($3::text[]))`,
+    [conexionId, inicio, sinLeer])
   await db.query(
     `UPDATE ml_catalogo c SET sin_movimiento = (c.estado = 'paused'
        AND NOT EXISTS (SELECT 1 FROM ml_preguntas q WHERE q.item_id = c.item_id AND q.fecha > NOW() - make_interval(days => $2))
