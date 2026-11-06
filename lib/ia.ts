@@ -13,7 +13,11 @@ import type { Pool } from 'pg'
 import { dbGlobal } from '@/lib/db'
 
 export const MODELO_IA = process.env.PREGUNTAS_MODELO ?? 'claude-sonnet-5-5'
-export const MODELO_SIMPLE = process.env.PREGUNTAS_MODELO_SIMPLE ?? 'claude-haiku-4-5-20251001'
+// 06-11-2026 (el dueño, tras comparar 272 preguntas): Haiku 5.5 reemplaza a Haiku 4.5 en TODO el sistema (borradores
+// simples, verificador, revisor de sugeridas, asistente, versión económica). Sonnet 5.5 sigue para lo complejo.
+export const MODELO_SIMPLE = process.env.PREGUNTAS_MODELO_SIMPLE ?? 'claude-haiku-5-5'
+// Desde cuándo rige Haiku 5.5: la pantalla de evaluación mide desde aquí (costos y acierto de las dos recetas).
+export const CAMBIO_HAIKU55 = '2026-11-06T10:30:00Z'
 // Haiku 5.5 (06-11): 10× más barato que Haiku 4.5; corre EN PARALELO como "eco55" (lib/iaEconomica.ts) para compararlo.
 export const MODELO_ECO55 = process.env.PREGUNTAS_MODELO_ECO55 ?? 'claude-haiku-5-5'
 export const iaConfigurada = () => !!process.env.ANTHROPIC_API_KEY

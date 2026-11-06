@@ -49,12 +49,13 @@ export function IaAutomatica() {
   const [info, setInfo] = useState<Info | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ver, setVer] = useState<'sola' | 'revisar' | 'eco' | 'h55'>('sola')
+  const [todo, setTodo] = useState(false)
   const cargar = useCallback(() => {
-    fetch('/api/preguntas/ia-auto').then(async r => {
+    fetch(`/api/preguntas/ia-auto${todo ? '?todo=1' : ''}`).then(async r => {
       const d = await r.json().catch(() => null)
       if (r.ok) setInfo(d); else setError(d?.error ?? 'No se pudo cargar')
     }).catch(() => setError('No se pudo cargar'))
-  }, [])
+  }, [todo])
   useEffect(() => { cargar() }, [cargar])
 
   const post = async (body: object) => {
@@ -113,6 +114,13 @@ export function IaAutomatica() {
       </section>
 
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-neutral-500">Medir:</span>
+          {([[false, 'Desde el cambio a Haiku 5.5 (06-11)'], [true, 'Todo el historial']] as const).map(([v, t]) => (
+            <button key={t} onClick={() => setTodo(v)}
+              className={`px-2.5 py-1 rounded-full border ${todo === v ? 'bg-sky-700 text-white border-sky-700' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
+          ))}
+        </div>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
           <span><b>{r.procesadas}</b> procesadas</span>
           <span className="text-emerald-700"><b>{r.solas}</b> {info.modo === 'real' ? 'salieron' : 'habrían salido'} solas</span>

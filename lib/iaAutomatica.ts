@@ -150,8 +150,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`,
           [q.id, JSON.stringify({ error: (e instanceof Error ? e.message : String(e)).slice(0, 200) })]).catch(() => {})
       }
-      // 06-11: la misma receta económica con Haiku 5.5 (10× más barato), también en paralelo y sin publicar.
-      await simularEco55(db, q.id, c, c.item?.status ?? q.item_estado)
+      // 06-11: la económica ya corre con Haiku 5.5 (MODELO_SIMPLE): la prueba aparte (eco55) quedó como historial.
     } catch (e) {
       fallas++
       const msg = e instanceof Error ? e.message : String(e)

@@ -3,21 +3,24 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { CLAVE_IA_AUTO, configIA } from '@/lib/iaAutomatica'
-import { cupoIA } from '@/lib/ia'
+import { cupoIA, CAMBIO_HAIKU55 } from '@/lib/ia'
 import { tieneModulo } from '@/lib/modulos'
 
 // GET /api/preguntas/ia-auto → Preguntas → Configuración → Respuesta automática con IA: el modo, los créditos y las
 // últimas preguntas que procesó (qué decidió, la respuesta, la que se publicó y la marca bien/mal del vendedor).
-export async function GET() {
+export async function GET(req: NextRequest) {
   const s = await sesionPreguntas('automatizaciones_config')
   if ('error' in s) return s.error
   if (!tieneModulo(s.session.user, 'ia_automatica')) return NextResponse.json({ error: 'Tu empresa no tiene la respuesta automática con IA' }, { status: 403 })
   try {
     const cfg = await configIA(s.db)
+    // 06-11: por defecto se mide desde el cambio a Haiku 5.5 (?todo=1 = todo el historial).
+    const desde = new URL(req.url).searchParams.get('todo') ? null : CAMBIO_HAIKU55
     const { rows } = await s.db.query(
       `SELECT id::text, texto, item_titulo, item_permalink, to_char(fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha, estado, respuesta, ia_auto
        FROM ml_preguntas WHERE ia_auto IS NOT NULL AND ia_auto->>'estado' IS DISTINCT FROM 'procesando'
-       ORDER BY fecha DESC LIMIT 400`)
+         AND ($1::text IS NULL OR ia_auto->>'fecha' >= $1)
+       ORDER BY fecha DESC LIMIT 400`, [desde])
     const sola = rows.filter(r => r.ia_auto.decision === 'sola')
     const marcadas = sola.filter(r => r.ia_auto.marca)
     return NextResponse.json({
@@ -30,6 +33,7 @@ export async function GET() {
       },
       economica: resumenEco(rows),
       haiku55: resumen55(rows),
+      medirDesde: desde,
       preguntas: rows,
     })
   } catch (err) { return apiError(err) }

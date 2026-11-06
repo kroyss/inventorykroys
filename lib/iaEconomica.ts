@@ -21,7 +21,7 @@ export interface DecisionEco {
 
 // El revisor de sugeridas (Haiku, lib/revisorSugeridas.ts) cuesta ~$0,003 y corre igual al abrir la bandeja: se cuenta
 // para no comparar contra un "gratis" que no es.
-const COSTO_REVISOR = 0.003
+const COSTO_REVISOR = 0.003   // con Haiku 4.5; con Haiku 5.5, la décima parte
 
 // Lo que la receta barata hizo mal en la evaluación del dueño (04-11: 8 mal de 99). Si la respuesta cae en algo de
 // esto, va a revisar: atajaba 7 de los 8 errores y solo 12 de las 91 buenas.
