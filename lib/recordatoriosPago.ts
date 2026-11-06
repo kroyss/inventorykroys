@@ -5,10 +5,14 @@
 // que lo hace seguro (simulación con las ventas del 04 al 09/10: empezando al 2.º día, 3 de 407
 // compradores habrían recibido uno estando pagados). Reglas:
 //   - APAGADO por defecto; el primero sale al 2.º día de la compra (el 1.º casi todos pagan);
-//   - antes de cada turno se hace un "Traer ME" y se espera: si Pagos ME no responde o da error,
-//     ese turno NO se manda nada (ante la duda, no molestar a quien ya pagó);
+//   - 06-11 (el dueño: nada automático en Pagos ME, asusta a los usuarios): el turno YA NO le pide nada a la PC. Espera a
+//     que el vendedor toque «Traer pagos y guías» (vale el que hizo desde HORAS_ANTES antes del turno) y, apenas llegan
+//     los pagos de todos sus perfiles sin error, manda. Sin eso, ese turno NO se manda nada (ante la duda, no molestar a
+//     quien ya pagó);
 //   - se frena con cualquier señal: pago traído, venta registrada, guía en Despachos, calificada,
-//     cancelada, el comprador escribió después de comprar, o "Ya pagó, no recordar";
+//     cancelada, "Ya pagó, no recordar", o una conversación VIVA: el comprador escribió y nadie le contestó todavía, o
+//     escribió hace menos de 24 h (06-11: antes cualquier mensaje lo frenaba para siempre, aunque se le contestara y
+//     el comprador no volviera a escribir);
 //   - justo antes de mandar se relee la orden y la conversación en ML (no solo lo guardado).
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
@@ -19,11 +23,24 @@ export const CLAVE_CONFIG = 'recordatorios_pago'
 export const CLAVE_TURNO = 'recordatorios_pago_turno'
 /** Hora (del país) de cada turno: 1 al día = 10:00; 2 al día = 10:00 y 17:00. */
 export const HORAS = [10, 17]
+/** Lo que muestra el turno mientras espera que el vendedor traiga los pagos. */
+const ESPERANDO = 'esperando que toques «Traer pagos y guías» para mandarlos (sin eso no se manda, para no recordarle a quien ya pagó)'
 /** Un turno solo arranca dentro de estas horas desde su hora (prenderlo de noche no manda nada). */
 const VENTANA_H = 3
-/** Si Pagos ME no termina en estos minutos, el turno se omite. */
-const ESPERA_ME_MIN = 20
 const MAX_POR_TURNO = 60
+/** Una conversación con un mensaje del comprador de menos de estas horas sigue viva: no se le recuerda. */
+export const HORAS_CONVERSACION = 24
+/** Vale un «Traer pagos y guías» hecho desde estas horas antes del turno (el de las 10:00, desde las 6:00). */
+const HORAS_ANTES = 4
+
+/** ¿La conversación sigue viva? (último mensaje del comprador sin contestar, o de menos de HORAS_CONVERSACION). */
+export function conversacionViva(mensajes: { propio: boolean; fecha: string }[], compra: string) {
+  const delComprador = mensajes.filter(m => !m.propio && new Date(m.fecha) > new Date(compra))
+  if (!delComprador.length) return false
+  const ultimo = Math.max(...delComprador.map(m => new Date(m.fecha).getTime()))
+  if (ultimo > Date.now() - HORAS_CONVERSACION * 36e5) return true
+  return !mensajes.some(m => m.propio && new Date(m.fecha).getTime() > ultimo)
+}
 /** ML corta los mensajes post-venta largos: el texto ya armado no puede pasar de esto. */
 export const MAX_TEXTO = 350
 
@@ -98,7 +115,11 @@ export const SQL_CANDIDATOS = `
     AND NOT EXISTS (SELECT 1 FROM me_pagos p WHERE p.venta IN (o.id::text, o.pack::text) AND p.verificacion <> 'invalido')
     AND NOT EXISTS (SELECT 1 FROM sales v WHERE v.ml_order_number IN (o.id::text, o.pack::text))
     AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack::text))
-    AND NOT EXISTS (SELECT 1 FROM ml_mensajes m WHERE m.pack_id = o.pack AND NOT m.propio AND m.fecha > o.fecha)`
+    -- Conversación viva (06-11): un mensaje del comprador de las últimas 24 h frena. Si nadie le contestó, lo frena la
+    -- relectura en vivo de ML justo antes de mandar (conversacionViva): las respuestas escritas desde la web de ML no
+    -- siempre están guardadas aquí, y con lo guardado se frenaba para siempre a quien sí le contestaron.
+    AND NOT EXISTS (SELECT 1 FROM ml_mensajes m WHERE m.pack_id = o.pack AND NOT m.propio AND m.fecha > o.fecha
+                      AND m.fecha > NOW() - make_interval(hours => ${HORAS_CONVERSACION}))`
 
 export interface Candidato {
   pack: string; id: string; conexion_id: number; fecha: string; comprador: string | null; comprador_nombre: string | null
@@ -142,7 +163,7 @@ export async function recordarPagos(db: Pool) {
   if (turno < 0) return null
   const clave = `${h.hoy}#${turno}`
 
-  // 1) Tomar el turno (una sola pasada del cron lo logra) y pedir "Traer ME".
+  // 1) Tomar el turno (una sola pasada del cron lo logra). Ya NO se le pide nada a la PC (06-11).
   const { rowCount } = await db.query(
     `INSERT INTO app_settings (key, value) VALUES ($1, $2)
      ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
@@ -154,39 +175,37 @@ export async function recordarPagos(db: Pool) {
       await guardarTurno(db, { clave, estado: 'listo', at: new Date().toISOString(), enviados: 0, errores: 0, saltados: 0 })
       return { turno: clave, sinCandidatos: true }
     }
-    const { rows: [p] } = await db.query(`INSERT INTO me_pedidos (pedido_por) VALUES (NULL) RETURNING id`)
-    await guardarTurno(db, { clave, estado: 'esperando_me', pedido: Number(p.id), at: new Date().toISOString() })
-    return { turno: clave, pidioME: Number(p.id) }
+    await guardarTurno(db, { clave, estado: 'esperando_me', at: new Date().toISOString(), motivo: ESPERANDO })
+    return { turno: clave, esperando: true }
   }
 
-  // 2) Esperando a Pagos ME.
+  // 2) Esperando que el vendedor toque «Traer pagos y guías» (vale uno hecho desde HORAS_ANTES antes del turno).
   const { rows: [t] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_TURNO])
   const estado = JSON.parse(t?.value ?? '{}') as EstadoTurno
-  if (estado.clave !== clave || estado.estado !== 'esperando_me' || !estado.pedido) return null
-  const { rows: [ped] } = await db.query(
-    `SELECT resultados, pedido_at < NOW() - make_interval(mins => $2) AS vencido FROM me_pedidos WHERE id = $1`,
-    [estado.pedido, ESPERA_ME_MIN])
+  if (estado.clave !== clave || estado.estado !== 'esperando_me') return null
   // Perfiles del vigilante vistos en el último día (el DESPERTADOR no trae pagos).
   const { rows: perf } = await db.query(
     `SELECT perfil FROM me_latidos WHERE perfil <> 'DESPERTADOR' AND visto_at > NOW() - INTERVAL '1 day'`)
-  const res = (ped?.resultados ?? {}) as Record<string, { ok: boolean; error?: string | null }>
   const perfiles = perf.map(p => p.perfil as string)
-  const completo = perfiles.length > 0 && perfiles.every(p => res[p])
-  if (!completo) {
-    if (!ped || ped.vencido) {
-      const faltan = perfiles.filter(p => !res[p])
-      await guardarTurno(db, { ...estado, estado: 'omitido', motivo: perfiles.length
-        ? `Pagos ME no respondió (${faltan.join(', ')}): revisa la PC` : 'Pagos ME sin conectar: revisa la PC' }, 'esperando_me')
-    }
+  if (!perfiles.length) return null
+  const { rows: peds } = await db.query(
+    `SELECT id, resultados FROM me_pedidos
+     WHERE NOT pesos AND pedido_at >= CURRENT_DATE + make_interval(hours => $1) ORDER BY pedido_at DESC LIMIT 5`,
+    [Math.max(0, HORAS[turno] - HORAS_ANTES)])
+  const completos = peds.map(p => ({ id: Number(p.id), res: (p.resultados ?? {}) as Record<string, { ok: boolean }> }))
+    .filter(p => perfiles.every(x => p.res[x]))
+  const bueno = completos.find(p => perfiles.every(x => p.res[x].ok))
+  if (!bueno) {
+    // Trajo, pero con error: que lo vuelva a tocar (se sigue esperando dentro del turno).
+    const conError = completos[0] ? perfiles.filter(x => !completos[0].res[x].ok) : []
+    const motivo = conError.length ? `«Traer pagos y guías» terminó con error en ${conError.join(', ')}: vuelve a tocarlo` : ESPERANDO
+    if (motivo !== estado.motivo) await guardarTurno(db, { ...estado, motivo }, 'esperando_me')
     return null
   }
-  const conError = perfiles.filter(p => !res[p].ok)
-  if (conError.length) {
-    await guardarTurno(db, { ...estado, estado: 'omitido', motivo: `Pagos ME con error en ${conError.join(', ')}: no se mandó nada` }, 'esperando_me')
-    return null
-  }
+  estado.pedido = bueno.id
 
   // 3) Mandar (ya con los pagos al día). "enviando" lo toma una sola pasada.
+  delete estado.motivo
   if (!(await guardarTurno(db, { ...estado, estado: 'enviando' }, 'esperando_me'))) return null
   const lista = (await candidatos(db, cfg)).filter(c => c.ultimo_turno !== clave).slice(0, MAX_POR_TURNO)
   let enviados = 0, errores = 0, saltados = 0
@@ -224,9 +243,9 @@ async function recordarUna(db: Pool, c: Candidato, cfg: ConfigRecordatorios, tur
     if (!orden.buyer?.id) { await anotar(db, c, { turno, error: 'ML no dijo quién es el comprador' }); return 'error' }
     const { rows: [cx] } = await db.query(`SELECT ml_user_id FROM ml_conexiones WHERE id = $1`, [c.conexion_id])
     const seller = Number(cx.ml_user_id)
-    // ¿Escribió después de comprar? (leerHilo también lo guarda: la próxima vez ya no es candidato).
+    // ¿Conversación viva? (leerHilo también guarda los mensajes: la próxima vez ya se ve en la consulta).
     const hilo = await leerHilo(db, c.conexion_id, c.pack, seller, false)
-    if (hilo.mensajes.some(m => !m.propio && new Date(m.fecha) > new Date(c.fecha))) {
+    if (conversacionViva(hilo.mensajes, c.fecha)) {
       await anotar(db, c, { turno }); return 'saltado'
     }
     const texto = armarTexto(ultimo && cfg.final.activo ? cfg.final.texto : cfg.texto,

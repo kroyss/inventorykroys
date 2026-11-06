@@ -59,12 +59,13 @@ export default function RecordatoriosPago() {
           <span>
             <span className="font-semibold text-neutral-900">Recordar el pago a quien compró y no ha concretado</span>
             <span className="block text-sm text-neutral-600">
-              Desde el <b>2.º día</b> de la compra se le manda un mensaje por MercadoLibre. Antes de cada envío se traen los pagos de
-              {' '}MercadoEnvíos: si no se pueden traer, <b>ese turno no se manda nada</b>.
+              Desde el <b>2.º día</b> de la compra se le manda un mensaje por MercadoLibre. Salen cuando tocas
+              {' '}<b>«Traer pagos y guías»</b> (vale desde 4 horas antes de cada turno): así no se le recuerda a quien ya pagó.
+              {' '}Si ese turno no traes los pagos, <b>no se manda nada</b>.
             </span>
             <span className="block text-xs text-neutral-500 mt-1">
               No se le manda a quien: ya tiene el pago traído, la venta registrada o la guía en Despachos, está calificada o cancelada,
-              {' '}o te escribió después de comprar. Ni a quien marques &quot;Ya pagó&quot;.
+              {' '}o te escribió y todavía no le contestas (o te escribió hace menos de 24 h). Ni a quien marques &quot;Ya pagó&quot;.
             </span>
           </span>
         </label>
@@ -73,7 +74,7 @@ export default function RecordatoriosPago() {
             Último turno: {t.at ? fechaCorta(t.at) : t.clave.split('#')[0]} ·{' '}
             {t.estado === 'listo' ? <>{t.enviados ?? 0} enviados{t.saltados ? ` · ${t.saltados} saltados (ya escribieron o se cancelaron)` : ''}{t.errores ? <span className="text-red-700"> · {t.errores} con error</span> : ''}</>
               : t.estado === 'omitido' ? <span className="text-amber-800">no se mandó nada: {t.motivo}</span>
-              : t.estado === 'esperando_me' ? 'trayendo los pagos de MercadoEnvíos…' : 'enviando…'}
+              : t.estado === 'esperando_me' ? <span className="text-amber-800">{t.motivo ?? 'esperando los pagos de MercadoEnvíos…'}</span> : 'enviando…'}
           </p>
         )}
       </section>
