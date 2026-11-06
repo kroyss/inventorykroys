@@ -3,6 +3,8 @@
 // Se suben los estados de cuenta (Bancamiga, Banesco, Mercantil, Provincial…) y el cruce se hace AQUÍ, en el navegador:
 // los archivos no van al servidor. Se confía en lo que dice el banco, no en lo que escribió el comprador.
 // Nada se aprueba solo: "Aprobar" = "Pago correcto", con la nota del movimiento del banco.
+// Banco de Venezuela (06-11): no deja bajar el estado de cuenta; se copian los movimientos de la pantalla y se pegan
+// en su recuadro (lib/conciliacionBanco.ts → leerPegadoBDV). Queda como un "archivo" más (BDV_NOMBRE).
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { BotonComprobante } from '@/components/ventas/VerComprobante'
@@ -15,6 +17,7 @@ interface Pago extends PagoCruce { cuenta: string | null; banco_emisor: string |
 interface Archivo { nombre: string; datos: ArrayBuffer | null; banco: string; estado: EstadoCuenta | null; error: string | null; at?: string }
 
 const BANCOS = ['Bancamiga', 'Banesco', 'Mercantil', 'BBVA Provincial', 'Banco Plaza']
+const BDV_NOMBRE = 'Banco de Venezuela (pegado)'
 const bs = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const dm = (f: string | null) => f ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : '—'
 const ESTADO_VENTA: Record<string, string> = { BORRADOR: 'Borrador', REABIERTA: 'Reabierta', PAGO_VERIFICADO: 'Pago verificado', PROCESADA: 'Procesada', DESCARGADA: 'Despachada', DESCARGADA_LOCAL: 'Entregada' }
@@ -42,6 +45,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
   const [ocupado, setOcupado] = useState(false)
   const [abierto, setAbierto] = useState<Record<string, boolean>>({ seguro: true, probable: true, revisar: true })
   const [guardado, setGuardado] = useState<number | null>(null)   // pagos con el resultado del banco guardado
+  const [bdv, setBdv] = useState<{ ok: boolean; texto: string } | null>(null)
 
   const cargarPagos = useCallback(() => fetch('/api/pagos-me/comprobar', { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
@@ -94,6 +98,23 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
     // Un estado nuevo de un banco reemplaza al anterior de ese banco (siempre queda el más reciente).
     setArchivos(as => [...as.filter(a => !nuevos.some(n => n.estado && n.banco === a.banco)), ...nuevos])
   }
+  // Pegar los movimientos del BDV: se leen al momento y se suman a los ya pegados (sin repetir).
+  const pegarBDV = async (texto: string) => {
+    const { leerPegadoBDV, sumarPegadoBDV } = await lib()
+    const r = leerPegadoBDV(texto)
+    const cortado = r.cortados ? ` · ${r.cortados} quedó cortado al copiar y se ignoró` : ''
+    if (!r.leidos) {
+      setBdv({ ok: false, texto: 'No encontré movimientos: copia desde la primera fecha hasta el último saldo (mira el ejemplo).' })
+      return
+    }
+    const previo = archivos.find(a => a.nombre === BDV_NOMBRE)?.estado ?? null
+    const estado = sumarPegadoBDV(previo, r.movimientos)
+    const nuevos = estado.movimientos.length - (previo?.movimientos.length ?? 0)
+    setArchivos(as => [...as.filter(a => a.nombre !== BDV_NOMBRE),
+      { nombre: BDV_NOMBRE, datos: null, banco: 'Venezuela', estado, error: estado.movimientos.length ? null : 'No hay créditos', at: new Date().toISOString() }])
+    const f = (x: string) => x ? dm(x) : '—'
+    setBdv({ ok: true, texto: `Leí ${r.leidos} movimientos (${r.movimientos.length} créditos${previo ? `, ${nuevos} nuevos` : ''}), del ${f(estado.desde)} al ${f(estado.hasta)}${cortado}.` })
+  }
   const cambiarBanco = async (i: number, banco: string) => {
     const a = await leer({ ...archivos[i], banco })
     setArchivos(as => as.map((x, k) => k === i ? a : x))
@@ -131,6 +152,7 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
 
   return (
     <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -148,15 +170,16 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
               <li key={i} className="flex flex-wrap items-center gap-2 px-3 py-2">
                 <span className="min-w-0 flex-1 truncate text-neutral-700" title={a.nombre}>{a.nombre}</span>
                 {a.at && !a.datos && <span className="text-[11px] text-sky-700">en memoria · {new Date(a.at).toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' })}</span>}
+                {a.nombre === BDV_NOMBRE ? null : (
                 <select value={BANCOS.includes(a.banco) ? a.banco : ''} onChange={e => cambiarBanco(i, e.target.value)} disabled={!a.datos}
                   className="rounded border border-neutral-300 px-2 py-1 text-xs">
                   <option value="">¿Qué banco?</option>
                   {BANCOS.map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
+                </select>)}
                 {a.estado
                   ? <span className="text-xs text-neutral-500">{a.estado.movimientos.length} créditos · {dm(a.estado.desde)} al {dm(a.estado.hasta)}</span>
                   : <span className="text-xs text-red-700">{a.error}</span>}
-                <button onClick={() => setArchivos(as => as.filter((_, k) => k !== i))} className="px-1 text-neutral-400 hover:text-red-600" title="Quitar">✕</button>
+                <button onClick={() => { setArchivos(as => as.filter((_, k) => k !== i)); if (a.nombre === BDV_NOMBRE) setBdv(null) }} className="px-1 text-neutral-400 hover:text-red-600" title="Quitar">✕</button>
               </li>
             ))}
           </ul>
@@ -170,6 +193,30 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
           ) : <b className="text-neutral-800">{bs(margen)}</b>}
           Bs más por venta.
         </div>
+      </div>
+
+      {/* Banco de Venezuela: copiar y pegar */}
+      <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-neutral-900">Banco de Venezuela (BDV)</h2>
+          <p className="text-xs text-neutral-500">El BDV no deja descargar el estado de cuenta: copia los movimientos de su página y pégalos aquí. No se guardan en el sistema.</p>
+        </div>
+        <textarea rows={3} value="" readOnly={false} onChange={() => {}}
+          onPaste={e => { e.preventDefault(); pegarBDV(e.clipboardData.getData('text')) }}
+          placeholder="Haz clic aquí y pega los movimientos (Ctrl+V, o clic derecho → Pegar)"
+          className="w-full resize-none rounded-lg border-2 border-dashed border-sky-300 bg-sky-50/40 px-3 py-3 text-sm placeholder:text-sky-800/70 focus:border-sky-500 focus:outline-none" />
+        {bdv && <p className={`text-xs ${bdv.ok ? 'text-green-800' : 'text-red-700'}`}>{bdv.ok ? '✓ ' : ''}{bdv.texto}</p>}
+        <details className="text-xs text-neutral-600">
+          <summary className="cursor-pointer text-sky-700">¿Cómo copio del BDV?</summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-4">
+            <li>En <b>BDV en línea</b> entra a <b>Consulta de movimientos</b> y pon <b>100 registros por página</b>.</li>
+            <li>Con el mouse selecciona desde la <b>primera fecha</b> hasta el <b>último saldo</b>, como en el ejemplo, y copia: <b>Ctrl+C</b> (o clic derecho → Copiar).</li>
+            <li>Aquí haz clic en el recuadro y pega: <b>Ctrl+V</b> (o clic derecho → Pegar). Se lee solo.</li>
+          </ol>
+          <EjemploBDV />
+          <p className="mt-2">Si algo quedó cortado al principio o al final, se ignora y te avisamos. Puedes pegar varias páginas, una tras otra: no se repiten.</p>
+        </details>
+      </div>
       </div>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
@@ -212,6 +259,32 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
           {Object.keys(porNivel).length === 0 && <p className="text-sm text-neutral-500">No hay pagos pendientes para cruzar con estos archivos.</p>}
         </>
       )}
+    </div>
+  )
+}
+
+/** Ejemplo de la pantalla "Consulta de movimientos" del BDV con números inventados y la selección en azul. */
+function EjemploBDV() {
+  const filas = [
+    ['05-11-2026 10:14', '0677290651234', 'OPERACION PAGOMOVIL BDV', 'CREDITO', '4.250,00 Bs.', '12.480,50 Bs.'],
+    ['05-11-2026 09:02', '0677289904321', 'OPERACION PAGOMOVIL BDV', 'CREDITO', '3.120,75 Bs.', '8.230,50 Bs.'],
+    ['04-11-2026 19:45', '0027280511111', 'COMISION PAGOMOVILBDV', 'DEBITO', '-57,60 Bs.', '5.109,75 Bs.'],
+    ['04-11-2026 18:30', '0677285517777', 'OPERACION PAGOMOVIL BDV', 'CREDITO', '5.167,35 Bs.', '5.167,35 Bs.'],
+  ]
+  return (
+    <div className="mt-2 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-2">
+      <p className="mb-1 text-center text-[11px] font-semibold text-[#1d5c9c]">Consulta de movimientos <span className="font-normal text-neutral-400">(ejemplo)</span></p>
+      <table className="w-full min-w-[480px] text-[10px]">
+        <thead><tr className="text-left text-neutral-500">{['Fecha', 'Referencia', 'Descripción', 'Débito / Crédito', 'Monto', 'Saldo'].map(t => <th key={t} className="px-1 py-1 font-normal">{t}</th>)}</tr></thead>
+        <tbody>
+          {filas.map((f, i) => (
+            <tr key={i} className="border-t border-neutral-100">
+              {f.map((c, k) => <td key={k} className="px-1 py-1"><span className="bg-[#3367d6] text-white">{c}</span></td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[10px] text-neutral-500">Lo azul es lo seleccionado: desde la primera fecha hasta el último saldo. Los títulos pueden quedar afuera.</p>
     </div>
   )
 }

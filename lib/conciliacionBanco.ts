@@ -118,6 +118,57 @@ export function leerEstadoCuenta(datos: ArrayBuffer | Uint8Array, nombreArchivo 
   return { banco: b, desde: fechas[0] ?? '', hasta: fechas.at(-1) ?? '', movimientos, filas: filas.length - iT - 1 }
 }
 
+// ── Banco de Venezuela: copiar y pegar (06-11) ───────────────────────────────
+// El BDV no deja bajar el estado de cuenta: en "Consulta de movimientos" se seleccionan las filas con el mouse, se
+// copian (Ctrl+C) y se pegan en el comprobador. Al pegar llega UN campo por línea: fecha y hora · referencia (puede
+// faltar, p. ej. el abono de intereses) · descripción · DEBITO/CREDITO · monto · saldo. Cada movimiento empieza en su
+// línea "dd-mm-aaaa hh:mm", así que los títulos no hacen falta y lo que no es movimiento ("Registros por página",
+// "1 - 50 de 100") se ignora. Si se copió cortado, el pedazo sin fecha (al principio) o sin monto completo (al
+// final) se descarta y se cuenta en `cortados` para avisar. Solo los créditos se cruzan.
+// La referencia del BDV (0677260822079) y la que escribe el comprador (007660822079) comparten los últimos
+// dígitos: alcanza con puntosRef (últimos 6).
+const FECHA_BDV = /^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2})$/
+const MONTO_BDV = /^(-?[\d.]+,\d{2}) ?Bs\.?$/i
+
+export interface PegadoBDV { movimientos: MovBanco[]; leidos: number; cortados: number }
+
+export function leerPegadoBDV(texto: string): PegadoBDV {
+  const l = texto.split(/\r?\n/).map(x => x.trim()).filter(Boolean)
+  const movimientos: MovBanco[] = []
+  let i = l.findIndex(x => FECHA_BDV.test(x)), leidos = 0, cortados = 0
+  if (i < 0) return { movimientos, leidos, cortados: l.some(x => MONTO_BDV.test(x)) ? 1 : 0 }
+  if (l.slice(0, i).some(x => MONTO_BDV.test(x) || /^(CREDITO|DEBITO)$/i.test(x))) cortados++
+  while (i < l.length) {
+    let j = i + 1
+    while (j < l.length && !FECHA_BDV.test(l[j])) j++
+    const b = l.slice(i, j)
+    i = j
+    const t = b.findIndex(x => /^(CREDITO|DEBITO)$/i.test(x))
+    const m = t > 0 ? b[t + 1]?.match(MONTO_BDV) : null
+    if (!m) { cortados++; continue }
+    leidos++
+    const monto = numeroBanco(m[1])
+    if (b[t].toUpperCase() !== 'CREDITO' || !(monto > 0)) continue
+    const [, d, mes, a, h, mi] = b[0].match(FECHA_BDV)!
+    const ref = t > 2 && /^\d{4,}$/.test(b[1]) ? b[1] : ''
+    const desc = b.slice(ref ? 2 : 1, t).join(' ')
+    movimientos.push({ banco: 'Venezuela', fecha: `${a}-${mes}-${d}`, ref: digitos(ref), concepto: `${desc} · ${h}:${mi}`,
+      monto: Math.round(monto * 100) / 100,
+      // "OPERACION PAGOMOVIL BDV" = pago móvil desde otra cuenta del BDV; "OTROS BANCO" = desde otro banco (no dice cuál).
+      emisor: /PAGOMOVIL BDV$/i.test(desc) ? 'Venezuela' : emisorDe(desc) })
+  }
+  return { movimientos, leidos, cortados }
+}
+
+/** Suma movimientos pegados a un estado del BDV sin repetir (se pueden pegar varias páginas, una tras otra). */
+export function sumarPegadoBDV(previo: EstadoCuenta | null, nuevos: MovBanco[]): EstadoCuenta {
+  const clave = (m: MovBanco) => `${m.fecha}|${m.ref}|${m.monto}|${m.concepto}`
+  const vistos = new Set((previo?.movimientos ?? []).map(clave))
+  const movimientos = [...(previo?.movimientos ?? []), ...nuevos.filter(m => !vistos.has(clave(m)) && vistos.add(clave(m)))]
+  const fechas = movimientos.map(m => m.fecha).sort()
+  return { banco: 'Venezuela', desde: fechas[0] ?? '', hasta: fechas.at(-1) ?? '', movimientos, filas: movimientos.length }
+}
+
 // ── Cruce ────────────────────────────────────────────────────────────────────
 
 export interface PagoME {

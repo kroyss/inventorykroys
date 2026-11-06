@@ -326,6 +326,12 @@ compras juntas (revisa que el monto alcance para todas) o el mismo comprobante u
 **Comprobar con el banco:** sube los estados de cuenta de tu banco (archivos descargados del banco) y el sistema
 cruza referencia, monto y fecha con los pagos: los que coinciden quedan como «Pago correcto». Muestra también los
 créditos del banco que no son de ninguna venta.
+**Banco de Venezuela (BDV):** no deja descargar el estado de cuenta. En BDV en línea entra a «Consulta de
+movimientos», pon 100 registros por página, selecciona con el mouse desde la primera fecha hasta el último saldo y
+copia (Ctrl+C); en el comprobador haz clic en el recuadro «Banco de Venezuela» y pega (Ctrl+V). Se lee solo y dice
+cuántos movimientos leyó; si algo quedó cortado al copiar, se ignora y avisa. Se pueden pegar varias páginas (no se
+repiten). Ahí mismo, en «¿Cómo copio del BDV?», hay un ejemplo con imagen. El monto que cuenta es el que llegó al
+banco, no el que escribió el comprador.
 
 **Problemas comunes:**
 - *«PC sin señal» / «ningún perfil de Chrome tiene el Asistente conectado»:* la PC está apagada, o falta el paso 4.
