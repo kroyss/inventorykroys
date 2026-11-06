@@ -16,16 +16,22 @@ const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Bi
 function Copiar({ texto }: { texto: string }) {
   const [ok, setOk] = useState(false)
   return (
-    <button type="button" onClick={() => { navigator.clipboard?.writeText(texto).then(() => { setOk(true); setTimeout(() => setOk(false), 1500) }).catch(() => {}) }}
-      className="ml-2 text-xs text-sky-700 hover:underline">{ok ? '✓ copiado' : 'copiar'}</button>
+    // 06-11 (el dueño): ícono de copiar (dos hojas) en vez de la palabra; al copiar, un ✓ verde un momento.
+    <button type="button" title={ok ? 'Copiado' : 'Copiar'} aria-label={ok ? 'Copiado' : `Copiar ${texto}`}
+      onClick={() => { navigator.clipboard?.writeText(texto).then(() => { setOk(true); setTimeout(() => setOk(false), 1500) }).catch(() => {}) }}
+      className={`ml-2 inline-flex h-7 w-7 items-center justify-center rounded-md align-middle ${ok ? 'text-emerald-600' : 'text-neutral-400 hover:bg-sky-50 hover:text-sky-700'}`}>
+      {ok
+        ? <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 10.5l4 4 8-9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        : <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.6}><rect x="7" y="7" width="10" height="10" rx="2" /><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /></svg>}
+    </button>
   )
 }
 
 function Dato({ etiqueta, valor, copiar = true }: { etiqueta: string; valor: string; copiar?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1 border-b border-neutral-100 last:border-0">
+    <div className="flex items-center justify-between gap-3 py-1 border-b border-neutral-100 last:border-0">
       <span className="text-neutral-500 text-sm">{etiqueta}</span>
-      <span className="text-sm font-medium text-neutral-900 text-right">{valor}{copiar && <Copiar texto={valor.replace(/^Bs |^\$/, '')} />}</span>
+      <span className="flex items-center text-sm font-medium text-neutral-900 text-right">{valor}{copiar ? <Copiar texto={valor.replace(/^Bs |^\$/, '')} /> : <span className="ml-2 w-7" />}</span>
     </div>
   )
 }
@@ -87,7 +93,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     : <>Tu {s.plan ? 'plan' : 'prueba gratis'} venció{s.vence ? <> el <b>{ddmm(s.vence)}</b></> : null}. Paga para reactivar tu cuenta: tus datos se conservan.</>
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4">
       {/* Estado */}
       <section className={`rounded-xl border px-4 py-3 text-sm ${s.estado === 'vencido' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-white border-neutral-200 text-neutral-800'}`}>
         {estadoTexto}
@@ -122,7 +128,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
       )}
 
       {!enRevision && s.conectadas > 0 && (
-        <>
+        // 06-11 (el dueño): en pantalla ancha, a la izquierda el plan y a la derecha cómo pagar (antes una columna angosta).
+        <div className="grid gap-4 lg:grid-cols-2 items-start">
           {/* 1 · Lo que te toca */}
           <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
             <h2 className="text-sm font-semibold text-neutral-800">1 · {s.estado === 'activo' ? 'Renueva tu plan' : 'Elige tu plan'}</h2>
@@ -184,6 +191,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             </div>
           </section>
 
+          <div className="space-y-4">
           {/* 2 · Paga */}
           <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
             <h2 className="text-sm font-semibold text-neutral-800">2 · Paga</h2>
@@ -196,7 +204,6 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             {metodo === 'pago_movil' ? (
               <div>
                 <Dato etiqueta="Monto" valor={bs ? fmtBs(bs) : 'sin tasa BCV hoy'} copiar={!!bs} />
-                {s.tasaBcv && <p className="text-xs text-neutral-500 py-1">{fmtUsd(total)} a tasa BCV de hoy ({s.tasaBcv.toLocaleString('de-DE', { maximumFractionDigits: 2 })} Bs/$)</p>}
                 <Dato etiqueta="Banco" valor={s.datos.pago_movil.banco} copiar={false} />
                 <Dato etiqueta="Teléfono" valor={s.datos.pago_movil.telefono} />
                 <Dato etiqueta="Cédula" valor={s.datos.pago_movil.cedula} />
@@ -244,7 +251,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             </button>
             <p className="text-xs text-neutral-500">Lo confirmamos a mano y te avisamos. Si lo reportas antes de que venza, tu cuenta no se corta mientras lo revisamos.</p>
           </section>
-        </>
+          </div>
+        </div>
       )}
 
       {/* Anteriores */}
