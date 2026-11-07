@@ -61,7 +61,9 @@ export async function verificarBorrador(datos: string, pregunta: string, borrado
     sistema: SISTEMA + (v2 ? SISTEMA_V2_EXTRA : ''), herramienta: HERRAMIENTA, modelo: modeloV, maxTokens: 700,
     contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
   })
-  const sinRespaldo = (r.afirmaciones ?? []).filter(a => !a.respaldada || /^ninguna/i.test(a.donde ?? ''))
+  // v2: Haiku a veces igual marca la cortesía o "el precio es el publicado" (07-11, 3 de 30): se descartan aquí.
+  const CORTESIA = /^([\s¡!.,]*(hola|buenas?( (tardes|noches|d[ií]as))?|saludos|con gusto|quedo a (su|tu) orden|estamos a (su|tu) orden|gracias|oferta con confianza)[\s¡!.,]*)+$|precio (es )?(el )?publicado|tasa bcv|menor tiempo posible|se confirma al concretar/i
+  const sinRespaldo = (r.afirmaciones ?? []).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? '')) && !(v2 && CORTESIA.test((a.afirmacion ?? '').trim())))
   const faltan = r.partes_sin_contestar ?? []
   const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`
     : faltan.length ? `Falta contestar: ${faltan.join('; ')}`
