@@ -46,6 +46,9 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
   const [abierto, setAbierto] = useState<Record<string, boolean>>({ seguro: true, probable: true, revisar: true })
   const [guardado, setGuardado] = useState<number | null>(null)   // pagos con el resultado del banco guardado
   const [bdv, setBdv] = useState<{ ok: boolean; texto: string } | null>(null)
+  // Lo último que se pegó, tal cual llegó (para ver por qué no se lee y mandarlo a soporte). Solo en este navegador.
+  const [pegado, setPegado] = useState<string | null>(null)
+  const [verPegado, setVerPegado] = useState(false)
 
   const cargarPagos = useCallback(() => fetch('/api/pagos-me/comprobar', { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
@@ -100,11 +103,14 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
   }
   // Pegar los movimientos del BDV: se leen al momento y se suman a los ya pegados (sin repetir).
   const pegarBDV = async (texto: string) => {
+    setPegado(texto); setVerPegado(false)
     const { leerPegadoBDV, sumarPegadoBDV } = await lib()
     const r = leerPegadoBDV(texto)
     const cortado = r.cortados ? ` · ${r.cortados} quedó cortado al copiar y se ignoró` : ''
     if (!r.leidos) {
-      setBdv({ ok: false, texto: 'No encontré movimientos: copia desde la primera fecha hasta el último saldo (mira el ejemplo).' })
+      fetch('/api/pagos-me/pegado-bdv', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto.slice(0, 200_000), lineas: r.lineas ?? 0 }) }).catch(() => {})
+      setBdv({ ok: false, texto: `Guardamos una copia de lo que pegaste para que soporte revise por qué no se lee. No encontré movimientos: copia desde la primera fecha hasta el último saldo (mira el ejemplo).${texto.trim() ? ` (Llegaron ${r.lineas ?? 0} líneas${texto.includes('\t') ? ' en columnas' : ''}.)` : ' (No llegó texto: prueba con Ctrl+C y Ctrl+V.)'}` })
       return
     }
     const previo = archivos.find(a => a.nombre === BDV_NOMBRE)?.estado ?? null
@@ -200,13 +206,29 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-neutral-900">Banco de Venezuela (BDV)</h2>
-          <p className="text-xs text-neutral-500">El BDV no deja descargar el estado de cuenta: copia los movimientos de su página y pégalos aquí. Se leen en tu navegador y no se suben a ningún lado.</p>
+          <p className="text-xs text-neutral-500">El BDV no deja descargar el estado de cuenta: copia los movimientos de su página y pégalos aquí. Se leen en tu navegador. Por ahora, si no se pueden leer, se guarda una copia para que soporte revise el problema.</p>
         </div>
         <textarea rows={3} value="" readOnly={false} onChange={() => {}}
-          onPaste={e => { e.preventDefault(); pegarBDV(e.clipboardData.getData('text')) }}
+          onPaste={e => { e.preventDefault(); pegarBDV(textoPegado(e.clipboardData)) }}
           placeholder="Haz clic aquí y pega los movimientos (Ctrl+V, o clic derecho → Pegar)"
           className="w-full resize-none rounded-lg border-2 border-dashed border-sky-300 bg-sky-50/40 px-3 py-3 text-sm placeholder:text-sky-800/70 focus:border-sky-500 focus:outline-none" />
         {bdv && <p className={`text-xs ${bdv.ok ? 'text-green-800' : 'text-red-700'}`}>{bdv.ok ? '✓ ' : ''}{bdv.texto}</p>}
+        {pegado !== null && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setVerPegado(v => !v)} className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-700">
+                {verPegado ? 'Ocultar lo que se pegó' : 'Ver lo que se pegó'}</button>
+              {verPegado && <button type="button" onClick={() => navigator.clipboard?.writeText(pegado).catch(() => {})}
+                className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-700">Copiar</button>}
+            </div>
+            {verPegado && <>
+              <p className="text-[11px] text-neutral-500">
+                Así llegó lo que pegaste: {pegado.length} caracteres, {pegado.split(/\r?\n/).length} líneas{pegado.includes('\t') ? ', con columnas (⇥ = separación de columna)' : ''}. Si no se lee, copia esto y mándalo a soporte.</p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] text-neutral-800">
+                {pegado ? pegado.replace(/\t/g, ' ⇥ ') : '(vacío: no llegó texto)'}</pre>
+            </>}
+          </div>
+        )}
         <details className="text-xs text-neutral-600">
           <summary className="cursor-pointer text-sky-700">¿Cómo copio del BDV?</summary>
           <ol className="mt-2 list-decimal space-y-1 pl-4">
@@ -265,6 +287,17 @@ export default function ComprobarBanco({ onAprobados }: { onAprobados: () => voi
 }
 
 /** Ejemplo de la pantalla "Consulta de movimientos" del BDV con números inventados y la selección en azul. */
+/** Lo pegado como texto; si el navegador solo dio HTML (tabla), se pasa a líneas con celdas separadas por TAB. */
+function textoPegado(c: DataTransfer) {
+  const t = c.getData('text/plain') || c.getData('text')
+  if (t.trim()) return t
+  const html = c.getData('text/html')
+  if (!html) return ''
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const filas = [...doc.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('td,th')].map(td => (td.textContent ?? '').trim()).join('\t'))
+  return filas.length ? filas.join('\n') : (doc.body.textContent ?? '')
+}
+
 function EjemploBDV() {
   const filas = [
     ['05-11-2026 10:14', '0677290651234', 'OPERACION PAGOMOVIL BDV', 'CREDITO', '4.250,00 Bs.', '12.480,50 Bs.'],

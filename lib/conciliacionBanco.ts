@@ -88,7 +88,11 @@ export function leerFilas(datos: ArrayBuffer | Uint8Array): string[][] {
 }
 
 export function leerEstadoCuenta(datos: ArrayBuffer | Uint8Array, nombreArchivo = '', banco?: string): EstadoCuenta {
-  const filas = leerFilas(datos)
+  return estadoDeFilas(leerFilas(datos), nombreArchivo, banco)
+}
+
+/** Estado de cuenta desde una tabla (filas × celdas): archivos de los bancos y lo pegado en columnas. */
+export function estadoDeFilas(filas: string[][], nombreArchivo = '', banco?: string): EstadoCuenta {
   // Títulos: Fecha + Referencia, o Fecha + Descripción (Provincial no trae columna de referencia).
   const iT = filas.findIndex(f => f.some(c => norm(c) === 'fecha')
     && f.some(c => norm(c).startsWith('referencia') || norm(c).startsWith('descripcion') || norm(c).startsWith('concepto')))
@@ -127,29 +131,45 @@ export function leerEstadoCuenta(datos: ArrayBuffer | Uint8Array, nombreArchivo 
 // final) se descarta y se cuenta en `cortados` para avisar. Solo los créditos se cruzan.
 // La referencia del BDV (0677260822079) y la que escribe el comprador (007660822079) comparten los últimos
 // dígitos: alcanza con puntosRef (últimos 6).
-const FECHA_BDV = /^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2})$/
-const MONTO_BDV = /^(-?[\d.]+,\d{2}) ?Bs\.?$/i
+// 07-11 (Gerardo): según el navegador o la versión de la página, lo copiado llega con las celdas separadas por
+// TAB (una fila por línea), con fecha sin hora, "Crédito" con tilde o "Bs." delante del monto. Se aceptan todas;
+// y si la tabla trae columnas Débito / Crédito (sin la palabra CREDITO en cada fila), se lee como tabla.
+const FECHA_BDV = /^(\d{2})[-/](\d{2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?)?$/i
+const MONTO_BDV = /^(?:Bs\.?\s*)?(-?[\d.]+,\d{2})\s*(?:Bs\.?)?$/i
+const TIPO_BDV = /^(CR[EÉ]DITO|D[EÉ]BITO)$/i
 
-export interface PegadoBDV { movimientos: MovBanco[]; leidos: number; cortados: number }
+export interface PegadoBDV { movimientos: MovBanco[]; leidos: number; cortados: number; lineas?: number }
 
 export function leerPegadoBDV(texto: string): PegadoBDV {
-  const l = texto.split(/\r?\n/).map(x => x.trim()).filter(Boolean)
+  const r = leerPegadoCampos(texto)
+  if (r.leidos || !texto.includes('\t')) return r
+  // En columnas: se lee como tabla (Fecha · Referencia · Descripción · Débito · Crédito · Saldo).
+  try {
+    const filas = texto.split(/\r?\n/).map(f => f.split('\t').map(c => c.trim())).filter(f => f.some(Boolean))
+    const e = estadoDeFilas(filas, 'bdv', 'Venezuela')
+    if (e.movimientos.length || e.filas) return { movimientos: e.movimientos, leidos: filas.filter(f => fechaBanco(f.find(Boolean))).length, cortados: 0, lineas: r.lineas }
+  } catch { /* sin títulos: queda el resultado por campos */ }
+  return r
+}
+
+function leerPegadoCampos(texto: string): PegadoBDV {
+  const l = texto.split(/\r?\n|\t/).map(x => x.trim()).filter(Boolean)
   const movimientos: MovBanco[] = []
   let i = l.findIndex(x => FECHA_BDV.test(x)), leidos = 0, cortados = 0
-  if (i < 0) return { movimientos, leidos, cortados: l.some(x => MONTO_BDV.test(x)) ? 1 : 0 }
-  if (l.slice(0, i).some(x => MONTO_BDV.test(x) || /^(CREDITO|DEBITO)$/i.test(x))) cortados++
+  if (i < 0) return { movimientos, leidos, cortados: l.some(x => MONTO_BDV.test(x)) ? 1 : 0, lineas: l.length }
+  if (l.slice(0, i).some(x => MONTO_BDV.test(x) || TIPO_BDV.test(x))) cortados++
   while (i < l.length) {
     let j = i + 1
     while (j < l.length && !FECHA_BDV.test(l[j])) j++
     const b = l.slice(i, j)
     i = j
-    const t = b.findIndex(x => /^(CREDITO|DEBITO)$/i.test(x))
+    const t = b.findIndex(x => TIPO_BDV.test(x))
     const m = t > 0 ? b[t + 1]?.match(MONTO_BDV) : null
     if (!m) { cortados++; continue }
     leidos++
     const monto = numeroBanco(m[1])
-    if (b[t].toUpperCase() !== 'CREDITO' || !(monto > 0)) continue
-    const [, d, mes, a, h, mi] = b[0].match(FECHA_BDV)!
+    if (!/^CR/i.test(b[t]) || !(monto > 0)) continue
+    const [, d, mes, a, h = '00', mi = '00'] = b[0].match(FECHA_BDV)!
     const ref = t > 2 && /^\d{4,}$/.test(b[1]) ? b[1] : ''
     const desc = b.slice(ref ? 2 : 1, t).join(' ')
     movimientos.push({ banco: 'Venezuela', fecha: `${a}-${mes}-${d}`, ref: digitos(ref), concepto: `${desc} · ${h}:${mi}`,
@@ -157,7 +177,7 @@ export function leerPegadoBDV(texto: string): PegadoBDV {
       // "OPERACION PAGOMOVIL BDV" = pago móvil desde otra cuenta del BDV; "OTROS BANCO" = desde otro banco (no dice cuál).
       emisor: /PAGOMOVIL BDV$/i.test(desc) ? 'Venezuela' : emisorDe(desc) })
   }
-  return { movimientos, leidos, cortados }
+  return { movimientos, leidos, cortados, lineas: l.length }
 }
 
 /** Suma movimientos pegados a un estado del BDV sin repetir (se pueden pegar varias páginas, una tras otra). */
