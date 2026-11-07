@@ -16,7 +16,7 @@ import { SQL_CUENTA_SINCRONIZA } from '@/lib/cuenta'
 import type { Country } from '@/lib/types'
 
 /** `sincroniza` = la empresa tiene Preguntas y la cuenta al día (lo mismo que mira el cron): solo esas reciben ventas. */
-interface Cuenta { empresaId: number; country: Country; conexionId: number; sincroniza: boolean }
+interface Cuenta { empresaId: number; country: Country; conexionId: number; sincroniza: boolean; iaAuto: boolean }
 let mapa: { at: number; cuentas: Map<string, Cuenta> } | null = null
 const MAPA_MIN = 10
 
@@ -24,12 +24,13 @@ async function cuentaDe(mlUserId: string): Promise<Cuenta | null> {
   if (!mapa || Date.now() - mapa.at > MAPA_MIN * 60_000) {
     const cuentas = new Map<string, Cuenta>()
     const { rows: empresas } = await dbGlobal().query(
-      `SELECT e.id, e.country, (e.is_active AND 'preguntas' = ANY(e.modulos) AND ${SQL_CUENTA_SINCRONIZA}) AS sincroniza
+      `SELECT e.id, e.country, (e.is_active AND 'preguntas' = ANY(e.modulos) AND ${SQL_CUENTA_SINCRONIZA}) AS sincroniza,
+              'ia_automatica' = ANY(e.modulos) AS ia_auto
        FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id`)
     for (const e of empresas) {
       const { rows } = await conEmpresa(e.id, e.country as Country, db =>
         db.query(`SELECT id, ml_user_id::text AS u FROM ml_conexiones WHERE estado = 'activa'`))
-      for (const r of rows) cuentas.set(r.u, { empresaId: e.id, country: e.country as Country, conexionId: r.id, sincroniza: !!e.sincroniza })
+      for (const r of rows) cuentas.set(r.u, { empresaId: e.id, country: e.country as Country, conexionId: r.id, sincroniza: !!e.sincroniza, iaAuto: !!e.ia_auto })
     }
     mapa = { at: Date.now(), cuentas }
   }
@@ -95,7 +96,14 @@ export async function procesarPreguntaNotificada(id: number, mlUserId: string | 
       detalle = await conEmpresa(c.empresaId, c.country, async db => {
         const { rowCount: estaba } = await db.query(`SELECT 1 FROM ml_preguntas WHERE id = $1`, [pregunta])
         const estado = await guardarPreguntaNotificada(db, c.conexionId, pregunta)
-        return { empresa: c.empresaId, nueva: !estaba, estado }
+        // 07-11: sin esperar al cron, respuestas rápidas automáticas y la IA automática (lib/automaticasAhora.ts).
+        let auto: unknown = null
+        if (estado === 'UNANSWERED') {
+          const { responderAlInstante } = await import('@/lib/automaticasAhora')
+          auto = await responderAlInstante(db, c.empresaId, c.country, c.iaAuto)
+            .catch(e => ({ error: (e instanceof Error ? e.message : String(e)).slice(0, 150) }))
+        }
+        return { empresa: c.empresaId, nueva: !estaba, estado, ...(auto ? { auto } : {}) }
       })
     }
   } catch (e) {

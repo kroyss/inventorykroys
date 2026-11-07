@@ -9,6 +9,16 @@ import { borradorMensaje } from '@/lib/mensajesIA'
 import { costoDe, registrarUso, iaConfigurada } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
+import { responderHilo } from '@/lib/mensajesML'
+
+// AUTOMÁTICO (07-11, mig 149, pedido del dueño: las de confianza alta venían bien): con 'mensajes_ia_auto' = {"modo":"real"}
+// las de decisión 'sola' se MANDAN. Antes de mandar se confirma que la conversación sigue esperando al vendedor (nadie del
+// equipo contestó) y que no llegó otro mensaje del comprador después (ese se contesta en la pasada siguiente, junto).
+export const CLAVE_AUTO = 'mensajes_ia_auto'
+async function autoReal(db: Pool) {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
+  try { return JSON.parse(r?.value ?? '{}').modo === 'real' } catch { return false }
+}
 
 export const CLAVE_DESDE = 'mensajes_ia_desde'
 const ESPERA_MIN = 2          // el comprador suele mandar 2 o 3 mensajes seguidos: se contesta al último
@@ -57,12 +67,13 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
      INSERT INTO ml_mensajes_ia (pack_id, conexion_id, mensaje_at)
      SELECT pack_id, conexion_id, ultimo_at FROM c
      ON CONFLICT (empresa_id, pack_id, mensaje_at) DO NOTHING
-     RETURNING id, pack_id::text, conexion_id, (SELECT ml_user_id FROM ml_conexiones WHERE id = conexion_id) AS seller`,
+     RETURNING id, pack_id::text, conexion_id, mensaje_at, (SELECT ml_user_id FROM ml_conexiones WHERE id = conexion_id) AS seller`,
     [desde, HORAS_MAX, ESPERA_MIN, POR_PASADA])
   if (!rows.length) return null
   const { rows: [mi] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
   const persona = leerMiIA(mi?.value)?.persona ?? []
-  let listos = 0, errores = 0
+  const real = await autoReal(db)
+  let listos = 0, errores = 0, enviadas = 0
   for (const r of rows) {
     try {
       // borradorMensaje relee la conversación en ML (y la guarda): después se toma lo que escribió el comprador desde el
@@ -80,6 +91,22 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
            decision = $6, motivos = $7, modelo = $8, costo = $9 WHERE id = $1`,
         [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costoDe(b.modelo, b.uso)])
       listos++
+      if (real && decision === 'sola' && b.respuesta) {
+        const { rows: [c] } = await db.query(
+          `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera FROM ml_conversaciones WHERE pack_id = $1`,
+          [r.pack_id, r.mensaje_at])
+        if (c?.espera) {
+          try {
+            await responderHilo(db, r.conexion_id, r.pack_id, b.respuesta)
+            await db.query(`UPDATE ml_mensajes_ia SET enviada_at = NOW() WHERE id = $1`, [r.id])
+            enviadas++
+          } catch (e) {
+            const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
+            console.error('[mensajes ia auto]', r.pack_id, msg)
+            await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, msg]).catch(() => {})
+          }
+        }
+      }
     } catch (e) {
       errores++
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
@@ -87,7 +114,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       await db.query(`UPDATE ml_mensajes_ia SET estado = 'error', error = $2 WHERE id = $1`, [r.id, msg]).catch(() => {})
     }
   }
-  return { listos, errores }
+  return { listos, errores, enviadas }
 }
 
 /** El borrador de la IA para el último mensaje del comprador de una conversación (si lo hay y nadie contestó). */
@@ -104,7 +131,7 @@ export async function borradorPrueba(db: Pool, pack: string) {
 export async function listaPrueba(db: Pool) {
   const { rows } = await db.query(
     `SELECT i.id::text, i.pack_id::text, i.mensaje_at, i.comprador, i.estado, i.respuesta, i.confianza, i.decision, i.motivos,
-            i.error, i.marca, c.comprador_nombre, c.comprador_nick, c.productos, x.nickname AS cuenta,
+            i.error, i.marca, i.enviada_at, i.envio_error, c.comprador_nombre, c.comprador_nick, c.productos, x.nickname AS cuenta,
             (SELECT string_agg(m.texto, E'\\n' ORDER BY m.fecha) FROM (
                SELECT texto, fecha FROM ml_mensajes m WHERE m.pack_id = i.pack_id AND m.propio AND m.fecha > i.mensaje_at
                ORDER BY fecha LIMIT 2) m) AS equipo

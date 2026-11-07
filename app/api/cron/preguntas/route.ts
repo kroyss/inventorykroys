@@ -7,8 +7,7 @@ import { sincronizarEmpresa } from '@/lib/preguntas'
 import { calificarAutomatico, noConcretadasAutomaticas } from '@/lib/calificacionesAuto'
 import { recordarPagos } from '@/lib/recordatoriosPago'
 import { mensajeAlComprar } from '@/lib/mensajeAlComprar'
-import { responderAutomaticas } from '@/lib/automaticasPreguntas'
-import { procesarIAAutomatica } from '@/lib/iaAutomatica'
+import { responderAlInstante } from '@/lib/automaticasAhora'
 import { procesarMensajesIA } from '@/lib/mensajesIAPrueba'
 import { vencerPlanes } from '@/lib/planesCuenta'
 import { actualizarCatalogo, importarHistorial } from '@/lib/catalogoML'
@@ -101,22 +100,14 @@ export async function GET(req: NextRequest) {
     }
     // Respuestas automáticas (lib/automaticasPreguntas.ts): solo las respuestas rápidas que el
     // vendedor activó como automáticas; lo primero, para responder en menos de un minuto.
+    // + la IA automática (lib/iaAutomatica.ts) en las empresas que la prendieron. Desde el 07-11 lo normal es que ya lo
+    // haya hecho el aviso de ML al llegar la pregunta (lib/automaticasAhora.ts, con candado por empresa); esto es el respaldo.
     for (const e of sincronizadas) {
       try {
-        const r = await conEmpresa(e.id, e.country as Country, db => responderAutomaticas(db))
-        if (r) console.log('[respuestas automaticas]', e.id, r)
+        const r = await conEmpresa(e.id, e.country as Country, db => responderAlInstante(db, e.id, e.country, !!e.ia_auto))
+        if (r && (r.rapidas || r.ia)) console.log('[respuestas automaticas]', e.id, r)
       } catch (err) {
         console.error('[respuestas automaticas]', e.id, err instanceof Error ? err.message : err)
-      }
-    }
-    // Respuesta automática con IA (lib/iaAutomatica.ts): solo empresas que la prendieron (prueba o real), después de
-    // las respuestas rápidas automáticas, con las preguntas que quedaron sin responder.
-    for (const e of sincronizadas.filter(x => x.ia_auto)) {
-      try {
-        const r = await conEmpresa(e.id, e.country as Country, db => procesarIAAutomatica(db, e.id, e.country))
-        if (r) console.log('[ia automatica]', e.id, r)
-      } catch (err) {
-        console.error('[ia automatica]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Mensajes con IA en prueba (lib/mensajesIAPrueba.ts, mig 145): borrador de cada mensaje nuevo, NO manda nada.
