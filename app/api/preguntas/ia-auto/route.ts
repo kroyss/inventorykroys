@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       await s.db.query(
         `INSERT INTO app_settings (key, value) VALUES ($1, $2)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde })])
+        [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde, ...(actual.v2 ? { v2: true } : {}) })])
     } else if (b.accion === 'marcar_eco') {
       await s.db.query(
         `UPDATE ml_preguntas SET ia_auto = jsonb_set(ia_auto, ARRAY[$3::text, 'marca'], to_jsonb($2::text))

@@ -15,10 +15,11 @@ import { automaticasPausadas } from '@/lib/automaticasPreguntas'
 import { simularEconomica, type DecisionEco } from '@/lib/iaEconomica'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
-export interface ConfigIA { modo: ModoIA; desde: string | null }
+export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean }   // v2 (07-11): prueba por empresa, "v2": true en el JSON
 export interface DecisionIA {
   modo: ModoIA; decision: 'sola' | 'revisar'; motivos: string[]; respuesta: string; confianza: string
   verificacion: string | null; modelo: string; costo: number; fecha: string; publicada?: boolean; error?: string
+  version?: 'v2'
   marca?: 'bien' | 'mal' | null; marcada_at?: string
   entrada?: number; salida?: number        // tokens (04-11, para comparar con la versión económica)
   eco?: DecisionEco                         // la versión económica en paralelo (lib/iaEconomica.ts)
@@ -32,7 +33,7 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_IA_AUTO])
   try {
     const v = JSON.parse(r?.value ?? '{}')
-    return { modo: ['sombra', 'real'].includes(v.modo) ? v.modo : 'apagado', desde: v.desde ?? null }
+    return { modo: ['sombra', 'real'].includes(v.modo) ? v.modo : 'apagado', desde: v.desde ?? null, v2: v.v2 === true }
   } catch { return { modo: 'apagado', desde: null } }
 }
 
@@ -114,13 +115,13 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
   for (const q of rows) {
     try {
       const c = await armarContexto(db, Number(q.id), country)
-      const b = await pedirBorrador(c, false)
+      const b = await pedirBorrador(c, false, undefined, cfg.v2)
       await registrarUso(db, 'preguntas', b.llamadas, null)
-      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c))
+      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2)
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
-        fecha: new Date().toISOString(),
+        fecha: new Date().toISOString(), ...(cfg.v2 ? { version: 'v2' as const } : {}),
         entrada: b.llamadas.reduce((a, l) => a + (l.uso.input_tokens ?? 0) + (l.uso.cache_creation_input_tokens ?? 0) + (l.uso.cache_read_input_tokens ?? 0), 0),
         salida: b.llamadas.reduce((a, l) => a + (l.uso.output_tokens ?? 0), 0),
       }
