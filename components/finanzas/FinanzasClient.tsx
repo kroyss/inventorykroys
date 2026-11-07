@@ -7,6 +7,7 @@ import { Combobox } from '@/components/ui/Combobox'
 import { parseLocalDate } from '@/lib/tz'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { DateField, MonthField } from '@/components/ui/DateField'
+import CostosML from '@/components/finanzas/CostosML'
 
 const CURRENCIES = ['USD', 'COP', 'VES'] as const
 
@@ -44,12 +45,13 @@ interface Capital {
   totalCost: number; totalSale: number
 }
 
-type Tab = 'movimientos' | 'cierre' | 'capital' | 'cuentas'
+type Tab = 'movimientos' | 'cierre' | 'capital' | 'cuentas' | 'costos_ml'
 const TAB_LABELS: Record<Tab, string> = {
   movimientos: 'Movimientos',
   cierre:      'Cierre mensual',
   capital:     'Capital / Liquidez',
   cuentas:     'Cuentas',
+  costos_ml:   'Costos ML',
 }
 
 export default function FinanzasClient() {
@@ -125,7 +127,9 @@ export default function FinanzasClient() {
 
       {/* Tabs */}
       <Tabs value={tab} onChange={setTab}
-        items={(['movimientos', 'cierre', 'capital', 'cuentas'] as Tab[]).map(t => ({ value: t, label: TAB_LABELS[t] }))} />
+        items={(['movimientos', 'cierre', 'capital', 'cuentas', 'costos_ml'] as Tab[]).map(t => ({ value: t, label: TAB_LABELS[t] }))} />
+
+      {tab === 'costos_ml' && <CostosML />}
 
       {/* ════════ MOVIMIENTOS ════════ */}
       {tab === 'movimientos' && (
