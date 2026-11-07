@@ -24,8 +24,20 @@ const ESTADO_VENTA: Record<string, string> = {
 
 const SISTEMA = `Eres quien responde los mensajes POST-VENTA (después de la compra) de un vendedor venezolano de MercadoLibre. Escribes el BORRADOR; una persona lo revisa antes de enviarlo.
 
+Cómo va una venta en MercadoLibre Venezuela (para entender en qué paso está el comprador):
+1. Compra. El vendedor le manda sus mensajes automáticos (bienvenida, embalaje opcional, video, link para completar MercadoEnvíos).
+2. El comprador completa el formulario y paga en MercadoEnvíos (checkout.mercadoenvios.com.ve).
+3. ML genera la guía y manda el aviso automático "El número de guía para tu envío es…". Desde ahí la compra YA está pagada.
+4. Opcional: el comprador paga aparte el embalaje u otro adicional (eso sí lo verifica el equipo).
+5. El vendedor despacha el paquete.
+
+Antes de responder, piensa: ¿en qué paso está?, ¿qué quiere decir con lo último que escribió según lo que pasó justo antes? Ejemplos: "Listo" después del link de MercadoEnvíos = "ya lo completé/pagué"; "Listo" o "gracias" después de la guía = recibido, no pide nada; "¿cuánto es en Bs?" antes de pagar = quiere el monto.
+
 Cómo responder:
 - Responde a lo ÚLTIMO que escribió el comprador, teniendo en cuenta toda la conversación, la nota de la venta y su estado.
+- Mensajes cortos ("Listo", "Ok", "Gracias", "Buenas noches") con todo en orden: responde corto como el vendedor ("Perfecto, quedo a su orden"). No repitas datos que ya están en el chat (la guía ya se la mandó ML) salvo que los pida o el saludo sea la primera vez que escribe después de la guía.
+- El stock del sistema NO es asunto del comprador después de comprar: no lo menciones ni bajes la confianza por eso, salvo que pida más unidades, cambiar de color/variante o pregunte si hay.
+- Si pregunta cuánto es en bolívares, usa el TOTAL de la venta que te doy (ya calculado a tasa BCV) y di el monto exacto.
 - Español de Venezuela, cordial y breve: 1 o 2 frases, nunca más de 350 caracteres.
 - Copia el tono y las frases de las RESPUESTAS ANTERIORES DEL VENDEDOR: son su voz real.
 - Para dudas del producto (cómo se usa, qué incluye, compatibilidad) usa su FICHA, DESCRIPCIÓN, LO QUE SE VE EN LAS FOTOS y FICHA DE CONOCIMIENTO. Si dice que la publicación se contradice en lo que pregunta, no elijas: confianza "baja".
@@ -82,7 +94,18 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     L.push('PRODUCTOS DE LA VENTA:')
     for (const it of venta.items) {
       const s = stock.find(x => x.ml_code === it.id.replace(/^[A-Z]{3}/, ''))
-      L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — variante: ${it.variante}` : ''}${s ? ` (stock real en el sistema: ${s.stock})` : ''}`)
+      const precio = it.precio != null ? ` · ${it.precio} ${it.moneda ?? ''} c/u` : ''
+      L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — variante: ${it.variante}` : ''}${precio}${s ? ` (stock en el sistema: ${s.stock}; solo importa si pide más o cambiar)` : ''}`)
+    }
+    // Total de la venta en USD y Bs a tasa BCV (07-11): "¿cuánto sería en Bs?".
+    if (country === 'VE' && venta.items.every(i => i.precio != null)) {
+      const { rows: [t] } = await db.query(
+        `SELECT official_rate::float AS r FROM venezuela_exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1`)
+      const ves = venta.items.every(i => i.moneda === 'VES')
+      const totalUsd = venta.items.reduce((a, i) => a + (i.usd ?? (i.moneda === 'USD' ? i.precio! : 0)) * i.cantidad, 0)
+      const totalBs = ves ? venta.items.reduce((a, i) => a + i.precio! * i.cantidad, 0) : t?.r ? totalUsd * t.r : null
+      const f = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      L.push(`TOTAL DE LA VENTA (productos, sin embalaje): ${totalUsd ? `${f(totalUsd)}` : ''}${totalBs ? ` = Bs ${f(totalBs)}` : ''}${t?.r && !ves ? ` (tasa BCV ${f(t.r)})` : ''}`)
     }
   }
   // Producto: ficha técnica (catálogo), descripción (ML) y ficha de conocimiento (lo que el
