@@ -7,7 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 export interface Apartado {
   id: number; venta: string | null; guia_ver: string | null; carrier: string; destinatario: string | null; remitente: string | null
-  impresa: boolean; apartado: 'espera' | 'cancelado' | null; apartado_nota: string | null; apartado_at: string | null
+  impresa: boolean; apartado: 'espera' | 'cancelado' | 'enviada' | null; apartado_nota: string | null; apartado_at: string | null
   productos?: string | null   // qué lleva (23-10)
   apartado_por: string | null; etapa: 'sin_imprimir' | 'impresa' | 'por_reportar'
 }
@@ -140,7 +140,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
             <FormApartar e={apartando} ocupado={ocupado} onCancelar={() => setApartando(null)}
               onApartar={async (tipo, nota) => {
                 const ok = await accion({ accion: 'apartar', id: apartando.id, tipo, nota },
-                  `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'quedó en espera (cuando vaya a salir, toca «Sale en el próximo manifiesto»).' : 'cancelado, no se enviará.'}`)
+                  `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'quedó en espera (cuando vaya a salir, toca «Sale en el próximo manifiesto»).' : tipo === 'enviada' ? 'marcado «Ya la envié»: sale de la jornada y del manifiesto, la venta no se cancela.' : 'cancelado, no se enviará.'}`)
                 if (ok) { setApartando(null); setBuscar(''); setCandidatos(null) }
               }} />
           ) : (
@@ -217,9 +217,9 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
 }
 
 function FormApartar({ e, ocupado, onCancelar, onApartar }: {
-  e: Apartado; ocupado: boolean; onCancelar: () => void; onApartar: (tipo: 'espera' | 'cancelado', nota: string) => void
+  e: Apartado; ocupado: boolean; onCancelar: () => void; onApartar: (tipo: 'espera' | 'cancelado' | 'enviada', nota: string) => void
 }) {
-  const [tipo, setTipo] = useState<'espera' | 'cancelado'>('espera')
+  const [tipo, setTipo] = useState<'espera' | 'cancelado' | 'enviada'>('espera')
   const [nota, setNota] = useState('')
   return (
     <section className="space-y-3 rounded-lg border border-neutral-200 p-3">
@@ -227,7 +227,7 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
       <p className="text-xs text-neutral-500">{e.destinatario ?? ''} · guía {e.guia_ver ?? '—'} · {ETAPA[e.etapa]}</p>
       {e.productos && <p className="text-xs font-medium text-neutral-800">📦 {e.productos}</p>}
       <div className="space-y-1.5">
-        {([['espera', 'Todavía no sale', 'Queda en espera; sale en el próximo manifiesto cuando lo liberes.'], ['cancelado', 'No se enviará', 'Desistió, pago mal o error: nunca se despacha ni se reporta.']] as const).map(([v, t, d]) => (
+        {([['espera', 'Todavía no sale', 'Queda en espera; sale en el próximo manifiesto cuando lo liberes.'], ['enviada', 'Ya la envié', 'Ya salió por fuera de Despachos (p. ej. antes de usar el sistema): sale de la jornada y del manifiesto, la venta NO se cancela.'], ['cancelado', 'No se enviará', 'Desistió, pago mal o error: la venta no se concretó; nunca se despacha ni se reporta.']] as const).map(([v, t, d]) => (
           <label key={v} className={`flex cursor-pointer gap-2 rounded-lg border px-3 py-2 ${tipo === v ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'}`}>
             <input type="radio" checked={tipo === v} onChange={() => setTipo(v)} className="mt-0.5" />
             <span><b className="text-sm">{t}</b><span className="block text-xs text-neutral-500">{d}</span></span>
@@ -244,9 +244,9 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
       )}
       <div className="flex justify-end gap-2">
         <button onClick={onCancelar} className="btn-secondary text-xs">Cancelar</button>
-        <button disabled={ocupado || nota.trim().length < 2} onClick={() => onApartar(tipo, nota.trim())}
+        <button disabled={ocupado || (tipo !== 'enviada' && nota.trim().length < 2)} onClick={() => onApartar(tipo, nota.trim())}
           className={`text-xs disabled:opacity-50 ${tipo === 'cancelado' ? 'btn-primary !bg-red-600 hover:!bg-red-700' : 'btn-primary'}`}>
-          {tipo === 'espera' ? 'Apartar: todavía no sale' : 'Cancelar el envío'}
+          {tipo === 'espera' ? 'Apartar: todavía no sale' : tipo === 'enviada' ? 'Ya la envié' : 'Cancelar el envío'}
         </button>
       </div>
     </section>

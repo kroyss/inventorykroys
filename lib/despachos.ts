@@ -223,7 +223,7 @@ export interface EtiquetaValidada {
   destinatario: string | null
   incluida: boolean
   impresa: boolean
-  apartado?: 'espera' | 'cancelado' | null   // mig. 107
+  apartado?: 'espera' | 'cancelado' | 'enviada' | null   // mig. 107
   sale_id: number | null
   sale_status: string | null
   customer_name: string | null

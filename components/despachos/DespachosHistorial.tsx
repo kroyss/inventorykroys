@@ -17,12 +17,12 @@ interface Jornada {
   envios: number
 }
 interface EtiquetaLote { id: number; venta: string | null; guia: string | null; destinatario: string | null; reimpresion: boolean
-  apartado?: 'espera' | 'cancelado' | null }   // mig. 107
+  apartado?: 'espera' | 'cancelado' | 'enviada' | null }   // mig. 107
 interface Lote { id: number; generated_at: string; label_count: number; page_count: number; generated_by: string | null; etiquetas: EtiquetaLote[] }
 interface EtiquetaHallada {
   id: number; venta: string | null; guia: string | null; destinatario: string | null; remitente: string | null
   reimpresion: boolean; lote_id: number; generated_at: string; jornada_id: number | null
-  apartado?: 'espera' | 'cancelado' | null; apartado_nota?: string | null   // mig. 107
+  apartado?: 'espera' | 'cancelado' | 'enviada' | null; apartado_nota?: string | null   // mig. 107
   jornada_status: string | null; closed_at: string | null
 }
 
@@ -127,7 +127,7 @@ export default function DespachosHistorial() {
                 {hallazgos.map(e => (
                   <tr key={e.id} className="border-t border-neutral-100">
                     <td className="px-4 py-2 font-mono text-xs">{e.venta ?? '—'}{e.reimpresion && <span className="ml-1 text-amber-700">(reimpresión)</span>}
-                      {e.apartado && <div className="font-sans text-amber-700" title={e.apartado_nota ?? ''}>{e.apartado === 'cancelado' ? '✕ Envío cancelado' : '⏸ En espera'}{e.apartado_nota ? `: ${e.apartado_nota}` : ''}</div>}</td>
+                      {e.apartado && <div className="font-sans text-amber-700" title={e.apartado_nota ?? ''}>{e.apartado === 'cancelado' ? '✕ Envío cancelado' : e.apartado === 'enviada' ? '✓ Ya enviada por fuera' : '⏸ En espera'}{e.apartado_nota ? `: ${e.apartado_nota}` : ''}</div>}</td>
                     <td className="px-4 py-2 font-mono text-xs">{e.guia ?? '—'}</td>
                     <td className="px-4 py-2 max-w-[14rem] truncate">{e.destinatario ?? '—'}</td>
                     <td className="px-4 py-2 text-xs text-neutral-500 whitespace-nowrap">
@@ -195,7 +195,7 @@ export default function DespachosHistorial() {
                                       <td className="px-3 py-1 font-mono">{e.venta ?? '—'}</td>
                                       <td className="px-3 py-1 font-mono text-neutral-500">{e.guia ?? '—'}</td>
                                       <td className="px-3 py-1 max-w-[14rem] truncate">{e.destinatario ?? ''}</td>
-                                      <td className="px-3 py-1 text-amber-700">{e.reimpresion ? 'reimpresión' : e.apartado === 'cancelado' ? 'envío cancelado' : e.apartado === 'espera' ? 'en espera' : ''}</td>
+                                      <td className="px-3 py-1 text-amber-700">{e.reimpresion ? 'reimpresión' : e.apartado === 'cancelado' ? 'envío cancelado' : e.apartado === 'espera' ? 'en espera' : e.apartado === 'enviada' ? 'ya enviada por fuera' : ''}</td>
                                       <td className="px-3 py-1 text-right">
                                         <button onClick={() => bajar(`/api/despachos/etiquetas/${e.id}/pdf`)}
                                           className="underline text-neutral-600 hover:text-neutral-900">original</button>

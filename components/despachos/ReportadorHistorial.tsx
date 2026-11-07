@@ -7,7 +7,7 @@ interface Envio {
   reimpresion: boolean; reporte_estado: string | null; reporte_detalle: string | null
   reporte_intentos: number; reportado_at: string | null; reporte_mensaje: string | null
   jornada_id: number; closed_at: string
-  apartado?: 'espera' | 'cancelado' | null; apartado_nota?: string | null   // Despachos → En espera (mig. 107)
+  apartado?: 'espera' | 'cancelado' | 'enviada' | null; apartado_nota?: string | null   // Despachos → En espera (mig. 107)
 }
 type FiltroEstado = 'todos' | 'enviados' | 'problema' | 'pendientes'
 interface Dia { jornada: number; closed_at: string; envios: Envio[] }
@@ -25,6 +25,7 @@ const PENDIENTE = { label: 'Pendiente', cls: 'bg-sky-100 text-sky-800' }
 const APARTADO = {
   espera:    { label: 'En espera (no se reporta)', cls: 'bg-amber-100 text-amber-900' },
   cancelado: { label: 'Envío cancelado',           cls: 'bg-neutral-200 text-neutral-600' },
+  enviada:   { label: 'Ya enviada por fuera',      cls: 'bg-neutral-200 text-neutral-600' },
 }
 
 const TZ = 'America/Caracas'

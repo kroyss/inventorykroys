@@ -1,5 +1,6 @@
 'use client'
 import { AvisoEnEspera, BotonEnEspera, PanelEnEspera, useEnEspera, type Apartado } from '@/components/despachos/EnEspera'
+import PrimeraJornada from '@/components/despachos/PrimeraJornada'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { PageHeader, EmptyState } from '@/components/ui'
@@ -19,7 +20,7 @@ interface Etiqueta {
   remitente: string | null
   destinatario: string | null
   incluida: boolean
-  apartado?: 'espera' | 'cancelado' | null   // en "En espera" (mig. 107)
+  apartado?: 'espera' | 'cancelado' | 'enviada' | null   // en "En espera" (mig. 107)
   sale_status: string | null
   sale_notes: string | null
   customer_name?: string | null
@@ -336,6 +337,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
       />
 
       <AvisoEnEspera lista={espera.lista} onAbrir={() => setPanelEspera({ pre: null })} />
+      <PrimeraJornada onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />
       {panelEspera && (
         <PanelEnEspera lista={espera.lista} preseleccion={panelEspera.pre} onCerrar={() => setPanelEspera(null)} conInventario={!desdeML}
           onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />
@@ -683,7 +685,7 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {e.apartado
-                      ? <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">{e.apartado === 'espera' ? '⏸ En espera' : '✕ Cancelado'}</span>
+                      ? <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">{e.apartado === 'espera' ? '⏸ En espera' : e.apartado === 'enviada' ? '✓ Ya enviada' : '✕ Cancelado'}</span>
                       : <span className={`inline-block px-2 py-0.5 rounded-full ${ui.cls}`}>{ui.label}</span>}
                     {e.detalle && !e.apartado && <div className="text-neutral-500 mt-0.5">{e.detalle}</div>}
                     {!e.apartado && e.venta && (

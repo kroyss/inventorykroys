@@ -186,7 +186,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { rows: [salio] } = await db.query(
       `SELECT EXISTS (SELECT 1 FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
                       JOIN despacho_jornadas j ON j.id = l.jornada_id
-                      WHERE e.venta = $1 AND e.impresa AND j.status = 'CERRADA' AND e.apartado IS NULL) AS si`, [sale.ml_order_number])
+                      WHERE e.venta = $1 AND e.impresa AND j.status = 'CERRADA' AND (e.apartado IS NULL OR e.apartado = 'enviada')) AS si`, [sale.ml_order_number])
     const { rows: [fac] } = await db.query(
       `SELECT invoice_number FROM invoices i WHERE ${sqlFacturaIncluye('i', '$1')} AND status = 'EMITIDA' LIMIT 1`, [id])
     const linea = (pid: number, cantidad: number, precio: number, nota: string | null): Linea =>
