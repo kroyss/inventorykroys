@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
+import { dbGlobal } from '@/lib/db'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
 import { DIAS_MAX, cargadasConPago, despachadasFuera, marcarFuera, marcarNoConcretada, noConcretadas, ventasPorConfirmar } from '@/lib/porConfirmar'
 import { MOTIVOS_NO_CONCRETADA } from '@/lib/noConcretada'
@@ -17,7 +18,12 @@ export async function GET() {
   if ('error' in s) return s.error
   try {
     const conInventario = tieneModulo(s.session.user, 'inventario')
-    const [{ dias, filas }, noConc, fuera] = await Promise.all([ventasPorConfirmar(s.db), noConcretadas(s.db),
+    // Mig 148: con inventario, solo lo vendido desde que se prendió (las anteriores ya se trabajaron sin inventario).
+    const { rows: [emp] } = conInventario
+      ? await dbGlobal().query(`SELECT inventario_desde FROM empresas WHERE id = $1`, [s.session.user.empresaId])
+      : { rows: [] }
+    const desde: string | null = emp?.inventario_desde ? new Date(emp.inventario_desde).toISOString() : null
+    const [{ dias, filas }, noConc, fuera] = await Promise.all([ventasPorConfirmar(s.db, desde), noConcretadas(s.db),
       conInventario ? Promise.resolve([]) : despachadasFuera(s.db)])
     let ultimaBusqueda: string | null = null
     // Solo con inventario: sin inventario (Fundadores) no hay ventas cargadas.
@@ -29,7 +35,7 @@ export async function GET() {
       ultimaBusqueda = fin ?? (p ? new Date(p.pedido_at).toISOString() : null)
     }
     const { rows: [sync] } = await s.db.query(`SELECT MIN(ordenes_sync_at) AS at FROM ml_conexiones WHERE estado = 'activa'`)
-    return NextResponse.json({ dias, filas, cargadas, noConcretadas: noConc, despachadasFuera: fuera, ultimaBusqueda, pagosME: tieneModulo(s.session.user, 'pagos_me'), sincronizadas_at: sync?.at ?? null })
+    return NextResponse.json({ dias, filas, cargadas, conInventario, inventarioDesde: desde, noConcretadas: noConc, despachadasFuera: fuera, ultimaBusqueda, pagosME: tieneModulo(s.session.user, 'pagos_me'), sincronizadas_at: sync?.at ?? null })
   } catch (err) {
     return apiError(err)
   }

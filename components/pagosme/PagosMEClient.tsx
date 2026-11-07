@@ -17,6 +17,7 @@ interface Datos {
   }
   /** Sin ventas cargadas: las guías van solas a Despachos con las ventas de MercadoLibre. */
   desdeML: boolean
+  conInventario?: boolean
   /** Cuentas de ML (VE) y si ya tienen su Chrome trayendo (29-10). */
   cuentasML?: { nickname: string; estado: string; con_navegador: boolean }[]
 }
@@ -274,7 +275,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
           ))}
         </div>
       )}
-      {datos?.desdeML && vista === 'ventas' && (
+      {datos?.desdeML && vista === 'ventas' && !datos.conInventario && (
         <PorConfirmar datos={pc.datos} onRecargar={pc.cargar} onConfirmar={() => {}}
           onVerificar={async (id, v) => {
             const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -283,6 +284,23 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
             await Promise.all([pc.cargar(), cargar()])
           }} />
       )}
+      {/* Con inventario (07-11): la MISMA lista y el mismo modo que Ventas → Por confirmar (registrar la venta descuenta
+          el stock; "Ya la despaché por fuera" no va: descuadra el inventario). Antes se veía en modo sin inventario. */}
+      {datos?.desdeML && vista === 'ventas' && datos.conInventario && <>
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          Llevas inventario: esta es la misma lista de <a href="/ventas?vista=confirmar" className="font-medium underline">Ventas → Por confirmar</a>.
+          Verifica el pago aquí y toca «Registrar venta» para descontarla del stock.
+        </div>
+        <PorConfirmar datos={pc.datos} onRecargar={pc.cargar}
+          onConfirmar={n => { window.location.href = `/ventas?vista=confirmar&registrar=${n}` }}
+          onVerificarPago={async (id, v) => {
+            const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
+            if (!r?.ok) setError('No se pudo guardar la verificación')
+            await Promise.all([pc.cargar(), cargar()])
+          }}
+          onVerificarCargada={() => { window.location.href = '/ventas?vista=confirmar' }} />
+      </>}
 
       {(!datos?.desdeML || vista === 'historial') && <>
       <div className="flex flex-wrap items-center justify-between gap-2">

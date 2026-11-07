@@ -223,7 +223,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     const q = new URLSearchParams(window.location.search)
     if (q.get('new') === '1') {
       setEditing(null); setShowForm(true)
-    } else if (q.get('vista') === 'confirmar' && porConfirmar) setVistaPC(true)
+    } else if (q.get('vista') === 'confirmar' && porConfirmar) {
+      setVistaPC(true)
+      // ?registrar=<número> (07-11, "Registrar venta" desde Pagos ME con inventario): abre el formulario de esa venta.
+      const reg = q.get('registrar')?.trim()
+      if (reg && /^\d+$/.test(reg)) { setNumeroNuevo(reg); setEditing(null); setShowForm(true) }
+    }
     // ?venta=<número> (desde Despachos → En espera → "Corregir pedido"): abre esa venta.
     // &editar=1 ("Editar venta →" en una fila del lote de Despachos, 22-10): venta PROCESADA → Corregir pedido directo
     // (no se reabre: sigue procesada y el stock se ajusta por la diferencia), sin la ficha detrás. Borrador → Editar venta.

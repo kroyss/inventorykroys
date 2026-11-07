@@ -65,7 +65,8 @@ export interface PorConfirmar {
 export interface NoConcretada { numero: string; fecha: string; comprador: string | null; nick: string | null; productos: string | null
                                 motivo: MotivoNoConcretada; nota: string | null; at: string; por: string | null }
 
-export async function ventasPorConfirmar(db: Pool) {
+/** `desde` (mig 148, con inventario): solo las ventas posteriores a cuando se prendió el inventario. */
+export async function ventasPorConfirmar(db: Pool, desde: string | null = null) {
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
   const dias = leerPlantillasCal(pl?.value).noConcretada.dias
   const { rows } = await db.query(
@@ -96,9 +97,10 @@ export async function ventasPorConfirmar(db: Pool) {
        AND (o.fecha > NOW() - make_interval(days => $2)
             OR (p.verificacion <> 'invalido' AND o.fecha > NOW() - make_interval(days => $3)))
        AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
+       AND ($4::timestamptz IS NULL OR o.fecha >= $4)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
-     ORDER BY o.fecha DESC`, [dias, DIAS_MAX, DIAS_CON_PAGO])
+     ORDER BY o.fecha DESC`, [dias, DIAS_MAX, DIAS_CON_PAGO, desde])
 
   // Cuántos productos del sistema tiene cada publicación (sin el prefijo: MLV768007052 → 768007052) y
   // cada variante ("768007052:180012345", Importar desde ML). Primero la variante exacta, si no la

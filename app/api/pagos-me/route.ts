@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { LATIDO_MIN, SELECT_PAGOS, TRAIDA_EN_CURSO_MIN, sesionPagosME } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
+import { tieneModulo } from '@/lib/modulos'
 import { asegurarPagosDemo, entregarDemo } from '@/lib/demoDatos'
 
 /**
@@ -92,6 +93,7 @@ export async function GET(req: NextRequest) {
       vigilante: { clave: !!clave?.creado_at || !!clave?.con_codigo, latidos, pedido: pedido ?? null },
       cuentasML,
       desdeML: s.desdeML,
+      conInventario: tieneModulo(s.session.user, 'inventario'),
     })
   } catch (err) {
     return apiError(err)

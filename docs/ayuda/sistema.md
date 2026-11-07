@@ -525,6 +525,12 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Stock en ML:** cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
   cuentas de una vez. Aquí se marca si una publicación es pack/combo («trae N u.»).
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
+  **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
+  toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
+- **Prender o apagar el Inventario:** no se pierde nada (pagos, guías, despachos y calificaciones siguen igual). Al
+  prenderlo, Por confirmar solo pide registrar las ventas **desde ese momento**; las anteriores quedan como estaban en
+  Pagos ME. Si se apagó y se volvió a prender, en Inventario sale un aviso: lo vendido mientras estuvo apagado no se
+  descontó, conviene hacer un conteo (hoja de conteo) y cargar las diferencias como ajuste.
 - **Inventario:** stock actual de cada producto y sus movimientos. Ajuste de stock: si contaste y está mal, se guarda
   como ajuste.
 - **Compras:** «Entró mercancía» (en un paso: carga el inventario), o por etapas si la empresa lo usa.

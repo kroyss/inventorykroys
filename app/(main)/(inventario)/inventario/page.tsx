@@ -6,6 +6,8 @@ import type { InventoryItem } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { redirect } from 'next/navigation'
+import { dbGlobal } from '@/lib/db'
+import { COUNTRY_TZ } from '@/lib/tz'
 
 export const metadata = { title: 'Inventario' }
 
@@ -63,7 +65,24 @@ export default async function InventarioPage() {
       name
   `)
 
-  return (
+  // Mig 148: si el inventario se apagó y se volvió a prender hace menos de 30 días, lo vendido mientras estuvo apagado
+  // no se descontó: aviso para hacer un conteo.
+  const { rows: [emp] } = await dbGlobal().query(
+    `SELECT inventario_desde, inventario_hasta FROM empresas
+     WHERE id = $1 AND inventario_hasta IS NOT NULL AND inventario_desde > inventario_hasta
+       AND inventario_desde > NOW() - INTERVAL '30 days'`, [session!.user.empresaId])
+  const fecha = (d: Date) => new Intl.DateTimeFormat('es-VE', { day: 'numeric', month: 'short', timeZone: COUNTRY_TZ[session!.user.country] }).format(d)
+
+  return (<>
+    {emp && (
+      <div className="mb-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Estuviste sin inventario del <b>{fecha(new Date(emp.inventario_hasta))}</b> al <b>{fecha(new Date(emp.inventario_desde))}</b>:
+          lo que vendiste en esos días no se descontó del stock. Haz un conteo para ponerlo al día
+          (<a href="/hoja-inventario" className="underline">hoja de conteo</a>) y carga las diferencias como ajuste.
+        </div>
+      </div>
+    )}
     <InventarioClient
       initialItems={rows as InventoryItem[]}
       acceso={{ config: puede(session!.user, 'inventario_config'), costos: puede(session!.user, 'costos') }}
@@ -71,5 +90,5 @@ export default async function InventarioPage() {
       etiquetas={tieneModulo(session!.user, 'etiquetas')}
       stockML={tieneModulo(session!.user, 'preguntas')}
     />
-  )
+  </>)
 }
