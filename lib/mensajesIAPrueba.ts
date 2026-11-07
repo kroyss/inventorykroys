@@ -27,7 +27,7 @@ const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay|queda|quedan)\b|ag
 export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null }, comprador: string, persona: string[] = []): string[] {
   const m: string[] = []
   if (RECLAMO.test(comprador)) m.push('Reclamo, cancelación o devolución: lo ve una persona')
-  if (PAGO.test(comprador)) m.push('Habla de un pago o comprobante: lo verifica una persona')
+  if (PAGO.test(comprador) && !/embalaje|adicional/i.test(comprador)) m.push('Habla de un pago o comprobante: lo verifica una persona')
   if (DATOS.test(comprador)) m.push('Manda datos personales o de envío: lo ve una persona')
   const tema = persona.find(t => t.length >= 4 && comprador.toLowerCase().includes(t.toLowerCase().split(' ')[0]))
   if (tema) m.push(`Tema que en Mi IA marcaste para una persona (${tema})`)

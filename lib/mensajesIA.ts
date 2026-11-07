@@ -11,6 +11,7 @@ import { itemsDeVenta, envioML, leerHilo, sugerenciasMensaje, textoPlano } from 
 import { leerNotas } from '@/lib/notasML'
 import { mlFetch } from '@/lib/ml'
 import { fichasActivas } from '@/lib/fichasIA'
+import { COUNTRY_TZ } from '@/lib/tz'
 import { contextoFotos, fichaDeAtributos, lineasFotos, type FotoML } from '@/lib/fotosIA'
 
 const ESTADO_VENTA: Record<string, string> = {
@@ -45,7 +46,14 @@ Cómo responder:
 - Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
 - Usa SOLO los datos que te doy. Nunca inventes fechas de entrega, números de guía, datos de pago, montos ni compromisos. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
 - Si hay GUÍA de envío, puedes darla. Si no la hay, no digas que ya se envió.
-- Si dice "PAGO: ya pagó en MercadoEnvíos", la compra YA está pagada: nunca digas que el pago no aparece ni que lo van a verificar. Si el comprador habla de un pago APARTE (embalaje, diferencia, un adicional), ese sí lo verifica el equipo: confirma que la compra ya está pagada (y la guía si la hay) y di que verifican ese pago aparte y le confirman por este chat.
+- Si dice "PAGO: ya pagó en MercadoEnvíos", la compra YA está pagada: nunca digas que el pago no aparece.
+- Cuándo sale el envío: con HOY y los días de despacho de las POLÍTICAS di el día concreto ("el lunes", "mañana martes"). Si las POLÍTICAS no dicen días de despacho, no prometas un día.
+- No repitas datos que ya están en el chat (la guía que mandó ML, montos ya dados) salvo que los pida. Si ya tiene guía y solo saluda o dice "listo": dile que verifican su pago y el día en que procesan el envío.
+- Datos para pagar (cuentas, pago móvil, Zelle…): SOLO los de "Datos para pagar" de las POLÍTICAS, copiados exactos. Si no están ahí y el comprador los pide, deja la respuesta VACÍA con confianza "baja" y falta_dato "Pide datos de pago: los da el equipo".
+- Adicionales OPCIONALES que el vendedor ofrece en sus mensajes o respuestas rápidas (p. ej. embalaje): el monto sale de ahí, nunca uno fijo. Son opcionales: si dice que ya lo pagó, responde corto ("Perfecto, quedo a su orden") y el día de envío, sin decir que se verifica; si pregunta si es obligatorio o qué pasa si no lo paga, di que es opcional y que puede agregarlo cuando quiera; si ya tiene guía y no lo agregó, puedes sugerirlo una vez.
+- Otro pago aparte que NO es un adicional opcional (una diferencia, otro producto): ese lo verifica el equipo.
+- Monto: desglose "cantidad × precio = subtotal" con el TOTAL de la venta; si el vendedor ofrece un adicional opcional, súmalo aparte como opcional ("si desea agregar el embalaje de X, total Y").
+- Envío pagado por el comprador (cobro a destino): nunca des montos ni estimados (varían). Confirma la agencia entre las de cobro a destino de las POLÍTICAS; cuando la elija, pídele nombre completo, cédula, teléfono, dirección, ciudad y estado. Si las POLÍTICAS piden un mínimo de unidades para el envío gratis y el producto entra ahí, recomienda comprar ese mínimo: le sale más barato que el cobro a destino.
 - Si pregunta algo que depende del equipo y no está en los datos (cuándo sale el paquete, desde qué oficina, un problema con el pago o el formulario), no lo inventes: responde que lo verifican con el equipo y le avisan por este chat, con confianza "baja" y el dato en "falta_dato".
 - Si el comprador solo manda un emoji o un "ok", no hace falta responder: deja la respuesta vacía con confianza "alta".
 - Si el comprador solo saluda o agradece, responde corto y amable.
@@ -151,7 +159,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   }
   const guiaME = ml?.guia || avisoGuia
   const pagadoME = !!(g || guiaME)
-  const lineaPago = pagadoME ? `PAGO: ya pagó en MercadoEnvíos (la compra está pagada${guiaME ? `, guía ${guiaME}` : ''}). Si habla de un pago aparte (embalaje, diferencia), ese lo verifica el equipo.` : null
+  const lineaPago = pagadoME ? `PAGO: ya pagó en MercadoEnvíos (la compra está pagada${guiaME ? `, guía ${guiaME}` : ''}).` : null
   if (conInventario) {
     L.push(s ? `ESTADO EN EL SISTEMA: ${ESTADO_VENTA[s.status] ?? s.status}` : 'ESTADO EN EL SISTEMA: la venta todavía no está cargada en el sistema.')
   } else {
@@ -177,6 +185,9 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     L.push('\nRESPUESTAS ANTERIORES DEL VENDEDOR A MENSAJES PARECIDOS (otras ventas):')
     L.push(ejemplos.sugerencias.map(x => `Comprador: ${x.pregunta}\nVendedor: ${x.respuesta}`).join('\n\n'))
   }
+  // Hoy (07-11): para decir el día de envío según los días de despacho de las POLÍTICAS.
+  const tz = COUNTRY_TZ[country as 'VE' | 'CO'] ?? COUNTRY_TZ.VE
+  L.push(`\nHOY: ${new Intl.DateTimeFormat('es-VE', { timeZone: tz, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date())}`)
   L.push('\nCONVERSACIÓN (de la más vieja a la más nueva):')
   for (const m of hilo.mensajes.slice(-30)) {
     const t = textoPlano(m.texto).slice(0, 600)
