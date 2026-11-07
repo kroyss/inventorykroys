@@ -66,13 +66,25 @@ export async function contextoFotos(db: Pool, conexionId: number, itemId: string
     if (g && (g.huella === huella || !lista.length)) return { texto: g.texto, contradicciones: g.contradicciones }
     if (!lista.length) return null
 
+    // Las fotos se bajan desde aquí y van en base64: Anthropic no puede descargar las de mlstatic por URL (400).
+    const imagenes = (await Promise.all(lista.map(async f => {
+      try {
+        const r = await fetch((f.secure_url ?? f.url!).replace(/^http:/, 'https:'), { cache: 'no-store', signal: AbortSignal.timeout(10000) })
+        const tipo = (r.headers.get('content-type') ?? '').split(';')[0].trim()
+        if (!r.ok || !/^image\/(jpeg|png|webp|gif)$/.test(tipo)) return null
+        const buf = Buffer.from(await r.arrayBuffer())
+        if (buf.length > 4_500_000) return null
+        return { type: 'image', source: { type: 'base64', media_type: tipo, data: buf.toString('base64') } }
+      } catch { return null }
+    }))).filter(Boolean)
+    if (!imagenes.length) return g ? { texto: g.texto, contradicciones: g.contradicciones } : null
     const contenido = [
-      ...lista.map(f => ({ type: 'image', source: { type: 'url', url: (f.secure_url ?? f.url!).replace(/^http:/, 'https:') } })),
+      ...imagenes,
       { type: 'text', text: [
         `PUBLICACIÓN: ${pub.titulo ?? itemId}`,
         `FICHA TÉCNICA: ${pub.ficha ?? '(sin ficha)'}`,
         `DESCRIPCIÓN:\n${(pub.descripcion ?? '(sin descripción)').slice(0, 3000)}`,
-        `Arriba van ${lista.length} foto(s) de la publicación.`,
+        `Arriba van ${imagenes.length} foto(s) de la publicación.`,
       ].join('\n') },
     ]
     const { resultado: r, uso, modelo } = await llamarClaude<{ texto: string; contradicciones: string | null }>(
@@ -85,7 +97,7 @@ export async function contextoFotos(db: Pool, conexionId: number, itemId: string
       `INSERT INTO ml_item_fotos_ia (item_id, huella, texto, contradicciones, fotos, modelo, leido_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())
        ON CONFLICT (empresa_id, item_id) DO UPDATE SET huella = EXCLUDED.huella, texto = EXCLUDED.texto,
          contradicciones = EXCLUDED.contradicciones, fotos = EXCLUDED.fotos, modelo = EXCLUDED.modelo, leido_at = NOW()`,
-      [itemId, huella, texto, contra, lista.length, modelo])
+      [itemId, huella, texto, contra, imagenes.length, modelo])
     return { texto, contradicciones: contra }
   } catch (e) {
     console.error('[fotos ia]', itemId, e instanceof Error ? e.message : e)
