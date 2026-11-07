@@ -40,14 +40,25 @@ const HERRAMIENTA = {
   },
 }
 
+// Versión 2 (07-11): el de arriba frenaba por detalles (el saludo, "colores claros", la conversión a Bs, "dos días" sin decir
+// "el lunes"). Esto se suma y manda.
+const SISTEMA_V2_EXTRA = `
+
+AJUSTES (mandan sobre lo anterior):
+- NO son afirmaciones que verificar: saludos y despedidas, frases de cortesía, "el precio es el publicado", "a tasa BCV", "lo hacemos en el menor tiempo posible", "el despacho se confirma al concretar la compra", "déjanos verificar", ni descripciones obvias de un dato que sí está (blanco o nude son colores claros; si VARIANTES dice 0 de una talla, "no la tenemos" está respaldado).
+- Una conversión a bolívares sale de la línea PRECIO EN MERCADOLIBRE AHORA: respaldada.
+- Lo que dice una RESPUESTA RÁPIDA del vendedor que aplica, o lo que el vendedor ya respondió igual en ESTA publicación, está respaldado.
+- partes_sin_contestar: solo si una parte quedó SIN ninguna respuesta. Una respuesta general correcta o la frase segura de despacho cuenta como contestada ("¿si compro el lunes cuándo llega?" → "normalmente son dos días" está contestada).
+- Sigue siendo NO respaldado: colores, tallas, medidas, números, plazos, mínimos, agencias, cobros o compatibilidades que no estén escritos.`
+
 export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA }
 
 /** `datos` = el mismo bloque de contexto que recibió la IA del borrador. */
-export async function verificarBorrador(datos: string, pregunta: string, borrador: string, modeloV = MODELO_SIMPLE): Promise<Verificacion> {
+export async function verificarBorrador(datos: string, pregunta: string, borrador: string, modeloV = MODELO_SIMPLE, v2 = false): Promise<Verificacion> {
   const { resultado: r, uso, modelo } = await llamarClaude<{
     afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean }[]; partes_sin_contestar?: string[]; mal_entendida?: boolean
   }>({
-    sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: modeloV, maxTokens: 700,
+    sistema: SISTEMA + (v2 ? SISTEMA_V2_EXTRA : ''), herramienta: HERRAMIENTA, modelo: modeloV, maxTokens: 700,
     contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
   })
   const sinRespaldo = (r.afirmaciones ?? []).filter(a => !a.respaldada || /^ninguna/i.test(a.donde ?? ''))

@@ -417,6 +417,20 @@ Reglas estrictas (una respuesta equivocada publicada sola le cuesta una venta o 
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
+// Versión 2 (07-11, comparación con la IA de MercadoLibre en una cuenta cliente: ML publicaba todo y bien; la nuestra frenaba
+// 11 de 19, 5 por detalles del verificador y 4 por no saber una regla de tiempo). Se suma a SISTEMA y manda sobre lo de arriba.
+// En prueba: solo la usa /api/cron/ia-v2 (no publica). Ver docs/memoria.
+export const SISTEMA_V2_EXTRA = `
+
+AJUSTES (mandan sobre lo anterior):
+- Corto y al grano, como un vendedor con experiencia: contesta SOLO lo que preguntó, con los datos concretos (qué colores o tallas hay, el precio). Las RESPUESTAS RÁPIDAS son tu guía de tono y de políticas, NO un texto para pegar entero: agrega tasa, agencias, embalaje o "oferta con confianza" solo si preguntó por eso (o por precio o envío). Excepción: un mínimo OBLIGATORIO para envío gratis va siempre.
+- Si pide una variante que no hay (según VARIANTES o STOCK), decir "esa no la tenemos" y cuáles sí hay ES una respuesta completa y segura: confianza "alta".
+- Si pide medidas de una talla o variante que no hay, basta decir que no está disponible y ofrecer las que sí: no hace falta la medida.
+- ¿Sale hoy? ¿Cuándo llega? ¿Envían el mismo día? Si las POLÍTICAS no dan el plazo, NO lo dejes en "baja": responde la frase segura "El despacho se confirma al concretar la compra y lo hacemos en el menor tiempo posible" (más el envío gratis si aplica). Es completa: confianza "alta". Nunca prometas "hoy" ni un día exacto que no esté escrito.
+- "¿Tiene unidades para hoy?" = ¿hay disponible?: contesta la disponibilidad, sin prometer que sale hoy.
+- No des montos en bolívares: si preguntan el precio, el de la publicación en USD "a tasa BCV del día".
+- Lo que SÍ sigue en "baja": las POLÍTICAS o las RESPUESTAS RÁPIDAS se contradicen con la descripción en lo que pregunta (cobros adicionales, mínimos, agencias); datos técnicos o medidas que no están escritos; compatibilidades; pagos fuera de MercadoLibre.`
+
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
  *  ACTUAL = el de antes. RECORTADO = el que se usa desde el 28-10: probado con /api/cron/ia-comparar en preguntas
  *  reales (misma calidad, ~29% más barato). La comparación sigue disponible con los dos. */
@@ -514,8 +528,8 @@ export const esPreguntaSimple = (texto: string) =>
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
  *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
-export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
-  const sistema = SISTEMA + (web
+export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO, v2 = false): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
+  const sistema = SISTEMA + (v2 ? SISTEMA_V2_EXTRA : '') + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
     : '')
   const contenido = bloqueContexto(c, recorte)
@@ -540,7 +554,7 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
   let verificacion: string | null = null
   if (!web && b.respuesta && b.confianza !== 'baja') {
-    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta).catch(() => null)
+    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta, MODELO_SIMPLE, v2).catch(() => null)
     if (v) {
       llamadas.push(v.llamada)
       if (!v.ok) { verificacion = v.motivo; b = { ...b, confianza: 'baja', falta_dato: b.falta_dato ?? v.motivo } }

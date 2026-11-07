@@ -69,13 +69,14 @@ function fabricanteInventado(respuesta: string, datos: string) {
 
 /** Por qué una respuesta de la IA NO saldría sola (vacío = saldría sola). `datos`: textos de la publicación. */
 const TERCERO = /\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (solo |no )?(indica|dice|especifica|menciona|muestra|aclara|detalla)|seg[uú]n (la|esta) (publicaci[oó]n|ficha|descripci[oó]n)|los datos (indican|dicen)/i
+// v2 (07-11): "no tenemos esa" deja de frenar si el verificador la encontró respaldada (VARIANTES/STOCK) y la confianza es alta.
 export function motivosRevisar(b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
-  itemEstado: string | null, pregunta = '', datos = ''): string[] {
+  itemEstado: string | null, pregunta = '', datos = '', v2 = false): string[] {
   const m: string[] = []
   if (!b.respuesta) return ['La IA no propuso respuesta']
   if (b.confianza !== 'alta') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
   else if (b.verificacion && b.verificacion !== 'ok') m.push(b.verificacion)
-  if (NEGATIVA.test(b.respuesta)) m.push('Dice que no hay: lo confirma una persona')
+  if (NEGATIVA.test(b.respuesta) && !(v2 && b.confianza === 'alta' && b.verificacion === 'ok')) m.push('Dice que no hay: lo confirma una persona')
   if (OTRA_PUBLICACION.test(b.respuesta)) m.push('Recomienda otra publicación')
   // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
   if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')
