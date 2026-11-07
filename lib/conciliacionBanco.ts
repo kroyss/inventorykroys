@@ -134,7 +134,7 @@ export function estadoDeFilas(filas: string[][], nombreArchivo = '', banco?: str
 // 07-11 (Gerardo): según el navegador o la versión de la página, lo copiado llega con las celdas separadas por
 // TAB (una fila por línea), con fecha sin hora, "Crédito" con tilde o "Bs." delante del monto. Se aceptan todas;
 // y si la tabla trae columnas Débito / Crédito (sin la palabra CREDITO en cada fila), se lee como tabla.
-const FECHA_BDV = /^(\d{2})[-/](\d{2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?)?$/i
+const FECHA_BDV = /^(\d{2})[-/](\d{2})[-/](\d{4})(?:\s*(?:-\s*)?\s(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?)?$/i
 const MONTO_BDV = /^(?:Bs\.?\s*)?(-?[\d.]+,\d{2})\s*(?:Bs\.?)?$/i
 const TIPO_BDV = /^(CR[EÉ]DITO|D[EÉ]BITO)$/i
 

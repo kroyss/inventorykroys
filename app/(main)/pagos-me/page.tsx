@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { llevaInventario, tieneModulo } from '@/lib/modulos'
+import { llevaInventario, tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import PagosMEClient from '@/components/pagosme/PagosMEClient'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
@@ -10,8 +10,11 @@ import { puede } from '@/lib/permisos'
 export const metadata = { title: 'Pagos MercadoEnvíos' }
 
 // Fuera del grupo (inventario) desde 2026-10-15: también lo usan las empresas sin inventario (Fundadores).
-export default async function PagosMEPage() {
+export default async function PagosMEPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const session = await getServerSession(authOptions)
+  // /pagos-me?vista=confirmar (enlace de Novedades, 07-11): el comprobador del banco está aquí si trabaja todo desde ML,
+  // y en Ventas → Por confirmar si lleva inventario.
+  if ((await searchParams).vista === 'confirmar' && session && !ventasDesdeML(session.user)) redirect('/ventas?vista=confirmar')
   if (!tieneModulo(session?.user, 'pagos_me') || !puede(session?.user, 'ver_pagos_me') || session!.user.country !== 'VE') {
     redirect(llevaInventario(session?.user) ? '/dashboard' : '/automatizaciones')
   }
