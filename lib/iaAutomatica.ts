@@ -7,7 +7,7 @@
 // bien o mal) · real (publica las "sola"). La pausa de las respuestas automáticas (preguntas_auto_pausa) la frena igual.
 // Cada pregunta procesada usa 1 crédito de IA (ia_uso.modulo = 'preguntas'); sin créditos no procesa.
 import type { Pool } from 'pg'
-import { armarContexto, datosPublicacion, pedirBorrador, iaConfigurada } from '@/lib/preguntas'
+import { armarContexto, datosPublicacion, pedirBorrador, iaConfigurada, textoVendedor } from '@/lib/preguntas'
 import { costoDe, cupoIA, registrarUso, MODELO_ECO55 } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
@@ -52,6 +52,14 @@ const MUCHAS = /\b([5-9]|\d{2,})\s*(unidades|unds?\b|packs?|piezas|pares|cajas|d
 const DIVISA = /divisas?|en d[oó]lares|precio en \$|en efectivo|\bverdes?\b|\busdt?\b/i
 // Medios de pago fuera de MercadoLibre (Cashea, Zelle, Binance...): la IA inventó "sí contamos con Cashea".
 const PAGO = /cashea|zelle|binance|paypal|zinli|wally|reserve|cripto|pago m[oó]vil|transferencia|efectivo|krece|lysto/i
+// v2 (07-11, el dueño): el medio de pago no frena si está ESCRITO en lo del vendedor (Mi IA, políticas, respuestas rápidas):
+// todos los que nombran la pregunta y la respuesta tienen que estar ahí. Cashea/Zelle inventados siguen frenando.
+const sinTildes = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+function pagoEscrito(pregunta: string, respuesta: string, vendedor: string) {
+  const v = sinTildes(vendedor)
+  const medios = [...sinTildes(pregunta + ' ' + respuesta).matchAll(new RegExp(PAGO.source, 'gi'))].map(m => m[0])
+  return medios.length > 0 && v.trim() !== '' && medios.every(m => v.includes(m))
+}
 // Compatibilidad con un vehículo o modelo: la IA confirmó "sí para Kia Picanto" sin tenerlo.
 const VEHICULO = /\b(kia|toyota|chevrolet|chevy|ford|fiat|hyundai|mitsubishi|renault|nissan|mazda|honda|jeep|chery|volkswagen|vw|peugeot|suzuki|dodge|chrysler|daewoo|iveco|mercedes|bmw|audi|seat|jac|dongfeng|great wall|bera|empire|yamaha|bajaj|skygo|picanto|aveo|corolla|fiesta|optra|spark|cherokee|hilux|terios|yaris)\b|\b(modelo|año)\s+(19|20)\d{2}\b|\b(19|20)\d{2}\b.*\b(carro|camioneta|moto|veh[ií]culo)\b/i
 const SIN_CONFIRMAR = /no (lo )?(tenemos|est[aá]) confirmad|verific|consult|no (es|son) compatible|no (sirve|aplica|funciona)/i
@@ -72,7 +80,7 @@ function fabricanteInventado(respuesta: string, datos: string) {
 const TERCERO = /\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (solo |no )?(indica|dice|especifica|menciona|muestra|aclara|detalla)|seg[uú]n (la|esta) (publicaci[oó]n|ficha|descripci[oó]n)|los datos (indican|dicen)/i
 // v2 (07-11): "no tenemos esa" deja de frenar si el verificador la encontró respaldada (VARIANTES/STOCK) y la confianza es alta.
 export function motivosRevisar(b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
-  itemEstado: string | null, pregunta = '', datos = '', v2 = false): string[] {
+  itemEstado: string | null, pregunta = '', datos = '', v2 = false, vendedor = ''): string[] {
   const m: string[] = []
   if (!b.respuesta) return ['La IA no propuso respuesta']
   if (b.confianza !== 'alta') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
@@ -84,7 +92,7 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')
   if (MUCHAS.test(pregunta)) m.push('Pide muchas unidades: lo coordina una persona')
   if (DIVISA.test(pregunta)) m.push('Pregunta precio en divisa: lo contesta una persona')
-  if (PAGO.test(pregunta)) m.push('Pregunta por un medio de pago: lo confirma una persona')
+  if (PAGO.test(pregunta) && !(v2 && pagoEscrito(pregunta, b.respuesta, vendedor))) m.push('Pregunta por un medio de pago: lo confirma una persona')
   if (VEHICULO.test(pregunta) && !SIN_CONFIRMAR.test(b.respuesta)) m.push('Confirma compatibilidad con un vehículo o modelo')
   if (fabricanteInventado(b.respuesta, datos)) m.push('Menciona un fabricante o marca no confirmada')
   if (itemEstado && itemEstado !== 'active') m.push('La publicación no está activa')
@@ -117,7 +125,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false, undefined, cfg.v2)
       await registrarUso(db, 'preguntas', b.llamadas, null)
-      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2)
+      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c))
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),

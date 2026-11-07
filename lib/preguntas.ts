@@ -242,7 +242,13 @@ interface ItemML {
   pictures?: FotoML[]
 }
 
+/** Lo que el vendedor dejó escrito como regla (Mi IA/políticas + respuestas rápidas): respalda medios de pago (v2). */
+export function textoVendedor(c: Contexto) {
+  return [c.politicas, ...c.plantillas.map(p => p.texto)].filter(Boolean).join('\n')
+}
+
 /** Textos de la publicación (título, descripción, ficha, producto) para comprobar lo que la IA afirma. */
+
 export function datosPublicacion(c: Contexto) {
   return [c.item?.title, c.titulo, c.descripcion, c.ficha?.texto, c.producto?.name].filter(Boolean).join(' \n ')
 }

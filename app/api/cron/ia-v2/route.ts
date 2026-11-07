@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { costoDe } from '@/lib/ia'
-import { armarContexto, datosPublicacion, pedirBorrador } from '@/lib/preguntas'
+import { armarContexto, datosPublicacion, pedirBorrador, textoVendedor } from '@/lib/preguntas'
 import { motivosRevisar } from '@/lib/iaAutomatica'
 import type { Country } from '@/lib/types'
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         const datos = datosPublicacion(c), estado = c.item?.status ?? r.item_estado
         const correr = async (v2: boolean) => {
           const b = await pedirBorrador(c, false, undefined, v2)
-          const motivos = motivosRevisar(b, estado, c.pregunta.texto, datos, v2)
+          const motivos = motivosRevisar(b, estado, c.pregunta.texto, datos, v2, textoVendedor(c))
           return { respuesta: b.respuesta, confianza: b.confianza, decision: motivos.length ? 'revisar' : 'sola', motivos,
             costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0) }
         }
