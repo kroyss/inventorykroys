@@ -3,9 +3,11 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
-import { listaPrueba } from '@/lib/mensajesIAPrueba'
+import { CLAVE_AUTO, listaPrueba } from '@/lib/mensajesIAPrueba'
+import { puede } from '@/lib/permisos'
 
-// Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts). GET → los casos y el resumen · POST → marcar Bien / Mal.
+// Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts). GET → los casos, el resumen y si está en automático
+// · POST → marcar Bien / Mal · PUT { auto } → enciende / apaga el envío automático (mig 149, permiso automatizaciones_config).
 async function sesion() {
   const s = await sesionPreguntas()
   if ('error' in s) return s
@@ -17,7 +19,27 @@ export async function GET() {
   const s = await sesion()
   if ('error' in s) return s.error
   try {
-    return NextResponse.json(await listaPrueba(s.db))
+    const { rows: [a] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
+    let auto = false
+    try { auto = JSON.parse(a?.value ?? '{}').modo === 'real' } catch { /* apagado */ }
+    return NextResponse.json({ ...(await listaPrueba(s.db)), auto, puedeConfigurar: puede(s.session.user, 'automatizaciones_config') })
+  } catch (err) { return apiError(err) }
+}
+
+const Auto = z.object({ auto: z.boolean() })
+
+export async function PUT(req: NextRequest) {
+  const s = await sesion()
+  if ('error' in s) return s.error
+  if (!puede(s.session.user, 'automatizaciones_config')) return NextResponse.json({ error: 'No tienes permiso para cambiar las automatizaciones' }, { status: 403 })
+  try {
+    const p = Auto.safeParse(await req.json())
+    if (!p.success) return NextResponse.json({ error: p.error.message }, { status: 400 })
+    await s.db.query(
+      `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [CLAVE_AUTO, JSON.stringify({ modo: p.data.auto ? 'real' : 'apagado', por: s.session.user.id, at: new Date().toISOString() })])
+    return NextResponse.json({ ok: true, auto: p.data.auto })
   } catch (err) { return apiError(err) }
 }
 

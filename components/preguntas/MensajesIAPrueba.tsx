@@ -17,7 +17,16 @@ const fecha = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0)
 
 export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string) => void }) {
-  const [d, setD] = useState<{ casos: Caso[]; contradicciones?: Contra[]; resumen: Resumen } | null>(null)
+  const [d, setD] = useState<{ casos: Caso[]; contradicciones?: Contra[]; resumen: Resumen; auto?: boolean; puedeConfigurar?: boolean } | null>(null)
+  const [cambiando, setCambiando] = useState(false)
+  const cambiarAuto = async (auto: boolean) => {
+    if (auto && !confirm('¿Encender los mensajes automáticos? Las respuestas que la IA da por seguras (confianza alta, sin reclamos, pagos ni datos personales) se mandarán solas al comprador.')) return
+    setCambiando(true)
+    const r = await fetch('/api/mensajes/ia-prueba', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auto }) })
+    const j = await r.json().catch(() => ({}))
+    setCambiando(false)
+    if (!r.ok) setError(j.error ?? 'No se pudo cambiar'); else cargar()
+  }
   const [error, setError] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<'todas' | 'sola' | 'revisar' | 'sin_marcar'>('todas')
   const cargar = () => fetch('/api/mensajes/ia-prueba').then(async r => {
@@ -37,9 +46,19 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
   const casos = d.casos.filter(c => filtro === 'todas' ? true : filtro === 'sin_marcar' ? c.estado === 'listo' && !c.marca : c.decision === filtro)
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 space-y-1">
-        <p className="font-medium">IA de Mensajes en prueba: no manda nada</p>
-        <p className="text-xs">A cada mensaje nuevo de un comprador la IA le deja escrita la respuesta en la conversación (la encuentras al abrirla) y anota si habría salido sola. Marca Bien o Mal para saber si se puede encender.</p>
+      <div className={`rounded-xl border p-4 text-sm flex flex-wrap items-center justify-between gap-3 ${d.auto ? 'border-green-200 bg-green-50 text-green-900' : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
+        <div className="space-y-1 min-w-0 flex-1">
+          <p className="font-medium">{d.auto ? 'Mensajes automáticos: encendido' : 'Mensajes automáticos: apagado (solo prueba, no manda nada)'}</p>
+          <p className="text-xs">{d.auto
+            ? 'Las respuestas que la IA da por seguras se mandan solas unos 2 minutos después del último mensaje del comprador. Las demás quedan escritas en la conversación para que las revise una persona. Reclamos, pagos, datos personales y montos siempre van a una persona.'
+            : 'A cada mensaje nuevo de un comprador la IA le deja escrita la respuesta en la conversación (la encuentras al abrirla) y anota si habría salido sola. Marca Bien o Mal para saber si se puede encender.'}</p>
+        </div>
+        {d.puedeConfigurar && (
+          <button type="button" disabled={cambiando} onClick={() => cambiarAuto(!d.auto)}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${d.auto ? 'border border-green-300 bg-white text-green-800 hover:bg-green-100' : 'bg-neutral-900 text-white hover:bg-neutral-800'}`}>
+            {cambiando ? '…' : d.auto ? 'Apagar automático' : 'Encender automático'}
+          </button>
+        )}
       </div>
       <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
         {[
