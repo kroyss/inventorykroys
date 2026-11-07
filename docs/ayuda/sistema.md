@@ -373,7 +373,14 @@ y arma el **manifiesto** al final del día.
   manifiesto».
 - **Cancelar envío:** nunca sale ni se le manda la guía. No se puede deshacer. La venta queda marcada «No se concretó»
   (aunque tenga pago registrado): en Calificaciones sale como no concretada y la automática la califica.
+- **Ya la envié:** el paquete ya salió por fuera de Despachos. Sale de la jornada y del manifiesto, y la venta **no**
+  se cancela. No uses «Cancelar envío» para esto.
 - Si la etiqueta ya estaba impresa, separa el paquete físico.
+
+**Primer día en Despachos:** el sistema trae también las guías pagadas de días anteriores, y muchas ya las enviaste
+por tu cuenta. Arriba sale el aviso «Es tu primer día en Despachos» → **¿Cuáles ya enviaste?**: marca esas (o
+«Marcar las de días anteriores») y toca **Ya las envié**. Salen de la jornada y del manifiesto sin cancelar la venta.
+Si ya imprimiste el PDF, esas etiquetas simplemente no se usan. Desde el segundo día solo llegan las nuevas.
 
 **Si despachas algunas órdenes con otro programa:** no hace falta sacarlas del lote. Cuando MercadoEnvíos muestra la
 orden como completada, el sistema la deja sin tildar con la nota «Despachada por otro lado» y no la imprime. Mejor no
