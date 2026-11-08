@@ -538,7 +538,7 @@ export const esPreguntaSimple = (texto: string) =>
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
  *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
-export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO, v2 = false): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
+export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO, v2 = false, verificarBaja = false): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
   const sistema = SISTEMA + (v2 ? SISTEMA_V2_EXTRA : '') + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
     : '')
@@ -563,7 +563,9 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   // Verificador (31-10): lo que la IA da por seguro se busca afirmación por afirmación en los datos; si algo no está
   // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
   let verificacion: string | null = null
-  if (!web && b.respuesta && b.confianza !== 'baja') {
+  // 08-11: la respuesta automática verifica también las de confianza baja (verificarBaja): si el verificador las aprueba
+  // pueden salir solas (el dueño marcó 40 de 41 "podía salir sola"). La confianza no sube: queda anotada como estaba.
+  if (!web && b.respuesta && (b.confianza !== 'baja' || verificarBaja)) {
     const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta, MODELO_SIMPLE, v2).catch(() => null)
     if (v) {
       llamadas.push(v.llamada)

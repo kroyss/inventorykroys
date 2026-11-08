@@ -85,8 +85,10 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   itemEstado: string | null, pregunta = '', datos = '', v2 = false, vendedor = ''): string[] {
   const m: string[] = []
   if (!b.respuesta) return ['La IA no propuso respuesta']
-  if (b.confianza !== 'alta') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
-  else if (b.verificacion && b.verificacion !== 'ok') m.push(b.verificacion)
+  // 08-11 (el dueño, con 65 marcadas): confianza baja o media SOLA ya no frena si el verificador aprobó la respuesta
+  // (nada afirmado fuera de los datos). Las demás reglas (no hay, pagos, montos, otra publicación…) siguen frenando.
+  if (b.confianza !== 'alta' && b.verificacion !== 'ok') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
+  else if (b.confianza === 'alta' && b.verificacion && b.verificacion !== 'ok') m.push(b.verificacion)
   if (NEGATIVA.test(b.respuesta) && !(v2 && b.confianza === 'alta' && b.verificacion === 'ok')) m.push('Dice que no hay: lo confirma una persona')
   if (OTRA_PUBLICACION.test(b.respuesta)) m.push('Recomienda otra publicación')
   // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
@@ -127,7 +129,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
   for (const q of rows) {
     try {
       const c = await armarContexto(db, Number(q.id), country)
-      const b = await pedirBorrador(c, false, undefined, cfg.v2)
+      const b = await pedirBorrador(c, false, undefined, cfg.v2, true)
       await registrarUso(db, 'preguntas', b.llamadas, null)
       const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c))
       if (frenos) motivos.push(...await motivosFrenos(db, frenos, country, 'preguntas', q.comprador_id))
