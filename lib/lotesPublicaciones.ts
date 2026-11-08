@@ -4,11 +4,13 @@
 // a ML); cada cambio queda en ml_publicacion_cambios con lo que había antes.
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
-import { componer, mismoTexto, separar, caracteresNoPermitidos, MAX_DESCRIPCION, type PlantillaTexto } from '@/lib/descripcionTexto'
+import { componer, mismoTexto, separar, caracteresNoPermitidos, MAX_DESCRIPCION, NOMBRE_TIPO, type PlantillaTexto, type TipoTexto } from '@/lib/descripcionTexto'
 import { cuentaDe, guardarPublicacion } from '@/lib/publicacionesML'
 
 export interface Plantilla extends PlantillaTexto { nombre: string; conexion_id: number | null; usos?: number }
-export interface Separacion { encabezadoId: number | null; pieId: number | null; cuerpo: string; separada: boolean }
+export interface Separacion { encabezadoId: number | null; pieId: number | null; condicionesId: number | null; cuerpo: string; separada: boolean }
+export type Partes = { encabezadoId: number | null; pieId: number | null; condicionesId?: number | null; cuerpo: string }
+const textoDe = (ps: Plantilla[], s: Partes) => componer(ps.find(x => x.id === s.encabezadoId)?.texto, s.cuerpo, ps.find(x => x.id === s.pieId)?.texto, ps.find(x => x.id === s.condicionesId)?.texto)
 
 const POR_PASADA_ESCRIBIR = 12
 const POR_PASADA_LEER = 25
@@ -26,26 +28,26 @@ export async function plantillasDe(db: Pool, conexionId: number | null): Promise
 export async function separacionDe(db: Pool, itemId: string, conexionId: number, textoML: string, plantillas?: Plantilla[]): Promise<Separacion> {
   const ps = plantillas ?? await plantillasDe(db, conexionId)
   const { rows: [r] } = await db.query(
-    `SELECT encabezado_id::int, pie_id::int, cuerpo, texto_ml FROM ml_item_descripcion WHERE item_id = $1`, [itemId])
+    `SELECT encabezado_id::int, pie_id::int, condiciones_id::int, cuerpo, texto_ml FROM ml_item_descripcion WHERE item_id = $1`, [itemId])
   if (r && r.cuerpo != null) {
-    const enc = ps.find(p => p.id === r.encabezado_id), pie = ps.find(p => p.id === r.pie_id)
+    const enc = ps.find(p => p.id === r.encabezado_id), pie = ps.find(p => p.id === r.pie_id), cond = ps.find(p => p.id === r.condiciones_id)
     // Vale lo guardado si en ML sigue el mismo texto que dejamos (aunque después se haya cambiado la plantilla:
     // así, al actualizar un pie en lote, se reemplaza el viejo y no se duplica) o si coincide con las plantillas de ahora.
-    if ((r.texto_ml != null && mismoTexto(r.texto_ml, textoML)) || mismoTexto(componer(enc?.texto, r.cuerpo, pie?.texto), textoML)) {
-      return { encabezadoId: enc?.id ?? null, pieId: pie?.id ?? null, cuerpo: r.cuerpo, separada: true }
+    if ((r.texto_ml != null && mismoTexto(r.texto_ml, textoML)) || mismoTexto(componer(enc?.texto, r.cuerpo, pie?.texto, cond?.texto), textoML)) {
+      return { encabezadoId: enc?.id ?? null, pieId: pie?.id ?? null, condicionesId: cond?.id ?? null, cuerpo: r.cuerpo, separada: true }
     }
   }
   const s = separar(textoML, ps)
-  return { encabezadoId: s.encabezado?.id ?? null, pieId: s.pie?.id ?? null, cuerpo: s.cuerpo, separada: !!(s.encabezado || s.pie) }
+  return { encabezadoId: s.encabezado?.id ?? null, pieId: s.pie?.id ?? null, condicionesId: s.condiciones?.id ?? null, cuerpo: s.cuerpo, separada: !!(s.encabezado || s.pie || s.condiciones) }
 }
 
-export async function guardarSeparacion(db: Pool, itemId: string, conexionId: number, s: { encabezadoId: number | null; pieId: number | null; cuerpo: string }, textoML: string) {
+export async function guardarSeparacion(db: Pool, itemId: string, conexionId: number, s: Partes, textoML: string) {
   await db.query(
-    `INSERT INTO ml_item_descripcion (item_id, conexion_id, encabezado_id, pie_id, cuerpo, texto_ml, leido_at, actualizado_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+    `INSERT INTO ml_item_descripcion (item_id, conexion_id, encabezado_id, pie_id, condiciones_id, cuerpo, texto_ml, leido_at, actualizado_at)
+     VALUES ($1, $2, $3, $4, $7, $5, $6, NOW(), NOW())
      ON CONFLICT (empresa_id, item_id) DO UPDATE SET conexion_id = EXCLUDED.conexion_id, encabezado_id = EXCLUDED.encabezado_id,
-       pie_id = EXCLUDED.pie_id, cuerpo = EXCLUDED.cuerpo, texto_ml = EXCLUDED.texto_ml, leido_at = NOW(), actualizado_at = NOW()`,
-    [itemId, conexionId, s.encabezadoId, s.pieId, s.cuerpo, textoML])
+       pie_id = EXCLUDED.pie_id, condiciones_id = EXCLUDED.condiciones_id, cuerpo = EXCLUDED.cuerpo, texto_ml = EXCLUDED.texto_ml, leido_at = NOW(), actualizado_at = NOW()`,
+    [itemId, conexionId, s.encabezadoId, s.pieId, s.cuerpo, textoML, s.condicionesId ?? null])
 }
 
 const leerDescripcion = async (db: Pool, conexionId: number, itemId: string) =>
@@ -77,7 +79,7 @@ export async function mandarDescripcion(db: Pool, conexionId: number, itemId: st
 }
 
 // ── Crear lotes ──
-export type ParametrosDescripcion = { parte: 'encabezado' | 'pie'; plantillaId: number | null; noReconocida: 'saltar' | 'agregar' }
+export type ParametrosDescripcion = { parte: TipoTexto; plantillaId: number | null; noReconocida: 'saltar' | 'agregar' }
 export type ParametrosPrecio = { modo: 'porcentaje' | 'monto' | 'fijo'; valor: number; redondeo: 'no' | 'entero' | '90' }
 
 export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer', titulo: string, parametros: object, items: { item: string; datos?: object }[], userId: number | null) {
@@ -180,15 +182,16 @@ async function procesarItem(db: Pool, l: { tipo: string; parametros: Record<stri
   if (p.plantillaId != null && !plantilla) return ['saltada', 'Ese texto es de otra cuenta (o se borró)']
   const texto = await leerDescripcion(db, cuenta.id, it.item_id)
   const s = await separacionDe(db, it.item_id, cuenta.id, texto, ps)
-  const tieneParte = p.parte === 'encabezado' ? s.encabezadoId != null : s.pieId != null
+  const tieneParte = (p.parte === 'encabezado' ? s.encabezadoId : p.parte === 'condiciones' ? s.condicionesId : s.pieId) != null
   if (!tieneParte && !s.separada && p.noReconocida === 'saltar' && plantilla) {
     const { rows: [r] } = await db.query(`SELECT cuerpo FROM ml_item_descripcion WHERE item_id = $1 AND cuerpo IS NOT NULL`, [it.item_id])
-    if (!r) return ['saltada', `No se reconoce si ya tiene ${p.parte === 'pie' ? 'un pie' : 'un encabezado'}: sepárala en el editor o con «Detectar textos repetidos», o vuelve a aplicarlo con «agregar igual»`]
+    if (!r) return ['saltada', `No se reconoce si ya tiene ${NOMBRE_TIPO[p.parte].uno}: sepárala en el editor o con «Detectar textos repetidos», o vuelve a aplicarlo con «agregar igual»`]
   }
-  const nuevaSep = { encabezadoId: s.encabezadoId, pieId: s.pieId, cuerpo: s.cuerpo }
+  const nuevaSep: Partes = { encabezadoId: s.encabezadoId, pieId: s.pieId, condicionesId: s.condicionesId, cuerpo: s.cuerpo }
   if (p.parte === 'encabezado') nuevaSep.encabezadoId = plantilla?.id ?? null
+  else if (p.parte === 'condiciones') nuevaSep.condicionesId = plantilla?.id ?? null
   else nuevaSep.pieId = plantilla?.id ?? null
-  const nuevo = componer(ps.find(x => x.id === nuevaSep.encabezadoId)?.texto, nuevaSep.cuerpo, ps.find(x => x.id === nuevaSep.pieId)?.texto)
+  const nuevo = textoDe(ps, nuevaSep)
   if (mismoTexto(nuevo, texto)) { await guardarSeparacion(db, it.item_id, cuenta.id, nuevaSep, texto); return ['sin_cambio', 'Ya lo tenía'] }
   if (nuevo.length > MAX_DESCRIPCION) return ['error', `La descripción quedaría de ${nuevo.length} caracteres (máximo ${MAX_DESCRIPCION})`]
   const malos = caracteresNoPermitidos(nuevo)
@@ -210,8 +213,8 @@ export async function resepararLeidas(db: Pool, conexionId: number | null) {
     if (!porCuenta.has(r.conexion_id)) porCuenta.set(r.conexion_id, await plantillasDe(db, r.conexion_id))
     // Con las plantillas de ahora (no lo guardado): así una plantilla nueva se reconoce también donde ya había otra parte.
     const f = separar(r.texto_ml, porCuenta.get(r.conexion_id)!)
-    if (f.encabezado || f.pie) {
-      await guardarSeparacion(db, r.item_id, r.conexion_id, { encabezadoId: f.encabezado?.id ?? null, pieId: f.pie?.id ?? null, cuerpo: f.cuerpo }, r.texto_ml)
+    if (f.encabezado || f.pie || f.condiciones) {
+      await guardarSeparacion(db, r.item_id, r.conexion_id, { encabezadoId: f.encabezado?.id ?? null, pieId: f.pie?.id ?? null, condicionesId: f.condiciones?.id ?? null, cuerpo: f.cuerpo }, r.texto_ml)
       n++
     }
   }

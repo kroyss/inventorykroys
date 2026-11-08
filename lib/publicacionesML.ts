@@ -60,8 +60,8 @@ export interface Publicacion {
   fotos: { id: string; url: string }[]
   descripcion: string
   // Descripción en 3 partes (08-11): encabezado y pie son textos guardados (plantillas); el cuerpo es de esta publicación.
-  desc: { encabezadoId: number | null; pieId: number | null; cuerpo: string }
-  plantillas: { id: number; tipo: 'encabezado' | 'pie'; nombre: string; texto: string; conexion_id: number | null }[]
+  desc: { encabezadoId: number | null; pieId: number | null; condicionesId: number | null; cuerpo: string }
+  plantillas: { id: number; tipo: 'encabezado' | 'condiciones' | 'pie'; nombre: string; texto: string; conexion_id: number | null }[]
   limites: { fotos: number; fotosVariante: number }   // de la categoría en ML (MLV: 12 y 10)
   campos: CampoFicha[]
   variantes: { id: number; precio: number | null; stock: number; vendidas: number; sku: string | null
@@ -148,7 +148,7 @@ export async function leerPublicacion(db: Pool, itemId: string, country: string)
     categoriaNombre: cat?.path_from_root?.map(p => p.name).join(' › ') ?? cat?.name ?? null,
     fotos: (it.pictures ?? []).map(p => ({ id: p.id, url: p.secure_url ?? p.url ?? '' })),
     descripcion: desc.plain_text ?? '',
-    desc: { encabezadoId: sep.encabezadoId, pieId: sep.pieId, cuerpo: sep.cuerpo },
+    desc: { encabezadoId: sep.encabezadoId, pieId: sep.pieId, condicionesId: sep.condicionesId, cuerpo: sep.cuerpo },
     plantillas,
     limites: { fotos: cat?.settings?.max_pictures_per_item ?? 12, fotosVariante: cat?.settings?.max_pictures_per_item_var ?? 10 },
     campos,
@@ -169,7 +169,7 @@ export interface CambiosPublicacion {
   stock?: number                       // solo sin variantes
   estado?: 'active' | 'paused'
   descripcion?: string
-  descPartes?: { encabezadoId: number | null; pieId: number | null; cuerpo: string }   // gana sobre `descripcion`
+  descPartes?: { encabezadoId: number | null; pieId: number | null; condicionesId?: number | null; cuerpo: string }   // gana sobre `descripcion`
   atributos?: { id: string; value_id?: string | null; value_name?: string | null }[]
   fotos?: string[]                     // ids en el orden nuevo (incluye las recién subidas)
   variantes?: { id: number; stock?: number; combinaciones?: { id: string | null; nombre: string; valor: string }[]; fotos?: string[] }[]
@@ -274,11 +274,12 @@ export async function guardarPublicacion(db: Pool, itemId: string, c: CambiosPub
     const ps = await plantillasDe(db, cuenta.id)
     const enc = c.descPartes.encabezadoId == null ? null : ps.find(x => x.id === c.descPartes!.encabezadoId)
     const pie = c.descPartes.pieId == null ? null : ps.find(x => x.id === c.descPartes!.pieId)
-    if ((c.descPartes.encabezadoId != null && !enc) || (c.descPartes.pieId != null && !pie)) {
-      errores.push({ parte: 'descripcion', mensaje: 'El encabezado o el pie elegido ya no existe (o es de otra cuenta)' })
+    const cond = c.descPartes.condicionesId == null ? null : ps.find(x => x.id === c.descPartes!.condicionesId)
+    if ((c.descPartes.encabezadoId != null && !enc) || (c.descPartes.pieId != null && !pie) || (c.descPartes.condicionesId != null && !cond)) {
+      errores.push({ parte: 'descripcion', mensaje: 'El encabezado, las condiciones o el pie elegido ya no existe (o es de otra cuenta)' })
     } else {
-      partes3 = { encabezadoId: enc?.id ?? null, pieId: pie?.id ?? null, cuerpo: c.descPartes.cuerpo }
-      c.descripcion = componer(enc?.texto, c.descPartes.cuerpo, pie?.texto)
+      partes3 = { encabezadoId: enc?.id ?? null, pieId: pie?.id ?? null, condicionesId: cond?.id ?? null, cuerpo: c.descPartes.cuerpo }
+      c.descripcion = componer(enc?.texto, c.descPartes.cuerpo, pie?.texto, cond?.texto)
     }
   }
   if (c.descripcion !== undefined) {

@@ -4,6 +4,7 @@ import { sesionPublicaciones } from '@/lib/preguntasSesion'
 import { apiError } from '@/lib/apiError'
 import { crearLote, precioNuevo, type ParametrosPrecio } from '@/lib/lotesPublicaciones'
 import { seleccion } from '@/lib/publicacionesLista'
+import { NOMBRE_TIPO } from '@/lib/descripcionTexto'
 
 // Cambios en lote de Publicaciones (mig 152). Los procesa el cron de a pocas por minuto.
 // GET → los últimos lotes con su avance.
@@ -28,7 +29,7 @@ const Seleccion = z.object({
   filtro: z.object({ q: z.string().max(100).optional(), cuenta: z.number().int().nullable().optional(), estado: z.string().nullable().optional() }).optional(),
 })
 const Pedido = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('descripcion'), seleccion: Seleccion, parte: z.enum(['encabezado', 'pie']), plantillaId: z.number().int().nullable(),
+  z.object({ tipo: z.literal('descripcion'), seleccion: Seleccion, parte: z.enum(['encabezado', 'condiciones', 'pie']), plantillaId: z.number().int().nullable(),
              noReconocida: z.enum(['saltar', 'agregar']), confirmar: z.boolean() }),
   z.object({ tipo: z.literal('precio'), seleccion: Seleccion, modo: z.enum(['porcentaje', 'monto', 'fijo']), valor: z.number().min(-1e9).max(1e10),
              redondeo: z.enum(['no', 'entero', '90']), confirmar: z.boolean() }),
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
       `SELECT COUNT(*)::int AS n FROM ml_item_descripcion WHERE item_id = ANY($1::text[]) AND cuerpo IS NOT NULL`, [filas.map(f => f.item_id)])
     if (!d.confirmar) return NextResponse.json({ total: filas.length, separadas: sep.n, deOtraCuenta: deOtra, ejemplo: filas.slice(0, 5) })
     const nombre = plantilla ? `«${plantilla.nombre}»` : '(quitar)'
-    const lote = await crearLote(s.db, 'descripcion', `${d.parte === 'pie' ? 'Pie' : 'Encabezado'} ${nombre} en ${filas.length} publicaciones`,
+    const lote = await crearLote(s.db, 'descripcion', `${NOMBRE_TIPO[d.parte].titulo} ${nombre} en ${filas.length} publicaciones`,
       { parte: d.parte, plantillaId: d.plantillaId, noReconocida: d.noReconocida }, filas.map(f => ({ item: f.item_id })), userId)
     return NextResponse.json({ lote })
   } catch (err) { return apiError(err) }

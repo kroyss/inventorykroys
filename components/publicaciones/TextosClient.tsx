@@ -7,10 +7,10 @@ import { caracteresNoPermitidos, limpiarTexto } from '@/lib/descripcionTexto'
 // Textos de descripción (08-11): encabezados y pies guardados, por cuenta o para todas. Editar uno puede actualizarlo
 // en ML en todas las publicaciones que lo usan (en lote). «Detectar» busca textos que ya se repiten en muchas
 // descripciones para guardarlos con un clic.
-interface Texto { id: number; tipo: 'encabezado' | 'pie'; nombre: string; texto: string; conexion_id: number | null; cuenta: string | null; usos: number }
+interface Texto { id: number; tipo: 'encabezado' | 'condiciones' | 'pie'; nombre: string; texto: string; conexion_id: number | null; cuenta: string | null; usos: number }
 interface Cuenta { id: number; nickname: string; publicaciones: number; leidas: number }
 interface Candidato { tipo: 'encabezado' | 'pie'; texto: string; lineas: number; publicaciones: number }
-type Form = { id: number | null; tipo: 'encabezado' | 'pie'; nombre: string; texto: string; conexion_id: number | null; usos: number; actualizarEnML: boolean }
+type Form = { id: number | null; tipo: 'encabezado' | 'condiciones' | 'pie'; nombre: string; texto: string; conexion_id: number | null; usos: number; actualizarEnML: boolean }
 
 export default function TextosClient() {
   const [d, setD] = useState<{ textos: Texto[]; cuentas: Cuenta[] } | null>(null)
@@ -65,25 +65,25 @@ export default function TextosClient() {
 
   if (!d) return <div className="h-40 rounded-xl border border-neutral-200 bg-neutral-50 animate-pulse" />
   const malos = form ? caracteresNoPermitidos(form.texto) : []
-  const nuevo = (tipo: 'encabezado' | 'pie', texto = '', conexion_id: number | null = null) =>
+  const nuevo = (tipo: 'encabezado' | 'condiciones' | 'pie', texto = '', conexion_id: number | null = null) =>
     setForm({ id: null, tipo, nombre: '', texto, conexion_id, usos: 0, actualizarEnML: false })
 
   return (
     <div className="space-y-4">
       {aviso && <div className="text-sm bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-3 py-2 flex justify-between gap-2"><span>{aviso}</span><button type="button" onClick={() => setAviso(null)}>✕</button></div>}
 
-      {(['pie', 'encabezado'] as const).map(tipo => {
+      {(['encabezado', 'condiciones', 'pie'] as const).map(tipo => {
         const lista = d.textos.filter(t => t.tipo === tipo)
         return (
           <section key={tipo} className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="font-semibold text-neutral-900">{tipo === 'pie' ? 'Pies (abajo de la descripción)' : 'Encabezados (arriba de la descripción)'}</h2>
-                <p className="text-xs text-neutral-500">{tipo === 'pie' ? 'Ubicación, horario, formas de pago, envíos, garantía, condiciones…' : 'Saludo o datos que van antes de la descripción del producto.'}</p>
+                <h2 className="font-semibold text-neutral-900">{tipo === 'pie' ? 'Pies (al final)' : tipo === 'condiciones' ? 'Condiciones de compra (después del producto, antes del pie)' : 'Encabezados (arriba de la descripción)'}</h2>
+                <p className="text-xs text-neutral-500">{tipo === 'pie' ? 'Ubicación, horario, datos de la tienda…' : tipo === 'condiciones' ? 'Envíos, montos mínimos, formas de pago, garantía, cambios…' : 'Saludo o datos que van antes de la descripción del producto.'}</p>
               </div>
               <button type="button" onClick={() => nuevo(tipo)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">+ Nuevo</button>
             </div>
-            {!lista.length ? <p className="text-sm text-neutral-500">Ninguno todavía.</p> : (
+            {!lista.length ? <p className="text-sm text-neutral-500">{tipo === 'condiciones' ? 'Ningunas todavía.' : 'Ninguno todavía.'}</p> : (
               <ul className="divide-y divide-neutral-100">
                 {lista.map(t => (
                   <li key={t.id} className="py-2 flex flex-wrap items-start gap-3">
@@ -126,7 +126,7 @@ export default function TextosClient() {
               <li key={i} className="rounded-lg border border-neutral-200 p-3 space-y-1.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs text-neutral-600"><b>{c.tipo === 'pie' ? 'Final' : 'Inicio'}</b> igual en {c.publicaciones} publicaciones · {c.lineas} líneas</span>
-                  <button type="button" onClick={() => nuevo(c.tipo, c.texto, cuentaDet)} className="text-xs px-2 py-1 rounded border border-sky-300 text-sky-700">Guardar como {c.tipo}</button>
+                  <button type="button" onClick={() => nuevo(c.tipo, c.texto, cuentaDet)} className="text-xs px-2 py-1 rounded border border-sky-300 text-sky-700">Guardar como {c.tipo === 'pie' ? 'pie o condiciones' : c.tipo}</button>
                 </div>
                 <p className="text-xs text-neutral-600 whitespace-pre-wrap max-h-28 overflow-y-auto bg-neutral-50 rounded px-2 py-1">{c.texto}</p>
               </li>
@@ -138,7 +138,12 @@ export default function TextosClient() {
       {form && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !guardando && setForm(null)}>
           <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl p-5 space-y-3 max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold text-neutral-900">{form.id ? 'Editar' : 'Nuevo'} {form.tipo}</h3>
+            <h3 className="font-semibold text-neutral-900">{form.id ? 'Editar texto' : 'Nuevo texto'}</h3>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium text-neutral-600">Va como</span>
+              {(['encabezado', 'condiciones', 'pie'] as const).map(t => <button key={t} type="button" disabled={!!form.id} onClick={() => setForm({ ...form, tipo: t })}
+                className={`px-2.5 py-1 rounded-lg border text-xs disabled:cursor-default ${form.tipo === t ? 'bg-neutral-900 text-white border-neutral-900' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 disabled:opacity-40'}`}>
+                {t === 'encabezado' ? 'Encabezado' : t === 'condiciones' ? 'Condiciones de compra' : 'Pie'}</button>)}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Nombre</span>
                 <input value={form.nombre} maxLength={60} onChange={e => setForm({ ...form, nombre: e.target.value })} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm" /></label>

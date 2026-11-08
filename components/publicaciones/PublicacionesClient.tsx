@@ -12,7 +12,7 @@ const precio = (n: number | null, m: string | null) => n == null ? '—'
   : `${m === 'COP' ? '$' : 'US$'} ${n.toLocaleString('de-DE', { maximumFractionDigits: m === 'COP' ? 0 : 2, minimumFractionDigits: m === 'COP' ? 0 : 2 })}`
 
 type Seleccion = { items?: string[]; filtro?: { q: string; cuenta: number | null; estado: string | null } }
-interface Texto { id: number; tipo: 'encabezado' | 'pie'; nombre: string; texto: string; conexion_id: number | null; cuenta: string | null }
+interface Texto { id: number; tipo: 'encabezado' | 'condiciones' | 'pie'; nombre: string; texto: string; conexion_id: number | null; cuenta: string | null }
 
 /** Publicaciones (Fase 6): buscar una publicación de las cuentas conectadas y abrir su editor. Desde 08-11 también
  *  elegir varias (o todas las de la búsqueda) y cambiarles el encabezado / pie de la descripción o el precio en lote. */
@@ -155,7 +155,7 @@ function Listo({ lote, onCerrar }: { lote: number; onCerrar: () => void }) {
 
 function LoteDescripcion({ sel, cuantas, onCerrar, onHecho }: { sel: Seleccion; cuantas: number; onCerrar: () => void; onHecho: () => void }) {
   const [textos, setTextos] = useState<Texto[] | null>(null)
-  const [parte, setParte] = useState<'encabezado' | 'pie'>('pie')
+  const [parte, setParte] = useState<'encabezado' | 'condiciones' | 'pie'>('pie')
   const [plantilla, setPlantilla] = useState<string>('')           // '' = elegir, 'quitar' = sacarlo
   const [noRec, setNoRec] = useState<'saltar' | 'agregar'>('saltar')
   const [vista, setVista] = useState<null | { total: number; separadas: number; deOtraCuenta: number }>(null)
@@ -176,28 +176,28 @@ function LoteDescripcion({ sel, cuantas, onCerrar, onHecho }: { sel: Seleccion; 
     } finally { setEnviando(false) }
   }
   return (
-    <Modal titulo={`Encabezado o pie en ${cuantas.toLocaleString('es-VE')} publicaciones`} onCerrar={() => !enviando && onCerrar()}>
+    <Modal titulo={`Encabezado, condiciones o pie en ${cuantas.toLocaleString('es-VE')} publicaciones`} onCerrar={() => !enviando && onCerrar()}>
       {lote ? <Listo lote={lote} onCerrar={onCerrar} /> : <>
         <p className="text-xs text-neutral-500">Se cambia solo esa parte de la descripción; lo de cada producto queda igual. Vale para activas y pausadas.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Qué parte</span>
-            <select value={parte} onChange={e => { setParte(e.target.value as 'pie'); setPlantilla(''); setVista(null) }} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm bg-white">
-              <option value="pie">Pie (abajo)</option><option value="encabezado">Encabezado (arriba)</option>
+            <select value={parte} onChange={e => { setParte(e.target.value as 'encabezado' | 'condiciones' | 'pie'); setPlantilla(''); setVista(null) }} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm bg-white">
+              <option value="pie">Pie (abajo)</option><option value="condiciones">Condiciones de compra (antes del pie)</option><option value="encabezado">Encabezado (arriba)</option>
             </select></label>
           <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Poner</span>
             <select value={plantilla} onChange={e => { setPlantilla(e.target.value); setVista(null) }} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm bg-white">
               <option value="">Elegir…</option>
               {opciones.map(t => <option key={t.id} value={t.id}>{t.nombre} ({t.cuenta ?? 'todas las cuentas'})</option>)}
-              <option value="quitar">Quitarlo (dejar sin {parte})</option>
+              <option value="quitar">Quitarlo (dejar sin {parte === 'condiciones' ? 'condiciones de compra' : parte})</option>
             </select></label>
         </div>
-        {textos && !opciones.length && <p className="text-xs text-neutral-500">No hay {parte === 'pie' ? 'pies' : 'encabezados'} guardados. Créalos en <Link href="/publicaciones/textos" className="text-sky-700 hover:underline">Textos de descripción</Link>.</p>}
+        {textos && !opciones.length && <p className="text-xs text-neutral-500">No hay {parte === 'pie' ? 'pies' : parte === 'condiciones' ? 'condiciones de compra' : 'encabezados'} guardados. Créalos en <Link href="/publicaciones/textos" className="text-sky-700 hover:underline">Textos de descripción</Link>.</p>}
         {elegido && <p className="text-xs text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 whitespace-pre-wrap max-h-40 overflow-y-auto">{elegido.texto}</p>}
         {plantilla && plantilla !== 'quitar' && (
           <fieldset className="text-sm space-y-1">
-            <legend className="text-xs font-medium text-neutral-600">Si en una publicación no se reconoce el {parte} que tiene ahora</legend>
+            <legend className="text-xs font-medium text-neutral-600">Si en una publicación no se reconoce {parte === 'condiciones' ? 'las condiciones de compra que tiene' : `el ${parte} que tiene`} ahora</legend>
             <label className="flex gap-2"><input type="radio" checked={noRec === 'saltar'} onChange={() => { setNoRec('saltar'); setVista(null) }} /> <span>Saltarla (no tocarla) <span className="text-neutral-400">· recomendado, así no queda repetido</span></span></label>
-            <label className="flex gap-2"><input type="radio" checked={noRec === 'agregar'} onChange={() => { setNoRec('agregar'); setVista(null) }} /> <span>Agregarlo igual {parte === 'pie' ? 'al final' : 'al principio'}</span></label>
+            <label className="flex gap-2"><input type="radio" checked={noRec === 'agregar'} onChange={() => { setNoRec('agregar'); setVista(null) }} /> <span>Agregarlo igual {parte === 'pie' ? 'al final' : parte === 'condiciones' ? 'antes del pie' : 'al principio'}</span></label>
           </fieldset>
         )}
         {vista && (

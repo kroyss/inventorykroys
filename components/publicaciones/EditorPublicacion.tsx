@@ -12,7 +12,7 @@ import { componer, mismoTexto, caracteresNoPermitidos, limpiarTexto, tieneContac
 type Valor = { vid: string | null; vname: string }
 interface Borrador {
   titulo: string; precio: string; stock: string; estado: string
-  encId: number | null; pieId: number | null; cuerpo: string
+  encId: number | null; pieId: number | null; condId: number | null; cuerpo: string
   valores: Record<string, Valor>
   fotos: string[]                       // sin variantes: las de la publicación, en orden
   variantes: Record<number, { stock: string; combos: { id: string | null; nombre: string; valor: string }[]; fotos: string[] }>
@@ -32,7 +32,7 @@ const NOMBRE_PARTE: Record<string, string> = {
 function borradorDe(p: Publicacion): Borrador {
   return {
     titulo: p.item.titulo, precio: precioTxt(p.item.precio, p.item.moneda), stock: String(p.item.stock), estado: p.item.estado,
-    encId: p.desc.encabezadoId, pieId: p.desc.pieId, cuerpo: p.desc.cuerpo,
+    encId: p.desc.encabezadoId, pieId: p.desc.pieId, condId: p.desc.condicionesId ?? null, cuerpo: p.desc.cuerpo,
     valores: Object.fromEntries(p.campos.map(c => [c.id, { vid: c.valorId, vname: c.valor ?? '' }])),
     fotos: p.fotos.map(f => f.id),
     variantes: Object.fromEntries(p.variantes.map(v => [v.id, { stock: String(v.stock), combos: v.combinaciones.map(c => ({ ...c })), fotos: v.fotos }])),
@@ -66,11 +66,15 @@ function diferencias(p: Publicacion, b: Borrador) {
   }
   const texto = textoFinal(p, b)
   if (!mismoTexto(texto, p.descripcion)) {
-    c.descPartes = { encabezadoId: b.encId, pieId: b.pieId, cuerpo: b.cuerpo }
+    c.descPartes = { encabezadoId: b.encId, pieId: b.pieId, condicionesId: b.condId, cuerpo: b.cuerpo }
     const enc = p.plantillas.find(x => x.id === b.encId), pie = p.plantillas.find(x => x.id === b.pieId)
     const encA = p.plantillas.find(x => x.id === p.desc.encabezadoId), pieA = p.plantillas.find(x => x.id === p.desc.pieId)
     if (b.encId !== p.desc.encabezadoId) lista.push({ parte: 'Encabezado', antes: encA?.nombre ?? 'sin encabezado', despues: enc?.nombre ?? 'sin encabezado' })
     if (b.pieId !== p.desc.pieId) lista.push({ parte: 'Pie', antes: pieA?.nombre ?? 'sin pie', despues: pie?.nombre ?? 'sin pie' })
+    if (b.condId !== (p.desc.condicionesId ?? null)) {
+      const nom = (id: number | null) => p.plantillas.find(x => x.id === id)?.nombre ?? 'sin condiciones'
+      lista.push({ parte: 'Condiciones de compra', antes: nom(p.desc.condicionesId ?? null), despues: nom(b.condId) })
+    }
     lista.push({ parte: 'Descripción', antes: `${p.descripcion.trim().length} caracteres`, despues: `${texto.length} caracteres` })
     const malos = caracteresNoPermitidos(texto)
     if (malos.length) errores.push(`La descripción tiene caracteres que MercadoLibre no acepta: ${malos.join(' ')}`)
@@ -138,7 +142,7 @@ const resumenFotos = (nuevas: number, quitadas: number) =>
 
 /** El texto completo como lo verá el comprador en ML. */
 function textoFinal(p: Publicacion, b: Borrador) {
-  return componer(p.plantillas.find(x => x.id === b.encId)?.texto, b.cuerpo, p.plantillas.find(x => x.id === b.pieId)?.texto)
+  return componer(p.plantillas.find(x => x.id === b.encId)?.texto, b.cuerpo, p.plantillas.find(x => x.id === b.pieId)?.texto, p.plantillas.find(x => x.id === b.condId)?.texto)
 }
 
 const mover = (a: string[], i: number, d: -1 | 1) => {
@@ -262,7 +266,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
   const [destino, setDestino] = useState<number | null>(null)     // a qué variante va la foto que se sube (null = publicación)
   const [elegir, setElegir] = useState<number | null>(null)       // variante que está eligiendo fotos de otra
   const [vista, setVista] = useState(false)
-  const [pasar, setPasar] = useState<null | { tipo: 'encabezado' | 'pie'; linea: number; nombre: string; todas: boolean; guardando: boolean; error: string | null }>(null)
+  const [pasar, setPasar] = useState<null | { tipo: 'encabezado' | 'condiciones' | 'pie'; linea: number; nombre: string; todas: boolean; guardando: boolean; error: string | null }>(null)
   const archivo = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -334,13 +338,14 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
 
   // Descripción
   const plantillasCuenta = p.plantillas.filter(x => x.conexion_id == null || x.conexion_id === p.cuenta.id)
-  const encabezados = plantillasCuenta.filter(x => x.tipo === 'encabezado'), pies = plantillasCuenta.filter(x => x.tipo === 'pie')
-  const enc = p.plantillas.find(x => x.id === b.encId), pie = p.plantillas.find(x => x.id === b.pieId)
+  const encabezados = plantillasCuenta.filter(x => x.tipo === 'encabezado'), pies = plantillasCuenta.filter(x => x.tipo === 'pie'), condiciones = plantillasCuenta.filter(x => x.tipo === 'condiciones')
+  const enc = p.plantillas.find(x => x.id === b.encId), pie = p.plantillas.find(x => x.id === b.pieId), cond = p.plantillas.find(x => x.id === b.condId)
   const textoML = textoFinal(p, b)
   const malosCuerpo = caracteresNoPermitidos(b.cuerpo)
-  const malosPlantilla = caracteresNoPermitidos((enc?.texto ?? '') + (pie?.texto ?? ''))
+  const malosPlantilla = caracteresNoPermitidos((enc?.texto ?? '') + (cond?.texto ?? '') + (pie?.texto ?? ''))
   const lineasCuerpo = b.cuerpo.replace(/\r\n?/g, '\n').split('\n')
-  const textoPasar = pasar ? (pasar.tipo === 'pie' ? lineasCuerpo.slice(pasar.linea) : lineasCuerpo.slice(0, pasar.linea + 1)).join('\n').trim() : ''
+  const alFinal = pasar?.tipo !== 'encabezado'
+  const textoPasar = pasar ? (alFinal ? lineasCuerpo.slice(pasar.linea) : lineasCuerpo.slice(0, pasar.linea + 1)).join('\n').trim() : ''
   const guardarPasar = async () => {
     if (!pasar || !textoPasar || !pasar.nombre.trim()) return
     setPasar({ ...pasar, guardando: true, error: null })
@@ -349,9 +354,9 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setPasar({ ...pasar, guardando: false, error: d.error ?? 'No se pudo guardar' }); return }
     const nueva = { id: d.id as number, tipo: pasar.tipo, nombre: pasar.nombre.trim(), texto: textoPasar, conexion_id: pasar.todas ? null : p.cuenta.id }
-    const resto = (pasar.tipo === 'pie' ? lineasCuerpo.slice(0, pasar.linea) : lineasCuerpo.slice(pasar.linea + 1)).join('\n').trim()
+    const resto = (alFinal ? lineasCuerpo.slice(0, pasar.linea) : lineasCuerpo.slice(pasar.linea + 1)).join('\n').trim()
     setP({ ...p, plantillas: [...p.plantillas, nueva] })
-    set(x => ({ ...x, cuerpo: resto, ...(pasar.tipo === 'pie' ? { pieId: nueva.id } : { encId: nueva.id }) }))
+    set(x => ({ ...x, cuerpo: resto, ...(pasar.tipo === 'pie' ? { pieId: nueva.id } : pasar.tipo === 'condiciones' ? { condId: nueva.id } : { encId: nueva.id }) }))
     setPasar(null)
   }
 
@@ -538,7 +543,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
         </Seccion>
       )}
 
-      <Seccion titulo="Descripción" ayuda="En 3 partes: encabezado y pie son textos guardados que se repiten en muchas publicaciones; en el medio, lo de este producto. A MercadoLibre va todo junto."
+      <Seccion titulo="Descripción" ayuda="En 4 partes: encabezado, condiciones de compra y pie son textos guardados que se repiten en muchas publicaciones; la descripción del producto es de esta. A MercadoLibre va todo junto, en ese orden."
         derecha={<button type="button" onClick={() => setVista(true)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Vista previa</button>}>
         <div className="space-y-3">
           <ParteFija titulo="Encabezado" valor={b.encId} opciones={encabezados} texto={enc?.texto}
@@ -548,12 +553,14 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
               <span className="text-xs font-medium text-neutral-600">Descripción del producto</span>
               <div className="flex gap-3 text-xs">
                 <button type="button" onClick={() => setPasar({ tipo: 'encabezado', linea: 0, nombre: '', todas: false, guardando: false, error: null })} className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Pasar el inicio a encabezado…</button>
-                <button type="button" onClick={() => setPasar({ tipo: 'pie', linea: Math.max(0, lineasCuerpo.length - 1), nombre: '', todas: false, guardando: false, error: null })} className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Pasar el final a pie…</button>
+                <button type="button" onClick={() => setPasar({ tipo: 'pie', linea: Math.max(0, lineasCuerpo.length - 1), nombre: '', todas: false, guardando: false, error: null })} className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Pasar el final a condiciones o pie…</button>
               </div>
             </div>
             <textarea rows={10} value={b.cuerpo} onChange={e => set(x => ({ ...x, cuerpo: e.target.value }))}
               className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
           </div>
+          <ParteFija titulo="Condiciones de compra" valor={b.condId} opciones={condiciones} texto={cond?.texto}
+            onChange={id => set(x => ({ ...x, condId: id }))} />
           <ParteFija titulo="Pie" valor={b.pieId} opciones={pies} texto={pie?.texto}
             onChange={id => set(x => ({ ...x, pieId: id }))} />
           {malosCuerpo.length > 0 && (
@@ -610,18 +617,22 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
       {pasar && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !pasar.guardando && setPasar(null)}>
           <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl p-5 space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold text-neutral-900">{pasar.tipo === 'pie' ? 'Pasar el final a un pie guardado' : 'Pasar el inicio a un encabezado guardado'}</h3>
-            <p className="text-xs text-neutral-500">Toca la línea donde {pasar.tipo === 'pie' ? 'empieza el pie (de ahí hasta el final)' : 'termina el encabezado (desde el principio hasta ahí)'}. Queda guardado para usarlo en otras publicaciones; en ML no cambia nada hasta que guardes.</p>
+            <h3 className="font-semibold text-neutral-900">{alFinal ? 'Pasar el final a un texto guardado' : 'Pasar el inicio a un encabezado guardado'}</h3>
+            {alFinal && <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-xs font-medium text-neutral-600">Guardarlo como</span>
+              {(['condiciones', 'pie'] as const).map(t => <button key={t} type="button" onClick={() => setPasar({ ...pasar, tipo: t })}
+                className={`px-2.5 py-1 rounded-lg border text-xs ${pasar.tipo === t ? 'bg-neutral-900 text-white border-neutral-900' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100'}`}>{t === 'pie' ? 'Pie' : 'Condiciones de compra'}</button>)}
+            </div>}
+            <p className="text-xs text-neutral-500">Toca la línea donde {alFinal ? 'empieza (de ahí hasta el final)' : 'termina el encabezado (desde el principio hasta ahí)'}. Queda guardado para usarlo en otras publicaciones; en ML no cambia nada hasta que guardes.</p>
             <div className="rounded-lg border border-neutral-200 max-h-64 overflow-y-auto text-xs font-mono">
               {lineasCuerpo.map((l, i) => {
-                const dentro = pasar.tipo === 'pie' ? i >= pasar.linea : i <= pasar.linea
+                const dentro = alFinal ? i >= pasar.linea : i <= pasar.linea
                 return <button key={i} type="button" onClick={() => setPasar({ ...pasar, linea: i })}
                   className={`block w-full text-left px-2 py-0.5 whitespace-pre-wrap break-words ${dentro ? 'bg-sky-50 text-sky-900' : 'text-neutral-500 hover:bg-neutral-50'}`}>{l || ' '}</button>
               })}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Nombre (para reconocerlo)</span>
-                <input value={pasar.nombre} maxLength={60} onChange={e => setPasar({ ...pasar, nombre: e.target.value })} placeholder={pasar.tipo === 'pie' ? 'Ej: Condiciones y envíos' : 'Ej: Bienvenida'}
+                <input value={pasar.nombre} maxLength={60} onChange={e => setPasar({ ...pasar, nombre: e.target.value })} placeholder={pasar.tipo === 'pie' ? 'Ej: Ubicación y horario' : pasar.tipo === 'condiciones' ? 'Ej: Condiciones de compra' : 'Ej: Bienvenida'}
                   className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm" /></label>
               <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Para</span>
                 <select value={pasar.todas ? 'todas' : 'esta'} onChange={e => setPasar({ ...pasar, todas: e.target.value === 'todas' })} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm bg-white">

@@ -30,7 +30,7 @@ const Cambios = z.object({
   stock: z.number().int().min(0).max(99999).optional(),
   estado: z.enum(['active', 'paused']).optional(),
   descripcion: texto(50000).optional(),
-  descPartes: z.object({ encabezadoId: z.number().int().nullable(), pieId: z.number().int().nullable(), cuerpo: texto(50000) }).optional(),
+  descPartes: z.object({ encabezadoId: z.number().int().nullable(), pieId: z.number().int().nullable(), condicionesId: z.number().int().nullable().optional(), cuerpo: texto(50000) }).optional(),
   atributos: z.array(z.object({ id: texto(80), value_id: texto(80).nullable().optional(), value_name: texto(255).nullable().optional() })).max(200).optional(),
   fotos: z.array(texto(80)).max(12).optional(),
   variantes: z.array(z.object({

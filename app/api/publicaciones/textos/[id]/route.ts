@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sesionPublicaciones } from '@/lib/preguntasSesion'
 import { apiError } from '@/lib/apiError'
-import { caracteresNoPermitidos } from '@/lib/descripcionTexto'
+import { caracteresNoPermitidos, NOMBRE_TIPO, type TipoTexto } from '@/lib/descripcionTexto'
 import { crearLote } from '@/lib/lotesPublicaciones'
 
 const Cambio = z.object({
@@ -29,9 +29,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     let lote: number | null = null
     if (p.data.actualizarEnML) {
       const { rows } = await s.db.query(
-        `SELECT item_id FROM ml_item_descripcion WHERE ${t.tipo === 'pie' ? 'pie_id' : 'encabezado_id'} = $1`, [id])
+        `SELECT item_id FROM ml_item_descripcion WHERE ${NOMBRE_TIPO[t.tipo as TipoTexto].columna} = $1`, [id])
       if (rows.length) {
-        lote = await crearLote(s.db, 'descripcion', `${t.tipo === 'pie' ? 'Pie' : 'Encabezado'} «${p.data.nombre}» actualizado en ${rows.length} publicaciones`,
+        lote = await crearLote(s.db, 'descripcion', `${NOMBRE_TIPO[t.tipo as TipoTexto].titulo} «${p.data.nombre}» actualizado en ${rows.length} publicaciones`,
           { parte: t.tipo, plantillaId: id, noReconocida: 'agregar' }, rows.map(r => ({ item: r.item_id })), Number(s.session.user.id) || null)
       }
     }
@@ -47,7 +47,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const id = Number((await params).id)
   try {
     await s.db.query(
-      `UPDATE ml_item_descripcion SET cuerpo = NULL WHERE encabezado_id = $1 OR pie_id = $1`, [id])
+      `UPDATE ml_item_descripcion SET cuerpo = NULL WHERE encabezado_id = $1 OR pie_id = $1 OR condiciones_id = $1`, [id])
     await s.db.query(`DELETE FROM ml_desc_plantillas WHERE id = $1`, [id])
     return NextResponse.json({ ok: true })
   } catch (err) { return apiError(err) }

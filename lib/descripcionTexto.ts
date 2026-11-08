@@ -7,20 +7,29 @@ export const MAX_DESCRIPCION = 50000
 
 const normal = (s: string) => s.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim()
 
-export function componer(encabezado: string | null | undefined, cuerpo: string, pie: string | null | undefined) {
-  return [encabezado, cuerpo, pie].map(x => normal(x ?? '')).filter(Boolean).join(SEPARADOR)
+/** Orden en ML: encabezado, descripción del producto, condiciones de compra (mig 154) y pie. */
+export function componer(encabezado: string | null | undefined, cuerpo: string, pie: string | null | undefined, condiciones?: string | null) {
+  return [encabezado, cuerpo, condiciones, pie].map(x => normal(x ?? '')).filter(Boolean).join(SEPARADOR)
+}
+
+export type TipoTexto = 'encabezado' | 'condiciones' | 'pie'
+export const TIPOS_TEXTO: TipoTexto[] = ['encabezado', 'condiciones', 'pie']
+export const NOMBRE_TIPO: Record<TipoTexto, { titulo: string; plural: string; uno: string; columna: string }> = {
+  encabezado: { titulo: 'Encabezado', plural: 'Encabezados', uno: 'un encabezado', columna: 'encabezado_id' },
+  condiciones: { titulo: 'Condiciones de compra', plural: 'Condiciones de compra', uno: 'unas condiciones de compra', columna: 'condiciones_id' },
+  pie: { titulo: 'Pie', plural: 'Pies', uno: 'un pie', columna: 'pie_id' },
 }
 
 /** ¿Son el mismo texto? (sin contar espacios al final de línea ni saltos de línea de Windows) */
 export const mismoTexto = (a: string, b: string) => normal(a) === normal(b)
 
-export interface PlantillaTexto { id: number; tipo: 'encabezado' | 'pie'; texto: string }
+export interface PlantillaTexto { id: number; tipo: TipoTexto; texto: string }
 
 /** Separa un texto de ML con las plantillas guardadas: si empieza con un encabezado conocido o termina con un pie
  *  conocido (texto exacto), los saca. Lo que queda es el cuerpo. Gana el más largo si hay varios. */
 export function separar(texto: string, plantillas: PlantillaTexto[]) {
   let resto = normal(texto)
-  let encabezado: PlantillaTexto | null = null, pie: PlantillaTexto | null = null
+  let encabezado: PlantillaTexto | null = null, pie: PlantillaTexto | null = null, condiciones: PlantillaTexto | null = null
   const porLargo = [...plantillas].sort((a, b) => normal(b.texto).length - normal(a.texto).length)
   for (const p of porLargo.filter(x => x.tipo === 'encabezado')) {
     const t = normal(p.texto)
@@ -30,7 +39,12 @@ export function separar(texto: string, plantillas: PlantillaTexto[]) {
     const t = normal(p.texto)
     if (t && resto.endsWith(t) && (resto.length === t.length || resto[resto.length - t.length - 1] === '\n')) { pie = p; resto = resto.slice(0, resto.length - t.length).trim(); break }
   }
-  return { encabezado, pie, cuerpo: resto }
+  // Las condiciones de compra van justo antes del pie (o al final si no hay pie).
+  for (const p of porLargo.filter(x => x.tipo === 'condiciones')) {
+    const t = normal(p.texto)
+    if (t && resto.endsWith(t) && (resto.length === t.length || resto[resto.length - t.length - 1] === '\n')) { condiciones = p; resto = resto.slice(0, resto.length - t.length).trim(); break }
+  }
+  return { encabezado, pie, condiciones, cuerpo: resto }
 }
 
 // Lo que MercadoLibre acepta en la descripción: texto plano. Letras (con acentos y ñ), números, espacios y los signos

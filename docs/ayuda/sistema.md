@@ -310,7 +310,7 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 
 ## 7b. Publicaciones (Inventario → Publicaciones)
 
-*Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación, cambiar precios a muchas, subir precios en lote, pie de descripción, encabezado, plantilla de descripción, cambiar la info de abajo de la descripción en todas.
+*Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación, cambiar precios a muchas, subir precios en lote, pie de descripción, encabezado, condiciones de compra, plantilla de descripción, cambiar la info de abajo de la descripción en todas.
 
 Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas (cada una aparece si tu empresa y tu
 usuario la tienen):
@@ -334,11 +334,13 @@ usuario la tienen):
     hasta 12).
   - **Características principales** (las que pide ML, * = obligatoria) y **secundarias** («Ver todas» para completar
     las vacías). Si vacías una que tenía valor, queda como «No aplica».
-  - **Descripción en 3 partes:** **encabezado** (arriba), **descripción del producto** (lo de esta publicación) y
-    **pie** (abajo: ubicación, horario, pagos, envíos, garantía…). Encabezado y pie son **textos guardados** que se
-    eligen de una lista; a ML va todo junto. **Vista previa** muestra cómo queda en ML. Si hay caracteres que ML no
+  - **Descripción en 4 partes:** **encabezado** (arriba), **descripción del producto** (lo de esta publicación),
+    **condiciones de compra** (envíos, montos mínimos, pagos, garantía, cambios…) y **pie** (abajo: ubicación,
+    horario…). Encabezado, condiciones y pie son **textos guardados** que se eligen de una lista; al lado están
+    **Editar texto** (lo abre en Textos guardados, en otra pestaña) y **Quitar** (lo saca de esta publicación); a ML
+    va todo junto, en ese orden. **Vista previa** muestra cómo queda en ML. Si hay caracteres que ML no
     acepta (emojis, símbolos raros) avisa y **Quitarlos** los saca; se permiten letras, números y signos básicos
-    (# * - + / . , : ;). También avisa si parece que hay un teléfono, correo o link. **Pasar el final a pie…** (o el
+    (# * - + / . , : ;). También avisa si parece que hay un teléfono, correo o link. **Pasar el final a condiciones o pie…** (o el
     inicio a encabezado) convierte ese pedazo en un texto guardado para usarlo en otras publicaciones.
 - **Revisar y guardar:** antes de mandar ves cada cambio **antes → después**. Solo se manda lo que cambiaste.
   Si MercadoLibre rechaza algo, te dice qué y por qué; lo demás queda guardado.
@@ -346,7 +348,7 @@ usuario la tienen):
 
 **Cambiar muchas a la vez:** en la lista marca las que quieras (o «Elegir esta página» y después «Elegir las N de
 esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
-- **Encabezado / pie:** elegir qué parte y qué texto guardado poner (o **quitarlo**). Si en una publicación no se
+- **Encabezado / condiciones / pie:** elegir qué parte y qué texto guardado poner (o **quitarlo**). Si en una publicación no se
   reconoce el pie que tiene ahora, se puede **saltar** (recomendado, así no queda repetido) o **agregarlo igual**.
   Primero muestra cuántas van y después se confirma.
 - **Cambiar precios:** subir o bajar un %, sumar o restar un monto o poner un precio fijo, con redondeo (entero o
@@ -355,7 +357,7 @@ esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
   saltado y los errores se ven en **Cambios en lote** (link arriba de la lista); ahí también se puede cancelar lo
   que falta.
 
-**Textos de descripción** (link arriba de la lista): los encabezados y pies guardados, cada uno **para una cuenta o
+**Textos de descripción** (link arriba de la lista): los encabezados, condiciones de compra y pies guardados, cada uno **para una cuenta o
 para todas**. Al **editar** uno que ya usan publicaciones, se puede marcar «Actualizarlo también en MercadoLibre» y
 se cambia en todas las que lo usan (activas y pausadas). **Detectar textos repetidos:** «Leer descripciones» de una
 cuenta (solo lee, tarda unos minutos) y «Buscar repetidos» muestra los finales (o inicios) que ya están iguales en
