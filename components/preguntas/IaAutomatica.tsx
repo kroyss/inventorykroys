@@ -140,8 +140,9 @@ export function IaAutomatica() {
           <span>Marcadas: <b>{r.marcadas}</b>{pct !== null && <> · <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien</b></>}</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {([['sola', `${info.modo === 'real' ? 'Salieron' : 'Habrían salido'} solas (${r.solas})`], ['revisar', `Las pasó a una persona (${r.revisar})`],
-             ['eco', `Versión económica (${info.economica.comparadas})`], ['h55', `Haiku 4.5 vs 5.5 (${info.haiku55.comparadas})`]] as const).map(([k, t]) => (
+          {/* 08-11 (el dueño): fuera las pestañas «Versión económica» y «Haiku 4.5 vs 5.5»: Haiku 5.5 ya escribe todas
+              (ver lib/preguntas.ts) y las comparaciones se apagaron. Sus componentes quedan abajo como historial. */}
+          {([['sola', `${info.modo === 'real' ? 'Salieron' : 'Habrían salido'} solas (${r.solas})`], ['revisar', `Las pasó a una persona (${r.revisar})`]] as const).map(([k, t]) => (
             <button key={k} onClick={() => setVer(k)}
               className={`px-3 py-1.5 rounded-full text-sm border ${ver === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
           ))}

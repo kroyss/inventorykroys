@@ -41,7 +41,7 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
 
 // "No tenemos / no hay / agotado": decir que no de más pierde la venta (y el stock de la publicación puede ir atrasado),
 // así que siempre lo ve una persona.
-const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
+const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
 // Modo prueba 01–04/11 (78 de 79 bien): el único error fue un monto inventado ("cobro destino por MRW aprox. 1.600 Bs").
 // Montos en bolívares, estimados y cobros a destino con cifra cambian a diario: siempre una persona.

@@ -33,7 +33,17 @@ const PAGO = /comprobante|capture|captura|referencia|ya (pagu|transfer|hice el p
 const DATOS = /\b\d{7,}\b|\bc\.?\s?i\.?\b|c[eé]dula|direcci[oó]n|\bcalle\b|\bav(enida|\.)|\burb(anizaci[oó]n|\.)|\bsector\b|\bedificio\b|\bapto\b|tel[eé]fono/i
 // Lo que dice la IA.
 const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad/i
-const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay|queda|quedan)\b|agotad|sin (stock|existencia)/i
+// 08-11: "no hay problema" no es decir que no hay producto.
+const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan)\b|agotad|sin (stock|existencia)/i
+// 08-11 (el dueño): un monto que el VENDEDOR ya escribió en la conversación (ej. "400Bs de embalaje") no es un estimado
+// de la IA: no frena. Frena si la IA da un monto que no está escrito por el vendedor, o si dice "aproximado".
+const montosBs = (t: string) => [...t.matchAll(/(\d[\d.,]*)\s?(?:bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?(\d[\d.,]*)/gi)]
+  .map(m => (m[1] ?? m[2] ?? '').replace(/[.,]+$/, ''))
+function montoInventado(respuesta: string, vendedor: string) {
+  if (/aproximad/i.test(respuesta)) return true
+  const dichos = new Set(montosBs(vendedor))
+  return montosBs(respuesta).some(n => !dichos.has(n))
+}
 
 // Pedido especial (08-11, el dueño): pide otro color/variante, mezclar, otra cantidad u otro producto. No sale nada solo
 // (ni la frase de escape): queda el borrador para la persona y una nota en la venta de ML ("PEDIDO ESPECIAL - verificar: …")
@@ -59,7 +69,7 @@ async function notaVerificar(db: Pool, conexionId: number, pack: string, tipo: k
 }
 
 /** Por qué NO saldría sola (vacío = saldría sola). */
-export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null }, comprador: string, persona: string[] = []): string[] {
+export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null }, comprador: string, persona: string[] = [], vendedor = ''): string[] {
   const m: string[] = []
   if (b.pedido_especial) m.push(`${PEDIDO_ESPECIAL}: ${b.pedido_especial}`)
   if (b.reclamo && !RECLAMO.test(comprador)) m.push(`Reclamo: ${b.reclamo}`)
@@ -70,7 +80,7 @@ export function motivosMensaje(b: { respuesta: string; confianza: string; falta_
   if (tema) m.push(`Tema que en Mi IA marcaste para una persona (${tema})`)
   if (!b.respuesta) { if (b.confianza !== 'alta') m.push('La IA no propuso respuesta'); return m }
   if (b.confianza !== 'alta') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
-  if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado')
+  if (MONTO.test(b.respuesta) && montoInventado(b.respuesta, vendedor)) m.push('Da un monto en bolívares o un estimado')
   if (NEGATIVA.test(b.respuesta)) m.push('Dice que no hay: lo confirma una persona')
   const p = problemasDelTexto(b.respuesta, 'mensaje')
   if (p.length) m.push(`MercadoLibre la borraría: ${p.join(', ')}`)
@@ -112,7 +122,8 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
         `SELECT propio, texto FROM ml_mensajes WHERE pack_id = $1 ORDER BY fecha DESC LIMIT 10`, [r.pack_id])
       const corte = msgs.findIndex(m => m.propio)
       const comprador = (corte < 0 ? msgs : msgs.slice(0, corte)).reverse().map(m => String(m.texto)).join('\n').slice(0, 1000)
-      const motivos = motivosMensaje(b, comprador, persona)
+      const vendedor = msgs.filter(m => m.propio).map(m => String(m.texto)).join('\n')
+      const motivos = motivosMensaje(b, comprador, persona, vendedor)
       let topeOHorario: string[] = []
       if (frenos) {
         const { rows: [cv] } = await db.query(`SELECT comprador_id::text FROM ml_conversaciones WHERE pack_id = $1`, [r.pack_id])
