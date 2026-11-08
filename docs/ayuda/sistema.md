@@ -639,6 +639,8 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   perder el envío gratis. **Traer ME y ML** trae precios y campañas de MercadoLibre y los pesos del portal de
   MercadoEnvíos (con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar sale un aviso verde con cuántas
   publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
+  En una campaña que **todavía no empezó** (ej. Black Friday del 16/11) puedes agregar publicaciones desde ya: quedan
+  **programadas** y el precio se activa solo el día que empieza.
 - **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
 - **Reportes → Resumen** (en prueba, solo algunas empresas; también con el botón **Métricas** del Inicio): todo junto
   para **7, 30, 90 días o 1 año** contra el período anterior del mismo largo: lo vendido, cantidad de ventas y
