@@ -26,6 +26,10 @@ export interface PromoDeItem {
   estado: string               // started (adentro) · candidate (puede entrar) · pending · …
   precio: number | null        // precio en la promoción (started)
   minimo: number | null        // precio mínimo que acepta ML para entrar (candidate)
+  // 08-11: lo que SUGIERE ML (su "Nueva propuesta"): el precio más alto que acepta = el descuento mínimo que pide, y
+  // el precio para salir destacada. Varía por campaña y por publicación: siempre se toma de ML.
+  maximo?: number | null
+  top?: number | null
 }
 
 export interface ItemML {
@@ -86,7 +90,8 @@ export async function actualizarPromociones(db: Pool, conexionId: number): Promi
         const id = String(x.id)
         const it = items.get(id)
         if (!it) continue                    // pausada o de otra cuenta: no se muestra
-        it.promos.push({ campana: camp.id, estado: String(x.status ?? ''), precio: num(x.price), minimo: num(x.min_discounted_price) })
+        it.promos.push({ campana: camp.id, estado: String(x.status ?? ''), precio: num(x.price), minimo: num(x.min_discounted_price),
+          maximo: num(x.max_discounted_price), top: num(x.max_top_discounted_price) })
         if (!it.precio && num(x.original_price)) it.precio = Number(x.original_price)
       }
       despues = p.paging?.searchAfter ?? null

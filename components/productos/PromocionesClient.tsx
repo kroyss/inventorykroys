@@ -18,6 +18,7 @@ import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
 
 export interface CampanaVista extends CampanaML { conexionId: number; cuentas: string[]; adentro: number; candidatas: number
   pctDefecto?: number | null   // campañas propias: el % que se propone al agregar (se elige al crearla)
+  pctML?: number | null        // campañas de ML: el % que sugiere ML (el más común entre sus invitadas; 08-11)
 }
 export interface FilaPromo {
   id: string; conexionId: number; cuenta: string; titulo: string; precio: number; producto: string | null; costo: number | null
@@ -80,7 +81,7 @@ const ENVIO: Record<EstadoEnvio, { t: string; c: string }> = {
 }
 const Chip = ({ e }: { e: EstadoEnvio }) => <span className={`inline-block px-2 py-0.5 rounded-full border text-[11px] ${ENVIO[e].c}`}>{ENVIO[e].t}</span>
 
-export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, conPagosME, historial }: {
+export default function PromocionesClient({ filas, campanas: campanasBase, cuentas, pesosAl, conPagosME, historial }: {
   filas: FilaPromo[]; campanas: CampanaVista[]
   cuentas: { id: number; nombre: string; actualizado_at: string; error: string | null }[]
   pesosAl: string | null; conPagosME: boolean; historial: AccionHecha[]
@@ -97,6 +98,21 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   const [error, setError] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<Modal>(null)
+  // 08-11 (el dueño): el % que sugiere MercadoLibre en cada campaña suya (su "Nueva propuesta"). ML lo da por publicación
+  // (max_discounted_price = el descuento mínimo que pide); se toma el más común entre las invitadas.
+  const campanas = useMemo(() => campanasBase.map(c => {
+    if (c.tipo === 'SELLER_CAMPAIGN') return c
+    const cuenta = new Map<number, number>()
+    for (const f of filas) {
+      if (f.conexionId !== c.conexionId || !(f.precio > 0)) continue
+      const p = f.promos.find(x => x.campana === c.id && x.estado === 'candidate')
+      if (p?.maximo == null || !(p.maximo > 0)) continue
+      const pc = Math.ceil((1 - p.maximo / f.precio) * 100 - 0.01)
+      if (pc >= 1 && pc <= 80) cuenta.set(pc, (cuenta.get(pc) ?? 0) + 1)
+    }
+    const top = [...cuenta.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
+    return { ...c, pctML: top ? top[0] : null }
+  }), [campanasBase, filas])
   const [margenMin, setMargenMin] = useState(15)
   const [pctSug, setPctSug] = useState(10)
   // Margen neto (Fase 3): tasas y parámetros de ML de Ajustes, como el catálogo.
@@ -157,7 +173,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
   // Sugerencias: las que pueden entrar y que, con el % propuesto, NO pierden el envío gratis (y no quedan
   // bajo el mínimo que acepta ML). De ML: las que ML invita. Propia: las de la cuenta que todavía no están.
   // El margen no filtra (muchas publicaciones no tienen costo): se ve como aviso en la vista previa.
-  const pctDe = (c: CampanaVista) => c.pctDefecto ?? pctSug
+  const pctDe = (c: CampanaVista) => c.pctDefecto ?? c.pctML ?? pctSug
   const sugeridas = (c: CampanaVista) => vistas.filter(v => {
     if (v.conexionId !== c.conexionId) return false
     const p = v.promos.find(x => x.campana === c.id)
@@ -168,6 +184,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
     // Con el máximo seguro: las que no aguantarían el % se proponen ajustadas (si aguantan al menos 1%).
     const s = precioSeguro(v.precio, pctDe(c), v.envioBase, v.peso, tablas)
     if (s.sinMargen || pctReal(v.precio, s.precio) < 1) return false
+    if (p?.maximo != null && s.precio > p.maximo + 0.005) return false   // no llega al descuento que pide ML
     return !(p?.minimo != null && s.precio < p.minimo)
   })
 
@@ -366,7 +383,7 @@ export default function PromocionesClient({ filas, campanas, cuentas, pesosAl, c
                         <div className="font-medium text-neutral-900">{c.nombre}</div>
                         <span className="text-[11px] text-neutral-400 whitespace-nowrap">{propia ? 'propia' : c.tipo}{c.estado !== 'started' ? ` · ${c.estado}` : ''}</span>
                       </div>
-                      <div className="text-xs text-neutral-500 mt-0.5">{propia && c.pctDefecto ? <><b className="text-neutral-700">{c.pctDefecto}%</b> · </> : null}{fecha(c.inicio)} → {fecha(c.fin)}{!propia && <> · entrar hasta {fecha(c.limite)}</>} · {c.cuentas.join(', ')}</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">{propia && c.pctDefecto ? <><b className="text-neutral-700">{c.pctDefecto}%</b> · </> : null}{!propia && c.pctML ? <><b className="text-neutral-700">{c.pctML}%</b> sugerido por ML · </> : null}{fecha(c.inicio)} → {fecha(c.fin)}{!propia && <> · entrar hasta {fecha(c.limite)}</>} · {c.cuentas.join(', ')}</div>
                       <div className="text-sm mt-2"><b>{c.adentro}</b> adentro{!propia && <> · <b>{c.candidatas}</b> pueden entrar</>}</div>
                     </button>
                     <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
@@ -613,6 +630,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const cambio = yaAdentro && propia && cand?.precio != null && Math.abs(cand.precio - precio) >= 0.011
     const puede = !!cf && (cambio || (!yaAdentro && (propia || cand?.estado === 'candidate')))
     const bajoMin = cand?.minimo != null && precio < cand.minimo
+    // 08-11: ML pide un descuento mínimo (su sugerido): con menos, no la acepta.
+    const sobreMax = !yaAdentro && cand?.maximo != null && precio > cand.maximo + 0.005
     // Siempre contra el envío AL PRECIO PUBLICADO (no contra el de otra promo que ya le haya bajado el precio).
     const base = f.envioBase
     const despues = envioPorTransportista(f.peso, precio, tablas)
@@ -629,6 +648,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const motivo = !camp ? null : !cf ? `${f.cuenta} no tiene «${camp.nombre}»`
       : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
       : bajoPiso ? `Bajo $${PISO_ML}: ML no la acepta` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
+      : sobreMax ? `ML pide al menos −${pct(pctReal(f.precio, cand!.maximo!))} (hasta ${usd(cand!.maximo)})`
       : seguro.sinMargen ? 'Sin margen: perdería el envío gratis' : null
     const advertencia = motivo ? null
       : ajustada ? `Ajustada a −${pct(pctReal(f.precio, precio))} (envío gratis)`
@@ -808,7 +828,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
                     mal: r.filter(x => !x.ok).length, okIds: Object.entries(resultados).filter(([, x]) => x.ok).map(([id]) => id) }])
                   setResultados({}); setReintento({}); setConPierden(false)
                 }
-                setModal({ ...modal, campana: e.target.value, pct: c?.pctDefecto ?? modal.pct })
+                setModal({ ...modal, campana: e.target.value, pct: c?.pctDefecto ?? c?.pctML ?? modal.pct })
               }} className={`border rounded-lg px-2 py-1.5 min-w-[240px] ${hechas.length && !modal.campana ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-neutral-300'}`}>
                 <option value="">{hechas.length ? 'Elegir otra campaña…' : 'Elegir…'}</option>
                 {opciones.map(({ c, n, cuentas }) => <option key={`${c.conexionId}|${c.id}`} value={`${c.conexionId}|${c.id}`}>{c.nombre} {c.tipo === 'SELLER_CAMPAIGN' ? '(propia)' : '(de ML)'}{mezcla ? ` · ${cuentas.join(' + ')}` : ''} · {n} de {filas.length}</option>)}
@@ -823,7 +843,12 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
                   className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-right" />%
               </span>
             </label>
-            <span className="text-xs text-neutral-500 pb-2">{camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}</span>
+            <span className="text-xs text-neutral-500 pb-2">
+              {camp?.pctML && camp.tipo !== 'SELLER_CAMPAIGN' && <><button type="button" onClick={() => setModal({ ...modal, pct: camp.pctML! })}
+                className={`underline-offset-2 hover:underline ${modal.pct === camp.pctML ? 'text-emerald-700' : 'text-sky-700'}`}
+                title="Lo que propone MercadoLibre para esta campaña (cambia según la campaña)"><b>{camp.pctML}%</b> sugerido por MercadoLibre</button> · </>}
+              {camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}
+            </span>
           </div>
           {enviando && avance && (
             <div className="sticky top-0 z-10 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
