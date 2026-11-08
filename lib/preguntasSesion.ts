@@ -19,6 +19,16 @@ export async function sesionPreguntas(permiso?: Permiso) {
   return { session, db } as const
 }
 
+/** Publicaciones (editor, mig. 151): sesión de Preguntas (conexiones de ML) + su módulo y el permiso. */
+export async function sesionPublicaciones() {
+  const s = await sesionPreguntas('editar_publicaciones')
+  if ('error' in s) return s
+  if (!tieneModulo(s.session.user, 'publicaciones')) {
+    return { error: NextResponse.json({ error: 'Tu empresa no tiene el módulo Publicaciones' }, { status: 403 }) } as const
+  }
+  return s
+}
+
 /** Stock (alertas de stock): sesión de Preguntas (conexiones de ML) + su módulo `alertas_stock`. */
 export async function sesionStock(permiso?: Permiso) {
   const s = await sesionPreguntas(permiso)

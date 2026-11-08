@@ -78,6 +78,7 @@ const MORE_AUTO: NavItem[] = [
   { href: '/pagos-me',         label: 'Pagos ME',   icon: 'pagos',      countries: ['VE'] },
   { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  countries: ['VE'] },
   { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
+  { href: '/publicaciones',    label: 'Publicaciones', icon: 'productos', countries: ['VE', 'CO'] },
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
   { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
   { href: '/aprendizaje',      label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },

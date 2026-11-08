@@ -26,7 +26,7 @@ Está organizado en **espacios**, cada uno con su propio menú:
 
 | Espacio | Qué tiene | Quién lo ve |
 |---|---|---|
-| **Automatizaciones** | Preguntas, Mensajes, Stock, Pagos ME, Despachos, Calificaciones, Reportador, Cuentas de ML, Mis avisos | Todas las empresas |
+| **Automatizaciones** | Preguntas, Mensajes, Stock, Publicaciones (en prueba), Pagos ME, Despachos, Calificaciones, Reportador, Cuentas de ML, Mis avisos | Todas las empresas |
 | **Inventario** | Inicio, Ventas, Inventario, Compras, Productos, Vincular ML, Reportes, Ajustes | Solo si la empresa tiene el módulo Inventario |
 | **Radar de Oportunidades** | Otra aplicación (radar.elcomerciantedigital.com) para buscar productos que conviene vender | Solo si la empresa tiene el módulo Radar |
 
@@ -35,6 +35,20 @@ Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todo
 **Nada se publica solo sin que lo decidas:** el sistema propone (respuestas, calificaciones, mensajes) y tú
 revisas, salvo en lo que tú mismo prendas como automático (respuestas automáticas, calificación automática,
 mensaje al comprador nuevo, recordatorios de pago).
+
+### Inicio de Automatizaciones
+
+*Cómo lo pregunta la gente:* resumen, estadísticas, cuántas preguntas, tiempo de respuesta, cómo me fue, comparar semana.
+
+Arriba, **Pendiente ahora** (lo mismo que los numeritos del menú). Debajo, **Cómo viene tu atención**: los últimos
+**7, 30 o 90 días** comparados con el período anterior del mismo largo:
+- **Preguntas recibidas.**
+- **Respondidas:** el % respondido, cuántas respondió sola la IA automática y cuántas se respondieron desde la app o
+  la web de MercadoLibre.
+- **Tiempo de respuesta:** la mitad de las preguntas se respondió en menos de ese tiempo, y el % respondido en menos de 1 hora.
+- **Ventas en MercadoLibre** (no canceladas) y cuántas preguntas hubo por cada venta.
+La flecha verde es que mejoró y la roja que empeoró (en el tiempo de respuesta, bajar es lo bueno). Solo lo ve quien
+tiene acceso a Preguntas.
 
 ### Módulos
 
@@ -304,6 +318,30 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 
 ---
 
+## 7b. Publicaciones (Automatizaciones → Publicaciones) · en prueba
+
+*Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación.
+
+Editar tus publicaciones de MercadoLibre **sin entrar a ML**, con una pantalla parecida a la de ML. Por ahora solo
+para algunas empresas (módulo en prueba) y para quien tenga el permiso **Publicaciones (editar en MercadoLibre)**.
+
+- **Buscar:** por título, SKU o número (MLV…), por cuenta y activas/pausadas. Toca una para abrirla.
+- La pantalla trae lo que hay **ahora mismo** en MercadoLibre:
+  - **Título:** solo se puede cambiar si la publicación **no tiene ventas** (regla de MercadoLibre).
+  - **Precio, stock y estado** (activa / pausada). Debajo del precio ves la comisión de ML estimada (la de Ajustes) y
+    lo que te queda antes del envío y del costo.
+  - **Variantes:** el nombre de cada variante (ej. color «Rojo»), su stock y qué fotos muestra. No se crean ni se
+    borran variantes desde aquí. Con variantes, el precio es el mismo para todas.
+  - **Fotos:** cambiar el orden (la primera es la portada), quitar y **agregar** (JPG, PNG o WEBP, hasta 10 fotos).
+  - **Características principales** (las que pide ML, * = obligatoria) y **secundarias** («Ver todas» para completar
+    las vacías). Si vacías una que tenía valor, queda como «No aplica».
+  - **Descripción:** solo texto (ML no acepta formato, links, teléfonos ni correos).
+- **Revisar y guardar:** antes de mandar ves cada cambio **antes → después**. Solo se manda lo que cambiaste.
+  Si MercadoLibre rechaza algo, te dice qué y por qué; lo demás queda guardado.
+- **Cambios hechos desde el sistema:** cada cambio queda anotado (quién, cuándo, qué y si ML lo aceptó).
+
+---
+
 ## 8. Pagos ME (Automatizaciones → Pagos ME) · Venezuela
 
 *Cómo lo pregunta la gente:* MercadoEnvíos, Mercadoenvios, el portal, pagos de envío, comprobantes, el programa, el vigilante, la extensión, Asistente de envíos, código de conexión, traer pagos, verificar pagos, banco, estado de cuenta.
@@ -508,6 +546,9 @@ escribe a ti.
 - Producto agotado (y opcionalmente por agotarse). Puede llegar hasta 1 hora después.
 - Promociones de MercadoLibre: campaña nueva y campañas por cerrar.
 - **Resumen de la mañana** y **cierre del día** con lo que quedó pendiente.
+- **Resumen de la semana** (los lunes, a la hora del resumen de la mañana): ventas, preguntas, tiempo de respuesta y
+  calificaciones de los últimos 7 días contra los 7 anteriores, y el termómetro de cada cuenta. Con «Mandarme el de
+  esta semana ahora» lo pruebas.
 - **Silencio:** horas en las que no te llega nada; lo pendiente llega al terminar.
 
 Si no ves algunos avisos es porque tu usuario no tiene acceso a esa sección (Preguntas, Mensajes o Calificaciones).
@@ -594,7 +635,9 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 
 - **No bloquea compradores:** MercadoLibre no lo permite desde otros sistemas; se hace desde la web de ML.
 - **No saca solo las guías de MercadoEnvíos** en Venezuela: para eso está **Pagos ME** (el programa en tu PC).
-- **No publica ni cambia precios solo.** Solo cambia stock o reactiva cuando tú lo pides.
+- **No publica ni cambia precios solo.** Solo cambia stock o reactiva cuando tú lo pides, y en **Publicaciones**
+  (si tu empresa lo tiene) edita lo que tú cambies y confirmes. No crea publicaciones nuevas.
+- **No cambia el título de una publicación con ventas:** MercadoLibre no lo permite.
 - **No ve tus guías si las imprimes directo en MercadoLibre** (sin pasar por Despachos).
 - **Links de Facebook** en mensajes: MercadoLibre los rechaza.
 - **Mensajes de más de 350 caracteres** (mensaje al comprador nuevo): ML los corta sin avisar.

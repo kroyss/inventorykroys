@@ -43,6 +43,9 @@ export const PERMISOS = {
   // 29-10 (mig. 133): entrar al Radar de Oportunidades (otro sitio). El admin siempre; a un empleado se le marca aquí.
   ver_radar:          { tipo: 'seccion', nombre: 'Radar de Oportunidades', usuario: false, modulo: 'radar',
                         detalle: 'Entrar a radar.elcomerciantedigital.com con su mismo usuario' },
+  // 07-11 (mig. 151): editar publicaciones de ML. Cambia lo que ven los compradores: el empleado, solo si se le marca.
+  editar_publicaciones: { tipo: 'seccion', nombre: 'Publicaciones (editar en MercadoLibre)', usuario: false, modulo: 'publicaciones',
+                          detalle: 'Cambiar precio, stock, fotos, características, variantes y descripción de las publicaciones' },
   // ── Acciones (dentro de las secciones) ──
   costos:                  { tipo: 'accion', nombre: 'Ver costos y ganancias', usuario: false, modulo: 'inventario',
                              detalle: 'Inicio completo (ventas, ganancia, bonos) y costos/totales en Compras e Importaciones' },
@@ -101,7 +104,7 @@ const SECCION_DE_RUTA: [string, Permiso][] = [
   ['/reportes', 'ver_reportes'], ['/finanzas', 'ver_finanzas'], ['/preguntas', 'ver_preguntas'],
   ['/mensajes', 'ver_mensajes'], ['/calificaciones', 'ver_calificaciones'], ['/despachos', 'ver_despachos'],
   ['/reportador', 'ver_reportador'], ['/alertas-stock', 'ver_stock'], ['/aprendizaje', 'ver_aprendizaje'],
-  ['/vincular-ml', 'vincular_ml'],
+  ['/vincular-ml', 'vincular_ml'], ['/publicaciones', 'editar_publicaciones'],
 ]
 const SOLO_ADMIN = ['/tasas', '/usuarios', '/plataforma']
 

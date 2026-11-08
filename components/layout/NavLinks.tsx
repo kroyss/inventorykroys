@@ -31,6 +31,7 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/calificaciones',   label: 'Calificaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/alertas-stock',    label: 'Stock',         countries: ['VE', 'CO'], espacio: 'automatizaciones' },
+  { href: '/publicaciones',    label: 'Publicaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
 interface Props {

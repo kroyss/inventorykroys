@@ -37,9 +37,8 @@ export default function ResumenAtencion() {
 
   useEffect(() => {
     let vivo = true
-    setError(false)
     fetch(`/api/automatizaciones/resumen?dias=${dias}`).then(x => x.ok ? x.json() : Promise.reject())
-      .then(j => { if (vivo) setR(j) }).catch(() => { if (vivo) setError(true) })
+      .then(j => { if (vivo) { setR(j); setError(false) } }).catch(() => { if (vivo) setError(true) })
     return () => { vivo = false }
   }, [dias])
 

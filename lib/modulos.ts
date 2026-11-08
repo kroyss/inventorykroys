@@ -52,6 +52,9 @@ export const MODULOS = {
   // En prueba solo SolucionesMC.
   mi_ia:              'Mi IA: cuestionario paso a paso con las reglas del negocio para la IA de Preguntas y Mensajes (en prueba)',
   fotos_ia:           'Fotos para la IA: lee una vez las fotos de cada publicación que usa la IA y avisa si la publicación se contradice',
+  // 07-11 (migración 151): editar publicaciones existentes de ML (precio, stock, fotos, características, variantes,
+  // descripción). En prueba solo SolucionesMC.
+  publicaciones:      'Publicaciones: editar las publicaciones de MercadoLibre desde el sistema (precio, stock, fotos, características, variantes, descripción)',
   mensajes_ia:        'Mensajes con IA en prueba: la IA deja escrito el borrador de cada mensaje nuevo y se marca Bien/Mal (no manda nada)',
 } as const
 
@@ -74,6 +77,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
   '/alertas-stock': 'alertas_stock',
+  '/publicaciones': 'publicaciones',
   '/pagos-me':       'pagos_me',
   '/vincular-ml':    'inventario',
   '/productos/mercadoenvios': 'descuento_ml',
