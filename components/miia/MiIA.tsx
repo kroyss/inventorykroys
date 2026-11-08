@@ -441,9 +441,100 @@ function Prueba({ iaAuto, onEncendida }: { iaAuto: string | null; onEncendida: (
   )
 }
 
+// ── Pasar mis Políticas a Mi IA (08-11) ─────────────────────────────────────
+// Un solo lugar: lo de "Políticas para la IA" se reparte en los temas; si choca con lo que ya hay, elige la persona
+// (por defecto queda lo de Mi IA). Lo que no encaja queda en "Otras indicaciones" (el mismo texto, solo con el resto).
+type Pase = { propuesto: Partial<Config>; resto: string; politicas: string }
+type Fila = { id: string; tema: string; ahora: string; nuevo: string; valor: unknown; estado: 'nuevo' | 'igual' | 'choca' }
+
+function filasPase(c: Config, propuesto: Partial<Config>): Fila[] {
+  const out: Fila[] = []
+  const prop = propuesto as unknown as Record<string, unknown>, act = c as unknown as Record<string, unknown>
+  for (const p of PASOS) {
+    if (p.id === 'extras' || prop[p.id] === undefined) continue
+    const v = prop[p.id], a = act[p.id]
+    const valor = v && typeof v === 'object' && !Array.isArray(v) && a && typeof a === 'object' && !Array.isArray(a) ? { ...a, ...v } : v
+    const conNuevo = { ...c, [p.id]: valor } as Config
+    const ahora = p.lleno(c) ? resumen(p.id, c) || 'Completo' : ''
+    const nuevo = resumen(p.id, conNuevo) || 'Completo'
+    out.push({ id: p.id, tema: p.tema, ahora, nuevo, valor, estado: !ahora ? 'nuevo' : ahora === nuevo ? 'igual' : 'choca' })
+  }
+  return out
+}
+
+function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase; onListo: () => void; onCerrar: () => void }) {
+  const filas = filasPase(c, pase.propuesto)
+  const extras = pase.propuesto.extras ?? []
+  const [elige, setElige] = useState<Record<string, 'mi' | 'pol'>>({})
+  const [resto, setResto] = useState(pase.resto)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const guardar = async () => {
+    const final = { ...c } as unknown as Record<string, unknown>
+    for (const f of filas) if (f.estado === 'nuevo' || (f.estado === 'choca' && elige[f.id] === 'pol')) final[f.id] = f.valor
+    if (extras.length) { final.extras = [...(c.extras ?? []), ...extras].slice(0, 12); delete final.extrasNoAplica }
+    setGuardando(true); setError(null)
+    const r = await fetch('/api/mi-ia/politicas', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miIA: final, resto }) })
+    const d = await r.json().catch(() => ({}))
+    setGuardando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    onListo()
+  }
+
+  const chocan = filas.filter(f => f.estado === 'choca')
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+      <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-neutral-900">Pasar mis Políticas a Mi IA</h2>
+          <p className="text-sm text-neutral-600">Así queda todo en un solo lugar. Revisa y guarda: nada cambia hasta que guardes.</p>
+        </div>
+        {!filas.length && !extras.length && <p className="text-sm text-neutral-600">No encontré nada de tus Políticas que vaya en los temas de Mi IA.</p>}
+        {chocan.length > 0 && <div className="space-y-2">
+          <p className="text-sm font-medium text-amber-900">Esto no coincide: elige cuál vale</p>
+          {chocan.map(f => (
+            <div key={f.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1.5">
+              <p className="text-sm font-medium text-neutral-900">{f.tema}</p>
+              {([['mi', 'Lo de Mi IA', f.ahora], ['pol', 'Lo de mis Políticas', f.nuevo]] as const).map(([k, t, v]) => (
+                <label key={k} className="flex items-start gap-2 text-sm text-neutral-800 cursor-pointer">
+                  <input type="radio" name={`pase-${f.id}`} checked={(elige[f.id] ?? 'mi') === k} onChange={() => setElige(e => ({ ...e, [f.id]: k }))} className="mt-1" />
+                  <span><b>{t}:</b> {v}</span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>}
+        {filas.some(f => f.estado === 'nuevo') && <div className="space-y-1">
+          <p className="text-sm font-medium text-neutral-900">Se agrega a Mi IA</p>
+          <ul className="space-y-0.5 text-sm text-neutral-700">{filas.filter(f => f.estado === 'nuevo').map(f => <li key={f.id}><b>{f.tema}:</b> {f.nuevo}</li>)}</ul>
+        </div>}
+        {extras.length > 0 && <p className="text-sm text-neutral-700"><b>Información extra:</b> se agrega {lista(extras.map(x => `«${x.titulo}»`))}.</p>}
+        {filas.some(f => f.estado === 'igual') && <p className="text-xs text-neutral-500">Ya estaba igual en Mi IA: {lista(filas.filter(f => f.estado === 'igual').map(f => f.tema))}.</p>}
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-neutral-900">Otras indicaciones</p>
+          <p className="text-xs text-neutral-500">Lo que no encaja en ningún tema. Queda en la pestaña Otras indicaciones; lo demás sale de ahí para que no esté repetido.</p>
+          <textarea value={resto} onChange={e => setResto(e.target.value)} rows={4} placeholder="(Nada: todo quedó en Mi IA)"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm font-mono resize-y" />
+        </div>
+        <details className="text-xs text-neutral-500">
+          <summary className="cursor-pointer">Ver mis Políticas como estaban</summary>
+          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-neutral-50 p-3 text-neutral-700">{pase.politicas}</pre>
+        </details>
+        {error && <p className="text-sm text-red-700">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCerrar} className="px-3 py-2 rounded-lg text-sm text-neutral-500 hover:text-neutral-800">Cancelar</button>
+          <button type="button" onClick={guardar} disabled={guardando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
+            {guardando ? 'Guardando…' : 'Guardar en Mi IA'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA() {
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; politicas?: boolean } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
   const [sugeridos, setSugeridos] = useState<string[]>([])
@@ -466,6 +557,15 @@ export default function MiIA() {
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [verTexto, setVerTexto] = useState(false)
+  const [pase, setPase] = useState<Pase | null>(null)
+  const [pasando, setPasando] = useState(false)
+  const pasarPoliticas = async () => {
+    setPasando(true); setError(null)
+    const r = await fetch('/api/mi-ia/politicas', { method: 'POST' }); const d = await r.json().catch(() => ({}))
+    setPasando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudieron leer tus Políticas'); return }
+    setPase(d)
+  }
 
   const cargar = async () => {
     const r = await fetch('/api/mi-ia'); const d = await r.json()
@@ -567,6 +667,12 @@ export default function MiIA() {
         </div>
       )}
       {avisosSug}
+      {datos.politicas && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+        <p className="text-sm text-sky-900">Tienes <b>Políticas para la IA</b> escritas aparte. Pásalas aquí para tener todo en un solo lugar: si algo no coincide, eliges tú.</p>
+        <button type="button" onClick={pasarPoliticas} disabled={pasando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
+          {pasando ? 'Leyendo tus Políticas…' : 'Pasar mis Políticas a Mi IA'}</button>
+      </div>}
+      {pase && <PasarPoliticas c={c} pase={pase} onCerrar={() => setPase(null)} onListo={() => { setPase(null); cargar() }} />}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {PASOS.map((p, i) => {
           const ok = p.lleno(c), r = ok ? resumen(p.id, c) : ''

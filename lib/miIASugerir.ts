@@ -64,7 +64,7 @@ Reglas:
 - persona: temas que él siempre manda a hablar aparte o que deja para revisar (reclamos, al mayor…), solo si se ve.
 - avisos: contradicciones entre las fuentes o cosas que conviene que el vendedor confirme (frases cortas, en español, tuteando). Ej.: "En unas respuestas el envío por MRW es gratis y en otras cobro a destino: confírmalo."`
 
-const HERRAMIENTA = {
+export const HERRAMIENTA = {
   name: 'mi_ia',
   description: 'Lo que se entiende de cómo trabaja el vendedor, para prellenar su configuración.',
   input_schema: {
@@ -88,7 +88,7 @@ const HERRAMIENTA = {
 }
 
 /** Cada tema por separado: si la IA mandó algo inválido en uno, se descarta ese tema y no todo. */
-function limpiar(x: Record<string, unknown>): Partial<EntradaMiIA> {
+export function limpiar(x: Record<string, unknown>): Partial<EntradaMiIA> {
   const out: Record<string, unknown> = {}
   const campos = EsquemaMiIA.shape
   for (const k of Object.keys(campos) as (keyof typeof campos)[]) {

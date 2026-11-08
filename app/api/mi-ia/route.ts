@@ -6,6 +6,7 @@ import { esDuenoPlataforma } from '@/lib/empresa'
 import { tieneModulo } from '@/lib/modulos'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
+import { leerPoliticas } from '@/lib/miIAPoliticas'
 
 // Mi IA (06-11, lib/miIA.ts): el cuestionario de reglas del negocio para la IA de Preguntas y Mensajes.
 // GET → lo guardado (o null), el país y cuántas cuentas de ML tiene. PUT → guarda todo el cuestionario.
@@ -17,9 +18,12 @@ export async function GET() {
   try {
     const { rows: [c] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
     const { rows: [n] } = await s.db.query(`SELECT COUNT(*)::int AS n FROM ml_conexiones WHERE estado = 'activa'`)
+    const politicas = await leerPoliticas(s.db)
     const miIA = leerMiIA(c?.value)
     return NextResponse.json({
       miIA, pais: s.session.user.country, cuentas: n?.n ?? 0,
+      // 08-11: ¿tiene "Políticas para la IA" escritas aparte? → ofrece pasarlas a Mi IA (un solo lugar).
+      politicas: politicas.length > 0,
       // 06-11 (el dueño): cómo se lo pasamos a la IA solo lo ve el dueño de la plataforma (no a clientes: se puede copiar).
       texto: miIA && esDuenoPlataforma(s.session.user) ? { preguntas: textoMiIA(miIA, 'preguntas'), mensajes: textoMiIA(miIA, 'mensajes') } : null,
       // Parte D: ¿puede encender la respuesta automática desde aquí? (módulo ia_automatica) y en qué modo está.
