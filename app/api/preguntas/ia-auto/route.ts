@@ -23,6 +23,18 @@ export async function GET(req: NextRequest) {
        ORDER BY fecha DESC LIMIT 400`, [desde])
     const sola = rows.filter(r => r.ia_auto.decision === 'sola')
     const marcadas = sola.filter(r => r.ia_auto.marca)
+    // 08-11: en las que pasó a una persona, la marca dice si podía salir sola ('bien') o estuvo bien frenada ('mal').
+    // Por motivo (lo que va antes de ":"), para saber qué regla frena de más.
+    const frenadasMarcadas = rows.filter(r => r.ia_auto.decision === 'revisar' && r.ia_auto.marca)
+    const porMotivo = new Map<string, { marcadas: number; podian: number }>()
+    for (const r of frenadasMarcadas) {
+      const ks = new Set<string>(((r.ia_auto.motivos ?? []) as string[]).map(m => String(m).split(':')[0].trim()).filter(Boolean))
+      for (const k of ks.size ? ks : new Set(['Sin motivo'])) {
+        const v = porMotivo.get(k) ?? { marcadas: 0, podian: 0 }
+        v.marcadas++; if (r.ia_auto.marca === 'bien') v.podian++
+        porMotivo.set(k, v)
+      }
+    }
     return NextResponse.json({
       ...cfg,
       cupo: await cupoIA(s.db, s.session.user.empresaId),
@@ -30,6 +42,10 @@ export async function GET(req: NextRequest) {
         procesadas: rows.length, solas: sola.length, revisar: rows.length - sola.length,
         marcadas: marcadas.length, bien: marcadas.filter(r => r.ia_auto.marca === 'bien').length,
         costo: rows.reduce((a, r) => a + (Number(r.ia_auto.costo) || 0), 0),
+        frenadas: {
+          marcadas: frenadasMarcadas.length, podian: frenadasMarcadas.filter(r => r.ia_auto.marca === 'bien').length,
+          porMotivo: [...porMotivo.entries()].map(([motivo, v]) => ({ motivo, ...v })).sort((a, b) => b.marcadas - a.marcadas).slice(0, 8),
+        },
       },
       economica: resumenEco(rows),
       haiku55: resumen55(rows),

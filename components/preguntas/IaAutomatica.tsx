@@ -29,7 +29,8 @@ interface Fila { id: string; texto: string; item_titulo: string | null; item_per
 interface Info {
   modo: Modo; desde: string | null
   cupo: { usados: number; limite: number | null; quedan: number | null; agotado: boolean }
-  resumen: { procesadas: number; solas: number; revisar: number; marcadas: number; bien: number; costo: number }
+  resumen: { procesadas: number; solas: number; revisar: number; marcadas: number; bien: number; costo: number
+    frenadas?: { marcadas: number; podian: number; porMotivo: { motivo: string; marcadas: number; podian: number }[] } }
   economica: ResumenEco
   haiku55: Resumen55
   preguntas: Fila[]
@@ -87,6 +88,14 @@ export function IaAutomatica() {
   const filas = ver === 'eco' || ver === 'h55' ? [] : info.preguntas.filter(p => p.ia_auto.decision === ver)
   const conEco = info.preguntas.filter(p => p.ia_auto.eco?.decision)
   const pct = r.marcadas ? Math.round((100 * r.bien) / r.marcadas) : null
+  // Las que pasó a una persona, marcadas (se calcula aquí para que cambie al marcar).
+  const frM = info.preguntas.filter(p => p.ia_auto.decision === 'revisar' && p.ia_auto.marca)
+  const porMot = new Map<string, { marcadas: number; podian: number }>()
+  for (const p of frM) for (const k of new Set((p.ia_auto.motivos ?? []).map(m => String(m).split(':')[0].trim()).filter(Boolean))) {
+    const v = porMot.get(k) ?? { marcadas: 0, podian: 0 }; v.marcadas++; if (p.ia_auto.marca === 'bien') v.podian++; porMot.set(k, v)
+  }
+  const frenadas = { marcadas: frM.length, podian: frM.filter(p => p.ia_auto.marca === 'bien').length,
+    porMotivo: [...porMot.entries()].map(([motivo, v]) => ({ motivo, ...v })).sort((a, b) => b.marcadas - a.marcadas).slice(0, 8) }
 
   return (
     <div className="space-y-4">
@@ -127,17 +136,24 @@ export function IaAutomatica() {
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
           <span><b>{r.procesadas}</b> procesadas</span>
           <span className="text-emerald-700"><b>{r.solas}</b> {info.modo === 'real' ? 'salieron' : 'habrían salido'} solas</span>
-          <span className="text-amber-700"><b>{r.revisar}</b> para revisar</span>
+          <span className="text-amber-700"><b>{r.revisar}</b> pasó a una persona</span>
           <span>Marcadas: <b>{r.marcadas}</b>{pct !== null && <> · <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien</b></>}</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {([['sola', `${info.modo === 'real' ? 'Salieron' : 'Habrían salido'} solas (${r.solas})`], ['revisar', `Para revisar (${r.revisar})`],
+          {([['sola', `${info.modo === 'real' ? 'Salieron' : 'Habrían salido'} solas (${r.solas})`], ['revisar', `Las pasó a una persona (${r.revisar})`],
              ['eco', `Versión económica (${info.economica.comparadas})`], ['h55', `Haiku 4.5 vs 5.5 (${info.haiku55.comparadas})`]] as const).map(([k, t]) => (
             <button key={k} onClick={() => setVer(k)}
               className={`px-3 py-1.5 rounded-full text-sm border ${ver === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
           ))}
         </div>
         {ver === 'sola' && <p className="text-xs text-neutral-500">Marca cada una: ¿la habrías publicado tal cual? Con 95% de «bien» conviene activarla.</p>}
+        {ver === 'revisar' && <div className="space-y-2">
+          <p className="text-xs text-neutral-500">Estas <b>no salieron solas</b> por el motivo que dice cada una; ya se respondieron en «Sin responder». Aquí no hay nada pendiente: si quieres, marca si la IA <b>podía haberla mandado</b> o si estuvo <b>bien frenada</b>. Con eso vemos qué reglas frenan de más para dejar salir más solas.</p>
+          {frenadas.marcadas > 0 && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700 space-y-1">
+            <p>Marcadas <b>{frenadas.marcadas}</b>: <b className={frenadas.podian / frenadas.marcadas >= 0.5 ? 'text-amber-700' : 'text-emerald-700'}>{Math.round((100 * frenadas.podian) / frenadas.marcadas)}% podían salir solas</b>.</p>
+            <ul className="space-y-0.5">{frenadas.porMotivo.map(m => <li key={m.motivo}>{m.motivo}: {m.podian} de {m.marcadas} podían salir solas</li>)}</ul>
+          </div>}
+        </div>}
         {ver === 'eco' && <ComparacionEco e={info.economica} filas={conEco} marcar={marcarEco} />}
         {ver === 'h55' && <Comparacion55 e={info.haiku55} filas={info.preguntas.filter(p => p.ia_auto.eco?.decision && p.ia_auto.eco55?.decision)}
           marcar={(id, m) => marcarEco(id, m, 'eco55')} />}
@@ -159,6 +175,16 @@ export function IaAutomatica() {
               {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
                 <p className="text-sm rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700"><span className="text-xs font-semibold text-neutral-500 mr-1.5">Publicada</span>{p.respuesta}</p>)}
               {!p.respuesta && p.estado === 'UNANSWERED' && <p className="text-xs text-neutral-400">Todavía sin responder.</p>}
+              {p.ia_auto.decision === 'revisar' && p.ia_auto.respuesta && (
+                <div className="flex gap-1.5">
+                  {([['bien', '✓ Podía salir sola'], ['mal', 'Bien frenada']] as const).map(([m, t]) => (
+                    <button key={m} onClick={() => marcar(p.id, p.ia_auto.marca === m ? null : m)}
+                      className={`px-2.5 py-1 rounded-md text-xs border ${p.ia_auto.marca === m
+                        ? m === 'bien' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-neutral-700 text-white border-neutral-700'
+                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
+                  ))}
+                </div>
+              )}
               {p.ia_auto.decision === 'sola' && (
                 <div className="flex gap-1.5">
                   {(['bien', 'mal'] as const).map(m => (
