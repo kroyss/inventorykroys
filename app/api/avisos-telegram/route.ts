@@ -55,6 +55,7 @@ const Prefs = z.object({
   promos: z.boolean(),
   cierre: z.boolean(), cierre_hora: hora,
   resumen: z.boolean(), resumen_hora: hora,
+  semanal: z.boolean().optional(),
   silencio: z.boolean(), silencio_desde: hora, silencio_hasta: hora,
 }).strict()
 

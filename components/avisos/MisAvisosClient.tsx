@@ -17,6 +17,7 @@ interface Prefs {
   promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
+  semanal: boolean
   silencio: boolean; silencio_desde: number; silencio_hasta: number
 }
 interface Estado {
@@ -84,7 +85,7 @@ export default function MisAvisosClient() {
     await cargar(); setOcupado(false); setPrueba(null)
   }
 
-  const mandarPrueba = async (tipo: 'prueba' | 'resumen' = 'prueba') => {
+  const mandarPrueba = async (tipo: 'prueba' | 'resumen' | 'semanal' = 'prueba') => {
     setPrueba('enviando')
     const r = await fetch('/api/avisos-telegram/prueba', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo }) })
     const d = await r.json().catch(() => ({}))
@@ -279,6 +280,17 @@ export default function MisAvisosClient() {
                 <button type="button" onClick={() => mandarPrueba('resumen')} disabled={prueba === 'enviando'}
                   className="block mt-1.5 text-xs text-sky-700 hover:underline underline-offset-2 disabled:opacity-50">
                   Mandarme el resumen ahora
+                </button>
+              )}
+            </Fila>
+            <Fila icono="📊" titulo="Resumen de la semana" on={p.semanal} onCambio={v => cambiar({ semanal: v })}
+              ejemplo={'📊 Tu semana, Marcos. Últimos 7 días contra los 7 anteriores:\n\n🛒 214 ventas en MercadoLibre (▲ 12%)\n❓ 380 preguntas (▲ 8%), 371 respondidas (95 sola la IA)\n⏱️ La mitad respondida en menos de 14 min (▼ 20%)\n⭐ Calificaciones: 160 positivas · 1 neutral\n\nTermómetro\n   • PIKEKE: 🟢 verde · MercadoLíder Gold\n   • SOLUCION-MC: 🟢 verde'}>
+              Los <b className="font-medium text-neutral-700">lunes</b>, a la hora del resumen diario: cómo te fue la semana contra la anterior
+              (ventas, preguntas, tiempo de respuesta, calificaciones y el termómetro de cada cuenta).
+              {e.conectado && (
+                <button type="button" onClick={() => mandarPrueba('semanal')} disabled={prueba === 'enviando'}
+                  className="block mt-1.5 text-xs text-sky-700 hover:underline underline-offset-2 disabled:opacity-50">
+                  Mandarme el de esta semana ahora
                 </button>
               )}
             </Fila>

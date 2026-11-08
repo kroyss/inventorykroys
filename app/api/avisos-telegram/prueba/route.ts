@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     if (!t) return NextResponse.json({ error: 'Primero conecta tu Telegram' }, { status: 409 })
     try {
       const { tipo } = await req.json().catch(() => ({}))
-      if (tipo === 'resumen') await resumenAhora(s.userId, s.empresaId)
+      if (tipo === 'resumen' || tipo === 'semanal') await resumenAhora(s.userId, s.empresaId, tipo === 'semanal')
       else await avisoDePrueba(t.chat, s.user.name ?? '')
     } catch (e) {
       if (!(e instanceof TelegramBloqueado)) throw e

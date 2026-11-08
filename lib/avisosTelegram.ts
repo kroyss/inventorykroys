@@ -29,6 +29,8 @@ import {
   type Boton,
 } from '@/lib/telegram'
 import type { Country, UserRole } from '@/lib/types'
+import { resumenAtencion, cambio, textoMinutos } from '@/lib/resumenAtencion'
+import { leerReputacion } from '@/lib/reputacionML'
 
 // ── Mensajes de cierre (25-10) ─────────────────────────────────────────────
 /** Sin texto = mandó solo un archivo: casi siempre el comprobante del pago. */
@@ -59,6 +61,7 @@ export interface PrefsAvisos {
   promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
+  semanal: boolean          // los lunes, a la hora del resumen: la semana contra la anterior (Fase 5, 2026-11-07)
   silencio: boolean; silencio_desde: number; silencio_hasta: number
 }
 
@@ -73,6 +76,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   promos: true,
   cierre: false, cierre_hora: 18,
   resumen: true, resumen_hora: 8,
+  semanal: true,
   silencio: true, silencio_desde: 22, silencio_hasta: 7,
 }
 export const MINUTOS_OPCIONES = [0, 15, 30, 60, 120, 240] as const   // 0 = al instante
@@ -455,6 +459,15 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     if (await mandar(d, e, 'resumen', [h.hoy], html, [[{ texto: 'Abrir el sistema', url: urlSistema('/automatizaciones') }]])) enviados++
   }
 
+  // Resumen semanal: los lunes, en las mismas 3 horas del resumen diario (fuera del silencio). Una vez por semana.
+  if (p.semanal && !silencio && hora >= p.resumen_hora && hora < p.resumen_hora + 3) {
+    const { rows: [h] } = await db.query(`SELECT CURRENT_DATE::text AS hoy, EXTRACT(ISODOW FROM CURRENT_DATE)::int AS dow`)
+    if (h.dow === 1 && (await pendientes(d, e, 'semanal', [h.hoy])).size) {
+      const html = await resumenSemanal(db, e, d, disp, cab)
+      if (await mandar(d, e, 'semanal', [h.hoy], html, [[{ texto: 'Ver en el sistema', url: urlSistema('/automatizaciones') }]])) enviados++
+    }
+  }
+
   // Cierre del día (opcional, 2026-10-15): una vez por día a la hora elegida, SOLO lo que quedó pendiente.
   // Si no queda nada, no se manda (pero se da por hecho el día, para no volver a mirar).
   if (p.cierre && !silencio && hora >= p.cierre_hora && hora < p.cierre_hora + 3) {
@@ -468,6 +481,48 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     }
   }
   return enviados
+}
+
+const TERMOMETRO: Record<string, string> = {
+  '5_green': '🟢 verde', '4_light_green': '🟢 verde claro', '3_yellow': '🟡 amarillo', '2_orange': '🟠 naranja', '1_red': '🔴 rojo',
+}
+const LIDER: Record<string, string> = { platinum: 'MercadoLíder Platinum', gold: 'MercadoLíder Gold', silver: 'MercadoLíder' }
+
+/** Lunes: los últimos 7 días contra los 7 anteriores (ventas, preguntas, tiempo de respuesta, calificaciones y
+ *  el termómetro de cada cuenta). Mismas cifras que "Cómo viene tu atención" en el Inicio de Automatizaciones. */
+async function resumenSemanal(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: ReturnType<typeof avisosDisponibles>, cab: string) {
+  const { actual: a, anterior: b } = await resumenAtencion(db, 7)
+  const flecha = (ahora: number | null, antes: number | null, menosEsMejor = false) => {
+    if (ahora == null || antes == null) return ''
+    const c = cambio(ahora, antes)
+    if (c == null || c === 0) return ''
+    return ` (${c > 0 ? '▲' : '▼'} ${Math.abs(c)}%${(menosEsMejor ? c < 0 : c > 0) ? '' : ' ⚠️'})`
+  }
+  const lineas: string[] = [`🛒 ${n(a.ventas)} venta${a.ventas === 1 ? '' : 's'} en MercadoLibre${flecha(a.ventas, b.ventas)}`]
+  if (disp.pregunta && a.preguntas) {
+    lineas.push(`❓ ${n(a.preguntas)} pregunta${a.preguntas === 1 ? '' : 's'}${flecha(a.preguntas, b.preguntas)}, `
+      + `${n(a.respondidas)} respondida${a.respondidas === 1 ? '' : 's'}${a.porIA ? ` (${n(a.porIA)} sola la IA)` : ''}`)
+    if (a.mediana != null) lineas.push(`⏱️ La mitad respondida en menos de ${textoMinutos(a.mediana)}${flecha(a.mediana, b.mediana, true)}`)
+  }
+  if (disp.negativa) {
+    const { rows: [c] } = await db.query(
+      `SELECT COUNT(*) FILTER (WHERE cal_recibida = 'positive')::int AS pos, COUNT(*) FILTER (WHERE cal_recibida = 'neutral')::int AS neu,
+              COUNT(*) FILTER (WHERE cal_recibida = 'negative')::int AS neg
+       FROM ml_ordenes WHERE cal_recibida_at >= NOW() - INTERVAL '7 days'`)
+    if (c.pos || c.neu || c.neg) lineas.push(`⭐ Calificaciones: ${n(c.pos)} positiva${c.pos === 1 ? '' : 's'}`
+      + (c.neu ? ` · ${n(c.neu)} neutral${c.neu === 1 ? '' : 'es'}` : '') + (c.neg ? ` · <b>${n(c.neg)} negativa${c.neg === 1 ? '' : 's'}</b>` : ''))
+    // Termómetro de cada cuenta (una consulta a ML por cuenta, una vez por semana; si falla, se omite).
+    const { rows: cuentas } = await db.query(`SELECT id, nickname, ml_user_id FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
+    const rep: string[] = []
+    for (const k of cuentas) {
+      try {
+        const r = await leerReputacion(db, k.id, k.ml_user_id)
+        if (r?.level_id) rep.push(`   • ${esc(k.nickname)}: ${TERMOMETRO[r.level_id] ?? r.level_id}${r.power_seller_status && LIDER[r.power_seller_status] ? ` · ${LIDER[r.power_seller_status]}` : ''}`)
+      } catch { /* sin dato de esa cuenta */ }
+    }
+    if (rep.length) lineas.push('', '<b>Termómetro</b>', ...rep)
+  }
+  return `${cab}📊 <b>Tu semana, ${esc(d.nombre.split(/\s+/)[0])}.</b> Últimos 7 días contra los 7 anteriores:\n\n${lineas.join('\n')}`
 }
 
 /** De estas referencias, las que todavía no se le avisaron. */
@@ -687,7 +742,7 @@ export async function enviarAvisosTelegram() {
 
 /** "Mandar mi resumen ahora" (Mis avisos): el resumen de hoy de la empresa actual, sin esperar la hora
  *  (no cuenta como el del día: el automático igual llega). */
-export async function resumenAhora(userId: number, empresaId: number) {
+export async function resumenAhora(userId: number, empresaId: number, semanal = false) {
   const { rows: [r] } = await dbGlobal().query(
     `SELECT t.user_id, t.chat_id::text, COALESCE(u.full_name, u.username) AS nombre, ue.role, ue.permisos, ue.avisos,
             t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos, e.organizacion_id
@@ -699,7 +754,8 @@ export async function resumenAhora(userId: number, empresaId: number) {
   const e: EmpresaAvisos = { id: r.empresa_id, nombre: r.empresa, country: r.country, modulos: r.modulos, organizacion_id: r.organizacion_id }
   await conEmpresa(e.id, e.country, async db => {
     const { rows: [h] } = await db.query(`SELECT EXTRACT(HOUR FROM NOW())::int AS hora`)
-    const html = await resumenDiario(db, e, r, avisosDisponibles({ role: r.role, permisos: r.permisos, modulos: e.modulos }), '', h.hora)
+    const disp = avisosDisponibles({ role: r.role, permisos: r.permisos, modulos: e.modulos })
+    const html = semanal ? await resumenSemanal(db, e, r, disp, '') : await resumenDiario(db, e, r, disp, '', h.hora)
     await enviarTelegram(r.chat_id, html, [[{ texto: 'Abrir el sistema', url: urlSistema('/automatizaciones') }]])
   })
   return true
