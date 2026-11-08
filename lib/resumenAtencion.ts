@@ -31,7 +31,8 @@ async function cifras(db: Pool, desde: number, hasta: number): Promise<CifrasAte
      FROM ml_preguntas
      WHERE fecha >= NOW() - make_interval(days => $1) AND fecha < NOW() - make_interval(days => $2)`, [desde, hasta])
   const { rows: [o] } = await db.query(
-    `SELECT COUNT(*) FILTER (WHERE modulo = 'preguntas' AND fuente = 'automatica')::int AS por_ia,
+    // La IA automática anota 'ia_auto' (lib/iaAutomatica.ts); 'automatica' son las respuestas rápidas automáticas.
+    `SELECT COUNT(*) FILTER (WHERE modulo = 'preguntas' AND fuente = 'ia_auto')::int AS por_ia,
             COUNT(*) FILTER (WHERE modulo = 'mensajes')::int AS mensajes
      FROM respuestas_origen
      WHERE fecha >= NOW() - make_interval(days => $1) AND fecha < NOW() - make_interval(days => $2)`, [desde, hasta])

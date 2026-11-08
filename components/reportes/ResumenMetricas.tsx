@@ -17,7 +17,7 @@ const n = (x: number) => x.toLocaleString('es-VE')
 function Cambio({ ahora, antes, menosEsMejor = false }: { ahora: number | null; antes: number | null; menosEsMejor?: boolean }) {
   if (ahora == null || antes == null) return <span className="text-neutral-400">sin dato anterior</span>
   const c = cambio(ahora, antes)
-  if (c == null) return <span className="text-neutral-400">antes: 0</span>
+  if (c == null) return null
   if (c === 0) return <span className="text-neutral-500">igual que antes</span>
   const bueno = menosEsMejor ? c < 0 : c > 0
   return <span className={bueno ? 'text-emerald-600' : 'text-red-600'}>{c > 0 ? '▲' : '▼'} {Math.abs(c)}%</span>
