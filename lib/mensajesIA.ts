@@ -58,6 +58,7 @@ Cómo responder:
 - Si el comprador solo manda un emoji o un "ok", no hace falta responder: deja la respuesta vacía con confianza "alta".
 - Si el comprador solo saluda o agradece, responde corto y amable.
 - Nada de correos, redes sociales ni links que no sean de MercadoLibre.
+- PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró, preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
 
@@ -70,12 +71,13 @@ const HERRAMIENTA = {
       respuesta: { type: 'string', description: 'Mensaje listo para enviar, máximo 350 caracteres (vacío si no se puede responder sin inventar).' },
       confianza: { type: 'string', enum: ['alta', 'media', 'baja'], description: 'alta = todo sale de los datos dados; baja = falta información.' },
       falta_dato: { type: ['string', 'null'], description: 'Qué dato faltó para responder bien, o null.' },
+      pedido_especial: { type: ['string', 'null'], description: 'Si pide algo distinto a lo que compró (otro color/talla/variante, mezclar variantes, otra cantidad u otro producto): resumen corto "Compró X, quiere Y". Si no, null.' },
     },
-    required: ['respuesta', 'confianza', 'falta_dato'],
+    required: ['respuesta', 'confianza', 'falta_dato', 'pedido_especial'],
   },
 }
 
-export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null }
+export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null; pedido_especial?: string | null }
 
 // conInventario = false: la empresa trabaja "todo desde MercadoLibre" (sin ventas cargadas): el
 // estado sale de la venta en ML y NO se le dice a la IA que "no está cargada" (sería falso).
@@ -199,6 +201,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     respuesta: String(b.respuesta ?? '').trim().slice(0, 350),
     confianza: ['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja',
     falta_dato: b.falta_dato || null,
+    pedido_especial: typeof b.pedido_especial === 'string' && b.pedido_especial.trim() ? b.pedido_especial.trim().slice(0, 200) : null,
     uso, modelo, ejemplos: ejemplos.sugerencias.length,
   }
 }

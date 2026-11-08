@@ -11,6 +11,7 @@ import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { responderHilo } from '@/lib/mensajesML'
 import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
+import { copiarNotas, crearNota, editarNota, leerNotas, unirNotas, LARGO_NOTA } from '@/lib/notasML'
 
 // AUTOMÁTICO (07-11, mig 149, pedido del dueño: las de confianza alta venían bien): con 'mensajes_ia_auto' = {"modo":"real"}
 // las de decisión 'sola' se MANDAN. Antes de mandar se confirma que la conversación sigue esperando al vendedor (nadie del
@@ -34,9 +35,31 @@ const DATOS = /\b\d{7,}\b|\bc\.?\s?i\.?\b|c[eé]dula|direcci[oó]n|\bcalle\b|\ba
 const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad/i
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay|queda|quedan)\b|agotad|sin (stock|existencia)/i
 
+// Pedido especial (08-11, el dueño): pide otro color/variante, mezclar, otra cantidad u otro producto. No sale nada solo
+// (ni la frase de escape): queda el borrador para la persona y una nota en la venta de ML ("PEDIDO ESPECIAL - verificar: …")
+// que el equipo ve en Ventas y Despachos antes de enviar. Lo detecta la IA (no palabras sueltas, para no frenar de más).
+export const PEDIDO_ESPECIAL = 'Pedido especial'
+const PREFIJO_NOTA = 'PEDIDO ESPECIAL - verificar'
+
+async function notaPedidoEspecial(db: Pool, conexionId: number, pack: string, resumen: string) {
+  const texto = `${PREFIJO_NOTA}: ${resumen}`.slice(0, LARGO_NOTA)
+  const { notas, error } = await leerNotas(db, conexionId, pack)
+  if (error) throw new Error(error)
+  const previa = notas.find(n => n.texto.trim().toUpperCase().startsWith('PEDIDO ESPECIAL'))
+  if (previa?.texto.trim() === texto) return
+  if (previa) await editarNota(db, conexionId, pack, previa, texto)
+  else await crearNota(db, conexionId, pack, texto)
+  const r = await leerNotas(db, conexionId, pack)
+  const todas = r.notas.some(n => n.texto.trim() === texto) ? r.notas
+    : [...r.notas.filter(n => n.id !== previa?.id), { id: 'pendiente', texto, fecha: new Date().toISOString(), fuente: 'orden' as const }]
+  await copiarNotas(db, pack, todas)
+  await db.query(`UPDATE sales SET notes = $2, updated_at = NOW() WHERE ml_order_number = $1`, [pack, unirNotas(todas)])
+}
+
 /** Por qué NO saldría sola (vacío = saldría sola). */
-export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null }, comprador: string, persona: string[] = []): string[] {
+export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null }, comprador: string, persona: string[] = []): string[] {
   const m: string[] = []
+  if (b.pedido_especial) m.push(`${PEDIDO_ESPECIAL}: ${b.pedido_especial}`)
   if (RECLAMO.test(comprador)) m.push('Reclamo, cancelación o devolución: lo ve una persona')
   if (PAGO.test(comprador) && !/embalaje|adicional/i.test(comprador)) m.push('Habla de un pago o comprobante: lo verifica una persona')
   if (DATOS.test(comprador)) m.push('Manda datos personales o de envío: lo ve una persona')
@@ -100,6 +123,13 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
            decision = $6, motivos = $7, modelo = $8, costo = $9 WHERE id = $1`,
         [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costoDe(b.modelo, b.uso)])
       listos++
+      if (b.pedido_especial) {
+        try { await notaPedidoEspecial(db, r.conexion_id, r.pack_id, b.pedido_especial) } catch (e) {
+          const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
+          console.error('[mensajes ia pedido especial]', r.pack_id, msg)
+          await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de pedido especial: ${msg}`]).catch(() => {})
+        }
+      }
       if (real && decision === 'sola' && b.respuesta) {
         const { rows: [c] } = await db.query(
           `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera FROM ml_conversaciones WHERE pack_id = $1`,
@@ -119,7 +149,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       // Frase de escape: no salió sola, hay algo que contestar y no se frenó por el tope. Una por conversación cada 24 h.
       // Sin marcarla como leída: sigue en «Por atender» y el equipo encuentra el borrador de la IA escrito.
       const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
-      if (real && frenos?.escape && decision === 'revisar' && !porTope) {
+      if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial) {
         const { rows: [c] } = await db.query(
           `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
                   EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
