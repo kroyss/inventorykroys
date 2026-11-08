@@ -665,7 +665,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
 
   // De a TANDA por pedido (2026-10-17): cada publicación tarda ~2 s (se agrega y se comprueba con el precio
   // real) y el servidor corta la espera al minuto; con 28 de una vez la pantalla perdía la respuesta.
-  const TANDA = 10
+  // 08-11: 4 por pedido (antes 10): cada una tarda unos segundos en comprobarse y con 10 se pasaba el tiempo de espera.
+  const TANDA = 4
   const [avance, setAvance] = useState<{ hechas: number; total: number; comprobando?: number } | null>(null)
   const [enCola, setEnCola] = useState<Set<string>>(new Set())
   // Mientras agrega no se cierra (cerrar o recargar cortaba las tandas que faltaban, 2026-10-17).

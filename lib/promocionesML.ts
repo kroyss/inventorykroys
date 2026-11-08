@@ -392,11 +392,15 @@ export async function agregarACampana(db: Pool, conexionId: number, usuarioId: n
       })
       let v: PrecioVigente | null = null
       let guardado = false
+      // 08-11: primero se pregunta si quedó PROGRAMADA (campaña que no empezó: 1 sola consulta). Antes se miraban 3 cosas
+      // por vuelta y con 10 por tanda el pedido pasaba el minuto y medio: la pantalla decía "no llegó la respuesta".
       for (let i = 0; i < 4 && !guardado; i++) {
-        await esperar(1500)
+        await esperar(1200)
+        const e = await estadoEnCampana(db, conexionId, item.id, campana.id)
+        if (e === 'pending') { guardado = true; break }
         v = await precioVigente(db, conexionId, item.id)
-        guardado = v?.campana === campana.id || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
-          || await programadaEn(db, conexionId, item.id, campana.id)
+        guardado = v?.campana === campana.id || e === 'started'
+          || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
       }
       // ML dijo que sí pero todavía no se ve (18-10: a veces tarda más): no es error; la pantalla lo vuelve a
       // comprobar en unos segundos (verificarEnCampana).
