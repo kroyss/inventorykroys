@@ -39,13 +39,15 @@ const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay|queda|quedan)\b|ag
 // (ni la frase de escape): queda el borrador para la persona y una nota en la venta de ML ("PEDIDO ESPECIAL - verificar: …")
 // que el equipo ve en Ventas y Despachos antes de enviar. Lo detecta la IA (no palabras sueltas, para no frenar de más).
 export const PEDIDO_ESPECIAL = 'Pedido especial'
-const PREFIJO_NOTA = 'PEDIDO ESPECIAL - verificar'
+// Reclamos (devolución, garantía, reemplazo, dañado, envío equivocado) ya iban siempre a una persona (RECLAMO); ahora
+// también dejan su nota "RECLAMO - verificar: …" para que el reemplazo o la devolución no se pierdan en el chat.
+const PREFIJOS = { pedido: 'PEDIDO ESPECIAL', reclamo: 'RECLAMO' } as const
 
-async function notaPedidoEspecial(db: Pool, conexionId: number, pack: string, resumen: string) {
-  const texto = `${PREFIJO_NOTA}: ${resumen}`.slice(0, LARGO_NOTA)
+async function notaVerificar(db: Pool, conexionId: number, pack: string, tipo: keyof typeof PREFIJOS, resumen: string) {
+  const texto = `${PREFIJOS[tipo]} - verificar: ${resumen}`.slice(0, LARGO_NOTA)
   const { notas, error } = await leerNotas(db, conexionId, pack)
   if (error) throw new Error(error)
-  const previa = notas.find(n => n.texto.trim().toUpperCase().startsWith('PEDIDO ESPECIAL'))
+  const previa = notas.find(n => n.texto.trim().toUpperCase().startsWith(`${PREFIJOS[tipo]} - VERIFICAR`))
   if (previa?.texto.trim() === texto) return
   if (previa) await editarNota(db, conexionId, pack, previa, texto)
   else await crearNota(db, conexionId, pack, texto)
@@ -57,9 +59,10 @@ async function notaPedidoEspecial(db: Pool, conexionId: number, pack: string, re
 }
 
 /** Por qué NO saldría sola (vacío = saldría sola). */
-export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null }, comprador: string, persona: string[] = []): string[] {
+export function motivosMensaje(b: { respuesta: string; confianza: string; falta_dato: string | null; pedido_especial?: string | null; reclamo?: string | null }, comprador: string, persona: string[] = []): string[] {
   const m: string[] = []
   if (b.pedido_especial) m.push(`${PEDIDO_ESPECIAL}: ${b.pedido_especial}`)
+  if (b.reclamo && !RECLAMO.test(comprador)) m.push(`Reclamo: ${b.reclamo}`)
   if (RECLAMO.test(comprador)) m.push('Reclamo, cancelación o devolución: lo ve una persona')
   if (PAGO.test(comprador) && !/embalaje|adicional/i.test(comprador)) m.push('Habla de un pago o comprobante: lo verifica una persona')
   if (DATOS.test(comprador)) m.push('Manda datos personales o de envío: lo ve una persona')
@@ -123,11 +126,12 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
            decision = $6, motivos = $7, modelo = $8, costo = $9 WHERE id = $1`,
         [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costoDe(b.modelo, b.uso)])
       listos++
-      if (b.pedido_especial) {
-        try { await notaPedidoEspecial(db, r.conexion_id, r.pack_id, b.pedido_especial) } catch (e) {
+      for (const [tipo, resumen] of [['pedido', b.pedido_especial], ['reclamo', b.reclamo]] as const) {
+        if (!resumen) continue
+        try { await notaVerificar(db, r.conexion_id, r.pack_id, tipo, resumen) } catch (e) {
           const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
-          console.error('[mensajes ia pedido especial]', r.pack_id, msg)
-          await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de pedido especial: ${msg}`]).catch(() => {})
+          console.error('[mensajes ia nota]', tipo, r.pack_id, msg)
+          await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Nota de ${tipo === 'pedido' ? 'pedido especial' : 'reclamo'}: ${msg}`]).catch(() => {})
         }
       }
       if (real && decision === 'sola' && b.respuesta) {
@@ -149,7 +153,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       // Frase de escape: no salió sola, hay algo que contestar y no se frenó por el tope. Una por conversación cada 24 h.
       // Sin marcarla como leída: sigue en «Por atender» y el equipo encuentra el borrador de la IA escrito.
       const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
-      if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial) {
+      if (real && frenos?.escape && decision === 'revisar' && !porTope && !b.pedido_especial && !b.reclamo) {
         const { rows: [c] } = await db.query(
           `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
                   EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
