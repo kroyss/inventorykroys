@@ -1,6 +1,7 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { caracteresNoPermitidos, limpiarTexto } from '@/lib/descripcionTexto'
 
 // Textos de descripción (08-11): encabezados y pies guardados, por cuenta o para todas. Editar uno puede actualizarlo
@@ -20,9 +21,16 @@ export default function TextosClient() {
   const [cuentaDet, setCuentaDet] = useState<number | null>(null)
   const [cand, setCand] = useState<{ leidas: number; candidatos: Candidato[] } | null>(null)
 
+  // ?editar=ID (botón «Editar texto» del editor de publicación): abre ese texto apenas carga.
+  const editar = Number(useSearchParams().get('editar')) || null
+  const abierto = useRef(false)
   const cargar = useCallback(() => {
-    fetch('/api/publicaciones/textos').then(r => r.json()).then(x => setD({ textos: x.textos ?? [], cuentas: x.cuentas ?? [] })).catch(() => setD({ textos: [], cuentas: [] }))
-  }, [])
+    fetch('/api/publicaciones/textos').then(r => r.json()).then(x => {
+      setD({ textos: x.textos ?? [], cuentas: x.cuentas ?? [] })
+      const t = editar && !abierto.current ? (x.textos as Texto[] ?? []).find(y => y.id === editar) : null
+      if (t) { abierto.current = true; setForm({ id: t.id, tipo: t.tipo, nombre: t.nombre, texto: t.texto, conexion_id: t.conexion_id, usos: t.usos, actualizarEnML: t.usos > 0 }) }
+    }).catch(() => setD({ textos: [], cuentas: [] }))
+  }, [editar])
   useEffect(() => { cargar() }, [cargar])
   const detectar = useCallback((cuenta: number) => {
     fetch(`/api/publicaciones/textos/detectar?cuenta=${cuenta}`).then(r => r.json()).then(x => setCand({ leidas: x.leidas ?? 0, candidatos: x.candidatos ?? [] })).catch(() => setCand({ leidas: 0, candidatos: [] }))
@@ -84,8 +92,8 @@ export default function TextosClient() {
                       <p className="text-xs text-neutral-500 whitespace-pre-wrap line-clamp-3">{t.texto}</p>
                     </div>
                     <div className="flex gap-2 text-xs">
-                      <button type="button" onClick={() => setForm({ id: t.id, tipo: t.tipo, nombre: t.nombre, texto: t.texto, conexion_id: t.conexion_id, usos: t.usos, actualizarEnML: t.usos > 0 })} className="text-sky-700 hover:underline">Editar</button>
-                      <button type="button" onClick={() => borrar(t)} className="text-red-600 hover:underline">Borrar</button>
+                      <button type="button" onClick={() => setForm({ id: t.id, tipo: t.tipo, nombre: t.nombre, texto: t.texto, conexion_id: t.conexion_id, usos: t.usos, actualizarEnML: t.usos > 0 })} className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100">Editar</button>
+                      <button type="button" onClick={() => borrar(t)} className="px-2.5 py-1 rounded-lg border border-red-200 bg-white text-red-700 hover:bg-red-50">Borrar</button>
                     </div>
                   </li>
                 ))}

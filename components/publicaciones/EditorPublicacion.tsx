@@ -183,7 +183,13 @@ function ParteFija({ titulo, valor, opciones, texto, onChange }: {
             <option value="">Sin {titulo.toLowerCase()}</option>
             {opciones.map(o => <option key={o.id} value={o.id}>{o.nombre}{o.conexion_id == null ? ' (todas las cuentas)' : ''}</option>)}
           </select>
-          <Link href="/publicaciones/textos" className="text-xs text-sky-700 hover:underline whitespace-nowrap">Textos guardados</Link>
+          {valor != null && <>
+            <Link href={`/publicaciones/textos?editar=${valor}`} target="_blank" title="Abre en otra pestaña: puedes cambiarlo y actualizarlo en todas las publicaciones que lo usan"
+              className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Editar texto</Link>
+            <button type="button" onClick={() => onChange(null)} title="Lo saca de esta publicación (el texto guardado no se borra)"
+              className="px-2.5 py-1 rounded-lg border border-red-200 bg-white text-xs text-red-700 hover:bg-red-50 whitespace-nowrap">Quitar</button>
+          </>}
+          <Link href="/publicaciones/textos" target="_blank" title="Crear, editar o borrar tus encabezados y pies (en otra pestaña)" className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Textos guardados</Link>
         </div>
       </div>
       {texto ? <p className="text-xs text-neutral-600 whitespace-pre-wrap max-h-32 overflow-y-auto">{texto}</p>
@@ -541,8 +547,8 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium text-neutral-600">Descripción del producto</span>
               <div className="flex gap-3 text-xs">
-                <button type="button" onClick={() => setPasar({ tipo: 'encabezado', linea: 0, nombre: '', todas: false, guardando: false, error: null })} className="text-sky-700 hover:underline">Pasar el inicio a encabezado…</button>
-                <button type="button" onClick={() => setPasar({ tipo: 'pie', linea: Math.max(0, lineasCuerpo.length - 1), nombre: '', todas: false, guardando: false, error: null })} className="text-sky-700 hover:underline">Pasar el final a pie…</button>
+                <button type="button" onClick={() => setPasar({ tipo: 'encabezado', linea: 0, nombre: '', todas: false, guardando: false, error: null })} className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Pasar el inicio a encabezado…</button>
+                <button type="button" onClick={() => setPasar({ tipo: 'pie', linea: Math.max(0, lineasCuerpo.length - 1), nombre: '', todas: false, guardando: false, error: null })} className="px-2.5 py-1 rounded-lg border border-neutral-300 bg-white text-xs text-neutral-700 hover:bg-neutral-100 whitespace-nowrap">Pasar el final a pie…</button>
               </div>
             </div>
             <textarea rows={10} value={b.cuerpo} onChange={e => set(x => ({ ...x, cuerpo: e.target.value }))}
