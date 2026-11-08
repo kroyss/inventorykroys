@@ -55,6 +55,8 @@ export const MODULOS = {
   // 07-11 (migración 151): editar publicaciones existentes de ML (precio, stock, fotos, características, variantes,
   // descripción). En prueba solo SolucionesMC.
   publicaciones:      'Publicaciones: editar las publicaciones de MercadoLibre desde el sistema (precio, stock, fotos, características, variantes, descripción)',
+  // 08-11 (migración 151): Reportes → Atención ML y el bloque «Tu semana» del resumen de los lunes. En prueba solo SolucionesMC.
+  atencion_ml:        'Atención ML: reporte de preguntas, respuestas, tiempo de respuesta y ventas de ML, y «Tu semana» en el resumen de Telegram de los lunes (en prueba)',
   mensajes_ia:        'Mensajes con IA en prueba: la IA deja escrito el borrador de cada mensaje nuevo y se marca Bien/Mal (no manda nada)',
 } as const
 
@@ -77,7 +79,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/mensajes':  'preguntas',
   '/calificaciones': 'preguntas',
   '/alertas-stock': 'alertas_stock',
-  '/publicaciones': 'publicaciones',
+  '/publicaciones': 'inventario',
   '/pagos-me':       'pagos_me',
   '/vincular-ml':    'inventario',
   '/productos/mercadoenvios': 'descuento_ml',

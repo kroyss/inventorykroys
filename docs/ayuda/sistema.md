@@ -26,8 +26,8 @@ Está organizado en **espacios**, cada uno con su propio menú:
 
 | Espacio | Qué tiene | Quién lo ve |
 |---|---|---|
-| **Automatizaciones** | Preguntas, Mensajes, Stock, Publicaciones (en prueba), Pagos ME, Despachos, Calificaciones, Reportador, Cuentas de ML, Mis avisos | Todas las empresas |
-| **Inventario** | Inicio, Ventas, Inventario, Compras, Productos, Vincular ML, Reportes, Ajustes | Solo si la empresa tiene el módulo Inventario |
+| **Automatizaciones** | Preguntas, Mensajes, Stock, Pagos ME, Despachos, Calificaciones, Reportador, Cuentas de ML, Mis avisos | Todas las empresas |
+| **Inventario** | Inicio, Ventas, Inventario, Compras, Productos, Publicaciones, Reportes, Ajustes | Solo si la empresa tiene el módulo Inventario |
 | **Radar de Oportunidades** | Otra aplicación (radar.elcomerciantedigital.com) para buscar productos que conviene vender | Solo si la empresa tiene el módulo Radar |
 
 Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todos.
@@ -35,20 +35,6 @@ Lo que no es de ningún espacio (Usuarios, Aprendizaje, Novedades) está en todo
 **Nada se publica solo sin que lo decidas:** el sistema propone (respuestas, calificaciones, mensajes) y tú
 revisas, salvo en lo que tú mismo prendas como automático (respuestas automáticas, calificación automática,
 mensaje al comprador nuevo, recordatorios de pago).
-
-### Inicio de Automatizaciones
-
-*Cómo lo pregunta la gente:* resumen, estadísticas, cuántas preguntas, tiempo de respuesta, cómo me fue, comparar semana.
-
-Arriba, **Pendiente ahora** (lo mismo que los numeritos del menú). Debajo, **Cómo viene tu atención**: los últimos
-**7, 30 o 90 días** comparados con el período anterior del mismo largo:
-- **Preguntas recibidas.**
-- **Respondidas:** el % respondido, cuántas respondió sola la IA automática y cuántas se respondieron desde la app o
-  la web de MercadoLibre.
-- **Tiempo de respuesta:** la mitad de las preguntas se respondió en menos de ese tiempo, y el % respondido en menos de 1 hora.
-- **Ventas en MercadoLibre** (no canceladas) y cuántas preguntas hubo por cada venta.
-La flecha verde es que mejoró y la roja que empeoró (en el tiempo de respuesta, bajar es lo bueno). Solo lo ve quien
-tiene acceso a Preguntas.
 
 ### Módulos
 
@@ -318,12 +304,18 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 
 ---
 
-## 7b. Publicaciones (Automatizaciones → Publicaciones) · en prueba
+## 7b. Publicaciones (Inventario → Publicaciones)
 
 *Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación.
 
-Editar tus publicaciones de MercadoLibre **sin entrar a ML**, con una pantalla parecida a la de ML. Por ahora solo
-para algunas empresas (módulo en prueba) y para quien tenga el permiso **Publicaciones (editar en MercadoLibre)**.
+Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas (cada una aparece si tu empresa y tu
+usuario la tienen):
+- **Editar** (en prueba, solo algunas empresas; permiso **Publicaciones (editar en MercadoLibre)**): ver abajo.
+- **Vincular:** unir cada publicación (o variante) con su producto.
+- **Stock:** el stock que muestra cada cuenta de ML contra tu inventario.
+- **Promociones** (Venezuela): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis.
+
+**Editar** sirve para cambiar tus publicaciones **sin entrar a ML**, con una pantalla parecida a la de ML.
 
 - **Buscar:** por título, SKU o número (MLV…), por cuenta y activas/pausadas. Toca una para abrirla.
 - La pantalla trae lo que hay **ahora mismo** en MercadoLibre:
@@ -546,9 +538,9 @@ escribe a ti.
 - Producto agotado (y opcionalmente por agotarse). Puede llegar hasta 1 hora después.
 - Promociones de MercadoLibre: campaña nueva y campañas por cerrar.
 - **Resumen de la mañana** y **cierre del día** con lo que quedó pendiente.
-- **Resumen de la semana** (los lunes, a la hora del resumen de la mañana): ventas, preguntas, tiempo de respuesta y
-  calificaciones de los últimos 7 días contra los 7 anteriores, y el termómetro de cada cuenta. Con «Mandarme el de
-  esta semana ahora» lo pruebas.
+- Los **lunes**, el resumen de la mañana trae además **Tu semana** (en prueba, solo algunas empresas): ventas,
+  preguntas, tiempo de respuesta y calificaciones de los últimos 7 días contra los 7 anteriores, y el termómetro de
+  cada cuenta.
 - **Silencio:** horas en las que no te llega nada; lo pendiente llega al terminar.
 
 Si no ves algunos avisos es porque tu usuario no tiene acceso a esa sección (Preguntas, Mensajes o Calificaciones).
@@ -580,9 +572,10 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Inicio:** cómo va tu negocio este mes (ventas, ganancia, sin stock, ventas pendientes).
 - **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
-- **Vincular ML:** une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
+- **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Vincular** (Publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
-- **Stock en ML:** cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
+- **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
   cuentas de una vez. Aquí se marca si una publicación es pack/combo («trae N u.»).
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
@@ -603,6 +596,11 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 
 <!-- VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos -->
 
+
+**Reportes → Atención ML** (en prueba, solo algunas empresas; necesita ver Preguntas): los últimos **7, 30 o 90 días**
+contra el período anterior del mismo largo: preguntas recibidas; % respondido (cuántas sola la IA y cuántas desde la
+app o la web de ML); tiempo de respuesta (la mitad se respondió en menos de ese tiempo, y el % en menos de 1 hora);
+ventas de ML no canceladas y preguntas por venta. Flecha verde = mejoró, roja = empeoró (en el tiempo, bajar es lo bueno).
 ---
 
 ## 16. Central de aprendizaje y Novedades

@@ -6,6 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
+import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio; soloDesdeML?: boolean }[] = [
@@ -15,10 +16,10 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   { href: '/inventario', label: 'Inventario',countries: ['VE', 'CO'] as Country[] },
   { href: '/compras',    label: 'Compras',   countries: ['VE', 'CO'] as Country[] },
   { href: '/productos',  label: 'Productos', countries: ['VE', 'CO'] as Country[] },
+  // 08-11: todo lo de las publicaciones de ML (Editar, Vincular, Stock, Promociones), con pestañas. Si no ve ninguna, no aparece.
+  { href: '/publicaciones', label: 'Publicaciones', countries: ['VE', 'CO'] as Country[] },
   { href: '/reportes',   label: 'Reportes',  countries: ['VE', 'CO'] as Country[] },
   { href: '/finanzas',   label: 'Finanzas',  countries: ['VE', 'CO'] as Country[] },
-  // Para los empleados (permiso vincular_ml); quien ve Productos entra desde ahí ("Vincular con ML").
-  { href: '/vincular-ml', label: 'Vincular ML', countries: ['VE', 'CO'] as Country[] },
   // Ajustes, Usuarios y Plataforma viven en el menú de la cuenta (UserMenu).
   // ── Automatizaciones ──
   { href: '/automatizaciones', label: 'Inicio',     countries: ['VE', 'CO'], espacio: 'automatizaciones' },
@@ -31,7 +32,6 @@ const allLinks: { href: string; label: string; countries: Country[]; espacio?: E
   { href: '/mensajes',         label: 'Mensajes',   countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/calificaciones',   label: 'Calificaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
   { href: '/alertas-stock',    label: 'Stock',         countries: ['VE', 'CO'], espacio: 'automatizaciones' },
-  { href: '/publicaciones',    label: 'Publicaciones', countries: ['VE', 'CO'], espacio: 'automatizaciones' },
 ]
 
 interface Props {
@@ -63,7 +63,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
     l => rutaPermitida(l.href, u) && l.countries.includes(country) && rutaHabilitada(l.href, modulos)
       && (l.espacio ?? 'inventario') === espacioActual(pathname, modulos)
       && (!l.soloDesdeML || ventasDesdeML({ modulos }))
-      && !(l.href === '/vincular-ml' && puede(u, 'ver_productos'))
+      && (l.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
   )
   const activo = (href: string) =>
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))

@@ -521,13 +521,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             Importar desde ML
           </Link>
         )}
-        {/* Publicaciones ML (26-10): Vincular, Stock y Promociones en un lugar, con pestañas (PublicacionesMLTabs). */}
-        {(importarML || (country === 'VE' && promociones)) && (
-          <Link href={importarML ? '/vincular-ml' : '/productos/promociones'} className="btn-secondary text-sm whitespace-nowrap"
-            title="Tus productos en MercadoLibre: vincular cada publicación, el stock que muestra cada cuenta y las promociones">
-            Publicaciones ML
-          </Link>
-        )}
         {country === 'VE' && descuento && (
           <Link href="/productos/mercadoenvios" className="btn-secondary text-sm whitespace-nowrap">MercadoEnvíos</Link>
         )}

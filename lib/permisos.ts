@@ -104,7 +104,7 @@ const SECCION_DE_RUTA: [string, Permiso][] = [
   ['/reportes', 'ver_reportes'], ['/finanzas', 'ver_finanzas'], ['/preguntas', 'ver_preguntas'],
   ['/mensajes', 'ver_mensajes'], ['/calificaciones', 'ver_calificaciones'], ['/despachos', 'ver_despachos'],
   ['/reportador', 'ver_reportador'], ['/alertas-stock', 'ver_stock'], ['/aprendizaje', 'ver_aprendizaje'],
-  ['/vincular-ml', 'vincular_ml'], ['/publicaciones', 'editar_publicaciones'],
+  ['/vincular-ml', 'vincular_ml'],
 ]
 const SOLO_ADMIN = ['/tasas', '/usuarios', '/plataforma']
 

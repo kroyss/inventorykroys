@@ -3,6 +3,7 @@
 -- precio, stock, descripción, características principales y secundarias, fotos y variantes.
 -- Cada cambio que se manda a ML queda anotado (qué había antes, qué se mandó, quién y el resultado) para
 -- poder revisar y volver atrás a mano. Módulo `publicaciones`: solo SolucionesMC (empresa 1) por ahora.
+-- Módulo `atencion_ml` (Reportes → Atención ML): solo SolucionesMC por ahora.
 -- Tabla por empresa (RLS). Solo agrega: compatible con la versión anterior. Idempotente.
 BEGIN;
 
@@ -38,5 +39,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ml_publicacion_cambios TO inventory_app;
 GRANT USAGE, SELECT ON SEQUENCE ml_publicacion_cambios_id_seq TO inventory_app;
 
 UPDATE empresas SET modulos = array_append(modulos, 'publicaciones') WHERE id = 1 AND NOT ('publicaciones' = ANY (modulos));
+-- Reportes → Atención ML + «Tu semana» los lunes en el resumen de Telegram (08-11): también solo SolucionesMC (VE y CO).
+UPDATE empresas SET modulos = array_append(modulos, 'atencion_ml') WHERE id IN (1, 2) AND NOT ('atencion_ml' = ANY (modulos));
 
 COMMIT;

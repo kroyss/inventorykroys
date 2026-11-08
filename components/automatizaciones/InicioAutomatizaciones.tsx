@@ -1,7 +1,6 @@
 'use client'
 import Link from 'next/link'
 import { useAvisos, type Avisos } from '@/components/layout/Avisos'
-import ResumenAtencion from './ResumenAtencion'
 
 // Íconos de trazo (24x24)
 const ICONOS = {
@@ -12,7 +11,6 @@ const ICONOS = {
   despachos: <><path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></>,
   reportador: <><path d="M3 11l18-8-8 18-2-8-8-2z" /></>,
   stock: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
-  publicaciones: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9h6M7 13h10M7 17h4" /><path d="m16 6 2 2" /></>,
 }
 
 export interface Herramienta {
@@ -33,11 +31,10 @@ function Icono({ de, activa }: { de: keyof typeof ICONOS; activa: boolean }) {
  * Inicio de Automatizaciones: arriba lo que está pendiente HOY (con los mismos numeritos
  * del menú, en vivo), abajo todas las herramientas agrupadas por momento de la venta.
  */
-export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esAdmin = false, conResumen = false }: {
+export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esAdmin = false }: {
   grupos: { titulo: string; texto: string; items: Herramienta[] }[]
   sinCuentas?: boolean   // la empresa todavía no conectó ninguna cuenta de MercadoLibre
   esAdmin?: boolean
-  conResumen?: boolean   // muestra "Cómo viene tu atención" (ve Preguntas y tiene cuentas)
 }) {
   const avisos = useAvisos()
   const todas = grupos.flatMap(g => g.items).filter(h => h.activa && h.aviso)
@@ -82,8 +79,6 @@ export default function InicioAutomatizaciones({ grupos, sinCuentas = false, esA
           </div>
         )}
       </section>
-
-      {conResumen && <ResumenAtencion />}
 
       {/* ── Herramientas ── */}
       {grupos.map(g => (

@@ -39,9 +39,6 @@ export default async function AutomatizacionesPage() {
         { href: '/mensajes', titulo: 'Mensajes', icono: 'mensajes', activa: ml, aviso: 'mensajes', urgente: true,
           pendiente: 'conversaciones sin leer',
           texto: 'Los mensajes de tus ventas sin leer, de todas las cuentas, con el producto y el estado de la venta. Respondes desde aquí.' },
-        // Fase 6 (mig. 151): módulo en prueba → solo aparece si la empresa lo tiene.
-        ...(ml && tieneModulo(u, 'publicaciones') && puede(u, 'editar_publicaciones') ? [{ href: '/publicaciones', titulo: 'Publicaciones', icono: 'publicaciones' as const, activa: true,
-          texto: 'Edita tus publicaciones como en MercadoLibre: precio, stock, fotos, características, variantes y descripción. Ves antes → después y queda anotado.' }] : []),
       ],
     },
     {
@@ -67,8 +64,7 @@ export default async function AutomatizacionesPage() {
     <div>
       <PageHeader title="Automatiza" subtitle="Lo que pasa en MercadoLibre, atendido desde aquí: preguntas, mensajes, despachos, guías y calificaciones"
         actions={ml && !sinCuentas ? <CuentasConectadas cuentas={cuentas} esAdmin={puede(u, 'ml_cuentas')} /> : undefined} />
-      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={puede(u, 'ml_cuentas')}
-        conResumen={ml && !sinCuentas && puede(u, 'ver_preguntas')} />
+      <InicioAutomatizaciones grupos={grupos} sinCuentas={sinCuentas} esAdmin={puede(u, 'ml_cuentas')} />
     </div>
   )
 }

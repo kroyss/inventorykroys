@@ -6,6 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
+import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 // Barra inferior del celular. Íconos de línea (mismo trazo en todos, estilo Lucide) en lugar de
@@ -58,7 +59,7 @@ const MORE: NavItem[] = [
   { href: '/automatizaciones', label: 'Automatiza', icon: 'automatizaciones', countries: ['VE', 'CO'] },
   { href: '/facturas',   label: 'Facturas',   icon: 'facturas',   countries: ['VE'] },
   { href: '/productos',  label: 'Productos',  icon: 'productos',  countries: ['VE', 'CO'] },
-  { href: '/vincular-ml', label: 'Vincular ML', icon: 'productos', countries: ['VE', 'CO'] },
+  { href: '/publicaciones', label: 'Publicaciones', icon: 'productos', countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: 'ajustes',    countries: ['VE', 'CO'] },
   { href: '/usuarios',   label: 'Usuarios',   icon: 'usuarios',   countries: ['VE', 'CO'] },
@@ -78,7 +79,6 @@ const MORE_AUTO: NavItem[] = [
   { href: '/pagos-me',         label: 'Pagos ME',   icon: 'pagos',      countries: ['VE'] },
   { href: '/despachos',        label: 'Despachos',  icon: 'despachos',  countries: ['VE'] },
   { href: '/calificaciones',   label: 'Calificaciones', icon: 'calificaciones', countries: ['VE', 'CO'] },
-  { href: '/publicaciones',    label: 'Publicaciones', icon: 'productos', countries: ['VE', 'CO'] },
   { href: '/reportador',       label: 'Reportador', icon: 'reportador', countries: ['VE'] },
   { href: '/dashboard',        label: 'Inventario', icon: 'inventario', countries: ['VE', 'CO'] },
   { href: '/aprendizaje',      label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
@@ -112,7 +112,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
 
   const visible = (items: NavItem[]) =>
     items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos)
-      && !(i.href === '/vincular-ml' && puede(u, 'ver_productos'))   // quien ve Productos entra desde ahí
+      && (i.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
       && !(i.href === '/pagos-me' && !ventasDesdeML({ modulos })))
 
   const auto    = espacioActual(pathname, modulos) === 'automatizaciones'
