@@ -1,13 +1,13 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { CICLOS, CICLOS_IDS, ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, cicloDe, montoPlan, planConRadar, sumarMeses, type Ciclo, type Plan } from '@/lib/planes'
+import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
 
 // Plataforma → ficha del cliente → Plan y pagos (01-11-2026, migración 138): activar o renovar el plan (módulos y
 // créditos del escalón salen solos), recargar créditos de IA, Radar PRO de fin de semana y el historial de pagos.
 
 export interface DatosPlan {
   organizacion_id: number; fundador: boolean; estado: string
-  plan: Plan['id'] | null; escalon: number | null; ciclo: string | null
+  plan: Plan['id'] | null; escalon: number | null; ciclo: 'mensual' | 'trimestral' | null
   plan_hasta: string | null; radar_pro_hasta: string | null
   empresas: { id: number; nombre: string }[]
 }
@@ -32,7 +32,7 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
   // Formulario del plan: por defecto el plan que tiene (o Automatizaciones), desde el día que vence (o hoy).
   const vigente = d.plan_hasta && d.plan_hasta >= hoy
   const [f, setF] = useState({
-    plan: (d.plan ?? 'automatizaciones') as Plan['id'], escalon: d.escalon ?? 0, ciclo: cicloDe(d.ciclo) as Ciclo,
+    plan: (d.plan ?? 'automatizaciones') as Plan['id'], escalon: d.escalon ?? 0, ciclo: (d.ciclo ?? 'mensual') as 'mensual' | 'trimestral',
     extras: 0, monto: '', nota: '',
   })
   const calc = montoPlan(f.plan, f.escalon, f.ciclo, d.fundador, f.extras)
@@ -86,8 +86,8 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
             </select>
           </label>
           <div className="flex flex-wrap gap-3">
-            {CICLOS_IDS.map(c => (
-              <label key={c} className="flex items-center gap-1"><input type="radio" checked={f.ciclo === c} onChange={() => setF({ ...f, ciclo: c })} />{c === 'mensual' ? 'Mensual' : `${CICLOS[c].nombre} (−${CICLOS[c].descuento}%)`}</label>
+            {(['mensual', 'trimestral'] as const).map(c => (
+              <label key={c} className="flex items-center gap-1"><input type="radio" checked={f.ciclo === c} onChange={() => setF({ ...f, ciclo: c })} />{c === 'mensual' ? 'Mensual' : 'Trimestral (−10%)'}</label>
             ))}
             <label className="flex items-center gap-1">Cuentas ML extra
               <input type="number" min={0} value={f.extras} onChange={e => setF({ ...f, extras: Number(e.target.value) || 0 })} className="w-12 border border-neutral-300 rounded px-1 py-0.5" />

@@ -1,6 +1,6 @@
 import { TELEGRAM_DESPEGUE } from '@/lib/despegue'
 import {
-  CUENTA_EXTRA, CUENTAS_INCLUIDAS, CICLOS, CICLOS_IDS, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, RECARGA_IA,
+  CUENTA_EXTRA, CUENTAS_INCLUIDAS, DESCUENTO_TRIMESTRAL, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, RECARGA_IA,
 } from '@/lib/planes'
 
 export const metadata = {
@@ -145,9 +145,7 @@ export default function PreciosPage() {
               <li className="flex justify-between gap-4"><span>Cuenta de MercadoLibre adicional</span><b className="whitespace-nowrap text-neutral-900">+${CUENTA_EXTRA}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Recarga de {RECARGA_IA.creditos} créditos de IA (no vencen)</span><b className="whitespace-nowrap text-neutral-900">${RECARGA_IA.precio}</b></li>
               <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos, con Automatizaciones o Completo (1.<sup>er</sup> mes de regalo solo en tu primer plan, luego sin descuento)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
-              {CICLOS_IDS.filter(c => CICLOS[c].descuento > 0).map(c => (
-                <li key={c} className="flex justify-between gap-4"><span>Pagando {CICLOS[c].nombre} juntos</span><b className="whitespace-nowrap text-lime-700">−{CICLOS[c].descuento}%</b></li>
-              ))}
+              <li className="flex justify-between gap-4"><span>Pago trimestral</span><b className="whitespace-nowrap text-lime-700">−{DESCUENTO_TRIMESTRAL}%</b></li>
             </ul>
           </div>
         </section>

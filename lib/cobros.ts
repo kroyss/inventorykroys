@@ -19,7 +19,7 @@ import { compare } from 'bcryptjs'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
-import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, montoPlan, CICLOS, CICLOS_IDS, cicloDe, mesesCiclo, type Ciclo, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
+import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
 import { UPLOAD_DIR } from '@/lib/uploads'
 import { chatsDuenoPlataforma } from '@/lib/registro'
@@ -122,16 +122,15 @@ const nombrePlan = (p: string) => PLANES.find(x => x.id === p)?.nombre ?? p
 const ddmm = (f: string) => f.split('-').reverse().join('/')
 const diasEntre = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
 const descuentoDe = (fundador: boolean, ciclo: string | null) =>
-  Math.max(fundador ? DESCUENTO_FUNDADOR : 0, CICLOS[cicloDe(ciclo)].descuento)
-const nombreDescuento = (fundador: boolean, d: number, ciclo: Ciclo) =>
-  fundador && d === DESCUENTO_FUNDADOR ? `Descuento Fundador −${d}%` : `Descuento por pagar ${CICLOS[ciclo].nombre} −${d}%`
+  Math.max(fundador ? DESCUENTO_FUNDADOR : 0, ciclo === 'trimestral' ? DESCUENTO_TRIMESTRAL : 0)
+const nombreDescuento = (fundador: boolean, d: number) => `Descuento ${fundador && d === DESCUENTO_FUNDADOR ? 'Fundador' : 'trimestral'} −${d}%`
 
 /** Líneas de un pago de plan: el plan por meses, el descuento (solo el plan), cuentas extra y Radar PRO (cobros viejos). */
-export function desglosePlan(plan: string, escalon: number, ciclo: Ciclo, fundador: boolean, cuentasExtra: number, radarUsd = 0): Linea[] {
+export function desglosePlan(plan: string, escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra: number, radarUsd = 0): Linea[] {
   const m = montoPlan(plan as Plan['id'], escalon, ciclo, fundador, cuentasExtra)
   const meses = `${m.meses} ${m.meses === 1 ? 'mes' : 'meses'}`
   const l: Linea[] = [{ texto: `${nombrePlan(plan)} · escalón ${ESCALONES[escalon]?.ventas ?? escalon} ventas · ${fmt(m.base)}/mes × ${meses}`, usd: m.base * m.meses }]
-  if (m.descuento) l.push({ texto: `${nombreDescuento(fundador, m.descuento, ciclo)} (solo el plan)`, usd: -r2(m.base * m.meses * m.descuento / 100) })
+  if (m.descuento) l.push({ texto: `${nombreDescuento(fundador, m.descuento)} (solo el plan)`, usd: -r2(m.base * m.meses * m.descuento / 100) })
   if (m.extras) l.push({ texto: `${cuentasExtra} cuenta(s) de ML extra · ${fmt(CUENTA_EXTRA)} × ${meses}`, usd: m.extras * m.meses })
   if (radarUsd > 0) l.push({ texto: `Radar PRO · ${Math.round(radarUsd / RADAR_PRO.precio)} mes(es) × ${fmt(RADAR_PRO.precio)} (sin descuento)`, usd: r2(radarUsd) })
   return l
@@ -151,7 +150,7 @@ export function calcularMejora(actual: string, nuevo: Plan['id'], escalon: numbe
   const mes = r2(dif * (100 - d) / 100)
   const monto = Math.max(0.01, r2(mes * dias / 30))
   const lineas: Linea[] = [{ texto: `Diferencia ${nombrePlan(actual)} → ${nombrePlan(nuevo)}: ${fmt(pn)} − ${fmt(pa)} = ${fmt(dif)}/mes`, usd: dif }]
-  if (d) lineas.push({ texto: nombreDescuento(fundador, d, cicloDe(ciclo)), usd: r2(mes - dif) })
+  if (d) lineas.push({ texto: nombreDescuento(fundador, d), usd: r2(mes - dif) })
   lineas.push({ texto: `Solo los ${dias} días que le quedan al plan (hasta el ${ddmm(hasta)}) de 30`, usd: r2(monto - mes) })
   return { plan: nuevo, nombre: nombrePlan(nuevo), monto, dias, lineas }
 }
@@ -167,7 +166,7 @@ const SELECT_COBRO = `SELECT k.id, k.tipo, k.plan, k.escalon, k.ciclo, k.radar_p
   k.revisado_at, k.comprobante IS NOT NULL AS tiene_comprobante, COALESCE(k.detalle->>'hasta', to_char(p.hasta, 'YYYY-MM-DD')) AS hasta
   FROM organizacion_cobros k LEFT JOIN organizacion_pagos p ON p.id = k.pago_id`
 
-export interface OpcionPlan { id: Plan['id']; nombre: string; resumen: string; mensual: number; porCiclo: Record<Ciclo, number>; radar: boolean }
+export interface OpcionPlan { id: Plan['id']; nombre: string; resumen: string; mensual: number; trimestral: number; radar: boolean }
 export interface SituacionPlan {
   organizacion: string; estado: EstadoCuenta; fundador: boolean
   plan: Plan['id'] | null; escalon: number | null; ciclo: string | null
@@ -206,7 +205,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
   const opciones = PLANES.map(p => ({
     id: p.id, nombre: p.nombre, resumen: p.resumen, radar: planConRadar(p.id),
     mensual: montoPlan(p.id, escalon, 'mensual', !!o.fundador, cuentasExtra).total,
-    porCiclo: Object.fromEntries(CICLOS_IDS.map(c => [c, montoPlan(p.id, escalon, c, !!o.fundador, cuentasExtra).total])) as Record<Ciclo, number>,
+    trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador, cuentasExtra).total,
   }))
   const planSugerido = (conPlan && PLANES.some(p => p.id === o.plan) ? o.plan : 'automatizaciones') as Plan['id']
   const activo = estado === 'activo' && conPlan && !!o.plan_hasta && o.plan_hasta >= hoy
@@ -235,12 +234,12 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
 }
 
 /** Monto que se cobra (lo recalcula el servidor: nunca se toma el que manda la pantalla). */
-export function montoCobro(s: SituacionPlan, plan: Plan['id'], ciclo: Ciclo, radarPro: boolean) {
+export function montoCobro(s: SituacionPlan, plan: Plan['id'], ciclo: 'mensual' | 'trimestral', radarPro: boolean) {
   const op = s.opciones.find(x => x.id === plan)
   if (!op) throw new Error('Plan inválido')
-  const meses = mesesCiclo(ciclo)
+  const meses = ciclo === 'trimestral' ? 3 : 1
   const pro = radarPro && op.radar ? RADAR_PRO.precio * mesesRadarPro(s.radarPro.regalo, meses) : 0
-  const usd = op.porCiclo[ciclo] + pro
+  const usd = (ciclo === 'trimestral' ? op.trimestral : op.mensual) + pro
   return { usd: Math.round(usd * 100) / 100, pro: pro > 0, meses }
 }
 
@@ -251,7 +250,7 @@ export function mesesRadarPro(regalo: boolean, meses: number) {
 
 // ── Reportar ─────────────────────────────────────────────────────────────────────────────────────────────────────
 export interface Reporte {
-  tipo: TipoCobro; plan: Plan['id']; ciclo: Ciclo; metodo: Metodo
+  tipo: TipoCobro; plan: Plan['id']; ciclo: 'mensual' | 'trimestral'; metodo: Metodo
   referencia: string; fechaPago: string
   archivo: { tipo: string; datos: Buffer } | null
 }
@@ -261,8 +260,8 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
   if (s.ultimo?.estado === 'revision') throw new ErrorCobro('Ya tienes un pago en revisión: te avisamos apenas lo confirmemos.')
   if (!s.conectadas) throw new ErrorCobro('Primero conecta tu cuenta de MercadoLibre: el plan se calcula con sus ventas.')
   // El monto lo calcula el servidor (nunca el que manda la pantalla).
-  const cicloPlan = cicloDe(s.ciclo)
-  let f: { plan: string; escalon: number; ciclo: Ciclo; radar: boolean; extras: number; usd: number; detalle: Detalle }
+  const cicloPlan = s.ciclo === 'trimestral' ? 'trimestral' : 'mensual'
+  let f: { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; radar: boolean; extras: number; usd: number; detalle: Detalle }
   if (r.tipo === 'radar_pro') {
     const c = s.radarProCompra
     if (!c) throw new ErrorCobro('Radar PRO se agrega con un plan activo que incluya Radar.')
@@ -338,7 +337,7 @@ async function avisarDueno(id: number, archivo: Reporte['archivo']) {
  * Créditos de IA (mig. 140): el primer plan o el que vuelve tras vencer arranca su mes hoy; renovar uno vigente no.
  */
 export async function registrarPlan(client: PoolClient, org: number, b: {
-  plan: Plan['id']; escalon: number; ciclo: Ciclo; hasta: string; monto: number; nota?: string | null; desde?: string
+  plan: Plan['id']; escalon: number; ciclo: 'mensual' | 'trimestral'; hasta: string; monto: number; nota?: string | null; desde?: string
 }, por: number | null) {
   const { rows: [o] } = await client.query(
     `SELECT estado, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta
@@ -438,7 +437,7 @@ export async function aprobarCobro(id: number, por: number) {
       return resultado
     }
 
-    const meses = mesesCiclo(k.ciclo)
+    const meses = k.ciclo === 'trimestral' ? 3 : 1
     // 06-11 (Gerardo): si paga en la prueba, el plan arranca cuando ella termina (no pierde los días que le quedaban).
     // La prueba vale hasta su último día inclusive: el plan cuenta desde ese día, igual que una renovación.
     const base = [k.plan_hasta, k.prueba_hasta, hoy].filter((f): f is string => !!f && f >= hoy).sort().pop()!
@@ -522,7 +521,7 @@ function conDesglose(k: Record<string, unknown>) {
   const { detalle, fundador, p_desde, p_hasta, ...resto } = k as Record<string, unknown> & { detalle: Detalle | null; fundador: boolean; p_desde: string | null; p_hasta: string | null }
   let lineas = detalle?.lineas
   if (!lineas) {
-    const c = k as { plan: string; escalon: number; ciclo: Ciclo; cuentas_extra: number; radar_pro: boolean; monto_usd: number }
+    const c = k as { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; cuentas_extra: number; radar_pro: boolean; monto_usd: number }
     const plan = montoPlan(c.plan as Plan['id'], c.escalon, c.ciclo, !!fundador, c.cuentas_extra).total
     lineas = desglosePlan(c.plan, c.escalon, c.ciclo, !!fundador, c.cuentas_extra, c.radar_pro ? r2(c.monto_usd - plan) : 0)
   }

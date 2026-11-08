@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 const Reporte = z.object({
   tipo: z.enum(['plan', 'radar_pro', 'upgrade']).catch('plan'),
   plan: z.enum(['esencial', 'automatizaciones', 'completo']),
-  ciclo: z.enum(['mensual', 'trimestral', 'semestral', 'anual']),
+  ciclo: z.enum(['mensual', 'trimestral']),
   metodo: z.enum(['pago_movil', 'binance']),
   referencia: z.string().trim().min(3, 'Escribe la referencia del pago').max(80),
   fecha_pago: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'),

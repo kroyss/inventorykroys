@@ -212,7 +212,8 @@ Cada ítem dice **dónde vive en lo nuestro** y si es para todas las empresas (n
 
 - 07-11-2026: informe hecho.
 - 07-11-2026, decisiones del dueño:
-  - **Fase 1 aprobada** (variables en respuestas rápidas, aviso ML desconectada, prepago −10/−20/−30 % a 3/6/12 meses, desconectar revoca en ML).
+  - **Fase 1 aprobada** (variables en respuestas rápidas, aviso ML desconectada, desconectar revoca en ML).
+  - **Prepago 6/12 meses: NO** (se hizo y se revirtió el mismo día). Se queda solo el trimestral −10 % que ya existía: si el vendedor sube de ventas tiene que poder subir de escalón/plan, y un pago largo lo congela.
   - **Fase 2 aprobada**: horario de IA (de fábrica sin horario), tope por comprador (3 en 24 h), frase de escape SOLO en Mensajes, Mi IA suma temas: cambios y devoluciones, horario de atención, precio al mayor, regateo, apartar/reservar, información extra libre por secciones (originalidad/procedencia NO).
   - **«Responder todo»** (frase de escape también en Preguntas, opcional y apagado): para MÁS ADELANTE; sin él quedan nuestros frenos actuales.
   - **Fases 3 (comprobante con IA) y 4 (mensajes por evento): FUERA.**

@@ -87,8 +87,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Automatizaciones** (recomendado): lo de Esencial + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
   + Radar de Oportunidades.
 - **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios, Promociones y reportes.
-- Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pagando varios meses juntos:
-  3 meses −10%, 6 meses −20%, 12 meses −30% (Fundadores: −30% siempre; los descuentos no se suman, vale el mayor). El descuento es solo del plan: cuentas extra,
+- Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%
+  (Fundadores: −30% mensual o trimestral, no se suman). El descuento es solo del plan: cuentas extra,
   Radar PRO y recargas de IA van a precio completo. El Fundador conserva el 30% mientras renueve a tiempo: si su mes gratis o
   su plan vence sin pago (ni pago reportado antes de vencer), la cuenta se pausa y deja de ser Fundador; al volver paga precio normal. Se puede pagar en bolívares a tasa BCV.
 - **Créditos de IA:** cada «Proponer con IA» usa 1 crédito; «Buscar en internet» usa 1 más 1 por cada búsqueda
@@ -117,7 +117,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
-     Puedes elegir 1 mes, 3 meses (−10%), 6 meses (−20%) o 12 meses (−30%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo.
+     Puedes elegir mensual o trimestral (−10%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo.
      Con un plan activo, arriba eliges **qué pagar**: **Renovar plan**, **Agregar Radar PRO** (1 mes, $6) o
      **Mejorar mi plan** (pasar a uno más caro desde hoy: pagas solo la diferencia por mes, con el mismo descuento que
      tiene tu plan, por los días que le quedan; la fecha de vencimiento no cambia y ahí renuevas ya con el nuevo).
