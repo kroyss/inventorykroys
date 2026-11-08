@@ -10,6 +10,7 @@ import { costoDe, registrarUso, iaConfigurada } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { responderHilo } from '@/lib/mensajesML'
+import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
 
 // AUTOMÁTICO (07-11, mig 149, pedido del dueño: las de confianza alta venían bien): con 'mensajes_ia_auto' = {"modo":"real"}
 // las de decisión 'sola' se MANDAN. Antes de mandar se confirma que la conversación sigue esperando al vendedor (nadie del
@@ -73,7 +74,9 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
   const { rows: [mi] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
   const persona = leerMiIA(mi?.value)?.persona ?? []
   const real = await autoReal(db)
-  let listos = 0, errores = 0, enviadas = 0
+  // Frenos (07-11, lib/iaFrenos.ts): horario y tope por comprador, y la frase de escape. Solo en modo real.
+  const frenos = real ? await leerFrenos(db) : null
+  let listos = 0, errores = 0, enviadas = 0, escapes = 0
   for (const r of rows) {
     try {
       // borradorMensaje relee la conversación en ML (y la guarda): después se toma lo que escribió el comprador desde el
@@ -84,6 +87,12 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       const corte = msgs.findIndex(m => m.propio)
       const comprador = (corte < 0 ? msgs : msgs.slice(0, corte)).reverse().map(m => String(m.texto)).join('\n').slice(0, 1000)
       const motivos = motivosMensaje(b, comprador, persona)
+      let topeOHorario: string[] = []
+      if (frenos) {
+        const { rows: [cv] } = await db.query(`SELECT comprador_id::text FROM ml_conversaciones WHERE pack_id = $1`, [r.pack_id])
+        topeOHorario = await motivosFrenos(db, frenos, country, 'mensajes', cv?.comprador_id ?? null)
+        motivos.push(...topeOHorario)
+      }
       const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length ? 'revisar' : 'sola'
       await registrarUso(db, 'simulacion', [{ modelo: b.modelo, uso: b.uso }], null)
       await db.query(
@@ -107,6 +116,26 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
           }
         }
       }
+      // Frase de escape: no salió sola, hay algo que contestar y no se frenó por el tope. Una por conversación cada 24 h.
+      // Sin marcarla como leída: sigue en «Por atender» y el equipo encuentra el borrador de la IA escrito.
+      const porTope = topeOHorario.some(t => t.startsWith('Este comprador'))
+      if (real && frenos?.escape && decision === 'revisar' && !porTope) {
+        const { rows: [c] } = await db.query(
+          `SELECT ultimo_de_comprador AND ultimo_at <= $2::timestamptz AS espera,
+                  EXISTS (SELECT 1 FROM ml_mensajes_ia WHERE pack_id = $1 AND escape_at > NOW() - INTERVAL '24 hours') AS ya
+           FROM ml_conversaciones WHERE pack_id = $1`, [r.pack_id, r.mensaje_at])
+        if (c?.espera && !c.ya) {
+          try {
+            await responderHilo(db, r.conexion_id, r.pack_id, frenos.escape, true)
+            await db.query(`UPDATE ml_mensajes_ia SET escape_at = NOW() WHERE id = $1`, [r.id])
+            escapes++
+          } catch (e) {
+            const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
+            console.error('[mensajes ia escape]', r.pack_id, msg)
+            await db.query(`UPDATE ml_mensajes_ia SET envio_error = $2 WHERE id = $1`, [r.id, `Frase de escape: ${msg}`]).catch(() => {})
+          }
+        }
+      }
     } catch (e) {
       errores++
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 200)
@@ -114,7 +143,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       await db.query(`UPDATE ml_mensajes_ia SET estado = 'error', error = $2 WHERE id = $1`, [r.id, msg]).catch(() => {})
     }
   }
-  return { listos, errores, enviadas }
+  return { listos, errores, enviadas, escapes }
 }
 
 /** El borrador de la IA para el último mensaje del comprador de una conversación (si lo hay y nadie contestó). */
@@ -122,7 +151,10 @@ export async function borradorPrueba(db: Pool, pack: string) {
   const { rows: [b] } = await db.query(
     `SELECT i.respuesta, i.confianza, i.falta_dato, i.decision, i.motivos FROM ml_mensajes_ia i
      JOIN ml_conversaciones c ON c.pack_id = i.pack_id
-     WHERE i.pack_id = $1 AND i.estado = 'listo' AND c.ultimo_de_comprador AND i.mensaje_at >= c.ultimo_at
+     WHERE i.pack_id = $1 AND i.estado = 'listo'
+       AND ((c.ultimo_de_comprador AND i.mensaje_at >= c.ultimo_at)
+            -- Se mandó la frase de escape y nadie más escribió después: el borrador sigue sirviendo para el equipo.
+            OR (i.escape_at IS NOT NULL AND c.ultimo_at <= i.escape_at + INTERVAL '2 minutes'))
      ORDER BY i.mensaje_at DESC LIMIT 1`, [pack])
   return b ?? null
 }
@@ -131,7 +163,7 @@ export async function borradorPrueba(db: Pool, pack: string) {
 export async function listaPrueba(db: Pool) {
   const { rows } = await db.query(
     `SELECT i.id::text, i.pack_id::text, i.mensaje_at, i.comprador, i.estado, i.respuesta, i.confianza, i.decision, i.motivos,
-            i.error, i.marca, i.enviada_at, i.envio_error, c.comprador_nombre, c.comprador_nick, c.productos, x.nickname AS cuenta,
+            i.error, i.marca, i.enviada_at, i.escape_at, i.envio_error, c.comprador_nombre, c.comprador_nick, c.productos, x.nickname AS cuenta,
             (SELECT string_agg(m.texto, E'\\n' ORDER BY m.fecha) FROM (
                SELECT texto, fecha FROM ml_mensajes m WHERE m.pack_id = i.pack_id AND m.propio AND m.fecha > i.mensaje_at
                ORDER BY fecha LIMIT 2) m) AS equipo

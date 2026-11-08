@@ -316,7 +316,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     hueco = envio ? huecoVariasUnidades(peso?.kg, q.item_precio, q.item_precio_original, tablas) : null
   }
   // Mi IA (06-11, lib/miIA.ts) + el texto libre de siempre. Sin Mi IA guardada, igual que antes.
-  const pol = await politicasIA(db, 'preguntas')
+  const pol = await politicasIA(db, 'preguntas', q.texto)
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
   const { rows: notas } = await db.query(
     `SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [q.item_id])

@@ -28,6 +28,13 @@ export interface MiIA {
   /** Temas que van siempre a una persona. */
   persona?: string[]
   postventa?: { pasos?: string[]; datosPago?: string; noAplica?: boolean }   // noAplica: "no hace falta nada" (cuenta como completo)
+  // 07-11 (Fase 2 de docs/analisis-mercasist.md): temas que en VE se preguntan mucho y no tenían dónde ir.
+  cambios?: { acepta?: 'si' | 'falla' | 'no'; dias?: number | null; envio?: 'comprador' | 'nosotros' | 'depende' }
+  negocio?: { mayor?: 'escribir' | 'mismo'; mayorDesde?: number | null; regateo?: 'fijo' | 'consultar'; apartar?: 'no' | 'si'; apartarHoras?: number | null }
+  atencion?: { horario?: string }
+  /** Información extra por secciones: la IA la recibe SOLO si la pregunta o el mensaje trata de eso (título o palabras). */
+  extras?: { titulo: string; texto: string; palabras?: string }[]
+  extrasNoAplica?: boolean
 }
 
 export const MI_IA_KEY = 'mi_ia'
@@ -54,7 +61,17 @@ const DESCONOCIDO: Record<NonNullable<MiIA['desconocido']>[number], string> = {
 }
 
 /** Mi IA escrita como políticas para la IA. `modulo` decide si va la parte post-venta. */
-export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes'): string {
+const sinTildes = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+/** ¿La sección extra trata de lo que preguntan? Sus palabras (separadas por coma) o las palabras de 4+ letras del título. */
+export function extraAplica(x: { titulo: string; palabras?: string }, consulta: string) {
+  const q = sinTildes(consulta)
+  const claves = [...(x.palabras ?? '').split(','), ...x.titulo.split(/\s+/)].map(w => sinTildes(w.trim())).filter(w => w.length >= 4)
+  return claves.some(w => q.includes(w))
+}
+
+/** Mi IA escrita como políticas para la IA. `modulo` decide si va la parte post-venta. `consulta` (la pregunta o el mensaje)
+ *  elige las secciones de información extra; sin ella van todas. */
+export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: string): string {
   const S: string[] = []
   const sec = (titulo: string, ls: (string | number | null | false | undefined)[]) => {
     const l = ls.filter((x): x is string => typeof x === "string" && !!x)
@@ -108,6 +125,28 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes'): string {
   if (c.persona?.length) sec('SIEMPRE LO RESPONDE UNA PERSONA', [
     `${lista(c.persona).replace(/^./, x => x.toUpperCase())}: no lo respondas tú, deja confianza "baja".`,
   ])
+  const cb = c.cambios ?? {}
+  sec('CAMBIOS Y DEVOLUCIONES', [
+    cb.acepta === 'si' ? `Aceptamos cambios o devoluciones${cb.dias ? ` dentro de ${cb.dias} días de recibido` : ''}.`
+      : cb.acepta === 'falla' ? `Solo cambiamos por falla de fábrica${cb.dias ? ` (dentro de ${cb.dias} días de recibido)` : ''}.`
+      : cb.acepta === 'no' ? 'No aceptamos cambios ni devoluciones, salvo lo que cubre MercadoLibre.' : null,
+    cb.acepta && cb.acepta !== 'no' && cb.envio ? (cb.envio === 'comprador' ? 'El envío del cambio o la devolución lo paga el comprador.'
+      : cb.envio === 'nosotros' ? 'El envío del cambio o la devolución lo pagamos nosotros.' : 'Quién paga el envío del cambio se ve en cada caso.') : null,
+  ])
+  const ng = c.negocio ?? {}
+  sec('AL MAYOR, REBAJAS Y APARTADOS', [
+    ng.mayor === 'escribir' ? `Ventas al mayor${ng.mayorDesde ? ` (desde ${ng.mayorDesde} unidades)` : ''}: dile que con gusto, que pregunte por la cantidad que necesita y lo coordinamos.`
+      : ng.mayor === 'mismo' ? 'No hay precio al mayor: el precio es el mismo por unidad.' : null,
+    ng.regateo === 'fijo' ? 'El precio es fijo: no hay rebaja. Nunca inventes descuentos.'
+      : ng.regateo === 'consultar' ? 'Si pide rebaja, no prometas ninguna: dile que lo consultamos.' : null,
+    ng.apartar === 'no' ? 'No apartamos productos: se asegura comprando.'
+      : ng.apartar === 'si' ? `Se puede apartar un producto${ng.apartarHoras ? ` por ${ng.apartarHoras} horas` : ''}.` : null,
+  ])
+  if (limpio(c.atencion?.horario)) sec('HORARIO DE ATENCIÓN', [
+    `Atendemos ${limpio(c.atencion!.horario)}. Si preguntan cuándo respondemos o escriben fuera de ese horario, dilo.`,
+  ])
+  const ex = (c.extras ?? []).filter(x => limpio(x.titulo) && limpio(x.texto) && (consulta === undefined || extraAplica(x, consulta)))
+  if (ex.length) S.push(`INFORMACIÓN EXTRA DEL VENDEDOR (úsala solo si responde lo que preguntan)\n${ex.map(x => `- ${limpio(x.titulo)}: ${limpio(x.texto)}`).join('\n')}`)
   if (modulo === 'mensajes') {
     const pv = c.postventa ?? {}
     sec('DESPUÉS DE LA COMPRA', [
@@ -119,11 +158,11 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes'): string {
 }
 
 /** Lo que la IA recibe como POLÍTICAS DEL VENDEDOR: Mi IA (si está guardada) + el texto libre de siempre. */
-export async function politicasIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' | 'mensajes'): Promise<{ texto: string; miIA: MiIA | null }> {
+export async function politicasIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' | 'mensajes', consulta?: string): Promise<{ texto: string; miIA: MiIA | null }> {
   const { rows } = await db.query(`SELECT key, value FROM app_settings WHERE key = ANY($1)`, [[MI_IA_KEY, 'preguntas_politicas']])
   const libre = limpio(rows.find(r => r.key === 'preguntas_politicas')?.value)
   const miIA = leerMiIA(rows.find(r => r.key === MI_IA_KEY)?.value)
-  const estructurado = miIA ? textoMiIA(miIA, modulo) : ''
+  const estructurado = miIA ? textoMiIA(miIA, modulo, consulta) : ''
   const texto = !estructurado ? libre
     : `${estructurado}${libre ? `\n\nOTRAS INDICACIONES DEL VENDEDOR (si chocan con lo de arriba, manda lo de arriba):\n${libre}` : ''}`
   return { texto, miIA }

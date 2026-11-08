@@ -14,8 +14,12 @@ const PASOS: Paso[] = [
   { id: 'despacho', tema: 'Despacho', titulo: '¿Cuándo despachas?', lleno: c => !!c.despacho?.dias },
   { id: 'ubicacion', tema: 'Ubicación y retiro', titulo: '¿Dónde estás y se puede retirar?', lleno: c => !!(c.ubicacion?.zona || c.ubicacion?.retiro) },
   { id: 'factura', tema: 'Factura y garantía', titulo: 'Factura y garantía', lleno: c => !!(c.factura?.tipo || c.factura?.garantiaDias) },
+  { id: 'cambios', tema: 'Cambios y devoluciones', titulo: '¿Aceptas cambios o devoluciones?', lleno: c => !!c.cambios?.acepta },
+  { id: 'negocio', tema: 'Al mayor, rebajas y apartados', titulo: 'Al mayor, rebajas y apartados', lleno: c => !!(c.negocio?.mayor || c.negocio?.regateo || c.negocio?.apartar) },
+  { id: 'atencion', tema: 'Horario de atención', titulo: '¿En qué horario atienden?', lleno: c => !!c.atencion?.horario?.trim() },
   { id: 'desconocido', tema: 'Si no sabe algo', titulo: 'Si la IA no sabe un dato técnico, ¿qué hace?', lleno: c => !!c.desconocido?.length },
   { id: 'persona', tema: 'Siempre una persona', titulo: '¿Qué temas responde siempre una persona?', lleno: c => !!c.persona?.length },
+  { id: 'extras', tema: 'Información extra', titulo: 'Información extra (opcional)', lleno: c => !!(c.extrasNoAplica || c.extras?.length) },
   { id: 'postventa', tema: 'Después de la compra', titulo: 'Después de la compra (Mensajes)', lleno: c => !!(c.postventa?.noAplica || c.postventa?.pasos?.length || c.postventa?.datosPago) },
 ]
 
@@ -40,6 +44,13 @@ function resumen(id: string, c: Config): string {
       c.factura?.garantiaDias ? `${c.factura.garantiaDias} días de garantía${c.factura.garantiaNoCubre ? ` (no cubre ${corto(c.factura.garantiaNoCubre, 40)})` : ''}` : ''].filter(Boolean).join(' · ')
     case 'desconocido': return (c.desconocido ?? []).map((k, i) => `${i + 1}. ${{ verificar: 'lo verificamos', preguntar: 'preguntar', recomendar: 'recomendar otra', persona: 'una persona' }[k]}`).join(' · ')
     case 'persona': return corto(lista(c.persona ?? []), 90)
+    case 'cambios': return [c.cambios?.acepta === 'si' ? 'Sí' : c.cambios?.acepta === 'falla' ? 'Solo por falla' : c.cambios?.acepta === 'no' ? 'No' : '',
+      c.cambios?.dias ? `${c.cambios.dias} días` : '', c.cambios?.envio === 'comprador' ? 'envío lo paga el comprador' : c.cambios?.envio === 'nosotros' ? 'envío lo pagamos' : ''].filter(Boolean).join(' · ')
+    case 'negocio': return [c.negocio?.mayor === 'escribir' ? `al mayor${c.negocio.mayorDesde ? ` desde ${c.negocio.mayorDesde} u.` : ''}: que pregunte` : c.negocio?.mayor === 'mismo' ? 'sin precio al mayor' : '',
+      c.negocio?.regateo === 'fijo' ? 'precio fijo' : c.negocio?.regateo === 'consultar' ? 'rebaja: lo consultamos' : '',
+      c.negocio?.apartar === 'no' ? 'no aparta' : c.negocio?.apartar === 'si' ? `aparta${c.negocio.apartarHoras ? ` ${c.negocio.apartarHoras} h` : ''}` : ''].filter(Boolean).join(' · ')
+    case 'atencion': return corto(c.atencion?.horario?.trim() ?? '')
+    case 'extras': return c.extrasNoAplica && !c.extras?.length ? 'No hace falta' : corto(lista((c.extras ?? []).map(x => x.titulo)), 90)
     case 'postventa': return c.postventa?.noAplica ? 'No hace falta nada' : [c.postventa?.pasos?.length ? corto(lista(c.postventa.pasos), 70) : '', c.postventa?.datosPago ? 'con datos de pago' : ''].filter(Boolean).join(' · ')
   }
   return ''
@@ -237,6 +248,77 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
     case 'persona': return <Pregunta t="Marca los temas" ayuda="Esas preguntas y mensajes nunca salen solos: van a revisión.">
       <Varios valor={c.persona} opciones={PERSONA} otroPlaceholder="Otro tema" onChange={v => set(c => ({ ...c, persona: v }))} />
     </Pregunta>
+    case 'cambios': return <>
+      <Pregunta t="¿Aceptas cambios o devoluciones?" ayuda="Lo que cubre MercadoLibre (compra protegida) vale igual.">
+        <div className="flex flex-wrap gap-2">
+          {([['si', 'Sí'], ['falla', 'Solo por falla de fábrica'], ['no', 'No']] as const).map(([k, t]) =>
+            <Chip key={k} activo={c.cambios?.acepta === k} onClick={() => set(c => ({ ...c, cambios: { ...c.cambios, acepta: k } }))}>{t}</Chip>)}
+        </div>
+      </Pregunta>
+      {c.cambios?.acepta && c.cambios.acepta !== 'no' && <>
+        <Pregunta t="¿En cuántos días desde que lo recibe?">
+          <div className="flex items-center gap-2 text-sm text-neutral-700">
+            <input inputMode="numeric" value={c.cambios?.dias ?? ''} onChange={e => set(c => ({ ...c, cambios: { ...c.cambios, dias: e.target.value ? Math.round(num(e.target.value) ?? 0) : null } }))}
+              className="w-20 rounded-lg border border-neutral-300 px-2 py-1" /> días
+          </div>
+        </Pregunta>
+        <Pregunta t="¿Quién paga el envío del cambio?"><div className="flex flex-wrap gap-2">
+          {([['comprador', 'El comprador'], ['nosotros', 'Nosotros'], ['depende', 'Depende del caso']] as const).map(([k, t]) =>
+            <Chip key={k} activo={c.cambios?.envio === k} onClick={() => set(c => ({ ...c, cambios: { ...c.cambios, envio: k } }))}>{t}</Chip>)}
+        </div></Pregunta>
+      </>}
+    </>
+    case 'negocio': return <>
+      <Pregunta t="¿Vendes al mayor?" ayuda="Igual, los pedidos de muchas unidades siempre los revisa una persona antes de salir.">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+          <Chip activo={c.negocio?.mayor === 'escribir'} onClick={() => set(c => ({ ...c, negocio: { ...c.negocio, mayor: 'escribir' } }))}>Sí, que pregunte la cantidad</Chip>
+          <Chip activo={c.negocio?.mayor === 'mismo'} onClick={() => set(c => ({ ...c, negocio: { ...c.negocio, mayor: 'mismo' } }))}>No, mismo precio</Chip>
+          {c.negocio?.mayor === 'escribir' && <>desde <input inputMode="numeric" value={c.negocio.mayorDesde ?? ''} onChange={e => set(c => ({ ...c, negocio: { ...c.negocio, mayorDesde: e.target.value ? Math.round(num(e.target.value) ?? 0) : null } }))}
+            className="w-16 rounded-lg border border-neutral-300 px-2 py-1" /> unidades</>}
+        </div>
+      </Pregunta>
+      <Pregunta t="Si piden rebaja"><div className="flex flex-wrap gap-2">
+        <Chip activo={c.negocio?.regateo === 'fijo'} onClick={() => set(c => ({ ...c, negocio: { ...c.negocio, regateo: 'fijo' } }))}>El precio es fijo</Chip>
+        <Chip activo={c.negocio?.regateo === 'consultar'} onClick={() => set(c => ({ ...c, negocio: { ...c.negocio, regateo: 'consultar' } }))}>Decir que lo consultamos</Chip>
+      </div></Pregunta>
+      <Pregunta t="¿Apartas productos?">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+          <Chip activo={c.negocio?.apartar === 'no'} onClick={() => set(c => ({ ...c, negocio: { ...c.negocio, apartar: 'no' } }))}>No, se asegura comprando</Chip>
+          <Chip activo={c.negocio?.apartar === 'si'} onClick={() => set(c => ({ ...c, negocio: { ...c.negocio, apartar: 'si' } }))}>Sí</Chip>
+          {c.negocio?.apartar === 'si' && <>por <input inputMode="numeric" value={c.negocio.apartarHoras ?? ''} onChange={e => set(c => ({ ...c, negocio: { ...c.negocio, apartarHoras: e.target.value ? Math.round(num(e.target.value) ?? 0) : null } }))}
+            className="w-16 rounded-lg border border-neutral-300 px-2 py-1" /> horas</>}
+        </div>
+      </Pregunta>
+    </>
+    case 'atencion': return <Pregunta t="¿En qué horario atienden?" ayuda="La IA lo dice si preguntan cuándo responden o escriben fuera de horario.">
+      <Opciones valor={c.atencion?.horario} opciones={['de lunes a viernes de 8 am a 5 pm', 'de lunes a sábado de 8 am a 6 pm']} placeholder="Ej.: lunes a viernes de 9 a 6 y sábados hasta la 1"
+        onChange={v => set(c => ({ ...c, atencion: { horario: v } }))} />
+    </Pregunta>
+    case 'extras': {
+      const xs = c.extras ?? []
+      const setX = (v: NonNullable<Config['extras']>) => set(c => ({ ...c, extras: v, extrasNoAplica: v.length ? false : c.extrasNoAplica }))
+      return <>
+        <div className="flex gap-2">
+          <Chip activo={!!c.extrasNoAplica && !xs.length} onClick={() => set(c => ({ ...c, extras: [], extrasNoAplica: true }))}>No hace falta</Chip>
+        </div>
+        <p className="text-xs text-neutral-500">Textos largos (garantía detallada, compatibilidades, cómo se usa). La IA lee cada sección <b>solo cuando la pregunta trata de eso</b>: por su título o por las palabras que pongas. Así gasta menos y no se confunde.</p>
+        {xs.map((x, i) => (
+          <div key={i} className="rounded-lg border border-neutral-200 p-3 space-y-2">
+            <div className="flex gap-2">
+              <input value={x.titulo} maxLength={60} onChange={e => setX(xs.map((y, j) => j === i ? { ...y, titulo: e.target.value } : y))} placeholder="Título (ej. Compatibilidad)"
+                className="flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium" />
+              <button type="button" onClick={() => setX(xs.filter((_, j) => j !== i))} className="text-xs text-red-600 px-2">Quitar</button>
+            </div>
+            <textarea rows={3} maxLength={1500} value={x.texto} onChange={e => setX(xs.map((y, j) => j === i ? { ...y, texto: e.target.value } : y))}
+              placeholder="Lo que la IA debe saber de este tema" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+            <input value={x.palabras ?? ''} maxLength={200} onChange={e => setX(xs.map((y, j) => j === i ? { ...y, palabras: e.target.value } : y))}
+              placeholder="Palabras que la activan, separadas por coma (ej. sirve, compatible, modelo)" className="w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-xs" />
+            {contacto(x.texto) && <p className="text-xs text-red-700">Tiene un teléfono, correo o link: MercadoLibre borra o sanciona esas respuestas. Quítalo.</p>}
+          </div>
+        ))}
+        {xs.length < 12 && <button type="button" onClick={() => setX([...xs, { titulo: '', texto: '' }])} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">+ Agregar sección</button>}
+      </>
+    }
     case 'postventa': return <>
       <div className="flex gap-2">
         <Chip activo={!!c.postventa?.noAplica} onClick={() => set(c => ({ ...c, postventa: c.postventa?.noAplica ? { ...c.postventa, noAplica: false } : { noAplica: true } }))}>No hace falta nada</Chip>
@@ -255,7 +337,7 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
 
 // ── Parte C: sugerencia (solo propone) ───────────────────────────────────────
 type Sugerencia = { sugerido: Partial<Config>; avisos: string[]; fuentes: { respuestas: number; descripciones: number; bloque: string | null; politicas: boolean }; fecha: string }
-const TEMA_DE_CAMPO: Record<string, string> = { tono: 'tono', oferta: 'oferta', pago: 'pago', envio: 'envio', despacho: 'despacho', ubicacion: 'ubicacion', factura: 'factura', desconocido: 'desconocido', persona: 'persona', postventa: 'postventa' }
+const TEMA_DE_CAMPO: Record<string, string> = { tono: 'tono', oferta: 'oferta', pago: 'pago', envio: 'envio', despacho: 'despacho', ubicacion: 'ubicacion', factura: 'factura', desconocido: 'desconocido', persona: 'persona', postventa: 'postventa', cambios: 'cambios', negocio: 'negocio', atencion: 'atencion', extras: 'extras' }
 const ddmm = (iso: string) => { const d = new Date(iso); return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 
 /** Mezcla lo sugerido SOLO en los temas que están vacíos; devuelve la config y qué temas vinieron sugeridos. */

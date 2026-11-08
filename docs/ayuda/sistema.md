@@ -186,6 +186,17 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
   que diga que no hay, que recomiende otra publicación o con datos que no están en la publicación o tus políticas. El
   resto te queda con la respuesta ya escrita para revisar y enviar.
 - Cada pregunta que la IA procesa usa 1 crédito. La pausa de respuestas automáticas también la detiene.
+- **Frenos de la IA automática** (en la misma pantalla; valen también para Mensajes):
+  - **Horario:** días y horas en que la IA responde sola (ej. de 19:00 a 08:00). Fuera de ese horario deja la
+    respuesta escrita para una persona. Sin horario responde a cualquier hora.
+  - **Máximo por comprador:** cuántas respuestas automáticas recibe un mismo comprador en 24 horas (de fábrica 3);
+    la siguiente queda para una persona.
+  - **Frase de escape (solo Mensajes):** si la IA no manda la respuesta sola, puede mandar una frase corta
+    («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
+    en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas. En Preguntas no
+    existe porque MercadoLibre acepta una sola respuesta por pregunta.
+- **Mi IA** también pregunta por cambios y devoluciones, ventas al mayor, rebajas, apartados, horario de atención e
+  **información extra** por secciones (la IA lee cada sección solo cuando la pregunta trata de eso).
 
 **Para que la IA responda mejor:**
 - **Políticas para la IA:** lo general de tu negocio (horarios, envíos, formas de pago, garantía, retiro en

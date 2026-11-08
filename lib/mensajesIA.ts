@@ -175,7 +175,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   const textoNotas = [...notas.notas.map(n => n.texto), s?.notes].filter((x): x is string => !!x?.trim())
   if (textoNotas.length) L.push(`NOTA DE LA VENTA: ${[...new Set(textoNotas)].join(' · ')}`)
   // Mi IA (06-11, lib/miIA.ts, con la parte post-venta) + el texto libre de siempre.
-  const pol = await politicasIA(db, 'mensajes')
+  const pol = await politicasIA(db, 'mensajes', hilo.mensajes.slice(-6).filter(m => !m.propio).map(m => m.texto).join('\n'))
   if (pol.texto) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${pol.texto}`)
   // Respuestas rápidas de Mensajes (06-11): cómo escribe el vendedor post-venta. Las reglas mandan las POLÍTICAS.
   const { rows: [mr] } = await db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)

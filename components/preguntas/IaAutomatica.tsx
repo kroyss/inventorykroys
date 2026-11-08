@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Cargando } from '@/components/ui'
+import { FrenosIA } from './FrenosIA'
 
 // Preguntas → Configuración → Respuesta automática con IA (01-11-2026, lib/iaAutomatica.ts).
 // Modo prueba: la IA decide qué habría salido solo, sin publicar; el vendedor marca cada una bien o mal y ve el % de
@@ -112,6 +113,8 @@ export function IaAutomatica() {
         </p>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </section>
+
+      <FrenosIA conEscape={false} />
 
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-1.5 text-xs">

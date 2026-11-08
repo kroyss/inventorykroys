@@ -13,6 +13,7 @@ import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
 import { automaticasPausadas } from '@/lib/automaticasPreguntas'
 import { simularEconomica, type DecisionEco } from '@/lib/iaEconomica'
+import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
 export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean }   // v2 (07-11): prueba por empresa, "v2": true en el JSON
@@ -117,15 +118,18 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
                   WHERE estado = 'UNANSWERED' AND ia_auto IS NULL
                     AND fecha > NOW() - make_interval(hours => $1) AND fecha >= COALESCE($2::timestamptz, NOW())
                   ORDER BY fecha LIMIT $3 FOR UPDATE SKIP LOCKED)
-     RETURNING id::text, item_estado`,
+     RETURNING id::text, item_estado, comprador_id::text`,
     [HORAS_MAX, cfg.desde, Math.min(POR_PASADA, cupo.quedan ?? POR_PASADA)])
   let solas = 0, revisar = 0, publicadas = 0, fallas = 0
+  // Frenos (07-11, lib/iaFrenos.ts): horario y tope por comprador. Solo en modo real (la prueba mide sin ellos).
+  const frenos = cfg.modo === 'real' && rows.length ? await leerFrenos(db) : null
   for (const q of rows) {
     try {
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false, undefined, cfg.v2)
       await registrarUso(db, 'preguntas', b.llamadas, null)
       const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c))
+      if (frenos) motivos.push(...await motivosFrenos(db, frenos, country, 'preguntas', q.comprador_id))
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),

@@ -218,4 +218,10 @@ Cada ítem dice **dónde vive en lo nuestro** y si es para todas las empresas (n
   - **«Responder todo»** (frase de escape también en Preguntas, opcional y apagado): para MÁS ADELANTE; sin él quedan nuestros frenos actuales.
   - **Fases 3 (comprobante con IA) y 4 (mensajes por evento): FUERA.**
   - **Fase 5 aprobada** (resumen en Inicio de Automatizaciones + lunes por Telegram).
-  - **Fase 6**: por pantalla como ML (no Excel), empezando por editar publicaciones existentes. **Prueba 07-11 en PIKEKE MLV772995696**: PUT del mismo precio → 200 y PUT de la misma descripción (`/items/{id}/description?api_version=2`) → 200, releído sin cambios. Ya probado antes: stock, activar, variantes/fotos, promociones. Falta probar características y título (regla ML: título no editable con ventas).
+  - **Fase 6**: por pantalla como ML (no Excel), empezando por editar publicaciones existentes. **Prueba 07-11 en PIKEKE MLV772995696**: PUT del mismo precio → 200 y PUT de la misma descripción (`/items/{id}/description?api_version=2`) → 200, releído sin cambios. Ya probado antes: stock, activar, variantes/fotos, promociones.
+    **Segunda prueba 07-11 (cambiar y devolver, todo quedó como estaba):**
+    - Título con ventas → 400 `field_not_updatable` "Cannot update title when item has bids" (confirmado: no se puede).
+    - Característica principal `MODEL` → 200 (cambió y volvió). Secundaria `WIDTH` (número + unidad) → 200. Se manda solo `attributes: [{id, value_name}]`; las demás no se tocan. ML devuelve las características en otro orden después de editar (los valores son los mismos).
+    - Fotos: `pictures: [{id}…]` en otro orden → 200 y vuelta al orden original → 200.
+    - Variantes (MLV535999308): `variations` con TODAS las variantes por id; a una se le cambió el nombre (combinación libre, sin id de atributo) y el orden de sus fotos → 200, y vuelta → 200. Precio, stock y estado sin cambios.
+    - Conclusión: con la API se puede editar todo menos el título de una publicación con ventas.
