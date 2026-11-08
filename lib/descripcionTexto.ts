@@ -47,6 +47,55 @@ export function separar(texto: string, plantillas: PlantillaTexto[]) {
   return { encabezado, pie, condiciones, cuerpo: resto }
 }
 
+// ── Bloques PARECIDOS (08-11, el dueño): en los cambios en lote, unas condiciones o un pie viejos pegados a mano
+// (mismos títulos y casi las mismas líneas que un texto guardado, pero no idénticos) se reconocen y se reemplazan,
+// en vez de saltar la publicación o dejarlos repetidos. Solo lo usan los lotes, no el editor.
+const lineaUtil = (l: string) => {
+  const t = l.trim().toLowerCase().replace(/\s+/g, ' ')
+  return t.length > 3 && /[a-z0-9áéíóúñ]/i.test(t) ? t : null
+}
+const lineasUtiles = (s: string) => new Set(normal(s).split('\n').map(lineaUtil).filter((x): x is string => !!x))
+
+/** Qué tanto se parecen dos textos: líneas en común sobre las del más corto (0 a 1). */
+export function similitud(a: string, b: string) {
+  const A = lineasUtiles(a), B = lineasUtiles(b)
+  if (A.size < 3 || B.size < 3) return 0
+  let c = 0
+  for (const x of A) if (B.has(x)) c++
+  return c / Math.min(A.size, B.size)
+}
+
+/** Quita del final (o del inicio) del texto el bloque más grande que se parece a alguna referencia. null = no hay. */
+export function quitarParecido(texto: string, referencias: string[], lado: 'final' | 'inicio'): string | null {
+  const ls = normal(texto).split('\n')
+  const n = ls.length
+  let corte: number | null = null
+  for (const ref of referencias) {
+    const set = lineasUtiles(ref)
+    if (set.size < 3) continue
+    let comunes = 0, utiles = 0
+    for (let k = 0; k < n; k++) {
+      const i = lado === 'final' ? n - 1 - k : k
+      const u = lineaUtil(ls[i])
+      if (!u) continue
+      utiles++
+      if (!set.has(u)) continue
+      comunes++
+      // El bloque empieza (o termina) en una línea conocida, la mayoría de sus líneas están en la referencia y trae
+      // buena parte de ella.
+      if (comunes >= 3 && comunes / utiles >= 0.6 && comunes >= set.size * 0.4) {
+        const c = lado === 'final' ? i : i + 1
+        if (corte === null || (lado === 'final' ? c < corte : c > corte)) corte = c
+      }
+    }
+  }
+  if (corte === null) return null
+  // Con sus separadores (***, líneas vacías) pegados.
+  if (lado === 'final') { while (corte > 0 && !lineaUtil(ls[corte - 1])) corte-- }
+  else { while (corte < n && !lineaUtil(ls[corte])) corte++ }
+  return (lado === 'final' ? ls.slice(0, corte) : ls.slice(corte)).join('\n').trim()
+}
+
 // Lo que MercadoLibre acepta en la descripción: texto plano. Letras (con acentos y ñ), números, espacios y los signos
 // básicos. Lo demás (emojis, símbolos raros, viñetas especiales) ML lo rechaza o lo borra.
 const PERMITIDO = /[\p{L}\p{N}\s.,;:¿?¡!()[\]{}"'`´\-_+*/\\#%&@$=<>|°ºª~^€£¥…·•–—“”‘’]/u

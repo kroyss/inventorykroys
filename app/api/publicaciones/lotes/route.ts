@@ -30,7 +30,7 @@ const Seleccion = z.object({
 })
 const Pedido = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('descripcion'), seleccion: Seleccion, parte: z.enum(['encabezado', 'condiciones', 'pie']), plantillaId: z.number().int().nullable(),
-             noReconocida: z.enum(['saltar', 'agregar']), confirmar: z.boolean() }),
+             noReconocida: z.enum(['saltar', 'agregar']).optional(), confirmar: z.boolean() }),
   z.object({ tipo: z.literal('precio'), seleccion: Seleccion, modo: z.enum(['porcentaje', 'monto', 'fijo']), valor: z.number().min(-1e9).max(1e10),
              redondeo: z.enum(['no', 'entero', '90']), confirmar: z.boolean() }),
 ])
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     if (!d.confirmar) return NextResponse.json({ total: filas.length, separadas: sep.n, deOtraCuenta: deOtra, ejemplo: filas.slice(0, 5) })
     const nombre = plantilla ? `«${plantilla.nombre}»` : '(quitar)'
     const lote = await crearLote(s.db, 'descripcion', `${NOMBRE_TIPO[d.parte].titulo} ${nombre} en ${filas.length} publicaciones`,
-      { parte: d.parte, plantillaId: d.plantillaId, noReconocida: d.noReconocida }, filas.map(f => ({ item: f.item_id })), userId)
+      { parte: d.parte, plantillaId: d.plantillaId }, filas.map(f => ({ item: f.item_id })), userId)
     return NextResponse.json({ lote })
   } catch (err) { return apiError(err) }
 }

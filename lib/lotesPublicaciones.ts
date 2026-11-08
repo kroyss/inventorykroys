@@ -4,7 +4,7 @@
 // a ML); cada cambio queda en ml_publicacion_cambios con lo que había antes.
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
-import { componer, mismoTexto, separar, caracteresNoPermitidos, MAX_DESCRIPCION, NOMBRE_TIPO, type PlantillaTexto, type TipoTexto } from '@/lib/descripcionTexto'
+import { componer, mismoTexto, separar, caracteresNoPermitidos, MAX_DESCRIPCION, NOMBRE_TIPO, type PlantillaTexto, type TipoTexto, quitarParecido, similitud } from '@/lib/descripcionTexto'
 import { cuentaDe, guardarPublicacion } from '@/lib/publicacionesML'
 
 export interface Plantilla extends PlantillaTexto { nombre: string; conexion_id: number | null; usos?: number }
@@ -79,7 +79,8 @@ export async function mandarDescripcion(db: Pool, conexionId: number, itemId: st
 }
 
 // ── Crear lotes ──
-export type ParametrosDescripcion = { parte: TipoTexto; plantillaId: number | null; noReconocida: 'saltar' | 'agregar' }
+// noReconocida quedó de los lotes viejos (antes del 08-11): ya no se usa, el sistema decide solo.
+export type ParametrosDescripcion = { parte: TipoTexto; plantillaId: number | null; noReconocida?: 'saltar' | 'agregar' }
 export type ParametrosPrecio = { modo: 'porcentaje' | 'monto' | 'fijo'; valor: number; redondeo: 'no' | 'entero' | '90' }
 
 export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer', titulo: string, parametros: object, items: { item: string; datos?: object }[], userId: number | null) {
@@ -183,11 +184,21 @@ async function procesarItem(db: Pool, l: { tipo: string; parametros: Record<stri
   const texto = await leerDescripcion(db, cuenta.id, it.item_id)
   const s = await separacionDe(db, it.item_id, cuenta.id, texto, ps)
   const tieneParte = (p.parte === 'encabezado' ? s.encabezadoId : p.parte === 'condiciones' ? s.condicionesId : s.pieId) != null
-  if (!tieneParte && !s.separada && p.noReconocida === 'saltar' && plantilla) {
-    const { rows: [r] } = await db.query(`SELECT cuerpo FROM ml_item_descripcion WHERE item_id = $1 AND cuerpo IS NOT NULL`, [it.item_id])
-    if (!r) return ['saltada', `No se reconoce si ya tiene ${NOMBRE_TIPO[p.parte].uno}: sepárala en el editor o con «Detectar textos repetidos», o vuelve a aplicarlo con «agregar igual»`]
+  // 08-11 (el dueño): ya no se salta nada. Si no tiene esa parte reconocida, se busca un bloque PARECIDO pegado a mano
+  // (versión vieja del mismo texto) y se reemplaza; si no hay nada parecido, se agrega.
+  let cuerpo = s.cuerpo, pieId = s.pieId
+  if (!tieneParte && plantilla) {
+    const refs = ps.filter(x => x.id === plantilla.id || x.tipo === p.parte
+      || (p.parte !== 'encabezado' && x.tipo !== 'encabezado')).map(x => x.texto)
+    const q = quitarParecido(s.cuerpo, refs, p.parte === 'encabezado' ? 'inicio' : 'final')
+    if (q !== null) cuerpo = q
+    // Unas condiciones que hoy están guardadas como pie (el mismo bloque): pasan a ser las condiciones, sin repetir.
+    if (p.parte === 'condiciones' && pieId != null) {
+      const pie = ps.find(x => x.id === pieId)
+      if (pie && similitud(pie.texto, plantilla.texto) >= 0.6) pieId = null
+    }
   }
-  const nuevaSep: Partes = { encabezadoId: s.encabezadoId, pieId: s.pieId, condicionesId: s.condicionesId, cuerpo: s.cuerpo }
+  const nuevaSep: Partes = { encabezadoId: s.encabezadoId, pieId, condicionesId: s.condicionesId, cuerpo }
   if (p.parte === 'encabezado') nuevaSep.encabezadoId = plantilla?.id ?? null
   else if (p.parte === 'condiciones') nuevaSep.condicionesId = plantilla?.id ?? null
   else nuevaSep.pieId = plantilla?.id ?? null

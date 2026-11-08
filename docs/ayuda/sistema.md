@@ -351,9 +351,10 @@ usuario la tienen):
 
 **Cambiar muchas a la vez:** en la lista marca las que quieras (o «Elegir esta página» y después «Elegir las N de
 esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
-- **Encabezado / condiciones / pie:** elegir qué parte y qué texto guardado poner (o **quitarlo**). Si en una publicación no se
-  reconoce el pie que tiene ahora, se puede **saltar** (recomendado, así no queda repetido) o **agregarlo igual**.
-  Primero muestra cuántas van y después se confirma.
+- **Encabezado, condiciones o pie:** elegir qué parte y qué texto guardado poner (o **quitarlo**) y tocar Aplicar. El
+  sistema decide solo en cada publicación: si ya tiene esa parte (aunque sea una versión vieja escrita a mano y un poco
+  distinta), la **reemplaza**; si no tiene, la **agrega**. Nunca queda repetida. Al terminar muestra el resultado:
+  cuántas se actualizaron, cuántas ya lo tenían y cuáles no se pudieron (con el motivo en «Ver el detalle»).
 - **Cambiar precios:** subir o bajar un %, sumar o restar un monto o poner un precio fijo, con redondeo (entero o
   terminado en ,90). Muestra la tabla **antes → después** de cada una y recién ahí se confirma.
 - Se manda a ML **de a poco** (unas 12 por minuto) aunque cierres la pantalla. El avance, lo que salió bien, lo

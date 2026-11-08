@@ -124,7 +124,7 @@ export default function PublicacionesClient() {
               <span className="text-sm text-neutral-700">{cuantas.toLocaleString('es-VE')} elegida{cuantas === 1 ? '' : 's'}{todasBusqueda ? ' (toda la búsqueda)' : ''}</span>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={limpiar} className="btn-secondary !px-3 !py-1.5">Quitar selección</button>
-                <button type="button" onClick={() => setAccion('descripcion')} className="btn-secondary !px-3 !py-1.5">Encabezado / pie</button>
+                <button type="button" onClick={() => setAccion('descripcion')} className="btn-secondary !px-3 !py-1.5">Encabezado, condiciones o pie</button>
                 <button type="button" onClick={() => setAccion('precio')} className="btn-primary text-sm">Cambiar precios</button>
               </div>
             </div>
@@ -155,14 +155,41 @@ function Modal({ titulo, children, onCerrar }: { titulo: string; children: React
   )
 }
 
+// 08-11 (el dueño): «Listo» muestra el resultado real del lote (cambiadas, ya lo tenían, no se pudo), no solo que se mandó.
+interface AvanceLote { id: number; estado: string; total: number; ok: number; sin_cambio: number; saltadas: number; errores: number; pendientes: number }
 function Listo({ lote, onCerrar }: { lote: number; onCerrar: () => void }) {
+  const [a, setA] = useState<AvanceLote | null>(null)
+  useEffect(() => {
+    let vivo = true, t: ReturnType<typeof setTimeout> | undefined
+    const leer = () => fetch('/api/publicaciones/lotes').then(r => r.ok ? r.json() : null).then(d => {
+      if (!vivo) return
+      const x = (d?.lotes as AvanceLote[] | undefined)?.find(l => l.id === lote) ?? null
+      setA(x)
+      if (!x || x.estado !== 'terminado') t = setTimeout(leer, 3000)
+    }).catch(() => { if (vivo) t = setTimeout(leer, 5000) })
+    leer()
+    return () => { vivo = false; if (t) clearTimeout(t) }
+  }, [lote])
+  const listo = a?.estado === 'terminado'
+  const malas = (a?.saltadas ?? 0) + (a?.errores ?? 0)
   return <>
-    <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-      ✓ Listo. Se va mandando a MercadoLibre de a poco (unas 12 por minuto) aunque cierres esta pantalla.
-    </p>
+    {!listo ? (
+      <p className="text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+        Mandando a MercadoLibre… {a ? <b className="num">{a.total - a.pendientes} de {a.total}</b> : null} (unas 12 por minuto). Puedes cerrar esta pantalla: sigue solo.
+      </p>
+    ) : (
+      <div className={`text-sm rounded-lg px-3 py-2 border ${malas ? 'text-amber-900 bg-amber-50 border-amber-200' : 'text-emerald-800 bg-emerald-50 border-emerald-200'}`}>
+        <p className="font-medium">{malas ? 'Terminó, pero no todas se pudieron cambiar' : '✓ Listo'}</p>
+        <ul className="mt-1 space-y-0.5">
+          {a!.ok > 0 && <li>✓ {a!.ok} {a!.ok === 1 ? 'publicación actualizada' : 'publicaciones actualizadas'}</li>}
+          {a!.sin_cambio > 0 && <li>= {a!.sin_cambio} ya lo tenían</li>}
+          {malas > 0 && <li>✗ {malas} no se pudieron: mira el motivo en «Ver el detalle»</li>}
+        </ul>
+      </div>
+    )}
     <div className="flex justify-end gap-2">
       <button type="button" onClick={onCerrar} className="btn-secondary !px-3 !py-1.5">Cerrar</button>
-      <Link href={`/publicaciones/lotes?lote=${lote}`} className="btn-primary text-sm">Ver el avance</Link>
+      <Link href={`/publicaciones/lotes?lote=${lote}`} className="btn-primary text-sm">{listo ? 'Ver el detalle' : 'Ver el avance'}</Link>
     </div>
   </>
 }
@@ -171,7 +198,6 @@ function LoteDescripcion({ sel, cuantas, onCerrar, onHecho }: { sel: Seleccion; 
   const [textos, setTextos] = useState<Texto[] | null>(null)
   const [parte, setParte] = useState<'encabezado' | 'condiciones' | 'pie'>('pie')
   const [plantilla, setPlantilla] = useState<string>('')           // '' = elegir, 'quitar' = sacarlo
-  const [noRec, setNoRec] = useState<'saltar' | 'agregar'>('saltar')
   const [vista, setVista] = useState<null | { total: number; separadas: number; deOtraCuenta: number }>(null)
   const [enviando, setEnviando] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -183,14 +209,14 @@ function LoteDescripcion({ sel, cuantas, onCerrar, onHecho }: { sel: Seleccion; 
     setEnviando(true); setErr(null)
     try {
       const r = await fetch('/api/publicaciones/lotes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: 'descripcion', seleccion: sel, parte, plantillaId: plantilla === 'quitar' ? null : Number(plantilla), noReconocida: noRec, confirmar }) })
+        body: JSON.stringify({ tipo: 'descripcion', seleccion: sel, parte, plantillaId: plantilla === 'quitar' ? null : Number(plantilla), confirmar }) })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setErr(d.error ?? 'No se pudo'); return }
       if (confirmar) { setLote(d.lote); onHecho() } else setVista(d)
     } finally { setEnviando(false) }
   }
   return (
-    <Modal titulo={`Encabezado, condiciones o pie en ${cuantas.toLocaleString('es-VE')} publicaciones`} onCerrar={() => !enviando && onCerrar()}>
+    <Modal titulo={`Encabezado, condiciones o pie en ${(lote ? vista?.total ?? cuantas : cuantas).toLocaleString('es-VE')} publicaciones`} onCerrar={() => !enviando && onCerrar()}>
       {lote ? <Listo lote={lote} onCerrar={onCerrar} /> : <>
         <p className="text-xs text-neutral-500">Se cambia solo esa parte de la descripción; lo de cada producto queda igual. Vale para activas y pausadas.</p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -207,16 +233,9 @@ function LoteDescripcion({ sel, cuantas, onCerrar, onHecho }: { sel: Seleccion; 
         </div>
         {textos && !opciones.length && <p className="text-xs text-neutral-500">No hay {parte === 'pie' ? 'pies' : parte === 'condiciones' ? 'condiciones de compra' : 'encabezados'} guardados. Créalos en <Link href="/publicaciones/textos" className="text-sky-700 hover:underline">Textos de descripción</Link>.</p>}
         {elegido && <p className="text-xs text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 whitespace-pre-wrap max-h-40 overflow-y-auto">{elegido.texto}</p>}
-        {plantilla && plantilla !== 'quitar' && (
-          <fieldset className="text-sm space-y-1">
-            <legend className="text-xs font-medium text-neutral-600">Si en una publicación no se reconoce {parte === 'condiciones' ? 'las condiciones de compra que tiene' : `el ${parte} que tiene`} ahora</legend>
-            <label className="flex gap-2"><input type="radio" checked={noRec === 'saltar'} onChange={() => { setNoRec('saltar'); setVista(null) }} /> <span>Saltarla (no tocarla) <span className="text-neutral-400">· recomendado, así no queda repetido</span></span></label>
-            <label className="flex gap-2"><input type="radio" checked={noRec === 'agregar'} onChange={() => { setNoRec('agregar'); setVista(null) }} /> <span>Agregarlo igual {parte === 'pie' ? 'al final' : parte === 'condiciones' ? 'antes del pie' : 'al principio'}</span></label>
-          </fieldset>
-        )}
         {vista && (
           <div className="text-sm bg-sky-50 border border-sky-200 text-sky-900 rounded-lg px-3 py-2 space-y-1">
-            <p>Van {vista.total.toLocaleString('es-VE')} publicaciones. {vista.separadas.toLocaleString('es-VE')} ya están separadas en partes{vista.total - vista.separadas > 0 ? `; las otras ${(vista.total - vista.separadas).toLocaleString('es-VE')} se leen de ML al momento y se reconocen con tus textos guardados` : ''}.</p>
+            <p>Van {vista.total.toLocaleString('es-VE')} publicaciones. En cada una: si ya tiene {parte === 'condiciones' ? 'unas condiciones de compra' : `un ${parte}`} (aunque sea una versión vieja escrita a mano), se reemplaza; si no tiene, se agrega. Nunca queda repetido.</p>
             {vista.deOtraCuenta > 0 && <p className="text-amber-800">{vista.deOtraCuenta} son de otra cuenta: ese texto es solo de {elegido?.cuenta}, se saltan.</p>}
           </div>
         )}
