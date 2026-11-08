@@ -41,7 +41,7 @@ export default function CuentasMLClient() {
   }, [cargar])
 
   const desconectar = async (c: Cuenta) => {
-    if (!await confirm({ title: `Desconectar ${c.nickname}`, message: 'Se dejan de traer sus preguntas, mensajes y ventas, y no se podrá responder desde aquí. También se le quita a la app el permiso en MercadoLibre. Lo ya guardado se conserva.', confirmText: 'Desconectar', danger: true })) return
+    if (!await confirm({ title: `Desconectar ${c.nickname}`, message: 'Se dejan de traer sus preguntas, mensajes y ventas, y no se podrá responder desde aquí. Lo ya guardado se conserva.', confirmText: 'Desconectar', danger: true })) return
     await fetch(`/api/ml/conexiones/${c.id}`, { method: 'DELETE' })
     cargar()
   }

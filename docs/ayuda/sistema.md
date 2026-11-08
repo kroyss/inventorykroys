@@ -165,8 +165,8 @@ nada de ella hasta que toques **Reconectar**. Mientras esté desconectada sale u
 pantallas con el botón **Reconectar →**. Con Telegram conectado te avisamos apenas pase (ver
 [Mis avisos](#13-mis-avisos-telegram)).
 
-**Desconectar:** en Cuentas de MercadoLibre, **Desconectar** deja de traer sus preguntas, mensajes y ventas y además
-le quita a la app el permiso en MercadoLibre (lo guardado se conserva).
+**Desconectar:** en Cuentas de MercadoLibre, **Desconectar** deja de traer sus preguntas, mensajes y ventas
+(lo guardado se conserva). Se vuelve a conectar con **Reconectar**.
 
 El sistema nunca publica, cambia precios ni borra nada en ML sin que lo pidas.
 
