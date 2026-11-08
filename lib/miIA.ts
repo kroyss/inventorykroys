@@ -29,7 +29,7 @@ export interface MiIA {
   persona?: string[]
   postventa?: { pasos?: string[]; datosPago?: string; noAplica?: boolean }   // noAplica: "no hace falta nada" (cuenta como completo)
   // 07-11 (Fase 2 de docs/analisis-mercasist.md): temas que en VE se preguntan mucho y no tenían dónde ir.
-  cambios?: { acepta?: 'si' | 'falla' | 'no'; dias?: number | null; envio?: 'comprador' | 'nosotros' | 'depende' }
+  cambios?: { acepta?: 'si' | 'falla' | 'no'; motivos?: MotivoCambio[]; dias?: number | null; envio?: 'comprador' | 'nosotros' | 'depende' }
   negocio?: { mayor?: 'escribir' | 'mismo'; mayorDesde?: number | null; regateo?: 'fijo' | 'consultar'; apartar?: 'no' | 'si'; apartarHoras?: number | null }
   atencion?: { horario?: string }
   /** Información extra por secciones: la IA la recibe SOLO si la pregunta o el mensaje trata de eso (título o palabras). */
@@ -126,9 +126,10 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
     `${lista(c.persona).replace(/^./, x => x.toUpperCase())}: no lo respondas tú, deja confianza "baja".`,
   ])
   const cb = c.cambios ?? {}
+  const mot = motivosCambio(cb)
   sec('CAMBIOS Y DEVOLUCIONES', [
     cb.acepta === 'si' ? `Aceptamos cambios o devoluciones${cb.dias ? ` dentro de ${cb.dias} días de recibido` : ''}.`
-      : cb.acepta === 'falla' ? `Solo cambiamos por falla de fábrica${cb.dias ? ` (dentro de ${cb.dias} días de recibido)` : ''}.`
+      : cb.acepta === 'falla' ? `Solo aceptamos cambios o devoluciones en estos casos: ${mot.map(m => MOTIVOS_CAMBIO[m].prompt).join('; ')}${cb.dias ? ` (dentro de ${cb.dias} días de recibido)` : ''}. En otros casos no.`
       : cb.acepta === 'no' ? 'No aceptamos cambios ni devoluciones, salvo lo que cubre MercadoLibre.' : null,
     cb.acepta && cb.acepta !== 'no' && cb.envio ? (cb.envio === 'comprador' ? 'El envío del cambio o la devolución lo paga el comprador.'
       : cb.envio === 'nosotros' ? 'El envío del cambio o la devolución lo pagamos nosotros.' : 'Quién paga el envío del cambio se ve en cada caso.') : null,
@@ -166,4 +167,16 @@ export async function politicasIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' |
   const texto = !estructurado ? libre
     : `${estructurado}${libre ? `\n\nOTRAS INDICACIONES DEL VENDEDOR (si chocan con lo de arriba, manda lo de arriba):\n${libre}` : ''}`
   return { texto, miIA }
+}
+
+// Cambios "solo en algunos casos" (acepta = 'falla'; el nombre quedó de cuando era solo falla de fábrica).
+// Sin motivos guardados = falla de fábrica, que era lo único que significaba antes.
+export type MotivoCambio = 'falla' | 'error' | 'cambio'
+export const MOTIVOS_CAMBIO: Record<MotivoCambio, { texto: string; prompt: string }> = {
+  falla: { texto: 'Falla de fábrica', prompt: 'falla de fábrica' },
+  error: { texto: 'Error nuestro en el envío (otro producto, modelo, talla o color)', prompt: 'error nuestro en el envío (le llegó otro producto, modelo, talla o color)' },
+  cambio: { texto: 'Cambio por otro producto, talla o color que pide el comprador', prompt: 'cambio por otro producto, talla o color que pide el comprador' },
+}
+export function motivosCambio(cb: { motivos?: MotivoCambio[] }): MotivoCambio[] {
+  return cb.motivos?.length ? cb.motivos : ['falla']
 }

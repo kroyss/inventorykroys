@@ -20,7 +20,7 @@ export const EsquemaMiIA = z.object({
   desconocido: z.array(z.enum(['verificar', 'preguntar', 'recomendar', 'persona'])).max(4).optional(),
   persona: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
   postventa: z.object({ pasos: z.array(z.string().trim().min(1).max(80)).max(6).optional(), datosPago: txt(400), noAplica: z.boolean().optional() }).optional(),
-  cambios: z.object({ acepta: z.enum(['si', 'falla', 'no']).optional(), dias: z.number().int().min(0).max(365).nullable().optional(),
+  cambios: z.object({ acepta: z.enum(['si', 'falla', 'no']).optional(), motivos: z.array(z.enum(['falla', 'error', 'cambio'])).max(3).optional(), dias: z.number().int().min(0).max(365).nullable().optional(),
     envio: z.enum(['comprador', 'nosotros', 'depende']).optional() }).optional(),
   negocio: z.object({ mayor: z.enum(['escribir', 'mismo']).optional(), mayorDesde: z.number().int().min(2).max(100000).nullable().optional(),
     regateo: z.enum(['fijo', 'consultar']).optional(), apartar: z.enum(['no', 'si']).optional(), apartarHoras: z.number().int().min(1).max(720).nullable().optional() }).optional(),

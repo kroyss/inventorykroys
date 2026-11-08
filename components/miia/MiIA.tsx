@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
-import type { MiIA as Config, Agencia } from '@/lib/miIA'
+import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
+import { MOTIVOS_CAMBIO, motivosCambio } from '@/lib/miIA'
 
 // Mi IA (06-11, lib/miIA.ts): cuestionario paso a paso (una pantalla por tema) + página con una tarjeta por tema.
 // La misma en Preguntas → Configuración, en Mensajes y en el menú de usuario (/mi-ia). Guarda en cada "Siguiente".
@@ -44,7 +45,7 @@ function resumen(id: string, c: Config): string {
       c.factura?.garantiaDias ? `${c.factura.garantiaDias} días de garantía${c.factura.garantiaNoCubre ? ` (no cubre ${corto(c.factura.garantiaNoCubre, 40)})` : ''}` : ''].filter(Boolean).join(' · ')
     case 'desconocido': return (c.desconocido ?? []).map((k, i) => `${i + 1}. ${{ verificar: 'lo verificamos', preguntar: 'preguntar', recomendar: 'recomendar otra', persona: 'una persona' }[k]}`).join(' · ')
     case 'persona': return corto(lista(c.persona ?? []), 90)
-    case 'cambios': return [c.cambios?.acepta === 'si' ? 'Sí' : c.cambios?.acepta === 'falla' ? 'Solo por falla' : c.cambios?.acepta === 'no' ? 'No' : '',
+    case 'cambios': return [c.cambios?.acepta === 'si' ? 'Sí' : c.cambios?.acepta === 'falla' ? `Solo: ${motivosCambio(c.cambios).map(m => MOTIVOS_CAMBIO[m].texto.split(' (')[0].toLowerCase()).join(', ')}` : c.cambios?.acepta === 'no' ? 'No' : '',
       c.cambios?.dias ? `${c.cambios.dias} días` : '', c.cambios?.envio === 'comprador' ? 'envío lo paga el comprador' : c.cambios?.envio === 'nosotros' ? 'envío lo pagamos' : ''].filter(Boolean).join(' · ')
     case 'negocio': return [c.negocio?.mayor === 'escribir' ? `al mayor${c.negocio.mayorDesde ? ` desde ${c.negocio.mayorDesde} u.` : ''}: que pregunte` : c.negocio?.mayor === 'mismo' ? 'sin precio al mayor' : '',
       c.negocio?.regateo === 'fijo' ? 'precio fijo' : c.negocio?.regateo === 'consultar' ? 'rebaja: lo consultamos' : '',
@@ -251,10 +252,22 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
     case 'cambios': return <>
       <Pregunta t="¿Aceptas cambios o devoluciones?" ayuda="Lo que cubre MercadoLibre (compra protegida) vale igual.">
         <div className="flex flex-wrap gap-2">
-          {([['si', 'Sí'], ['falla', 'Solo por falla de fábrica'], ['no', 'No']] as const).map(([k, t]) =>
+          {([['si', 'Sí, por cualquier motivo'], ['falla', 'Solo en algunos casos'], ['no', 'No']] as const).map(([k, t]) =>
             <Chip key={k} activo={c.cambios?.acepta === k} onClick={() => set(c => ({ ...c, cambios: { ...c.cambios, acepta: k } }))}>{t}</Chip>)}
         </div>
       </Pregunta>
+      {c.cambios?.acepta === 'falla' && <Pregunta t="¿En qué casos?" ayuda="Marca todos los que aceptas.">
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(MOTIVOS_CAMBIO) as MotivoCambio[]).map(k => {
+            const sel = motivosCambio(c.cambios ?? {})
+            return <Chip key={k} activo={sel.includes(k)} onClick={() => set(c => {
+              const act = motivosCambio(c.cambios ?? {})
+              const nuevo = act.includes(k) ? act.filter(x => x !== k) : [...act, k]
+              return { ...c, cambios: { ...c.cambios, motivos: nuevo.length ? nuevo : act } }
+            })}>{MOTIVOS_CAMBIO[k].texto}</Chip>
+          })}
+        </div>
+      </Pregunta>}
       {c.cambios?.acepta && c.cambios.acepta !== 'no' && <>
         <Pregunta t="¿En cuántos días desde que lo recibe?">
           <div className="flex items-center gap-2 text-sm text-neutral-700">
