@@ -627,7 +627,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const topeZoom = base.estado === 'ambas' ? topeDescuento(f.precio, base.minZoom) : null
     const tope = base.estado === 'ambas' || base.estado === 'tealca' ? topeDescuento(f.precio, base.minTealca) : null
     const motivo = !camp ? null : !cf ? `${f.cuenta} no tiene «${camp.nombre}»`
-      : mezcla && noEmpezo(cf) ? `En ${f.cuenta} empieza el ${fecha(cf.inicio)}` : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
+      : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
       : bajoPiso ? `Bajo $${PISO_ML}: ML no la acepta` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
       : seguro.sinMargen ? 'Sin margen: perdería el envío gratis' : null
     const advertencia = motivo ? null
@@ -641,7 +641,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
       cambio, antes: cambio ? cand!.precio! : null, ajustada }
   })
-  const validas = camp && !sinEmpezar ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
+  const validas = camp ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
   // De a TANDA por pedido (2026-10-17): cada publicación tarda ~2 s (se agrega y se comprueba con el precio
   // real) y el servidor corta la espera al minuto; con 28 de una vez la pantalla perdía la respuesta.
@@ -857,9 +857,8 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
             </div>
           )}
           {sinEmpezar && (
-            <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
-              Esta campaña empieza el {fecha(camp!.inicio)}. MercadoLibre no guarda publicaciones antes del inicio
-              (dice que sí, pero no quedan): agrégalas ese día.
+            <p className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-900">
+              Esta campaña empieza el <b>{fecha(camp!.inicio)}</b>: las publicaciones quedan <b>programadas</b> y el precio se activa solo ese día.
             </p>
           )}
           <div className="overflow-x-auto border border-neutral-200 rounded-lg">
@@ -923,7 +922,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
             <button onClick={() => setModal(null)} className="btn-ghost text-sm">Cancelar</button>
             {hayResultados && camp && <button onClick={() => pasarAOtra()} disabled={enviando} className="btn-secondary text-sm" title="Deja esta campaña como está y elige otra para las mismas publicaciones">Agregar también a otra…</button>}
             {hayAlgo && <button onClick={() => onHecho(resumen())} disabled={enviando} className="btn-secondary text-sm">Terminar</button>}
-            <button onClick={confirmar} disabled={!camp || sinEmpezar || !validas.length || enviando} className="btn-primary text-sm">
+            <button onClick={confirmar} disabled={!camp || !validas.length || enviando} className="btn-primary text-sm">
               {enviando ? (avance && avance.total > TANDA ? `Agregando… ${avance.hechas} de ${avance.total}` : 'Agregando y comprobando…') : `Agregar ${validas.length} a la campaña`}
             </button>
           </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
-import { agregarACampana, cambiarPrecioEnCampana, estadoCampana, quitarDeCampana, verificarEnCampana } from '@/lib/promocionesML'
+import { agregarACampana, cambiarPrecioEnCampana, quitarDeCampana, verificarEnCampana } from '@/lib/promocionesML'
 import { sesionPromociones } from '@/lib/promocionesSesion'
 
 export const maxDuration = 120
@@ -41,12 +41,8 @@ export async function POST(req: NextRequest) {
       for (const it of b.items) resultados.push({ id: it.id, estado: await verificarEnCampana(s.db, b.conexionId, it, b.campana, b.final) })
       return NextResponse.json({ resultados })
     }
-    // ML responde "ok" pero NO guarda ofertas en campañas que todavía no empezaron (probado el 16-10).
-    // El estado se pregunta a ML en el momento (la foto guardada puede decir "pending" de una que ya empezó).
-    const estado = b.accion === 'agregar' ? (await estadoCampana(s.db, b.conexionId, b.campana.id, b.campana.tipo)) ?? b.campana.estado : null
-    if (b.accion === 'agregar' && estado && estado !== 'started') {
-      return NextResponse.json({ error: 'Esta campaña todavía no empezó: MercadoLibre no guarda publicaciones antes del inicio. Agrégalas el día que empiece.' }, { status: 400 })
-    }
+    // 08-11: en campañas que todavía no empezaron SÍ se pueden programar (probado con Black Friday 26: la publicación queda
+    // "pending" en /seller-promotions/items). El 16-10 parecía que no porque se comprobaba con el precio de HOY.
     const resultados: { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean; precioTarda?: boolean; porConfirmar?: boolean }[] = []
     for (const it of b.items) {
       if (b.accion === 'cambiar') {

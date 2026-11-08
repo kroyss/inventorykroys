@@ -235,6 +235,13 @@ async function estadoEnCampana(db: Pool, conexionId: number, itemId: string, cam
   return r.find(p => p.id === campanaId)?.status ?? 'fuera'
 }
 
+/** Programada (08-11): en una campaña que todavía no empezó la publicación figura "pending" en /seller-promotions/items,
+ *  pero ni /sale_price ni /prices la muestran hasta el inicio. Cuenta como guardada. */
+async function programadaEn(db: Pool, conexionId: number, itemId: string, campanaId: string) {
+  const e = await estadoEnCampana(db, conexionId, itemId, campanaId)
+  return e === 'pending' || e === 'started'
+}
+
 /** Estado actual de una campaña según ML (started, pending, finished…); null si no se pudo leer. */
 export async function estadoCampana(db: Pool, conexionId: number, campanaId: string, tipo: string): Promise<string | null> {
   const r = await mlFetch<{ status?: string }>(db, conexionId,
@@ -384,6 +391,7 @@ export async function agregarACampana(db: Pool, conexionId: number, usuarioId: n
         await esperar(1500)
         v = await precioVigente(db, conexionId, item.id)
         guardado = v?.campana === campana.id || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
+          || await programadaEn(db, conexionId, item.id, campana.id)
       }
       // ML dijo que sí pero todavía no se ve (18-10: a veces tarda más): no es error; la pantalla lo vuelve a
       // comprobar en unos segundos (verificarEnCampana).
@@ -404,6 +412,7 @@ export async function verificarEnCampana(db: Pool, conexionId: number, item: { i
   const precio = Math.round(item.precio * 100) / 100
   const v = await precioVigente(db, conexionId, item.id)
   const ok = v?.campana === campana.id || (await preciosPromo(db, conexionId, item.id)).some(a => Math.abs(a - precio) < 0.011)
+    || await programadaEn(db, conexionId, item.id, campana.id)
   if (!ok && !final) return 'pendiente'
   if (ok) await marcarEnFoto(db, conexionId, item.id, campana.id, precio)
   await db.query(
