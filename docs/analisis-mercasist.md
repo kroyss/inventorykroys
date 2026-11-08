@@ -215,6 +215,7 @@ Cada ítem dice **dónde vive en lo nuestro** y si es para todas las empresas (n
   - **Fase 1 aprobada** (variables en respuestas rápidas, aviso ML desconectada, desconectar revoca en ML).
   - **Prepago 6/12 meses: NO** (se hizo y se revirtió el mismo día). Se queda solo el trimestral −10 % que ya existía: si el vendedor sube de ventas tiene que poder subir de escalón/plan, y un pago largo lo congela.
   - **Fase 2 aprobada**: horario de IA (de fábrica sin horario), tope por comprador (3 en 24 h), frase de escape SOLO en Mensajes, Mi IA suma temas: cambios y devoluciones, horario de atención, precio al mayor, regateo, apartar/reservar, información extra libre por secciones (originalidad/procedencia NO).
+  - 07-11: **Fase 1 y Fase 2 hechas, en staging** (rama importar-ml, 8f32040), esperando revisión del dueño. Fase 2: `lib/iaFrenos.ts`, `/api/ia-frenos`, `components/preguntas/FrenosIA.tsx`, mig 150 `ml_mensajes_ia.escape_at`, Mi IA (cambios, negocio, atencion, extras).
   - **«Responder todo»** (frase de escape también en Preguntas, opcional y apagado): para MÁS ADELANTE; sin él quedan nuestros frenos actuales.
   - **Fases 3 (comprobante con IA) y 4 (mensajes por evento): FUERA.**
   - **Fase 5 aprobada** (resumen en Inicio de Automatizaciones + lunes por Telegram).
