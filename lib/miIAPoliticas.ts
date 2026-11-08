@@ -15,13 +15,15 @@ const SISTEMA = `Eres quien ordena la configuración de la IA de atención de un
 Reglas:
 - No inventes. Solo lo que el texto dice. Si un tema no aparece, déjalo fuera.
 - Agencias: con su nombre (ZOOM, TEALCA, MRW, MercadoEnvíos…); gratis=true si el envío por esa agencia es gratis. Si dice "envío gratis desde $X" y "por debajo mínimo N unidades": envio.minimo = { precioMenor: X, unidades: N }.
+- Despacho: despacho.dias = texto corto con los días y cuándo sale (ej. "Lunes a viernes, al día siguiente de confirmar el pago y el formulario"); despacho.sabados si lo dice; despacho.corte (HH:MM) solo si da una hora.
 - Garantía: factura.garantiaDias y factura.garantiaNoCubre (lo que no cubre, corto).
 - Cambios y devoluciones: cambios.acepta = "si" (por cualquier motivo), "falla" (solo en algunos casos; motivos: "falla" falla de fábrica, "error" error del vendedor en el envío, "cambio" el comprador pide otro producto/talla/color) o "no". cambios.dias si lo dice. cambios.envio = "comprador" si el comprador paga los gastos de devolución, "nosotros" o "depende".
 - Retiro: ubicacion.retiro = "acuerdo" si es previo acuerdo, "horario" si tiene horario, "no" si no hay.
 - Si no sabe algo o no puede afirmar stock: desconocido con "verificar" (decir que lo verificamos), "preguntar", "recomendar" o "persona", en el orden que se entienda.
 - Saludo y despedida tal cual (cortos). trato "usted" o "tu".
 - extras: SOLO textos largos de un tema puntual (compatibilidades, modo de uso, garantía muy detallada) que no caben en un campo; título corto y palabras clave separadas por coma.
-- resto: los renglones ORIGINALES (copiados tal cual) que no quedaron en ningún campo de arriba. No incluyas lo que ya repartiste. No incluyas la prohibición de dar teléfono, WhatsApp, correo o redes (eso ya es regla fija del sistema). Si todo encajó, resto vacío.`
+- resto: los renglones ORIGINALES (copiados tal cual) que no quedaron en ningún campo de arriba. No incluyas lo que ya repartiste. No incluyas la prohibición de dar teléfono, WhatsApp, correo o redes (eso ya es regla fija del sistema). Si todo encajó, resto vacío.
+- Revisa al final: CADA renglón del texto tiene que haber quedado en algún campo o en resto. Nada se pierde.`
 
 const HERRAMIENTA = {
   name: 'mi_ia',
