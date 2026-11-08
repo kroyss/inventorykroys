@@ -10,6 +10,7 @@ import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { tieneModulo } from '@/lib/modulos'
 import { leerConfigDb } from '@/lib/recordatoriosPago'
 import { autoresDelHilo } from '@/lib/mensajesAutor'
+import { tasaBCVHoy } from '@/lib/tasaDia'
 
 async function conversacion(db: import('pg').Pool, pack: string) {
   const { rows: [c] } = await db.query(
@@ -48,7 +49,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ pack
       const { rows: [r] } = await s.db.query(`SELECT enviados, detenido FROM ml_recordatorios WHERE pack_id = $1::bigint`, [pack])
       if (r && (r.enviados > 0 || r.detenido)) recordatorio = r
     }
-    return NextResponse.json({ cuenta: c.nickname, ...h, mensajes, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas, recordatorio })
+    return NextResponse.json({ cuenta: c.nickname, ...h, mensajes, items: venta?.items ?? null, comprador: venta?.comprador ?? null, preguntas, recordatorio,
+      tasa_bcv: s.session.user.country === 'VE' ? await tasaBCVHoy(s.db) : null })   // variables de las respuestas rápidas
   } catch (err) {
     return apiError(err)
   }

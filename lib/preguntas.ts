@@ -229,6 +229,7 @@ export async function sincronizarEmpresa(db: Pool, forzar = false): Promise<Resu
 // Revisión del texto: lib/preguntasTexto.ts (se usa también en el navegador).
 export { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerPlantillas, plantillaAplica, condicionPlantilla, type Plantilla } from '@/lib/preguntasTexto'
+import { rellenarVariables } from '@/lib/variablesTexto'
 import { sincronizarReputacion } from '@/lib/reputacionML'
 
 // ── Contexto para la IA ─────────────────────────────────────────────────────
@@ -482,7 +483,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   if (aplican.length) {
     L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR que aplican a este producto${precio !== null ? ` (precio $${precio.toFixed(2)})` : ''}. ` +
       `Si la pregunta es de disponibilidad, precio, envío o retiro, usa la que corresponda casi tal cual (solo ajusta lo mínimo):\n` +
-      aplican.map(p => `- [${p.titulo}] (${condicionPlantilla(p)}): ${p.texto}`).join('\n'))
+      aplican.map(p => `- [${p.titulo}] (${condicionPlantilla(p)}): ${rellenarVariables(p.texto, { producto: c.item?.title ?? c.titulo, precio, tasa: c.tasa }).texto}`).join('\n'))
   }
   // 06-11: con "¿tiene disponible 3?" en un producto de $2,19 respondió solo "sí, las 3" y se saltó el mínimo de 2 para
   // el envío gratis ("no agregues lo que no preguntó"). Si la respuesta rápida que aplica por precio pide un mínimo, va siempre.

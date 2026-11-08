@@ -1,5 +1,6 @@
 'use client'
 import SituacionChip, { type Situacion } from './SituacionChip'
+import { rellenarVariables } from '@/lib/variablesTexto'
 import CambiarStock from './CambiarStock'
 import TextoConPublicaciones from './TextoConPublicaciones'
 import { AbrirFicha } from './FichaPublicacion'
@@ -214,6 +215,7 @@ interface Datos {
   cuentas: Cuenta[]; configuracion: { ml: boolean; ia: boolean }
   tablasEnvio?: TablasEnvio | null
   plantillas: Plantilla[]
+  tasa_bcv?: number | null
 }
 type Vista = 'pendientes' | 'respondidas' | 'cuentas'
 
@@ -415,7 +417,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
                 )
               })()}
               {datos.preguntas.map(p => (
-                <TarjetaPendiente key={p.id} p={p} esAdmin={puedeReponer} verAvisosInternos={verAvisosInternos} iaLista={datos.configuracion.ia} plantillas={datos.plantillas}
+                <TarjetaPendiente key={p.id} p={p} esAdmin={puedeReponer} verAvisosInternos={verAvisosInternos} iaLista={datos.configuracion.ia} plantillas={datos.plantillas} tasa={datos.tasa_bcv ?? null}
                   onRespondida={msg => { setAviso(msg); cargar() }}
                   onCambioSugerida={(id, intacta) => setEditadas(e => { const n = new Set(e); if (intacta) n.delete(id); else n.add(id); return n })} />
               ))}
@@ -436,8 +438,8 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
 }
 
 // ── Pregunta sin responder ─────────────────────────────────────────────────
-function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, onRespondida, onCambioSugerida }: {
-  p: Pregunta; esAdmin: boolean; verAvisosInternos: boolean; iaLista: boolean; plantillas: Plantilla[]; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
+function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, tasa, onRespondida, onCambioSugerida }: {
+  p: Pregunta; esAdmin: boolean; verAvisosInternos: boolean; iaLista: boolean; plantillas: Plantilla[]; tasa: number | null; onRespondida: (a: { tipo: 'ok' | 'error'; texto: string }) => void
   /** Avisa si el cuadro sigue con la sugerida sin cambios (entra en "Enviar las sugeridas"). */
   onCambioSugerida?: (id: string, intacta: boolean) => void
 }) {
@@ -614,7 +616,7 @@ function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, 
             return { pl, i, aplica, condicionada, probable, grupo: probable ? 0 : aplica && condicionada ? 1 : aplica ? 2 : 3 }
           }).sort((a, b) => a.grupo - b.grupo || a.i - b.i).map(({ pl, i, aplica, condicionada, probable }) => {
             return (
-              <button key={pl.id ?? i} type="button" onClick={() => { usar(pl.texto, 'rapida', pl.id); setMeta({ confianza: null, falta: null, web: false }) }}
+              <button key={pl.id ?? i} type="button" onClick={() => { usar(rellenarVariables(pl.texto, { producto: p.item_titulo, precio: precioUSD(p), tasa }).texto, 'rapida', pl.id); setMeta({ confianza: null, falta: null, web: false }) }}
                 title={`${probable ? (sug ? 'Es la sugerida que ya está escrita en el cuadro.\n\n' : 'La más probable para esta pregunta, según tus respuestas anteriores.\n\n') : ''}${pl.texto}\n\nPara ${condicionPlantilla(pl)}`}
                 className={`shrink-0 whitespace-nowrap max-w-[12rem] truncate px-2.5 py-1 text-xs rounded-full border transition-colors ${
                   probable ? 'bg-sky-50 border-sky-400 text-sky-900 ring-2 ring-sky-100 font-medium hover:bg-sky-100'

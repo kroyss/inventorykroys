@@ -180,7 +180,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   // Respuestas rápidas de Mensajes (06-11): cómo escribe el vendedor post-venta. Las reglas mandan las POLÍTICAS.
   const { rows: [mr] } = await db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
   const rapidos = leerMensajesRapidos(mr?.value)
-  if (rapidos.length) L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR PARA MENSAJES (su forma de escribir; si alguna aplica a lo que pregunta, úsala casi tal cual; si un dato choca con las POLÍTICAS, mandan las POLÍTICAS):\n${rapidos.slice(0, 15).map(r => `- [${r.titulo}]: ${r.texto}`).join('\n')}`)
+  if (rapidos.length) L.push(`\nRESPUESTAS RÁPIDAS DEL VENDEDOR PARA MENSAJES (su forma de escribir; si alguna aplica a lo que pregunta, úsala casi tal cual; si un dato choca con las POLÍTICAS, mandan las POLÍTICAS; lo que está entre llaves como {nombre}, {producto} o {precio} NUNCA va tal cual: cámbialo por el dato real de esta venta o sácalo):\n${rapidos.slice(0, 15).map(r => `- [${r.titulo}]: ${r.texto}`).join('\n')}`)
   if (ejemplos.sugerencias.length) {
     L.push('\nRESPUESTAS ANTERIORES DEL VENDEDOR A MENSAJES PARECIDOS (otras ventas):')
     L.push(ejemplos.sugerencias.map(x => `Comprador: ${x.pregunta}\nVendedor: ${x.respuesta}`).join('\n\n'))

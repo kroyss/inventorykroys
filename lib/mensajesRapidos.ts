@@ -1,5 +1,5 @@
 // Respuestas rápidas de Mensajes (post-venta): botones en cada conversación que ponen un texto
-// fijo para retocar antes de enviar. Sin variables (igual que las de Preguntas): el nombre de la
+// fijo para retocar antes de enviar. Desde 07-11 con variables ({nombre}, {producto}, {precio}…, lib/variablesTexto.ts); el nombre de la
 // tienda va escrito tal cual. Se guardan en app_settings.mensajes_plantillas (JSON).
 
 export interface MensajeRapido { titulo: string; texto: string }

@@ -38,7 +38,7 @@ interface Empresa {
   pausa_fecha: string | null
   plan: 'esencial' | 'automatizaciones' | 'completo' | null   // plan pagado (mig 138, Plataforma → Plan y pagos)
   escalon: number | null
-  ciclo: 'mensual' | 'trimestral' | null
+  ciclo: string | null
   plan_hasta: string | null
   radar_pro_hasta: string | null
   creada: string

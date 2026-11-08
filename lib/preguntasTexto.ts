@@ -1,3 +1,4 @@
+import { variablesSinDato } from '@/lib/variablesTexto'
 // ── Respuestas rápidas (app_settings `preguntas_plantillas`, JSON) ─────────
 // Como las de MercadoLibre, con una condición opcional de precio del producto (USD):
 // p. ej. "desde $3" → envío gratis; "menos de $3" → mínimo 2 unidades.
@@ -58,6 +59,9 @@ export function revisarTexto(t: string, tipo: 'pregunta' | 'mensaje' = 'pregunta
   const s = t.trim()
   if (!s) bloqueantes.push('La respuesta está vacía')
   if (s.length > 2000) bloqueantes.push('Pasa de 2000 caracteres (límite de MercadoLibre)')
+  // Variables de respuestas rápidas sin su dato (lib/variablesTexto.ts): nunca sale un "{precio}" a ML.
+  const sinDato = variablesSinDato(s)
+  if (sinDato.length) bloqueantes.push(`Falta el dato de ${sinDato.join(', ')}: escríbelo a mano`)
   // Correos: en preguntas (públicas) ML los borra; en la mensajería postventa de MLV sí pasan (el dueño mandó uno
   // el 30-10). En mensajes ni bloquean ni cuentan como link ("gmail.com").
   const sinCorreos = tipo === 'mensaje' ? s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, ' ') : s

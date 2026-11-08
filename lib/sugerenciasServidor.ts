@@ -8,6 +8,8 @@ import { calibrar, respaldo, sugerir, probable, palabrasQueActivan, ofreceEnvioG
 import { aprender, conAprendidas, CLAVE_APRENDIDAS, CLAVE_QUITADAS, type Aprendidas, type Quitadas } from '@/lib/palabrasAprendidas'
 import { fueEditada } from '@/lib/respuestasOrigen'
 import { revisarSugeridas } from '@/lib/revisorSugeridas'
+import { rellenarVariables } from '@/lib/variablesTexto'
+import { tasaBCVHoy } from '@/lib/tasaDia'
 
 const HISTORIAL = 3000           // preguntas respondidas con las que se calibra
 const CACHE_HORAS = 24
@@ -97,6 +99,7 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   const { rows: hechos } = await db.query(
     `SELECT item_id, envio_gratis, precio_ref::float FROM ml_item_hechos WHERE item_id = ANY($1::text[])`, [preguntas.map(p => p.item_id)])
   const envio = new Map(hechos.map(h => [h.item_id as string, h as { envio_gratis: boolean | null; precio_ref: number | null }]))
+  const tasa = plantillas.some(p => /\{(precio_bs|tasa_bcv)\}/i.test(p.texto)) ? await tasaBCVHoy(db) : null
   // «¿Disponible N?» (28-10): lo que se puede vender de la publicación = su stock en ML (leído con la pregunta) y, si
   // está vinculada a un producto (sin variante), también el inventario en unidades de la publicación («trae N u.»).
   const { rows: stocks } = await db.query(
@@ -125,8 +128,11 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
       // Sus palabras (aprendidas de lo que el vendedor hizo, o escritas por él) bastan: la calibración
       // por temas no puede probar una palabra que recién se aprendió.
       const palabras = s.temas.includes(`p:${id}`) ? palabrasQueActivan(s.plantilla, p.texto) : []
+      // Variables (lib/variablesTexto.ts): con los datos de esta pregunta; si falta uno, no hay sugerida (botón resaltado).
+      const rell = rellenarVariables(s.plantilla.texto, { producto: item.titulo, precio, tasa })
+      if (rell.faltan.length) { probables.set(p.id, id); continue }
       if (r !== null || palabras.length) {
-        out.set(p.id, { plantilla: id, titulo: s.plantilla.titulo, texto: s.plantilla.texto, respaldo: r ?? 0,
+        out.set(p.id, { plantilla: id, titulo: s.plantilla.titulo, texto: rell.texto, respaldo: r ?? 0,
           sin_confirmar: s.sinConfirmar, ...(r === null ? { por_palabras: palabras } : {}), ...(s.porVariante ? { por_variante: true } : {}) })
         continue
       }

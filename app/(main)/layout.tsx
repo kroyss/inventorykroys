@@ -8,6 +8,8 @@ import CommandPalette from '@/components/layout/CommandPalette'
 import { ES_STAGING } from '@/lib/entorno'
 import { AvisosProvider } from '@/components/layout/Avisos'
 import AvisoCuenta from '@/components/layout/AvisoCuenta'
+import AvisoConexionML from '@/components/layout/AvisoConexionML'
+import { puede } from '@/lib/permisos'
 import BienvenidaVideo from '@/components/aprendizaje/BienvenidaVideo'
 import AvisoDisco from '@/components/layout/AvisoDisco'
 import VerComoBarra from '@/components/layout/VerComoBarra'
@@ -42,6 +44,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <Navbar />
       {esDuenoPlataforma(session.user) && <AvisoDisco />}
       <AvisoCuenta organizacionId={session.user.organizacionId} esAdmin={role === 'admin'} />
+      <AvisoConexionML empresaId={session.user.empresaId} country={country} puedeReconectar={puede(session.user, 'ml_cuentas')} />
       <main className="max-w-7xl mx-auto px-4 py-6">
         {children}
       </main>

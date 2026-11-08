@@ -19,7 +19,7 @@ const Fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
 const Body = z.discriminatedUnion('tipo', [
   z.object({
     tipo: z.literal('plan'), plan: z.enum(['esencial', 'automatizaciones', 'completo']),
-    escalon: z.number().int().min(0).max(ESCALONES.length - 1), ciclo: z.enum(['mensual', 'trimestral']),
+    escalon: z.number().int().min(0).max(ESCALONES.length - 1), ciclo: z.enum(['mensual', 'trimestral', 'semestral', 'anual']),
     hasta: Fecha, monto: z.number().min(0).max(100000), nota: z.string().max(300).optional(),
   }),
   z.object({

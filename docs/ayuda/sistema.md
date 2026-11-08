@@ -87,8 +87,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Automatizaciones** (recomendado): lo de Esencial + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
   + Radar de Oportunidades.
 - **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios, Promociones y reportes.
-- Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%
-  (Fundadores: −30% mensual o trimestral, no se suman). El descuento es solo del plan: cuentas extra,
+- Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pagando varios meses juntos:
+  3 meses −10%, 6 meses −20%, 12 meses −30% (Fundadores: −30% siempre; los descuentos no se suman, vale el mayor). El descuento es solo del plan: cuentas extra,
   Radar PRO y recargas de IA van a precio completo. El Fundador conserva el 30% mientras renueve a tiempo: si su mes gratis o
   su plan vence sin pago (ni pago reportado antes de vencer), la cuenta se pausa y deja de ser Fundador; al volver paga precio normal. Se puede pagar en bolívares a tasa BCV.
 - **Créditos de IA:** cada «Proponer con IA» usa 1 crédito; «Buscar en internet» usa 1 más 1 por cada búsqueda
@@ -117,7 +117,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
-     Puedes elegir mensual o trimestral (−10%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo.
+     Puedes elegir 1 mes, 3 meses (−10%), 6 meses (−20%) o 12 meses (−30%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo.
      Con un plan activo, arriba eliges **qué pagar**: **Renovar plan**, **Agregar Radar PRO** (1 mes, $6) o
      **Mejorar mi plan** (pasar a uno más caro desde hoy: pagas solo la diferencia por mes, con el mismo descuento que
      tiene tu plan, por los días que le quedan; la fecha de vencimiento no cambia y ahí renuevas ya con el nuevo).
@@ -147,8 +147,12 @@ permisos. Vuelves solo al sistema con la cuenta ya conectada. Para conectar otra
 MercadoLibre** (o usa otra ventana/perfil) y repite: si no, ML vuelve a conectar la misma.
 
 **Reconectar:** si cambiaste la clave de ML o la cuenta perdió la conexión, aparece como desconectada y no entra
-nada de ella hasta que toques **Reconectar**. Con Telegram conectado te avisamos apenas pase (ver
+nada de ella hasta que toques **Reconectar**. Mientras esté desconectada sale un aviso rojo arriba de todas las
+pantallas con el botón **Reconectar →**. Con Telegram conectado te avisamos apenas pase (ver
 [Mis avisos](#13-mis-avisos-telegram)).
+
+**Desconectar:** en Cuentas de MercadoLibre, **Desconectar** deja de traer sus preguntas, mensajes y ventas y además
+le quita a la app el permiso en MercadoLibre (lo guardado se conserva).
 
 El sistema nunca publica, cambia precios ni borra nada en ML sin que lo pidas.
 
@@ -164,7 +168,8 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
 
 **Cómo se usa:**
 1. Abre una pregunta: ves la publicación, la pregunta y las preguntas anteriores de ese comprador.
-2. Responde escribiendo, con una **respuesta rápida** (botón con un texto guardado) o con **Proponer con IA**: la
+2. Responde escribiendo, con una **respuesta rápida** (botón con un texto guardado; puede llevar **datos que se llenan
+   solos**: `{producto}`, `{precio}`, `{precio_bs}` = precio × tasa BCV del día y `{tasa_bcv}`) o con **Proponer con IA**: la
    IA lee la publicación, tus políticas y lo que el sistema aprendió de ese producto y propone una respuesta.
    **No se envía nada sin que la revises.**
    Antes de mostrarla, una segunda revisión busca cada dato de la propuesta (colores, medidas, envío, ubicación,
@@ -230,6 +235,9 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.
 - **Respuestas rápidas de mensajes:** botones con textos guardados; un clic pone el texto y lo puedes retocar.
+  Pueden llevar datos que se llenan solos: `{nombre}` (primer nombre del comprador), `{producto}`, `{precio}`,
+  `{precio_bs}` (precio × tasa BCV del día) y `{tasa_bcv}`. Si falta un dato (ej. la venta tiene varios productos),
+  queda escrito entre llaves y no se puede enviar hasta que lo escribas a mano.
   Si no tienes ninguna, el sistema ofrece unos ejemplos para empezar.
 - **Proponer con IA:** lee la conversación, la nota y la venta y propone una respuesta (no envía nada). Si la guía
   no salió de Despachos, usa la de MercadoEnvíos. Si preguntan algo que depende de tu equipo (cuándo sale el paquete,

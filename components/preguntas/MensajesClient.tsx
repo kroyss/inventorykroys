@@ -1,5 +1,7 @@
 'use client'
 import MiIA from '@/components/miia/MiIA'
+import { conDatosDeEjemplo, rellenarVariables } from '@/lib/variablesTexto'
+import { AyudaVariables } from './AyudaVariables'
 import MensajesIAPrueba from '@/components/preguntas/MensajesIAPrueba'
 import SituacionChip, { type Situacion } from './SituacionChip'
 import AvisoPesos from './AvisoPesos'
@@ -216,6 +218,7 @@ const conUsd = (it: { usd?: number | null; moneda?: string | null }) => it.usd !
 export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = false }: { c: Conversacion; rapidas: MensajeRapido[]; onCambio: () => void; soloLectura?: boolean; sinNotas?: boolean }) {
   const [mensajes, setMensajes] = useState<Mensaje[] | null>(null)
   const [comprador, setComprador] = useState<{ nick: string | null; nombre: string | null } | null>(null)
+  const [tasa, setTasa] = useState<number | null>(null)   // BCV del día, para {precio_bs}/{tasa_bcv}
   const [items, setItems] = useState<{ id: string; titulo: string; variante?: string | null; cantidad: number; precio?: number | null; moneda?: string | null; usd?: number | null; usd_aprox?: boolean; link: string | null; imagen?: string | null
     envio?: { estado: 'ambas' | 'tealca' | 'destino' | 'sin_peso'; texto: string; conflicto?: ConflictoPesos | null } | null; situacion?: Situacion; disponible?: number | null; variacion?: number | null }[] | null>(null)
   const [previas, setPrevias] = useState<PreguntaPrevia[]>([])
@@ -293,6 +296,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
     if (d.comprador) setComprador(d.comprador)
     if (Array.isArray(d.preguntas)) setPrevias(d.preguntas)
     setRecordatorio(d.recordatorio ?? null)
+    setTasa(typeof d.tasa_bcv === 'number' ? d.tasa_bcv : null)
     if (marcar) onCambio()
   }, [c.pack_id, onCambio])
   useEffect(() => { leer() }, [leer])
@@ -490,7 +494,12 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
             <div className="flex gap-1.5 min-w-0 overflow-x-auto [scrollbar-width:none] md:flex-wrap md:overflow-visible">
               {rapidas.map((rp, i) => (
                 <button key={i} type="button" title={rp.texto}
-                  onClick={() => { const t = rp.texto.slice(0, 350); setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
+                  onClick={() => {
+                    // Variables (lib/variablesTexto.ts): con una sola compra van su producto y precio en $; con varias, no.
+                    const it = items?.length === 1 ? items[0] : null
+                    const t = rellenarVariables(rp.texto, { nombre: comprador?.nombre ?? c.comprador_nombre, producto: it?.titulo,
+                      precio: it ? (it.moneda === 'USD' ? it.precio : it.usd) ?? null : null, tasa }).texto.slice(0, 350)
+                    setTexto(t); setOrigen({ fuente: 'rapida', base: t }); setMeta(null) }}
                   className="shrink-0 whitespace-nowrap max-w-[12rem] truncate text-xs rounded-full px-2.5 py-1 ring-1 ring-inset ring-neutral-300 text-neutral-700 hover:bg-neutral-100">
                   {rp.titulo}
                 </button>
@@ -555,8 +564,8 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
 
   const guardar = async (nueva: MensajeRapido[] = lista) => {
     const limpias = nueva.map(p => ({ titulo: p.titulo.trim(), texto: p.texto.trim() })).filter(p => p.titulo && p.texto)
-    const malas = limpias.filter(p => problemasDelTexto(p.texto, 'mensaje').length)
-    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto, 'mensaje').join(', ')}` }); return }
+    const malas = limpias.filter(p => problemasDelTexto(conDatosDeEjemplo(p.texto), 'mensaje').length)
+    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(conDatosDeEjemplo(malas[0].texto), 'mensaje').join(', ')}` }); return }
     setGuardando(true)
     const r = await fetch('/api/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -611,6 +620,7 @@ function EditorRapidos({ iniciales, sugeridas, onGuardado }: { iniciales: Mensaj
                     <textarea value={p.texto} onChange={e => cambiar(i, { texto: e.target.value })} rows={6} maxLength={350}
                       placeholder="Texto del mensaje (ej. ¡Hola! Gracias por tu compra, ya estamos preparando tu pedido)"
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm leading-relaxed resize-y" />
+                    <AyudaVariables conNombre onAgregar={v => cambiar(i, { texto: `${p.texto}${p.texto && !p.texto.endsWith(' ') ? ' ' : ''}${v}` })} />
                     <div className="flex items-center justify-between gap-2">
                       <span className={`text-[11px] ${n >= 350 ? 'text-red-600 font-medium' : 'text-neutral-400'}`}>{n}/350{n >= 350 ? ' · llegó al límite de MercadoLibre' : ''}</span>
                       <BotonEliminar nombre={p.titulo} onEliminar={() => eliminar(i)} />

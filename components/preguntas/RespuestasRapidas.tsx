@@ -1,5 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { conDatosDeEjemplo } from '@/lib/variablesTexto'
+import { AyudaVariables } from './AyudaVariables'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, type Plantilla } from '@/lib/preguntasTexto'
 import type { Propuesta } from '@/lib/propuestasRespuestas'
@@ -62,8 +64,8 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
       ...p, id: p.id || nuevoId(), titulo: p.titulo.trim(), texto: p.texto.trim(),
       palabras: (p.palabras ?? []).map(w => w.trim().toLowerCase()).filter(Boolean),
     })).filter(p => p.titulo && p.texto)
-    const malas = limpias.filter(p => problemasDelTexto(p.texto).length)
-    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(malas[0].texto).join(', ')}` }); return false }
+    const malas = limpias.filter(p => problemasDelTexto(conDatosDeEjemplo(p.texto)).length)
+    if (malas.length) { setMsg({ ok: false, t: `"${malas[0].titulo}": ${problemasDelTexto(conDatosDeEjemplo(malas[0].texto)).join(', ')}` }); return false }
     setGuardando(true)
     const r = await fetch('/api/settings', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -203,6 +205,7 @@ export function RespuestasRapidas({ iniciales, onGuardado }: { iniciales: Planti
                     </div>
                     <textarea value={p.texto} onChange={ev => cambiar(i, { texto: ev.target.value })} rows={4} maxLength={2000}
                       placeholder="Texto de la respuesta" className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm resize-y" />
+                    <AyudaVariables conNombre={false} onAgregar={v => cambiar(i, { texto: `${p.texto}${p.texto && !p.texto.endsWith(' ') ? ' ' : ''}${v}` })} />
                     <Aprendizaje e={e} propias={p.palabras ?? []}
                       onQuitarPropia={w => cambiar(i, { palabras: (p.palabras ?? []).filter(x => x !== w) })}
                       onQuitarAprendida={w => p.id && quitarAprendida(p.id, w)} />

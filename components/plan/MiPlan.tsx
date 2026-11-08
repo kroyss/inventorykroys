@@ -5,6 +5,7 @@
 // `acceso`: entra desde /renovar (cuenta vencida, sin sesión) con el acceso firmado de /api/mi-plan/entrar.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
+import { CICLOS, CICLOS_IDS, DESCUENTO_FUNDADOR, type Ciclo } from '@/lib/planes'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 const fmtBs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -41,7 +42,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const [s, setS] = useState<SituacionPlan | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState<string>('automatizaciones')
-  const [ciclo, setCiclo] = useState<'mensual' | 'trimestral'>('mensual')
+  const [ciclo, setCiclo] = useState<Ciclo>('mensual')
   // 06-11 (Plan A/B): qué paga — renovar el plan, 1 mes de Radar PRO aparte o pasar a un plan mejor.
   const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade'>('plan')
   const [mejora, setMejora] = useState<string>('')
@@ -68,7 +69,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
   const tipo = compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade' : 'plan'
   const total = tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
-    : Math.round((ciclo === 'trimestral' ? op.trimestral : op.mensual) * 100) / 100
+    : Math.round(op.porCiclo[ciclo] * 100) / 100
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
   const comprobante = (k: CobroFila) => `/api/mi-plan/comprobante/${k.id}${acceso ? `?acceso=${encodeURIComponent(acceso)}` : ''}`
@@ -198,12 +199,17 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
               </div>
             )}
             <div className="flex flex-wrap gap-2 text-sm">
-              {(['mensual', 'trimestral'] as const).map(c => (
-                <button key={c} type="button" onClick={() => setCiclo(c)}
-                  className={`rounded-full border px-3 py-1 ${ciclo === c ? 'border-sky-400 bg-sky-50 text-sky-900' : 'border-neutral-200 text-neutral-600'}`}>
-                  {c === 'mensual' ? 'Mensual' : `Trimestral${s.fundador ? '' : ' (−10%)'}`}
-                </button>
-              ))}
+              {/* 07-11 (Fase 1.3): 1, 3, 6 o 12 meses; el descuento se muestra solo si mejora el de Fundador (no se suman). */}
+              {CICLOS_IDS.map(c => {
+                const d = CICLOS[c].descuento
+                const ver = d > 0 && (!s.fundador || d > DESCUENTO_FUNDADOR)
+                return (
+                  <button key={c} type="button" onClick={() => setCiclo(c)}
+                    className={`rounded-full border px-3 py-1 ${ciclo === c ? 'border-sky-400 bg-sky-50 text-sky-900' : 'border-neutral-200 text-neutral-600'}`}>
+                    {c === 'mensual' ? 'Mensual' : CICLOS[c].nombre}{ver && <span className="text-lime-700"> (−{d}%)</span>}
+                  </button>
+                )
+              })}
             </div>
             {op.radar && s.radarPro.regalo && (
               <p className="text-xs text-lime-700">
@@ -213,7 +219,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             {s.cuentasExtra > 0 && <p className="text-xs text-neutral-500">Incluye {s.cuentasExtra} cuenta(s) de MercadoLibre extra (tienes {s.cuentas}; el plan trae 2).</p>}
             </>}
             <div className="flex items-baseline justify-between border-t border-neutral-100 pt-3">
-              <span className="text-sm text-neutral-600">Total a pagar{tipo === 'plan' && ciclo === 'trimestral' ? ' (3 meses)' : ''}</span>
+              <span className="text-sm text-neutral-600">Total a pagar{tipo === 'plan' && ciclo !== 'mensual' ? ` (${CICLOS[ciclo].nombre})` : ''}</span>
               <span className="text-lg font-semibold num">{fmtUsd(total)}</span>
             </div>
           </section>

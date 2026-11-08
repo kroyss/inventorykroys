@@ -59,6 +59,19 @@ export const CUENTAS_INCLUIDAS = 2
 export const CUENTA_EXTRA = 3
 export const RECARGA_IA = { creditos: 100, precio: 4 }
 export const DESCUENTO_TRIMESTRAL = 10
+// Pagar varios meses juntos (07-11-2026, Fase 1.3 de docs/analisis-mercasist.md, decisión del dueño): −10 % por 3 meses,
+// −20 % por 6 y −30 % por 12. Es solo del plan y no se suma con el de Fundador (se toma el mayor).
+export const CICLOS = {
+  mensual: { meses: 1, descuento: 0, nombre: '1 mes' },
+  trimestral: { meses: 3, descuento: DESCUENTO_TRIMESTRAL, nombre: '3 meses' },
+  semestral: { meses: 6, descuento: 20, nombre: '6 meses' },
+  anual: { meses: 12, descuento: 30, nombre: '12 meses' },
+} as const
+export type Ciclo = keyof typeof CICLOS
+export const CICLOS_IDS = Object.keys(CICLOS) as Ciclo[]
+/** El ciclo guardado (o mensual si no hay o no se reconoce). */
+export const cicloDe = (c: string | null | undefined): Ciclo => (c && c in CICLOS ? c : 'mensual') as Ciclo
+export const mesesCiclo = (c: string | null | undefined) => CICLOS[cicloDe(c)].meses
 
 // ── Asignar planes en Plataforma (01-11-2026, migración 138) ─────────────────────────────────────────────────────
 // Módulos que el plan prende o apaga. Lo demás (inventario, ia_automatica, etiquetas…) no lo toca el plan:
@@ -76,13 +89,13 @@ export const planConRadar = (plan: string | null | undefined) => !!plan && (MODU
 export const DESCUENTO_FUNDADOR = 30
 export const RADAR_PRO = { precio: 6 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
 
-/** Monto a cobrar: (precio del escalón + cuentas extra) × meses, con el mayor descuento (Fundador o trimestral, no se suman). */
-export function montoPlan(plan: Plan['id'], escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra = 0) {
-  // El descuento (fundador o trimestral, no se suman) es solo del plan: cuentas extra, Radar PRO y recargas van completos.
+/** Monto a cobrar: (precio del escalón + cuentas extra) × meses, con el mayor descuento (Fundador o por meses, no se suman). */
+export function montoPlan(plan: Plan['id'], escalon: number, ciclo: Ciclo, fundador: boolean, cuentasExtra = 0) {
+  // El descuento (fundador o por meses, no se suman) es solo del plan: cuentas extra, Radar PRO y recargas van completos.
   const base = ESCALONES[escalon]?.precios[plan] ?? 0
   const extras = Math.max(0, cuentasExtra) * CUENTA_EXTRA
-  const meses = ciclo === 'trimestral' ? 3 : 1
-  const descuento = Math.max(fundador ? DESCUENTO_FUNDADOR : 0, ciclo === 'trimestral' ? DESCUENTO_TRIMESTRAL : 0)
+  const meses = mesesCiclo(ciclo)
+  const descuento = Math.max(fundador ? DESCUENTO_FUNDADOR : 0, CICLOS[cicloDe(ciclo)].descuento)
   return { base, extras, meses, descuento, total: Math.round(base * meses * (100 - descuento) + extras * meses * 100) / 100 }
 }
 

@@ -8,6 +8,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { mlConfigurado } from '@/lib/ml'
 import { iaConfigurada } from '@/lib/preguntas'
 import { leerPlantillas } from '@/lib/preguntasTexto'
+import { tasaBCVHoy } from '@/lib/tasaDia'
 
 // GET /api/preguntas?vista=pendientes|respondidas&page=1&q=
 // Bandeja de la empresa + contadores + cuentas conectadas + qué falta configurar.
@@ -78,6 +79,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       preguntas: rows, total: tot.n, page, tam: TAM, contadores: n, cuentas,
       plantillas: leerPlantillas(pl?.value),
+      tasa_bcv: s.session.user.country === 'VE' ? await tasaBCVHoy(s.db) : null,   // variables {precio_bs}/{tasa_bcv} (lib/variablesTexto.ts)
       configuracion: { ml: mlConfigurado(), ia: iaConfigurada() },
       tablasEnvio: conEnvio ? await leerTablasEnvio(s.db) : null,   // ZOOM y TEALCA de Ajustes (19-10)
     })
