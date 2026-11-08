@@ -27,6 +27,14 @@ export default function PublicacionesClient() {
   const [elegidas, setElegidas] = useState<Set<string>>(new Set())
   const [todasBusqueda, setTodasBusqueda] = useState(false)
   const [accion, setAccion] = useState<null | 'descripcion' | 'precio'>(null)
+  // 08-11: «Actualizar desde ML» relee el catálogo ya (si no, las nuevas aparecen en la vuelta automática de cada 6 h).
+  const [recarga, setRecarga] = useState(0)
+  const [actualizando, setActualizando] = useState(false)
+  const actualizar = async () => {
+    setActualizando(true)
+    await fetch('/api/publicaciones', { method: 'POST' }).catch(() => null)
+    setActualizando(false); setRecarga(n => n + 1)
+  }
 
   useEffect(() => { const t = setTimeout(() => { setBuscar(q); setPagina(1) }, 300); return () => clearTimeout(t) }, [q])
   useEffect(() => {
@@ -35,7 +43,7 @@ export default function PublicacionesClient() {
     fetch(`/api/publicaciones?${p}`).then(x => x.ok ? x.json() : Promise.reject())
       .then(d => { if (vivo) { setR(d); setError(false) } }).catch(() => { if (vivo) setError(true) })
     return () => { vivo = false }
-  }, [buscar, cuenta, estado, pagina])
+  }, [buscar, cuenta, estado, pagina, recarga])
 
   const paginas = r ? Math.max(1, Math.ceil(r.total / r.porPagina)) : 1
   const limpiar = () => { setElegidas(new Set()); setTodasBusqueda(false) }
@@ -48,7 +56,11 @@ export default function PublicacionesClient() {
   const marcarPagina = () => { setTodasBusqueda(false); setElegidas(s => { const n = new Set(s); r?.filas.forEach(f => paginaMarcada ? n.delete(f.item_id) : n.add(f.item_id)); return n }) }
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap justify-end gap-3 text-sm">
+      <div className="flex flex-wrap justify-end items-center gap-3 text-sm">
+        <button type="button" onClick={actualizar} disabled={actualizando} className="text-sky-700 hover:underline disabled:opacity-50"
+          title="Trae de MercadoLibre las publicaciones nuevas y los cambios (solo se refresca solo cada 6 horas)">
+          {actualizando ? 'Actualizando desde ML…' : '↻ Actualizar desde ML'}
+        </button>
         <Link href="/publicaciones/textos" className="text-sky-700 hover:underline">Textos de descripción</Link>
         <Link href="/publicaciones/lotes" className="text-sky-700 hover:underline">Cambios en lote</Link>
       </div>

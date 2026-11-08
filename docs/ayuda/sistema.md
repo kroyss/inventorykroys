@@ -323,6 +323,8 @@ usuario la tienen):
 **Editar** sirve para cambiar tus publicaciones **sin entrar a ML**, con una pantalla parecida a la de ML.
 
 - **Buscar:** por título, SKU o número (MLV…), por cuenta y activas/pausadas. Toca una para abrirla.
+- **↻ Actualizar desde ML** (arriba a la derecha): trae ya las publicaciones nuevas o recién reactivadas. Sin tocarlo,
+  la lista se refresca sola cada 6 horas, por eso una recién publicada puede no aparecer al momento.
 - La pantalla trae lo que hay **ahora mismo** en MercadoLibre:
   - **Título:** solo se puede cambiar si la publicación **no tiene ventas** (regla de MercadoLibre).
   - **Precio, stock y estado** (activa / pausada). Debajo del precio ves la comisión de ML estimada (la de Ajustes) y

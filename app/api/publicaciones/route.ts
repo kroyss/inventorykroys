@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sesionPublicaciones } from '@/lib/preguntasSesion'
 import { apiError } from '@/lib/apiError'
 import { whereFiltro } from '@/lib/publicacionesLista'
+import { actualizarCatalogo } from '@/lib/catalogoML'
 
 const POR_PAGINA = 40
 
@@ -23,6 +24,21 @@ export async function GET(req: NextRequest) {
       s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`),
     ])
     return NextResponse.json({ filas: rows, total: t.n, porPagina: POR_PAGINA, cuentas })
+  } catch (err) {
+    return apiError(err)
+  }
+}
+
+// POST /api/publicaciones → relee YA de MercadoLibre el catálogo de todas las cuentas (08-11, el dueño: las recién
+// publicadas no salían hasta la vuelta automática de cada 6 horas).
+export async function POST() {
+  const s = await sesionPublicaciones()
+  if ('error' in s) return s.error
+  try {
+    const { rows } = await s.db.query(`SELECT id FROM ml_conexiones WHERE estado = 'activa'`)
+    let n = 0
+    for (const c of rows) n += (await actualizarCatalogo(s.db, c.id, true).catch(() => null)) ?? 0
+    return NextResponse.json({ ok: true, leidas: n })
   } catch (err) {
     return apiError(err)
   }
