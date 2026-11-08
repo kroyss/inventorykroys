@@ -58,6 +58,8 @@ export const MODULOS = {
   // 08-11 (migración 151): Reportes → Atención ML y el bloque «Tu semana» del resumen de los lunes. En prueba solo SolucionesMC.
   atencion_ml:        'Atención ML: reporte de preguntas, respuestas, tiempo de respuesta y ventas de ML, y «Tu semana» en el resumen de Telegram de los lunes (en prueba)',
   mensajes_ia:        'Mensajes con IA en prueba: la IA deja escrito el borrador de cada mensaje nuevo y se marca Bien/Mal (no manda nada)',
+  // 08-11 (migración 152): Productos → Catálogo PDF (logo, con o sin precio, elegir productos) para mandar por WhatsApp.
+  catalogo_pdf:       'Catálogo PDF: armar un catálogo con logo, fotos y precios (o sin precios) para mandar por WhatsApp (Productos)',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -85,6 +87,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/productos/mercadoenvios': 'descuento_ml',
   '/productos/margenes':      'descuento_ml',
   '/productos/promociones':   'promociones',
+  '/productos/catalogo':      'catalogo_pdf',
 }
 
 /** Empresa que solo tiene el Radar: no tiene nada que ver en el Sistema. */

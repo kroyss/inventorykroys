@@ -121,12 +121,13 @@ interface Props {
   country:          Country
   mlAccounts: string[]   // cuentas ML de la empresa (Ajustes o, si no hay, las conectadas)
   descuento: boolean     // módulo Descuento ML: sin él el descuento vale 0 (/api/settings) y no se muestra
+  catalogo?: boolean     // módulo catalogo_pdf (Catálogo PDF para WhatsApp)
   importarML?: boolean   // permiso "Importar productos desde MercadoLibre" + cuentas de ML (Primeros pasos)
   categorias?: boolean   // módulo precios_categorias. Apagado (Inventario simple): precio = lo publicado, sin categoría ni exceso
   promociones?: boolean  // módulo promociones + permiso (migración 094): link a Promociones
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false }: Props) {
   // Inventario simple: el precio de venta es el que se guardó (lo publicado en ML), no costo × categoría × exceso.
   const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
@@ -530,6 +531,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             Márgenes &lt; $5
           </Link>
         )}
+        {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF</Link>}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nuevo producto</button>
       </>} />
 

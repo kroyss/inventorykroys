@@ -15,7 +15,7 @@ interface Eco {
 }
 interface Decision {
   modo: Modo; decision: 'sola' | 'revisar'; motivos: string[]; respuesta?: string; confianza?: string
-  publicada?: boolean; error?: string; marca?: 'bien' | 'mal' | null; costo?: number
+  publicada?: boolean; escape?: boolean; error?: string; marca?: 'bien' | 'mal' | null; costo?: number
   entrada?: number; salida?: number; eco?: Eco; eco55?: Eco
 }
 interface ResumenEco {
@@ -154,6 +154,7 @@ export function IaAutomatica() {
               <p className="text-sm rounded-lg bg-sky-50 px-3 py-2 text-sky-950"><span className="text-xs font-semibold text-sky-700 mr-1.5">IA</span>{p.ia_auto.respuesta || '(sin respuesta)'}</p>
               {p.ia_auto.decision === 'revisar' && p.ia_auto.motivos?.length > 0 && <p className="text-xs text-amber-700">Por qué no sale sola: {p.ia_auto.motivos.join(' · ')}</p>}
               {p.ia_auto.publicada && <p className="text-xs text-emerald-700">Publicada sola en MercadoLibre.</p>}
+              {p.ia_auto.escape && <p className="text-xs text-sky-700">Se respondió con la frase de «Responder todo».</p>}
               {p.ia_auto.error && <p className="text-xs text-red-600">{p.ia_auto.error}</p>}
               {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
                 <p className="text-sm rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700"><span className="text-xs font-semibold text-neutral-500 mr-1.5">Publicada</span>{p.respuesta}</p>)}

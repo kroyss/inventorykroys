@@ -1,0 +1,93 @@
+// Descripción de una publicación en 3 partes (08-11-2026, pedido del dueño): encabezado (arriba) + descripción del
+// producto + pie (ubicación, horario, pagos, envíos, condiciones). En el sistema van separadas; a MercadoLibre se
+// manda todo junto, cada parte separada por una línea en blanco. Sin dependencias: lo usan la pantalla y el servidor.
+
+export const SEPARADOR = '\n\n'
+export const MAX_DESCRIPCION = 50000
+
+const normal = (s: string) => s.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim()
+
+export function componer(encabezado: string | null | undefined, cuerpo: string, pie: string | null | undefined) {
+  return [encabezado, cuerpo, pie].map(x => normal(x ?? '')).filter(Boolean).join(SEPARADOR)
+}
+
+/** ¿Son el mismo texto? (sin contar espacios al final de línea ni saltos de línea de Windows) */
+export const mismoTexto = (a: string, b: string) => normal(a) === normal(b)
+
+export interface PlantillaTexto { id: number; tipo: 'encabezado' | 'pie'; texto: string }
+
+/** Separa un texto de ML con las plantillas guardadas: si empieza con un encabezado conocido o termina con un pie
+ *  conocido (texto exacto), los saca. Lo que queda es el cuerpo. Gana el más largo si hay varios. */
+export function separar(texto: string, plantillas: PlantillaTexto[]) {
+  let resto = normal(texto)
+  let encabezado: PlantillaTexto | null = null, pie: PlantillaTexto | null = null
+  const porLargo = [...plantillas].sort((a, b) => normal(b.texto).length - normal(a.texto).length)
+  for (const p of porLargo.filter(x => x.tipo === 'encabezado')) {
+    const t = normal(p.texto)
+    if (t && resto.startsWith(t) && (resto.length === t.length || resto[t.length] === '\n')) { encabezado = p; resto = resto.slice(t.length).trim(); break }
+  }
+  for (const p of porLargo.filter(x => x.tipo === 'pie')) {
+    const t = normal(p.texto)
+    if (t && resto.endsWith(t) && (resto.length === t.length || resto[resto.length - t.length - 1] === '\n')) { pie = p; resto = resto.slice(0, resto.length - t.length).trim(); break }
+  }
+  return { encabezado, pie, cuerpo: resto }
+}
+
+// Lo que MercadoLibre acepta en la descripción: texto plano. Letras (con acentos y ñ), números, espacios y los signos
+// básicos. Lo demás (emojis, símbolos raros, viñetas especiales) ML lo rechaza o lo borra.
+const PERMITIDO = /[\p{L}\p{N}\s.,;:¿?¡!()[\]{}"'`´\-_+*/\\#%&@$=<>|°ºª~^€£¥…·•–—“”‘’]/u
+
+/** Los caracteres que ML no acepta (sin repetir), para avisar antes de guardar. */
+export function caracteresNoPermitidos(texto: string): string[] {
+  const malos = new Set<string>()
+  for (const ch of texto) if (!PERMITIDO.test(ch)) malos.add(ch)
+  return [...malos]
+}
+
+/** Quita los caracteres que ML no acepta (y los espacios dobles que quedan). */
+export function limpiarTexto(texto: string) {
+  let out = ''
+  for (const ch of texto) if (PERMITIDO.test(ch)) out += ch
+  return out.replace(/[ \t]{2,}/g, ' ')
+}
+
+/** Teléfonos, correos o links: ML no los permite en la descripción (puede pausar la publicación). */
+export function tieneContacto(texto: string) {
+  return /\b[\w.+-]+@[\w-]+\.[\w.]+\b/.test(texto) || /(https?:\/\/|www\.)\S+/i.test(texto) || /(\+?\d[\d\s-]{8,}\d)/.test(texto)
+}
+
+// ── Detectar textos repetidos (pies y encabezados que ya están pegados en muchas descripciones) ──
+export interface Candidato { tipo: 'encabezado' | 'pie'; texto: string; lineas: number; items: string[] }
+
+/** De las descripciones de una cuenta, los finales (pies) e inicios (encabezados) que se repiten en al menos
+ *  `minimo` publicaciones. Por cada largo se cuentan las publicaciones que comparten exactamente esas líneas; se
+ *  queda con los más largos que no son parte de otro mejor. */
+export function detectarRepetidos(textos: { item: string; texto: string }[], minimo = 3, maxLineas = 40): Candidato[] {
+  const out: Candidato[] = []
+  for (const tipo of ['pie', 'encabezado'] as const) {
+    const cuenta = new Map<string, { lineas: number; items: string[] }>()
+    for (const { item, texto } of textos) {
+      const ls = normal(texto).split('\n')
+      const vistos = new Set<string>()
+      for (let k = 2; k <= Math.min(maxLineas, ls.length - 1); k++) {
+        const parte = (tipo === 'pie' ? ls.slice(ls.length - k) : ls.slice(0, k)).join('\n').trim()
+        if (!parte || vistos.has(parte)) continue
+        vistos.add(parte)
+        const c = cuenta.get(parte) ?? { lineas: k, items: [] }
+        c.items.push(item)
+        cuenta.set(parte, c)
+      }
+    }
+    const buenos = [...cuenta.entries()].filter(([, c]) => c.items.length >= minimo)
+      .sort((a, b) => b[1].lineas * b[1].items.length - a[1].lineas * a[1].items.length)
+    const elegidos: Candidato[] = []
+    for (const [texto, c] of buenos) {
+      // Fuera si es parte de uno ya elegido que lo tiene casi en las mismas publicaciones.
+      if (elegidos.some(e => (tipo === 'pie' ? e.texto.endsWith(texto) : e.texto.startsWith(texto)) && e.items.length >= c.items.length * 0.8)) continue
+      elegidos.push({ tipo, texto, lineas: c.lineas, items: c.items })
+      if (elegidos.length >= 6) break
+    }
+    out.push(...elegidos)
+  }
+  return out
+}

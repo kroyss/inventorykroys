@@ -18,6 +18,7 @@ import { esDemoEmpresa } from '@/lib/demo'
 import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
 import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
+import { procesarLotes } from '@/lib/lotesPublicaciones'
 import type { Country } from '@/lib/types'
 
 // Cron de preguntas (crontab del VPS, cada minuto, con CRON_SECRET):
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
     // Inactiva: ningún usuario suyo usó el sistema en DIAS_INACTIVA días (la plataforma nunca).
     `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario, 'pagos_me' = ANY(e.modulos) AS pagos_me,
-            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto, 'mensajes_ia' = ANY(e.modulos) AS msg_ia,
+            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto, 'mensajes_ia' = ANY(e.modulos) AS msg_ia, 'publicaciones' = ANY(e.modulos) AS publicaciones,
             o.estado <> 'propietario' AND COALESCE((
               SELECT MAX(GREATEST(u.ultima_actividad, u.last_login)) FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
               WHERE ue.empresa_id = e.id) < NOW() - INTERVAL '${DIAS_INACTIVA} days', TRUE) AS inactiva
@@ -90,6 +91,15 @@ export async function GET(req: NextRequest) {
       if (r) console.log('[planes vencidos]', r)
     } catch (err) {
       console.error('[planes vencidos]', err instanceof Error ? err.message : err)
+    }
+    // Publicaciones en lote (lib/lotesPublicaciones.ts, mig 152): pies/encabezados, precios y lecturas, de a pocas por minuto.
+    for (const e of sincronizadas.filter(x => x.publicaciones)) {
+      try {
+        const r = await conEmpresa(e.id, e.country as Country, db => procesarLotes(db))
+        if (r) console.log('[publicaciones lote]', e.id, r)
+      } catch (err) {
+        console.error('[publicaciones lote]', e.id, err instanceof Error ? err.message : err)
+      }
     }
     for (const e of sincronizadas.filter(x => x.stock)) {
       try {

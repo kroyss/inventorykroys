@@ -19,6 +19,7 @@ const Body = z.object({
     .refine(h => h.desde !== h.hasta, 'La hora de inicio y la de fin no pueden ser iguales').nullable(),
   tope: z.number().int().min(1, 'El tope mínimo es 1').max(50),
   escape: z.string().trim().max(200).nullable(),
+  escapePreguntas: z.string().trim().max(350).nullable().optional(),
 })
 
 export async function PUT(req: NextRequest) {
@@ -30,6 +31,10 @@ export async function PUT(req: NextRequest) {
     if (p.data.escape) {
       const malo = problemasDelTexto(p.data.escape, 'mensaje')
       if (malo.length) return NextResponse.json({ error: `La frase de escape: ${malo.join(' · ')}` }, { status: 400 })
+    }
+    if (p.data.escapePreguntas) {
+      const malo = problemasDelTexto(p.data.escapePreguntas, 'pregunta')
+      if (malo.length) return NextResponse.json({ error: `La frase para Preguntas: ${malo.join(' · ')}` }, { status: 400 })
     }
     const v = normalizarFrenos(p.data)
     await s.db.query(

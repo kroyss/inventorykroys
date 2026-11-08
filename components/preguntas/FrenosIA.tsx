@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 // Frenos de la IA automática (07-11, lib/iaFrenos.ts): horario, tope por comprador y (en Mensajes) frase de escape.
 // Valen para Preguntas y Mensajes a la vez (mismo guardado). Solo actúan con la IA automática ACTIVA.
 type Horario = { dias: number[]; desde: string; hasta: string }
-type Frenos = { horario: Horario | null; tope: number; escape: string | null }
+type Frenos = { horario: Horario | null; tope: number; escape: string | null; escapePreguntas: string | null }
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 export function FrenosIA({ conEscape }: { conEscape: boolean }) {
@@ -70,6 +70,20 @@ export function FrenosIA({ conEscape }: { conEscape: boolean }) {
           <textarea rows={2} maxLength={200} value={f.escape ?? ''} onChange={e => setF({ ...f, escape: e.target.value })}
             onBlur={() => guardar({ ...f, escape: f.escape?.trim() || null })}
             placeholder="Ej.: ¡Recibido! En un momento te confirmamos." className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+        </div>
+      )}
+      {!conEscape && (
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-2 text-sm text-neutral-800">
+            <input type="checkbox" checked={f.escapePreguntas != null} onChange={e => e.target.checked ? setF({ ...f, escapePreguntas: '' }) : guardar({ ...f, escapePreguntas: null })} />
+            Responder todo <span className="text-neutral-400">(opcional)</span>
+          </label>
+          <p className="text-xs text-neutral-500 pl-6">Lo que la IA deja para revisar se contesta con esta frase, así ninguna pregunta queda sin respuesta (por ejemplo de noche). Ojo: MercadoLibre acepta <b>una sola respuesta</b> por pregunta, así que esa pregunta queda respondida con la frase. La respuesta de la IA queda escrita para que la veas. No se usa con el tope por comprador ni con publicaciones pausadas.</p>
+          {f.escapePreguntas != null && (
+            <textarea rows={2} maxLength={350} value={f.escapePreguntas} onChange={e => setF({ ...f, escapePreguntas: e.target.value })}
+              onBlur={() => f.escapePreguntas?.trim() && guardar({ ...f, escapePreguntas: f.escapePreguntas.trim() })}
+              placeholder="Ej.: Hola, sí tenemos disponible. Escríbenos por mensaje después de la compra y te confirmamos todos los detalles." className="ml-6 w-[calc(100%-1.5rem)] rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          )}
         </div>
       )}
       {(guardando || msg) && <p className={`text-xs ${guardando ? 'text-neutral-500' : msg?.ok ? 'text-lime-700' : 'text-red-600'}`}>{guardando ? 'Guardando…' : msg?.t}</p>}

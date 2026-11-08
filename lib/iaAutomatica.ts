@@ -13,13 +13,14 @@ import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
 import { automaticasPausadas } from '@/lib/automaticasPreguntas'
 import { simularEconomica, type DecisionEco } from '@/lib/iaEconomica'
-import { leerFrenos, motivosFrenos } from '@/lib/iaFrenos'
+import { leerFrenos, motivosFrenos, MOTIVO_TOPE } from '@/lib/iaFrenos'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
 export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean }   // v2 (07-11): prueba por empresa, "v2": true en el JSON
 export interface DecisionIA {
   modo: ModoIA; decision: 'sola' | 'revisar'; motivos: string[]; respuesta: string; confianza: string
   verificacion: string | null; modelo: string; costo: number; fecha: string; publicada?: boolean; error?: string
+  escape?: boolean                          // «Responder todo» (08-11): se contestó con la frase de Preguntas
   version?: 'v2'
   marca?: 'bien' | 'mal' | null; marcada_at?: string
   entrada?: number; salida?: number        // tokens (04-11, para comparar con la versión económica)
@@ -142,6 +143,12 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         d.publicada = r.ok && !!r.publicada
         if (!r.ok) d.error = r.error
         if (d.publicada) publicadas++; else fallas++
+      } else if (d.decision === 'revisar' && cfg.modo === 'real' && frenos?.escapePreguntas
+                 && !motivos.some(m => m.startsWith(MOTIVO_TOPE)) && (c.item?.status ?? q.item_estado) !== 'paused') {
+        // «Responder todo» (opcional): la pregunta no queda sin contestar; la respuesta de la IA queda escrita para ver.
+        const r = await publicarRespuesta(db, q.id, frenos.escapePreguntas, { fuente: 'ia_escape', base: frenos.escapePreguntas })
+        if (r.ok && r.publicada) d.escape = true
+        else if (!r.ok) d.error = r.error
       }
       d.decision === 'sola' ? solas++ : revisar++
       // Activa: la respuesta queda como borrador (quien abra la pregunta la encuentra escrita). En prueba NO: el equipo

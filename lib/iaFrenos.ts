@@ -6,6 +6,10 @@
 //   - FRASE DE ESCAPE (solo Mensajes): cuando la IA no la manda sola, puede mandar un acuse corto ("Recibido, ya te
 //     confirmamos") y la conversación sigue en «Por atender» para el equipo. En Preguntas NO: ML acepta una sola respuesta
 //     por pregunta y la buena ya no podría ir ahí. Apagada de fábrica.
+//   - RESPONDER TODO (08-11, pedido del dueño, opcional y apagado): en Preguntas, lo que la IA deja para revisar se
+//     contesta con una frase propia (ej. "Sí, disponible. Escríbenos por mensaje tras la compra…"). La pregunta queda
+//     RESPONDIDA con esa frase (ML acepta una sola respuesta): sirve para no dejar preguntas sin contestar de noche.
+//     No se usa si el freno fue el tope por comprador ni si la publicación está pausada.
 // Solo frenan en modo REAL (en modo prueba se mide la decisión de la IA sin ellos). Se guarda en app_settings.ia_frenos.
 import type { Pool } from 'pg'
 import { COUNTRY_TZ } from '@/lib/tz'
@@ -14,7 +18,7 @@ export const CLAVE_FRENOS = 'ia_frenos'
 export const TOPE_DEFAULT = 3
 
 export interface HorarioIA { dias: number[]; desde: string; hasta: string }   // dias: 0 = domingo … 6 = sábado; "HH:MM"
-export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: string | null }
+export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: string | null; escapePreguntas: string | null }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -26,7 +30,8 @@ export function normalizarFrenos(v: unknown): FrenosIA {
     ? { dias, desde: String(h.desde), hasta: String(h.hasta) } : null
   const tope = Number.isInteger(o.tope) && (o.tope as number) >= 0 && (o.tope as number) <= 50 ? o.tope as number : TOPE_DEFAULT
   const escape = typeof o.escape === 'string' && o.escape.trim() ? o.escape.trim().slice(0, 200) : null
-  return { horario, tope, escape }
+  const escapePreguntas = typeof o.escapePreguntas === 'string' && o.escapePreguntas.trim() ? o.escapePreguntas.trim().slice(0, 350) : null
+  return { horario, tope, escape, escapePreguntas }
 }
 
 export async function leerFrenos(db: Pick<Pool, 'query'>): Promise<FrenosIA> {
@@ -49,6 +54,7 @@ export function dentroDelHorario(h: HorarioIA | null, country: string, ahora = n
   return false
 }
 
+export const MOTIVO_TOPE = 'Tope por comprador'
 export const NOMBRE_DIA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
 /** Motivos de los frenos para una respuesta automática (vacío = puede salir). */
@@ -60,13 +66,13 @@ export async function motivosFrenos(db: Pick<Pool, 'query'>, f: FrenosIA, countr
     const { rows: [r] } = modulo === 'preguntas'
       ? await db.query(
           `SELECT COUNT(*)::int AS n FROM ml_preguntas
-           WHERE comprador_id::text = $1::text AND ia_auto->>'publicada' = 'true'
+           WHERE comprador_id::text = $1::text AND (ia_auto->>'publicada' = 'true' OR ia_auto->>'escape' = 'true')
              AND COALESCE(respuesta_fecha, (ia_auto->>'fecha')::timestamptz) > NOW() - INTERVAL '24 hours'`, [String(compradorId)])
       : await db.query(
           `SELECT COUNT(*)::int AS n FROM ml_mensajes_ia i JOIN ml_conversaciones c ON c.pack_id = i.pack_id
            WHERE c.comprador_id::text = $1::text
              AND (i.enviada_at > NOW() - INTERVAL '24 hours' OR i.escape_at > NOW() - INTERVAL '24 hours')`, [String(compradorId)])
-    if ((r?.n ?? 0) >= f.tope) m.push(`Este comprador ya recibió ${r.n} respuesta${r.n === 1 ? '' : 's'} automática${r.n === 1 ? '' : 's'} en 24 h`)
+    if ((r?.n ?? 0) >= f.tope) m.push(`${MOTIVO_TOPE}: este comprador ya recibió ${r.n} respuesta${r.n === 1 ? '' : 's'} automática${r.n === 1 ? '' : 's'} en 24 h`)
   }
   return m
 }

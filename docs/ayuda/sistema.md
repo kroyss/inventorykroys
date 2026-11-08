@@ -193,8 +193,12 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
     la siguiente queda para una persona.
   - **Frase de escape (solo Mensajes):** si la IA no manda la respuesta sola, puede mandar una frase corta
     («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
-    en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas. En Preguntas no
-    existe porque MercadoLibre acepta una sola respuesta por pregunta.
+    en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas.
+  - **Responder todo (solo Preguntas, opcional, apagado de fábrica):** lo que la IA deja para revisar se contesta con
+    una frase tuya (ej. «Sí, tenemos disponible. Escríbenos por mensaje después de la compra»), así ninguna pregunta
+    queda sin respuesta. Ojo: MercadoLibre acepta **una sola respuesta** por pregunta, así que queda respondida con
+    esa frase; la respuesta de la IA queda escrita para que la veas. No se usa si frenó el máximo por comprador ni si
+    la publicación está pausada.
 - **Mi IA** también pregunta por cambios y devoluciones, ventas al mayor, rebajas, apartados, horario de atención e
   **información extra** por secciones (la IA lee cada sección solo cuando la pregunta trata de eso).
 
@@ -306,7 +310,7 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 
 ## 7b. Publicaciones (Inventario → Publicaciones)
 
-*Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación.
+*Cómo lo pregunta la gente:* editar publicación, cambiar precio en ML, cambiar fotos, características, ficha técnica, descripción, variantes, pausar publicación, cambiar precios a muchas, subir precios en lote, pie de descripción, encabezado, plantilla de descripción, cambiar la info de abajo de la descripción en todas.
 
 Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas (cada una aparece si tu empresa y tu
 usuario la tienen):
@@ -322,15 +326,41 @@ usuario la tienen):
   - **Título:** solo se puede cambiar si la publicación **no tiene ventas** (regla de MercadoLibre).
   - **Precio, stock y estado** (activa / pausada). Debajo del precio ves la comisión de ML estimada (la de Ajustes) y
     lo que te queda antes del envío y del costo.
-  - **Variantes:** el nombre de cada variante (ej. color «Rojo»), su stock y qué fotos muestra. No se crean ni se
-    borran variantes desde aquí. Con variantes, el precio es el mismo para todas.
-  - **Fotos:** cambiar el orden (la primera es la portada), quitar y **agregar** (JPG, PNG o WEBP, hasta 10 fotos).
+  - **Variantes:** el nombre de cada variante (ej. color «Rojo»), su stock y **sus fotos**: cada variante tiene las
+    suyas (subir, ordenar, quitar, o traer una de otra variante con «De otra variante»). Hasta 10 por variante y 12
+    distintas entre todas (lo que permite ML); las de la publicación se arman solas. No se crean ni se borran
+    variantes desde aquí. Con variantes, el precio es el mismo para todas.
+  - **Fotos** (sin variantes): cambiar el orden (la primera es la portada), quitar y **agregar** (JPG, PNG o WEBP,
+    hasta 12).
   - **Características principales** (las que pide ML, * = obligatoria) y **secundarias** («Ver todas» para completar
     las vacías). Si vacías una que tenía valor, queda como «No aplica».
-  - **Descripción:** solo texto (ML no acepta formato, links, teléfonos ni correos).
+  - **Descripción en 3 partes:** **encabezado** (arriba), **descripción del producto** (lo de esta publicación) y
+    **pie** (abajo: ubicación, horario, pagos, envíos, garantía…). Encabezado y pie son **textos guardados** que se
+    eligen de una lista; a ML va todo junto. **Vista previa** muestra cómo queda en ML. Si hay caracteres que ML no
+    acepta (emojis, símbolos raros) avisa y **Quitarlos** los saca; se permiten letras, números y signos básicos
+    (# * - + / . , : ;). También avisa si parece que hay un teléfono, correo o link. **Pasar el final a pie…** (o el
+    inicio a encabezado) convierte ese pedazo en un texto guardado para usarlo en otras publicaciones.
 - **Revisar y guardar:** antes de mandar ves cada cambio **antes → después**. Solo se manda lo que cambiaste.
   Si MercadoLibre rechaza algo, te dice qué y por qué; lo demás queda guardado.
 - **Cambios hechos desde el sistema:** cada cambio queda anotado (quién, cuándo, qué y si ML lo aceptó).
+
+**Cambiar muchas a la vez:** en la lista marca las que quieras (o «Elegir esta página» y después «Elegir las N de
+esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
+- **Encabezado / pie:** elegir qué parte y qué texto guardado poner (o **quitarlo**). Si en una publicación no se
+  reconoce el pie que tiene ahora, se puede **saltar** (recomendado, así no queda repetido) o **agregarlo igual**.
+  Primero muestra cuántas van y después se confirma.
+- **Cambiar precios:** subir o bajar un %, sumar o restar un monto o poner un precio fijo, con redondeo (entero o
+  terminado en ,90). Muestra la tabla **antes → después** de cada una y recién ahí se confirma.
+- Se manda a ML **de a poco** (unas 12 por minuto) aunque cierres la pantalla. El avance, lo que salió bien, lo
+  saltado y los errores se ven en **Cambios en lote** (link arriba de la lista); ahí también se puede cancelar lo
+  que falta.
+
+**Textos de descripción** (link arriba de la lista): los encabezados y pies guardados, cada uno **para una cuenta o
+para todas**. Al **editar** uno que ya usan publicaciones, se puede marcar «Actualizarlo también en MercadoLibre» y
+se cambia en todas las que lo usan (activas y pausadas). **Detectar textos repetidos:** «Leer descripciones» de una
+cuenta (solo lee, tarda unos minutos) y «Buscar repetidos» muestra los finales (o inicios) que ya están iguales en
+muchas publicaciones, para guardarlos con un clic. Al guardar un texto, las descripciones que ya lo tienen igual
+quedan separadas solas. Borrar un texto no cambia nada en ML.
 
 ---
 
@@ -572,6 +602,11 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Inicio:** cómo va tu negocio este mes (ventas, ganancia, sin stock, ventas pendientes).
 - **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
+- **Catálogo PDF** (Productos → botón Catálogo PDF; en prueba, solo algunas empresas): elige productos (buscar,
+  «Solo con stock», «Solo con foto»), sube tu **logo**, pon el nombre, una línea debajo y un texto al final
+  (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
+  como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
+  datos» los deja para la próxima vez.
 - **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.

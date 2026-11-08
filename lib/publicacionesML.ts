@@ -10,6 +10,8 @@
 // Cada envío queda en ml_publicacion_cambios (antes / enviado / resultado). Nunca se crea ni se borra una publicación.
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML, tokenVigente, CuentaDemo, ML_API } from '@/lib/ml'
+import { componer, caracteresNoPermitidos, MAX_DESCRIPCION } from '@/lib/descripcionTexto'
+import { plantillasDe, separacionDe, guardarSeparacion } from '@/lib/lotesPublicaciones'
 
 // ── Lo que devuelve ML ──
 export interface ValorML { id?: string | null; name?: string | null }
@@ -57,6 +59,10 @@ export interface Publicacion {
   categoriaNombre: string | null
   fotos: { id: string; url: string }[]
   descripcion: string
+  // Descripción en 3 partes (08-11): encabezado y pie son textos guardados (plantillas); el cuerpo es de esta publicación.
+  desc: { encabezadoId: number | null; pieId: number | null; cuerpo: string }
+  plantillas: { id: number; tipo: 'encabezado' | 'pie'; nombre: string; texto: string; conexion_id: number | null }[]
+  limites: { fotos: number; fotosVariante: number }   // de la categoría en ML (MLV: 12 y 10)
   campos: CampoFicha[]
   variantes: { id: number; precio: number | null; stock: number; vendidas: number; sku: string | null
                combinaciones: { id: string | null; nombre: string; valor: string }[]; fotos: string[] }[]
@@ -93,7 +99,7 @@ export async function leerPublicacion(db: Pool, itemId: string, country: string)
   const [desc, attrsCat, cat, com, hist] = await Promise.all([
     mlFetch<{ plain_text?: string }>(db, cuenta.id, `/items/${encodeURIComponent(itemId)}/description`).catch(() => ({ plain_text: '' })),
     mlFetch<AtributoCategoria[]>(db, cuenta.id, `/categories/${encodeURIComponent(it.category_id)}/attributes`).catch(() => [] as AtributoCategoria[]),
-    mlFetch<{ name?: string; path_from_root?: { name: string }[] }>(db, cuenta.id, `/categories/${encodeURIComponent(it.category_id)}`).catch(() => null),
+    mlFetch<{ name?: string; path_from_root?: { name: string }[]; settings?: { max_pictures_per_item?: number; max_pictures_per_item_var?: number } }>(db, cuenta.id, `/categories/${encodeURIComponent(it.category_id)}`).catch(() => null),
     db.query(`SELECT value FROM app_settings WHERE key = 'ml_comision'`),
     db.query(
       `SELECT c.id, c.creado_at AS fecha, COALESCE(u.full_name, u.username) AS usuario, c.partes, c.ok, c.error
@@ -128,6 +134,8 @@ export async function leerPublicacion(db: Pool, itemId: string, country: string)
       valores: [], unidades: [], unidad: null, largoMax: null, valorId: v.value_id ?? null, valor: v.value_name ?? null })
   }
 
+  const plantillas = await plantillasDe(db, cuenta.id)
+  const sep = await separacionDe(db, itemId, cuenta.id, desc.plain_text ?? '', plantillas)
   const sku = (v: VarianteItem) => v.seller_custom_field?.trim() || v.attributes?.find(a => a.id === 'SELLER_SKU')?.value_name?.trim() || null
   return {
     item: {
@@ -140,6 +148,9 @@ export async function leerPublicacion(db: Pool, itemId: string, country: string)
     categoriaNombre: cat?.path_from_root?.map(p => p.name).join(' › ') ?? cat?.name ?? null,
     fotos: (it.pictures ?? []).map(p => ({ id: p.id, url: p.secure_url ?? p.url ?? '' })),
     descripcion: desc.plain_text ?? '',
+    desc: { encabezadoId: sep.encabezadoId, pieId: sep.pieId, cuerpo: sep.cuerpo },
+    plantillas,
+    limites: { fotos: cat?.settings?.max_pictures_per_item ?? 12, fotosVariante: cat?.settings?.max_pictures_per_item_var ?? 10 },
     campos,
     variantes: (it.variations ?? []).map(v => ({
       id: v.id, precio: v.price ?? null, stock: v.available_quantity ?? 0, vendidas: v.sold_quantity ?? 0, sku: sku(v),
@@ -158,6 +169,7 @@ export interface CambiosPublicacion {
   stock?: number                       // solo sin variantes
   estado?: 'active' | 'paused'
   descripcion?: string
+  descPartes?: { encabezadoId: number | null; pieId: number | null; cuerpo: string }   // gana sobre `descripcion`
   atributos?: { id: string; value_id?: string | null; value_name?: string | null }[]
   fotos?: string[]                     // ids en el orden nuevo (incluye las recién subidas)
   variantes?: { id: number; stock?: number; combinaciones?: { id: string | null; nombre: string; valor: string }[]; fotos?: string[] }[]
@@ -256,14 +268,34 @@ export async function guardarPublicacion(db: Pool, itemId: string, c: CambiosPub
       await anotar(partes, body, false, m, antes)
     }
   }
+  let partes3: CambiosPublicacion['descPartes'] | null = null
+  if (c.descPartes) {
+    // Se arma acá con los textos guardados de ahora (no con lo que mandó la pantalla).
+    const ps = await plantillasDe(db, cuenta.id)
+    const enc = c.descPartes.encabezadoId == null ? null : ps.find(x => x.id === c.descPartes!.encabezadoId)
+    const pie = c.descPartes.pieId == null ? null : ps.find(x => x.id === c.descPartes!.pieId)
+    if ((c.descPartes.encabezadoId != null && !enc) || (c.descPartes.pieId != null && !pie)) {
+      errores.push({ parte: 'descripcion', mensaje: 'El encabezado o el pie elegido ya no existe (o es de otra cuenta)' })
+    } else {
+      partes3 = { encabezadoId: enc?.id ?? null, pieId: pie?.id ?? null, cuerpo: c.descPartes.cuerpo }
+      c.descripcion = componer(enc?.texto, c.descPartes.cuerpo, pie?.texto)
+    }
+  }
+  if (c.descripcion !== undefined) {
+    const malos = caracteresNoPermitidos(c.descripcion)
+    if (malos.length) { errores.push({ parte: 'descripcion', mensaje: `Tiene caracteres que MercadoLibre no acepta: ${malos.join(' ')}` }); c.descripcion = undefined }
+    else if (c.descripcion.length > MAX_DESCRIPCION) { errores.push({ parte: 'descripcion', mensaje: `Pasa de ${MAX_DESCRIPCION} caracteres` }); c.descripcion = undefined }
+  }
   if (c.descripcion !== undefined) {
     const d = await mlFetch<{ plain_text?: string }>(db, cuenta.id, `/items/${encodeURIComponent(itemId)}/description`).catch(() => ({ plain_text: '' }))
+    if (partes3) await guardarSeparacion(db, itemId, cuenta.id, partes3, (d.plain_text ?? '').trim() === c.descripcion.trim() ? c.descripcion : d.plain_text ?? '')
     if ((d.plain_text ?? '').trim() !== c.descripcion.trim()) {
       const enviado = { plain_text: c.descripcion.trim() }
       try {
         await mlFetch(db, cuenta.id, `/items/${encodeURIComponent(itemId)}/description?api_version=2`, { method: 'PUT', body: enviado })
         guardado.push('descripcion')
         await anotar(['descripcion'], enviado, true, null, { descripcion: d.plain_text ?? '' })
+        if (partes3) await guardarSeparacion(db, itemId, cuenta.id, partes3, enviado.plain_text)
       } catch (e) {
         const m = errorDeML(e)
         errores.push({ parte: 'descripcion', mensaje: m })

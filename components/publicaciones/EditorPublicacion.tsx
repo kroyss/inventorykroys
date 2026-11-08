@@ -2,18 +2,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { CambiosPublicacion, CampoFicha, Publicacion, ResultadoGuardar } from '@/lib/publicacionesML'
+import { componer, mismoTexto, caracteresNoPermitidos, limpiarTexto, tieneContacto, MAX_DESCRIPCION } from '@/lib/descripcionTexto'
 
 // Editor de UNA publicación de MercadoLibre (Fase 6, 2026-11-07). Se carga lo que hay AHORA en ML, se edita como en
 // ML y al guardar se muestra "antes → después" de cada cosa; recién ahí se manda (solo lo que cambió).
 
-const MAX_FOTOS = 10
+// 08-11: con variantes, cada variante tiene SUS fotos (subir, ordenar, quitar); las fotos de la publicación se arman
+// solas juntando las de todas. La descripción va en 3 partes: encabezado y pie (textos guardados) + la del producto.
 type Valor = { vid: string | null; vname: string }
 interface Borrador {
-  titulo: string; precio: string; stock: string; estado: string; descripcion: string
+  titulo: string; precio: string; stock: string; estado: string
+  encId: number | null; pieId: number | null; cuerpo: string
   valores: Record<string, Valor>
-  fotos: { id: string; url: string }[]
+  fotos: string[]                       // sin variantes: las de la publicación, en orden
   variantes: Record<number, { stock: string; combos: { id: string | null; nombre: string; valor: string }[]; fotos: string[] }>
 }
+const sinRepetir = (a: string[]) => [...new Set(a)]
 
 const num = (s: string) => { const n = Number(s.replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN }
 const dinero = (n: number, moneda: string) => (moneda === 'COP' ? '$ ' : moneda === 'USD' ? 'US$ ' : `${moneda} `)
@@ -28,9 +32,9 @@ const NOMBRE_PARTE: Record<string, string> = {
 function borradorDe(p: Publicacion): Borrador {
   return {
     titulo: p.item.titulo, precio: precioTxt(p.item.precio, p.item.moneda), stock: String(p.item.stock), estado: p.item.estado,
-    descripcion: p.descripcion,
+    encId: p.desc.encabezadoId, pieId: p.desc.pieId, cuerpo: p.desc.cuerpo,
     valores: Object.fromEntries(p.campos.map(c => [c.id, { vid: c.valorId, vname: c.valor ?? '' }])),
-    fotos: p.fotos,
+    fotos: p.fotos.map(f => f.id),
     variantes: Object.fromEntries(p.variantes.map(v => [v.id, { stock: String(v.stock), combos: v.combinaciones.map(c => ({ ...c })), fotos: v.fotos }])),
   }
 }
@@ -60,9 +64,17 @@ function diferencias(p: Publicacion, b: Borrador) {
   if (b.estado !== p.item.estado && (b.estado === 'active' || b.estado === 'paused')) {
     c.estado = b.estado; lista.push({ parte: 'Estado', antes: ESTADOS[p.item.estado] ?? p.item.estado, despues: ESTADOS[b.estado] })
   }
-  if (b.descripcion.trim() !== p.descripcion.trim()) {
-    c.descripcion = b.descripcion
-    lista.push({ parte: 'Descripción', antes: `${p.descripcion.trim().length} caracteres`, despues: `${b.descripcion.trim().length} caracteres` })
+  const texto = textoFinal(p, b)
+  if (!mismoTexto(texto, p.descripcion)) {
+    c.descPartes = { encabezadoId: b.encId, pieId: b.pieId, cuerpo: b.cuerpo }
+    const enc = p.plantillas.find(x => x.id === b.encId), pie = p.plantillas.find(x => x.id === b.pieId)
+    const encA = p.plantillas.find(x => x.id === p.desc.encabezadoId), pieA = p.plantillas.find(x => x.id === p.desc.pieId)
+    if (b.encId !== p.desc.encabezadoId) lista.push({ parte: 'Encabezado', antes: encA?.nombre ?? 'sin encabezado', despues: enc?.nombre ?? 'sin encabezado' })
+    if (b.pieId !== p.desc.pieId) lista.push({ parte: 'Pie', antes: pieA?.nombre ?? 'sin pie', despues: pie?.nombre ?? 'sin pie' })
+    lista.push({ parte: 'Descripción', antes: `${p.descripcion.trim().length} caracteres`, despues: `${texto.length} caracteres` })
+    const malos = caracteresNoPermitidos(texto)
+    if (malos.length) errores.push(`La descripción tiene caracteres que MercadoLibre no acepta: ${malos.join(' ')}`)
+    if (texto.length > MAX_DESCRIPCION) errores.push(`La descripción pasa de ${MAX_DESCRIPCION.toLocaleString('es-VE')} caracteres`)
   }
   const atributos: NonNullable<CambiosPublicacion['atributos']> = []
   for (const campo of p.campos) {
@@ -77,15 +89,21 @@ function diferencias(p: Publicacion, b: Borrador) {
     lista.push({ parte: campo.nombre, antes: textoValor(campo, { vid: antesVid, vname: antesName }), despues: textoValor(campo, v.vid || v.vname.trim() ? v : { vid: '-1', vname: '' }) })
   }
   if (atributos.length) c.atributos = atributos
-  const fotosAntes = p.fotos.map(f => f.id).join(','), fotosAhora = b.fotos.map(f => f.id).join(',')
-  if (fotosAntes !== fotosAhora) {
-    c.fotos = b.fotos.map(f => f.id)
-    const nuevas = b.fotos.filter(f => !p.fotos.some(x => x.id === f.id)).length
-    const quitadas = p.fotos.filter(f => !b.fotos.some(x => x.id === f.id)).length
-    lista.push({ parte: 'Fotos', antes: `${p.fotos.length} fotos`, despues: `${b.fotos.length} fotos`
-      + [nuevas && `${nuevas} nueva${nuevas === 1 ? '' : 's'}`, quitadas && `${quitadas} quitada${quitadas === 1 ? '' : 's'}`, !nuevas && !quitadas && 'otro orden']
-        .filter(Boolean).map(x => ` · ${x}`).join('') })
-    if (!b.fotos.length) errores.push('La publicación tiene que tener al menos una foto')
+  const lim = p.limites
+  // Fotos de las variantes: si alguna cambió, las de la publicación son las de todas juntas (sin repetir).
+  const fotosVarCambian = p.variantes.some(v => b.variantes[v.id] && b.variantes[v.id].fotos.join(',') !== v.fotos.join(','))
+  const fotosNuevas = p.variantes.length
+    ? (fotosVarCambian ? sinRepetir(p.variantes.flatMap(v => b.variantes[v.id]?.fotos ?? v.fotos)) : null)
+    : (b.fotos.join(',') !== p.fotos.map(f => f.id).join(',') ? b.fotos : null)
+  if (fotosNuevas) {
+    c.fotos = fotosNuevas
+    if (!p.variantes.length) {
+      const nuevas = b.fotos.filter(id => !p.fotos.some(x => x.id === id)).length
+      const quitadas = p.fotos.filter(f => !b.fotos.includes(f.id)).length
+      lista.push({ parte: 'Fotos', antes: `${p.fotos.length} fotos`, despues: `${b.fotos.length} fotos` + resumenFotos(nuevas, quitadas) })
+    }
+    if (!fotosNuevas.length) errores.push('La publicación tiene que tener al menos una foto')
+    if (fotosNuevas.length > lim.fotos) errores.push(`Entre todas las variantes hay ${fotosNuevas.length} fotos distintas: MercadoLibre permite ${lim.fotos} por publicación`)
   }
   const variantes: NonNullable<CambiosPublicacion['variantes']> = []
   for (const v of p.variantes) {
@@ -101,16 +119,77 @@ function diferencias(p: Publicacion, b: Borrador) {
       out.combinaciones = e.combos.map(x => ({ ...x, valor: x.valor.trim() }))
       lista.push({ parte: 'Variante', antes: nombreAntes, despues: e.combos.map(x => x.valor.trim()).join(' / ') })
     }
-    const vivas = e.fotos.filter(id => b.fotos.some(f => f.id === id))
     if (e.fotos.join(',') !== v.fotos.join(',')) {
-      out.fotos = vivas
-      lista.push({ parte: `Fotos · ${nombreAntes}`, antes: `${v.fotos.length} fotos`, despues: `${vivas.length} fotos` })
+      out.fotos = e.fotos
+      const nuevas = e.fotos.filter(id => !v.fotos.includes(id)).length, quitadas = v.fotos.filter(id => !e.fotos.includes(id)).length
+      lista.push({ parte: `Fotos · ${nombreAntes}`, antes: `${v.fotos.length} fotos`, despues: `${e.fotos.length} fotos` + resumenFotos(nuevas, quitadas) })
+      if (!e.fotos.length) errores.push(`La variante ${nombreAntes} se queda sin fotos`)
+      if (e.fotos.length > lim.fotosVariante) errores.push(`La variante ${nombreAntes} tiene ${e.fotos.length} fotos: MercadoLibre permite ${lim.fotosVariante}`)
     }
-    if (!vivas.length && (out.fotos || c.fotos)) errores.push(`La variante ${nombreAntes} se queda sin fotos`)
     if (Object.keys(out).length > 1) variantes.push(out)
   }
   if (variantes.length) c.variantes = variantes
   return { cambios: c, lista, errores }
+}
+
+const resumenFotos = (nuevas: number, quitadas: number) =>
+  [nuevas && `${nuevas} nueva${nuevas === 1 ? '' : 's'}`, quitadas && `${quitadas} quitada${quitadas === 1 ? '' : 's'}`, !nuevas && !quitadas && 'otro orden']
+    .filter(Boolean).map(x => ` · ${x}`).join('')
+
+/** El texto completo como lo verá el comprador en ML. */
+function textoFinal(p: Publicacion, b: Borrador) {
+  return componer(p.plantillas.find(x => x.id === b.encId)?.texto, b.cuerpo, p.plantillas.find(x => x.id === b.pieId)?.texto)
+}
+
+const mover = (a: string[], i: number, d: -1 | 1) => {
+  const f = [...a]; const j = i + d
+  if (j < 0 || j >= f.length) return a
+  ;[f[i], f[j]] = [f[j], f[i]]
+  return f
+}
+
+/** Fotos con ordenar y quitar (las de la publicación o las de una variante). */
+function FilaFotos({ ids, url, nueva, onMover, onQuitar, chica }: {
+  ids: string[]; url: (id: string) => string; nueva: (id: string) => boolean
+  onMover: (i: number, d: -1 | 1) => void; onQuitar: (id: string) => void; chica?: boolean
+}) {
+  return (
+    <div className={chica ? 'grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2' : 'grid grid-cols-3 sm:grid-cols-5 gap-2'}>
+      {ids.map((id, i) => (
+        <div key={id} className="relative rounded-lg border border-neutral-200 bg-neutral-50 aspect-square overflow-hidden">
+          {url(id) ? <img src={url(id)} alt="" className="w-full h-full object-contain" /> : <div className="w-full h-full grid place-items-center text-[10px] text-neutral-400">foto</div>}
+          {i === 0 && <span className="absolute top-1 left-1 text-[10px] bg-neutral-900 text-white rounded px-1.5 py-0.5">{chica ? '1ª' : 'Portada'}</span>}
+          {nueva(id) && <span className="absolute top-1 right-1 text-[10px] bg-sky-600 text-white rounded px-1.5 py-0.5">Nueva</span>}
+          <div className="absolute inset-x-0 bottom-0 flex justify-between bg-white/90 text-xs">
+            <button type="button" onClick={() => onMover(i, -1)} disabled={i === 0} className="px-1.5 py-1 disabled:opacity-30" aria-label="Mover a la izquierda">←</button>
+            <button type="button" onClick={() => onQuitar(id)} className="px-1.5 py-1 text-red-600" title="Quitar">✕</button>
+            <button type="button" onClick={() => onMover(i, 1)} disabled={i === ids.length - 1} className="px-1.5 py-1 disabled:opacity-30" aria-label="Mover a la derecha">→</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ParteFija({ titulo, valor, opciones, texto, onChange }: {
+  titulo: string; valor: number | null; opciones: { id: number; nombre: string; conexion_id: number | null }[]; texto?: string; onChange: (id: number | null) => void
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-3 space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-neutral-600">{titulo}</span>
+        <div className="flex items-center gap-2">
+          <select value={valor ?? ''} onChange={e => onChange(e.target.value ? Number(e.target.value) : null)} className="rounded-lg border border-neutral-300 px-2 py-1 text-xs bg-white max-w-[220px]">
+            <option value="">Sin {titulo.toLowerCase()}</option>
+            {opciones.map(o => <option key={o.id} value={o.id}>{o.nombre}{o.conexion_id == null ? ' (todas las cuentas)' : ''}</option>)}
+          </select>
+          <Link href="/publicaciones/textos" className="text-xs text-sky-700 hover:underline whitespace-nowrap">Textos guardados</Link>
+        </div>
+      </div>
+      {texto ? <p className="text-xs text-neutral-600 whitespace-pre-wrap max-h-32 overflow-y-auto">{texto}</p>
+        : <p className="text-[11px] text-neutral-400">{opciones.length ? 'Ninguno elegido.' : 'Todavía no hay textos guardados. Puedes crearlos desde «Textos de descripción» o con «Pasar…».'}</p>}
+    </div>
+  )
 }
 
 function CampoInput({ c, v, onChange }: { c: CampoFicha; v: Valor; onChange: (v: Valor) => void }) {
@@ -173,6 +252,11 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
   const [subiendo, setSubiendo] = useState(0)
   const [errorFoto, setErrorFoto] = useState<string | null>(null)
   const [todas, setTodas] = useState(false)
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const [destino, setDestino] = useState<number | null>(null)     // a qué variante va la foto que se sube (null = publicación)
+  const [elegir, setElegir] = useState<number | null>(null)       // variante que está eligiendo fotos de otra
+  const [vista, setVista] = useState(false)
+  const [pasar, setPasar] = useState<null | { tipo: 'encabezado' | 'pie'; linea: number; nombre: string; todas: boolean; guardando: boolean; error: string | null }>(null)
   const archivo = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -181,7 +265,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
       const d = await r.json().catch(() => ({}))
       if (!vivo) return
       if (!r.ok) setError(d.error ?? 'No se pudo leer la publicación de MercadoLibre')
-      else { setError(null); setP(d); setB(borradorDe(d)) }
+      else { setError(null); setP(d); setB(borradorDe(d)); setUrls(u => ({ ...u, ...Object.fromEntries((d as Publicacion).fotos.map(f => [f.id, f.url])) })) }
     }).catch(() => { if (vivo) setError('No se pudo leer la publicación de MercadoLibre') })
     return () => { vivo = false }
   }, [itemId])
@@ -211,33 +295,58 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
   const principales = p.campos.filter(c => c.principal)
   const secundarias = p.campos.filter(c => !c.principal)
   const secundariasVisibles = todas ? secundarias : secundarias.filter(c => c.valor || c.valorId || b.valores[c.id]?.vname)
-  const fotoUsada = (id: string) => p.variantes.filter(v => b.variantes[v.id]?.fotos.includes(id))
-
-  const moverFoto = (i: number, d: -1 | 1) => set(x => {
-    const f = [...x.fotos]; const j = i + d
-    if (j < 0 || j >= f.length) return x
-    ;[f[i], f[j]] = [f[j], f[i]]
-    return { ...x, fotos: f }
-  })
-  const quitarFoto = (id: string) => set(x => ({
-    ...x, fotos: x.fotos.filter(f => f.id !== id),
-    variantes: Object.fromEntries(Object.entries(x.variantes).map(([k, v]) => [k, { ...v, fotos: v.fotos.filter(f => f !== id) }])),
-  }))
+  const urlDe = (id: string) => urls[id] ?? ''
+  const fotosOriginales = new Set([...p.fotos.map(f => f.id), ...p.variantes.flatMap(v => v.fotos)])
+  const esNueva = (id: string) => !fotosOriginales.has(id)
+  const fotosDe = (vid: number | null) => vid == null ? b.fotos : b.variantes[vid]?.fotos ?? []
+  const ponerFotos = (vid: number | null, f: (a: string[]) => string[]) => set(x => vid == null
+    ? { ...x, fotos: f(x.fotos) }
+    : { ...x, variantes: { ...x.variantes, [vid]: { ...x.variantes[vid], fotos: f(x.variantes[vid].fotos) } } })
+  const maxDe = (vid: number | null) => vid == null ? p.limites.fotos : p.limites.fotosVariante
+  const abrirSubir = (vid: number | null) => { setDestino(vid); setErrorFoto(null); archivo.current?.click() }
   const subir = async (files: FileList | null) => {
     if (!files?.length) return
+    const vid = destino
     setErrorFoto(null)
-    const lista = [...files].slice(0, Math.max(0, MAX_FOTOS - b.fotos.length))
-    for (const f of lista) {
+    const lugar = Math.max(0, maxDe(vid) - fotosDe(vid).length)
+    if (files.length > lugar) setErrorFoto(`Solo caben ${lugar} foto${lugar === 1 ? '' : 's'} más (máximo ${maxDe(vid)})`)
+    for (const f of [...files].slice(0, lugar)) {
       setSubiendo(n => n + 1)
       try {
         const fd = new FormData(); fd.append('foto', f)
         const r = await fetch(`/api/publicaciones/${itemId}/foto`, { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (!r.ok) setErrorFoto(d.error ?? 'No se pudo subir la foto')
-        else set(x => ({ ...x, fotos: [...x.fotos, { id: d.id, url: d.url }] }))
+        else { setUrls(u => ({ ...u, [d.id]: d.url })); ponerFotos(vid, a => sinRepetir([...a, d.id])) }
       } finally { setSubiendo(n => n - 1) }
     }
     if (archivo.current) archivo.current.value = ''
+  }
+  // Fotos de la publicación que hoy tiene alguna variante (para «De otra variante»).
+  const todasLasFotos = sinRepetir([...p.fotos.map(f => f.id), ...p.variantes.flatMap(v => b.variantes[v.id]?.fotos ?? [])])
+  const poolAhora = p.variantes.length ? sinRepetir(p.variantes.flatMap(v => b.variantes[v.id]?.fotos ?? [])) : b.fotos
+
+  // Descripción
+  const plantillasCuenta = p.plantillas.filter(x => x.conexion_id == null || x.conexion_id === p.cuenta.id)
+  const encabezados = plantillasCuenta.filter(x => x.tipo === 'encabezado'), pies = plantillasCuenta.filter(x => x.tipo === 'pie')
+  const enc = p.plantillas.find(x => x.id === b.encId), pie = p.plantillas.find(x => x.id === b.pieId)
+  const textoML = textoFinal(p, b)
+  const malosCuerpo = caracteresNoPermitidos(b.cuerpo)
+  const malosPlantilla = caracteresNoPermitidos((enc?.texto ?? '') + (pie?.texto ?? ''))
+  const lineasCuerpo = b.cuerpo.replace(/\r\n?/g, '\n').split('\n')
+  const textoPasar = pasar ? (pasar.tipo === 'pie' ? lineasCuerpo.slice(pasar.linea) : lineasCuerpo.slice(0, pasar.linea + 1)).join('\n').trim() : ''
+  const guardarPasar = async () => {
+    if (!pasar || !textoPasar || !pasar.nombre.trim()) return
+    setPasar({ ...pasar, guardando: true, error: null })
+    const r = await fetch('/api/publicaciones/textos', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: pasar.tipo, nombre: pasar.nombre.trim(), texto: textoPasar, conexion_id: pasar.todas ? null : p.cuenta.id }) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { setPasar({ ...pasar, guardando: false, error: d.error ?? 'No se pudo guardar' }); return }
+    const nueva = { id: d.id as number, tipo: pasar.tipo, nombre: pasar.nombre.trim(), texto: textoPasar, conexion_id: pasar.todas ? null : p.cuenta.id }
+    const resto = (pasar.tipo === 'pie' ? lineasCuerpo.slice(0, pasar.linea) : lineasCuerpo.slice(pasar.linea + 1)).join('\n').trim()
+    setP({ ...p, plantillas: [...p.plantillas, nueva] })
+    set(x => ({ ...x, cuerpo: resto, ...(pasar.tipo === 'pie' ? { pieId: nueva.id } : { encId: nueva.id }) }))
+    setPasar(null)
   }
 
   const guardar = async () => {
@@ -324,40 +433,55 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
         )}
       </Seccion>
 
+      <input ref={archivo} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => subir(e.target.files)} />
       {p.variantes.length > 0 && (
-        <Seccion titulo={`Variantes (${p.variantes.length})`} ayuda="Nombre de cada variante, su stock y qué fotos muestra. No se crean ni se borran variantes desde aquí.">
+        <Seccion titulo={`Variantes (${p.variantes.length})`}
+          ayuda={<>Nombre, stock y fotos de cada variante (hasta {p.limites.fotosVariante} por variante, {p.limites.fotos} distintas entre todas; van {poolAhora.length}). No se crean ni se borran variantes desde aquí.</>}>
+          {errorFoto && <p className="text-xs text-red-700">{errorFoto}</p>}
           <div className="space-y-3">
             {p.variantes.map(v => {
               const e = b.variantes[v.id]
+              const otras = todasLasFotos.filter(id => !e.fotos.includes(id))
               return (
                 <div key={v.id} className="rounded-lg border border-neutral-200 p-3 space-y-2">
                   <div className="flex flex-wrap items-end gap-3">
                     {e.combos.map((c, i) => (
                       <label key={i} className="block text-sm flex-1 min-w-[140px]">
                         <span className="text-xs font-medium text-neutral-600">{c.nombre}</span>
-                        <input value={c.valor} maxLength={80} onChange={ev => set(x => ({ ...x, variantes: { ...x.variantes, [v.id]: { ...e, combos: e.combos.map((y, j) => j === i ? { ...y, valor: ev.target.value } : y) } } }))}
+                        <input value={c.valor} maxLength={80} onChange={ev => set(x => ({ ...x, variantes: { ...x.variantes, [v.id]: { ...x.variantes[v.id], combos: x.variantes[v.id].combos.map((y, j) => j === i ? { ...y, valor: ev.target.value } : y) } } }))}
                           className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm" />
                       </label>
                     ))}
                     <label className="block text-sm w-28">
                       <span className="text-xs font-medium text-neutral-600">Stock</span>
-                      <input inputMode="numeric" value={e.stock} onChange={ev => set(x => ({ ...x, variantes: { ...x.variantes, [v.id]: { ...e, stock: ev.target.value.replace(/\D/g, '') } } }))}
+                      <input inputMode="numeric" value={e.stock} onChange={ev => set(x => ({ ...x, variantes: { ...x.variantes, [v.id]: { ...x.variantes[v.id], stock: ev.target.value.replace(/\D/g, '') } } }))}
                         className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm num" />
                     </label>
                     <span className="text-xs text-neutral-500 pb-2">{v.vendidas} vendidas{v.sku ? ` · SKU ${v.sku}` : ''}</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {b.fotos.map(f => {
-                      const on = e.fotos.includes(f.id)
-                      return (
-                        <button key={f.id} type="button" title={on ? 'Quitar de esta variante' : 'Mostrar en esta variante'}
-                          onClick={() => set(x => ({ ...x, variantes: { ...x.variantes, [v.id]: { ...e, fotos: on ? e.fotos.filter(y => y !== f.id) : [...e.fotos, f.id] } } }))}
-                          className={`w-11 h-11 rounded-md border-2 overflow-hidden bg-neutral-50 ${on ? 'border-sky-500' : 'border-transparent opacity-40 hover:opacity-80'}`}>
-                          <img src={f.url} alt="" className="w-full h-full object-contain" />
-                        </button>
-                      )
-                    })}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className={`text-xs ${e.fotos.length > p.limites.fotosVariante || !e.fotos.length ? 'text-red-600' : 'text-neutral-500'}`}>Fotos de esta variante: {e.fotos.length}/{p.limites.fotosVariante}</span>
+                    <div className="flex gap-2">
+                      {otras.length > 0 && <button type="button" onClick={() => setElegir(elegir === v.id ? null : v.id)} className="text-xs px-2 py-1 rounded border border-neutral-300">De otra variante</button>}
+                      {e.fotos.length < p.limites.fotosVariante && <button type="button" onClick={() => abrirSubir(v.id)} disabled={subiendo > 0} className="text-xs px-2 py-1 rounded border border-neutral-300 disabled:opacity-50">{subiendo && destino === v.id ? 'Subiendo…' : '+ Subir fotos'}</button>}
+                    </div>
                   </div>
+                  {elegir === v.id && (
+                    <div className="rounded-lg bg-neutral-50 border border-neutral-200 p-2 space-y-1">
+                      <p className="text-[11px] text-neutral-500">Toca una foto para agregarla a esta variante.</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {otras.map(id => (
+                          <button key={id} type="button" disabled={e.fotos.length >= p.limites.fotosVariante} onClick={() => ponerFotos(v.id, a => sinRepetir([...a, id]))}
+                            className="w-12 h-12 rounded-md border border-neutral-300 overflow-hidden bg-white hover:border-sky-500 disabled:opacity-40">
+                            <img src={urlDe(id)} alt="" className="w-full h-full object-contain" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {e.fotos.length > 0
+                    ? <FilaFotos chica ids={e.fotos} url={urlDe} nueva={esNueva} onMover={(i, d) => ponerFotos(v.id, a => mover(a, i, d))} onQuitar={id => ponerFotos(v.id, a => a.filter(x => x !== id))} />
+                    : <p className="text-xs text-red-600">Sin fotos: sube al menos una.</p>}
                 </div>
               )
             })}
@@ -365,33 +489,17 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
         </Seccion>
       )}
 
-      <Seccion titulo={`Fotos (${b.fotos.length}/${MAX_FOTOS})`} ayuda="La primera es la portada. Las nuevas se suben a MercadoLibre y quedan en la publicación al guardar."
-        derecha={b.fotos.length < MAX_FOTOS && (
-          <button type="button" onClick={() => archivo.current?.click()} disabled={subiendo > 0} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
-            {subiendo ? 'Subiendo…' : '+ Agregar fotos'}
-          </button>
-        )}>
-        <input ref={archivo} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={e => subir(e.target.files)} />
-        {errorFoto && <p className="text-xs text-red-700">{errorFoto}</p>}
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {b.fotos.map((f, i) => {
-            const usada = fotoUsada(f.id)
-            return (
-              <div key={f.id} className="relative rounded-lg border border-neutral-200 bg-neutral-50 aspect-square overflow-hidden group">
-                <img src={f.url} alt="" className="w-full h-full object-contain" />
-                {i === 0 && <span className="absolute top-1 left-1 text-[10px] bg-neutral-900 text-white rounded px-1.5 py-0.5">Portada</span>}
-                {!p.fotos.some(x => x.id === f.id) && <span className="absolute top-1 right-1 text-[10px] bg-sky-600 text-white rounded px-1.5 py-0.5">Nueva</span>}
-                <div className="absolute inset-x-0 bottom-0 flex justify-between bg-white/90 text-xs">
-                  <button type="button" onClick={() => moverFoto(i, -1)} disabled={i === 0} className="px-2 py-1 disabled:opacity-30" aria-label="Mover a la izquierda">←</button>
-                  <button type="button" onClick={() => quitarFoto(f.id)} className="px-2 py-1 text-red-600"
-                    title={usada.length ? `La usa${usada.length > 1 ? 'n' : ''} ${usada.length} variante${usada.length > 1 ? 's' : ''}: se quita también de ahí` : 'Quitar'}>✕</button>
-                  <button type="button" onClick={() => moverFoto(i, 1)} disabled={i === b.fotos.length - 1} className="px-2 py-1 disabled:opacity-30" aria-label="Mover a la derecha">→</button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </Seccion>
+      {!p.variantes.length && (
+        <Seccion titulo={`Fotos (${b.fotos.length}/${p.limites.fotos})`} ayuda="La primera es la portada. Las nuevas se suben a MercadoLibre y quedan en la publicación al guardar."
+          derecha={b.fotos.length < p.limites.fotos && (
+            <button type="button" onClick={() => abrirSubir(null)} disabled={subiendo > 0} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
+              {subiendo ? 'Subiendo…' : '+ Agregar fotos'}
+            </button>
+          )}>
+          {errorFoto && <p className="text-xs text-red-700">{errorFoto}</p>}
+          <FilaFotos ids={b.fotos} url={urlDe} nueva={esNueva} onMover={(i, d) => ponerFotos(null, a => mover(a, i, d))} onQuitar={id => ponerFotos(null, a => a.filter(x => x !== id))} />
+        </Seccion>
+      )}
 
       {principales.length > 0 && (
         <Seccion titulo="Características principales" ayuda="Las que MercadoLibre usa para los filtros y la ficha técnica. * = obligatoria.">
@@ -424,9 +532,34 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
         </Seccion>
       )}
 
-      <Seccion titulo="Descripción" ayuda="Solo texto (MercadoLibre no acepta formato, links, teléfonos ni correos).">
-        <textarea rows={10} value={b.descripcion} onChange={e => set(x => ({ ...x, descripcion: e.target.value }))}
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+      <Seccion titulo="Descripción" ayuda="En 3 partes: encabezado y pie son textos guardados que se repiten en muchas publicaciones; en el medio, lo de este producto. A MercadoLibre va todo junto."
+        derecha={<button type="button" onClick={() => setVista(true)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Vista previa</button>}>
+        <div className="space-y-3">
+          <ParteFija titulo="Encabezado" valor={b.encId} opciones={encabezados} texto={enc?.texto}
+            onChange={id => set(x => ({ ...x, encId: id }))} />
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium text-neutral-600">Descripción del producto</span>
+              <div className="flex gap-3 text-xs">
+                <button type="button" onClick={() => setPasar({ tipo: 'encabezado', linea: 0, nombre: '', todas: false, guardando: false, error: null })} className="text-sky-700 hover:underline">Pasar el inicio a encabezado…</button>
+                <button type="button" onClick={() => setPasar({ tipo: 'pie', linea: Math.max(0, lineasCuerpo.length - 1), nombre: '', todas: false, guardando: false, error: null })} className="text-sky-700 hover:underline">Pasar el final a pie…</button>
+              </div>
+            </div>
+            <textarea rows={10} value={b.cuerpo} onChange={e => set(x => ({ ...x, cuerpo: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          </div>
+          <ParteFija titulo="Pie" valor={b.pieId} opciones={pies} texto={pie?.texto}
+            onChange={id => set(x => ({ ...x, pieId: id }))} />
+          {malosCuerpo.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+              <span>MercadoLibre no acepta estos caracteres: <b className="tracking-widest">{malosCuerpo.join(' ')}</b></span>
+              <button type="button" onClick={() => set(x => ({ ...x, cuerpo: limpiarTexto(x.cuerpo) }))} className="px-2 py-1 rounded border border-amber-300 bg-white">Quitarlos</button>
+            </div>
+          )}
+          {malosPlantilla.length > 0 && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">El encabezado o el pie tiene caracteres que ML no acepta ({malosPlantilla.join(' ')}): corrígelo en «Textos de descripción».</p>}
+          {tieneContacto(textoML) && <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">Parece que hay un teléfono, correo o link: MercadoLibre no los permite y puede pausar la publicación.</p>}
+          <p className={`text-xs text-right ${textoML.length > MAX_DESCRIPCION ? 'text-red-600' : 'text-neutral-400'}`}>{textoML.length.toLocaleString('es-VE')}/{MAX_DESCRIPCION.toLocaleString('es-VE')} caracteres en total · Permitidos: letras, números y signos básicos (# * - + / . , : ; ( ) ¿? ¡!)</p>
+        </div>
       </Seccion>
 
       {p.historial.length > 0 && (
@@ -452,6 +585,47 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
             <div className="flex gap-2">
               <button type="button" onClick={() => { setB(borradorDe(p)); setResultado(null) }} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Descartar</button>
               <button type="button" onClick={() => setRevisar(true)} disabled={subiendo > 0} className="btn-primary text-sm">Revisar y guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {vista && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setVista(false)}>
+          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl p-5 space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between"><h3 className="font-semibold text-neutral-900">Así se verá en MercadoLibre</h3>
+              <button type="button" onClick={() => setVista(false)} className="text-neutral-500 text-sm">Cerrar</button></div>
+            <p className="text-xs text-neutral-500">Descripción · {textoML.length.toLocaleString('es-VE')} caracteres</p>
+            <div className="rounded-lg border border-neutral-200 p-4 text-[15px] leading-relaxed text-neutral-700 whitespace-pre-wrap break-words">{textoML || <span className="text-neutral-400">Sin descripción</span>}</div>
+          </div>
+        </div>
+      )}
+
+      {pasar && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !pasar.guardando && setPasar(null)}>
+          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl p-5 space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-neutral-900">{pasar.tipo === 'pie' ? 'Pasar el final a un pie guardado' : 'Pasar el inicio a un encabezado guardado'}</h3>
+            <p className="text-xs text-neutral-500">Toca la línea donde {pasar.tipo === 'pie' ? 'empieza el pie (de ahí hasta el final)' : 'termina el encabezado (desde el principio hasta ahí)'}. Queda guardado para usarlo en otras publicaciones; en ML no cambia nada hasta que guardes.</p>
+            <div className="rounded-lg border border-neutral-200 max-h-64 overflow-y-auto text-xs font-mono">
+              {lineasCuerpo.map((l, i) => {
+                const dentro = pasar.tipo === 'pie' ? i >= pasar.linea : i <= pasar.linea
+                return <button key={i} type="button" onClick={() => setPasar({ ...pasar, linea: i })}
+                  className={`block w-full text-left px-2 py-0.5 whitespace-pre-wrap break-words ${dentro ? 'bg-sky-50 text-sky-900' : 'text-neutral-500 hover:bg-neutral-50'}`}>{l || ' '}</button>
+              })}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Nombre (para reconocerlo)</span>
+                <input value={pasar.nombre} maxLength={60} onChange={e => setPasar({ ...pasar, nombre: e.target.value })} placeholder={pasar.tipo === 'pie' ? 'Ej: Condiciones y envíos' : 'Ej: Bienvenida'}
+                  className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm" /></label>
+              <label className="block text-sm"><span className="text-xs font-medium text-neutral-600">Para</span>
+                <select value={pasar.todas ? 'todas' : 'esta'} onChange={e => setPasar({ ...pasar, todas: e.target.value === 'todas' })} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-sm bg-white">
+                  <option value="esta">Solo la cuenta {p.cuenta.nickname}</option><option value="todas">Todas las cuentas</option>
+                </select></label>
+            </div>
+            {pasar.error && <p className="text-xs text-red-700">{pasar.error}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setPasar(null)} disabled={pasar.guardando} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Cancelar</button>
+              <button type="button" onClick={guardarPasar} disabled={pasar.guardando || !textoPasar || !pasar.nombre.trim()} className="btn-primary text-sm">{pasar.guardando ? 'Guardando…' : 'Guardar texto'}</button>
             </div>
           </div>
         </div>
