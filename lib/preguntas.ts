@@ -491,6 +491,9 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   // Mi IA: el mismo aviso con el mínimo del cuestionario (si no lo dijo ya una respuesta rápida).
   if (!minimo && c.minimo && precio !== null && precio < c.minimo.precioMenor) L.push(`\nOBLIGATORIO EN ESTE PRODUCTO (cuesta menos de ${c.minimo.precioMenor}): si confirmas disponibilidad, precio o envío, di SIEMPRE que el envío gratis se activa con mínimo ${c.minimo.unidades} unidades, aunque el comprador no lo pregunte o pida más unidades que el mínimo.`)
   if (minimo) L.push(`\nOBLIGATORIO EN ESTE PRODUCTO: si confirmas disponibilidad, precio o envío, di SIEMPRE el mínimo de compra para el envío gratis como en la respuesta rápida [${minimo.titulo}], aunque el comprador no lo pregunte o pida más unidades que el mínimo.`)
+  // 08-11 (el dueño): en un producto de $3,00 la IA aplicó "menos de $3" y bajó la confianza. El límite se compara
+  // aquí, no lo decide la IA: si el precio NO es menor, se le dice explícitamente que el mínimo no aplica.
+  if (!minimo && c.minimo && precio !== null && precio >= c.minimo.precioMenor) L.push(`\nEN ESTE PRODUCTO NO APLICA EL MÍNIMO DE UNIDADES: cuesta $${precio.toFixed(2)} y el mínimo de ${c.minimo.unidades} unidades es solo para productos de MENOS de $${c.minimo.precioMenor} ($${c.minimo.precioMenor.toFixed(2)} exactos ya no lo pide). Tiene envío gratis desde 1 unidad: no menciones el mínimo ni bajes la confianza por eso.`)
   if (c.notas.length) L.push(`\nDATOS QUE EL VENDEDOR ANOTÓ DE ESTA PUBLICACIÓN:\n- ${c.notas.join('\n- ')}`)
   if (c.ficha) L.push(`\nFICHA DE CONOCIMIENTO (lo que el vendedor ya respondió de esta publicación, resumido):\n${c.ficha.texto}`)
   if (c.otras.length) {
