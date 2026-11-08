@@ -18,7 +18,7 @@ export default async function TextosPage() {
   return (
     <div>
       <PublicacionesMLTabs user={u} actual="editar" />
-      <Link href="/publicaciones" className="text-xs text-neutral-500 hover:text-neutral-800">← Publicaciones</Link>
+      <Link href="/publicaciones" className="btn-ghost !px-2 !py-1 text-xs">← Publicaciones</Link>
       <PageHeader title="Textos de descripción" subtitle="Encabezados y pies que se repiten en tus descripciones: cámbialos una vez y se actualizan en todas" />
       <TextosClient />
     </div>

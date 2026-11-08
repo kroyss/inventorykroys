@@ -293,7 +293,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
   if (error) return (
     <div className="bg-white rounded-xl border border-red-200 p-5 text-sm text-red-700 space-y-2">
       <p>{error}</p>
-      <Link href="/publicaciones" className="text-sky-700 hover:underline">← Volver a Publicaciones</Link>
+      <Link href="/publicaciones" className="btn-secondary !px-3 !py-1.5">← Volver a Publicaciones</Link>
     </div>
   )
   if (!p || !b || !dif) return <div className="space-y-3">{[0, 1, 2].map(i => <div key={i} className="h-32 rounded-xl border border-neutral-200 bg-neutral-50 animate-pulse" />)}</div>
@@ -384,14 +384,14 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
       <div className="flex flex-wrap items-start gap-3">
         {p.fotos[0] && <img src={p.fotos[0].url} alt="" className="w-16 h-16 rounded-lg object-contain bg-neutral-50 border border-neutral-200" />}
         <div className="min-w-0 flex-1">
-          <Link href="/publicaciones" className="text-xs text-neutral-500 hover:text-neutral-800">← Publicaciones</Link>
+          <Link href="/publicaciones" className="btn-ghost !px-2 !py-1 text-xs">← Publicaciones</Link>
           <h1 className="text-lg font-semibold text-neutral-900 leading-snug">{p.item.titulo}</h1>
           <p className="text-xs text-neutral-500 mt-0.5">
             {p.item.id} · {p.cuenta.nickname} · {ESTADOS[p.item.estado] ?? p.item.estado} · {p.item.vendidas.toLocaleString('es-VE')} vendidas
             {p.categoriaNombre && <> · {p.categoriaNombre}</>}
           </p>
         </div>
-        <a href={p.item.permalink} target="_blank" rel="noreferrer" className="text-sm text-sky-700 hover:underline whitespace-nowrap">Ver en MercadoLibre ↗</a>
+        <a href={p.item.permalink} target="_blank" rel="noreferrer" className="btn-secondary !px-3 !py-1.5 whitespace-nowrap">Ver en MercadoLibre ↗</a>
       </div>
 
       {resultado && (
@@ -544,7 +544,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
       )}
 
       <Seccion titulo="Descripción" ayuda="En 4 partes: encabezado, condiciones de compra y pie son textos guardados que se repiten en muchas publicaciones; la descripción del producto es de esta. A MercadoLibre va todo junto, en ese orden."
-        derecha={<button type="button" onClick={() => setVista(true)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Vista previa</button>}>
+        derecha={<button type="button" onClick={() => setVista(true)} className="btn-secondary !px-3 !py-1.5">Vista previa</button>}>
         <div className="space-y-3">
           <ParteFija titulo="Encabezado" valor={b.encId} opciones={encabezados} texto={enc?.texto}
             onChange={id => set(x => ({ ...x, encId: id }))} />
@@ -596,7 +596,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
           <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">{dif.lista.length} cambio{dif.lista.length === 1 ? '' : 's'} sin guardar</span>
             <div className="flex gap-2">
-              <button type="button" onClick={() => { setB(borradorDe(p)); setResultado(null) }} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Descartar</button>
+              <button type="button" onClick={() => { setB(borradorDe(p)); setResultado(null) }} className="btn-secondary !px-3 !py-1.5">Descartar</button>
               <button type="button" onClick={() => setRevisar(true)} disabled={subiendo > 0} className="btn-primary text-sm">Revisar y guardar</button>
             </div>
           </div>
@@ -641,7 +641,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
             </div>
             {pasar.error && <p className="text-xs text-red-700">{pasar.error}</p>}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setPasar(null)} disabled={pasar.guardando} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Cancelar</button>
+              <button type="button" onClick={() => setPasar(null)} disabled={pasar.guardando} className="btn-secondary !px-3 !py-1.5">Cancelar</button>
               <button type="button" onClick={guardarPasar} disabled={pasar.guardando || !textoPasar || !pasar.nombre.trim()} className="btn-primary text-sm">{pasar.guardando ? 'Guardando…' : 'Guardar texto'}</button>
             </div>
           </div>
@@ -670,7 +670,7 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
               <ul className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 list-disc ml-0 pl-6">{dif.errores.map((e, i) => <li key={i}>{e}</li>)}</ul>
             )}
             <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => setRevisar(false)} disabled={guardando} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Volver</button>
+              <button type="button" onClick={() => setRevisar(false)} disabled={guardando} className="btn-secondary !px-3 !py-1.5">Volver</button>
               <button type="button" onClick={guardar} disabled={guardando || dif.errores.length > 0} className="btn-primary text-sm">
                 {guardando ? 'Guardando…' : 'Guardar en MercadoLibre'}
               </button>

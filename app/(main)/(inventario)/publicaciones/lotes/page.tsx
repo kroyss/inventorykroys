@@ -19,7 +19,7 @@ export default async function LotesPage() {
   return (
     <div>
       <PublicacionesMLTabs user={u} actual="editar" />
-      <Link href="/publicaciones" className="text-xs text-neutral-500 hover:text-neutral-800">← Publicaciones</Link>
+      <Link href="/publicaciones" className="btn-ghost !px-2 !py-1 text-xs">← Publicaciones</Link>
       <PageHeader title="Cambios en lote" subtitle="Lo que se está mandando (o se mandó) a varias publicaciones a la vez" />
       <Suspense><LotesClient /></Suspense>
     </div>

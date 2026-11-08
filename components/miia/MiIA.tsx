@@ -334,7 +334,7 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
             {contacto(x.texto) && <p className="text-xs text-red-700">Tiene un teléfono, correo o link: MercadoLibre borra o sanciona esas respuestas. Quítalo.</p>}
           </div>
         ))}
-        {xs.length < 12 && <button type="button" onClick={() => setX([...xs, { titulo: '', texto: '' }])} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">+ Agregar sección</button>}
+        {xs.length < 12 && <button type="button" onClick={() => setX([...xs, { titulo: '', texto: '' }])} className="btn-secondary !px-3 !py-1.5">+ Agregar sección</button>}
       </>
     }
     case 'postventa': return <>

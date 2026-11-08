@@ -56,13 +56,15 @@ export default function PublicacionesClient() {
   const marcarPagina = () => { setTodasBusqueda(false); setElegidas(s => { const n = new Set(s); r?.filas.forEach(f => paginaMarcada ? n.delete(f.item_id) : n.add(f.item_id)); return n }) }
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap justify-end items-center gap-3 text-sm">
-        <button type="button" onClick={actualizar} disabled={actualizando} className="text-sky-700 hover:underline disabled:opacity-50"
-          title="Trae de MercadoLibre las publicaciones nuevas y los cambios (solo se refresca solo cada 6 horas)">
-          {actualizando ? 'Actualizando desde ML…' : '↻ Actualizar desde ML'}
+      {/* 08-11 (el dueño): acciones como botones, no como links sueltos. */}
+      <div className="flex flex-wrap justify-end items-center gap-2">
+        <button type="button" onClick={actualizar} disabled={actualizando} className="btn-secondary !px-3 !py-1.5"
+          title="Trae de MercadoLibre las publicaciones nuevas y los cambios (sola se refresca cada 6 horas)">
+          <svg viewBox="0 0 20 20" className={`h-4 w-4 ${actualizando ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          {actualizando ? 'Actualizando…' : 'Actualizar desde ML'}
         </button>
-        <Link href="/publicaciones/textos" className="text-sky-700 hover:underline">Textos de descripción</Link>
-        <Link href="/publicaciones/lotes" className="text-sky-700 hover:underline">Cambios en lote</Link>
+        <Link href="/publicaciones/textos" className="btn-secondary !px-3 !py-1.5"><svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M5 3h7l3 3v11H5z M8 9h5 M8 12h5" strokeLinecap="round" strokeLinejoin="round" /></svg>Textos de descripción</Link>
+        <Link href="/publicaciones/lotes" className="btn-secondary !px-3 !py-1.5"><svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="11" y="3" width="6" height="6" rx="1" /><rect x="3" y="11" width="6" height="6" rx="1" /><rect x="11" y="11" width="6" height="6" rx="1" /></svg>Cambios en lote</Link>
       </div>
       <div className="flex flex-wrap gap-2">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por título, SKU o número (MLV…)"
@@ -121,17 +123,17 @@ export default function PublicacionesClient() {
             <div className="sticky bottom-16 md:bottom-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 shadow">
               <span className="text-sm text-neutral-700">{cuantas.toLocaleString('es-VE')} elegida{cuantas === 1 ? '' : 's'}{todasBusqueda ? ' (toda la búsqueda)' : ''}</span>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={limpiar} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Quitar selección</button>
-                <button type="button" onClick={() => setAccion('descripcion')} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Encabezado / pie</button>
+                <button type="button" onClick={limpiar} className="btn-secondary !px-3 !py-1.5">Quitar selección</button>
+                <button type="button" onClick={() => setAccion('descripcion')} className="btn-secondary !px-3 !py-1.5">Encabezado / pie</button>
                 <button type="button" onClick={() => setAccion('precio')} className="btn-primary text-sm">Cambiar precios</button>
               </div>
             </div>
           )}
           {paginas > 1 && (
             <div className="flex items-center justify-center gap-3 text-sm">
-              <button type="button" disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)} className="px-3 py-1 rounded-lg border border-neutral-300 disabled:opacity-40">←</button>
+              <button type="button" disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)} className="btn-secondary !px-3 !py-1">←</button>
               <span className="text-neutral-600">{pagina} de {paginas}</span>
-              <button type="button" disabled={pagina >= paginas} onClick={() => setPagina(p => p + 1)} className="px-3 py-1 rounded-lg border border-neutral-300 disabled:opacity-40">→</button>
+              <button type="button" disabled={pagina >= paginas} onClick={() => setPagina(p => p + 1)} className="btn-secondary !px-3 !py-1">→</button>
             </div>
           )}
         </>
@@ -159,7 +161,7 @@ function Listo({ lote, onCerrar }: { lote: number; onCerrar: () => void }) {
       ✓ Listo. Se va mandando a MercadoLibre de a poco (unas 12 por minuto) aunque cierres esta pantalla.
     </p>
     <div className="flex justify-end gap-2">
-      <button type="button" onClick={onCerrar} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Cerrar</button>
+      <button type="button" onClick={onCerrar} className="btn-secondary !px-3 !py-1.5">Cerrar</button>
       <Link href={`/publicaciones/lotes?lote=${lote}`} className="btn-primary text-sm">Ver el avance</Link>
     </div>
   </>
@@ -220,7 +222,7 @@ function LoteDescripcion({ sel, cuantas, onCerrar, onHecho }: { sel: Seleccion; 
         )}
         {err && <p className="text-xs text-red-700">{err}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCerrar} disabled={enviando} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Cancelar</button>
+          <button type="button" onClick={onCerrar} disabled={enviando} className="btn-secondary !px-3 !py-1.5">Cancelar</button>
           {!vista
             ? <button type="button" onClick={() => pedir(false)} disabled={enviando || !plantilla} className="btn-primary text-sm">{enviando ? '…' : 'Revisar'}</button>
             : <button type="button" onClick={() => pedir(true)} disabled={enviando} className="btn-primary text-sm">{enviando ? 'Creando…' : `Aplicar en ${vista.total.toLocaleString('es-VE')}`}</button>}
@@ -289,7 +291,7 @@ function LotePrecio({ sel, onCerrar, onHecho }: { sel: Seleccion; onCerrar: () =
         {vista && <p className="text-xs text-neutral-600">Cambian {cambian.length.toLocaleString('es-VE')} de {vista.length.toLocaleString('es-VE')}{vista.length - cambian.length ? ' (las demás quedan igual o tienen un problema y se saltan)' : ''}.</p>}
         {err && <p className="text-xs text-red-700">{err}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCerrar} disabled={enviando} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Cancelar</button>
+          <button type="button" onClick={onCerrar} disabled={enviando} className="btn-secondary !px-3 !py-1.5">Cancelar</button>
           {!vista
             ? <button type="button" onClick={() => pedir(false)} disabled={enviando || !valor.trim() || !Number.isFinite(v)} className="btn-primary text-sm">{enviando ? '…' : 'Ver antes → después'}</button>
             : <button type="button" onClick={() => pedir(true)} disabled={enviando || !cambian.length} className="btn-primary text-sm">{enviando ? 'Creando…' : `Confirmar ${cambian.length.toLocaleString('es-VE')} cambios`}</button>}

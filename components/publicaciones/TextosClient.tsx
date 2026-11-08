@@ -81,7 +81,7 @@ export default function TextosClient() {
                 <h2 className="font-semibold text-neutral-900">{tipo === 'pie' ? 'Pies (al final)' : tipo === 'condiciones' ? 'Condiciones de compra (después del producto, antes del pie)' : 'Encabezados (arriba de la descripción)'}</h2>
                 <p className="text-xs text-neutral-500">{tipo === 'pie' ? 'Ubicación, horario, datos de la tienda…' : tipo === 'condiciones' ? 'Envíos, montos mínimos, formas de pago, garantía, cambios…' : 'Saludo o datos que van antes de la descripción del producto.'}</p>
               </div>
-              <button type="button" onClick={() => nuevo(tipo)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">+ Nuevo</button>
+              <button type="button" onClick={() => nuevo(tipo)} className="btn-secondary !px-3 !py-1.5">+ Nuevo</button>
             </div>
             {!lista.length ? <p className="text-sm text-neutral-500">{tipo === 'condiciones' ? 'Ningunas todavía.' : 'Ninguno todavía.'}</p> : (
               <ul className="divide-y divide-neutral-100">
@@ -166,7 +166,7 @@ export default function TextosClient() {
             )}
             {err && <p className="text-xs text-red-700">{err}</p>}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setForm(null)} disabled={guardando} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Cancelar</button>
+              <button type="button" onClick={() => setForm(null)} disabled={guardando} className="btn-secondary !px-3 !py-1.5">Cancelar</button>
               <button type="button" onClick={guardar} disabled={guardando || !form.nombre.trim() || !form.texto.trim() || malos.length > 0} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar'}</button>
             </div>
           </div>
