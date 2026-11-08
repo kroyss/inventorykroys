@@ -9,6 +9,8 @@ import type { CobroFila, SituacionPlan } from '@/lib/cobros'
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 const fmtBs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
+// Suma meses a YYYY-MM-DD (como sumarMeses del servidor): para mostrar hasta cuándo valen los créditos del plan.
+const masMeses = (f: string, n: number) => { const [a, m, d] = f.split('-').map(Number); const x = new Date(Date.UTC(a, m - 1 + n, d)); return x.toISOString().slice(0, 10) }
 const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const NOMBRE_PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
 const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
@@ -205,6 +207,22 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 </button>
               ))}
             </div>
+            {s.creditosMes > 0 && (() => {
+              // 08-11 (el dueño): los créditos de IA se entregan juntos por contrato (mensual ×1, trimestral ×3) y valen
+              // desde que arranca el plan hasta que vence; no pasan al plan siguiente. Las recargas son otra bolsa.
+              const meses = ciclo === 'trimestral' ? 3 : 1
+              const fin = masMeses(s.inicioPlan, meses)
+              const despues = s.inicioPlan > hoyLocal()
+              return (
+                <p className="text-xs text-neutral-600 rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-2">
+                  Incluye <b className="num">{(s.creditosMes * meses).toLocaleString('de-DE')} créditos de IA</b> para todo el plan
+                  {meses > 1 ? ` (${s.creditosMes} × ${meses} meses)` : ''}, del <b>{ddmm(s.inicioPlan)}</b> al <b>{ddmm(fin)}</b>.
+                  {' '}Los que no uses vencen con el plan y no pasan al siguiente.
+                  {despues ? (s.estado === 'activo' ? ` Hasta el ${ddmm(s.inicioPlan)} sigues con los créditos de tu plan actual.` : ` Hasta el ${ddmm(s.inicioPlan)} sigues con los créditos de tu prueba.`) : ''}
+                  {' '}Las recargas son aparte y no vencen.
+                </p>
+              )
+            })()}
             {op.radar && s.radarPro.regalo && (
               <p className="text-xs text-lime-700">
                 Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Después cuesta {fmtUsd(s.radarPro.precio)} por mes y lo agregas cuando quieras desde aquí.

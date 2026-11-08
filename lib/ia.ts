@@ -161,72 +161,109 @@ export async function leerLote(id: string): Promise<ResultadoLote[] | null> {
  *  la migración 066 el dueño también tiene tope, por decisión propia). Las fichas no cuentan (apagadas, migración 063). */
 export const CREDITOS_WEB_MAX = 4
 
-/** De qué período son los créditos incluidos (migración 140, 01-11-2026; regla del dueño):
- *   · 'prueba' → para TODA la prueba, desde que se activó o reactivó (no se renuevan);
- *   · 'plan'   → por mes de plan desde el día de la activación (organizaciones.creditos_desde): renueva ese día;
+/** De qué período son los créditos incluidos (regla del dueño, 08-11-2026; antes mig. 140):
+ *   · 'plan'   → UNA bolsa por contrato: créditos del escalón × meses pagados (mensual ×1, trimestral ×3), para usar
+ *                desde el día que arranca ese plan (organizacion_pagos.desde) hasta que vence (hasta). Lo que sobra se
+ *                pierde con el plan: al renovar empieza la bolsa del plan nuevo (no se acumula de un contrato al otro).
+ *   · 'prueba' → para TODA la prueba, desde que se activó o reactivó (no se renuevan). Si ya pagó y el plan arranca
+ *                después (pagó en la prueba), sigue con los de la prueba hasta ese día (`proximo`).
  *   · 'mes'    → la propietaria: mes calendario.
- *  Los incluidos que no se usan desaparecen con su período. Las RECARGAS compradas no vencen: se gastan después
- *  de los incluidos (ia_uso.creditos_recarga) y lo que sobra sigue de un período al otro. */
+ *  Activo sin pago registrado (cuentas de la casa como Demo): mes desde la activación, como antes.
+ *  Las RECARGAS compradas son otra bolsa: no vencen, se gastan después de los incluidos (ia_uso.creditos_recarga)
+ *  y lo que sobra sigue de un plan al otro. */
 export type PeriodoIA = 'prueba' | 'plan' | 'mes'
 export interface CupoIA {
   usados: number; limite: number | null; quedan: number | null; agotado: boolean
   /** Recargas compradas que quedan (no vencen). */
   recarga: number
   periodo: PeriodoIA
-  /** Cuándo se renuevan los incluidos (YYYY-MM-DD); null en prueba. */
+  /** plan: el día que vencen (YYYY-MM-DD, el vencimiento del plan); mes: cuándo se renuevan; null en prueba. */
   renueva: string | null
-  /** Incluidos: el tope del período y lo usado de ellos (para repartir un uso entre incluidos y recargas). */
+  /** Plan ya pagado que arranca más adelante (pagó en la prueba): desde cuándo y con cuántos créditos. */
+  proximo: { desde: string; creditos: number } | null
+  /** Incluidos: el tope del período (la bolsa) y lo usado de ellos (para repartir un uso entre incluidos y recargas). */
   base: number | null; incluidos: number
 }
 
+// El plan vigente y el siguiente ya pagado (fechas de Caracas: el plan del 09/11 al 09/02 cuenta desde el 09/11 a las
+// 00:00 y vence el 09/02 a las 00:00; ese día ya corre el siguiente, que arranca donde termina el anterior).
+const PLAN_VIGENTE = `FROM organizacion_pagos p WHERE p.organizacion_id = x.org AND p.tipo = 'plan'
+                 AND p.desde <= x.hoy AND p.hasta > x.hoy ORDER BY p.desde DESC, p.id DESC LIMIT 1`
+const PLAN_SIGUIENTE = `FROM organizacion_pagos p WHERE p.organizacion_id = x.org AND p.tipo = 'plan'
+                 AND p.desde > x.hoy ORDER BY p.desde, p.id LIMIT 1`
+const MESES = (h: string, d: string) =>
+  `GREATEST(1, (EXTRACT(YEAR FROM age(${h}, ${d})) * 12 + EXTRACT(MONTH FROM age(${h}, ${d})))::int)`
+
 export async function cupoIA(db: Pool, empresaId: number): Promise<CupoIA> {
-  // Inicio del período: plan = el último "aniversario" de la activación; prueba = la activación; propietaria = día 1.
   // ia_creditos_desde (mig. 066/140) es un piso: nunca se cuenta antes de esa fecha.
   const { rows: [e] } = await dbGlobal().query(
     `WITH x AS (
-       SELECT e.ia_limite_mes AS limite, e.ia_creditos_desde,
-              CASE WHEN o.estado = 'propietario' OR o.creditos_desde IS NULL THEN 'mes'
-                   WHEN o.estado = 'prueba' THEN 'prueba' ELSE 'plan' END AS periodo,
-              o.creditos_desde AS ancla,
+       SELECT e.ia_limite_mes AS limite, e.ia_creditos_desde, o.estado, o.creditos_desde AS ancla, o.id AS org,
+              (NOW() AT TIME ZONE 'America/Caracas')::date AS hoy,
               (SELECT COALESCE(SUM(p.creditos), 0) FROM organizacion_pagos p WHERE p.empresa_id = e.id AND p.tipo = 'recarga')::int AS recargas
        FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id WHERE e.id = $1),
      y AS (
-       SELECT x.*, CASE x.periodo
-                     WHEN 'mes' THEN date_trunc('month', NOW())
-                     WHEN 'prueba' THEN x.ancla
-                     ELSE x.ancla + make_interval(months => (EXTRACT(YEAR FROM age(NOW(), x.ancla)) * 12
-                                                             + EXTRACT(MONTH FROM age(NOW(), x.ancla)))::int) END AS inicio
-       FROM x)
-     SELECT limite, periodo, recargas, GREATEST(inicio, COALESCE(ia_creditos_desde, '-infinity')) AS desde,
-            CASE WHEN periodo = 'prueba' THEN NULL
-                 ELSE to_char((inicio + INTERVAL '1 month') AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') END AS renueva
-     FROM y`, [empresaId])
+       SELECT x.*,
+              (SELECT p.desde ${PLAN_VIGENTE}) AS p_desde, (SELECT p.hasta ${PLAN_VIGENTE}) AS p_hasta,
+              (SELECT p.desde ${PLAN_SIGUIENTE}) AS n_desde, (SELECT p.hasta ${PLAN_SIGUIENTE}) AS n_hasta
+       FROM x),
+     z AS (
+       SELECT y.*,
+              CASE WHEN estado = 'propietario' OR ancla IS NULL THEN 'mes'
+                   WHEN p_desde IS NOT NULL THEN 'plan'
+                   WHEN estado = 'prueba' OR n_desde IS NOT NULL THEN 'prueba'
+                   ELSE 'aniversario' END AS tipo
+       FROM y),
+     w AS (
+       SELECT z.*,
+              CASE tipo WHEN 'mes' THEN date_trunc('month', NOW())
+                        WHEN 'plan' THEN p_desde::timestamp AT TIME ZONE 'America/Caracas'
+                        WHEN 'prueba' THEN ancla
+                        ELSE ancla + make_interval(months => (EXTRACT(YEAR FROM age(NOW(), ancla)) * 12
+                                                              + EXTRACT(MONTH FROM age(NOW(), ancla)))::int) END AS inicio
+       FROM z)
+     SELECT limite, recargas, CASE WHEN tipo = 'aniversario' THEN 'plan' ELSE tipo END AS periodo,
+            CASE WHEN tipo = 'plan' THEN limite * ${MESES('p_hasta', 'p_desde')} ELSE limite END AS bolsa,
+            GREATEST(inicio, COALESCE(ia_creditos_desde, '-infinity')) AS desde,
+            CASE tipo WHEN 'prueba' THEN NULL
+                      WHEN 'plan' THEN to_char(p_hasta, 'YYYY-MM-DD')
+                      ELSE to_char((inicio + INTERVAL '1 month') AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') END AS renueva,
+            CASE WHEN tipo = 'prueba' THEN to_char(n_desde, 'YYYY-MM-DD') END AS proximo_desde,
+            CASE WHEN tipo = 'prueba' AND n_desde IS NOT NULL THEN limite * ${MESES('n_hasta', 'n_desde')} END AS proximo_creditos
+     FROM w`, [empresaId])
   // Lo usado en el período (de los incluidos y de las recargas) y lo usado de las recargas desde siempre.
   const { rows: [u] } = await db.query(
     `SELECT COALESCE(SUM(1 + busquedas - creditos_recarga) FILTER (WHERE fecha >= $1), 0)::int AS incluidos,
             COALESCE(SUM(creditos_recarga) FILTER (WHERE fecha >= $1), 0)::int AS recarga_periodo,
             COALESCE(SUM(creditos_recarga), 0)::int AS recarga_total
      FROM ia_uso WHERE modulo IN ('preguntas', 'mensajes')`, [e?.desde ?? null])
-  const base: number | null = e?.limite ?? null
+  const base: number | null = e?.limite == null ? null : Number(e.bolsa)
   const recarga = Math.max(0, (e?.recargas ?? 0) - u.recarga_total)
   const usados = u.incluidos + u.recarga_periodo
   const periodo = (e?.periodo ?? 'mes') as PeriodoIA
   const renueva = e?.renueva ?? null
-  if (base === null) return { usados, limite: null, quedan: null, agotado: false, recarga, periodo, renueva, base, incluidos: u.incluidos }
+  const proximo = e?.proximo_desde && e.proximo_creditos != null ? { desde: e.proximo_desde as string, creditos: Number(e.proximo_creditos) } : null
+  if (base === null) return { usados, limite: null, quedan: null, agotado: false, recarga, periodo, renueva, proximo, base, incluidos: u.incluidos }
   const quedan = Math.max(0, base - u.incluidos) + recarga
-  return { usados, limite: usados + quedan, quedan, agotado: quedan <= 0, recarga, periodo, renueva, base, incluidos: u.incluidos }
+  return { usados, limite: usados + quedan, quedan, agotado: quedan <= 0, recarga, periodo, renueva, proximo, base, incluidos: u.incluidos }
 }
 
 const ddmm = (f: string) => f.split('-').reverse().slice(0, 2).join('/')
 
-/** Cuándo vuelven los créditos, en palabras (para avisos y ayudas). */
-export const renuevaTexto = (c: Pick<CupoIA, 'periodo' | 'renueva'>) =>
-  c.periodo === 'prueba' ? 'los de la prueba son para toda la prueba (no se renuevan)'
+/** Cuándo terminan o vuelven los incluidos, en palabras; encaja después de «Los incluidos …». */
+export const renuevaTexto = (c: Pick<CupoIA, 'periodo' | 'renueva' | 'proximo'>) =>
+  c.periodo === 'prueba'
+    ? (c.proximo ? `de tu prueba sirven hasta el ${ddmm(c.proximo.desde)}; ese día empiezan los ${c.proximo.creditos} de tu plan`
+      : 'son para toda la prueba (no se renuevan)')
+    : c.periodo === 'plan' && c.renueva ? `son de tu plan y vencen con él el ${ddmm(c.renueva)} (al renovar empiezan los del plan nuevo)`
     : c.renueva ? `se renuevan el ${ddmm(c.renueva)}` : 'se renuevan cada mes'
 
 export const mensajeCupoAgotado = (c: CupoIA) =>
-  `Usaste los ${c.limite} créditos de IA ${c.periodo === 'prueba' ? 'de tu prueba' : 'de este período'}. Las respuestas parecidas y las respuestas rápidas siguen funcionando; `
-  + (c.periodo === 'prueba' ? 'para seguir usando la IA, activa un plan o compra una recarga.' : `los créditos ${renuevaTexto(c)}, o puedes comprar una recarga.`)
+  `Usaste los ${c.limite} créditos de IA ${c.periodo === 'prueba' ? 'de tu prueba' : c.periodo === 'plan' ? 'de tu plan' : 'de este período'}. Las respuestas parecidas y las respuestas rápidas siguen funcionando; `
+  + (c.periodo === 'prueba'
+    ? (c.proximo ? `el ${ddmm(c.proximo.desde)} empiezan los ${c.proximo.creditos} de tu plan, o puedes comprar una recarga.` : 'para seguir usando la IA, activa un plan o compra una recarga.')
+    : c.periodo === 'plan' ? 'puedes comprar una recarga (no vence) o, al renovar, empiezan los del plan nuevo.'
+    : `los créditos ${renuevaTexto(c)}, o puedes comprar una recarga.`)
 
 export const mensajeSinCreditosWeb = (quedan: number) =>
   `Buscar en internet usa hasta ${CREDITOS_WEB_MAX} créditos y te ${quedan === 1 ? 'queda 1' : `quedan ${quedan}`}. Puedes usar «Proponer con IA» (1 crédito) o anotar el dato del producto.`

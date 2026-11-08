@@ -12,7 +12,8 @@ export async function GET() {
   try {
     const cupo = await cupoIA(s.db, s.session.user.empresaId)
     // periodo/renueva (mig. 140): los créditos van atados a la prueba o al mes de plan, no al día 1.
-    const datos = { creditos: cupo.usados, limite: cupo.limite, periodo: cupo.periodo, renueva: renuevaTexto(cupo), recarga: cupo.recarga }
+    const datos = { creditos: cupo.usados, limite: cupo.limite, periodo: cupo.periodo, renueva: renuevaTexto(cupo), recarga: cupo.recarga,
+      vence: cupo.periodo === 'plan' && cupo.renueva ? cupo.renueva.split('-').reverse().slice(0, 2).join('/') : undefined }
     if (!esDuenoPlataforma(s.session.user)) return NextResponse.json(datos)
     const u = await usoDelMes(s.db)
     return NextResponse.json({ total: u.total, ...datos })

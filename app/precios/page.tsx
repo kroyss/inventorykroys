@@ -35,7 +35,7 @@ const PREGUNTAS = [
   { p: '¿Qué pasa si un mes vendo más?',
     r: 'Nada se bloquea. Si pasas dos meses seguidos por encima de tu escalón, pasas al siguiente; si bajas dos meses seguidos, también bajas.' },
   { p: '¿Qué son los créditos de IA?',
-    r: `Cada respuesta que te propone la IA usa un crédito. Las respuestas rápidas y las parecidas no gastan. Si se te acaban, recargas ${RECARGA_IA.creditos} por $${RECARGA_IA.precio} y no vencen.` },
+    r: `Cada respuesta que te propone la IA usa un crédito. Las respuestas rápidas y las parecidas no gastan. Los créditos del plan se entregan juntos al contratar (trimestral = los de 3 meses) y valen hasta que vence el plan; lo que no uses no pasa al plan siguiente. Si se te acaban, recargas ${RECARGA_IA.creditos} por $${RECARGA_IA.precio} y esas no vencen.` },
   { p: '¿Qué trae el Radar?',
     r: `Con los planes Automatizaciones y Completo tienes el Radar de Oportunidades Gratis todos los días: los productos que más se venden en MercadoLibre con su precio real, buscador y tu lista de productos investigados. Radar PRO (sellos, filtros, productos nuevos del mes, competencia y tendencias) es los sábados y domingos por $${RADAR_PRO.precio} al mes, y el primer mes va de regalo solo en tu primer plan: después se agrega al renovar a precio completo, sin descuento.` },
   { p: '¿Cómo pago?',
@@ -126,7 +126,7 @@ export default function PreciosPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-neutral-500">Los créditos de IA son iguales en los tres planes. Si necesitas más, recargas {RECARGA_IA.creditos} por ${RECARGA_IA.precio} y no vencen.</p>
+          <p className="mt-3 text-sm text-neutral-500">Los créditos de IA son iguales en los tres planes y se entregan juntos al contratar: en el trimestral recibes los de 3 meses para usarlos cuando quieras hasta que vence. Si necesitas más, recargas {RECARGA_IA.creditos} por ${RECARGA_IA.precio} y no vencen.</p>
         </section>
 
         {/* ── Incluido y extras ── */}

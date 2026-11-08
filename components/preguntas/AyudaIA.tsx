@@ -15,7 +15,7 @@ const ayuda = (u: { renueva?: string; recarga?: number }) =>
 /** Créditos de IA usados en el período (la prueba o el mes de plan, mig. 140). El cliente ve "usados de su límite";
  *  el dueño de la plataforma (sin límite) ve además lo que costaron. */
 export function UsoIA() {
-  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null; renueva?: string; recarga?: number } | null>(null)
+  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null; renueva?: string; recarga?: number; vence?: string } | null>(null)
   useEffect(() => {
     let vivo = true
     const cargar = () => fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
@@ -27,9 +27,10 @@ export function UsoIA() {
   if (uso.limite !== null) {
     const quedan = Math.max(0, uso.limite - uso.creditos)
     return (
-      <span className={`text-xs whitespace-nowrap ${quedan <= uso.limite * 0.1 ? 'text-amber-700' : 'text-neutral-500'}`}
+      // 08-11: en ámbar desde que queda el 20%; con plan, cuándo vencen (la bolsa es de todo el plan).
+      <span className={`text-xs whitespace-nowrap ${quedan <= uso.limite * 0.2 ? 'text-amber-700' : 'text-neutral-500'}`}
         title={ayuda(uso)}>
-        Créditos IA: <b className="num">{uso.creditos}</b> de {uso.limite} · te quedan <b className="num">{quedan}</b>
+        Créditos IA: <b className="num">{uso.creditos}</b> de {uso.limite} · te quedan <b className="num">{quedan}</b>{uso.vence ? ` · vencen ${uso.vence}` : ''}
       </span>
     )
   }

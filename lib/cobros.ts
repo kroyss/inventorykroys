@@ -174,6 +174,8 @@ export interface SituacionPlan {
   radarProHasta: string | null
   ventasMes: number; ventasMesAnt: number; mes: string; cuentas: number; conectadas: number; cuentasExtra: number
   escalonSugerido: number; escalonNombre: string
+  /** Créditos de IA por mes del escalón sugerido (la bolsa del plan = esto × meses pagados). */
+  creditosMes: number
   opciones: OpcionPlan[]; planSugerido: Plan['id']
   radarPro: { precio: number; regalo: boolean }   // regalo: el 1er plan con Radar trae 1 mes PRO (una sola vez en la vida)
   /** Radar PRO aparte (06-11): 1 mes cuando quiera, con plan activo que traiga Radar. null = no se puede ahora. */
@@ -218,7 +220,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     vence: estado === 'activo' ? o.plan_hasta : o.estado === 'prueba' ? o.prueba_hasta : o.plan_hasta,
     radarProHasta: o.radar_pro_hasta,
     ventasMes: vMes, ventasMesAnt: vAnt, mes: mesPasado(), cuentas, conectadas, cuentasExtra,
-    escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '',
+    escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '', creditosMes: ESCALONES[escalon]?.creditos ?? 0,
     opciones, planSugerido,
     // 04-11 (el dueño): el mes de regalo es UNA vez, en el primer plan con Radar (radar_pro_hasta vacío = nunca lo tuvo).
     // Suspender y volver, o renovar, ya no lo trae: se paga aparte a precio completo (sin descuento de Fundador ni
@@ -334,7 +336,8 @@ async function avisarDueno(id: number, archivo: Reporte['archivo']) {
 /**
  * Registra un plan pagado (Plataforma → Plan y pagos y la aprobación de un cobro): estado activo, plan, escalón,
  * ciclo, pagado hasta, módulos del plan y créditos del escalón. El primer plan con Radar trae 1 mes de PRO de regalo.
- * Créditos de IA (mig. 140): el primer plan o el que vuelve tras vencer arranca su mes hoy; renovar uno vigente no.
+ * Créditos de IA (08-11): la bolsa del plan sale de este pago (desde → hasta, créditos × meses; ver cupoIA). Ya no se
+ * mueve creditos_desde: si pagó en la prueba, sigue con los de la prueba hasta el día que arranca el plan.
  */
 export async function registrarPlan(client: PoolClient, org: number, b: {
   plan: Plan['id']; escalon: number; ciclo: 'mensual' | 'trimestral'; hasta: string; monto: number; nota?: string | null; desde?: string
@@ -348,10 +351,8 @@ export async function registrarPlan(client: PoolClient, org: number, b: {
   await client.query(
     `UPDATE organizaciones SET estado = 'activo', plan = $2, escalon = $3, ciclo = $4, plan_hasta = $5,
        prueba_dias = NULL, motivo_pausa = NULL, pausa_fecha = NULL,
-       radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END,
-       creditos_desde = CASE WHEN $8 THEN NOW() ELSE creditos_desde END
-     WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1),
-      !(o.estado === 'activo' && o.plan_hasta && o.plan_hasta >= hoy)])
+       radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END
+     WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1)])
   await modulosDelPlan(client, org, b.plan, b.escalon)
   const { rows: [p] } = await client.query(
     `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, plan, escalon, ciclo, desde, hasta, nota, por)

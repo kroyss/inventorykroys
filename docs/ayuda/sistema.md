@@ -93,9 +93,12 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   su plan vence sin pago (ni pago reportado antes de vencer), la cuenta se pausa y deja de ser Fundador; al volver paga precio normal. Se puede pagar en bolívares a tasa BCV.
 - **Créditos de IA:** cada «Proponer con IA» usa 1 crédito; «Buscar en internet» usa 1 más 1 por cada búsqueda
   (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
-  del plan se renuevan **cada mes en el día en que se activó** (si se activó el 18, cada 18) y los que no uses no
-  se acumulan. La prueba gratis trae 50 créditos **para toda la prueba** (no se renuevan). Recarga: 100 créditos
-  por $4: **no vencen**, se usan después de los incluidos y lo que sobra sigue de un mes al otro.
+  del plan se entregan **juntos al contratar**: mensual = los de 1 mes, trimestral = los de 3 meses (ej. 80 × 3 = 240),
+  para usar como quieras **desde el día que arranca el plan hasta que vence**. Lo que no uses vence con el plan y no
+  pasa al siguiente: al renovar empiezan los del plan nuevo. Si pagas durante la prueba, el plan arranca cuando
+  termina la prueba y hasta ese día sigues con los créditos de la prueba. La prueba gratis trae 50 créditos **para
+  toda la prueba** (no se renuevan). Recarga: 100 créditos por $4: **no vencen**, se usan después de los incluidos
+  y lo que sobra sigue de un plan al otro. El contador de créditos se pone en ámbar cuando queda el 20%.
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
   domingos** por **+$6 al mes**; el primer mes de PRO va de regalo **solo una vez, en tu primer plan**
@@ -230,7 +233,7 @@ preguntas (spam, ofensivas).
 
 **Problemas comunes:**
 - *No me aparecen preguntas:* revisa que la cuenta esté conectada (Cuentas de MercadoLibre).
-- *«No tienes créditos»:* se acabaron los de la prueba o los del mes de plan; puedes responder a mano o con respuestas rápidas (gratis), o
+- *«No tienes créditos»:* se acabaron los de la prueba o los de tu plan; puedes responder a mano o con respuestas rápidas (gratis), o
   recargar.
 
 **Video:** «Preguntas con IA».
