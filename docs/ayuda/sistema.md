@@ -91,8 +91,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   (Fundadores: −30% mensual o trimestral, no se suman). El descuento es solo del plan: cuentas extra,
   Radar PRO y recargas de IA van a precio completo. El Fundador conserva el 30% mientras renueve a tiempo: si su mes gratis o
   su plan vence sin pago (ni pago reportado antes de vencer), la cuenta se pausa y deja de ser Fundador; al volver paga precio normal. Se puede pagar en bolívares a tasa BCV.
-- **Créditos de IA:** cada «Proponer con IA» usa 1 crédito; «Buscar en internet» usa 1 más 1 por cada búsqueda
-  (hasta 4). Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
+- **Créditos de IA:** cada «Proponer con IA» usa 1 crédito. Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
   del plan se entregan **juntos al contratar**: mensual = los de 1 mes, trimestral = los de 3 meses (ej. 80 × 3 = 240),
   para usar como quieras **desde el día que arranca el plan hasta que vence**. Lo que no uses vence con el plan y no
   pasa al siguiente: al renovar empiezan los del plan nuevo. Si pagas durante la prueba, el plan arranca cuando
@@ -178,7 +177,6 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
    Antes de mostrarla, una segunda revisión busca cada dato de la propuesta (colores, medidas, envío, ubicación,
    garantía) en la publicación y en tus políticas: si algo no está escrito o falta contestar una parte, la propuesta
    sale con **confianza baja** y te dice qué revisar.
-3. **Buscar en internet:** para dudas técnicas que la publicación no responde (cuesta créditos extra).
 4. Envía. La respuesta sale en MercadoLibre a tu nombre.
 
 **Respuesta automática con IA** (Configuración → Respuesta automática con IA):

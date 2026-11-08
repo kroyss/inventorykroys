@@ -164,15 +164,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
            borrador_at = CASE WHEN borrador IS NULL AND $6 THEN NOW() ELSE borrador_at END
          WHERE id = $1`,
         [q.id, JSON.stringify(d), b.respuesta || null, b.confianza, motivos.join(' · ') || null, cfg.modo === 'real'])
-      // Versión económica en paralelo (después de publicar la real, así no la demora). Si falla, la real no se entera.
-      try {
-        const eco = await simularEconomica(db, c, c.item?.status ?? q.item_estado, motivosRevisar)
-        await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`, [q.id, JSON.stringify(eco)])
-      } catch (e) {
-        console.error('[ia economica]', q.id, e instanceof Error ? e.message : e)
-        await db.query(`UPDATE ml_preguntas SET ia_auto = ia_auto || jsonb_build_object('eco', $2::jsonb) WHERE id = $1`,
-          [q.id, JSON.stringify({ error: (e instanceof Error ? e.message : String(e)).slice(0, 200) })]).catch(() => {})
-      }
+      // 08-11: la versión económica en paralelo se apagó: Haiku 5.5 ya escribe la real (la comparación queda como historial).
       // 06-11: la económica ya corre con Haiku 5.5 (MODELO_SIMPLE): la prueba aparte (eco55) quedó como historial.
     } catch (e) {
       fallas++
@@ -184,10 +176,8 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
   }
   // Sin preguntas nuevas: la versión económica repasa de a poco las ya procesadas desde el 01-11 (las del modo prueba,
   // muchas marcadas por el dueño), así la comparación arranca con historial y no solo con lo que llegue hoy.
-  if (!rows.length) {
-    const r = await repasarEconomica(db, country).catch(e => { console.error('[ia economica repaso]', e instanceof Error ? e.message : e); return 0 })
-    return r ? { repasoEconomica: r } : null
-  }
+  // 08-11: el repaso de la versión económica se apagó (ver arriba).
+  if (!rows.length) return null
   return { solas, revisar, publicadas, fallas }
 }
 

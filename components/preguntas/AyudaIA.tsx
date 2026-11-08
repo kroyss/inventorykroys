@@ -7,7 +7,7 @@ export const avisarUsoIA = () => window.dispatchEvent(new Event('uso-ia'))
 /** Lo que cuesta cada botón, en créditos (ver cupoIA en lib/ia.ts). */
 export const CREDITOS_TXT = '1 crédito'
 export const CREDITOS_WEB_TXT = 'hasta 4 créditos'
-const AYUDA_CREDITOS = 'Cada «Proponer con IA» usa 1 crédito, se use o no la respuesta. «Buscar en internet» usa 1 más 1 por cada búsqueda que haga (hasta 4). Las respuestas parecidas y las rápidas no gastan créditos.'
+const AYUDA_CREDITOS = 'Cada «Proponer con IA» usa 1 crédito, se use o no la respuesta. Las respuestas parecidas y las rápidas no gastan créditos.'
 /** Cuándo vuelven (mig. 140): de la prueba, del mes de plan o recargas, que no vencen. */
 const ayuda = (u: { renueva?: string; recarga?: number }) =>
   `${AYUDA_CREDITOS}${u.renueva ? ` Los incluidos ${u.renueva}; los que no uses no se acumulan.` : ''}${u.recarga ? ` Te quedan ${u.recarga} de recargas (no vencen).` : ''}`

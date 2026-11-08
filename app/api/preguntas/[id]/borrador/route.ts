@@ -22,7 +22,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (web && cupo.quedan !== null && cupo.quedan < CREDITOS_WEB_MAX)
       return NextResponse.json({ error: mensajeSinCreditosWeb(cupo.quedan), cupo }, { status: 429 })
     const ctx = await armarContexto(s.db, Number(id), s.session.user.country)
-    const b = await pedirBorrador(ctx, !!web)
+    // 08-11 (el dueño): se quitó «Buscar en internet» (solo se usaba al presionarlo): siempre sin búsqueda.
+    const b = await pedirBorrador(ctx, false)
     await registrarUso(s.db, 'preguntas', b.llamadas, s.session.user.id)
     await s.db.query(
       `UPDATE ml_preguntas SET borrador = $2, borrador_confianza = $3, borrador_falta = $4,

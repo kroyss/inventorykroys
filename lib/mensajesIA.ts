@@ -6,7 +6,7 @@
 import { politicasIA } from '@/lib/miIA'
 import { leerMensajesRapidos } from '@/lib/mensajesRapidos'
 import type { Pool } from 'pg'
-import { llamarClaude, type UsoIA } from '@/lib/ia'
+import { llamarClaude, MODELO_SIMPLE, type UsoIA } from '@/lib/ia'
 import { itemsDeVenta, envioML, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
 import { leerNotas } from '@/lib/notasML'
 import { mlFetch } from '@/lib/ml'
@@ -198,7 +198,9 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     L.push(`${m.propio ? 'Vendedor' : 'Comprador'} (${m.fecha.slice(0, 16).replace('T', ' ')}): ${t}${m.adjuntos.length ? ' [mandó un adjunto]' : ''}`)
   }
 
-  const { resultado: b, uso, modelo } = await llamarClaude<BorradorMensaje>({ sistema: SISTEMA, contenido: L.join('\n'), herramienta: HERRAMIENTA })
+  // 08-11 (el dueño): Haiku 5.5 escribe los mensajes (antes Sonnet, ~20× más caro). Un reintento si falla.
+  const llamar = () => llamarClaude<BorradorMensaje>({ sistema: SISTEMA, contenido: L.join('\n'), herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE })
+  const { resultado: b, uso, modelo } = await llamar().catch(() => llamar())
   return {
     respuesta: String(b.respuesta ?? '').trim().slice(0, 350),
     confianza: ['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja',

@@ -537,7 +537,8 @@ export const esPreguntaSimple = (texto: string) =>
   SIMPLE.test(texto) && !TECNICO.test(texto) && texto.trim().split(/\s+/).length <= 30
 
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
- *  Las preguntas simples van primero a Haiku; si no queda seguro, se rehace con Sonnet. */
+ *  08-11 (el dueño): Haiku 5.5 escribe TODAS (antes: Haiku las simples y Sonnet el resto). Sonnet costaba ~20× más
+ *  y la competencia cobra ~$0,01 por respuesta; el verificador (Haiku) sigue frenando lo que no está en los datos. */
 export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO, v2 = false, verificarBaja = false): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
   const sistema = SISTEMA + (v2 ? SISTEMA_V2_EXTRA : '') + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
@@ -554,12 +555,8 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
       web, modelo: m,
     }
   }
-  let b: Awaited<ReturnType<typeof pedir>> | null = null
-  if (!web && esPreguntaSimple(c.pregunta.texto)) {
-    b = await pedir(MODELO_SIMPLE).catch(() => null)
-    if (!(b && b.confianza === 'alta' && b.respuesta)) b = null
-  }
-  b ??= await pedir()
+  // Un reintento si falla (corte de la IA o "no devolvió un borrador").
+  let b = await pedir(MODELO_SIMPLE).catch(() => pedir(MODELO_SIMPLE))
   // Verificador (31-10): lo que la IA da por seguro se busca afirmación por afirmación en los datos; si algo no está
   // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
   let verificacion: string | null = null
