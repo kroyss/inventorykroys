@@ -143,7 +143,7 @@ Cada ítem dice **dónde vive en lo nuestro** y si es para todas las empresas (n
 |---|---|---|---|
 | 1.1 | **Variables en respuestas rápidas** (Preguntas y Mensajes): `{nombre}`, `{precio}`, `{precio_bs}` a BCV del día, `{tasa_bcv}`, `{stock}`, `{enlace}`. Hoy son texto fijo (`lib/mensajesRapidos.ts` dice "sin variables"). Ya existe `{nombre}`/`{producto}` en Mensaje al comprar: reutilizar el mismo reemplazador. | Preguntas → Respuestas rápidas · Mensajes → Respuestas rápidas | Todas |
 | 1.2 | **Aviso "cuenta de ML desconectada"** arriba de todas las pantallas, con botón **Reconectar** (hoy solo se ve entrando a Cuentas de ML). Mismo lugar que `AvisoCuenta`. Incluye a TECNOVA (permisos viejos → "Reconectar para activar todo"). | `AvisoCuenta.tsx` | Todas |
-| 1.3 | **Descuento por prepago** en Mi plan: 3 meses −10 %, 6 meses −20 %, 12 meses −30 % (porcentajes a definir). Cobros ya maneja aprobación manual. | Mi plan · Plataforma → Cobros | Todas |
+| ~~1.3~~ | **DESCARTADO 07-11 (queda solo el trimestral −10 % que ya existía)** · Descuento por prepago en Mi plan: 3 meses −10 %, 6 meses −20 %, 12 meses −30 % (porcentajes a definir). Cobros ya maneja aprobación manual. | Mi plan · Plataforma → Cobros | Todas |
 | 1.4 | **"Desconectar" también revoca en ML** (hoy solo borra los tokens nuestros). | Cuentas de ML | Todas |
 
 ### Fase 2 — IA más segura y controlable (3–5 días)
