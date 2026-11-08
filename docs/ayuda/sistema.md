@@ -641,9 +641,11 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
   En una campaña que **todavía no empezó** (ej. Black Friday del 16/11) puedes agregar publicaciones desde ya: quedan
   **programadas** y el precio se activa solo el día que empieza.
-  En las campañas **de MercadoLibre** la tarjeta y la ventana de agregar muestran el **% sugerido por MercadoLibre**
-  (su «Nueva propuesta», p. ej. 18% en Black Friday) y viene puesto por defecto. Cambia según la campaña. Si pones
-  menos de lo que pide ML, esas publicaciones salen marcadas «ML pide al menos X%» y no se mandan.
+  En las campañas **de MercadoLibre**, ML sugiere un descuento **distinto para cada producto** (su «Nueva propuesta»).
+  La tarjeta muestra el rango (p. ej. «sugerido ML 15–25% según producto») y al agregar viene marcado «Sugerido de
+  MercadoLibre en cada producto»: cada publicación entra con el suyo. Si lo desmarcas, usas un % igual para todas
+  (10% por defecto, lo subes tú). Si pones menos de lo que pide ML, salen marcadas «ML pide al menos X%» y no se
+  mandan. Si con el sugerido una pierde el envío gratis, también queda fuera (o la agregas igual).
 - **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
 - **Reportes → Resumen** (en prueba, solo algunas empresas; también con el botón **Métricas** del Inicio): todo junto
   para **7, 30, 90 días o 1 año** contra el período anterior del mismo largo: lo vendido, cantidad de ventas y
