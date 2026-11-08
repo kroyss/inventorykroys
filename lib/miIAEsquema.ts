@@ -25,7 +25,7 @@ export const EsquemaMiIA = z.object({
   negocio: z.object({ mayor: z.enum(['escribir', 'mismo']).optional(), mayorDesde: z.number().int().min(2).max(100000).nullable().optional(),
     regateo: z.enum(['fijo', 'consultar']).optional(), apartar: z.enum(['no', 'si']).optional(), apartarHoras: z.number().int().min(1).max(720).nullable().optional() }).optional(),
   atencion: z.object({ horario: txt(120) }).optional(),
-  extras: z.array(z.object({ titulo: z.string().trim().min(1).max(60), texto: z.string().trim().min(1).max(1500), palabras: txt(200) })).max(12).optional(),
+  extras: z.array(z.object({ titulo: z.string().trim().min(1).max(60), texto: z.string().trim().min(1).max(1500), palabras: txt(200), siempre: z.boolean().optional() })).max(12).optional(),
   extrasNoAplica: z.boolean().optional(),
 })
 export type EntradaMiIA = z.infer<typeof EsquemaMiIA>

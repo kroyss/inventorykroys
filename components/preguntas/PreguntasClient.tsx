@@ -339,7 +339,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', miIA ? 'Otras indicaciones' : 'Políticas para la IA'], ['aprendido', 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica) && (k !== 'mi_ia' || miIA)).map(([k, t]) => (
+              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
@@ -347,7 +347,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
             {subConfig === 'mi_ia' && miIA && <MiIA />}
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
             {subConfig === 'aprendido' && <><LoAprendido /><DatosProductos /></>}
-            {subConfig === 'ia' && <CuentasYPoliticas conMiIA={!!miIA} />}
+            {subConfig === 'ia' && !miIA && <CuentasYPoliticas />}
             {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica />}
           </div>
         ) : <Cargando />
@@ -697,7 +697,7 @@ function FilaHistorial({ p }: { p: Pregunta }) {
 
 // ── Cuentas conectadas + políticas para la IA ──────────────────────────────
 // Las cuentas de ML viven en su pantalla (/cuentas-ml); aquí quedan las políticas para la IA.
-function CuentasYPoliticas({ conMiIA = false }: { conMiIA?: boolean }) {
+function CuentasYPoliticas() {
   const [politicas, setPoliticas] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [ok, setOk] = useState(false)
@@ -717,18 +717,16 @@ function CuentasYPoliticas({ conMiIA = false }: { conMiIA?: boolean }) {
   return (
     <div className="grid gap-4">
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-        <h2 className="font-semibold text-neutral-900">{conMiIA ? 'Otras indicaciones para la IA' : 'Políticas para la IA'}</h2>
-        {conMiIA ? <p className="text-xs text-neutral-500">
-          Solo lo que no encaja en ningún tema de <b>Mi IA</b>. Envío, pago, garantía, cambios, tono, etc. van en Mi IA, para que estén en un solo lugar: si algo choca, manda Mi IA.
-        </p> : <p className="text-xs text-neutral-500">
+        <h2 className="font-semibold text-neutral-900">Políticas para la IA</h2>
+        <p className="text-xs text-neutral-500">
           Lo que la IA debe saber de tu negocio. Escríbelo como se lo explicarías a un empleado nuevo. La IA no inventa nada fuera de esto.
-        </p>}
+        </p>
         <textarea value={politicas} onChange={e => { setPoliticas(e.target.value); setOk(false) }} rows={12}
           placeholder={'Ej.:\n- Pagos: pago móvil y transferencia (Banesco, Mercantil, Venezuela) a tasa BCV del día.\n- Envíos: por Zoom o Tealca, cobro a destino; salen de lunes a viernes.\n- Entregas en Caracas: …\n- Factura: sí emitimos, pedir datos por la mensajería de la venta.\n- Horario: lunes a sábado de 9 a 6.'}
           className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm font-mono resize-y" />
         <div className="flex items-center justify-end gap-3">
           {ok && <span className="text-xs text-emerald-700">Guardado</span>}
-          <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : conMiIA ? 'Guardar' : 'Guardar políticas'}</button>
+          <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar políticas'}</button>
         </div>
       </section>
     </div>

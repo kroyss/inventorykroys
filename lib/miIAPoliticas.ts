@@ -1,14 +1,14 @@
 // Mi IA = un solo lugar (08-11, el dueño): las "Políticas para la IA" de texto libre repetían casi todo lo del
 // cuestionario y ya chocaban (garantía 30 días en Políticas, 15 en Mi IA). "Pasar mis Políticas a Mi IA" reparte
-// ese texto en los temas, la pantalla muestra lo que choca para elegir, y lo que no encaja en ningún tema queda
-// como "Otras indicaciones" (el mismo campo preguntas_politicas, ahora solo con el resto).
+// ese texto en los temas, la pantalla muestra lo que choca para elegir, y lo que no encaja en ningún tema va a
+// Información extra (lo general con siempre=true). Al guardar, preguntas_politicas queda vacío.
 // Una llamada a la IA como la del prellenado (módulo 'simulacion': no descuenta créditos del cliente).
 import type { Pool } from 'pg'
 import { llamarClaude, registrarUso, MODELO_IA } from '@/lib/ia'
 import { HERRAMIENTA as BASE, limpiar } from '@/lib/miIASugerir'
 import type { EntradaMiIA } from '@/lib/miIAEsquema'
 
-export interface PasePoliticas { propuesto: Partial<EntradaMiIA>; resto: string; politicas: string }
+export interface PasePoliticas { propuesto: Partial<EntradaMiIA>; politicas: string }
 
 const SISTEMA = `Eres quien ordena la configuración de la IA de atención de un vendedor de MercadoLibre. Te paso sus "indicaciones escritas para la IA" (texto libre). Tienes que repartirlas en los temas de la herramienta "mi_ia".
 
@@ -21,13 +21,15 @@ Reglas:
 - Retiro: ubicacion.retiro = "acuerdo" si es previo acuerdo, "horario" si tiene horario, "no" si no hay.
 - Si no sabe algo o no puede afirmar stock: desconocido con "verificar" (decir que lo verificamos), "preguntar", "recomendar" o "persona", en el orden que se entienda.
 - Saludo y despedida tal cual (cortos). trato "usted" o "tu".
-- extras: SOLO textos largos de un tema puntual (compatibilidades, modo de uso, garantía muy detallada) que no caben en un campo; título corto y palabras clave separadas por coma.
-- resto: los renglones ORIGINALES (copiados tal cual) que no quedaron en ningún campo de arriba. No incluyas lo que ya repartiste. No incluyas la prohibición de dar teléfono, WhatsApp, correo o redes (eso ya es regla fija del sistema). Si todo encajó, resto vacío.
-- Revisa al final: CADA renglón del texto tiene que haber quedado en algún campo o en resto. Nada se pierde.`
+- extras: TODO lo que no quedó en un campo de arriba va aquí, con el texto ORIGINAL. Agrúpalo en pocas secciones con título corto:
+  · lo que vale para todas las respuestas (cómo responder, largo de las respuestas, disponibilidad o stock en general) → una sección "Indicaciones generales" con siempre=true;
+  · lo de un tema puntual (un trámite de factura, cómo se entrega el retiro, compatibilidades, modo de uso) → su sección con siempre=false y palabras clave separadas por coma (las que usaría el comprador al preguntar).
+- No pongas en extras la prohibición de dar teléfono, WhatsApp, correo o redes (eso ya es regla fija del sistema), ni lo que ya quedó en un campo.
+- Revisa al final: CADA renglón del texto tiene que haber quedado en algún campo o en extras. Nada se pierde.`
 
 const HERRAMIENTA = {
   name: 'mi_ia',
-  description: 'Las indicaciones del vendedor repartidas por tema, y lo que no encaja en ninguno.',
+  description: 'Las indicaciones del vendedor repartidas por tema; lo que no encaja en ninguno, en extras.',
   input_schema: {
     type: 'object',
     properties: {
@@ -40,8 +42,7 @@ const HERRAMIENTA = {
         apartar: { type: 'string', enum: ['no', 'si'] }, apartarHoras: { type: 'integer' } } },
       atencion: { type: 'object', properties: { horario: { type: 'string' } } },
       desconocido: { type: 'array', items: { type: 'string', enum: ['verificar', 'preguntar', 'recomendar', 'persona'] } },
-      extras: { type: 'array', items: { type: 'object', properties: { titulo: { type: 'string' }, texto: { type: 'string' }, palabras: { type: 'string' } }, required: ['titulo', 'texto'] } },
-      resto: { type: 'string' },
+      extras: { type: 'array', items: { type: 'object', properties: { titulo: { type: 'string' }, texto: { type: 'string' }, palabras: { type: 'string' }, siempre: { type: 'boolean' } }, required: ['titulo', 'texto'] } },
     },
   },
 }
@@ -53,9 +54,9 @@ export async function leerPoliticas(db: Pick<Pool, 'query'>) {
 
 export async function pasarPoliticas(db: Pool, usuarioId: number | string | null): Promise<PasePoliticas> {
   const politicas = await leerPoliticas(db)
-  if (!politicas) return { propuesto: {}, resto: '', politicas }
+  if (!politicas) return { propuesto: {}, politicas }
   const { resultado, uso, modelo } = await llamarClaude<Record<string, unknown>>({
     sistema: SISTEMA, contenido: `SUS INDICACIONES ESCRITAS PARA LA IA:\n${politicas.slice(0, 6000)}`, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 2500 })
   await registrarUso(db, 'simulacion', [{ modelo, uso }], usuarioId)
-  return { propuesto: limpiar(resultado), resto: typeof resultado.resto === 'string' ? resultado.resto.trim() : '', politicas }
+  return { propuesto: limpiar(resultado), politicas }
 }

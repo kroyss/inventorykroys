@@ -33,7 +33,7 @@ export interface MiIA {
   negocio?: { mayor?: 'escribir' | 'mismo'; mayorDesde?: number | null; regateo?: 'fijo' | 'consultar'; apartar?: 'no' | 'si'; apartarHoras?: number | null }
   atencion?: { horario?: string }
   /** Información extra por secciones: la IA la recibe SOLO si la pregunta o el mensaje trata de eso (título o palabras). */
-  extras?: { titulo: string; texto: string; palabras?: string }[]
+  extras?: { titulo: string; texto: string; palabras?: string; siempre?: boolean }[]   // siempre: indicaciones generales, van en todas
   extrasNoAplica?: boolean
 }
 
@@ -63,7 +63,8 @@ const DESCONOCIDO: Record<NonNullable<MiIA['desconocido']>[number], string> = {
 /** Mi IA escrita como políticas para la IA. `modulo` decide si va la parte post-venta. */
 const sinTildes = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 /** ¿La sección extra trata de lo que preguntan? Sus palabras (separadas por coma) o las palabras de 4+ letras del título. */
-export function extraAplica(x: { titulo: string; palabras?: string }, consulta: string) {
+export function extraAplica(x: { titulo: string; palabras?: string; siempre?: boolean }, consulta: string) {
+  if (x.siempre) return true
   const q = sinTildes(consulta)
   const claves = [...(x.palabras ?? '').split(','), ...x.titulo.split(/\s+/)].map(w => sinTildes(w.trim())).filter(w => w.length >= 4)
   return claves.some(w => q.includes(w))
@@ -146,7 +147,9 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
   if (limpio(c.atencion?.horario)) sec('HORARIO DE ATENCIÓN', [
     `Atendemos ${limpio(c.atencion!.horario)}. Si preguntan cuándo respondemos o escriben fuera de ese horario, dilo.`,
   ])
-  const ex = (c.extras ?? []).filter(x => limpio(x.titulo) && limpio(x.texto) && (consulta === undefined || extraAplica(x, consulta)))
+  const gen = (c.extras ?? []).filter(x => x.siempre && limpio(x.titulo) && limpio(x.texto))
+  if (gen.length) S.push(`INDICACIONES GENERALES DEL VENDEDOR (síguelas siempre)\n${gen.map(x => `- ${limpio(x.titulo)}: ${limpio(x.texto)}`).join('\n')}`)
+  const ex = (c.extras ?? []).filter(x => !x.siempre && limpio(x.titulo) && limpio(x.texto) && (consulta === undefined || extraAplica(x, consulta)))
   if (ex.length) S.push(`INFORMACIÓN EXTRA DEL VENDEDOR (úsala solo si responde lo que preguntan)\n${ex.map(x => `- ${limpio(x.titulo)}: ${limpio(x.texto)}`).join('\n')}`)
   if (modulo === 'mensajes') {
     const pv = c.postventa ?? {}

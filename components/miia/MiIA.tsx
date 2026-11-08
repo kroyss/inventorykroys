@@ -51,7 +51,7 @@ function resumen(id: string, c: Config): string {
       c.negocio?.regateo === 'fijo' ? 'precio fijo' : c.negocio?.regateo === 'consultar' ? 'rebaja: lo consultamos' : '',
       c.negocio?.apartar === 'no' ? 'no aparta' : c.negocio?.apartar === 'si' ? `aparta${c.negocio.apartarHoras ? ` ${c.negocio.apartarHoras} h` : ''}` : ''].filter(Boolean).join(' · ')
     case 'atencion': return corto(c.atencion?.horario?.trim() ?? '')
-    case 'extras': return c.extrasNoAplica && !c.extras?.length ? 'No hace falta' : corto(lista((c.extras ?? []).map(x => x.titulo)), 90)
+    case 'extras': return c.extrasNoAplica && !c.extras?.length ? 'No hace falta' : corto(lista((c.extras ?? []).map(x => x.siempre ? `${x.titulo} (siempre)` : x.titulo)), 90)
     case 'postventa': return c.postventa?.noAplica ? 'No hace falta nada' : [c.postventa?.pasos?.length ? corto(lista(c.postventa.pasos), 70) : '', c.postventa?.datosPago ? 'con datos de pago' : ''].filter(Boolean).join(' · ')
   }
   return ''
@@ -314,7 +314,7 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
         <div className="flex gap-2">
           <Chip activo={!!c.extrasNoAplica && !xs.length} onClick={() => set(c => ({ ...c, extras: [], extrasNoAplica: true }))}>No hace falta</Chip>
         </div>
-        <p className="text-xs text-neutral-500">Textos largos (garantía detallada, compatibilidades, cómo se usa). La IA lee cada sección <b>solo cuando la pregunta trata de eso</b>: por su título o por las palabras que pongas. Así gasta menos y no se confunde.</p>
+        <p className="text-xs text-neutral-500">Textos largos (garantía detallada, compatibilidades, cómo se usa). La IA lee cada sección <b>solo cuando la pregunta trata de eso</b>: por su título o por las palabras que pongas. Así gasta menos y no se confunde. Las reglas que valen para todo (ej. «respuestas cortas») márcalas <b>Siempre</b>.</p>
         {xs.map((x, i) => (
           <div key={i} className="rounded-lg border border-neutral-200 p-3 space-y-2">
             <div className="flex gap-2">
@@ -324,8 +324,13 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
             </div>
             <textarea rows={3} maxLength={1500} value={x.texto} onChange={e => setX(xs.map((y, j) => j === i ? { ...y, texto: e.target.value } : y))}
               placeholder="Lo que la IA debe saber de este tema" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-            <input value={x.palabras ?? ''} maxLength={200} onChange={e => setX(xs.map((y, j) => j === i ? { ...y, palabras: e.target.value } : y))}
-              placeholder="Palabras que la activan, separadas por coma (ej. sirve, compatible, modelo)" className="w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-xs" />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+              <span>La IA lo lee:</span>
+              <Chip activo={!x.siempre} onClick={() => setX(xs.map((y, j) => j === i ? { ...y, siempre: false } : y))}>Cuando la pregunta trata de eso</Chip>
+              <Chip activo={!!x.siempre} onClick={() => setX(xs.map((y, j) => j === i ? { ...y, siempre: true } : y))}>Siempre</Chip>
+            </div>
+            {!x.siempre && <input value={x.palabras ?? ''} maxLength={200} onChange={e => setX(xs.map((y, j) => j === i ? { ...y, palabras: e.target.value } : y))}
+              placeholder="Palabras que la activan, separadas por coma (ej. sirve, compatible, modelo)" className="w-full rounded-lg border border-neutral-300 px-3 py-1.5 text-xs" />}
             {contacto(x.texto) && <p className="text-xs text-red-700">Tiene un teléfono, correo o link: MercadoLibre borra o sanciona esas respuestas. Quítalo.</p>}
           </div>
         ))}
@@ -443,8 +448,8 @@ function Prueba({ iaAuto, onEncendida }: { iaAuto: string | null; onEncendida: (
 
 // ── Pasar mis Políticas a Mi IA (08-11) ─────────────────────────────────────
 // Un solo lugar: lo de "Políticas para la IA" se reparte en los temas; si choca con lo que ya hay, elige la persona
-// (por defecto queda lo de Mi IA). Lo que no encaja queda en "Otras indicaciones" (el mismo texto, solo con el resto).
-type Pase = { propuesto: Partial<Config>; resto: string; politicas: string }
+// (por defecto queda lo de Mi IA). Lo que no encaja en un tema va a Información extra (general = Siempre). Las Políticas quedan vacías.
+type Pase = { propuesto: Partial<Config>; politicas: string }
 type Fila = { id: string; tema: string; ahora: string; nuevo: string; valor: unknown; estado: 'nuevo' | 'igual' | 'choca' }
 
 function filasPase(c: Config, propuesto: Partial<Config>): Fila[] {
@@ -466,7 +471,6 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
   const filas = filasPase(c, pase.propuesto)
   const extras = pase.propuesto.extras ?? []
   const [elige, setElige] = useState<Record<string, 'mi' | 'pol'>>({})
-  const [resto, setResto] = useState(pase.resto)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -475,7 +479,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
     for (const f of filas) if (f.estado === 'nuevo' || (f.estado === 'choca' && elige[f.id] === 'pol')) final[f.id] = f.valor
     if (extras.length) { final.extras = [...(c.extras ?? []), ...extras].slice(0, 12); delete final.extrasNoAplica }
     setGuardando(true); setError(null)
-    const r = await fetch('/api/mi-ia/politicas', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miIA: final, resto }) })
+    const r = await fetch('/api/mi-ia/politicas', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ miIA: final }) })
     const d = await r.json().catch(() => ({}))
     setGuardando(false)
     if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
@@ -509,14 +513,13 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
           <p className="text-sm font-medium text-neutral-900">Se agrega a Mi IA</p>
           <ul className="space-y-0.5 text-sm text-neutral-700">{filas.filter(f => f.estado === 'nuevo').map(f => <li key={f.id}><b>{f.tema}:</b> {f.nuevo}</li>)}</ul>
         </div>}
-        {extras.length > 0 && <p className="text-sm text-neutral-700"><b>Información extra:</b> se agrega {lista(extras.map(x => `«${x.titulo}»`))}.</p>}
+        {extras.length > 0 && <div className="space-y-1">
+          <p className="text-sm font-medium text-neutral-900">Se agrega a Información extra</p>
+          <ul className="space-y-1 text-sm text-neutral-700">{extras.map((x, i) => <li key={i}>
+            <b>{x.titulo}</b> <span className="text-xs text-neutral-500">({x.siempre ? 'la IA lo lee siempre' : `cuando preguntan por ${x.palabras || x.titulo}`})</span>: {x.texto}</li>)}</ul>
+        </div>}
         {filas.some(f => f.estado === 'igual') && <p className="text-xs text-neutral-500">Ya estaba igual en Mi IA: {lista(filas.filter(f => f.estado === 'igual').map(f => f.tema))}.</p>}
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-neutral-900">Otras indicaciones</p>
-          <p className="text-xs text-neutral-500">Lo que no encaja en ningún tema. Queda en la pestaña Otras indicaciones; lo demás sale de ahí para que no esté repetido.</p>
-          <textarea value={resto} onChange={e => setResto(e.target.value)} rows={4} placeholder="(Nada: todo quedó en Mi IA)"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm font-mono resize-y" />
-        </div>
+        <p className="text-xs text-neutral-500">Al guardar, tus Políticas viejas quedan vacías: todo vive en Mi IA. Lo puedes corregir después en cada tarjeta.</p>
         <details className="text-xs text-neutral-500">
           <summary className="cursor-pointer">Ver mis Políticas como estaban</summary>
           <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-neutral-50 p-3 text-neutral-700">{pase.politicas}</pre>
