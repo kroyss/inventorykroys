@@ -38,6 +38,7 @@ export default async function VentasPage() {
       porConfirmar={tieneModulo(session!.user, 'preguntas')}
       verificarPagos={tieneModulo(session!.user, 'verificar_pagos')}
       // 25-10: donde las guías van solas a Despachos al verificar (clientes), el pago también se verifica aquí.
+      presupuestos={tieneModulo(session!.user, 'presupuestos')}
       pagoEnFila={ventasDesdeML(session!.user) && tieneModulo(session!.user, 'pagos_me') && puede(session!.user, 'ver_pagos_me')}
     />
   )

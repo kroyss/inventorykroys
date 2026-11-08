@@ -615,7 +615,14 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
   toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
-- **Prender o apagar el Inventario:** no se pierde nada (pagos, guías, despachos y calificaciones siguen igual). Al
+- **Presupuestos** (Ventas → botón Presupuestos; en prueba, solo algunas empresas): cotizaciones para un cliente.
+  **+ Nuevo presupuesto:** cliente (cédula/RIF y teléfono opcionales), productos del inventario (el precio se carga
+  solo y se puede cambiar) o **ítems libres** (servicio, envío), moneda (US$, Bs o pesos), descuento % y cuántos días
+  vale. **Guardar y ver** muestra la hoja con tu logo; **Guardar PDF** abre la impresión (elige «Guardar como PDF»)
+  para mandarlo por WhatsApp. **Datos del negocio:** logo, nombre, RIF/dirección/teléfono y condiciones (pago,
+  envíos, garantía), salen en todos. Se marca **Enviado** o **Rechazado**; si el cliente acepta, **Aceptado → pasar a
+  venta** crea una venta LOCAL en Borrador con esos productos (los ítems libres van en la nota) y sigue como cualquier
+  venta. Uno pasado a venta ya no se edita ni se borra.- **Prender o apagar el Inventario:** no se pierde nada (pagos, guías, despachos y calificaciones siguen igual). Al
   prenderlo, Por confirmar solo pide registrar las ventas **desde ese momento**; las anteriores quedan como estaban en
   Pagos ME. Si se apagó y se volvió a prender, en Inventario sale un aviso: lo vendido mientras estuvo apagado no se
   descontó, conviene hacer un conteo (hoja de conteo) y cargar las diferencias como ajuste.
@@ -627,6 +634,14 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   MercadoEnvíos (con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar sale un aviso verde con cuántas
   publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
 - **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
+- **Reportes → Resumen** (en prueba, solo algunas empresas; también con el botón **Métricas** del Inicio): todo junto
+  para **7, 30, 90 días o 1 año** contra el período anterior del mismo largo: lo vendido, cantidad de ventas y
+  unidades, ticket promedio y **ganancia** (después de costo y comisión de ML; solo con el permiso de costos), un
+  gráfico día a día contra el período anterior, ventas **por cuenta de MercadoLibre**, **atención** (preguntas,
+  tiempo de respuesta, cuántas respondió sola la IA, ventas por pregunta), **calificaciones** recibidas (positivas,
+  neutrales, negativas, contradictorias), los **más vendidos** y **los que cayeron** (vendían y ahora venden 40% menos
+  o más). Cada bloque tiene un enlace a su reporte de detalle. Las ventas de ML se guardan unos 4 meses: con 1 año la
+  comparación por cuenta queda incompleta (lo avisa).
 - **Ajustes:** tasa del dólar, costos de MercadoLibre (comisión, envío) y otras configuraciones del administrador.
 
 <!-- VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos -->

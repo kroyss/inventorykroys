@@ -12,5 +12,6 @@ export default async function ReportesPage() {
   if (!session || !puede(session.user, 'ver_reportes')) redirect('/dashboard')
   return <ReportesClient analisisStock={tieneModulo(session.user, 'analisis_stock')} importaciones={tieneModulo(session.user, 'importaciones')}
     despachaVE={session.user.country === 'VE' && tieneModulo(session.user, 'verificar_pagos')}
+    metricas={tieneModulo(session.user, 'metricas')}
     atencion={tieneModulo(session.user, 'atencion_ml') && tieneModulo(session.user, 'preguntas') && puede(session.user, 'ver_preguntas')} />
 }

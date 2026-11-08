@@ -50,8 +50,9 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false }: {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, metricas = false }: {
   country: Country; bonos: boolean; puedeTasas: boolean
+  metricas?: boolean       // módulo metricas (08-11): botón a Reportes → Resumen
   porConfirmar?: boolean   // cuentas de ML conectadas: botón "Por confirmar" (principal) + "Nueva venta"
   etapas?: boolean   // módulo compras_etapas (sin él no hay compras en tránsito)
   categorias?: boolean   // módulo precios_categorias (sin él no se muestra el exceso)
@@ -146,6 +147,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
               Por confirmar<NumeroBoton n={pendientesPorConfirmar(pc.datos)} cargando={!pc.datos} />
             </Link>
           )}
+          {metricas && <Link href="/reportes?tab=resumen" className="btn-secondary text-sm whitespace-nowrap" title="Ventas, ganancia, cuentas de ML, productos y atención con período contra el anterior">Métricas</Link>}
           <Link href="/ventas?new=1" className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>Nueva venta</Link>
           {!importaciones ? (
             <Link href="/compras?new=1" className="btn-secondary text-sm">Nueva compra</Link>

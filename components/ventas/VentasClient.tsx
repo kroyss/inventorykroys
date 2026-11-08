@@ -70,6 +70,7 @@ interface Props {
   userRole: UserRole
   country: Country
   facturas: boolean   // módulo Facturas (solo VE): sin él no se muestra el cuadro de factura
+  presupuestos?: boolean  // módulo presupuestos (08-11): botón a Ventas → Presupuestos
   porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
   pagoEnFila?: boolean   // cliente con inventario y Pagos ME (25-10): ✓ / ✗ del pago también en Por confirmar
   verificarPagos?: boolean   // VE: paso "Pago verificado" antes de procesar (módulo verificar_pagos; apagado = Inventario simple)
@@ -82,7 +83,7 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, presupuestos = false }: Props) {
   // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
   const directoVE = country === 'VE' && !verificarPagos
   // VE con el flujo completo: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE); CO y VE simple quedan igual.
@@ -405,6 +406,7 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               Por confirmar<NumeroBoton n={pendientesPC} cargando={!pc.datos} />
             </button>
           )}
+          {presupuestos && <a href="/ventas/presupuestos" className="btn-secondary text-sm whitespace-nowrap" title="Cotizaciones para clientes, imprimibles con tu logo">Presupuestos</a>}
           <button onClick={() => { setEditing(null); setShowForm(true) }}
             className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>
             Nueva venta

@@ -1,5 +1,6 @@
 'use client'
 import ResumenAtencion from '@/components/automatizaciones/ResumenAtencion'
+import ResumenMetricas from '@/components/reportes/ResumenMetricas'
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import {
   DateRangeBar, presetRange, type DatePreset,
@@ -13,11 +14,11 @@ import NumberInput from '@/components/ui/NumberInput'
 import * as XLSX from 'xlsx'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 
-type Tab = 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito' | 'conteos' | 'atencion'
+type Tab = 'resumen' | 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito' | 'conteos' | 'atencion'
 
 // Valores aceptados en los deep-links ?tab= y ?sub= (en mayúsculas: el hook
 // normaliza, para que el link funcione escrito de cualquier forma).
-const REPORT_TABS = ['VENTAS', 'COMPRAS', 'INVENTARIO', 'STOCK', 'TOP', 'TRANSITO', 'CONTEOS', 'ATENCION'] as const
+const REPORT_TABS = ['RESUMEN', 'VENTAS', 'COMPRAS', 'INVENTARIO', 'STOCK', 'TOP', 'TRANSITO', 'CONTEOS', 'ATENCION'] as const
 const STOCK_SUBS  = ['REPOSICION', 'REMATE', 'NUEVOS', 'DECLIVE'] as const
 
 const PERIOD_TABS: { key: Tab; label: string }[] = [
@@ -36,9 +37,10 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 // ni Conteos (conteos físicos).
 // importaciones: módulo. Sin él no se ofrece el filtro Local/Importación (solo hay compras locales).
 // atencion: «Atención ML» (preguntas, respuestas, tiempo y ventas de ML; módulo atencion_ml, 08-11).
-export default function ReportesClient({ analisisStock, importaciones, despachaVE = false, atencion = false }: { analisisStock: boolean; importaciones: boolean; despachaVE?: boolean; atencion?: boolean }) {
-  const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', 'ventas')
-  const tab = (!analisisStock && (tabGuardada === 'stock' || tabGuardada === 'conteos')) || (!atencion && tabGuardada === 'atencion') ? 'ventas' : tabGuardada
+// metricas: «Resumen» (módulo metricas, 08-11): todo junto con período contra el anterior; es la primera pestaña.
+export default function ReportesClient({ analisisStock, importaciones, despachaVE = false, atencion = false, metricas = false }: { analisisStock: boolean; importaciones: boolean; despachaVE?: boolean; atencion?: boolean; metricas?: boolean }) {
+  const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', metricas ? 'resumen' : 'ventas')
+  const tab = (!analisisStock && (tabGuardada === 'stock' || tabGuardada === 'conteos')) || (!atencion && tabGuardada === 'atencion') || (!metricas && tabGuardada === 'resumen') ? 'ventas' : tabGuardada
   const stateTabs = analisisStock ? STATE_TABS : STATE_TABS.filter(t => t.key !== 'stock' && t.key !== 'conteos')
   const [preset,   setPreset]   = useState<DatePreset>('last90')
   const [dateFrom, setDateFrom] = useState(presetRange('last90').from)
@@ -114,6 +116,7 @@ export default function ReportesClient({ analisisStock, importaciones, despachaV
       <PageHeader title="Reportes" subtitle="Por período (ventas, compras, más vendidos) o del estado actual del inventario" />
       {/* pestañas en dos grupos: por período | estado actual */}
       <Tabs value={tab} onChange={t => { setData(null); setTab(t) }} items={[
+        ...(metricas ? [{ value: 'resumen' as Tab, label: 'Resumen', group: 'periodo' }] : []),
         ...PERIOD_TABS.map(t => ({ value: t.key, label: t.label, group: 'periodo' })),
         ...(atencion ? [{ value: 'atencion' as Tab, label: 'Atención ML', group: 'periodo' }] : []),
         ...stateTabs.map(t => ({ value: t.key, label: t.label, group: 'estado' })),
@@ -172,6 +175,7 @@ export default function ReportesClient({ analisisStock, importaciones, despachaV
         <StockAnalysisReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} />
       )}
       {tab === 'atencion' && <ResumenAtencion />}
+      {tab === 'resumen' && <ResumenMetricas />}
       {!loading && data && tab === 'top'      && Array.isArray(data) && <TopProductsReport rows={data} />}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
         <InTransitReport rows={data} tipo={importaciones ? transTipo : ''} setTipo={setTransTipo} importaciones={importaciones} />

@@ -60,6 +60,9 @@ export const MODULOS = {
   mensajes_ia:        'Mensajes con IA en prueba: la IA deja escrito el borrador de cada mensaje nuevo y se marca Bien/Mal (no manda nada)',
   // 08-11 (migración 152): Productos → Catálogo PDF (logo, con o sin precio, elegir productos) para mandar por WhatsApp.
   catalogo_pdf:       'Catálogo PDF: armar un catálogo con logo, fotos y precios (o sin precios) para mandar por WhatsApp (Productos)',
+  // 08-11 (migración 153): Ventas → Presupuestos (cotización imprimible; aceptado → venta) y Reportes → Resumen.
+  presupuestos:       'Presupuestos: cotizaciones imprimibles con logo (cliente, productos, validez); aceptado se pasa a venta (Ventas)',
+  metricas:           'Métricas: Reportes → Resumen con período (7/30/90 días, 1 año) contra el anterior: ventas, ganancia, cuentas de ML, productos, atención y calificaciones',
 } as const
 
 export type Modulo = keyof typeof MODULOS
@@ -88,6 +91,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/productos/margenes':      'descuento_ml',
   '/productos/promociones':   'promociones',
   '/productos/catalogo':      'catalogo_pdf',
+  '/ventas/presupuestos':     'presupuestos',
 }
 
 /** Empresa que solo tiene el Radar: no tiene nada que ver en el Sistema. */
