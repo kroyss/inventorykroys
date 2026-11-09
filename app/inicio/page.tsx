@@ -2,7 +2,7 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import { COMUNIDAD_TELEGRAM, RADAR_CIFRAS, TELEGRAM_DESPEGUE, fechaLarga, type GrupoDespegue } from '@/lib/despegue'
-import { ESCALONES, PLANES, PRECIO_DESDE } from '@/lib/planes'
+import { CREDITOS_PRUEBA, ESCALONES, PLANES, PRECIO_DESDE } from '@/lib/planes'
 
 export const metadata = {
   title: { absolute: 'El Comerciante Digital · MercadoLibre Venezuela' },
@@ -176,6 +176,7 @@ export default async function InicioPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">Planes</p>
               <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">Desde ${PRECIO_DESDE} al mes.</h2>
               <p className="mt-1 text-sm text-neutral-500">Precio fijo en bolívares a tasa BCV, sin porcentaje de tus ventas.</p>
+              <p className="mt-1 text-sm text-neutral-500">Prueba gratis con {CREDITOS_PRUEBA} créditos de IA; tu primer plan te regala hasta {ESCALONES[ESCALONES.length - 1].creditos.toLocaleString('de-DE')} más. No vencen.</p>
             </div>
             <a href={PRECIOS} className="inline-flex items-center gap-2 rounded-xl bg-neutral-950 px-5 py-3 text-sm font-semibold text-lime-400 transition hover:bg-neutral-800">
               Ver planes y precios <span aria-hidden="true">→</span>

@@ -26,8 +26,8 @@ export function UsoIA() {
   if (!uso) return null
   if (uso.limite !== null) {
     const quedan = uso.quedan ?? Math.max(0, uso.limite - uso.creditos)
-    // En ámbar desde que queda el 20% de lo recibido.
-    const ambar = quedan <= uso.limite * 0.2 ? 'text-amber-700' : 'text-neutral-500'
+    // En ámbar desde que queda el 10% de lo recibido (09-11, el dueño).
+    const ambar = quedan <= 0 ? 'text-red-700' : quedan <= uso.limite * 0.1 ? 'text-amber-700' : 'text-neutral-500'
     if (uso.periodo === 'saldo') return (
       <span className={`text-xs whitespace-nowrap ${ambar}`} title={ayuda(uso)}>
         Créditos IA: te quedan <b className="num">{quedan.toLocaleString('de-DE')}</b> · no vencen

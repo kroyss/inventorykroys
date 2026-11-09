@@ -99,8 +99,10 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
     **una sola vez**. Renovar, cambiar de plan, pausar o reactivar no vuelve a dar créditos; lo que te quede sigue ahí.
   - **Recargas** (no vencen): 500 por $4, 2.000 por $15, 5.000 por $35. Se compran en **Mi plan → Créditos de IA**,
     igual que se paga el plan (Pago Móvil o Binance + captura); al confirmar el pago se suman al saldo y llega aviso.
-  - El contador (en Preguntas y Mensajes) dice cuántos te quedan y se pone en ámbar cuando queda el 20%. Si se acaban,
-    la IA deja de responder (también la automática) hasta que recargues; las respuestas rápidas y parecidas siguen.
+  - El contador (en Preguntas y Mensajes) dice cuántos te quedan. Cuando queda el **10%** y cuando **se acaban** sale un
+    aviso arriba en el sistema y le llega un Telegram al administrador (con el botón Recargar). Si se acaban, la IA deja
+    de responder (también la automática) hasta que recargues; las respuestas rápidas y parecidas siguen.
+  - Mi plan → Créditos de IA muestra cuántos te quedan.
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
   domingos** por **+$6 al mes**; el primer mes de PRO va de regalo **solo una vez, en tu primer plan**

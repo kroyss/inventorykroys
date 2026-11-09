@@ -67,6 +67,7 @@ export default function PreciosPage() {
           <a href={REGISTRO} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
             <Icono d={I.rayo} className="h-4 w-4" /> Prueba 15 días gratis
           </a>
+          <p className="mt-3 text-sm text-neutral-400">Incluye {CREDITOS_PRUEBA} créditos de IA. Sin tarjeta.</p>
         </div>
       </section>
 
@@ -129,6 +130,36 @@ export default function PreciosPage() {
           <p className="mt-3 text-sm text-neutral-500">Los créditos de IA se regalan una sola vez, con tu primer plan, y son iguales en los tres planes. <b className="text-neutral-700">No vencen</b>: se suman a los de tu prueba y a tus recargas. 1 crédito = 1 respuesta de la IA, a pregunta o a mensaje.</p>
         </section>
 
+        {/* ── Créditos de IA (09-11, mig. 156): un saldo que no vence ── */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">Créditos de IA</p>
+          <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">Un solo saldo que no vence.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-600">
+            1 crédito = 1 respuesta de la IA, a una pregunta o a un mensaje. Las respuestas rápidas y las parecidas no gastan.
+            Los créditos se suman y los usas cuando quieras.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-neutral-200 p-4">
+              <p className="text-sm text-neutral-500">Prueba gratis</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-neutral-900">{CREDITOS_PRUEBA}</p>
+              <p className="text-xs text-neutral-500">créditos de regalo</p>
+            </div>
+            <div className="rounded-xl border border-lime-300 bg-lime-50/60 p-4">
+              <p className="text-sm text-neutral-500">Tu primer plan</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-neutral-900">hasta {ESCALONES[ESCALONES.length - 1].creditos.toLocaleString('de-DE')}</p>
+              <p className="text-xs text-neutral-500">de regalo según tus ventas, una sola vez</p>
+            </div>
+            <div className="rounded-xl border border-neutral-200 p-4">
+              <p className="text-sm text-neutral-500">Recargas (no vencen)</p>
+              <ul className="mt-1 space-y-0.5 text-sm text-neutral-700">
+                {RECARGAS_IA.map(r => (
+                  <li key={r.creditos} className="flex justify-between gap-3"><span className="tabular-nums">{r.creditos.toLocaleString('de-DE')} créditos</span><b className="text-neutral-900">${r.precio}</b></li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* ── Incluido y extras ── */}
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
@@ -143,9 +174,6 @@ export default function PreciosPage() {
             <p className="font-semibold text-neutral-900">Extras</p>
             <ul className="mt-3 space-y-2 text-sm text-neutral-700">
               <li className="flex justify-between gap-4"><span>Cuenta de MercadoLibre adicional</span><b className="whitespace-nowrap text-neutral-900">+${CUENTA_EXTRA}/mes</b></li>
-              {RECARGAS_IA.map(r => (
-                <li key={r.creditos} className="flex justify-between gap-4"><span>Recarga de {r.creditos.toLocaleString('de-DE')} créditos de IA (no vencen)</span><b className="whitespace-nowrap text-neutral-900">${r.precio}</b></li>
-              ))}
               <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos, con Automatizaciones o Completo (1.<sup>er</sup> mes de regalo solo en tu primer plan, luego sin descuento)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Pago trimestral</span><b className="whitespace-nowrap text-lime-700">−{DESCUENTO_TRIMESTRAL}%</b></li>
             </ul>

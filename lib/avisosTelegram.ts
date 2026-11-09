@@ -31,6 +31,7 @@ import {
 import type { Country, UserRole } from '@/lib/types'
 import { resumenAtencion, cambio, textoMinutos } from '@/lib/resumenAtencion'
 import { leerReputacion } from '@/lib/reputacionML'
+import { cupoIA, nivelCreditos } from '@/lib/ia'
 
 // ── Mensajes de cierre (25-10) ─────────────────────────────────────────────
 /** Sin texto = mandó solo un archivo: casi siempre el comprobante del pago. */
@@ -240,6 +241,21 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
   const silencio = enSilencio(p, hora)
   const cab = cabecera(e, multi)
   let enviados = 0
+
+  // Créditos de IA (09-11, el dueño): al admin, cuando queda el 10% y cuando se acaban. Una vez por nivel y por saldo
+  // recibido (ref = total recibido): una recarga lo reinicia. Sin horario de silencio: si se acaban, la IA se detiene.
+  if (d.role === 'admin') {
+    const c = await cupoIA(db, e.id).catch(() => null)
+    const nivel = c ? nivelCreditos(c) : null
+    if (c && nivel) {
+      const total = c.limite ?? 0
+      if (await mandar(d, e, nivel === 'agotado' ? 'ia_creditos_0' : 'ia_creditos_10', [String(total)],
+        nivel === 'agotado'
+          ? `${cab}🔴 <b>Se acabaron tus créditos de IA</b>\n\nLa IA ya no propone respuestas ni responde sola. Las respuestas rápidas y las parecidas siguen funcionando. Recarga en Mi plan (no vencen).`
+          : `${cab}🟠 <b>Te quedan ${n(c.quedan ?? 0)} créditos de IA</b>\n\nEs el 10% de lo que tenías. Cuando se acaben, la IA deja de responder. Puedes recargar en Mi plan (no vencen).`,
+        [[{ texto: '💳 Recargar créditos', url: urlSistema('/mi-plan') }]])) enviados++
+    }
+  }
 
   // Cuenta desconectada (una vez por desconexión).
   if (p.desconectada && disp.desconectada && !silencio) {

@@ -146,6 +146,14 @@ export async function leerLote(id: string): Promise<ResultadoLote[] | null> {
  *    · "Buscar en internet" = 1 + 1 por cada búsqueda que haga la IA (máx. 3) = hasta 4.
  *  usados = filas de ia_uso de preguntas y mensajes (un borrador por fila) + sus búsquedas. */
 export const CREDITOS_WEB_MAX = 4
+/** 09-11 (el dueño): se avisa cuando queda el 10% de los créditos y cuando se acaban (contador, aviso arriba y Telegram). */
+export const AVISO_CREDITOS_PCT = 0.1
+/** Nivel de aviso de un saldo: 'agotado', 'poco' (≤ 10%) o null. Solo clientes (periodo 'saldo'). */
+export function nivelCreditos(c: Pick<CupoIA, 'periodo' | 'limite' | 'quedan'>): 'agotado' | 'poco' | null {
+  if (c.periodo !== 'saldo' || c.limite == null || c.quedan == null) return null
+  if (c.quedan <= 0) return 'agotado'
+  return c.quedan <= c.limite * AVISO_CREDITOS_PCT ? 'poco' : null
+}
 
 /** 09-11-2026 (el dueño, mig. 156): los créditos son UN SALDO que no vence.
  *   · 'saldo' → clientes: lo otorgado en ia_creditos (prueba 500, primer plan según escalón una sola vez, recargas,
@@ -190,7 +198,7 @@ export const renuevaTexto = (c: Pick<CupoIA, 'periodo' | 'renueva'>) =>
 
 export const mensajeCupoAgotado = (c: CupoIA) =>
   `Se acabaron tus créditos de IA. Las respuestas parecidas y las respuestas rápidas siguen funcionando; `
-  + (c.periodo === 'saldo' ? 'para seguir usando la IA, compra una recarga en Mi plan (no vencen).'
+  + (c.periodo === 'saldo' ? 'para seguir usando la IA, el administrador de la cuenta compra una recarga en Mi plan (no vencen).'
     : `los créditos ${renuevaTexto(c)}.`)
 
 export const mensajeSinCreditosWeb = (quedan: number) =>

@@ -151,6 +151,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             )}
             {tipo === 'recarga' && (
               <div className="space-y-2">
+                {s.saldoIA != null && <p className="text-sm text-neutral-800">Te quedan <b className="num">{s.saldoIA.toLocaleString('de-DE')} créditos</b>.</p>}
                 <p className="text-sm text-neutral-600">1 crédito = 1 respuesta de la IA (pregunta o mensaje). <b>No vencen</b> y se suman a los que tengas.</p>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {RECARGAS_IA.map((r, i) => (

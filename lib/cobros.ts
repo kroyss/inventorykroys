@@ -25,6 +25,7 @@ import { UPLOAD_DIR } from '@/lib/uploads'
 import { chatsDuenoPlataforma } from '@/lib/registro'
 import { enviarFotoTelegram, enviarTelegram, enviarTelegramId, ENTORNO, esc, telegramConfigurado, urlSistema } from '@/lib/telegram'
 import type { Country } from '@/lib/types'
+import { cupoIA } from '@/lib/ia'
 
 export const COBROS_DIR = path.join(UPLOAD_DIR, 'cobros')
 export const MAX_MB_COMPROBANTE = 5
@@ -174,6 +175,8 @@ export interface SituacionPlan {
   radarProHasta: string | null
   ventasMes: number; ventasMesAnt: number; mes: string; cuentas: number; conectadas: number; cuentasExtra: number
   escalonSugerido: number; escalonNombre: string
+  /** Créditos de IA que le quedan (saldo de su empresa principal); null = sin límite o no se pudo leer. */
+  saldoIA: number | null
   /** Créditos de IA que suma el PRIMER plan (escalón sugerido); 0 si ya los recibió (mig. 156: una sola vez). */
   creditosPrimerPlan: number
   opciones: OpcionPlan[]; planSugerido: Plan['id']
@@ -202,6 +205,8 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     ventasOrganizacion(orgId), tasaBCV(), leerDatosCobro(),
     dbGlobal().query(`${SELECT_COBRO} WHERE k.organizacion_id = $1 ORDER BY k.creado_at DESC LIMIT 12`, [orgId]),
   ])
+  const { rows: [emp] } = await dbGlobal().query(`SELECT id, country FROM empresas WHERE organizacion_id = $1 ORDER BY id LIMIT 1`, [orgId])
+  const saldoIA = emp ? await conEmpresa(emp.id, emp.country as Country, db => cupoIA(db, emp.id)).then(c => c.quedan).catch(() => null) : null
   const { rows: [yaPlan] } = await dbGlobal().query(
     `SELECT 1 FROM ia_creditos c JOIN empresas e ON e.id = c.empresa_id WHERE e.organizacion_id = $1 AND c.motivo = 'plan' LIMIT 1`, [orgId])
   const escalon = escalonSugerido(vMes, vAnt, conPlan ? Number(o.escalon) : null)
@@ -222,7 +227,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     vence: estado === 'activo' ? o.plan_hasta : o.estado === 'prueba' ? o.prueba_hasta : o.plan_hasta,
     radarProHasta: o.radar_pro_hasta,
     ventasMes: vMes, ventasMesAnt: vAnt, mes: mesPasado(), cuentas, conectadas, cuentasExtra,
-    escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '', creditosPrimerPlan: yaPlan ? 0 : ESCALONES[escalon]?.creditos ?? 0,
+    escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '', saldoIA, creditosPrimerPlan: yaPlan ? 0 : ESCALONES[escalon]?.creditos ?? 0,
     opciones, planSugerido,
     // 04-11 (el dueño): el mes de regalo es UNA vez, en el primer plan con Radar (radar_pro_hasta vacío = nunca lo tuvo).
     // Suspender y volver, o renovar, ya no lo trae: se paga aparte a precio completo (sin descuento de Fundador ni
