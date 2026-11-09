@@ -200,9 +200,11 @@ La IA contesta sola, a toda hora, las preguntas y los mensajes en que está segu
 para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Para arrancar (unos 10 minutos):
 1. Abre **Mi IA** (Preguntas → Configuración → Mi IA, o en Mensajes). Si es la primera vez, toca **«Empezar con lo que
    ya respondo»**: lee tus respuestas y descripciones y te propone cada tema. Revisa cada pantalla y corrige lo que haga
-   falta (pago, envío, despacho, tono, lo que siempre responde una persona…).
+   falta (pago, envío, despacho, tono, lo que siempre responde una persona…). **Hay que completar todos los temas:**
+   mientras falte alguno, la respuesta automática no se puede encender (te dice cuáles faltan).
 2. Abajo, en **Preguntas · pruébala con 10 preguntas reales**, toca **Probar**. La IA responde preguntas que tu equipo
-   ya contestó, sin publicar nada, y ves lado a lado tu respuesta y la de la IA, y si habría salido sola.
+   ya contestó, sin publicar nada, y ves lado a lado tu respuesta y la de la IA, y si habría salido sola. La prueba es
+   **opcional y gratis** (no usa créditos), con un máximo de **2 pruebas por día** en Preguntas y 2 en Mensajes.
 3. Si una está **Mal**, elige **qué estuvo mal** (le faltó un dato, dio un dato equivocado, no siguió cómo trabajas, el
    tono, o lo debía ver una persona). Abajo aparece **«Para mejorar»** con qué arreglar (un tema de Mi IA, la
    descripción, la ficha o las fotos de la publicación) y un botón para ir directo. Corrige y toca **Probar otra vez**.
@@ -224,9 +226,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 
 **Pantalla Respuesta automática con IA** (Preguntas → Configuración):
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
-- **Modo prueba:** la IA lee cada pregunta nueva y decide si habría salido sola, pero **no publica nada**. Ves lo que
-  habría respondido en «Habrían salido solas».
-- **Activa:** se publican solas solo las de confianza alta que pasan todas las revisiones. Nunca sale sola una respuesta
+- **Activa:** solo se puede elegir con todos los temas de Mi IA completos. Se publican solas solo las de confianza alta que pasan todas las revisiones. Nunca sale sola una respuesta
   que diga que no hay, que recomiende otra publicación o con datos que no están en la publicación o tus políticas. El
   resto te queda con la respuesta ya escrita para revisar y enviar.
 - Cada pregunta que la IA procesa usa 1 crédito. La pausa de respuestas automáticas también la detiene.

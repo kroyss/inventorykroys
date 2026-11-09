@@ -28,6 +28,7 @@ interface Resumen55 { comparadas: number; errores: number; costoReal: number; h4
 interface Fila { id: string; texto: string; item_titulo: string | null; item_permalink: string | null; fecha: string; estado: string; respuesta: string | null; ia_auto: Decision }
 interface Info {
   modo: Modo; desde: string | null
+  faltanMiIA?: string[]
   cupo: { usados: number; limite: number | null; quedan: number | null; agotado: boolean }
   resumen: { procesadas: number; solas: number; revisar: number; marcadas: number; bien: number; costo: number
     frenadas?: { marcadas: number; podian: number; porMotivo: { motivo: string; marcadas: number; podian: number }[] } }
@@ -38,7 +39,6 @@ interface Info {
 
 const MODOS: { v: Modo; t: string; d: string }[] = [
   { v: 'apagado', t: 'Apagada', d: 'La IA solo responde cuando tocas «Proponer con IA».' },
-  { v: 'sombra', t: 'Modo prueba', d: 'La IA lee cada pregunta nueva y decide si habría salido sola, pero NO publica nada. Tú marcas si estaba bien.' },
   { v: 'real', t: 'Activa', d: 'Las de confianza alta que pasan todas las revisiones se publican solas. El resto te queda con la respuesta ya escrita.' },
 ]
 
@@ -106,16 +106,23 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
             Solo salen solas las respuestas en que la IA está segura y que pasan todas las revisiones. Las demás te quedan escritas para revisar y enviar.
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {MODOS.map(m => (
-            <button key={m.v} onClick={() => m.v !== info.modo && cambiarModo(m.v)}
-              className={`text-left rounded-lg border px-3 py-2 ${info.modo === m.v ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 hover:border-neutral-300'}`}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {MODOS.map(m => {
+            const bloqueada = m.v === 'real' && info.modo !== 'real' && !!info.faltanMiIA?.length
+            return (
+            <button key={m.v} disabled={bloqueada} onClick={() => m.v !== info.modo && cambiarModo(m.v)}
+              className={`text-left rounded-lg border px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed ${info.modo === m.v ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 hover:border-neutral-300'}`}>
               <div className="text-sm font-semibold">{m.t}</div>
               <div className={`text-xs ${info.modo === m.v ? 'text-neutral-300' : 'text-neutral-500'}`}>{m.d}</div>
             </button>
-          ))}
+          )})}
         </div>
-        {!interno && info.modo !== 'real' && <p className="text-xs text-sky-800 rounded-lg bg-sky-50 px-3 py-2">Antes de activarla, pruébala con 10 preguntas reales en <b>Mi IA</b> (abajo de los temas).</p>}
+        {info.modo !== 'real' && !!info.faltanMiIA?.length && (
+          <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            Para activarla, primero completa <b>Mi IA</b> (pestaña de al lado). Te {info.faltanMiIA.length === 1 ? 'falta 1 tema' : `faltan ${info.faltanMiIA.length} temas`}: <b>{info.faltanMiIA.join(', ')}</b>.
+          </p>
+        )}
+        {!interno && info.modo !== 'real' && !info.faltanMiIA?.length && <p className="text-xs text-sky-800 rounded-lg bg-sky-50 px-3 py-2">Antes de activarla, si quieres, pruébala gratis con 10 preguntas reales en <b>Mi IA</b> (abajo de los temas).</p>}
         <p className="text-xs text-neutral-500">
           Cada pregunta que procesa usa 1 crédito de IA.
           {info.cupo.limite !== null ? <> Te quedan <b>{info.cupo.quedan}</b> de {info.cupo.limite}{info.cupo.agotado ? ' (sin créditos: no procesa hasta recargar)' : ''}.</> : ' Sin límite de créditos.'}

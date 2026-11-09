@@ -36,7 +36,8 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_IA_AUTO])
   try {
     const v = JSON.parse(r?.value ?? '{}')
-    return { modo: ['sombra', 'real'].includes(v.modo) ? v.modo : 'apagado', desde: v.desde ?? null, v2: v.v2 !== false }
+    // 09-11: el Modo prueba ('sombra') se quitó: gastaba créditos sin publicar nada. Quien lo tenía queda apagado.
+    return { modo: v.modo === 'real' ? 'real' : 'apagado', desde: v.desde ?? null, v2: v.v2 !== false }
   } catch { return { modo: 'apagado', desde: null, v2: true } }
 }
 

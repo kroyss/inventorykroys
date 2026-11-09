@@ -34,7 +34,7 @@ export async function GET() {
         const cupo = await cupoIA(db, e.id)
         return {
           id: e.id, nombre: e.nombre, estado: e.estado, plan: e.plan,
-          preguntas: { modo: ['sombra', 'real'].includes(p.modo) ? p.modo : 'apagado', desde: p.at ?? p.desde ?? null, total: q.total, solas: q.solas },
+          preguntas: { modo: p.modo === 'real' ? 'real' : 'apagado', desde: p.at ?? p.desde ?? null, total: q.total, solas: q.solas },
           mensajes: { encendido: m.modo === 'real', desde: m.modo === 'real' ? m.at ?? null : null, total: x.total, solas: x.solas, acuses: x.acuses },
           creditos: { usados: cupo.usados, quedan: cupo.quedan },
         }

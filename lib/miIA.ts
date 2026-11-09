@@ -39,6 +39,41 @@ export interface MiIA {
 
 export const MI_IA_KEY = 'mi_ia'
 
+// Los temas del cuestionario y cuándo cuenta cada uno como completo (09-11: la respuesta automática de Preguntas y
+// Mensajes solo se puede activar con TODOS completos; misma regla que el "te faltan N temas" de la pantalla).
+export const TEMAS_MI_IA: { id: string; tema: string; lleno: (c: MiIA) => boolean }[] = [
+  { id: 'tono', tema: 'Tono', lleno: c => !!(c.tono?.saludo || c.tono?.despedida) },
+  { id: 'oferta', tema: 'Oferta fija', lleno: c => c.oferta !== undefined },
+  { id: 'pago', tema: 'Pago', lleno: c => !!c.pago?.medios?.length },
+  { id: 'envio', tema: 'Envío', lleno: c => !!c.envio?.agencias?.length },
+  { id: 'despacho', tema: 'Despacho', lleno: c => !!c.despacho?.dias },
+  { id: 'ubicacion', tema: 'Ubicación y retiro', lleno: c => !!(c.ubicacion?.zona || c.ubicacion?.retiro) },
+  { id: 'factura', tema: 'Factura y garantía', lleno: c => !!(c.factura?.tipo || c.factura?.garantiaDias) },
+  { id: 'cambios', tema: 'Cambios y devoluciones', lleno: c => !!c.cambios?.acepta },
+  { id: 'negocio', tema: 'Al mayor, rebajas y apartados', lleno: c => !!(c.negocio?.mayor || c.negocio?.regateo || c.negocio?.apartar) },
+  { id: 'atencion', tema: 'Horario de atención', lleno: c => !!c.atencion?.horario?.trim() },
+  { id: 'desconocido', tema: 'Si no sabe algo', lleno: c => !!c.desconocido?.length },
+  { id: 'persona', tema: 'Siempre una persona', lleno: c => !!c.persona?.length },
+  { id: 'extras', tema: 'Información extra', lleno: c => !!(c.extrasNoAplica || c.extras?.length) },
+  { id: 'postventa', tema: 'Después de la compra', lleno: c => !!(c.postventa?.noAplica || c.postventa?.pasos?.length || c.postventa?.datosPago) },
+]
+
+/** Los temas de Mi IA que faltan (nombres). Sin Mi IA guardado: todos. */
+export function temasFaltan(c: MiIA | null): string[] {
+  return TEMAS_MI_IA.filter(t => !c || !t.lleno(c)).map(t => t.tema)
+}
+
+/** Lo mismo leyendo Mi IA de la base (para frenar el encendido en el servidor). */
+export async function faltanMiIA(db: Pick<Pool, 'query'>): Promise<string[]> {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
+  return temasFaltan(leerMiIA(r?.value))
+}
+
+/** Texto del error al querer encender sin Mi IA completo. */
+export function errorFaltanMiIA(faltan: string[]) {
+  return `Para activarla, primero completa Mi IA. Te ${faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: ${faltan.join(', ')}.`
+}
+
 export function leerMiIA(json: string | null | undefined): MiIA | null {
   try {
     const v = JSON.parse(json ?? '')

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
-import { MOTIVOS_CAMBIO, motivosCambio } from '@/lib/miIA'
+import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FrenosIA } from '@/components/preguntas/FrenosIA'
 
@@ -9,21 +9,23 @@ import { FrenosIA } from '@/components/preguntas/FrenosIA'
 // La misma en Preguntas → Configuración, en Mensajes y en el menú de usuario (/mi-ia). Guarda en cada "Siguiente".
 
 type Paso = { id: string; titulo: string; tema: string; lleno: (c: Config) => boolean }
+// Cuándo cuenta cada tema como completo: lib/miIA.ts (TEMAS_MI_IA), la misma regla que frena el encendido en el servidor.
+const LLENO = (id: string) => TEMAS_MI_IA.find(t => t.id === id)!.lleno
 const PASOS: Paso[] = [
-  { id: 'tono', tema: 'Tono', titulo: '¿Cómo le hablas al comprador?', lleno: c => !!(c.tono?.saludo || c.tono?.despedida) },
-  { id: 'oferta', tema: 'Oferta fija', titulo: '¿Hay algo que siempre quieras mencionar?', lleno: c => c.oferta !== undefined },
-  { id: 'pago', tema: 'Pago', titulo: '¿Cómo te pagan?', lleno: c => !!c.pago?.medios?.length },
-  { id: 'envio', tema: 'Envío', titulo: '¿Por dónde envías?', lleno: c => !!c.envio?.agencias?.length },
-  { id: 'despacho', tema: 'Despacho', titulo: '¿Cuándo despachas?', lleno: c => !!c.despacho?.dias },
-  { id: 'ubicacion', tema: 'Ubicación y retiro', titulo: '¿Dónde estás y se puede retirar?', lleno: c => !!(c.ubicacion?.zona || c.ubicacion?.retiro) },
-  { id: 'factura', tema: 'Factura y garantía', titulo: 'Factura y garantía', lleno: c => !!(c.factura?.tipo || c.factura?.garantiaDias) },
-  { id: 'cambios', tema: 'Cambios y devoluciones', titulo: '¿Aceptas cambios o devoluciones?', lleno: c => !!c.cambios?.acepta },
-  { id: 'negocio', tema: 'Al mayor, rebajas y apartados', titulo: 'Al mayor, rebajas y apartados', lleno: c => !!(c.negocio?.mayor || c.negocio?.regateo || c.negocio?.apartar) },
-  { id: 'atencion', tema: 'Horario de atención', titulo: '¿En qué horario atienden?', lleno: c => !!c.atencion?.horario?.trim() },
-  { id: 'desconocido', tema: 'Si no sabe algo', titulo: 'Si la IA no sabe un dato técnico, ¿qué hace?', lleno: c => !!c.desconocido?.length },
-  { id: 'persona', tema: 'Siempre una persona', titulo: '¿Qué temas responde siempre una persona?', lleno: c => !!c.persona?.length },
-  { id: 'extras', tema: 'Información extra', titulo: 'Información extra (opcional)', lleno: c => !!(c.extrasNoAplica || c.extras?.length) },
-  { id: 'postventa', tema: 'Después de la compra', titulo: 'Después de la compra (Mensajes)', lleno: c => !!(c.postventa?.noAplica || c.postventa?.pasos?.length || c.postventa?.datosPago) },
+  { id: 'tono', tema: 'Tono', titulo: '¿Cómo le hablas al comprador?', lleno: LLENO('tono') },
+  { id: 'oferta', tema: 'Oferta fija', titulo: '¿Hay algo que siempre quieras mencionar?', lleno: LLENO('oferta') },
+  { id: 'pago', tema: 'Pago', titulo: '¿Cómo te pagan?', lleno: LLENO('pago') },
+  { id: 'envio', tema: 'Envío', titulo: '¿Por dónde envías?', lleno: LLENO('envio') },
+  { id: 'despacho', tema: 'Despacho', titulo: '¿Cuándo despachas?', lleno: LLENO('despacho') },
+  { id: 'ubicacion', tema: 'Ubicación y retiro', titulo: '¿Dónde estás y se puede retirar?', lleno: LLENO('ubicacion') },
+  { id: 'factura', tema: 'Factura y garantía', titulo: 'Factura y garantía', lleno: LLENO('factura') },
+  { id: 'cambios', tema: 'Cambios y devoluciones', titulo: '¿Aceptas cambios o devoluciones?', lleno: LLENO('cambios') },
+  { id: 'negocio', tema: 'Al mayor, rebajas y apartados', titulo: 'Al mayor, rebajas y apartados', lleno: LLENO('negocio') },
+  { id: 'atencion', tema: 'Horario de atención', titulo: '¿En qué horario atienden?', lleno: LLENO('atencion') },
+  { id: 'desconocido', tema: 'Si no sabe algo', titulo: 'Si la IA no sabe un dato técnico, ¿qué hace?', lleno: LLENO('desconocido') },
+  { id: 'persona', tema: 'Siempre una persona', titulo: '¿Qué temas responde siempre una persona?', lleno: LLENO('persona') },
+  { id: 'extras', tema: 'Información extra', titulo: 'Información extra (opcional)', lleno: LLENO('extras') },
+  { id: 'postventa', tema: 'Después de la compra', titulo: 'Después de la compra (Mensajes)', lleno: LLENO('postventa') },
 ]
 
 /** Lo guardado en una línea (la tarjeta lo muestra para verificar sin entrar). */
@@ -413,7 +415,10 @@ const TEXTOS = {
 
 const ACEPTO = 'La IA responde en tu nombre.\n\nSolo salen solas las respuestas en que está segura. Lo delicado siempre pasa a una persona: reclamos, pagos, datos personales, cuando dice que no hay y los temas que marcaste en «Siempre una persona». Esas quedan escritas para que tu equipo las revise y las mande.\n\nCada respuesta usa 1 crédito de IA. La apagas cuando quieras desde aquí.'
 
-function Prueba({ tipo, encendida, onCambio, abrir }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; onCambio: () => void; abrir: (tema: string) => void }) {
+function Prueba({ tipo, encendida, onCambio, abrir, quedan: quedanAl, faltan }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; onCambio: () => void; abrir: (tema: string) => void
+  quedan: number | null; faltan: string[] }) {
+  const [usadas, setUsadas] = useState(0)
+  const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
   const confirm = useConfirm()
   const T = TEXTOS[tipo]
   const [casos, setCasos] = useState<Caso[] | null>(null)
@@ -426,7 +431,9 @@ function Prueba({ tipo, encendida, onCambio, abrir }: { tipo: 'preguntas' | 'men
     setCargando(true); setError(null); setMarcas({}); setErrores({})
     const r = await fetch(T.url, { method: 'POST' }); const d = await r.json().catch(() => ({}))
     setCargando(false)
+    if (r.status === 429) setUsadas(99)
     if (!r.ok) { setError(d.error ?? 'No se pudo probar'); return }
+    setUsadas(u => u + 1)   // 09-11: una prueba menos hoy (sin recargar la pantalla: no pierde lo que está editando)
     setCasos((d.casos as (Caso & { pregunta?: string; mensaje?: string })[]).map(x => ({ ...x, texto: x.pregunta ?? x.mensaje ?? '' })))
   }
   const cambiar = async (encender: boolean) => {
@@ -455,8 +462,11 @@ function Prueba({ tipo, encendida, onCambio, abrir }: { tipo: 'preguntas' | 'men
           <p className="text-sm font-medium text-neutral-900">{tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'} · pruébala con {casos?.length || 10} {T.titulo}</p>
           <p className="text-xs text-neutral-500">{T.sub}</p>
         </div>
-        <button type="button" onClick={probar} disabled={cargando} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
-          {cargando ? 'Probando… (puede tardar 1 minuto)' : casos ? 'Probar otra vez' : 'Probar'}</button>
+        <div className="text-right">
+          <button type="button" onClick={probar} disabled={cargando || quedan === 0} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
+            {cargando ? 'Probando… (puede tardar 1 minuto)' : quedan === 0 ? 'Puedes volver a probar mañana' : casos ? 'Probar otra vez' : 'Probar'}</button>
+          {quedan !== null && <p className="mt-1 text-xs text-neutral-500">Gratis · {quedan === 1 ? 'te queda 1 prueba hoy' : `te quedan ${quedan} pruebas hoy`}</p>}
+        </div>
       </div>
       {encendida && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
         <p className="text-sm text-green-900">{T.encendido}</p>
@@ -503,7 +513,9 @@ function Prueba({ tipo, encendida, onCambio, abrir }: { tipo: 'preguntas' | 'men
         <div className="rounded-lg bg-neutral-50 p-3 space-y-2">
           {casos.length > 0 && <p className="text-sm text-neutral-700">{solas} de {casos.length} saldrían solas; el resto quedaría escrito para que una persona lo mande.
             {marcadas.length > 0 && ` Marcaste ${bien} de ${marcadas.length} bien.`}</p>}
-          {encendida === false && <>
+          {encendida === false && faltan.length > 0 && <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            Para encenderla, primero completa Mi IA. Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{faltan.join(', ')}</b>.</p>}
+          {encendida === false && faltan.length === 0 && <>
             <button type="button" onClick={() => cambiar(true)} disabled={cambiando}
               className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
               {cambiando ? 'Encendiendo…' : T.encender}</button>
@@ -607,7 +619,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA() {
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; politicas?: boolean } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
   const [sugeridos, setSugeridos] = useState<string[]>([])
@@ -771,8 +783,10 @@ export default function MiIA() {
       {sug && !sugeridos.length && <p className="text-xs text-neutral-500">No encontré nada claro para los temas que faltan.</p>}
       {error && <p className="text-sm text-red-700">{error}</p>}
       {verTexto && datos.texto && <pre className="whitespace-pre-wrap rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">{datos.texto.mensajes}</pre>}
-      <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} onCambio={cargar} abrir={abrirTema} />
-      <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} onCambio={cargar} abrir={abrirTema} />
+      <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} onCambio={cargar} abrir={abrirTema}
+        quedan={datos.pruebas ? datos.pruebas.preguntas : null} faltan={faltan.map(i => PASOS[i].tema)} />
+      <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} onCambio={cargar} abrir={abrirTema}
+        quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
       {(datos.iaAuto !== null || datos.msgAuto != null) && <div className="space-y-1">
         <p className="text-sm font-medium text-neutral-900">Frenos de la respuesta automática</p>
         <FrenosIA conEscape={datos.msgAuto != null} />

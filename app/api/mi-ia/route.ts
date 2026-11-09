@@ -9,6 +9,7 @@ import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
 import { leerPoliticas } from '@/lib/miIAPoliticas'
 import { CLAVE_AUTO } from '@/lib/mensajesIAPrueba'
 import type { Pool } from 'pg'
+import { pruebasQuedan } from '@/lib/miIAPruebasTope'
 
 async function mensajesAuto(db: Pool) {
   const { rows: [a] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
@@ -37,6 +38,8 @@ export async function GET() {
       iaAuto: tieneModulo(s.session.user, 'ia_automatica') ? (await configIA(s.db)).modo : null,
       // 09-11: Mensajes automáticos (módulo mensajes_ia): encendido sí/no; null = no lo tiene.
       msgAuto: tieneModulo(s.session.user, 'mensajes_ia') ? await mensajesAuto(s.db) : null,
+      // 09-11: pruebas gratis que le quedan hoy (null = sin tope).
+      pruebas: await pruebasQuedan(s.db, s.session.user),
     })
   } catch (err) { return apiError(err) }
 }

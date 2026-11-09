@@ -5,6 +5,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { CLAVE_AUTO, listaPrueba } from '@/lib/mensajesIAPrueba'
 import { puede } from '@/lib/permisos'
+import { errorFaltanMiIA, faltanMiIA } from '@/lib/miIA'
 import { frenosDeFabrica } from '@/lib/iaFrenos'
 
 // Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts). GET → los casos, el resumen y si está en automático
@@ -36,6 +37,11 @@ export async function PUT(req: NextRequest) {
   try {
     const p = Auto.safeParse(await req.json())
     if (!p.success) return NextResponse.json({ error: p.error.message }, { status: 400 })
+    // 09-11: solo se enciende con Mi IA completo.
+    if (p.data.auto && tieneModulo(s.session.user, 'mi_ia')) {
+      const faltan = await faltanMiIA(s.db)
+      if (faltan.length) return NextResponse.json({ error: errorFaltanMiIA(faltan), faltanMiIA: faltan }, { status: 400 })
+    }
     await s.db.query(
       `INSERT INTO app_settings (key, value) VALUES ($1, $2)
        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,

@@ -6,6 +6,7 @@ import { CLAVE_IA_AUTO, configIA } from '@/lib/iaAutomatica'
 import { cupoIA, CAMBIO_HAIKU55 } from '@/lib/ia'
 import { tieneModulo } from '@/lib/modulos'
 import { frenosDeFabrica } from '@/lib/iaFrenos'
+import { errorFaltanMiIA, faltanMiIA } from '@/lib/miIA'
 
 // GET /api/preguntas/ia-auto → Preguntas → Configuración → Respuesta automática con IA: el modo, los créditos y las
 // últimas preguntas que procesó (qué decidió, la respuesta, la que se publicó y la marca bien/mal del vendedor).
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json({
       ...cfg,
+      faltanMiIA: tieneModulo(s.session.user, 'mi_ia') ? await faltanMiIA(s.db) : [],
       cupo: await cupoIA(s.db, s.session.user.empresaId),
       resumen: {
         procesadas: rows.length, solas: sola.length, revisar: rows.length - sola.length,
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
 }
 
 const Accion = z.discriminatedUnion('accion', [
-  z.object({ accion: z.literal('modo'), modo: z.enum(['apagado', 'sombra', 'real']) }),
+  z.object({ accion: z.literal('modo'), modo: z.enum(['apagado', 'real']) }),   // 09-11: sin 'sombra' (Modo prueba)
   z.object({ accion: z.literal('marcar'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable() }),
   z.object({ accion: z.literal('marcar_eco'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable(),
     campo: z.enum(['eco', 'eco55']).default('eco') }),
@@ -115,6 +117,11 @@ export async function POST(req: NextRequest) {
   try {
     const b = Accion.parse(await req.json())
     if (b.accion === 'modo') {
+      // 09-11: solo se activa con Mi IA completo (mejores respuestas desde el primer día).
+      if (b.modo === 'real' && tieneModulo(s.session.user, 'mi_ia')) {
+        const faltan = await faltanMiIA(s.db)
+        if (faltan.length) return NextResponse.json({ error: errorFaltanMiIA(faltan), faltanMiIA: faltan }, { status: 400 })
+      }
       const actual = await configIA(s.db)
       // "desde" = desde cuándo se procesan preguntas: al prender, solo las que llegan de ahí en adelante.
       const desde = b.modo === 'apagado' ? null : actual.modo === 'apagado' ? new Date().toISOString() : actual.desde
