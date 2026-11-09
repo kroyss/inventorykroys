@@ -627,7 +627,7 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
   toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
-- **Presupuestos** (Ventas → botón Presupuestos; en prueba, solo algunas empresas): cotizaciones para un cliente.
+- **Presupuestos** (Ventas → ícono de hoja junto a las fechas; en prueba, solo algunas empresas): cotizaciones para un cliente.
   **+ Nuevo presupuesto:** cliente (cédula/RIF y teléfono opcionales), productos del inventario (el precio se carga
   solo y se puede cambiar) o **ítems libres** (servicio, envío), moneda (US$, Bs o pesos), descuento % y cuántos días
   vale. **Guardar y ver** muestra la hoja con tu logo; **Guardar PDF** abre la impresión (elige «Guardar como PDF»)

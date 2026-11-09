@@ -406,7 +406,6 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               Por confirmar<NumeroBoton n={pendientesPC} cargando={!pc.datos} />
             </button>
           )}
-          {presupuestos && <a href="/ventas/presupuestos" className="btn-secondary text-sm whitespace-nowrap" title="Cotizaciones para clientes, imprimibles con tu logo">Presupuestos</a>}
           <button onClick={() => { setEditing(null); setShowForm(true) }}
             className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>
             Nueva venta
@@ -476,6 +475,15 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                 </button>
               )}
             </div>
+            {/* Presupuestos (09-11): se usa poco → ícono de hoja junto a las fechas, no un botón grande arriba. */}
+            {presupuestos && (
+              <a href="/ventas/presupuestos" title="Presupuestos: cotizaciones para clientes, imprimibles con tu logo" aria-label="Presupuestos"
+                className="grid place-items-center h-[38px] w-[38px] rounded-lg border border-neutral-300 bg-white text-neutral-500 hover:text-neutral-900 hover:border-neutral-500 transition-colors">
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" />
+                </svg>
+              </a>
+            )}
             {/* Modo RE (re-descarga de emergencia): recuperar guías ya descargadas.
                 Va junto a las fechas para distinguirlo de las acciones normales. */}
             {excelVisible && <button
