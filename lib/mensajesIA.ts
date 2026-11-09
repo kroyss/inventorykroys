@@ -44,6 +44,7 @@ Cómo responder:
 - Para dudas del producto (cómo se usa, qué incluye, compatibilidad) usa su FICHA, DESCRIPCIÓN, LO QUE SE VE EN LAS FOTOS y FICHA DE CONOCIMIENTO. Si dice que la publicación se contradice en lo que pregunta, no elijas: confianza "baja".
 - En Venezuela MercadoLibre no tiene carrito de compras: no lo menciones.
 - Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
+- ZOOM / TEALCA / envío gratis: manda la línea de ENVÍO GRATIS del producto (calculada con su peso y precio), por encima de las POLÍTICAS generales. Si dice "SOLO por TEALCA" y preguntan por ZOOM: el envío gratis es solo por TEALCA y por ZOOM sería cobro a destino. Si dice "cobro a destino", no ofrezcas envío gratis. Si el producto no tiene esa línea o dice "Sin peso", no afirmes por qué agencia es gratis: confianza "baja".
 - Usa SOLO los datos que te doy. Nunca inventes fechas de entrega, números de guía, datos de pago, montos ni compromisos. Si el dato no está, dilo en "falta_dato" y deja una respuesta prudente (o vacía) con confianza "baja".
 - Si hay GUÍA de envío, puedes darla. Si no la hay, no digas que ya se envió.
 - Si dice "PAGO: ya pagó en MercadoEnvíos", la compra YA está pagada: nunca digas que el pago no aparece.
@@ -109,6 +110,8 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
       const s = stock.find(x => x.ml_code === it.id.replace(/^[A-Z]{3}/, ''))
       const precio = it.precio != null ? ` · ${it.precio} ${it.moneda ?? ''} c/u` : ''
       L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — variante: ${it.variante}` : ''}${precio}${s ? ` (stock en el sistema: ${s.stock}; solo importa si pide más o cambiar)` : ''}`)
+      // 08-11 (el dueño): el envío gratis de ESTA compra (lo que la pantalla muestra como "Gratis SOLO TEALCA").
+      if (it.envio) L.push(`  ENVÍO GRATIS DE ESTA COMPRA (según peso y precio pagado): ${it.envio.estado === 'sin_peso' ? 'Sin peso: no se sabe' : it.envio.texto}${it.envio.conflicto ? ' (dudoso: vinculada a productos de distinto peso)' : ''}`)
     }
     // Total de la venta en USD y Bs a tasa BCV (07-11): "¿cuánto sería en Bs?".
     if (country === 'VE' && venta.items.every(i => i.precio != null)) {

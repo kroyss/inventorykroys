@@ -225,6 +225,10 @@ responde sola**: siempre la envía una persona.
   confirma si alcanza para lo que piden; si no hay, no alcanza o no se entiende cuál piden, queda para que respondas tú.
 - La IA también tiene en cuenta lo que ese mismo comprador preguntó antes (si te pregunta «¿cuánto tarda?» y después
   «sería a Valencia», entiende que es lo mismo).
+- **ZOOM o TEALCA:** en Preguntas y en Mensajes la IA responde según el envío gratis de ESE producto (lo que ves al
+  lado: «Gratis ZOOM y TEALCA», «Gratis SOLO TEALCA» o sin envío gratis), no según tus políticas generales. Si es solo
+  TEALCA y preguntan por ZOOM, dice que el envío gratis es por TEALCA y por ZOOM sería cobro a destino. Sin peso
+  cargado, no lo afirma y queda para que respondas tú.
 
 **Otras acciones:** reponer stock desde la pregunta («¿tienes disponible?» con la publicación agotada) y eliminar
 preguntas (spam, ofensivas).
@@ -641,11 +645,12 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
   En una campaña que **todavía no empezó** (ej. Black Friday del 16/11) puedes agregar publicaciones desde ya: quedan
   **programadas** y el precio se activa solo el día que empieza.
-  En las campañas **de MercadoLibre**, ML sugiere un descuento **distinto para cada producto** (su «Nueva propuesta»).
-  La tarjeta muestra el rango (p. ej. «sugerido ML 15–25% según producto») y al agregar viene marcado «Sugerido de
-  MercadoLibre en cada producto»: cada publicación entra con el suyo. Si lo desmarcas, usas un % igual para todas
-  (10% por defecto, lo subes tú). Si pones menos de lo que pide ML, salen marcadas «ML pide al menos X%» y no se
-  mandan. Si con el sugerido una pierde el envío gratis, también queda fuera (o la agregas igual).
+  Algunas campañas **de MercadoLibre** (hoy Black Friday) traen un precio **sugerido por ML distinto para cada
+  producto** (su «Nueva propuesta»): la tarjeta lo marca con «Precio sugerido por ML». Al agregar, cada publicación entra
+  con su precio sugerido (la columna «Nuevo» dice «−18% · sugerido ML»). Si con el sugerido una pierde el envío
+  gratis, sale como «Pierde envío gratis» y no se manda. Para usar un % igual para todas toca «Usar mi propio %»
+  (10% por defecto, lo subes tú). Las demás campañas de ML no traen sugerido (ML solo da el precio mínimo que acepta):
+  ahí se usa tu %. Si pones menos de lo que pide ML, salen marcadas «ML pide al menos X%» y no se mandan.
 - **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
 - **Reportes → Resumen** (en prueba, solo algunas empresas; también con el botón **Métricas** del Inicio): todo junto
   para **7, 30, 90 días o 1 año** contra el período anterior del mismo largo: lo vendido, cantidad de ventas y

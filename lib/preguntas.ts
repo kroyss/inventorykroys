@@ -412,6 +412,7 @@ Cómo responder:
 Reglas estrictas (una respuesta equivocada publicada sola le cuesta una venta o un reclamo al vendedor):
 - Colores, tallas, medidas, números técnicos (temperatura, voltaje, capacidad, autonomía) y qué incluye: SOLO si están escritos en el título, la ficha técnica, la descripción, la tabla VARIANTES, las notas del vendedor o LO QUE SE VE EN LAS FOTOS (cuando es texto impreso en la caja o la etiqueta, o lo que trae el paquete), y cópialos EXACTOS (mismo número, misma unidad). Nunca los deduzcas por tu cuenta de las fotos, del nombre del modelo ni de otras publicaciones. Si preguntan "¿qué colores tienes?" y no hay VARIANTES ni color escrito, no nombres colores: confianza "baja".
 - Ubicación, retiro, garantía, factura, plazos de despacho y formas de pago: SOLO lo que dicen las POLÍTICAS o las RESPUESTAS RÁPIDAS. No nombres ciudades ni zonas que no estén ahí.
+- ZOOM / TEALCA / envío gratis: manda la línea de ENVÍO GRATIS del producto (calculada con su peso y precio), por encima de las POLÍTICAS generales. Si dice "SOLO por TEALCA" y preguntan por ZOOM: el envío gratis es solo por TEALCA y por ZOOM sería cobro a destino. Si dice "cobro a destino", no ofrezcas envío gratis. Si el producto no tiene esa línea o dice "Sin peso", no afirmes por qué agencia es gratis: confianza "baja".
 - Envío gratis: SOLO según la línea "ENVÍO GRATIS A ESTE PRECIO" (si está) o las POLÍTICAS para el precio actual. Los montos y mínimos que digan las respuestas anteriores pueden estar viejos: no los copies.
 - Envío pagado por el comprador (cobro a destino): nunca des montos ni estimados, varían. Si el producto entra en el mínimo de unidades para envío gratis de las POLÍTICAS, recomienda comprar ese mínimo: le sale más barato que el cobro a destino.
 - Si el comprador habla de OTRO producto (uno que ya compró, o uno distinto al de esta publicación, p. ej. pregunta por una repetidora en la publicación de un router), no respondas como si fuera esta publicación: aclárale cuál es esta y, si el que busca está en OTRAS PUBLICACIONES DEL VENDEDOR, pon su link; si no está, confianza "baja".
@@ -464,7 +465,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
     const bs = pml.moneda === 'USD' && c.tasa ? ` ≈ Bs ${(pml.precio * c.tasa).toFixed(2)} a tasa BCV ${c.tasa}` : ''
     L.push(`PRECIO EN MERCADOLIBRE AHORA: ${pml.precio} ${pml.moneda}${bs}` + (pml.original ? ` (en promoción; antes ${pml.original})` : ''))
   }
-  if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM o TEALCA, responde según esto.`)
+  if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM, TEALCA o envío gratis, responde según esto (manda sobre las POLÍTICAS).`)
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, r.descripcion)}`)
   for (const l of lineasFotos(c.fotos ?? null)) L.push(`\n${l}`)
   if (c.producto) {

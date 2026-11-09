@@ -387,7 +387,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                         <div className="font-medium text-neutral-900">{c.nombre}</div>
                         <span className="text-[11px] text-neutral-400 whitespace-nowrap">{propia ? 'propia' : c.tipo}{c.estado !== 'started' ? ` · ${c.estado}` : ''}</span>
                       </div>
-                      <div className="text-xs text-neutral-500 mt-0.5">{propia && c.pctDefecto ? <><b className="text-neutral-700">{c.pctDefecto}%</b> · </> : null}{!propia && c.pctML ? <>sugerido ML <b className="text-neutral-700">{c.pctML.min === c.pctML.max ? `${c.pctML.min}%` : `${c.pctML.min}–${c.pctML.max}%`}</b> según producto · </> : null}{fecha(c.inicio)} → {fecha(c.fin)}{!propia && <> · entrar hasta {fecha(c.limite)}</>} · {c.cuentas.join(', ')}</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">{propia && c.pctDefecto ? <><b className="text-neutral-700">{c.pctDefecto}%</b> · </> : null}{!propia && c.pctML ? <span className="inline-block rounded-full bg-yellow-100 text-yellow-900 px-1.5 mr-1">Precio sugerido por ML</span> : null}{fecha(c.inicio)} → {fecha(c.fin)}{!propia && <> · entrar hasta {fecha(c.limite)}</>} · {c.cuentas.join(', ')}</div>
                       <div className="text-sm mt-2"><b>{c.adentro}</b> adentro{!propia && <> · <b>{c.candidatas}</b> pueden entrar</>}</div>
                     </button>
                     <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
@@ -662,7 +662,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
       : bajoPiso ? `Bajo $${PISO_ML}: ML no la acepta` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
       : sobreMax ? `ML pide al menos −${pct(pctReal(f.precio, cand!.maximo!))} (hasta ${usd(cand!.maximo)})`
       : seguro.sinMargen ? 'Sin margen: perdería el envío gratis'
-      : sugML != null && !conPierden && sinGratis && !pierdeZoom ? 'Con el sugerido de ML pierde el envío gratis' : null
+      : sugML != null && sinGratis && !pierdeZoom ? 'Pierde envío gratis con el sugerido de ML' : null
     const advertencia = motivo ? null
       : ajustada ? `Ajustada a −${pct(pctReal(f.precio, precio))} (envío gratis)`
       : pierdeZoom ? `⚠ Solo TEALCA${topeZoom ? ` · ZOOM hasta ${pct(topeZoom)}` : ''}`
@@ -672,7 +672,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
     const otra = f.promos.find(p => p.estado === 'started' && p.campana !== cf?.id)
       ?? (() => { const h = [...hechas].reverse().find(x => x.okIds.includes(f.id)); return h ? { nombre: h.nombre, precio: null } : undefined })()
     return { f, precio, enPiso, despues, pierde, sinGratis, pierdeZoom, unidades, margen, motivo, advertencia, otra, tope,
-      cambio, antes: cambio ? cand!.precio! : null, ajustada }
+      cambio, antes: cambio ? cand!.precio! : null, ajustada, sugML: sugML != null }
   })
   const validas = camp ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
@@ -851,18 +851,21 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
             {!opciones.length && (
               <span className="text-xs text-amber-800 pb-2">Ya están en todas las campañas disponibles, o MercadoLibre no les ofrece ninguna.</span>
             )}
-            {camp?.pctML && !propia && (
-              <label className="flex items-center gap-1.5 pb-2 text-xs text-neutral-700" title="MercadoLibre sugiere un descuento distinto para cada producto (su «Nueva propuesta»)">
-                <input type="checkbox" checked={usarML} onChange={e => setUsarML(e.target.checked)} />
-                Sugerido de MercadoLibre en cada producto ({camp.pctML.min === camp.pctML.max ? `${camp.pctML.min}%` : `${camp.pctML.min}–${camp.pctML.max}%`})
+            {conSugeridoML ? (
+              <span className="pb-2 text-xs text-neutral-700">Precio <b>sugerido por MercadoLibre</b> en cada producto ·{' '}
+                <button type="button" onClick={() => setUsarML(false)} disabled={enviando} className="text-sky-700 hover:underline">Usar mi propio %</button>
+              </span>
+            ) : (
+              <label className="space-y-1"><span className="block text-xs text-neutral-500">Descuento</span>
+                <span className="flex items-center gap-1">
+                  <input type="number" min={1} max={80} value={modal.pct} onChange={e => setModal({ ...modal, pct: Math.max(1, Math.min(80, Number(e.target.value) || 1)) })}
+                    className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-right" />%
+                  {camp?.pctML && !propia && (
+                    <button type="button" onClick={() => setUsarML(true)} disabled={enviando} className="ml-2 text-xs text-sky-700 hover:underline">Volver al sugerido de ML</button>
+                  )}
+                </span>
               </label>
             )}
-            <label className={`space-y-1 ${conSugeridoML ? 'opacity-40' : ''}`}><span className="block text-xs text-neutral-500">Descuento</span>
-              <span className="flex items-center gap-1">
-                <input type="number" min={1} max={80} value={modal.pct} disabled={conSugeridoML} onChange={e => setModal({ ...modal, pct: Math.max(1, Math.min(80, Number(e.target.value) || 1)) })}
-                  className="w-16 border border-neutral-300 rounded-lg px-2 py-1.5 text-right" />%
-              </span>
-            </label>
             <span className="text-xs text-neutral-500 pb-2">
               {camp ? `${validas.length} de ${filas.length} se pueden agregar` : 'Elige la campaña'}
             </span>
@@ -880,7 +883,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
               </div>
             </div>
           )}
-          {camp && filasPrev.some(x => (x.ajustada || x.sinGratis) && !resultados[x.f.id]) && (
+          {camp && !conSugeridoML && filasPrev.some(x => (x.ajustada || x.sinGratis) && !resultados[x.f.id]) && (
             <div className={`rounded-lg border px-3 py-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1 ${conPierden ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
               {conPierden
                 ? <span>Con <b>{modal.pct}%</b>, <b>{filasPrev.filter(x => x.sinGratis && !resultados[x.f.id]).length}</b> quedan SIN envío gratis (cobro a destino).</span>
@@ -894,7 +897,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
           )}
           {camp && filasPrev.some(x => x.pierdeZoom && !x.motivo && !resultados[x.f.id]) && (
             <div className="rounded-lg bg-amber-50 border border-amber-300 px-3 py-2 text-xs text-amber-900">
-              ⚠ Con <b>{modal.pct}%</b>, <b>{filasPrev.filter(x => x.pierdeZoom && !x.motivo && !resultados[x.f.id]).length}</b> pierden ZOOM y
+              ⚠ {conSugeridoML ? 'Con el sugerido de ML' : <>Con <b>{modal.pct}%</b></>}, <b>{filasPrev.filter(x => x.pierdeZoom && !x.motivo && !resultados[x.f.id]).length}</b> pierden ZOOM y
               quedan con envío gratis <b>solo por TEALCA</b>. Se agregan, y mientras dure la promoción Preguntas y Mensajes lo muestran así para responder bien.
             </div>
           )}
@@ -921,6 +924,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
                     <td className="px-2 py-1.5 text-right">{usd(x.f.precio)}</td>
                     <td className="px-2 py-1.5 text-right font-medium">{usd(x.precio)}
                       {x.ajustada && <span className="block text-[11px] font-normal text-emerald-700" title="Máximo descuento sin perder el envío gratis">máx. seguro · −{pct(pctReal(x.f.precio, x.precio))}</span>}
+                      {x.sugML && <span className="block text-[11px] font-normal text-yellow-800">−{pct(pctReal(x.f.precio, x.precio))} · sugerido ML</span>}
                       {x.enPiso && <span className="block text-[11px] font-normal text-sky-700" title={`ML no deja bajar de $${PISO_ML}: queda en el piso`}>piso $2 · −{pct(pctReal(x.f.precio, x.precio))}</span>}
                     </td>
                     <td className="px-2 py-1.5">
