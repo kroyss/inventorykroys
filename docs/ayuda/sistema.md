@@ -84,7 +84,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 
 - **Esencial:** Preguntas con IA, Mensajes, Calificaciones, Stock + avisos por Telegram, guías ZOOM/TEALCA
   (Despachos) y Reporte de guías (Reportador).
-- **Automatizaciones** (recomendado): lo de Esencial + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
+- **Automatizaciones** (recomendado): lo de Esencial + respuestas automáticas con IA en Preguntas y Mensajes (las activa
+  el cliente; cada respuesta usa 1 crédito) + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
   + Radar de Oportunidades.
 - **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios, Promociones y reportes.
 - Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%

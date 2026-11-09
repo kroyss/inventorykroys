@@ -21,9 +21,10 @@ export const PLANES: Plan[] = [
   },
   {
     id: 'automatizaciones', nombre: 'Automatizaciones', destacado: true,
-    resumen: 'Lo de Esencial, más tus pagos de MercadoEnvíos resueltos solos.',
+    resumen: 'Lo de Esencial, más la IA respondiendo sola y tus pagos de MercadoEnvíos resueltos solos.',
     base: 'Todo lo de Esencial, más:',
     incluye: [
+      'Respuestas automáticas con IA en preguntas y mensajes (las activas tú; usan tus créditos de IA)',
       'Pagos MercadoEnvíos: pagos y comprobantes llegan solos, listos para verificar',
       'Comprobación con el estado de cuenta de tu banco',
       'Las guías pasan directo a despachos',
