@@ -62,8 +62,8 @@ export const CREDITOS_PRUEBA = 500
 /** Paquetes de recarga (09-11): no vencen. 1 crédito = 1 respuesta de la IA (pregunta o mensaje). */
 export const RECARGAS_IA = [
   { creditos: 500, precio: 4 },
-  { creditos: 2000, precio: 14 },
-  { creditos: 5000, precio: 30 },
+  { creditos: 2000, precio: 15 },
+  { creditos: 5000, precio: 35 },
 ] as const
 /** El paquete chico (el que se nombra en textos cortos). */
 export const RECARGA_IA = RECARGAS_IA[0]

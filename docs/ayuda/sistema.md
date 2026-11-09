@@ -97,7 +97,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   - La **prueba gratis** trae **500 créditos**.
   - El **primer plan** que contratas regala créditos según tus ventas: 500, 1.000, 1.500 o 2.000 (tabla de arriba),
     **una sola vez**. Renovar, cambiar de plan, pausar o reactivar no vuelve a dar créditos; lo que te quede sigue ahí.
-  - **Recargas** (no vencen): 500 por $4, 2.000 por $14, 5.000 por $30. Se compran en **Mi plan → Créditos de IA**,
+  - **Recargas** (no vencen): 500 por $4, 2.000 por $15, 5.000 por $35. Se compran en **Mi plan → Créditos de IA**,
     igual que se paga el plan (Pago Móvil o Binance + captura); al confirmar el pago se suman al saldo y llega aviso.
   - El contador (en Preguntas y Mensajes) dice cuántos te quedan y se pone en ámbar cuando queda el 20%. Si se acaban,
     la IA deja de responder (también la automática) hasta que recargues; las respuestas rápidas y parecidas siguen.
