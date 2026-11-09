@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     if (lote > 0) {
       const { rows: [l] } = await db.query(
         `SELECT l.id::int, l.tipo, l.titulo, l.estado, l.total, ${SQL_CUENTAS}
-         FROM ml_pub_lotes l LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id WHERE l.id = $1 GROUP BY l.id`, [lote])
+         FROM ml_pub_lotes l LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id WHERE l.id = $1 GROUP BY l.empresa_id, l.id`, [lote])
       if (!l) return NextResponse.json({ error: 'No existe' }, { status: 404 })
       const { rows: items } = await db.query(
         `SELECT item_id, estado, mensaje, resultado, intentos FROM ml_pub_lote_items WHERE lote_id = $1`, [lote])
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       `SELECT l.id::int, l.tipo, l.titulo, l.estado, l.total, l.terminado_at, ${SQL_CUENTAS}
        FROM ml_pub_lotes l LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id
        WHERE l.tipo <> 'leer' AND (l.estado = 'en_curso' OR l.terminado_at > NOW() - INTERVAL '15 minutes')
-       GROUP BY l.id ORDER BY l.creado_at DESC LIMIT 5`)
+       GROUP BY l.empresa_id, l.id ORDER BY l.creado_at DESC LIMIT 5`)
     return NextResponse.json({ lotes: rows })
   } catch (err) { return apiError(err) }
 }
