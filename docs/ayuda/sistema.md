@@ -364,7 +364,7 @@ esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
 - **Cambiar precios:** subir o bajar un %, sumar o restar un monto o poner un precio fijo, con redondeo (entero o
   terminado en ,90). Muestra la tabla **antes → después** de cada una y recién ahí se confirma.
 - Se manda a ML **en segundo plano** (hasta unas 60 por minuto) aunque cierres la pantalla; abajo a la derecha sale el avance. Lo que salió bien, lo
-  saltado y los errores se ven en **Cambios en lote** (link arriba de la lista); ahí también se puede cancelar lo
+  saltado y los errores se ven en **Tareas en ML** (link arriba de la lista, pantalla «Tareas en MercadoLibre»); ahí también se puede cancelar lo
   que falta.
 
 **Textos de descripción** (link arriba de la lista): los encabezados, condiciones de compra y pies guardados, cada uno **para una cuenta o
@@ -649,8 +649,12 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   **programadas** y el precio se activa solo el día que empieza.
   **Agregar a una campaña ya no necesita la ventana abierta:** al tocar «Agregar N a la campaña» quedan en la cola y
   el sistema las manda solo a MercadoLibre (unas 60 por minuto, repartidas entre las cuentas que estén enviando cosas a
-  la vez). Puedes cerrar la ventana y seguir trabajando: **abajo a la derecha** sale un aviso con el avance («23 de
-  120») y al terminar cuántas quedaron y cuántas con error, con **Ver** para revisar el motivo de cada una.
+  la vez). Puedes cerrar la ventana y seguir trabajando.
+  **Aviso de tareas (abajo a la derecha, en todas las pantallas):** mientras el sistema manda cosas a MercadoLibre sale
+  una pastilla chica «Procesando tareas (N)». Al tocarla se abre con el avance de cada una («45 de 120»); al tocarla
+  otra vez se achica. Cuando termina cambia a «✓ Tareas terminadas» (o «con errores»): abierta muestra cuántas quedaron
+  y **Ver cómo quedaron** lleva a **Publicaciones → Tareas en MercadoLibre** (cada publicación con su resultado y el
+  motivo si falló; ahí también se cancela lo que falta). La ✕ quita el aviso.
   Algunas campañas **de MercadoLibre** (hoy Black Friday) traen un precio **sugerido por ML distinto para cada
   producto** (su «Nueva propuesta»): la tarjeta lo marca con «Precio sugerido por ML». Al agregar, cada publicación entra
   con su precio sugerido (la columna «Nuevo» dice «−18% · sugerido ML»). Si con el sugerido una pierde el envío

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sesionPublicaciones } from '@/lib/preguntasSesion'
+import { getSessionDb, unauthorized } from '@/lib/session'
+import { tiposPermitidos } from '@/lib/colaPermisos'
 import { apiError } from '@/lib/apiError'
 import { crearLote, precioNuevo, type ParametrosPrecio } from '@/lib/lotesPublicaciones'
 import { seleccion } from '@/lib/publicacionesLista'
@@ -8,18 +10,22 @@ import { NOMBRE_TIPO } from '@/lib/descripcionTexto'
 
 // Cambios en lote de Publicaciones (mig 152). Los procesa el cron de a pocas por minuto.
 // GET → los últimos lotes con su avance.
+// 08-11: es la pantalla «Tareas en MercadoLibre»: también las de Promociones, según lo que el usuario puede ver.
 export async function GET() {
-  const s = await sesionPublicaciones()
-  if ('error' in s) return s.error
+  const { session, db } = await getSessionDb()
+  if (!session || !db) return unauthorized()
+  const tipos = tiposPermitidos(session.user)
+  if (!tipos.length) return NextResponse.json({ lotes: [] })
   try {
-    const { rows } = await s.db.query(
+    const { rows } = await db.query(
       `SELECT l.id::int, l.tipo, l.titulo, l.estado, l.total, l.creado_at, l.terminado_at, COALESCE(u.full_name, u.username) AS usuario,
               COUNT(*) FILTER (WHERE i.estado = 'ok')::int AS ok, COUNT(*) FILTER (WHERE i.estado = 'sin_cambio')::int AS sin_cambio,
               COUNT(*) FILTER (WHERE i.estado = 'saltada')::int AS saltadas, COUNT(*) FILTER (WHERE i.estado = 'error')::int AS errores,
               COUNT(*) FILTER (WHERE i.estado IN ('pendiente', 'procesando'))::int AS pendientes
        FROM ml_pub_lotes l LEFT JOIN users u ON u.id = l.user_id LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id
-       WHERE l.tipo <> 'promocion' AND (l.tipo <> 'leer' OR l.creado_at > NOW() - INTERVAL '2 days')   -- promociones: en su pantalla
-       GROUP BY l.empresa_id, l.id, u.full_name, u.username ORDER BY l.creado_at DESC LIMIT 20`)
+       WHERE l.tipo = ANY($1::text[]) AND (l.tipo <> 'leer' OR l.creado_at > NOW() - INTERVAL '2 days')
+         AND l.creado_at > NOW() - INTERVAL '30 days'
+       GROUP BY l.empresa_id, l.id, u.full_name, u.username ORDER BY (l.estado = 'en_curso') DESC, l.creado_at DESC LIMIT 50`, [tipos])
     return NextResponse.json({ lotes: rows })
   } catch (err) { return apiError(err) }
 }

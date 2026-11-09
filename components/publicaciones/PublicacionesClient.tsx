@@ -64,7 +64,7 @@ export default function PublicacionesClient() {
           {actualizando ? 'Actualizando…' : 'Actualizar desde ML'}
         </button>
         <Link href="/publicaciones/textos" className="btn-secondary !px-3 !py-1.5"><svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M5 3h7l3 3v11H5z M8 9h5 M8 12h5" strokeLinecap="round" strokeLinejoin="round" /></svg>Textos de descripción</Link>
-        <Link href="/publicaciones/lotes" className="btn-secondary !px-3 !py-1.5"><svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="11" y="3" width="6" height="6" rx="1" /><rect x="3" y="11" width="6" height="6" rx="1" /><rect x="11" y="11" width="6" height="6" rx="1" /></svg>Cambios en lote</Link>
+        <Link href="/publicaciones/lotes" className="btn-secondary !px-3 !py-1.5"><svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="11" y="3" width="6" height="6" rx="1" /><rect x="3" y="11" width="6" height="6" rx="1" /><rect x="11" y="11" width="6" height="6" rx="1" /></svg>Tareas en ML</Link>
       </div>
       <div className="flex flex-wrap gap-2">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por título, SKU o número (MLV…)"

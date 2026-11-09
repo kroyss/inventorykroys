@@ -6,7 +6,9 @@ import { useSearchParams } from 'next/navigation'
 // publicación. Los procesa el sistema de a poco (cron cada minuto), aunque nadie tenga la pantalla abierta.
 interface Lote { id: number; tipo: string; titulo: string; estado: string; total: number; creado_at: string; terminado_at: string | null; usuario: string | null
   ok: number; sin_cambio: number; saltadas: number; errores: number; pendientes: number }
-interface Item { item_id: string; estado: string; mensaje: string | null; datos: Record<string, unknown> | null; hecho_at: string | null; titulo: string | null; cuenta: string | null }
+interface Item { item_id: string; estado: string; mensaje: string | null; datos: Record<string, unknown> | null; resultado: Record<string, unknown> | null
+  hecho_at: string | null; titulo: string | null; cuenta: string | null }
+const TIPO: Record<string, string> = { promocion: 'Promoción', descripcion: 'Descripción', precio: 'Precio', leer: 'Lectura' }
 
 const ESTADO_ITEM: Record<string, [string, string]> = {
   ok: ['Hecho', 'text-emerald-700'], sin_cambio: ['Ya estaba', 'text-neutral-500'], saltada: ['Saltada', 'text-amber-700'],
@@ -43,7 +45,7 @@ export default function LotesClient() {
   }
 
   if (!lotes) return <div className="h-40 rounded-xl border border-neutral-200 bg-neutral-50 animate-pulse" />
-  if (!lotes.length) return <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 px-4 py-6 text-center">Todavía no hay cambios en lote. Se crean desde la lista de Publicaciones (elegir varias) o desde «Textos de descripción».</p>
+  if (!lotes.length) return <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 px-4 py-6 text-center">Todavía no hay tareas. Se crean al agregar publicaciones a una promoción o al cambiar varias publicaciones a la vez.</p>
   return (
     <ul className="space-y-2">
       {lotes.map(l => {
@@ -53,7 +55,7 @@ export default function LotesClient() {
           <li key={l.id} className="bg-white rounded-xl border border-neutral-200 shadow-sm">
             <button type="button" onClick={() => { setItems(null); setAbierto(abierto === l.id ? null : l.id) }} className="w-full text-left px-4 py-3 space-y-1.5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm font-medium text-neutral-900">{l.titulo}</span>
+                <span className="text-sm font-medium text-neutral-900"><span className="mr-1.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[11px] font-normal text-neutral-600">{TIPO[l.tipo] ?? l.tipo}</span>{l.titulo}</span>
                 <span className="text-xs text-neutral-500">{new Date(l.creado_at).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}{l.usuario ? ` · ${l.usuario}` : ''}</span>
               </div>
               <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden"><div className={`h-full ${l.estado === 'cancelado' ? 'bg-neutral-400' : 'bg-lime-500'}`} style={{ width: `${pct}%` }} /></div>
@@ -72,7 +74,8 @@ export default function LotesClient() {
                   <ul className="divide-y divide-neutral-100 max-h-96 overflow-y-auto text-xs">
                     {items.map(i => {
                       const [txt, cls] = ESTADO_ITEM[i.estado] ?? [i.estado, '']
-                      const pa = i.datos?.precio_antes, pd = i.datos?.precio_nuevo
+                      // Precio: lotes de precio (precio_antes → precio_nuevo) o promociones (precioAntes → precio en la campaña).
+                      const pa = i.datos?.precio_antes ?? i.datos?.precioAntes, pd = i.datos?.precio_nuevo ?? i.resultado?.precio ?? i.datos?.precio
                       return (
                         <li key={i.item_id} className="py-1.5 flex flex-wrap gap-x-3">
                           <span className={`w-20 font-medium ${cls}`}>{txt}</span>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { apiError } from '@/lib/apiError'
 import { sesionPromociones } from '@/lib/promocionesSesion'
+import { tiposPermitidos } from '@/lib/colaPermisos'
 
 const SQL_CUENTAS = `COUNT(*) FILTER (WHERE i.estado = 'ok')::int AS ok, COUNT(*) FILTER (WHERE i.estado = 'sin_cambio')::int AS sin_cambio,
   COUNT(*) FILTER (WHERE i.estado = 'saltada')::int AS saltadas, COUNT(*) FILTER (WHERE i.estado = 'error')::int AS errores,
@@ -27,11 +28,13 @@ export async function GET(req: NextRequest) {
         `SELECT item_id, estado, mensaje, resultado, intentos FROM ml_pub_lote_items WHERE lote_id = $1`, [lote])
       return NextResponse.json({ lote: l, items })
     }
+    const tipos = tiposPermitidos(session.user).filter(t => t !== 'leer')
+    if (!tipos.length) return NextResponse.json({ lotes: [] })
     const { rows } = await db.query(
       `SELECT l.id::int, l.tipo, l.titulo, l.estado, l.total, l.terminado_at, ${SQL_CUENTAS}
        FROM ml_pub_lotes l LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id
-       WHERE l.tipo <> 'leer' AND (l.estado = 'en_curso' OR l.terminado_at > NOW() - INTERVAL '15 minutes')
-       GROUP BY l.empresa_id, l.id ORDER BY l.creado_at DESC LIMIT 5`)
+       WHERE l.tipo = ANY($1::text[]) AND (l.estado = 'en_curso' OR l.terminado_at > NOW() - INTERVAL '2 hours')
+       GROUP BY l.empresa_id, l.id ORDER BY l.creado_at DESC LIMIT 5`, [tipos])
     return NextResponse.json({ lotes: rows })
   } catch (err) { return apiError(err) }
 }

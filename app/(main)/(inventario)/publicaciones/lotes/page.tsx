@@ -3,24 +3,26 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { authOptions } from '@/lib/auth'
-import { tieneModulo } from '@/lib/modulos'
-import { puede } from '@/lib/permisos'
 import { PageHeader } from '@/components/ui'
 import LotesClient from '@/components/publicaciones/LotesClient'
 import PublicacionesMLTabs, { pestanasML } from '@/components/productos/PublicacionesMLTabs'
+import { tiposPermitidos } from '@/lib/colaPermisos'
 
-export const metadata = { title: 'Cambios en lote' }
+export const metadata = { title: 'Tareas en MercadoLibre' }
 
-// Publicaciones → Cambios en lote (mig 152): avance de precios / encabezados / pies mandados a varias publicaciones.
-export default async function LotesPage() {
+// Publicaciones → Tareas en MercadoLibre (antes «Cambios en lote», 08-11): todo lo que el sistema manda a ML en segundo
+// plano (cola, lib/colaML.ts): encabezados/pies, precios y promociones. Cada usuario ve las de sus secciones.
+export default async function TareasPage() {
   const session = await getServerSession(authOptions)
   const u = session!.user
-  if (!tieneModulo(u, 'preguntas') || !tieneModulo(u, 'publicaciones') || !puede(u, 'editar_publicaciones')) redirect(pestanasML(u)[0]?.href ?? '/productos')
+  const tipos = tiposPermitidos(u)
+  if (!tipos.length) redirect(pestanasML(u)[0]?.href ?? '/productos')
+  const editar = tipos.includes('descripcion')
   return (
     <div>
-      <PublicacionesMLTabs user={u} actual="editar" />
-      <Link href="/publicaciones" className="btn-ghost !px-2 !py-1 text-xs">← Publicaciones</Link>
-      <PageHeader title="Cambios en lote" subtitle="Lo que se está mandando (o se mandó) a varias publicaciones a la vez" />
+      <PublicacionesMLTabs user={u} actual={editar ? 'editar' : 'promociones'} />
+      <Link href={editar ? '/publicaciones' : '/productos/promociones'} className="btn-ghost !px-2 !py-1 text-xs">← {editar ? 'Publicaciones' : 'Promociones'}</Link>
+      <PageHeader title="Tareas en MercadoLibre" subtitle="Lo que el sistema está mandando (o mandó) a MercadoLibre en segundo plano: promociones, encabezados, pies y precios" />
       <Suspense><LotesClient /></Suspense>
     </div>
   )
