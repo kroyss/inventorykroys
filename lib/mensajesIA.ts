@@ -85,14 +85,18 @@ export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media
 
 // conInventario = false: la empresa trabaja "todo desde MercadoLibre" (sin ventas cargadas): el
 // estado sale de la venta en ML y NO se le dice a la IA que "no está cargada" (sería falso).
+// hasta (09-11, prueba de Mi IA): la conversación solo hasta ese mensaje del comprador (lo que el equipo ya contestó
+// no se le muestra), y HOY = ese momento.
 export async function borradorMensaje(db: Pool, conexionId: number, sellerId: number, pack: string, country: string,
-  conInventario = true): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
-  const [hilo, venta, notas, ejemplos] = await Promise.all([
+  conInventario = true, hasta?: string): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
+  const [hiloEntero, venta, notas, ejemplos] = await Promise.all([
     leerHilo(db, conexionId, pack, sellerId, false),
     itemsDeVenta(db, conexionId, pack).catch(() => null),
     leerNotas(db, conexionId, pack).catch(() => ({ notas: [] })),
     sugerenciasMensaje(db, pack, 6).catch(() => ({ consulta: null, sugerencias: [] })),
   ])
+  const corte = hasta ? Date.parse(hasta) + 1000 : null
+  const hilo = corte ? { ...hiloEntero, mensajes: hiloEntero.mensajes.filter(m => Date.parse(m.fecha) <= corte) } : hiloEntero
   if (!hilo.mensajes.length) throw new Error('La conversación no tiene mensajes')
 
   const L: string[] = []
@@ -197,7 +201,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   }
   // Hoy (07-11): para decir el día de envío según los días de despacho de las POLÍTICAS.
   const tz = COUNTRY_TZ[country as 'VE' | 'CO'] ?? COUNTRY_TZ.VE
-  L.push(`\nHOY: ${new Intl.DateTimeFormat('es-VE', { timeZone: tz, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date())}`)
+  L.push(`\nHOY: ${new Intl.DateTimeFormat('es-VE', { timeZone: tz, weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(hasta ? new Date(hasta) : new Date())}`)
   L.push('\nCONVERSACIÓN (de la más vieja a la más nueva):')
   for (const m of hilo.mensajes.slice(-30)) {
     const t = textoPlano(m.texto).slice(0, 600)

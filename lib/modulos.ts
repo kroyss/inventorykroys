@@ -50,14 +50,14 @@ export const MODULOS = {
   ia_automatica:      'Preguntas: respuesta automática con IA (modo prueba y activa; cada pregunta procesada usa 1 crédito)',
   // 06-11 (migración 144): Mi IA, el cuestionario de reglas del negocio para la IA de Preguntas y Mensajes (lib/miIA.ts).
   // En prueba solo SolucionesMC.
-  mi_ia:              'Mi IA: cuestionario paso a paso con las reglas del negocio para la IA de Preguntas y Mensajes (en prueba)',
+  mi_ia:              'Mi IA: cuestionario paso a paso con las reglas del negocio para la IA de Preguntas y Mensajes, la prueba con casos reales y el encendido de las respuestas automáticas',
   fotos_ia:           'Fotos para la IA: lee una vez las fotos de cada publicación que usa la IA y avisa si la publicación se contradice',
   // 07-11 (migración 151): editar publicaciones existentes de ML (precio, stock, fotos, características, variantes,
   // descripción). En prueba solo SolucionesMC.
   publicaciones:      'Publicaciones: editar las publicaciones de MercadoLibre desde el sistema (precio, stock, fotos, características, variantes, descripción)',
   // 08-11 (migración 151): Reportes → Atención ML y el bloque «Tu semana» del resumen de los lunes. En prueba solo SolucionesMC.
   atencion_ml:        'Atención ML: reporte de preguntas, respuestas, tiempo de respuesta y ventas de ML, y «Tu semana» en el resumen de Telegram de los lunes (en prueba)',
-  mensajes_ia:        'Mensajes con IA en prueba: la IA deja escrito el borrador de cada mensaje nuevo y se marca Bien/Mal (no manda nada)',
+  mensajes_ia:        'Mensajes con IA automática: con el automático encendido (Mi IA) responde sola lo seguro y deja escrito el resto (1 crédito cada una). En la plataforma, además, la pestaña IA en prueba',
   // 08-11 (migración 152): Productos → Catálogo PDF (logo, con o sin precio, elegir productos) para mandar por WhatsApp.
   catalogo_pdf:       'Catálogo PDF: armar un catálogo con logo, fotos y precios (o sin precios) para mandar por WhatsApp (Productos)',
   // 08-11 (migración 153): Ventas → Presupuestos (cotización imprimible; aceptado → venta) y Reportes → Resumen.

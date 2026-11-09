@@ -5,6 +5,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { CLAVE_IA_AUTO, configIA } from '@/lib/iaAutomatica'
 import { cupoIA, CAMBIO_HAIKU55 } from '@/lib/ia'
 import { tieneModulo } from '@/lib/modulos'
+import { frenosDeFabrica } from '@/lib/iaFrenos'
 
 // GET /api/preguntas/ia-auto → Preguntas → Configuración → Respuesta automática con IA: el modo, los créditos y las
 // últimas preguntas que procesó (qué decidió, la respuesta, la que se publicó y la marca bien/mal del vendedor).
@@ -120,7 +121,9 @@ export async function POST(req: NextRequest) {
       await s.db.query(
         `INSERT INTO app_settings (key, value) VALUES ($1, $2)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde, ...(actual.v2 ? { v2: true } : {}) })])
+        [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde, v2: actual.v2 !== false,
+          ...(b.modo === 'real' ? { por: s.session.user.id, at: new Date().toISOString() } : {}) })])
+      if (b.modo === 'real') await frenosDeFabrica(s.db)
     } else if (b.accion === 'marcar_eco') {
       await s.db.query(
         `UPDATE ml_preguntas SET ia_auto = jsonb_set(ia_auto, ARRAY[$3::text, 'marca'], to_jsonb($2::text))

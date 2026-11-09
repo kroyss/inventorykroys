@@ -75,11 +75,14 @@ export const DESCUENTO_TRIMESTRAL = 10
 // inventario se prende a mano mientras no esté listo para clientes (decisión del dueño, 01-11).
 // Radar: solo Automatizaciones y Completo (dueño, 01-11); Esencial no lo trae. radar_dia (solo el día de prueba) se
 // apaga siempre al pagar.
-export const MODULOS_CONTROLADOS = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar', 'radar_dia'] as const
+// 09-11 (mig. 158, el dueño): Automatizaciones y Completo traen la IA automática (Mi IA, fotos, Preguntas y Mensajes).
+// El módulo solo la deja DISPONIBLE: queda apagada hasta que el cliente la enciende en Mi IA.
+export const MODULOS_IA = ['mi_ia', 'fotos_ia', 'ia_automatica', 'mensajes_ia'] as const
+export const MODULOS_CONTROLADOS = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar', 'radar_dia', ...MODULOS_IA] as const
 export const MODULOS_PLAN: Record<Plan['id'], readonly string[]> = {
   esencial: ['despachos', 'reportador', 'preguntas', 'alertas_stock'],
-  automatizaciones: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar'],
-  completo: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar'],
+  automatizaciones: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar', ...MODULOS_IA],
+  completo: ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'radar', ...MODULOS_IA],
 }
 /** ¿El plan trae el Radar? */
 export const planConRadar = (plan: string | null | undefined) => !!plan && (MODULOS_PLAN[plan as Plan['id']] ?? []).includes('radar')

@@ -7,6 +7,13 @@ import { tieneModulo } from '@/lib/modulos'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
 import { leerPoliticas } from '@/lib/miIAPoliticas'
+import { CLAVE_AUTO } from '@/lib/mensajesIAPrueba'
+import type { Pool } from 'pg'
+
+async function mensajesAuto(db: Pool) {
+  const { rows: [a] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
+  try { return JSON.parse(a?.value ?? '{}').modo === 'real' } catch { return false }
+}
 
 // Mi IA (06-11, lib/miIA.ts): el cuestionario de reglas del negocio para la IA de Preguntas y Mensajes.
 // GET → lo guardado (o null), el país y cuántas cuentas de ML tiene. PUT → guarda todo el cuestionario.
@@ -28,6 +35,8 @@ export async function GET() {
       texto: miIA && esDuenoPlataforma(s.session.user) ? { preguntas: textoMiIA(miIA, 'preguntas'), mensajes: textoMiIA(miIA, 'mensajes') } : null,
       // Parte D: ¿puede encender la respuesta automática desde aquí? (módulo ia_automatica) y en qué modo está.
       iaAuto: tieneModulo(s.session.user, 'ia_automatica') ? (await configIA(s.db)).modo : null,
+      // 09-11: Mensajes automáticos (módulo mensajes_ia): encendido sí/no; null = no lo tiene.
+      msgAuto: tieneModulo(s.session.user, 'mensajes_ia') ? await mensajesAuto(s.db) : null,
     })
   } catch (err) { return apiError(err) }
 }

@@ -34,6 +34,20 @@ export function normalizarFrenos(v: unknown): FrenosIA {
   return { horario, tope, escape, escapePreguntas }
 }
 
+// 09-11 (el dueño, activación para clientes): al ENCENDER la IA automática por primera vez quedan unos frenos de fábrica
+// para que el cliente no tenga que configurar nada: tope de 3 por comprador en 24 h y, en Mensajes, un acuse corto
+// cuando la IA deja el mensaje para una persona. Sin horario: responde a toda hora (de noche es cuando más sirve).
+// Si la empresa ya tiene sus frenos guardados no se tocan. Se editan en Mi IA → Frenos.
+export const FRENOS_FABRICA: FrenosIA = {
+  horario: null, tope: TOPE_DEFAULT,
+  escape: '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.', escapePreguntas: null,
+}
+export async function frenosDeFabrica(db: Pick<Pool, 'query'>) {
+  await db.query(
+    `INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (empresa_id, key) DO NOTHING`,
+    [CLAVE_FRENOS, JSON.stringify(FRENOS_FABRICA)])
+}
+
 export async function leerFrenos(db: Pick<Pool, 'query'>): Promise<FrenosIA> {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_FRENOS])
   try { return normalizarFrenos(JSON.parse(r?.value ?? '{}')) } catch { return normalizarFrenos({}) }

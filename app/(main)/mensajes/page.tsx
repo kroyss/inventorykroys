@@ -6,6 +6,7 @@ import MensajesClient from '@/components/preguntas/MensajesClient'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
+import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 
 export const metadata = { title: 'Mensajes' }
 
@@ -22,5 +23,7 @@ export default async function MensajesPage({ searchParams }: { searchParams: Pro
   const { pack } = await searchParams
   return <MensajesClient pack={pack && /^\d{6,20}$/.test(pack) ? pack : null}
     miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')}
-    iaPrueba={tieneModulo(session!.user, 'mensajes_ia')} />
+    // 09-11 (el dueño): la pestaña «IA en prueba» (marcar Bien/Mal) es solo del equipo interno; los clientes
+    // encienden y prueban en Mi IA y ven el borrador de la IA en cada conversación.
+    iaPrueba={tieneModulo(session!.user, 'mensajes_ia') && session!.user.organizacionId === ORGANIZACION_PLATAFORMA} />
 }

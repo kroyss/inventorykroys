@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     // Solo cuentas al día o vencidas hace poco (lib/cuenta.ts): de quien no volvió no se trae nada.
     // Inactiva: ningún usuario suyo usó el sistema en DIAS_INACTIVA días (la plataforma nunca).
     `SELECT e.id, e.country, 'alertas_stock' = ANY(e.modulos) AS stock, 'inventario' = ANY(e.modulos) AS inventario, 'pagos_me' = ANY(e.modulos) AS pagos_me,
-            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto, 'mensajes_ia' = ANY(e.modulos) AS msg_ia, 'publicaciones' = ANY(e.modulos) AS publicaciones,
+            'promociones' = ANY(e.modulos) AS promociones, 'ia_automatica' = ANY(e.modulos) AS ia_auto, 'mensajes_ia' = ANY(e.modulos) AS msg_ia, o.estado = 'propietario' AS propietaria, 'publicaciones' = ANY(e.modulos) AS publicaciones,
             o.estado <> 'propietario' AND COALESCE((
               SELECT MAX(GREATEST(u.ultima_actividad, u.last_login)) FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
               WHERE ue.empresa_id = e.id) < NOW() - INTERVAL '${DIAS_INACTIVA} days', TRUE) AS inactiva
@@ -121,10 +121,11 @@ export async function GET(req: NextRequest) {
         console.error('[respuestas automaticas]', e.id, err instanceof Error ? err.message : err)
       }
     }
-    // Mensajes con IA en prueba (lib/mensajesIAPrueba.ts, mig 145): borrador de cada mensaje nuevo, NO manda nada.
+    // Mensajes con IA (lib/mensajesIAPrueba.ts, mig 145): la propietaria, borrador de cada mensaje nuevo (prueba interna);
+    // los clientes (09-11), solo con el automático encendido y con créditos.
     for (const e of sincronizadas.filter(x => x.msg_ia)) {
       try {
-        const r = await conEmpresa(e.id, e.country as Country, db => procesarMensajesIA(db, e.country, e.inventario))
+        const r = await conEmpresa(e.id, e.country as Country, db => procesarMensajesIA(db, e.country, e.inventario, !e.propietaria, e.id))
         if (r) console.log('[mensajes ia]', e.id, r)
       } catch (err) {
         console.error('[mensajes ia]', e.id, err instanceof Error ? err.message : err)

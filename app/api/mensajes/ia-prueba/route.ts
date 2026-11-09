@@ -5,6 +5,7 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { CLAVE_AUTO, listaPrueba } from '@/lib/mensajesIAPrueba'
 import { puede } from '@/lib/permisos'
+import { frenosDeFabrica } from '@/lib/iaFrenos'
 
 // Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts). GET → los casos, el resumen y si está en automático
 // · POST → marcar Bien / Mal · PUT { auto } → enciende / apaga el envío automático (mig 149, permiso automatizaciones_config).
@@ -39,6 +40,7 @@ export async function PUT(req: NextRequest) {
       `INSERT INTO app_settings (key, value) VALUES ($1, $2)
        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
       [CLAVE_AUTO, JSON.stringify({ modo: p.data.auto ? 'real' : 'apagado', por: s.session.user.id, at: new Date().toISOString() })])
+    if (p.data.auto) await frenosDeFabrica(s.db)
     return NextResponse.json({ ok: true, auto: p.data.auto })
   } catch (err) { return apiError(err) }
 }

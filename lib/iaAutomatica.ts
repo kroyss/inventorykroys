@@ -17,7 +17,7 @@ import { leerFrenos, motivosFrenos, MOTIVO_TOPE } from '@/lib/iaFrenos'
 import { SIN_CONFIRMAR, compatibilidadRespaldada, preguntaDeVehiculo, sinTildes } from '@/lib/iaCompatibilidad'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
-export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean }   // v2 (07-11): prueba por empresa, "v2": true en el JSON
+export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean }   // v2 (07-11): desde el 09-11 la de todos ("v2": false la apaga)
 export interface DecisionIA {
   modo: ModoIA; decision: 'sola' | 'revisar'; motivos: string[]; respuesta: string; confianza: string
   verificacion: string | null; modelo: string; costo: number; fecha: string; publicada?: boolean; error?: string
@@ -36,8 +36,8 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_IA_AUTO])
   try {
     const v = JSON.parse(r?.value ?? '{}')
-    return { modo: ['sombra', 'real'].includes(v.modo) ? v.modo : 'apagado', desde: v.desde ?? null, v2: v.v2 === true }
-  } catch { return { modo: 'apagado', desde: null } }
+    return { modo: ['sombra', 'real'].includes(v.modo) ? v.modo : 'apagado', desde: v.desde ?? null, v2: v.v2 !== false }
+  } catch { return { modo: 'apagado', desde: null, v2: true } }
 }
 
 // "No tenemos / no hay / agotado": decir que no de más pierde la venta (y el stock de la publicación puede ir atrasado),

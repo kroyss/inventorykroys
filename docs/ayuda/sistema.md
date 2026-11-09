@@ -185,15 +185,46 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
    sale con **confianza baja** y te dice qué revisar.
 4. Envía. La respuesta sale en MercadoLibre a tu nombre.
 
-**Respuesta automática con IA** (Configuración → Respuesta automática con IA):
+**Respuestas automáticas con IA (planes Automatizaciones y Completo, y la prueba gratis)**
+
+*Cómo lo pregunta la gente:* que la IA responda sola, activar respuestas automáticas, encender la IA, responder de
+noche, mensajes automáticos, cómo configuro la IA.
+
+La IA contesta sola, a toda hora, las preguntas y los mensajes en que está segura. Lo delicado siempre queda escrito
+para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Para arrancar (unos 10 minutos):
+1. Abre **Mi IA** (Preguntas → Configuración → Mi IA, o en Mensajes). Si es la primera vez, toca **«Empezar con lo que
+   ya respondo»**: lee tus respuestas y descripciones y te propone cada tema. Revisa cada pantalla y corrige lo que haga
+   falta (pago, envío, despacho, tono, lo que siempre responde una persona…).
+2. Abajo, en **Preguntas · pruébala con 10 preguntas reales**, toca **Probar**. La IA responde preguntas que tu equipo
+   ya contestó, sin publicar nada, y ves lado a lado tu respuesta y la de la IA, y si habría salido sola.
+3. Si una está **Mal**, elige **qué estuvo mal** (le faltó un dato, dio un dato equivocado, no siguió cómo trabajas, el
+   tono, o lo debía ver una persona). Abajo aparece **«Para mejorar»** con qué arreglar (un tema de Mi IA, la
+   descripción, la ficha o las fotos de la publicación) y un botón para ir directo. Corrige y toca **Probar otra vez**.
+4. Cuando te guste, toca **Encender respuestas automáticas en Preguntas** y acepta el aviso.
+5. Haz lo mismo en **Mensajes · pruébala con 10 mensajes reales** y **Encender respuestas automáticas en Mensajes**.
+- Para apagarla: el botón **Apagar** en Mi IA (o el modo Apagada en Preguntas → Configuración → Respuesta automática
+  con IA). Se apaga al instante.
+- Cada respuesta de la IA usa **1 crédito** (las de prueba no). Si se acaban los créditos, deja de responder sola
+  hasta que recargues en Mi plan.
+- Responde solo lo que llega **después** de encenderla.
+- **Siempre pasa a una persona:** reclamos, devoluciones y garantías, pagos y comprobantes, datos personales o de
+  envío, cuando la IA diría que no hay, pedidos de otro color o cantidad, montos que no están escritos y los temas que
+  pusiste en «Siempre una persona». En Mensajes esos quedan con la respuesta de la IA ya escrita en la conversación
+  («Borrador de la IA · Usar»); en Preguntas, en «Sin responder» con la respuesta escrita.
+- Al encenderla quedan unos **frenos de fábrica** (los cambias en Mi IA → Frenos): máximo 3 respuestas automáticas por
+  comprador en 24 horas, sin horario (responde a cualquier hora) y, en Mensajes, una frase corta («¡Hola! Recibimos tu
+  mensaje, en breve te respondemos por aquí.») cuando el mensaje queda para una persona.
+- El plan Esencial no la trae: en Preguntas → Configuración ves «Disponible en Automatizaciones y Completo».
+
+**Pantalla Respuesta automática con IA** (Preguntas → Configuración):
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
-- **Modo prueba:** la IA lee cada pregunta nueva y decide si habría salido sola, pero **no publica nada**. En la lista
-  «Habrían salido solas» marcas cada una ✓ Bien o ✗ Mal y ves el % de acierto.
+- **Modo prueba:** la IA lee cada pregunta nueva y decide si habría salido sola, pero **no publica nada**. Ves lo que
+  habría respondido en «Habrían salido solas».
 - **Activa:** se publican solas solo las de confianza alta que pasan todas las revisiones. Nunca sale sola una respuesta
   que diga que no hay, que recomiende otra publicación o con datos que no están en la publicación o tus políticas. El
   resto te queda con la respuesta ya escrita para revisar y enviar.
 - Cada pregunta que la IA procesa usa 1 crédito. La pausa de respuestas automáticas también la detiene.
-- **Frenos de la IA automática** (en la misma pantalla; valen también para Mensajes):
+- **Frenos de la IA automática** (en la misma pantalla y en Mi IA; valen también para Mensajes):
   - **Horario:** días y horas en que la IA responde sola (ej. de 19:00 a 08:00). Fuera de ese horario deja la
     respuesta escrita para una persona. Sin horario responde a cualquier hora.
   - **Máximo por comprador:** cuántas respuestas automáticas recibe un mismo comprador en 24 horas (de fábrica 3);
@@ -220,8 +251,8 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
   solo TEALCA) y la pestaña se llama **Datos de cada producto** (ahí quedan los datos anotados).
 
 **Respuesta sugerida:** cuando una pregunta se parece mucho a otra que ya respondiste, la respuesta aparece ya
-escrita; la revisas y la envías (también varias juntas con «Enviar las sugeridas»). Hoy **ninguna pregunta se
-responde sola**: siempre la envía una persona.
+escrita; la revisas y la envías (también varias juntas con «Enviar las sugeridas»). La respuesta sugerida **no se
+envía sola**: siempre la envía una persona (lo que sale solo es la respuesta automática con IA, si la encendiste).
 - Solo aparece si el sistema entiende **toda** la pregunta. Si trae otra cosa («¿disponible? ¿son rojos?», «¿me lo
   envías hoy?»), no aparece ya escrita y queda para que la respondas tú.
 - Antes de mostrarla, el sistema revisa que conteste **cada parte** de la pregunta. Si falta una parte y el dato está
@@ -267,6 +298,9 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   `{precio_bs}` (precio × tasa BCV del día) y `{tasa_bcv}`. Si falta un dato (ej. la venta tiene varios productos),
   queda escrito entre llaves y no se puede enviar hasta que lo escribas a mano.
   Si no tienes ninguna, el sistema ofrece unos ejemplos para empezar.
+- **Respuestas automáticas con IA:** se encienden y se prueban en **Mi IA** (ver «Respuestas automáticas con IA» en
+  Preguntas). Con la automática encendida, los mensajes que la IA no manda sola quedan con su respuesta escrita en la
+  conversación: tocas **Usar**, la revisas y la envías.
 - **Proponer con IA:** lee la conversación, la nota y la venta y propone una respuesta (no envía nada). Si la guía
   no salió de Despachos, usa la de MercadoEnvíos. Si preguntan algo que depende de tu equipo (cuándo sale el paquete,
   desde dónde se envía), no lo inventa: propone «lo verificamos con el equipo y te avisamos por aquí».

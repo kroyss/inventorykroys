@@ -46,7 +46,7 @@ const usd = (n: number, d = 2) => `$${n.toFixed(d)}`
 const miles = (n: number) => Math.round(n).toLocaleString('de-DE')
 const hora = (f: string) => new Date(`${f}Z`).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-export function IaAutomatica() {
+export function IaAutomatica({ interno = false }: { interno?: boolean }) {
   const confirm = useConfirm()
   const [info, setInfo] = useState<Info | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,8 +68,8 @@ export function IaAutomatica() {
   const cambiarModo = async (modo: Modo) => {
     if (modo === 'real' && !(await confirm({
       title: 'Activar respuesta automática con IA',
-      message: 'Las preguntas en que la IA está segura (confianza alta y revisadas) se publicarán SOLAS en MercadoLibre a tu nombre, sin que nadie las vea antes.\n\nNunca sale sola una respuesta que diga que no hay, que recomiende otra publicación o con datos que no estén en la publicación o tus políticas.\n\nCada pregunta que la IA procesa usa 1 crédito. Puedes pausarla cuando quieras.',
-      confirmText: 'Activar',
+      message: 'La IA responde en tu nombre: las preguntas en que está segura se publican SOLAS en MercadoLibre.\n\nLo delicado siempre pasa a una persona: cuando dice que no hay, datos que no están en la publicación o en Mi IA, medios de pago y los temas que marcaste en «Siempre una persona». Esas quedan escritas para que tu equipo las revise.\n\nCada pregunta que la IA procesa usa 1 crédito. La apagas cuando quieras.',
+      confirmText: 'Acepto, activar',
     }))) return
     post({ accion: 'modo', modo })
   }
@@ -115,6 +115,7 @@ export function IaAutomatica() {
             </button>
           ))}
         </div>
+        {!interno && info.modo !== 'real' && <p className="text-xs text-sky-800 rounded-lg bg-sky-50 px-3 py-2">Antes de activarla, pruébala con 10 preguntas reales en <b>Mi IA</b> (abajo de los temas).</p>}
         <p className="text-xs text-neutral-500">
           Cada pregunta que procesa usa 1 crédito de IA.
           {info.cupo.limite !== null ? <> Te quedan <b>{info.cupo.quedan}</b> de {info.cupo.limite}{info.cupo.agotado ? ' (sin créditos: no procesa hasta recargar)' : ''}.</> : ' Sin límite de créditos.'}
@@ -126,18 +127,18 @@ export function IaAutomatica() {
       <FrenosIA conEscape={false} />
 
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        {interno && <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-neutral-500">Medir:</span>
           {([[false, 'Desde el cambio a Haiku 5.5 (06-11)'], [true, 'Todo el historial']] as const).map(([v, t]) => (
             <button key={t} onClick={() => setTodo(v)}
               className={`px-2.5 py-1 rounded-full border ${todo === v ? 'bg-sky-700 text-white border-sky-700' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
           ))}
-        </div>
+        </div>}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
           <span><b>{r.procesadas}</b> procesadas</span>
           <span className="text-emerald-700"><b>{r.solas}</b> {info.modo === 'real' ? 'salieron' : 'habrían salido'} solas</span>
           <span className="text-amber-700"><b>{r.revisar}</b> pasó a una persona</span>
-          <span>Marcadas: <b>{r.marcadas}</b>{pct !== null && <> · <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien</b></>}</span>
+          {interno && <span>Marcadas: <b>{r.marcadas}</b>{pct !== null && <> · <b className={pct >= 95 ? 'text-emerald-700' : 'text-amber-700'}>{pct}% bien</b></>}</span>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {/* 08-11 (el dueño): fuera las pestañas «Versión económica» y «Haiku 4.5 vs 5.5»: Haiku 5.5 ya escribe todas
@@ -147,10 +148,10 @@ export function IaAutomatica() {
               className={`px-3 py-1.5 rounded-full text-sm border ${ver === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
           ))}
         </div>
-        {ver === 'sola' && <p className="text-xs text-neutral-500">Marca cada una: ¿la habrías publicado tal cual? Con 95% de «bien» conviene activarla.</p>}
+        {ver === 'sola' && interno && <p className="text-xs text-neutral-500">Marca cada una: ¿la habrías publicado tal cual? Con 95% de «bien» conviene activarla.</p>}
         {ver === 'revisar' && <div className="space-y-2">
           <p className="text-xs text-neutral-500">Estas <b>no salieron solas</b> por el motivo que dice cada una; ya se respondieron en «Sin responder». Aquí no hay nada pendiente: si quieres, marca si la IA <b>podía haberla mandado</b> o si estuvo <b>bien frenada</b>. Con eso vemos qué reglas frenan de más para dejar salir más solas.</p>
-          {frenadas.marcadas > 0 && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700 space-y-1">
+          {interno && frenadas.marcadas > 0 && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700 space-y-1">
             <p>Marcadas <b>{frenadas.marcadas}</b>: <b className={frenadas.podian / frenadas.marcadas >= 0.5 ? 'text-amber-700' : 'text-emerald-700'}>{Math.round((100 * frenadas.podian) / frenadas.marcadas)}% podían salir solas</b>.</p>
             <ul className="space-y-0.5">{frenadas.porMotivo.map(m => <li key={m.motivo}>{m.motivo}: {m.podian} de {m.marcadas} podían salir solas</li>)}</ul>
           </div>}
@@ -176,7 +177,7 @@ export function IaAutomatica() {
               {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
                 <p className="text-sm rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700"><span className="text-xs font-semibold text-neutral-500 mr-1.5">Publicada</span>{p.respuesta}</p>)}
               {!p.respuesta && p.estado === 'UNANSWERED' && <p className="text-xs text-neutral-400">Todavía sin responder.</p>}
-              {p.ia_auto.decision === 'revisar' && p.ia_auto.respuesta && (
+              {interno && p.ia_auto.decision === 'revisar' && p.ia_auto.respuesta && (
                 <div className="flex gap-1.5">
                   {([['bien', '✓ Podía salir sola'], ['mal', 'Bien frenada']] as const).map(([m, t]) => (
                     <button key={m} onClick={() => marcar(p.id, p.ia_auto.marca === m ? null : m)}
@@ -186,7 +187,7 @@ export function IaAutomatica() {
                   ))}
                 </div>
               )}
-              {p.ia_auto.decision === 'sola' && (
+              {interno && p.ia_auto.decision === 'sola' && (
                 <div className="flex gap-1.5">
                   {(['bien', 'mal'] as const).map(m => (
                     <button key={m} onClick={() => marcar(p.id, p.ia_auto.marca === m ? null : m)}

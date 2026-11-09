@@ -341,7 +341,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', envioPorPeso ? 'Datos de cada producto' : 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
+              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', envioPorPeso ? 'Datos de cada producto' : 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica || isAdmin) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
@@ -350,7 +350,15 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
             {subConfig === 'aprendido' && <>{!envioPorPeso && <LoAprendido />}<DatosProductos /></>}
             {subConfig === 'ia' && !miIA && <CuentasYPoliticas />}
-            {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica />}
+            {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica interno={verAvisosInternos} />}
+            {subConfig === 'ia_auto' && !iaAutomatica && (
+              <div className="max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-2">
+                <h2 className="font-semibold text-neutral-900">Respuesta automática con IA</h2>
+                <p className="text-sm text-neutral-600">La IA contesta sola las preguntas y los mensajes en que está segura, a toda hora; lo delicado queda escrito para tu equipo.</p>
+                <p className="text-sm text-neutral-600">Disponible en los planes <b>Automatizaciones</b> y <b>Completo</b>.</p>
+                <a href="/mi-plan" className="inline-block px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Ver Mi plan</a>
+              </div>
+            )}
           </div>
         ) : <Cargando />
       ) : !datos || datosDe !== (vista === 'respondidas' ? 'respondidas' : 'pendientes') ? <Cargando /> : sinCuentas && datos.total === 0 ? (

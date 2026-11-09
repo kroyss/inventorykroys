@@ -6,6 +6,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import CuentasPanel from './CuentasPanel'
 import FundadoresPanel from './FundadoresPanel'
 import InternoPanel from './InternoPanel'
+import IaClientesPanel from './IaClientesPanel'
 import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
 import ResumenPanel from './ResumenPanel'
@@ -157,7 +158,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
     // ?vista=cobros: el botón del aviso de Telegram de un pago reportado (mig. 141).
     if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVista('cobros')
   }, [])
-  const [interno, setInterno]   = useState<'ia' | 'personas'>('ia')
+  const [interno, setInterno]   = useState<'ia' | 'auto' | 'personas'>('ia')
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
@@ -264,12 +265,12 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
         : vista === 'contenido' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
         : vista === 'interno' ? <>
           <div className="flex gap-1.5">
-            {([['ia', 'IA y Telegram'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
+            {([['ia', 'IA y Telegram'], ['auto', 'IA automática por cliente'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
               <button key={k} onClick={() => setInterno(k)}
                 className={`px-3 py-1 rounded-full text-sm border ${interno === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
             ))}
           </div>
-          {interno === 'ia' ? <InternoPanel /> : <CuentasPanel />}
+          {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel /> : <CuentasPanel />}
         </> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}

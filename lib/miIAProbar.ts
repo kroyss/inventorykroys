@@ -28,9 +28,9 @@ export async function probarMiIA(db: Pool, country: string, usuarioId: number | 
     const base = { id: q.id, pregunta: q.texto, titulo: q.item_titulo, permalink: q.item_permalink, tuya: q.respuesta }
     try {
       const c = await armarContexto(db, Number(q.id), country)
-      const b = await pedirBorrador(c, false, undefined, false, true)
+      const b = await pedirBorrador(c, false, undefined, true, true)   // v2, la misma que la automática
       llamadas.push(...b.llamadas)
-      const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), false, '', datosCompatibilidad(c))
+      const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), true, '', datosCompatibilidad(c))
       return { ...base, ia: b.respuesta, decision: motivos.length ? 'revisar' : 'sola', motivos }
     } catch (e) {
       return { ...base, ia: '', decision: 'revisar', motivos: ['Error de la IA'], error: (e instanceof Error ? e.message : String(e)).slice(0, 200) }

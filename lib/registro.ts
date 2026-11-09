@@ -6,7 +6,8 @@ import { enviarTelegram, ENTORNO, telegramConfigurado } from '@/lib/telegram'
 
 /** Lo que trae la prueba: el plan Automatizaciones (lo mismo con lo que arrancaron los Fundadores) + Pagos ME.
  *  Sin Inventario: es el paso 2, se prende a mano en Plataforma cuando el cliente lo pide. */
-export const MODULOS_PRUEBA = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me'] as const
+// 09-11 (mig. 158): la prueba trae también la IA automática (apagada hasta que la encienden en Mi IA).
+export const MODULOS_PRUEBA = ['despachos', 'reportador', 'preguntas', 'alertas_stock', 'pagos_me', 'mi_ia', 'fotos_ia', 'ia_automatica', 'mensajes_ia'] as const
 
 /** Telegram a los admins de la organización dueña de la plataforma (los que conectaron su Telegram en este entorno). */
 export async function avisarDuenoPlataforma(html: string) {

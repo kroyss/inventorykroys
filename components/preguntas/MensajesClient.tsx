@@ -476,7 +476,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
         {ultimoEsComprador && !texto.trim() && dePrueba && (
           <div className="flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs ring-1 ring-inset ring-sky-200">
             <div className="min-w-0 flex-1">
-              <p className="text-sky-800">Borrador de la IA en prueba (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</p>
+              <p className="text-sky-800">Borrador de la IA (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</p>
               <p className="mt-0.5 text-neutral-800">{dePrueba.respuesta}</p>
             </div>
             <button type="button" className="shrink-0 rounded-full px-2.5 py-1 ring-1 ring-inset ring-sky-300 text-sky-800 hover:bg-sky-100"
@@ -525,7 +525,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
               : meta.confianza === 'media' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-red-50 text-red-700 ring-red-200'}`}>Confianza {meta.confianza}</span>
             {meta.falta && <span className="text-neutral-600">No encontré: <b>{meta.falta}</b></span>}
             {dePrueba && origen.fuente === 'ia' && origen.base === dePrueba.respuesta && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-800 ring-1 ring-inset ring-sky-200">
-              Borrador de la IA en prueba (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</span>}
+              Borrador de la IA (no se mandó) · {dePrueba.decision === 'sola' ? 'saldría sola' : `iría a revisión${dePrueba.motivos?.length ? `: ${dePrueba.motivos.join(' · ')}` : ''}`}</span>}
           </div>
         )}
         {error && <p className="text-xs text-red-600 whitespace-pre-line">{error}</p>}

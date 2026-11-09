@@ -3,10 +3,12 @@
 // la respuesta con borradorMensaje (lib/mensajesIA.ts, la misma del botón) y decide si habría salido SOLA o a REVISIÓN.
 // NO manda nada: queda como borrador en la conversación (lo encuentra escrito quien la abre) y en Mensajes → IA en prueba
 // para marcar Bien / Mal. Una por mensaje del comprador (varios seguidos = uno: se espera ESPERA_MIN sin mensajes nuevos).
-// Mientras sea prueba interna no descuenta créditos del cliente (módulo 'simulacion').
+// La propietaria (SolucionesMC) lo corre siempre como prueba interna y no descuenta créditos ('simulacion').
+// CLIENTES (09-11, mig. 158): solo con el automático ENCENDIDO (Mi IA) y cada respuesta usa 1 crédito ('mensajes');
+// sin créditos no procesa. Los que no salen solos quedan escritos en la conversación para el equipo.
 import type { Pool } from 'pg'
 import { borradorMensaje } from '@/lib/mensajesIA'
-import { costoDe, registrarUso, iaConfigurada } from '@/lib/ia'
+import { costoDe, cupoIA, registrarUso, iaConfigurada } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { responderHilo } from '@/lib/mensajesML'
@@ -23,6 +25,10 @@ async function autoReal(db: Pool) {
 }
 
 export const CLAVE_DESDE = 'mensajes_ia_desde'
+async function encendidoDesde(db: Pool) {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
+  try { return JSON.parse(r?.value ?? '{}').at ?? new Date().toISOString() } catch { return new Date().toISOString() }
+}
 const ESPERA_MIN = 2          // el comprador suele mandar 2 o 3 mensajes seguidos: se contesta al último
 const HORAS_MAX = 24          // uno más viejo ya lo está viendo una persona
 const POR_PASADA = 3
@@ -87,11 +93,16 @@ export function motivosMensaje(b: { respuesta: string; confianza: string; falta_
   return m
 }
 
-/** Lo llama el cron cada minuto. */
-export async function procesarMensajesIA(db: Pool, country: string, conInventario: boolean) {
+/** Lo llama el cron cada minuto. `cliente` = no es la propietaria (solo encendido y con créditos). */
+export async function procesarMensajesIA(db: Pool, country: string, conInventario: boolean, cliente = false, empresaId = 0) {
   if (!iaConfigurada()) return null
+  if (cliente) {
+    if (!(await autoReal(db))) return null
+    if ((await cupoIA(db, empresaId)).agotado) return null
+  }
   const { rows: [d] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_DESDE])
-  const desde = d?.value ?? new Date().toISOString()
+  // Clientes: desde que lo encendieron (no se contestan mensajes viejos).
+  const desde = cliente ? await encendidoDesde(db) : d?.value ?? new Date().toISOString()
   // Conversaciones cuyo último mensaje es del comprador, quieto hace ESPERA_MIN, y sin borrador para ese mensaje.
   const { rows } = await db.query(
     `WITH c AS (
@@ -131,7 +142,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
         motivos.push(...topeOHorario)
       }
       const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length ? 'revisar' : 'sola'
-      await registrarUso(db, 'simulacion', [{ modelo: b.modelo, uso: b.uso }], null)
+      await registrarUso(db, cliente ? 'mensajes' : 'simulacion', [{ modelo: b.modelo, uso: b.uso }], null)
       await db.query(
         `UPDATE ml_mensajes_ia SET estado = 'listo', comprador = $2, respuesta = $3, confianza = $4, falta_dato = $5,
            decision = $6, motivos = $7, modelo = $8, costo = $9 WHERE id = $1`,
