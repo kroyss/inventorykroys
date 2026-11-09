@@ -58,7 +58,7 @@ export default function AvisoColaML() {
   return (
     <div className="fixed z-40 right-14 bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-5 flex flex-col items-end gap-2">
       {abierto && (
-        <div className="w-[calc(100vw-1.5rem)] sm:w-80 rounded-xl border border-neutral-200 bg-white shadow-lg p-3 space-y-2.5 text-sm">
+        <div className="w-[calc(100vw-4.25rem)] sm:w-80 rounded-xl border border-neutral-200 bg-white shadow-lg p-3 space-y-2.5 text-sm">
           {visibles.map(l => {
             const hechas = l.total - l.pendientes
             return (
