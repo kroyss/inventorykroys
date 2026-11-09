@@ -364,7 +364,7 @@ esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
 - **Cambiar precios:** subir o bajar un %, sumar o restar un monto o poner un precio fijo, con redondeo (entero o
   terminado en ,90). Muestra la tabla **antes → después** de cada una y recién ahí se confirma.
 - Se manda a ML **en segundo plano** (hasta unas 60 por minuto) aunque cierres la pantalla; abajo a la derecha sale el avance. Lo que salió bien, lo
-  saltado y los errores se ven en **Tareas en ML** (link arriba de la lista, pantalla «Tareas en MercadoLibre»); ahí también se puede cancelar lo
+  saltado y los errores se ven en la pestaña **Tareas** (Inventario → Publicaciones, al lado de Promociones); ahí también se puede cancelar lo
   que falta.
 
 **Textos de descripción** (link arriba de la lista): los encabezados, condiciones de compra y pies guardados, cada uno **para una cuenta o
@@ -653,7 +653,7 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   **Aviso de tareas (abajo a la derecha, en todas las pantallas):** mientras el sistema manda cosas a MercadoLibre sale
   una pastilla chica «Procesando tareas (N)». Al tocarla se abre con el avance de cada una («45 de 120»); al tocarla
   otra vez se achica. Cuando termina cambia a «✓ Tareas terminadas» (o «con errores»): abierta muestra cuántas quedaron
-  y **Ver cómo quedaron** lleva a **Publicaciones → Tareas en MercadoLibre** (cada publicación con su resultado y el
+  y **Ver cómo quedaron** lleva a **Publicaciones → pestaña Tareas** (cada publicación con su resultado y el
   motivo si falló; ahí también se cancela lo que falta). La ✕ quita el aviso.
   Algunas campañas **de MercadoLibre** (hoy Black Friday) traen un precio **sugerido por ML distinto para cada
   producto** (su «Nueva propuesta»): la tarjeta lo marca con «Precio sugerido por ML». Al agregar, cada publicación entra

@@ -2,12 +2,13 @@ import Link from 'next/link'
 import type { UserRole } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
+import { tiposPermitidos } from '@/lib/colaPermisos'
 
 // Publicaciones (26-10; menú propio en Inventario desde 08-11): Editar, Vincular, Stock y Promociones son lo mismo visto
 // desde varios lados (mis publicaciones de ML). Cada pantalla sigue en su dirección de siempre (avisos de Telegram y
 // permisos no cambian); arriba comparten estas pestañas. Cada una se muestra con las mismas reglas que su página;
 // con una sola no se dibuja nada. El menú «Publicaciones» aparece si hay al menos una.
-export type PestanaML = 'editar' | 'vincular' | 'stock' | 'promociones'
+export type PestanaML = 'editar' | 'vincular' | 'stock' | 'promociones' | 'tareas'
 type UsuarioML = { role?: UserRole; permisos?: string[]; modulos?: string[]; country?: string }
 
 export function pestanasML(user: UsuarioML) {
@@ -16,6 +17,8 @@ export function pestanasML(user: UsuarioML) {
   if (puede(user, 'vincular_ml') || (puede(user, 'ver_productos') && puede(user, 'importar_ml'))) p.push({ k: 'vincular', t: 'Vincular', href: '/vincular-ml' })
   if (tieneModulo(user, 'inventario') && tieneModulo(user, 'preguntas') && puede(user, 'ver_inventario')) p.push({ k: 'stock', t: 'Stock', href: '/inventario/stock-ml' })
   if (user.country === 'VE' && tieneModulo(user, 'promociones') && puede(user, 'promociones') && puede(user, 'ver_productos')) p.push({ k: 'promociones', t: 'Promociones', href: '/productos/promociones' })
+  // Tareas en MercadoLibre (09-11): lo que se manda a ML en segundo plano (Editar y Promociones); cada uno ve las suyas.
+  if (tiposPermitidos(user).length) p.push({ k: 'tareas', t: 'Tareas', href: '/publicaciones/lotes' })
   return p
 }
 
