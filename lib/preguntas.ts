@@ -254,6 +254,14 @@ export function datosPublicacion(c: Contexto) {
   return [c.item?.title, c.titulo, c.descripcion, c.ficha?.texto, c.producto?.name].filter(Boolean).join(' \n ')
 }
 
+/** Todo lo escrito de la publicación para el freno de compatibilidad con vehículos (lib/iaCompatibilidad.ts): lo anterior +
+ *  ficha técnica de ML + notas del vendedor + lo que se ve en las fotos. Una compatibilidad "universal" dicha en cualquiera
+ *  de ellos respalda la respuesta, sea cual sea el modelo que pregunten. */
+export function datosCompatibilidad(c: Contexto) {
+  const tecnica = (c.item?.attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join('; ')
+  return [datosPublicacion(c), tecnica, ...(c.notas ?? []), c.fotos?.texto].filter(Boolean).join(' \n ')
+}
+
 export interface Contexto {
   pregunta: { id: number; texto: string; item_id: string; fecha: string }
   item: ItemML | null
@@ -404,6 +412,7 @@ Cómo responder:
 - Si la publicación no tiene lo que pide el comprador y en OTRAS PUBLICACIONES DEL VENDEDOR hay una que sí lo cumple (según su título o su ficha), recomiéndala como lo hace el vendedor: dile que esta no, que la otra sí, y pon el link de esa publicación tal cual. Si ninguna cumple con certeza, no recomiendes nada.
 - Nunca inventes medidas, compatibilidades, garantías, precios ni tiempos de envío. Si el dato no está, dilo como lo diría el propio vendedor ("ese modelo no lo tenemos confirmado", "déjanos verificarlo") y, si ayuda, pregunta para qué lo necesita (por ejemplo "¿para qué equipo lo necesitas?"); anótalo en "falta_dato" y deja confianza "baja". Si ni eso sirve, deja la respuesta vacía.
 - Si el título, la ficha y la descripción se contradicen justo en lo que pregunta (medida, material, compatibilidad), no elijas uno: anótalo en "falta_dato" con confianza "baja".
+- Si la descripción, la ficha, las notas o lo que se ve en las fotos dicen que el producto es universal o sirve para cualquier vehículo o equipo (o listan lo compatible), eso responde a CUALQUIER modelo concreto que pregunten: confirma que sirve, sin pedir el modelo y sin decir "no es de un modelo en específico", y repite lo que ahí se aclare (accesorios que se venden aparte, medidas, condiciones). Si no dice nada de compatibilidad, no lo afirmes.
 - Prohibido: links (salvo el de otra publicación del vendedor, tal cual viene en OTRAS PUBLICACIONES), páginas web, correos, teléfonos, redes sociales, "escríbeme al…". MercadoLibre borra esas respuestas.
 - En Venezuela MercadoLibre no tiene carrito de compras: no lo menciones.
 - "falta_dato": una frase corta (máximo 25 palabras) para el vendedor.

@@ -3,7 +3,7 @@
 // reglas que la respuesta automática, lib/iaAutomatica.ts). No publica nada ni toca la pregunta. No descuenta créditos
 // del cliente (módulo 'simulacion'): es para que decida si la enciende.
 import type { Pool } from 'pg'
-import { armarContexto, datosPublicacion, pedirBorrador } from '@/lib/preguntas'
+import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador } from '@/lib/preguntas'
 import { registrarUso, type LlamadaIA } from '@/lib/ia'
 import { motivosRevisar } from '@/lib/iaAutomatica'
 
@@ -30,7 +30,7 @@ export async function probarMiIA(db: Pool, country: string, usuarioId: number | 
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false, undefined, false, true)
       llamadas.push(...b.llamadas)
-      const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c))
+      const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), false, '', datosCompatibilidad(c))
       return { ...base, ia: b.respuesta, decision: motivos.length ? 'revisar' : 'sola', motivos }
     } catch (e) {
       return { ...base, ia: '', decision: 'revisar', motivos: ['Error de la IA'], error: (e instanceof Error ? e.message : String(e)).slice(0, 200) }
