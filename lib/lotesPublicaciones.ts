@@ -83,7 +83,8 @@ export async function mandarDescripcion(db: Pool, conexionId: number, itemId: st
 export type ParametrosDescripcion = { parte: TipoTexto; plantillaId: number | null; noReconocida?: 'saltar' | 'agregar' }
 export type ParametrosPrecio = { modo: 'porcentaje' | 'monto' | 'fijo'; valor: number; redondeo: 'no' | 'entero' | '90' }
 
-export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer', titulo: string, parametros: object, items: { item: string; datos?: object }[], userId: number | null) {
+export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer' | 'promocion', titulo: string, parametros: object,
+  items: { item: string; datos?: object; conexionId?: number }[], userId: number | null) {
   const unicos = [...new Map(items.map(x => [x.item, x])).values()]
   const { rows: [l] } = await db.query(
     `INSERT INTO ml_pub_lotes (tipo, titulo, parametros, user_id, total) VALUES ($1, $2, $3, $4, $5) RETURNING id::int`,
@@ -91,9 +92,11 @@ export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer
   for (let i = 0; i < unicos.length; i += 500) {
     const parte = unicos.slice(i, i + 500)
     await db.query(
-      `INSERT INTO ml_pub_lote_items (lote_id, item_id, datos) SELECT $1, x.item, x.datos
-       FROM jsonb_to_recordset($2::jsonb) AS x(item text, datos jsonb) ON CONFLICT DO NOTHING`,
-      [l.id, JSON.stringify(parte.map(x => ({ item: x.item, datos: x.datos ?? {} })))])
+      // La cuenta de cada publicación (mig 155): la cola reparte el tope por cuenta.
+      `INSERT INTO ml_pub_lote_items (lote_id, item_id, datos, conexion_id)
+       SELECT $1, x.item, x.datos, COALESCE(x.con, (SELECT c.conexion_id FROM ml_catalogo c WHERE c.item_id = x.item LIMIT 1))
+       FROM jsonb_to_recordset($2::jsonb) AS x(item text, datos jsonb, con int) ON CONFLICT DO NOTHING`,
+      [l.id, JSON.stringify(parte.map(x => ({ item: x.item, datos: x.datos ?? {}, con: x.conexionId ?? null })))])
   }
   return l.id as number
 }
@@ -150,6 +153,13 @@ export async function procesarLotes(db: Pool) {
     `UPDATE ml_pub_lotes l SET estado = 'terminado', terminado_at = NOW()
      WHERE l.estado = 'en_curso' AND NOT EXISTS (SELECT 1 FROM ml_pub_lote_items i WHERE i.lote_id = l.id AND i.estado IN ('pendiente', 'procesando'))`)
   return r.hechas || r.errores ? r : null
+}
+
+/** Una publicación de un lote de Publicaciones, para la cola común (lib/colaML.ts, mig 155). */
+export async function procesarItemLote(db: Pool, l: { tipo: string; parametros: Record<string, unknown>; user_id: number | null },
+  it: { item_id: string; datos: Record<string, unknown> }) {
+  const [estado, mensaje] = await procesarItem(db, l, it)
+  return { estado: estado as 'ok' | 'sin_cambio' | 'saltada' | 'error', mensaje }
 }
 
 async function procesarItem(db: Pool, l: { tipo: string; parametros: Record<string, unknown>; user_id: number | null },

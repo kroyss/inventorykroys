@@ -363,7 +363,7 @@ esta búsqueda», hasta 3.000; activas y pausadas). Abajo aparece la barra:
   cuántas se actualizaron, cuántas ya lo tenían y cuáles no se pudieron (con el motivo en «Ver el detalle»).
 - **Cambiar precios:** subir o bajar un %, sumar o restar un monto o poner un precio fijo, con redondeo (entero o
   terminado en ,90). Muestra la tabla **antes → después** de cada una y recién ahí se confirma.
-- Se manda a ML **de a poco** (unas 12 por minuto) aunque cierres la pantalla. El avance, lo que salió bien, lo
+- Se manda a ML **en segundo plano** (hasta unas 60 por minuto) aunque cierres la pantalla; abajo a la derecha sale el avance. Lo que salió bien, lo
   saltado y los errores se ven en **Cambios en lote** (link arriba de la lista); ahí también se puede cancelar lo
   que falta.
 
@@ -647,6 +647,10 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
   En una campaña que **todavía no empezó** (ej. Black Friday del 16/11) puedes agregar publicaciones desde ya: quedan
   **programadas** y el precio se activa solo el día que empieza.
+  **Agregar a una campaña ya no necesita la ventana abierta:** al tocar «Agregar N a la campaña» quedan en la cola y
+  el sistema las manda solo a MercadoLibre (unas 60 por minuto, repartidas entre las cuentas que estén enviando cosas a
+  la vez). Puedes cerrar la ventana y seguir trabajando: **abajo a la derecha** sale un aviso con el avance («23 de
+  120») y al terminar cuántas quedaron y cuántas con error, con **Ver** para revisar el motivo de cada una.
   Algunas campañas **de MercadoLibre** (hoy Black Friday) traen un precio **sugerido por ML distinto para cada
   producto** (su «Nueva propuesta»): la tarjeta lo marca con «Precio sugerido por ML». Al agregar, cada publicación entra
   con su precio sugerido (la columna «Nuevo» dice «−18% · sugerido ML»). Si con el sugerido una pierde el envío

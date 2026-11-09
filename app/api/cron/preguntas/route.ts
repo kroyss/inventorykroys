@@ -18,7 +18,7 @@ import { esDemoEmpresa } from '@/lib/demo'
 import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
 import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
-import { procesarLotes } from '@/lib/lotesPublicaciones'
+import { procesarColaML } from '@/lib/colaML'
 import type { Country } from '@/lib/types'
 
 // Cron de preguntas (crontab del VPS, cada minuto, con CRON_SECRET):
@@ -67,6 +67,16 @@ export async function GET(req: NextRequest) {
       resultado[e.id] = { error: err instanceof Error ? err.message : String(err) }
     }
   }
+  // Cola de tareas para MercadoLibre (lib/colaML.ts, mig 155): descripciones, precios, lecturas y promociones.
+  // Corre DESPUÉS de responder (tarda hasta ~50 s) y con candado: nunca dos pasadas a la vez.
+  after(async () => {
+    try {
+      const r = await procesarColaML()
+      if (r) console.log('[cola ml]', r)
+    } catch (err) {
+      console.error('[cola ml]', err instanceof Error ? err.message : err)
+    }
+  })
   // Alertas de stock: una cuenta por empresa y por pasada, si pasó la hora (lib/alertasStock.ts).
   // En segundo plano (después de responder) para no atrasar preguntas y mensajes.
   after(async () => {
@@ -91,15 +101,6 @@ export async function GET(req: NextRequest) {
       if (r) console.log('[planes vencidos]', r)
     } catch (err) {
       console.error('[planes vencidos]', err instanceof Error ? err.message : err)
-    }
-    // Publicaciones en lote (lib/lotesPublicaciones.ts, mig 152): pies/encabezados, precios y lecturas, de a pocas por minuto.
-    for (const e of sincronizadas.filter(x => x.publicaciones)) {
-      try {
-        const r = await conEmpresa(e.id, e.country as Country, db => procesarLotes(db))
-        if (r) console.log('[publicaciones lote]', e.id, r)
-      } catch (err) {
-        console.error('[publicaciones lote]', e.id, err instanceof Error ? err.message : err)
-      }
     }
     for (const e of sincronizadas.filter(x => x.stock)) {
       try {

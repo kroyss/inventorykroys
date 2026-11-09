@@ -676,95 +676,58 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
   })
   const validas = camp ? filasPrev.filter(x => !x.motivo && !resultados[x.f.id]?.ok) : []
 
-  // De a TANDA por pedido (2026-10-17): cada publicación tarda ~2 s (se agrega y se comprueba con el precio
-  // real) y el servidor corta la espera al minuto; con 28 de una vez la pantalla perdía la respuesta.
-  // 08-11: 4 por pedido (antes 10): cada una tarda unos segundos en comprobarse y con 10 se pasaba el tiempo de espera.
-  const TANDA = 4
-  const [avance, setAvance] = useState<{ hechas: number; total: number; comprobando?: number } | null>(null)
+  // 08-11 (el dueño): ya no las manda la pantalla. Quedan en la COLA de MercadoLibre (lib/colaML.ts) y el servidor las
+  // procesa solo (tope general de 60 por minuto); la ventana se puede cerrar y el aviso de abajo muestra el avance.
+  const [avance, setAvance] = useState<{ hechas: number; total: number } | null>(null)
   const [enCola, setEnCola] = useState<Set<string>>(new Set())
-  // Mientras agrega no se cierra (cerrar o recargar cortaba las tandas que faltaban, 2026-10-17).
-  useEffect(() => {
-    if (!enviando) return
-    const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
-    window.addEventListener('beforeunload', avisar)
-    return () => window.removeEventListener('beforeunload', avisar)
-  }, [enviando])
+  const [loteId, setLoteId] = useState<number | null>(null)
   const enviar = async (items: { id: string; conexionId: number; precio: number; precioAntes: number; cambio?: boolean }[]) => {
     if (!camp || !items.length) return
-    setEnviando(true); setEnCola(new Set(items.map(x => x.id)))
-    type Res = { id: string; ok: boolean; precio?: number; manda?: number | null; error?: string; noCreible?: boolean; porConfirmar?: boolean }
-    const todos: Res[] = []
-    const nuevos = { ...resultados }
-    let listas = 0
-    // Cada cuenta a SU campaña (las de una cuenta van juntas, de a TANDA).
-    for (const con of [...new Set(items.map(x => x.conexionId))]) {
-      const c = campDe(con)!
-      const deCuenta = items.filter(x => x.conexionId === con)
-      for (let i = 0; i < deCuenta.length; i += TANDA) {
-        const tanda = deCuenta.slice(i, i + TANDA)
-        setAvance({ hechas: listas, total: items.length })
-        const res: Res[] = []
-        let frena: string | null = null
-        for (const accion of ['agregar', 'cambiar'] as const) {
-          const parte = tanda.filter(x => !!x.cambio === (accion === 'cambiar')).map(({ cambio: _c, conexionId: _k, ...x }) => x)
-          if (!parte.length) continue
-          const r = await fetch('/api/promociones/acciones', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accion, conexionId: con, campana: { id: c.id, tipo: c.tipo, nombre: c.nombre, estado: c.estado }, items: parte }),
-          }).catch(() => null)
-          const d = r ? await r.json().catch(() => ({})) : {}
-          if (r?.status === 400) {   // la campaña no empezó u otro rechazo de todo el pedido: esa cuenta no sigue
-            if (!mezcla) {
-              setEnviando(false); setAvance(null); setEnCola(new Set())
-              return onHecho('', d.error ?? `No se pudo agregar a «${c.nombre}».`)
-            }
-            frena = d.error ?? `No se pudo agregar a «${c.nombre}».`
-            break
-          }
-          res.push(...(r?.ok ? d.resultados as Res[]
-            // Sin respuesta (se cortó la espera o la conexión): pudieron haber entrado; no se reintenta solo.
-            : parte.map(x => ({ id: x.id, ok: false, error: 'No llegó la respuesta: puede que haya entrado. Toca «Traer ME y ML» para confirmarlo antes de reintentar.' }))))
-        }
-        if (frena) res.push(...deCuenta.slice(i).filter(x => !res.some(y => y.id === x.id)).map(x => ({ id: x.id, ok: false, error: frena! })))
-        for (const x of res) nuevos[x.id] = x
-        todos.push(...res)
-        setResultados({ ...nuevos })
-        listas += frena ? deCuenta.length - i : tanda.length
-        setAvance({ hechas: listas, total: items.length })
-        if (frena) break
+    const campanasCuenta = [...new Set(items.map(x => x.conexionId))].map(con => ({ con, c: campDe(con) }))
+      .filter((x): x is { con: number; c: CampanaVista } => !!x.c)
+    setEnviando(true); setEnCola(new Set(items.map(x => x.id))); setAvance({ hechas: 0, total: items.length })
+    setResultados(r => { const n = { ...r }; for (const x of items) delete n[x.id]; return n })
+    const r = await fetch('/api/promociones/cola', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campanas: campanasCuenta.map(x => ({ conexionId: x.con, campana: { id: x.c.id, tipo: x.c.tipo, nombre: x.c.nombre } })), items }),
+    }).catch(() => null)
+    const d = r ? await r.json().catch(() => ({})) : {}
+    if (!r?.ok || !d.loteId) {
+      setEnviando(false); setAvance(null); setEnCola(new Set())
+      return onHecho('', d.error ?? 'No se pudo dejar en la cola. Prueba de nuevo.')
+    }
+    window.dispatchEvent(new Event('cola-ml'))   // el aviso de abajo empieza a mirar
+    setLoteId(d.loteId)
+  }
+  // Mientras la ventana siga abierta, se mira cómo va cada publicación.
+  useEffect(() => {
+    if (!loteId) return
+    let vivo = true
+    const mirar = async () => {
+      const d = await fetch(`/api/cola-ml?lote=${loteId}`).then(r => (r.ok ? r.json() : null)).catch(() => null)
+      if (!vivo || !d?.lote) return
+      const nuevos: typeof resultados = {}
+      for (const x of d.items as { item_id: string; estado: string; mensaje: string | null; resultado: { precio?: number; manda?: number | null; noCreible?: boolean } | null; intentos: number }[]) {
+        const res = x.resultado ?? {}
+        if (x.estado === 'ok' || x.estado === 'sin_cambio') nuevos[x.item_id] = { ok: true, precio: res.precio, manda: res.manda ?? null }
+        else if (x.estado === 'error' || x.estado === 'saltada') nuevos[x.item_id] = { ok: false, error: x.mensaje ?? 'No se pudo', noCreible: !!res.noCreible }
+        else if (x.intentos > 0) nuevos[x.item_id] = { ok: true, precio: res.precio, porConfirmar: true }
+      }
+      setResultados(prev => ({ ...prev, ...nuevos }))
+      setAvance({ hechas: d.lote.total - d.lote.pendientes, total: d.lote.total })
+      if (d.lote.estado !== 'en_curso') {
+        vivo = false
+        setEnviando(false); setAvance(null); setEnCola(new Set()); setLoteId(null)
+        // Queda abierta con el resultado de cada una: «Agregar también a otra…» o «Terminar».
       }
     }
-    // Las que ML aceptó pero todavía no reflejaba: se vuelven a mirar a los ~10 s y a los ~30 s (18-10).
-    for (const [espera, final] of [[10_000, false], [20_000, true]] as const) {
-      const pend = todos.filter(x => x.ok && x.porConfirmar)
-      if (!pend.length) break
-      setAvance({ hechas: items.length, total: items.length, comprobando: pend.length })
-      await new Promise(r => setTimeout(r, espera))
-      for (const con of [...new Set(items.map(x => x.conexionId))]) {
-        const c = campDe(con)!
-        const deCuenta = pend.filter(x => items.find(i => i.id === x.id)?.conexionId === con)
-        if (!deCuenta.length) continue
-        const r = await fetch('/api/promociones/acciones', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accion: 'verificar', conexionId: con, final, campana: { id: c.id, tipo: c.tipo, nombre: c.nombre },
-            items: deCuenta.map(x => ({ id: x.id, precio: x.precio ?? items.find(i => i.id === x.id)!.precio })) }),
-        }).catch(() => null)
-        const d = r?.ok ? await r.json().catch(() => null) : null
-        for (const v of (d?.resultados ?? []) as { id: string; estado: 'ok' | 'pendiente' | 'no' }[]) {
-          const x = todos.find(t => t.id === v.id)
-          if (!x) continue
-          if (v.estado === 'ok') x.porConfirmar = false
-          else if (v.estado === 'no') Object.assign(x, { ok: false, porConfirmar: false, error: 'MercadoLibre respondió que sí, pero el precio no apareció en la publicación: no entró a la campaña. Reintenta.' })
-          nuevos[x.id] = { ...x }
-        }
-      }
-      // Sin respuesta de la comprobación: quedan "por confirmar" (Traer de ML lo aclara).
-      setResultados({ ...nuevos })
-    }
-    setEnviando(false); setAvance(null); setEnCola(new Set())
-    // Todo bien: se cierra. Con errores (o sin confirmar) queda abierto para ver el motivo y reintentar a mano.
-    // Todo bien: no se cierra (20-10): queda anotada y se puede elegir otra campaña para las mismas publicaciones.
-    if (todos.every(x => x.ok && !x.porConfirmar) && !todos.some(x => x.manda)) pasarAOtra(nuevos)
+    mirar()
+    const t = setInterval(mirar, 3000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [loteId])
+  const cerrar = () => {
+    if (enviando) return onHecho('Se están agregando en segundo plano: puedes seguir trabajando. El aviso de abajo muestra el avance.')
+    if (hayAlgo) onHecho(resumen()); else setModal(null)
   }
   /** Anota la campaña actual como hecha (con lo que respondió ML) y deja elegir otra. */
   const pasarAOtra = (res: typeof resultados = resultados) => {
@@ -814,12 +777,11 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { if (!enviando) { if (hayAlgo) onHecho(resumen()); else setModal(null) } }}>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={cerrar}>
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-4 space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Agregar a una campaña · vista previa</h2>
-          <button onClick={() => { if (hayAlgo) onHecho(resumen()); else setModal(null) }} disabled={enviando}
-            title={enviando ? 'Espera a que termine de agregar' : undefined} className="text-neutral-500 text-sm disabled:opacity-40">Cerrar ✕</button>
+          <button onClick={cerrar} title={enviando ? 'Sigue en segundo plano' : undefined} className="text-neutral-500 text-sm">Cerrar ✕</button>
         </div>
         {hechas.length > 0 && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
@@ -873,13 +835,11 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
           {enviando && avance && (
             <div className="sticky top-0 z-10 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>{avance.comprobando
-                  ? <>Comprobando en MercadoLibre {avance.comprobando === 1 ? '1 que todavía no se veía' : `${avance.comprobando} que todavía no se veían`}. <b>No cierres esta ventana.</b></>
-                  : <>Agregando a «{camp?.nombre}»: <b>{avance.hechas} de {avance.total}</b> listas. <b>No cierres esta ventana</b> hasta que termine.</>}</span>
-                {!avance.comprobando && <span className="text-xs text-sky-700">≈ {Math.max(1, Math.ceil((avance.total - avance.hechas) * 2.3 / 60))} min</span>}
+                <span>Agregando a «{camp?.nombre}»: <b>{avance.hechas} de {avance.total}</b>. Puedes <b>cerrar esta ventana</b>: sigue en segundo plano.</span>
+                <span className="text-xs text-sky-700">≈ {Math.max(1, Math.ceil((avance.total - avance.hechas) / 60))} min</span>
               </div>
               <div className="mt-1.5 h-1.5 rounded-full bg-sky-100 overflow-hidden">
-                <div className="h-full bg-sky-600 transition-all" style={{ width: `${Math.round(avance.hechas / avance.total * 100)}%` }} />
+                <div className="h-full bg-sky-600 transition-all" style={{ width: `${Math.round(avance.hechas / Math.max(1, avance.total) * 100)}%` }} />
               </div>
             </div>
           )}
@@ -969,7 +929,7 @@ function AgregarModal({ modal, setModal, filas, campanas, margenA, margenMin, ta
             {hayResultados && camp && <button onClick={() => pasarAOtra()} disabled={enviando} className="btn-secondary text-sm" title="Deja esta campaña como está y elige otra para las mismas publicaciones">Agregar también a otra…</button>}
             {hayAlgo && <button onClick={() => onHecho(resumen())} disabled={enviando} className="btn-secondary text-sm">Terminar</button>}
             <button onClick={confirmar} disabled={!camp || !validas.length || enviando} className="btn-primary text-sm">
-              {enviando ? (avance && avance.total > TANDA ? `Agregando… ${avance.hechas} de ${avance.total}` : 'Agregando y comprobando…') : `Agregar ${validas.length} a la campaña`}
+              {enviando ? `Agregando… ${avance?.hechas ?? 0} de ${avance?.total ?? validas.length}` : `Agregar ${validas.length} a la campaña`}
             </button>
           </div>
         </>

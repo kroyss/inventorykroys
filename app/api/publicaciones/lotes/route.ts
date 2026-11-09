@@ -18,7 +18,7 @@ export async function GET() {
               COUNT(*) FILTER (WHERE i.estado = 'saltada')::int AS saltadas, COUNT(*) FILTER (WHERE i.estado = 'error')::int AS errores,
               COUNT(*) FILTER (WHERE i.estado IN ('pendiente', 'procesando'))::int AS pendientes
        FROM ml_pub_lotes l LEFT JOIN users u ON u.id = l.user_id LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id
-       WHERE l.tipo <> 'leer' OR l.creado_at > NOW() - INTERVAL '2 days'
+       WHERE l.tipo <> 'promocion' AND (l.tipo <> 'leer' OR l.creado_at > NOW() - INTERVAL '2 days')   -- promociones: en su pantalla
        GROUP BY l.id, u.full_name, u.username ORDER BY l.creado_at DESC LIMIT 20`)
     return NextResponse.json({ lotes: rows })
   } catch (err) { return apiError(err) }

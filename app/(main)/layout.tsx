@@ -15,6 +15,7 @@ import AvisoDisco from '@/components/layout/AvisoDisco'
 import VerComoBarra from '@/components/layout/VerComoBarra'
 import ActividadReal from '@/components/layout/ActividadReal'
 import BurbujaAyuda from '@/components/layout/BurbujaAyuda'
+import AvisoColaML from '@/components/layout/AvisoColaML'
 import { Suspense } from 'react'
 import { esDuenoPlataforma } from '@/lib/empresa'
 
@@ -55,6 +56,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <BienvenidaVideo />
       <BottomNav role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
       <ActividadReal />
+      {/* Lo que se está mandando a MercadoLibre en segundo plano (lib/colaML.ts). */}
+      <AvisoColaML />
       {/* Ayuda con IA + Soporte (lib/ayuda.ts, lib/soporte.ts). Suspense: lee ?soporte= de la URL. */}
       <Suspense><BurbujaAyuda /></Suspense>
       <CommandPalette role={role} permisos={session.user.permisos} country={country} modulos={modulos} />
