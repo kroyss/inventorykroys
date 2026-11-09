@@ -380,7 +380,7 @@ function mezclar(c: Config, s: Partial<Config>) {
 // ── Parte D: prueba con casos reales (Preguntas y, desde el 09-11, Mensajes) ─────────────────────────────────────
 // 09-11 (el dueño): al marcar «Mal» se elige qué estuvo mal y se recomienda qué mejorar (completar un tema de Mi IA,
 // la descripción, la ficha o las fotos…). Las marcas no se guardan: son para que el cliente decida si la enciende.
-type Caso = { id: string; texto: string; titulo: string | null; permalink?: string | null; tuya: string | null; ia: string; decision: 'sola' | 'revisar' | 'nada'; motivos: string[]; error?: string }
+type Caso = { id: string; texto: string; titulo: string | null; permalink?: string | null; itemId?: string | null; tuya: string | null; ia: string; decision: 'sola' | 'revisar' | 'nada'; motivos: string[]; error?: string }
 type Error_ = 'falta' | 'dato' | 'regla' | 'tono' | 'persona' | 'otro'
 const ERRORES: { id: Error_; t: string }[] = [
   { id: 'falta', t: 'Le faltó un dato del producto' },
@@ -414,6 +414,34 @@ const TEXTOS = {
 } as const
 
 const ACEPTO = 'La IA responde en tu nombre.\n\nSolo salen solas las respuestas en que está segura. Lo delicado siempre pasa a una persona: reclamos, pagos, datos personales, cuando dice que no hay y los temas que marcaste en «Siempre una persona». Esas quedan escritas para que tu equipo las revise y las mande.\n\nCada respuesta usa 1 crédito de IA. La apagas cuando quieras desde aquí.'
+
+// 09-11 (el dueño): desde la prueba, el dato que le faltó o dio mal se guarda en «Datos del producto» de esa publicación
+// (ml_item_notas, /api/preguntas/notas): la IA lo usa desde la próxima pregunta o mensaje. El mismo cuadro de cada pregunta.
+function GuardarDato({ itemId }: { itemId: string }) {
+  const [texto, setTexto] = useState('')
+  const [estado, setEstado] = useState<'' | 'guardando' | 'listo' | string>('')
+  const guardar = async () => {
+    setEstado('guardando')
+    const r = await fetch('/api/preguntas/notas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId, texto: texto.trim() }) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { void d; setEstado('No se pudo guardar el dato'); return }
+    setEstado('listo'); setTexto('')
+  }
+  if (estado === 'listo') return <p className="text-xs text-green-800">Guardado en «Datos del producto» de esta publicación. La IA lo usa desde la próxima pregunta.</p>
+  return (
+    <div className="space-y-1 pt-1">
+      <p className="text-xs text-neutral-600"><b>¿Qué debió decir?</b> Guárdalo como dato del producto y la IA lo usa de ahora en adelante.</p>
+      <div className="flex gap-2">
+        <input value={texto} onChange={e => setTexto(e.target.value)} maxLength={500} placeholder="Ej.: Trae cargador. Mide 30 cm. Es compatible con…"
+          className="flex-1 min-w-0 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
+        <button type="button" onClick={guardar} disabled={texto.trim().length < 3 || estado === 'guardando'}
+          className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{estado === 'guardando' ? '…' : 'Guardar'}</button>
+      </div>
+      <p className="text-[11px] text-neutral-400">Solo datos fijos del producto: sin precios, stock ni fechas (esos la IA los lee al día).</p>
+      {estado && estado !== 'guardando' && <p className="text-xs text-red-700">{estado}</p>}
+    </div>
+  )
+}
 
 function Prueba({ tipo, encendida, onCambio, abrir, quedan: quedanAl, faltan }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; onCambio: () => void; abrir: (tema: string) => void
   quedan: number | null; faltan: string[] }) {
@@ -495,6 +523,7 @@ function Prueba({ tipo, encendida, onCambio, abrir, quedan: quedanAl, faltan }: 
             <div className="flex flex-wrap gap-1">
               {ERRORES.map(e => <Chip key={e.id} activo={errores[x.id] === e.id} onClick={() => setErrores(v => ({ ...v, [x.id]: e.id }))}>{e.t}</Chip>)}
             </div>
+            {x.itemId && (errores[x.id] === 'falta' || errores[x.id] === 'dato') && <GuardarDato itemId={x.itemId} />}
           </div>}
         </div>
       ))}

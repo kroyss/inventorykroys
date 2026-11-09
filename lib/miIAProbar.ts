@@ -10,22 +10,22 @@ import { motivosRevisar } from '@/lib/iaAutomatica'
 export const PRUEBA_N = 10
 
 export interface CasoPrueba {
-  id: string; pregunta: string; titulo: string | null; permalink: string | null
+  id: string; pregunta: string; titulo: string | null; permalink: string | null; itemId: string | null
   tuya: string | null; ia: string; decision: 'sola' | 'revisar'; motivos: string[]; error?: string
 }
 
 export async function probarMiIA(db: Pool, country: string, usuarioId: number | string | null): Promise<CasoPrueba[]> {
   // Una por publicación (variedad), contestadas por una persona en los últimos 30 días.
   const { rows } = await db.query(
-    `SELECT id::text, texto, item_titulo, item_permalink, respuesta FROM (
+    `SELECT id::text, texto, item_id, item_titulo, item_permalink, respuesta FROM (
        SELECT DISTINCT ON (item_id) * FROM ml_preguntas
        WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL AND fecha > NOW() - INTERVAL '30 days'
          AND COALESCE(ia_auto->>'publicada', 'false') <> 'true'
        ORDER BY item_id, fecha DESC) x
      ORDER BY fecha DESC LIMIT $1`, [PRUEBA_N])
   const llamadas: LlamadaIA[] = []
-  const caso = async (q: { id: string; texto: string; item_titulo: string | null; item_permalink: string | null; respuesta: string | null }): Promise<CasoPrueba> => {
-    const base = { id: q.id, pregunta: q.texto, titulo: q.item_titulo, permalink: q.item_permalink, tuya: q.respuesta }
+  const caso = async (q: { id: string; texto: string; item_id: string | null; item_titulo: string | null; item_permalink: string | null; respuesta: string | null }): Promise<CasoPrueba> => {
+    const base = { id: q.id, pregunta: q.texto, titulo: q.item_titulo, permalink: q.item_permalink, itemId: q.item_id, tuya: q.respuesta }
     try {
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false, undefined, true, true)   // v2, la misma que la automática

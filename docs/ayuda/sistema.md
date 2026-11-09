@@ -208,6 +208,9 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 3. Si una está **Mal**, elige **qué estuvo mal** (le faltó un dato, dio un dato equivocado, no siguió cómo trabajas, el
    tono, o lo debía ver una persona). Abajo aparece **«Para mejorar»** con qué arreglar (un tema de Mi IA, la
    descripción, la ficha o las fotos de la publicación) y un botón para ir directo. Corrige y toca **Probar otra vez**.
+   En Preguntas, si elegiste *le faltó un dato* o *dio un dato equivocado*, ahí mismo escribes **qué debió decir** y
+   tocas **Guardar**: queda en **Datos del producto** de esa publicación y la IA lo usa desde la próxima pregunta y
+   mensaje (solo datos fijos: sin precios, stock ni fechas).
 4. Cuando te guste, toca **Encender respuestas automáticas en Preguntas** y acepta el aviso.
 5. Haz lo mismo en **Mensajes · pruébala con 10 mensajes reales** y **Encender respuestas automáticas en Mensajes**.
 - Para apagarla: el botón **Apagar** en Mi IA (o el modo Apagada en Preguntas → Configuración → Respuesta automática
