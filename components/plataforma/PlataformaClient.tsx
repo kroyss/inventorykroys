@@ -42,6 +42,7 @@ interface Empresa {
   ciclo: 'mensual' | 'trimestral' | null
   plan_hasta: string | null
   radar_pro_hasta: string | null
+  radar_mes_hasta?: string | null
   creada: string
   cuentas: string | null      // cuentas de MercadoLibre conectadas (null = ninguna)
   inventario?: UsoInventario | null   // solo con el módulo inventario (25-10)
@@ -384,7 +385,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Plan y pagos</h3>
                 <PlanCliente key={sel.organizacion_id} hoy={hoy}
                   d={{ organizacion_id: sel.organizacion_id, fundador: sel.fundador, estado: sel.estado, plan: sel.plan, escalon: sel.escalon,
-                    ciclo: sel.ciclo, plan_hasta: sel.plan_hasta, radar_pro_hasta: sel.radar_pro_hasta,
+                    ciclo: sel.ciclo, plan_hasta: sel.plan_hasta, radar_pro_hasta: sel.radar_pro_hasta, radar_mes_hasta: sel.radar_mes_hasta ?? null,
                     empresas: empresas.filter(x => x.organizacion_id === sel.organizacion_id).map(x => ({ id: x.id, nombre: x.nombre })) }}
                   onCambio={msg => { setError(null); setAviso(msg); cargar() }} onError={msg => { setAviso(null); setError(msg) }} />
               </section>

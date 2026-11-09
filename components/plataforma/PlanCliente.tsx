@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, RECARGAS_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
+import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, RECARGAS_IA, montoPlan, planConRadar, precioRadarMes, sumarMeses, type Plan } from '@/lib/planes'
 
 // Plataforma → ficha del cliente → Plan y pagos (01-11-2026, migración 138): activar o renovar el plan (módulos y
 // créditos del escalón salen solos), recargar créditos de IA, Radar PRO de fin de semana y el historial de pagos.
@@ -8,11 +8,11 @@ import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, RECARGAS_IA, montoPlan, planC
 export interface DatosPlan {
   organizacion_id: number; fundador: boolean; estado: string
   plan: Plan['id'] | null; escalon: number | null; ciclo: 'mensual' | 'trimestral' | null
-  plan_hasta: string | null; radar_pro_hasta: string | null
+  plan_hasta: string | null; radar_pro_hasta: string | null; radar_mes_hasta?: string | null
   empresas: { id: number; nombre: string }[]
 }
 interface Pago {
-  id: number; tipo: 'plan' | 'recarga' | 'radar_pro' | 'upgrade'; fecha: string; monto: number | null; plan: string | null; escalon: number | null
+  id: number; tipo: 'plan' | 'recarga' | 'radar_pro' | 'upgrade' | 'radar_mes'; fecha: string; monto: number | null; plan: string | null; escalon: number | null
   ciclo: string | null; desde: string | null; hasta: string | null; creditos: number | null; nota: string | null; empresa: string | null; por: string | null
 }
 
@@ -22,7 +22,7 @@ const usd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits
 
 export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPlan; hoy: string; onCambio: (msg: string) => void; onError: (e: string) => void }) {
   const [pagos, setPagos] = useState<Pago[] | null>(null)
-  const [abierto, setAbierto] = useState<null | 'plan' | 'recarga' | 'radar'>(null)
+  const [abierto, setAbierto] = useState<null | 'plan' | 'recarga' | 'radar' | 'radar_mes'>(null)
   const [guardando, setGuardando] = useState(false)
   const cargar = useCallback(() => {
     fetch(`/api/plataforma/organizaciones/${d.organizacion_id}/pagos`).then(r => r.ok ? r.json() : null).then(x => setPagos(x?.pagos ?? []))
@@ -41,6 +41,10 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
   const [recarga, setRecarga] = useState({ empresa: d.empresas[0]?.id ?? 0, creditos: String(RECARGA_IA.creditos), monto: String(RECARGA_IA.precio), nota: '' })
   const radarVigente = d.radar_pro_hasta && d.radar_pro_hasta >= hoy
   const [radar, setRadar] = useState({ hasta: '', monto: String(RADAR_PRO.precio), nota: '' })
+  // 09-11 (mig. 159): Radar mensual (solo Radar, PRO todos los días), para quien paga fuera de Mi plan.
+  const mesVigente = d.radar_mes_hasta && d.radar_mes_hasta >= hoy
+  const [radarMes, setRadarMes] = useState({ hasta: '', monto: String(precioRadarMes(hoy).precio), nota: '' })
+  const hastaMes = radarMes.hasta || sumarMeses(mesVigente ? d.radar_mes_hasta! : hoy, 1)
 
   const enviar = async (body: object) => {
     setGuardando(true)
@@ -71,7 +75,24 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
         {d.estado !== 'propietario' && <button onClick={() => setAbierto(abierto === 'plan' ? null : 'plan')} className="btn-primary text-xs">{d.plan ? 'Registrar pago / renovar' : 'Activar plan'}</button>}
         <button onClick={() => setAbierto(abierto === 'recarga' ? null : 'recarga')} className="btn-secondary text-xs">Recargar créditos IA</button>
         {d.estado !== 'propietario' && planConRadar(d.plan) && <button onClick={() => setAbierto(abierto === 'radar' ? null : 'radar')} className="btn-secondary text-xs">Radar PRO</button>}
+        {d.estado !== 'propietario' && !d.plan && <button onClick={() => setAbierto(abierto === 'radar_mes' ? null : 'radar_mes')} className="btn-secondary text-xs">Radar mensual</button>}
       </div>
+      {mesVigente && <p className="text-xs text-lime-800">Radar mensual (PRO todos los días) hasta el <b>{ddmmaa(d.radar_mes_hasta!)}</b>.</p>}
+
+      {abierto === 'radar_mes' && (
+        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs space-y-2">
+          <p className="text-neutral-600">Solo Radar, PRO todos los días. Normal {usd(precioRadarMes(hoy).lista)}/mes{precioRadarMes(hoy).promo ? `; hoy ${usd(precioRadarMes(hoy).precio)} (${precioRadarMes(hoy).promo!.texto})` : ''}. Lo normal es que lo pague en Mi plan y lo apruebes en Cobros.</p>
+          <div className="flex flex-wrap gap-3">
+            <label className="block">Hasta
+              <input type="date" min={hoy} value={hastaMes} onChange={e => setRadarMes({ ...radarMes, hasta: e.target.value })} className="mt-0.5 block border border-neutral-300 rounded px-2 py-1" />
+            </label>
+            <label className="block">Cobrado ($)<input inputMode="decimal" value={radarMes.monto} onChange={e => setRadarMes({ ...radarMes, monto: e.target.value })} className="mt-0.5 block w-20 border border-neutral-300 rounded px-2 py-1" /></label>
+          </div>
+          <input value={radarMes.nota} onChange={e => setRadarMes({ ...radarMes, nota: e.target.value })} placeholder="Nota (opcional)" className="w-full border border-neutral-300 rounded px-2 py-1" />
+          <button disabled={guardando} onClick={() => enviar({ tipo: 'radar_mes', hasta: hastaMes, monto: num(radarMes.monto) || 0, nota: radarMes.nota })}
+            className="btn-primary text-xs">{guardando ? 'Guardando…' : 'Guardar Radar mensual'}</button>
+        </div>
+      )}
 
       {abierto === 'plan' && (
         <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs space-y-2">
@@ -160,7 +181,7 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
                   <span className="text-neutral-400">{new Date(p.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'America/Caracas' })}</span>{' '}
                   {p.tipo === 'plan' ? <>{nombrePlan(p.plan)} · {p.ciclo}{p.hasta ? ` · hasta ${ddmmaa(p.hasta)}` : ''}</>
                     : p.tipo === 'recarga' ? <>Recarga {p.creditos} créditos{p.empresa && d.empresas.length > 1 ? ` · ${p.empresa}` : ''}</>
-                    : p.tipo === 'upgrade' ? <>Cambio a {nombrePlan(p.plan)}{p.hasta ? ` · hasta ${ddmmaa(p.hasta)}` : ''}</> : <>Radar PRO{p.hasta ? ` hasta ${ddmmaa(p.hasta)}` : ''}</>}
+                    : p.tipo === 'upgrade' ? <>Cambio a {nombrePlan(p.plan)}{p.hasta ? ` · hasta ${ddmmaa(p.hasta)}` : ''}</> : <>{p.tipo === 'radar_mes' ? 'Radar mensual' : 'Radar PRO'}{p.hasta ? ` hasta ${ddmmaa(p.hasta)}` : ''}</>}
                   {p.nota && <span className="text-neutral-400"> · {p.nota}</span>}
                 </span>
                 <span className="font-medium whitespace-nowrap">{p.monto != null ? usd(p.monto) : '—'}</span>

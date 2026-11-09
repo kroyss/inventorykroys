@@ -14,6 +14,7 @@ import { currentDate } from '@/lib/tz'
 //        de regalo; Esencial no trae Radar).
 //   POST { tipo: 'recarga' }: créditos de IA que no vencen (se suman al saldo, ia_creditos, mig. 156; monto 0 = regalo).
 //   POST { tipo: 'radar_pro' }: Radar PRO de fin de semana pagado ($6/mes) hasta una fecha.
+//   POST { tipo: 'radar_mes' } (09-11, mig. 159): Radar mensual (solo Radar, PRO todos los días) hasta una fecha.
 //   GET: el historial de pagos.
 const Fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
 const Body = z.discriminatedUnion('tipo', [
@@ -27,6 +28,7 @@ const Body = z.discriminatedUnion('tipo', [
     monto: z.number().min(0).max(100000), nota: z.string().max(300).optional(),
   }),
   z.object({ tipo: z.literal('radar_pro'), hasta: Fecha, monto: z.number().min(0).max(100000), nota: z.string().max(300).optional() }),
+  z.object({ tipo: z.literal('radar_mes'), hasta: Fecha, monto: z.number().min(0).max(100000), nota: z.string().max(300).optional() }),
 ])
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const b = Body.parse(await req.json())
     const { rows: [o] } = await db.query(
-      `SELECT estado, plan, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta,
+      `SELECT estado, plan, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta, to_char(radar_mes_hasta, 'YYYY-MM-DD') AS radar_mes_hasta,
               EXISTS (SELECT 1 FROM organizacion_pagos p WHERE p.organizacion_id = o.id AND p.tipo = 'plan') AS pago_antes
        FROM organizaciones o WHERE id = $1`, [org])
     if (!o) return NextResponse.json({ error: 'Organización no encontrada' }, { status: 404 })
@@ -62,6 +64,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     if (org === ORGANIZACION_PLATAFORMA) return NextResponse.json({ error: 'Tu organización es la propietaria: no tiene plan' }, { status: 400 })
+
+    if (b.tipo === 'radar_mes') {
+      if (b.hasta < hoy) return NextResponse.json({ error: 'La fecha "hasta" ya pasó' }, { status: 400 })
+      const desde = o.radar_mes_hasta && o.radar_mes_hasta >= hoy ? o.radar_mes_hasta : hoy
+      await db.query(`UPDATE organizaciones SET radar_mes_hasta = $2 WHERE id = $1`, [org, b.hasta])
+      await db.query(
+        `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, desde, hasta, nota, por) VALUES ($1, 'radar_mes', $2, $3, $4, $5, $6)`,
+        [org, b.monto, desde, b.hasta, b.nota || null, por])
+      return NextResponse.json({ ok: true, mensaje: `Radar mensual (PRO todos los días) hasta el ${b.hasta.split('-').reverse().join('/')}. Lo ve en su próximo ingreso al Radar.` })
+    }
 
     if (b.tipo === 'radar_pro') {
       if (!planConRadar(o.plan)) return NextResponse.json({ error: 'El Radar viene con Automatizaciones o Completo: primero registra uno de esos planes' }, { status: 400 })

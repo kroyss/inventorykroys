@@ -65,6 +65,12 @@ el portal de MercadoEnvíos de Venezuela.
   [Planes](#3-planes-y-créditos-de-ia)).
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al
   Radar; si intentas entrar al Sistema te lo indica. Para usar el Sistema, escríbenos.
+- **Radar mensual (solo Radar):** el registro del Radar está siempre abierto. Para entrar se paga el mes:
+  **$20 al mes** (en noviembre 2026, **$10**, −50%), y ese mes tienes el **Radar PRO todos los días**. Mientras no
+  pagas, al entrar al Radar ves 5 productos de ejemplo y el botón **Pagar y activar**, que te lleva a **Mi plan**
+  (app.elcomerciantedigital.com/renovar) con tu mismo usuario y contraseña; pagas por Pago Móvil o Binance y, cuando
+  lo confirmamos, se abre el Radar completo. Al vencer el mes vuelve la pantalla de pago; si pagas antes, el mes nuevo
+  se suma a continuación. Solo hay pago mensual.
 
 ---
 

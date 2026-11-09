@@ -5,7 +5,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import MiPlan from './MiPlan'
 
-export default function Renovar() {
+export default function Renovar({ usuario, radar = false }: { usuario?: string; radar?: boolean }) {
   const [acceso, setAcceso] = useState<string | null>(null)
   const [listo, setListo] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,8 +34,8 @@ export default function Renovar() {
   const campo = 'w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm bg-white'
   return (
     <form onSubmit={entrar} className="space-y-3 max-w-sm">
-      <p className="text-sm text-neutral-600">Entra con tu usuario y contraseña para ver tu plan y reportar tu pago.</p>
-      <input name="usuario" autoComplete="username" placeholder="Usuario" className={campo} required />
+      <p className="text-sm text-neutral-600">{radar ? 'Entra con el mismo usuario y contraseña del Radar para pagar tu mes.' : 'Entra con tu usuario y contraseña para ver tu plan y reportar tu pago.'}</p>
+      <input name="usuario" autoComplete="username" placeholder="Usuario" defaultValue={usuario} className={campo} required />
       <input name="clave" type="password" autoComplete="current-password" placeholder="Contraseña" className={campo} required />
       {error && <p className="text-sm text-red-700">{error}</p>}
       <button disabled={enviando} className="w-full rounded-lg bg-lime-400 px-4 py-2.5 text-sm font-semibold text-neutral-950 hover:bg-lime-300 disabled:opacity-50">

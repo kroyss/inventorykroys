@@ -11,7 +11,7 @@ import { ErrorCobro, MAX_MB_COMPROBANTE, TIPOS_COMPROBANTE, reportarCobro, situa
 //   GET  → situación (estado, ventas y escalón, opciones, datos de cobro, último pago y anteriores)
 //   POST (multipart: tipo, plan, ciclo, metodo, referencia, fecha_pago, archivo) → reporta el pago
 //     tipo (06-11, mig. 143): plan (elegir/renovar) · radar_pro (1 mes aparte) · upgrade (plan = el nuevo)
-//          · recarga (09-11, mig. 157: paquete = índice en RECARGAS_IA)
+//          · recarga (09-11, mig. 157: paquete = índice en RECARGAS_IA) · radar_mes (09-11, mig. 159: solo Radar, 1 mes)
 // Quién: el admin de una organización cliente con sesión, o con el acceso firmado de /renovar (cuenta vencida,
 // header x-renovar). Nunca la organización propietaria (no paga plan).
 async function quien(req: NextRequest) {
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 }
 
 const Reporte = z.object({
-  tipo: z.enum(['plan', 'radar_pro', 'upgrade', 'recarga']).catch('plan'),
+  tipo: z.enum(['plan', 'radar_pro', 'upgrade', 'recarga', 'radar_mes']).catch('plan'),
   paquete: z.coerce.number().int().min(0).max(9).optional(),
   plan: z.enum(['esencial', 'automatizaciones', 'completo']),
   ciclo: z.enum(['mensual', 'trimestral']),

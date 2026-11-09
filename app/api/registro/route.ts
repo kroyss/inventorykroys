@@ -7,7 +7,8 @@ import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
 import { choqueAlta, crearCuenta } from '@/lib/altaCuenta'
 import { avisarDuenoPlataforma, MODULOS_PRUEBA } from '@/lib/registro'
-import { RADAR_PRUEBA_DIA } from '@/lib/cuenta'
+import { precioRadarMes } from '@/lib/planes'
+import { currentDate } from '@/lib/tz'
 import { esc } from '@/lib/telegram'
 
 // POST /api/registro — autoregistro público (26-10, migración 125): crea la cuenta al instante en prueba de 15 días
@@ -26,6 +27,9 @@ const Registro = z.object({
   // 29-10 (migración 133): desde el Radar (radar.elcomerciantedigital.com/registro → /registro?para=radar). Misma cuenta
   // única, pero SOLO con el Radar: sin empresa ni prueba del Sistema. Entra los días del grupo de entrada del Radar.
   para:     z.enum(['radar']).optional(),
+  // 09-11 (mig. 159): link de promoción del Radar (registro?promo=…): solo esos entran al grupo de prueba de un día.
+  // Sin promo el registro del Radar paga para entrar (Radar mensual).
+  promo:    z.string().trim().regex(/^[a-z0-9_-]{0,30}$/i).optional(),
 }).refine(b => b.whatsapp || b.telegram, { message: 'Déjanos tu WhatsApp o tu Telegram (al menos uno) para ayudarte' })
 
 function ipDe(req: NextRequest) {
@@ -91,12 +95,13 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
       admin: { username: b.usuario, full_name: b.nombre, password: b.clave, email: b.correo },
       origenOrgId: ORGANIZACION_PLATAFORMA, origen: radar ? 'radar' : 'autoregistro',
       registro: { correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null, ip_hash: ipHash,
+                  ...(radar && b.promo ? { promo: b.promo.toLowerCase() } : {}),
                   navegador: req.headers.get('user-agent')?.slice(0, 200) ?? null },
     })
     await client.query('COMMIT')
 
     avisarDuenoPlataforma(radar
-      ? `📡 <b>Nuevo registro al Radar</b> (prueba ${esc(RADAR_PRUEBA_DIA)})\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`
+      ? `📡 <b>Nuevo registro al Radar</b> ${b.promo ? `(promo ${esc(b.promo)})` : `(Radar mensual ${precioRadarMes(currentDate()).precio} USD: falta que pague)`}\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`
       : `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
         + contacto + '\n'
         + 'Los días arrancan cuando conecte MercadoLibre.')

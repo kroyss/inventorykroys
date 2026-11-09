@@ -88,6 +88,14 @@ export const MODULOS_PLAN: Record<Plan['id'], readonly string[]> = {
 export const planConRadar = (plan: string | null | undefined) => !!plan && (MODULOS_PLAN[plan as Plan['id']] ?? []).includes('radar')
 export const DESCUENTO_FUNDADOR = 30
 export const RADAR_PRO = { precio: 6 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
+/** Radar mensual (09-11, mig. 159): para quien quiere SOLO el Radar. PRO todos los días del mes pagado. Solo mensual.
+ *  Promoción: −50% para los pagos reportados hasta el 30-11-2026 (hora de Venezuela). */
+export const RADAR_MES = { precio: 20, promo: { precio: 10, hasta: '2026-11-30', texto: '−50% solo en noviembre' } }
+/** Lo que cuesta el Radar mensual el día `hoy` (YYYY-MM-DD, hora de Venezuela). */
+export function precioRadarMes(hoy: string) {
+  const promo = hoy <= RADAR_MES.promo.hasta
+  return { precio: promo ? RADAR_MES.promo.precio : RADAR_MES.precio, lista: RADAR_MES.precio, promo: promo ? RADAR_MES.promo : null }
+}
 
 /** Monto a cobrar: (precio del escalón + cuentas extra) × meses, con el mayor descuento (Fundador o trimestral, no se suman). */
 export function montoPlan(plan: Plan['id'], escalon: number, ciclo: 'mensual' | 'trimestral', fundador: boolean, cuentasExtra = 0) {

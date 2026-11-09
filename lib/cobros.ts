@@ -19,7 +19,8 @@ import { compare } from 'bcryptjs'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
-import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, RECARGAS_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
+import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, RECARGAS_IA, montoPlan, planConRadar, precioRadarMes, sumarMeses, type Plan } from '@/lib/planes'
+import { soloRadar } from '@/lib/modulos'
 import { currentDate } from '@/lib/tz'
 import { UPLOAD_DIR } from '@/lib/uploads'
 import { chatsDuenoPlataforma } from '@/lib/registro'
@@ -113,7 +114,7 @@ export async function tasaBCV(): Promise<number | null> {
 // Qué se paga: plan (elegir/renovar), Radar PRO (1 mes aparte, como una recarga) o mejora de plan a mitad de período.
 // El desglose (líneas con su monto y las fechas que cubre) se guarda en organizacion_cobros.detalle para que el dueño
 // vea en Plataforma → Cobros qué contrató cada cliente; los cobros viejos (sin detalle) se reconstruyen de sus columnas.
-export type TipoCobro = 'plan' | 'radar_pro' | 'upgrade' | 'recarga'
+export type TipoCobro = 'plan' | 'radar_pro' | 'upgrade' | 'recarga' | 'radar_mes'
 export interface Linea { texto: string; usd: number }
 export interface Detalle { lineas: Linea[]; desde: string | null; hasta: string | null; /** recarga (mig. 157): créditos del paquete. */ creditos?: number }
 
@@ -185,6 +186,10 @@ export interface SituacionPlan {
   radarProCompra: { precio: number; desde: string; hasta: string } | null
   /** Planes más caros a los que puede pasar ahora pagando la diferencia (plan activo). */
   mejoras: Mejora[]
+  /** 09-11 (mig. 159): la organización tiene SOLO el Radar (se registró en el Radar): Mi plan ofrece el Radar mensual. */
+  soloRadar: boolean
+  /** Radar mensual: hasta cuándo lo tiene y lo que costaría 1 mes pagado hoy (a continuación del vigente). */
+  radarMes: { hasta: string | null; precio: number; lista: number; promo: string | null; desde: string; nuevoHasta: string }
   /** Desde qué día cuenta un plan pagado hoy (fin del plan vigente, de la prueba o hoy). */
   inicioPlan: string
   tasaBcv: number | null
@@ -195,7 +200,9 @@ export interface SituacionPlan {
 export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
   const { rows: [o] } = await dbGlobal().query(
     `SELECT nombre, estado, fundador, plan, escalon, ciclo, to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta,
-            to_char(prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta
+            to_char(prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, to_char(radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta,
+            to_char(radar_mes_hasta, 'YYYY-MM-DD') AS radar_mes_hasta,
+            (SELECT bool_and(modulos <@ ARRAY['radar', 'radar_dia']::text[] AND cardinality(modulos) > 0) FROM empresas WHERE organizacion_id = organizaciones.id) AS solo_radar
      FROM organizaciones WHERE id = $1`, [orgId])
   if (!o) throw new Error('Organización no encontrada')
   const hoy = currentDate()
@@ -237,9 +244,18 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     mejoras: activo ? PLANES.map(p => calcularMejora(o.plan, p.id, Number(o.escalon), o.ciclo, !!o.fundador, hoy, o.plan_hasta))
       .filter((m): m is Mejora => !!m) : [],
     inicioPlan,
+    soloRadar: !!o.solo_radar,
+    radarMes: radarMesDe(o.radar_mes_hasta, hoy),
     tasaBcv: tasa, datos,
     ultimo: (cobros[0] as CobroFila | undefined) ?? null, anteriores: cobros.slice(1) as CobroFila[],
   }
+}
+
+/** Radar mensual (mig. 159): 1 mes a continuación del vigente (o desde hoy), al precio de hoy. */
+function radarMesDe(hasta: string | null, hoy: string) {
+  const desde = hasta && hasta >= hoy ? hasta : hoy
+  const p = precioRadarMes(hoy)
+  return { hasta: hasta && hasta >= hoy ? hasta : null, precio: p.precio, lista: p.lista, promo: p.promo?.texto ?? null, desde, nuevoHasta: sumarMeses(desde, 1) }
 }
 
 /** Monto que se cobra (lo recalcula el servidor: nunca se toma el que manda la pantalla). */
@@ -269,11 +285,19 @@ export interface Reporte {
 export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
   const s = await situacionPlan(orgId)
   if (s.ultimo?.estado === 'revision') throw new ErrorCobro('Ya tienes un pago en revisión: te avisamos apenas lo confirmemos.')
-  if (!s.conectadas) throw new ErrorCobro('Primero conecta tu cuenta de MercadoLibre: el plan se calcula con sus ventas.')
+  if (!s.conectadas && r.tipo !== 'radar_mes') throw new ErrorCobro('Primero conecta tu cuenta de MercadoLibre: el plan se calcula con sus ventas.')
   // El monto lo calcula el servidor (nunca el que manda la pantalla).
   const cicloPlan = s.ciclo === 'trimestral' ? 'trimestral' : 'mensual'
   let f: { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; radar: boolean; extras: number; usd: number; detalle: Detalle }
-  if (r.tipo === 'recarga') {
+  if (r.tipo === 'radar_mes') {
+    // 09-11 (mig. 159): Radar mensual (solo Radar, PRO todos los días). El precio es el del día que lo reporta.
+    const m = s.radarMes
+    f = { plan: s.planSugerido, escalon: s.escalonSugerido, ciclo: 'mensual', radar: true, extras: 0, usd: m.precio,
+      detalle: { lineas: [
+        { texto: `Radar PRO todos los días · 1 mes${m.promo ? ` (precio normal ${fmt(m.lista)})` : ''}`, usd: m.lista },
+        ...(m.promo ? [{ texto: m.promo, usd: r2(m.precio - m.lista) }] : []),
+      ], desde: m.desde, hasta: m.nuevoHasta } }
+  } else if (r.tipo === 'recarga') {
     // 09-11 (mig. 157): recarga de créditos de IA, en prueba o con plan activo. No toca el plan.
     const p = RECARGAS_IA[r.paquete ?? -1]
     if (!p) throw new ErrorCobro('Elige un paquete de créditos.')
@@ -320,7 +344,7 @@ export class ErrorCobro extends Error {}
 const SQL_REF_REPETIDA = `(SELECT COUNT(*)::int FROM organizacion_cobros r WHERE lower(r.referencia) = lower(k.referencia)
   AND r.id <> k.id AND r.estado <> 'rechazado')`
 
-export const TITULO_TIPO: Record<TipoCobro, string> = { plan: 'Plan', radar_pro: 'Radar PRO (1 mes)', upgrade: 'Mejora de plan', recarga: 'Recarga de créditos IA' }
+export const TITULO_TIPO: Record<TipoCobro, string> = { plan: 'Plan', radar_pro: 'Radar PRO (1 mes)', upgrade: 'Mejora de plan', recarga: 'Recarga de créditos IA', radar_mes: 'Radar mensual' }
 
 async function avisarDueno(id: number, archivo: Reporte['archivo']) {
   if (!telegramConfigurado()) return
@@ -402,7 +426,7 @@ export async function aprobarCobro(id: number, por: number) {
     const { rows: [k] } = await client.query(
       `SELECT k.*, k.monto_usd::float AS usd, to_char(o.plan_hasta, 'YYYY-MM-DD') AS plan_hasta,
               CASE WHEN o.estado = 'prueba' THEN to_char(o.prueba_hasta, 'YYYY-MM-DD') END AS prueba_hasta,
-              to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta
+              to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta, to_char(o.radar_mes_hasta, 'YYYY-MM-DD') AS radar_mes_hasta
        FROM organizacion_cobros k JOIN organizaciones o ON o.id = k.organizacion_id WHERE k.id = $1 FOR UPDATE OF k`, [id])
     if (!k) throw new ErrorCobro('Pago no encontrado')
     if (k.estado !== 'revision') throw new ErrorCobro('Ese pago ya se revisó')
@@ -431,6 +455,24 @@ export async function aprobarCobro(id: number, por: number) {
       await client.query('COMMIT')
       resultado = { org: k.organizacion_id, userId: k.user_id, hasta: hoy, plan: k.plan,
         mensaje: `✅ <b>Pago aprobado</b>\nSe sumaron <b>${creditos.toLocaleString('de-DE')} créditos de IA</b> a tu saldo (no vencen). ¡Gracias!` }
+      avisarCliente(resultado.userId, resultado.mensaje)
+      return resultado
+    }
+
+    // 09-11 (mig. 159): Radar mensual, 1 mes a continuación del vigente (o desde hoy). PRO todos los días.
+    if (k.tipo === 'radar_mes') {
+      const desde = k.radar_mes_hasta && k.radar_mes_hasta >= hoy ? k.radar_mes_hasta : hoy
+      const hasta = sumarMeses(desde, 1)
+      await client.query(`UPDATE organizaciones SET radar_mes_hasta = $2 WHERE id = $1`, [k.organizacion_id, hasta])
+      const { rows: [p] } = await client.query(
+        `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, desde, hasta, nota, por) VALUES ($1, 'radar_mes', $2, $3, $4, $5, $6) RETURNING id`,
+        [k.organizacion_id, k.usd, desde, hasta, metodoRef, por])
+      await client.query(`INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle, por) VALUES ($1, 'radar_pro', $2, $3)`,
+        [k.organizacion_id, `Radar mensual hasta ${hasta}`, por])
+      await fechas(desde, hasta); await cerrar(Number(p.id))
+      await client.query('COMMIT')
+      resultado = { org: k.organizacion_id, userId: k.user_id, hasta, plan: k.plan,
+        mensaje: `✅ <b>Pago aprobado</b>\nTu Radar PRO está activo hasta el <b>${ddmm(hasta)}</b>. Entra en radar.elcomerciantedigital.com. ¡Gracias!` }
       avisarCliente(resultado.userId, resultado.mensaje)
       return resultado
     }

@@ -14,7 +14,7 @@ const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const NOMBRE_PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
 const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
-const titulo = (k: CobroFila) => k.tipo === 'recarga' ? 'Recarga de créditos de IA' : k.tipo === 'radar_pro' ? 'Radar PRO (1 mes)' : k.tipo === 'upgrade' ? `Cambio a ${NOMBRE_PLAN[k.plan] ?? k.plan}` : (NOMBRE_PLAN[k.plan] ?? k.plan)
+const titulo = (k: CobroFila) => k.tipo === 'radar_mes' ? 'Radar mensual (PRO todos los días)' : k.tipo === 'recarga' ? 'Recarga de créditos de IA' : k.tipo === 'radar_pro' ? 'Radar PRO (1 mes)' : k.tipo === 'upgrade' ? `Cambio a ${NOMBRE_PLAN[k.plan] ?? k.plan}` : (NOMBRE_PLAN[k.plan] ?? k.plan)
 
 function Copiar({ texto }: { texto: string }) {
   const [ok, setOk] = useState(false)
@@ -45,7 +45,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const [plan, setPlan] = useState<string>('automatizaciones')
   const [ciclo, setCiclo] = useState<'mensual' | 'trimestral'>('mensual')
   // 06-11 (Plan A/B): qué paga — renovar el plan, 1 mes de Radar PRO aparte o pasar a un plan mejor.
-  const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade' | 'recarga'>('plan')
+  const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade' | 'recarga' | 'radar_mes'>('plan')
   const [paquete, setPaquete] = useState(0)
   const [mejora, setMejora] = useState<string>('')
   const [metodo, setMetodo] = useState<'pago_movil' | 'binance'>('pago_movil')
@@ -71,10 +71,11 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
   // 09-11 (mig. 157): recargas de créditos de IA, en prueba o con plan activo.
   const puedeRecargar = s.estado !== 'vencido'
-  const tipo = compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade'
+  // 09-11 (mig. 159): cuenta de SOLO Radar → lo único que paga es el Radar mensual.
+  const tipo = s.soloRadar ? 'radar_mes' : compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade'
     : compra === 'recarga' && puedeRecargar ? 'recarga' : 'plan'
   const pq = RECARGAS_IA[paquete] ?? RECARGAS_IA[0]
-  const total = tipo === 'recarga' ? pq.precio : tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
+  const total = tipo === 'radar_mes' ? s.radarMes.precio : tipo === 'recarga' ? pq.precio : tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
     : Math.round((ciclo === 'trimestral' ? op.trimestral : op.mensual) * 100) / 100
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
@@ -96,14 +97,17 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     await cargar()
   }
 
-  const estadoTexto = s.estado === 'activo' ? <>Plan <b>{NOMBRE_PLAN[s.plan ?? ''] ?? s.plan}</b> activo hasta el <b>{ddmm(s.vence)}</b></>
+  const estadoTexto = s.soloRadar
+    ? (s.radarMes.hasta ? <>Radar PRO activo hasta el <b>{ddmm(s.radarMes.hasta)}</b>. Puedes pagar el mes siguiente cuando quieras.</>
+      : <>Tu Radar no está activo. Paga 1 mes para entrar con <b>Radar PRO todos los días</b>.</>)
+    : s.estado === 'activo' ? <>Plan <b>{NOMBRE_PLAN[s.plan ?? ''] ?? s.plan}</b> activo hasta el <b>{ddmm(s.vence)}</b></>
     : s.estado === 'prueba' ? <>Prueba gratis hasta el <b>{ddmm(s.vence)}</b></>
     : <>Tu {s.plan ? 'plan' : 'prueba gratis'} venció{s.vence ? <> el <b>{ddmm(s.vence)}</b></> : null}. Paga para reactivar tu cuenta: tus datos se conservan.</>
 
   return (
     <div className="space-y-4">
       {/* Estado */}
-      <section className={`rounded-xl border px-4 py-3 text-sm ${s.estado === 'vencido' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-white border-neutral-200 text-neutral-800'}`}>
+      <section className={`rounded-xl border px-4 py-3 text-sm ${s.estado === 'vencido' && !s.soloRadar ? 'bg-red-50 border-red-200 text-red-900' : 'bg-white border-neutral-200 text-neutral-800'}`}>
         {estadoTexto}
         {s.fundador && <span className="ml-2 text-xs bg-lime-100 text-lime-800 rounded px-1.5 py-0.5">Fundador −30%</span>}
       </section>
@@ -128,20 +132,34 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
         </section>
       ))}
 
-      {!enRevision && !s.conectadas && (
+      {!enRevision && !s.conectadas && !s.soloRadar && (
         <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p className="font-semibold">Primero conecta tu cuenta de MercadoLibre</p>
           <p className="mt-1">Tu plan se calcula con las ventas de tus cuentas de ML.{acceso ? '' : <> Conéctala en <a href="/cuentas-ml" className="underline">Cuentas de ML</a> y vuelve aquí.</>}</p>
         </section>
       )}
 
-      {!enRevision && s.conectadas > 0 && (
+      {!enRevision && (s.conectadas > 0 || s.soloRadar) && (
         // 06-11 (el dueño): en pantalla ancha, a la izquierda el plan y a la derecha cómo pagar (antes una columna angosta).
         <div className="grid gap-4 lg:grid-cols-2 items-start">
           {/* 1 · Lo que te toca */}
           <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-800">1 · {s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</h2>
-            {(s.radarProCompra || s.mejoras.length > 0 || puedeRecargar) && (
+            <h2 className="text-sm font-semibold text-neutral-800">1 · {s.soloRadar ? 'Tu Radar' : s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</h2>
+            {s.soloRadar && (
+              <div className="space-y-2">
+                <div className="rounded-lg border border-lime-200 bg-lime-50 px-3 py-2 text-sm text-neutral-800 space-y-1">
+                  <p className="flex flex-wrap items-baseline justify-between gap-2">
+                    <b>Radar PRO todos los días · 1 mes</b>
+                    <span className="num">{s.radarMes.promo && <s className="mr-1.5 text-neutral-500">{fmtUsd(s.radarMes.lista)}</s>}<b>{fmtUsd(s.radarMes.precio)}</b></span>
+                  </p>
+                  {s.radarMes.promo && <p className="text-xs font-semibold text-lime-800">{s.radarMes.promo}</p>}
+                  <p className="text-xs text-neutral-600">Catálogo completo con lo nuevo del mes, sellos, techo de ganancia, todos los filtros, Competencia y Tendencias.</p>
+                  <p className="text-xs text-neutral-600">Cubre del {ddmm(s.radarMes.desde)} al {ddmm(s.radarMes.nuevoHasta)}{s.radarMes.hasta ? ' (a continuación del que ya tienes)' : ''}. Se activa cuando confirmamos el pago.</p>
+                </div>
+                <p className="text-xs text-neutral-500">¿Además quieres automatizar tus ventas de MercadoLibre? Mira los planes en <a href="/precios" target="_blank" className="text-sky-700 hover:underline">elcomerciantedigital.com/precios</a>.</p>
+              </div>
+            )}
+            {!s.soloRadar && (s.radarProCompra || s.mejoras.length > 0 || puedeRecargar) && (
               <div className="flex flex-wrap gap-2 text-sm">
                 {([['plan', s.estado === 'activo' ? 'Renovar plan' : 'Plan'], ...(s.radarProCompra ? [['radar_pro', 'Agregar Radar PRO']] : []), ...(s.mejoras.length ? [['upgrade', 'Mejorar mi plan']] : []), ...(puedeRecargar ? [['recarga', 'Créditos de IA']] : [])] as [typeof compra, string][]).map(([c, t]) => (
                   <button key={c} type="button" onClick={() => setCompra(c)}
