@@ -105,6 +105,21 @@ export async function contextoFotos(db: Pool, conexionId: number, itemId: string
   }
 }
 
+/** «Ya lo corregí en ML» (09-11): vuelve a leer la publicación AHORA aunque la huella no haya cambiado
+ *  (también aplica la regla de contradicciones vigente). Devuelve lo que quedó, o null si no se pudo. */
+export async function releerFotos(db: Pool, itemId: string): Promise<ContextoFotos | null> {
+  const { rows: [c] } = await db.query(`SELECT conexion_id, titulo FROM ml_catalogo WHERE item_id = $1`, [itemId])
+  if (!c) return null
+  const pub = await mlFetch<{ title?: string; attributes?: { name: string; value_name: string | null }[]; pictures?: FotoML[] }>(
+    db, c.conexion_id, `/items/${itemId}?attributes=title,attributes,pictures`).catch(() => null)
+  if (!pub) return null
+  const desc = await mlFetch<{ plain_text?: string }>(db, c.conexion_id, `/items/${itemId}/description`)
+    .then(d => d.plain_text?.trim() || null).catch(() => null)
+  await db.query(`UPDATE ml_item_fotos_ia SET huella = '' WHERE item_id = $1`, [itemId])
+  return contextoFotos(db, c.conexion_id, itemId,
+    { titulo: pub.title ?? c.titulo, ficha: fichaDeAtributos(pub.attributes), descripcion: desc, fotos: pub.pictures ?? [] })
+}
+
 /** Las líneas para el contexto de la IA (Preguntas y Mensajes). */
 export function lineasFotos(f: ContextoFotos | null): string[] {
   const L: string[] = []

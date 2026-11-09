@@ -141,11 +141,13 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     const fotos = pub ? await contextoFotos(db, conexionId, it.id,
       { titulo: it.titulo, ficha: fichaDeAtributos(pub.attributes), descripcion: desc, fotos: pub.pictures ?? [] }) : null
     const lf = lineasFotos(fotos)
-    if (!cat?.ficha && !fc?.texto && !desc && !lf.length) continue
+    const { rows: notasItem } = await db.query(`SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [it.id])
+    if (!cat?.ficha && !fc?.texto && !desc && !lf.length && !notasItem.length) continue
     L.push(`\nPRODUCTO "${it.titulo}":`)
     if (cat?.ficha) L.push(`Ficha: ${cat.ficha}`)
     if (desc) L.push(`Descripción: ${desc.slice(0, 2500)}`)
     L.push(...lf)
+    if (notasItem.length) L.push(`DATOS QUE EL VENDEDOR ANOTÓ DE ESTE PRODUCTO (mandan sobre la ficha, la descripción y las fotos):\n- ${notasItem.map(n => n.texto).join('\n- ')}`)
     if (fc?.texto) L.push(`Ficha de conocimiento (lo que el vendedor ya respondió de este producto):\n${fc.texto}`)
   }
   if (venta?.comprador.nombre || venta?.comprador.nick) L.push(`COMPRADOR: ${[venta.comprador.nombre, venta.comprador.nick].filter(Boolean).join(' · ')}`)

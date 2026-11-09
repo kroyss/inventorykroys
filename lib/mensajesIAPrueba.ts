@@ -216,11 +216,13 @@ export async function listaPrueba(db: Pool) {
      LEFT JOIN ml_conversaciones c ON c.pack_id = i.pack_id
      LEFT JOIN ml_conexiones x ON x.id = i.conexion_id
      ORDER BY i.mensaje_at DESC LIMIT 300`)
-  // Publicaciones que se contradicen (fotos / ficha / descripción, mig 146): para corregirlas en ML.
+  // Publicaciones que se contradicen (fotos / ficha / descripción, mig 146). 09-11: primero las que más preguntas
+  // reciben (90 días), para corregir las que importan; se resuelven desde la lista (api/mensajes/ia-prueba/contradiccion).
   const { rows: contradicciones } = await db.query(
-    `SELECT f.item_id, COALESCE(c.titulo, f.item_id) AS titulo, c.permalink, f.contradicciones, f.leido_at
+    `SELECT f.item_id, COALESCE(c.titulo, f.item_id) AS titulo, c.permalink, f.contradicciones, f.leido_at,
+            (SELECT count(*)::int FROM ml_preguntas p WHERE p.item_id = f.item_id AND p.fecha > NOW() - INTERVAL '90 days') AS preguntas
      FROM ml_item_fotos_ia f LEFT JOIN ml_catalogo c ON c.item_id = f.item_id
-     WHERE f.contradicciones IS NOT NULL ORDER BY f.leido_at DESC LIMIT 50`).catch(() => ({ rows: [] }))
+     WHERE f.contradicciones IS NOT NULL ORDER BY preguntas DESC, f.leido_at DESC LIMIT 100`).catch(() => ({ rows: [] }))
   const listos = rows.filter(r => r.estado === 'listo')
   const solas = listos.filter(r => r.decision === 'sola')
   const marcadas = listos.filter(r => r.marca)

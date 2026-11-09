@@ -11,7 +11,7 @@ type Caso = {
   marca: 'bien' | 'mal' | null; comprador_nombre: string | null; comprador_nick: string | null; productos: string | null
   cuenta: string | null; equipo: string | null
 }
-type Contra = { item_id: string; titulo: string; permalink: string | null; contradicciones: string }
+type Contra = { item_id: string; titulo: string; permalink: string | null; contradicciones: string; preguntas?: number }
 type Resumen = { total: number; solas: number; revisar: number; nada: number; marcadas: number; bien: number; solasMarcadas: number; solasBien: number }
 
 const fecha = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -79,14 +79,9 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
       {!!d.contradicciones?.length && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
           <p className="font-medium">Publicaciones que se contradicen ({d.contradicciones.length})</p>
-          <p className="text-xs">Al leer las fotos, la ficha y la descripción, la IA encontró datos que no coinciden. Corrígelos en MercadoLibre: mientras tanto la IA no responde sola sobre eso.</p>
-          <ul className="space-y-1.5">
-            {d.contradicciones.map(x => (
-              <li key={x.item_id} className="text-xs">
-                {x.permalink ? <a href={x.permalink} target="_blank" rel="noreferrer" className="font-medium underline">{x.titulo}</a> : <span className="font-medium">{x.titulo}</span>}
-                <span className="text-amber-800"> · {x.contradicciones}</span>
-              </li>
-            ))}
+          <p className="text-xs">Al leer las fotos, la ficha y la descripción, la IA encontró datos que no coinciden; mientras tanto no responde sola sobre eso. Primero las que más preguntas reciben. En cada una puedes decirle el dato correcto, marcar que no es problema o, si ya la corregiste en MercadoLibre, que la vuelva a leer.</p>
+          <ul className="space-y-2">
+            {d.contradicciones.map(x => <FilaContra key={x.item_id} x={x} onListo={() => setD(v => v && { ...v, contradicciones: v.contradicciones?.filter(c => c.item_id !== x.item_id) })} />)}
           </ul>
         </div>
       )}
@@ -128,5 +123,55 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
         ))}
       </div>
     </div>
+  )
+}
+
+/** Una publicación que se contradice, con sus tres salidas. */
+function FilaContra({ x, onListo }: { x: Contra; onListo: () => void }) {
+  const [texto, setTexto] = useState(x.contradicciones)
+  const [escribiendo, setEscribiendo] = useState(false)
+  const [dato, setDato] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const mandar = async (cuerpo: Record<string, string>) => {
+    setOcupado(true); setAviso(null)
+    const r = await fetch('/api/mensajes/ia-prueba/contradiccion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: x.item_id, ...cuerpo }) })
+    const j = await r.json().catch(() => ({}))
+    setOcupado(false)
+    if (!r.ok) { setAviso(j.error ?? 'No se pudo'); return }
+    if (j.contradicciones) {
+      setTexto(j.contradicciones)
+      setAviso(cuerpo.accion === 'releer' ? 'La volví a leer y todavía no coincide. Revisa lo que dice arriba.' : null)
+    } else onListo()
+  }
+  return (
+    <li className="rounded-lg border border-amber-200 bg-white/70 p-2.5 text-xs space-y-1.5">
+      <div>
+        {x.permalink ? <a href={x.permalink} target="_blank" rel="noreferrer" className="font-medium underline">{x.titulo}</a> : <span className="font-medium">{x.titulo}</span>}
+        {!!x.preguntas && <span className="text-amber-700"> · {x.preguntas} preguntas en 90 días</span>}
+      </div>
+      <p className="text-amber-800 whitespace-pre-wrap">{texto}</p>
+      {escribiendo ? (
+        <div className="flex flex-wrap gap-2">
+          <input autoFocus value={dato} onChange={e => setDato(e.target.value)} maxLength={500}
+            placeholder="Ej.: Mide 30 cm de largo · Las pilas no vienen incluidas"
+            className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-900" />
+          <button type="button" disabled={ocupado || dato.trim().length < 3} onClick={() => mandar({ accion: 'dato', texto: dato.trim() })}
+            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Guardar</button>
+          <button type="button" onClick={() => setEscribiendo(false)} className="rounded-lg px-2 py-1.5 text-xs text-neutral-600">Cancelar</button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={ocupado} onClick={() => setEscribiendo(true)}
+            className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-800">El dato correcto es…</button>
+          <button type="button" disabled={ocupado} onClick={() => mandar({ accion: 'ignorar' })}
+            className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-800">No es problema</button>
+          <button type="button" disabled={ocupado} onClick={() => mandar({ accion: 'releer' })}
+            className="rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-800">{ocupado ? 'Leyendo…' : 'Ya lo corregí en ML'}</button>
+        </div>
+      )}
+      {aviso && <p className="text-red-700">{aviso}</p>}
+    </li>
   )
 }
