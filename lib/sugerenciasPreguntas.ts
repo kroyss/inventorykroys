@@ -119,12 +119,15 @@ export const ofreceEnvioGratis = (p: Pick<Plantilla, 'texto'>) => {
   const t = normalizar(p.texto)
   return t.includes('gratis') && !/(minimo|no se activa|no tiene|no aplica|no califica|cobro)/.test(t)
 }
+/** Promete envío gratis y nombra ZOOM (no sirve si a ese precio es solo por TEALCA). */
+export const prometeZoom = (p: Pick<Plantilla, 'texto'>) => ofreceEnvioGratis(p) && normalizar(p.texto).includes('zoom')
 /** La respuesta del vendedor dice que esa publicación NO tiene envío gratis. */
 export const NIEGA_ENVIO = /(no tiene (opcion|opción) de env|por unidad no|no aplica (el )?env|no califica (para|al) env|no tiene env[ií]o gratis)/
 
 /** envioGratis: lo aprendido de ESA publicación (ml_item_hechos): true confirmado, false no tiene. */
 /** stock: lo que se puede vender de ESA publicación (ML y, si está vinculada, el inventario); variantes: cuántas tiene. */
-export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null; variantes?: number | null; titulo?: string | null }
+/** soloTealca (08-11): por peso y precio el envío gratis es solo TEALCA → no se sugiere una que prometa gratis por ZOOM. */
+export interface ItemDatos { precio: number | null; stock: number | null; item_id?: string; envioGratis?: boolean | null; soloTealca?: boolean; variantes?: number | null; titulo?: string | null }
 export type Sugerencia =
   | { tipo: 'sugerida'; indice: number; plantilla: Plantilla; temas: string[]; sinConfirmar: boolean; porVariante?: boolean }
   | { tipo: 'humano'; motivo: string; temas: string[] }
@@ -165,7 +168,7 @@ export function sugerir(pregunta: string, item: ItemDatos,
     .filter(c => plantillaAplica(c.p, item.precio))
   if (!candidatas.length) return { tipo: 'humano', motivo: 'ninguna respuesta rápida cubre esto', temas }
   // Lo aprendido del producto: si ahí dijiste que no tiene envío gratis, no se ofrece.
-  const sinNegar = candidatas.filter(c => !(item.envioGratis === false && ofreceEnvioGratis(c.p)))
+  const sinNegar = candidatas.filter(c => !(item.envioGratis === false && ofreceEnvioGratis(c.p)) && !(item.soloTealca && prometeZoom(c.p)))
   if (!sinNegar.length) return { tipo: 'humano', motivo: 'este producto no tiene envío gratis', temas }
   const conStock = sinNegar.filter(c => !c.cubre.includes('disponible') || item.stock === null || item.stock > 0)
   if (!conStock.length) return { tipo: 'humano', motivo: 'sin stock', temas }
@@ -258,6 +261,7 @@ export function probable(pregunta: string, item: ItemDatos,
   for (const p of plantillas) {
     if (!plantillaAplica(p, item.precio) || (p.excluidos ?? []).includes(item.item_id ?? '')) continue
     if (item.envioGratis === false && ofreceEnvioGratis(p)) continue
+    if (item.soloTealca && prometeZoom(p)) continue
     const cubre = temasDePlantilla(p)
     if (!temas.every(t => cubre.includes(t))) continue
     const id = p.id ?? p.titulo

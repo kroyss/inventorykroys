@@ -239,7 +239,9 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
 
 // isAdmin = "Configurar automatizaciones" (pestaña Configuración); conectar cuentas y reponer stock
 // son permisos aparte (lib/permisos.ts).
-export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, iaAutomatica = false, verAvisosInternos = false, miIA = false }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean; iaAutomatica?: boolean; miIA?: boolean
+export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, iaAutomatica = false, verAvisosInternos = false, miIA = false, envioPorPeso = false }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean; iaAutomatica?: boolean; miIA?: boolean
+  /** 08-11: con pesos cargados el envío gratis sale del cálculo por peso: «Lo aprendido» (envío sí/no) no se muestra. */
+  envioPorPeso?: boolean
   /** Solo la organización dueña de la plataforma (22-10): "envío gratis sin confirmar" confundía a los Fundadores. */
   verAvisosInternos?: boolean }) {
   // ?vista=cuentas abre Políticas y respuestas rápidas (las cuentas de ML están en /cuentas-ml).
@@ -339,14 +341,14 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
+              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', envioPorPeso ? 'Datos de cada producto' : 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
             </div>
             {subConfig === 'mi_ia' && miIA && <MiIA />}
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
-            {subConfig === 'aprendido' && <><LoAprendido /><DatosProductos /></>}
+            {subConfig === 'aprendido' && <>{!envioPorPeso && <LoAprendido />}<DatosProductos /></>}
             {subConfig === 'ia' && !miIA && <CuentasYPoliticas />}
             {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica />}
           </div>

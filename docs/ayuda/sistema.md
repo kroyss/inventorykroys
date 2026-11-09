@@ -208,8 +208,10 @@ Todas las preguntas sin responder de todas tus cuentas, en una sola lista.
   persona…). Se escriben una vez y la IA las usa en todas las respuestas.
 - **Anotar dato del producto:** cuando respondes algo que la IA no sabía (ej. «sí trae cargador»), guárdalo como
   dato de ese producto y la próxima vez lo usa sin gastar créditos de más.
-- **Lo aprendido de cada producto:** el sistema guarda respuestas que diste y las reutiliza en preguntas parecidas
-  (gratis).
+- **Lo aprendido de cada producto:** el sistema aprende con tus respuestas qué publicaciones tienen envío gratis y
+  cuáles no, para no sugerir la respuesta rápida de envío gratis donde no aplica (gratis). Si tu empresa tiene los
+  pesos de MercadoEnvíos cargados (Promociones), esto lo calcula solo con el peso y el precio de hoy (también si es
+  solo TEALCA) y la pestaña se llama **Datos de cada producto** (ahí quedan los datos anotados).
 
 **Respuesta sugerida:** cuando una pregunta se parece mucho a otra que ya respondiste, la respuesta aparece ya
 escrita; la revisas y la envías (también varias juntas con «Enviar las sugeridas»). Hoy **ninguna pregunta se

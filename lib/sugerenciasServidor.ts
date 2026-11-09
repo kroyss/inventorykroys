@@ -10,6 +10,9 @@ import { fueEditada } from '@/lib/respuestasOrigen'
 import { revisarSugeridas } from '@/lib/revisorSugeridas'
 import { rellenarVariables } from '@/lib/variablesTexto'
 import { tasaBCVHoy } from '@/lib/tasaDia'
+import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
+import { envioGratisAhora } from '@/lib/mlShipping'
 
 const HISTORIAL = 3000           // preguntas respondidas con las que se calibra
 const CACHE_HORAS = 24
@@ -99,6 +102,17 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
   const { rows: hechos } = await db.query(
     `SELECT item_id, envio_gratis, precio_ref::float FROM ml_item_hechos WHERE item_id = ANY($1::text[])`, [preguntas.map(p => p.item_id)])
   const envio = new Map(hechos.map(h => [h.item_id as string, h as { envio_gratis: boolean | null; precio_ref: number | null }]))
+  // 08-11 (el dueño): con pesos cargados (Promociones) manda el cálculo por peso y precio de HOY (el mismo que usa la IA):
+  // sigue los cambios de precio y distingue ZOOM de TEALCA. Lo aprendido queda solo para las publicaciones sin peso.
+  const porPeso = await empresaConPromociones(db)
+  const pesos = new Map<string, number>()
+  const tablas = porPeso ? await leerTablasEnvio(db) : undefined
+  if (porPeso) {
+    const ids = [...new Set(preguntas.map(p => p.item_id))]
+    const { rows } = await db.query(`SELECT x AS id, ${sqlPesoPublicacion('x')} AS kg FROM unnest($1::text[]) x`, [ids])
+      .catch(() => ({ rows: [] as { id: string; kg: number | null }[] }))
+    for (const r of rows) if (r.kg) pesos.set(r.id, Number(r.kg))
+  }
   const tasa = plantillas.some(p => /\{(precio_bs|tasa_bcv)\}/i.test(p.texto)) ? await tasaBCVHoy(db) : null
   // «¿Disponible N?» (28-10): lo que se puede vender de la publicación = su stock en ML (leído con la pregunta) y, si
   // está vinculada a un producto (sin variante), también el inventario en unidades de la publicación («trae N u.»).
@@ -119,8 +133,11 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
     const precio = p.item_precio && (p.item_moneda ?? 'USD') === 'USD' ? Number(p.item_precio) : null
     // Confirmado con envío gratis, pero el precio bajó más de 20% desde entonces: se vuelve a confirmar.
     const h = envio.get(p.item_id)
-    const envioGratis = h?.envio_gratis === true && h.precio_ref && precio !== null && precio < h.precio_ref * 0.8 ? null : h?.envio_gratis ?? null
-    const item = { precio, stock: stockDe.get(p.id)?.stock ?? null, variantes: stockDe.get(p.id)?.variantes ?? null, item_id: p.item_id, envioGratis, titulo: stockDe.get(p.id)?.titulo ?? null }
+    const calc = porPeso ? envioGratisAhora(pesos.get(p.item_id), precio, null, tablas) : null
+    const envioGratis = calc ? calc.estado !== 'destino'
+      : h?.envio_gratis === true && h.precio_ref && precio !== null && precio < h.precio_ref * 0.8 ? null : h?.envio_gratis ?? null
+    const item = { precio, stock: stockDe.get(p.id)?.stock ?? null, variantes: stockDe.get(p.id)?.variantes ?? null, item_id: p.item_id, envioGratis,
+      soloTealca: calc?.estado === 'tealca', titulo: stockDe.get(p.id)?.titulo ?? null }
     const s = sugerir(p.texto, item, plantillas)
     if (s.tipo === 'sugerida') {
       const id = idPlantilla(s.plantilla)

@@ -27,5 +27,6 @@ export default async function PreguntasPage({ searchParams }: { searchParams: Pr
     puedeCuentas={puede(session!.user, 'ml_cuentas')} puedeReponer={puede(session!.user, 'reponer_stock')}
     iaAutomatica={tieneModulo(session!.user, 'ia_automatica')}
     miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')}
-    verAvisosInternos={session!.user.organizacionId === ORGANIZACION_PLATAFORMA} />
+    verAvisosInternos={session!.user.organizacionId === ORGANIZACION_PLATAFORMA}
+    envioPorPeso={tieneModulo(session!.user, 'promociones') && session!.user.country === 'VE'} />
 }
