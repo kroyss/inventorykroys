@@ -19,7 +19,7 @@ import { compare } from 'bcryptjs'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
-import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
+import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, RECARGAS_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
 import { UPLOAD_DIR } from '@/lib/uploads'
 import { chatsDuenoPlataforma } from '@/lib/registro'
@@ -112,9 +112,9 @@ export async function tasaBCV(): Promise<number | null> {
 // Qué se paga: plan (elegir/renovar), Radar PRO (1 mes aparte, como una recarga) o mejora de plan a mitad de período.
 // El desglose (líneas con su monto y las fechas que cubre) se guarda en organizacion_cobros.detalle para que el dueño
 // vea en Plataforma → Cobros qué contrató cada cliente; los cobros viejos (sin detalle) se reconstruyen de sus columnas.
-export type TipoCobro = 'plan' | 'radar_pro' | 'upgrade'
+export type TipoCobro = 'plan' | 'radar_pro' | 'upgrade' | 'recarga'
 export interface Linea { texto: string; usd: number }
-export interface Detalle { lineas: Linea[]; desde: string | null; hasta: string | null }
+export interface Detalle { lineas: Linea[]; desde: string | null; hasta: string | null; /** recarga (mig. 157): créditos del paquete. */ creditos?: number }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const fmt = (n: number) => `${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
@@ -255,6 +255,8 @@ export function mesesRadarPro(regalo: boolean, meses: number) {
 // ── Reportar ─────────────────────────────────────────────────────────────────────────────────────────────────────
 export interface Reporte {
   tipo: TipoCobro; plan: Plan['id']; ciclo: 'mensual' | 'trimestral'; metodo: Metodo
+  /** recarga: el paquete (índice en RECARGAS_IA). */
+  paquete?: number
   referencia: string; fechaPago: string
   archivo: { tipo: string; datos: Buffer } | null
 }
@@ -266,7 +268,14 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
   // El monto lo calcula el servidor (nunca el que manda la pantalla).
   const cicloPlan = s.ciclo === 'trimestral' ? 'trimestral' : 'mensual'
   let f: { plan: string; escalon: number; ciclo: 'mensual' | 'trimestral'; radar: boolean; extras: number; usd: number; detalle: Detalle }
-  if (r.tipo === 'radar_pro') {
+  if (r.tipo === 'recarga') {
+    // 09-11 (mig. 157): recarga de créditos de IA, en prueba o con plan activo. No toca el plan.
+    const p = RECARGAS_IA[r.paquete ?? -1]
+    if (!p) throw new ErrorCobro('Elige un paquete de créditos.')
+    if (s.estado === 'vencido') throw new ErrorCobro('Tu cuenta está vencida: primero renueva tu plan.')
+    f = { plan: s.plan ?? s.planSugerido, escalon: s.escalon ?? s.escalonSugerido, ciclo: cicloPlan, radar: false, extras: 0, usd: p.precio,
+      detalle: { lineas: [{ texto: `Recarga de ${p.creditos.toLocaleString('de-DE')} créditos de IA (no vencen)`, usd: p.precio }], desde: null, hasta: null, creditos: p.creditos } }
+  } else if (r.tipo === 'radar_pro') {
     const c = s.radarProCompra
     if (!c) throw new ErrorCobro('Radar PRO se agrega con un plan activo que incluya Radar.')
     f = { plan: s.plan!, escalon: s.escalon!, ciclo: cicloPlan, radar: true, extras: 0, usd: c.precio,
@@ -306,7 +315,7 @@ export class ErrorCobro extends Error {}
 const SQL_REF_REPETIDA = `(SELECT COUNT(*)::int FROM organizacion_cobros r WHERE lower(r.referencia) = lower(k.referencia)
   AND r.id <> k.id AND r.estado <> 'rechazado')`
 
-export const TITULO_TIPO: Record<TipoCobro, string> = { plan: 'Plan', radar_pro: 'Radar PRO (1 mes)', upgrade: 'Mejora de plan' }
+export const TITULO_TIPO: Record<TipoCobro, string> = { plan: 'Plan', radar_pro: 'Radar PRO (1 mes)', upgrade: 'Mejora de plan', recarga: 'Recarga de créditos IA' }
 
 async function avisarDueno(id: number, archivo: Reporte['archivo']) {
   if (!telegramConfigurado()) return
@@ -400,6 +409,26 @@ export async function aprobarCobro(id: number, por: number) {
       [id, desde, hasta])
     const cerrar = async (pagoId: number) => client.query(
       `UPDATE organizacion_cobros SET estado = 'aprobado', revisado_por = $2, revisado_at = NOW(), pago_id = $3 WHERE id = $1`, [id, por, pagoId])
+
+    // 09-11 (mig. 157): recarga de créditos de IA → a la empresa principal de la organización (la primera).
+    if (k.tipo === 'recarga') {
+      const creditos = Number((k.detalle as Detalle | null)?.creditos ?? 0)
+      if (!(creditos > 0)) throw new ErrorCobro('El pago no dice cuántos créditos son')
+      const { rows: [e] } = await client.query(`SELECT id FROM empresas WHERE organizacion_id = $1 ORDER BY id LIMIT 1`, [k.organizacion_id])
+      if (!e) throw new ErrorCobro('La organización no tiene empresa')
+      const { rows: [p] } = await client.query(
+        `INSERT INTO organizacion_pagos (organizacion_id, empresa_id, tipo, monto, creditos, nota, por) VALUES ($1, $2, 'recarga', $3, $4, $5, $6) RETURNING id`,
+        [k.organizacion_id, e.id, k.usd, creditos, metodoRef, por])
+      await client.query(
+        `INSERT INTO ia_creditos (empresa_id, motivo, creditos, pago_id, nota, por) VALUES ($1, 'recarga', $2, $3, $4, $5)`,
+        [e.id, creditos, p.id, metodoRef, por])
+      await cerrar(Number(p.id))
+      await client.query('COMMIT')
+      resultado = { org: k.organizacion_id, userId: k.user_id, hasta: hoy, plan: k.plan,
+        mensaje: `✅ <b>Pago aprobado</b>\nSe sumaron <b>${creditos.toLocaleString('de-DE')} créditos de IA</b> a tu saldo (no vencen). ¡Gracias!` }
+      avisarCliente(resultado.userId, resultado.mensaje)
+      return resultado
+    }
 
     // 06-11 (Plan A): Radar PRO aparte, 1 mes a continuación del que tenga vigente (o desde hoy).
     if (k.tipo === 'radar_pro') {

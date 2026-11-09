@@ -11,7 +11,7 @@ interface Pendiente {
   monto_bs: number | null; referencia: string; fecha_pago: string; creado_at: string; tiene_comprobante: boolean
   org_estado: string; vence: string | null; repetida: number
   // 06-11 (mig. 143): qué se paga, su desglose, qué fechas cubre y lo que la cuenta tiene vigente hoy.
-  tipo: 'plan' | 'radar_pro' | 'upgrade'; lineas: { texto: string; usd: number }[]; desde: string | null; hasta: string | null
+  tipo: 'plan' | 'radar_pro' | 'upgrade' | 'recarga'; lineas: { texto: string; usd: number }[]; desde: string | null; hasta: string | null
   radar_pro_hasta: string | null; estado: string; motivo: string | null; revisado_at: string
 }
 interface Vence { id: number; nombre: string; estado: string; plan: string | null; vence: string; ultimo_cobro: string | null }
@@ -25,13 +25,13 @@ const ESCALON = ['hasta 50', '51–300', '301–1.000', '+1.000']
 const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 const hora = (s: string) => new Date(s).toLocaleString('es-VE', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas' })
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
-const TIPO: Record<string, string> = { plan: 'Plan', radar_pro: 'Radar PRO aparte', upgrade: 'Mejora de plan' }
+const TIPO: Record<string, string> = { plan: 'Plan', radar_pro: 'Radar PRO aparte', upgrade: 'Mejora de plan', recarga: 'Recarga de créditos IA' }
 
 /** Qué contrató: cada línea con su monto, el total y las fechas que cubre; abajo lo que tiene vigente la cuenta. */
 function Desglose({ k }: { k: Pendiente }) {
   return (
     <div className="rounded-lg bg-neutral-50 border border-neutral-100 px-2.5 py-1.5 text-xs space-y-0.5">
-      <p className="font-semibold text-neutral-800">{TIPO[k.tipo] ?? k.tipo}{k.tipo !== 'radar_pro' ? ` · ${PLAN[k.plan] ?? k.plan} · ${k.ciclo}` : ''}
+      <p className="font-semibold text-neutral-800">{TIPO[k.tipo] ?? k.tipo}{k.tipo !== 'radar_pro' && k.tipo !== 'recarga' ? ` · ${PLAN[k.plan] ?? k.plan} · ${k.ciclo}` : ''}
         {k.desde && k.hasta ? <span className="font-normal text-neutral-600"> · cubre del {ddmm(k.desde)} al {ddmm(k.hasta)}</span> : null}</p>
       {k.lineas.map((l, i) => (
         <p key={i} className="flex justify-between gap-3 text-neutral-700"><span>{l.texto}</span><span className="num whitespace-nowrap">{l.usd < 0 ? '−' : ''}{usd(Math.abs(l.usd))}</span></p>

@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
 import { RECARGAS_IA } from '@/lib/planes'
-import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 const fmtBs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -15,7 +14,7 @@ const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const NOMBRE_PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
 const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
-const titulo = (k: CobroFila) => k.tipo === 'radar_pro' ? 'Radar PRO (1 mes)' : k.tipo === 'upgrade' ? `Cambio a ${NOMBRE_PLAN[k.plan] ?? k.plan}` : (NOMBRE_PLAN[k.plan] ?? k.plan)
+const titulo = (k: CobroFila) => k.tipo === 'recarga' ? 'Recarga de créditos de IA' : k.tipo === 'radar_pro' ? 'Radar PRO (1 mes)' : k.tipo === 'upgrade' ? `Cambio a ${NOMBRE_PLAN[k.plan] ?? k.plan}` : (NOMBRE_PLAN[k.plan] ?? k.plan)
 
 function Copiar({ texto }: { texto: string }) {
   const [ok, setOk] = useState(false)
@@ -46,7 +45,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const [plan, setPlan] = useState<string>('automatizaciones')
   const [ciclo, setCiclo] = useState<'mensual' | 'trimestral'>('mensual')
   // 06-11 (Plan A/B): qué paga — renovar el plan, 1 mes de Radar PRO aparte o pasar a un plan mejor.
-  const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade'>('plan')
+  const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade' | 'recarga'>('plan')
+  const [paquete, setPaquete] = useState(0)
   const [mejora, setMejora] = useState<string>('')
   const [metodo, setMetodo] = useState<'pago_movil' | 'binance'>('pago_movil')
   const [referencia, setReferencia] = useState('')
@@ -69,8 +69,12 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
 
   const op = s.opciones.find(o => o.id === plan) ?? s.opciones[0]
   const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
-  const tipo = compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade' : 'plan'
-  const total = tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
+  // 09-11 (mig. 157): recargas de créditos de IA, en prueba o con plan activo.
+  const puedeRecargar = s.estado !== 'vencido'
+  const tipo = compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade'
+    : compra === 'recarga' && puedeRecargar ? 'recarga' : 'plan'
+  const pq = RECARGAS_IA[paquete] ?? RECARGAS_IA[0]
+  const total = tipo === 'recarga' ? pq.precio : tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
     : Math.round((ciclo === 'trimestral' ? op.trimestral : op.mensual) * 100) / 100
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
@@ -83,6 +87,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     setEnviando(true)
     const f = new FormData()
     f.set('tipo', tipo); f.set('plan', tipo === 'upgrade' ? mej!.plan : plan); f.set('ciclo', ciclo); f.set('metodo', metodo)
+    if (tipo === 'recarga') f.set('paquete', String(paquete))
     f.set('referencia', referencia.trim()); f.set('fecha_pago', fecha); f.set('archivo', archivo)
     const r = await fetch('/api/mi-plan', { method: 'POST', headers, body: f }).catch(() => null)
     setEnviando(false)
@@ -136,12 +141,27 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
           {/* 1 · Lo que te toca */}
           <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
             <h2 className="text-sm font-semibold text-neutral-800">1 · {s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</h2>
-            {(s.radarProCompra || s.mejoras.length > 0) && (
+            {(s.radarProCompra || s.mejoras.length > 0 || puedeRecargar) && (
               <div className="flex flex-wrap gap-2 text-sm">
-                {([['plan', 'Renovar plan'], ...(s.radarProCompra ? [['radar_pro', 'Agregar Radar PRO']] : []), ...(s.mejoras.length ? [['upgrade', 'Mejorar mi plan']] : [])] as [typeof compra, string][]).map(([c, t]) => (
+                {([['plan', s.estado === 'activo' ? 'Renovar plan' : 'Plan'], ...(s.radarProCompra ? [['radar_pro', 'Agregar Radar PRO']] : []), ...(s.mejoras.length ? [['upgrade', 'Mejorar mi plan']] : []), ...(puedeRecargar ? [['recarga', 'Créditos de IA']] : [])] as [typeof compra, string][]).map(([c, t]) => (
                   <button key={c} type="button" onClick={() => setCompra(c)}
                     className={`rounded-full border px-3 py-1 ${tipo === c ? 'border-sky-400 bg-sky-50 text-sky-900' : 'border-neutral-200 text-neutral-600'}`}>{t}</button>
                 ))}
+              </div>
+            )}
+            {tipo === 'recarga' && (
+              <div className="space-y-2">
+                <p className="text-sm text-neutral-600">1 crédito = 1 respuesta de la IA (pregunta o mensaje). <b>No vencen</b> y se suman a los que tengas.</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {RECARGAS_IA.map((r, i) => (
+                    <button key={r.creditos} type="button" onClick={() => setPaquete(i)}
+                      className={`text-left rounded-lg border px-3 py-2 ${paquete === i ? 'border-sky-400 bg-sky-50' : 'border-neutral-200 hover:border-neutral-300'}`}>
+                      <p className="text-sm font-semibold num">{r.creditos.toLocaleString('de-DE')} créditos</p>
+                      <p className="text-sm num">{fmtUsd(r.precio)}</p>
+                      <p className="text-xs text-neutral-500">{fmtUsd(Math.round(r.precio / r.creditos * 100000) / 100)} cada 100</p>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {tipo === 'radar_pro' && s.radarProCompra && (
@@ -291,20 +311,6 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
           </div>
         </div>
       )}
-
-      {/* Recargas de créditos de IA (09-11, mig. 156): no vencen; por ahora se piden por Telegram. */}
-      <section className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm space-y-2">
-        <h2 className="text-sm font-semibold text-neutral-800">Recargas de créditos de IA</h2>
-        <p className="text-xs text-neutral-600">1 crédito = 1 respuesta de la IA (pregunta o mensaje). Los créditos <b>no vencen</b> y se suman a los que tengas.</p>
-        <ul className="flex flex-wrap gap-2">
-          {RECARGAS_IA.map(r => (
-            <li key={r.creditos} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs text-neutral-700">
-              <b className="num">{r.creditos.toLocaleString('de-DE')}</b> créditos · <b>{fmtUsd(r.precio)}</b>
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-neutral-500">Para recargar, <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="underline">escríbenos por Telegram</a>.</p>
-      </section>
 
       {/* Anteriores */}
       {(s.anteriores.length > 0 || (s.ultimo && s.ultimo.estado !== 'revision')) && (

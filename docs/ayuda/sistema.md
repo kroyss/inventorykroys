@@ -97,8 +97,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   - La **prueba gratis** trae **500 créditos**.
   - El **primer plan** que contratas regala créditos según tus ventas: 500, 1.000, 1.500 o 2.000 (tabla de arriba),
     **una sola vez**. Renovar, cambiar de plan, pausar o reactivar no vuelve a dar créditos; lo que te quede sigue ahí.
-  - **Recargas** (no vencen): 500 por $4, 2.000 por $15, 5.000 por $30. Por ahora se piden por Telegram (Mi plan
-    muestra los paquetes).
+  - **Recargas** (no vencen): 500 por $4, 2.000 por $14, 5.000 por $30. Se compran en **Mi plan → Créditos de IA**,
+    igual que se paga el plan (Pago Móvil o Binance + captura); al confirmar el pago se suman al saldo y llega aviso.
   - El contador (en Preguntas y Mensajes) dice cuántos te quedan y se pone en ámbar cuando queda el 20%. Si se acaban,
     la IA deja de responder (también la automática) hasta que recargues; las respuestas rápidas y parecidas siguen.
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
@@ -137,7 +137,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Cuenta ya vencida:** al intentar entrar aparece el aviso con el botón **Pagar mi plan**, que abre Mi plan sin
   iniciar sesión (también en app.elcomerciantedigital.com/renovar con tu usuario y contraseña). Al aprobarse el
   pago vuelves a entrar normal.
-- Recargas de créditos de IA: por ahora se piden escribiéndonos por Telegram.
+- Recargas de créditos de IA: en Mi plan → Créditos de IA (como el pago del plan).
 
 ---
 
