@@ -90,7 +90,7 @@ export const DESCUENTO_FUNDADOR = 30
 export const RADAR_PRO = { precio: 6 }        // Radar PRO los fines de semana, por mes (1er mes gratis al contratar)
 /** Radar mensual (09-11, mig. 159): para quien quiere SOLO el Radar. PRO todos los días del mes pagado. Solo mensual.
  *  Promoción: −50% para los pagos reportados hasta el 30-11-2026 (hora de Venezuela). */
-export const RADAR_MES = { precio: 20, promo: { precio: 10, hasta: '2026-11-30', texto: '−50% solo en noviembre' } }
+export const RADAR_MES = { precio: 20, promo: { precio: 12, hasta: '2026-11-30', texto: '−40% solo en noviembre' } }
 /** Lo que cuesta el Radar mensual el día `hoy` (YYYY-MM-DD, hora de Venezuela). */
 export function precioRadarMes(hoy: string) {
   const promo = hoy <= RADAR_MES.promo.hasta
