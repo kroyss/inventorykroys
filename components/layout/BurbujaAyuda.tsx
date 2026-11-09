@@ -321,10 +321,10 @@ export default function BurbujaAyuda() {
 
       {/* Solo un ícono de mensaje (menos invasivo); al pasar el cursor dice "Ayuda". */}
       <button onClick={() => setAbierta(a => !a)} aria-expanded={abierta} title={abierta ? 'Cerrar' : 'Ayuda'} aria-label={abierta ? 'Cerrar ayuda' : 'Ayuda'}
-        className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 grid place-items-center h-12 w-12 rounded-full border border-neutral-900 bg-neutral-900 text-lime-400 shadow-lg hover:border-lime-400 ${abierta ? '' : '[body:has([data-barra-fija])_&]:hidden'}`}>
+        className={`fixed z-[70] right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 grid place-items-center h-9 w-9 rounded-full border border-neutral-900 bg-neutral-900 text-lime-400 shadow-lg hover:border-lime-400 ${abierta ? '' : '[body:has([data-barra-fija])_&]:hidden'}`}>
         {abierta
-          ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          : <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>}
+          ? <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          : <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>}
         {!abierta && nuevos > 0 && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />}
       </button>
     </>
