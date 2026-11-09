@@ -174,7 +174,7 @@ function Listo({ lote, onCerrar }: { lote: number; onCerrar: () => void }) {
   return <>
     {!listo ? (
       <p className="text-sm text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
-        Mandando a MercadoLibre… {a ? <b className="num">{a.total - a.pendientes} de {a.total}</b> : null} (unas 12 por minuto). Puedes cerrar esta pantalla: sigue solo.
+        Mandando a MercadoLibre… {a ? <b className="num">{a.total - a.pendientes} de {a.total}</b> : null} (hasta 60 por minuto). Puedes cerrar esta pantalla: sigue solo.
       </p>
     ) : (
       <div className={`text-sm rounded-lg px-3 py-2 border ${malas ? 'text-amber-900 bg-amber-50 border-amber-200' : 'text-emerald-800 bg-emerald-50 border-emerald-200'}`}>

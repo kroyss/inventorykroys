@@ -8,7 +8,7 @@ import { crearLote, precioNuevo, type ParametrosPrecio } from '@/lib/lotesPublic
 import { seleccion } from '@/lib/publicacionesLista'
 import { NOMBRE_TIPO } from '@/lib/descripcionTexto'
 
-// Cambios en lote de Publicaciones (mig 152). Los procesa el cron de a pocas por minuto.
+// Cambios en lote de Publicaciones (mig 152). Los procesa la cola (lib/colaML.ts): arranca al crearlo, hasta 60 por minuto.
 // GET → los últimos lotes con su avance.
 // 08-11: es la pantalla «Tareas en MercadoLibre»: también las de Promociones, según lo que el usuario puede ver.
 export async function GET() {

@@ -1,8 +1,9 @@
 // Publicaciones en lote (08-11-2026, mig 152): descripción en 3 partes con textos guardados (encabezados y pies),
 // cambios en muchas publicaciones a la vez (poner/cambiar encabezado o pie, precios) y lectura de las descripciones
-// para detectar textos repetidos. Los lotes los procesa el cron de a pocas publicaciones por minuto (para no saturar
+// para detectar textos repetidos. Los lotes los procesa la cola (lib/colaML.ts, hasta 60 por minuto) (para no saturar
 // a ML); cada cambio queda en ml_publicacion_cambios con lo que había antes.
 import type { Pool } from 'pg'
+import { after } from 'next/server'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { componer, mismoTexto, separar, caracteresNoPermitidos, MAX_DESCRIPCION, NOMBRE_TIPO, type PlantillaTexto, type TipoTexto, quitarParecido, similitud } from '@/lib/descripcionTexto'
 import { cuentaDe, guardarPublicacion } from '@/lib/publicacionesML'
@@ -98,6 +99,12 @@ export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer
        FROM jsonb_to_recordset($2::jsonb) AS x(item text, datos jsonb, con int) ON CONFLICT DO NOTHING`,
       [l.id, JSON.stringify(parte.map(x => ({ item: x.item, datos: x.datos ?? {}, con: x.conexionId ?? null })))])
   }
+  // 09-11: arranca YA (antes esperaba al cron del minuto siguiente). Si hay otra pasada en curso, el candado la
+  // deja seguir y esto toma lo que falte en el próximo minuto. import dinámico: colaML importa este archivo.
+  after(async () => {
+    try { const { procesarColaML } = await import('@/lib/colaML'); await procesarColaML() }
+    catch (e) { console.error('[cola ml al crear]', e instanceof Error ? e.message : e) }
+  })
   return l.id as number
 }
 
