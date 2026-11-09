@@ -4,7 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { soloDueno } from '@/lib/plataforma'
-import { ESCALONES, RECARGA_IA, planConRadar, sumarMeses } from '@/lib/planes'
+import { ESCALONES, RECARGA_IA, RECARGAS_IA, planConRadar, sumarMeses } from '@/lib/planes'
 import { registrarPlan } from '@/lib/cobros'
 import { currentDate } from '@/lib/tz'
 
@@ -12,7 +12,7 @@ import { currentDate } from '@/lib/tz'
 //   POST { tipo: 'plan' }: activa o renueva el plan (estado activo, pagado hasta, módulos del plan y créditos del escalón;
 //        Automatizaciones y Completo traen el Radar Gratis y, el PRIMER plan con Radar, 1 mes de PRO de fin de semana
 //        de regalo; Esencial no trae Radar).
-//   POST { tipo: 'recarga' }: créditos de IA que no vencen (suman al tope del mes, lib/ia.ts cupoIA).
+//   POST { tipo: 'recarga' }: créditos de IA que no vencen (se suman al saldo, ia_creditos, mig. 156; monto 0 = regalo).
 //   POST { tipo: 'radar_pro' }: Radar PRO de fin de semana pagado ($6/mes) hasta una fecha.
 //   GET: el historial de pagos.
 const Fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
@@ -49,10 +49,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (b.tipo === 'recarga') {
       const { rowCount } = await db.query(`SELECT 1 FROM empresas WHERE id = $1 AND organizacion_id = $2`, [b.empresa_id, org])
       if (!rowCount) return NextResponse.json({ error: 'La empresa no es de este cliente' }, { status: 400 })
+      // 09-11 (mig. 156): el pago queda en organizacion_pagos y los créditos en el saldo (ia_creditos), en una sola
+      // sentencia. Monto 0 = regalo.
       await db.query(
-        `INSERT INTO organizacion_pagos (organizacion_id, empresa_id, tipo, monto, creditos, nota, por) VALUES ($1, $2, 'recarga', $3, $4, $5, $6)`,
+        `WITH p AS (
+           INSERT INTO organizacion_pagos (organizacion_id, empresa_id, tipo, monto, creditos, nota, por)
+           VALUES ($1, $2, 'recarga', $3, $4, $5, $6) RETURNING id)
+         INSERT INTO ia_creditos (empresa_id, motivo, creditos, pago_id, nota, por)
+         SELECT $2, CASE WHEN COALESCE($3::numeric, 0) > 0 THEN 'recarga' ELSE 'regalo' END, $4, p.id, $5, $6 FROM p`,
         [org, b.empresa_id, b.monto, b.creditos, b.nota || null, por])
-      return NextResponse.json({ ok: true, mensaje: `Recarga de ${b.creditos} créditos guardada: ya los puede usar.` })
+      return NextResponse.json({ ok: true, mensaje: `${b.monto ? 'Recarga' : 'Regalo'} de ${b.creditos} créditos guardado: ya los puede usar (no vencen).` })
     }
 
     if (org === ORGANIZACION_PLATAFORMA) return NextResponse.json({ error: 'Tu organización es la propietaria: no tiene plan' }, { status: 400 })
@@ -99,6 +105,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
               to_char(p.hasta, 'YYYY-MM-DD') AS hasta, p.creditos, p.nota, e.nombre AS empresa, u.full_name AS por
        FROM organizacion_pagos p LEFT JOIN empresas e ON e.id = p.empresa_id LEFT JOIN users u ON u.id = p.por
        WHERE p.organizacion_id = $1 ORDER BY p.fecha DESC LIMIT 100`, [id])
-    return NextResponse.json({ pagos: rows, recarga: RECARGA_IA })
+    return NextResponse.json({ pagos: rows, recarga: RECARGA_IA, recargas: RECARGAS_IA })
   } catch (err) { return apiError(err) }
 }

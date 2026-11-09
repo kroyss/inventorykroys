@@ -1,9 +1,8 @@
 // Planes y precios de El Comerciante Digital (27-10-2026, definidos por el dueño). Única fuente: los muestran
 // /precios y el cuadro del inicio. Precio = plan (qué herramientas) × escalón (ventas al mes de todas sus cuentas,
-// sin las canceladas); los créditos de IA van por escalón. Fundadores: 30% de por vida sobre su casilla (no se muestra en la página pública).
+// sin las canceladas); los créditos de IA de bienvenida van por escalón. Fundadores: 30% de por vida sobre su casilla (no se muestra en la página pública).
 // Reglas internas (no van en la página): margen del 10% sobre el tope del escalón; cambia de escalón tras 2 meses
-// seguidos por encima o por debajo; créditos de IA se renuevan cada mes en el día de la activación (mig. 140) y no se acumulan (subir de plan a mitad de
-// mes suma la diferencia; bajar aplica el mes siguiente); la cuenta se pausa al día siguiente del vencimiento (aviso 3 días antes; no se pausa si reportó su pago en Mi plan antes de vencer, mig. 141) y los datos se guardan 60 días.
+// seguidos por encima o por debajo; créditos de IA = UN saldo que no vence (09-11, mig. 156: prueba 500, primer plan según escalón una sola vez, recargas); la cuenta se pausa al día siguiente del vencimiento (aviso 3 días antes; no se pausa si reportó su pago en Mi plan antes de vencer, mig. 141) y los datos se guardan 60 días.
 
 export interface Plan { id: 'esencial' | 'automatizaciones' | 'completo'; nombre: string; resumen: string; base?: string; incluye: string[]; destacado?: boolean }
 
@@ -45,19 +44,29 @@ export const PLANES: Plan[] = [
   },
 ]
 
-/** Escalones por ventas al mes (todas tus cuentas, sin canceladas): precio en USD de cada plan y créditos de IA al mes.
- *  Los créditos van por escalón, no por plan (27-10): la IA se gasta respondiendo, y eso crece con las ventas. */
+/** Escalones por ventas al mes (todas tus cuentas, sin canceladas): precio en USD de cada plan y créditos de IA de
+ *  BIENVENIDA. 09-11 (el dueño): los créditos se dan UNA sola vez, con el primer plan que contrata (como el mes de Radar
+ *  PRO); no vencen, se acumulan con las recargas y no se vuelven a dar al renovar, cambiar de plan o reactivar. */
 export const ESCALONES: { nombre?: string; ventas: string; creditos: number; precios: Record<Plan['id'], number> }[] = [
-  { nombre: 'Emprende', ventas: 'Hasta 50', creditos: 50, precios: { esencial: 8, automatizaciones: 10, completo: 14 } },
-  { ventas: '51 a 300', creditos: 80, precios: { esencial: 12, automatizaciones: 15, completo: 20 } },
-  { ventas: '301 a 1.000', creditos: 100, precios: { esencial: 18, automatizaciones: 22, completo: 27 } },
-  { ventas: 'Más de 1.000', creditos: 150, precios: { esencial: 25, automatizaciones: 30, completo: 35 } },
+  { nombre: 'Emprende', ventas: 'Hasta 50', creditos: 500, precios: { esencial: 8, automatizaciones: 10, completo: 14 } },
+  { ventas: '51 a 300', creditos: 1000, precios: { esencial: 12, automatizaciones: 15, completo: 20 } },
+  { ventas: '301 a 1.000', creditos: 1500, precios: { esencial: 18, automatizaciones: 22, completo: 27 } },
+  { ventas: 'Más de 1.000', creditos: 2000, precios: { esencial: 25, automatizaciones: 30, completo: 35 } },
 ]
 
 export const PRECIO_DESDE = Math.min(...ESCALONES.flatMap(e => Object.values(e.precios)))
 export const CUENTAS_INCLUIDAS = 2
 export const CUENTA_EXTRA = 3
-export const RECARGA_IA = { creditos: 100, precio: 4 }
+/** Créditos de la prueba gratis (una vez, al registrarse). */
+export const CREDITOS_PRUEBA = 500
+/** Paquetes de recarga (09-11): no vencen. 1 crédito = 1 respuesta de la IA (pregunta o mensaje). */
+export const RECARGAS_IA = [
+  { creditos: 500, precio: 4 },
+  { creditos: 2000, precio: 15 },
+  { creditos: 5000, precio: 30 },
+] as const
+/** El paquete chico (el que se nombra en textos cortos). */
+export const RECARGA_IA = RECARGAS_IA[0]
 export const DESCUENTO_TRIMESTRAL = 10
 
 // ── Asignar planes en Plataforma (01-11-2026, migración 138) ─────────────────────────────────────────────────────

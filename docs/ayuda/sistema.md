@@ -75,12 +75,12 @@ el portal de MercadoEnvíos de Venezuela.
 Los precios están en app.elcomerciantedigital.com/precios. Hay tres planes, y el precio depende de cuántas
 ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 
-| Ventas al mes | Esencial | Automatizaciones | Completo | Créditos IA al mes |
+| Ventas al mes | Esencial | Automatizaciones | Completo | Créditos IA de regalo (1er plan) |
 |---|---|---|---|---|
-| Hasta 50 | $8 | $10 | $14 | 50 |
-| 51 a 300 | $12 | $15 | $20 | 80 |
-| 301 a 1.000 | $18 | $22 | $27 | 100 |
-| Más de 1.000 | $25 | $30 | $35 | 150 |
+| Hasta 50 | $8 | $10 | $14 | 500 |
+| 51 a 300 | $12 | $15 | $20 | 1.000 |
+| 301 a 1.000 | $18 | $22 | $27 | 1.500 |
+| Más de 1.000 | $25 | $30 | $35 | 2.000 |
 
 - **Esencial:** Preguntas con IA, Mensajes, Calificaciones, Stock + avisos por Telegram, guías ZOOM/TEALCA
   (Despachos) y Reporte de guías (Reportador).
@@ -91,13 +91,16 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   (Fundadores: −30% mensual o trimestral, no se suman). El descuento es solo del plan: cuentas extra,
   Radar PRO y recargas de IA van a precio completo. El Fundador conserva el 30% mientras renueve a tiempo: si su mes gratis o
   su plan vence sin pago (ni pago reportado antes de vencer), la cuenta se pausa y deja de ser Fundador; al volver paga precio normal. Se puede pagar en bolívares a tasa BCV.
-- **Créditos de IA:** cada «Proponer con IA» usa 1 crédito. Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**. Los créditos
-  del plan se entregan **juntos al contratar**: mensual = los de 1 mes, trimestral = los de 3 meses (ej. 80 × 3 = 240),
-  para usar como quieras **desde el día que arranca el plan hasta que vence**. Lo que no uses vence con el plan y no
-  pasa al siguiente: al renovar empiezan los del plan nuevo. Si pagas durante la prueba, el plan arranca cuando
-  termina la prueba y hasta ese día sigues con los créditos de la prueba. La prueba gratis trae 50 créditos **para
-  toda la prueba** (no se renuevan). Recarga: 100 créditos por $4: **no vencen**, se usan después de los incluidos
-  y lo que sobra sigue de un plan al otro. El contador de créditos se pone en ámbar cuando queda el 20%.
+- **Créditos de IA:** cada respuesta de la IA usa 1 crédito: «Proponer con IA» y cada respuesta automática, en
+  Preguntas o en Mensajes. Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**.
+  Los créditos son **un solo saldo que no vence**: se suman y se usan cuando quieras.
+  - La **prueba gratis** trae **500 créditos**.
+  - El **primer plan** que contratas regala créditos según tus ventas: 500, 1.000, 1.500 o 2.000 (tabla de arriba),
+    **una sola vez**. Renovar, cambiar de plan, pausar o reactivar no vuelve a dar créditos; lo que te quede sigue ahí.
+  - **Recargas** (no vencen): 500 por $4, 2.000 por $15, 5.000 por $30. Por ahora se piden por Telegram (Mi plan
+    muestra los paquetes).
+  - El contador (en Preguntas y Mensajes) dice cuántos te quedan y se pone en ámbar cuando queda el 20%. Si se acaban,
+    la IA deja de responder (también la automática) hasta que recargues; las respuestas rápidas y parecidas siguen.
 - **Radar de Oportunidades:** los planes **Automatizaciones y Completo** traen el **Radar Gratis todos los días** (Esencial no) (catálogo con precio real, buscador
   y cabina). **Radar PRO** (sellos, filtros, productos nuevos del mes, Competencia, Tendencias) es los **sábados y
   domingos** por **+$6 al mes**; el primer mes de PRO va de regalo **solo una vez, en tu primer plan**

@@ -174,8 +174,8 @@ export interface SituacionPlan {
   radarProHasta: string | null
   ventasMes: number; ventasMesAnt: number; mes: string; cuentas: number; conectadas: number; cuentasExtra: number
   escalonSugerido: number; escalonNombre: string
-  /** Créditos de IA por mes del escalón sugerido (la bolsa del plan = esto × meses pagados). */
-  creditosMes: number
+  /** Créditos de IA que suma el PRIMER plan (escalón sugerido); 0 si ya los recibió (mig. 156: una sola vez). */
+  creditosPrimerPlan: number
   opciones: OpcionPlan[]; planSugerido: Plan['id']
   radarPro: { precio: number; regalo: boolean }   // regalo: el 1er plan con Radar trae 1 mes PRO (una sola vez en la vida)
   /** Radar PRO aparte (06-11): 1 mes cuando quiera, con plan activo que traiga Radar. null = no se puede ahora. */
@@ -202,6 +202,8 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     ventasOrganizacion(orgId), tasaBCV(), leerDatosCobro(),
     dbGlobal().query(`${SELECT_COBRO} WHERE k.organizacion_id = $1 ORDER BY k.creado_at DESC LIMIT 12`, [orgId]),
   ])
+  const { rows: [yaPlan] } = await dbGlobal().query(
+    `SELECT 1 FROM ia_creditos c JOIN empresas e ON e.id = c.empresa_id WHERE e.organizacion_id = $1 AND c.motivo = 'plan' LIMIT 1`, [orgId])
   const escalon = escalonSugerido(vMes, vAnt, conPlan ? Number(o.escalon) : null)
   const cuentasExtra = Math.max(0, cuentas - CUENTAS_INCLUIDAS)
   const opciones = PLANES.map(p => ({
@@ -220,7 +222,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     vence: estado === 'activo' ? o.plan_hasta : o.estado === 'prueba' ? o.prueba_hasta : o.plan_hasta,
     radarProHasta: o.radar_pro_hasta,
     ventasMes: vMes, ventasMesAnt: vAnt, mes: mesPasado(), cuentas, conectadas, cuentasExtra,
-    escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '', creditosMes: ESCALONES[escalon]?.creditos ?? 0,
+    escalonSugerido: escalon, escalonNombre: ESCALONES[escalon]?.ventas ?? '', creditosPrimerPlan: yaPlan ? 0 : ESCALONES[escalon]?.creditos ?? 0,
     opciones, planSugerido,
     // 04-11 (el dueño): el mes de regalo es UNA vez, en el primer plan con Radar (radar_pro_hasta vacío = nunca lo tuvo).
     // Suspender y volver, o renovar, ya no lo trae: se paga aparte a precio completo (sin descuento de Fundador ni
@@ -336,8 +338,8 @@ async function avisarDueno(id: number, archivo: Reporte['archivo']) {
 /**
  * Registra un plan pagado (Plataforma → Plan y pagos y la aprobación de un cobro): estado activo, plan, escalón,
  * ciclo, pagado hasta, módulos del plan y créditos del escalón. El primer plan con Radar trae 1 mes de PRO de regalo.
- * Créditos de IA (08-11): la bolsa del plan sale de este pago (desde → hasta, créditos × meses; ver cupoIA). Ya no se
- * mueve creditos_desde: si pagó en la prueba, sigue con los de la prueba hasta el día que arranca el plan.
+ * Créditos de IA (09-11, mig. 156): el PRIMER plan suma al saldo los créditos de su escalón, una sola vez (el índice
+ * único uq_ia_creditos_plan lo asegura); renovar, cambiar de plan o reactivar no vuelve a dar.
  */
 export async function registrarPlan(client: PoolClient, org: number, b: {
   plan: Plan['id']; escalon: number; ciclo: 'mensual' | 'trimestral'; hasta: string; monto: number; nota?: string | null; desde?: string
@@ -353,24 +355,29 @@ export async function registrarPlan(client: PoolClient, org: number, b: {
        prueba_dias = NULL, motivo_pausa = NULL, pausa_fecha = NULL,
        radar_pro_hasta = CASE WHEN $6 THEN $7::date ELSE radar_pro_hasta END
      WHERE id = $1`, [org, b.plan, b.escalon, b.ciclo, b.hasta, bienvenida, sumarMeses(hoy, 1)])
-  await modulosDelPlan(client, org, b.plan, b.escalon)
+  await modulosDelPlan(client, org, b.plan)
   const { rows: [p] } = await client.query(
     `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, plan, escalon, ciclo, desde, hasta, nota, por)
      VALUES ($1, 'plan', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
     [org, b.monto, b.plan, b.escalon, b.ciclo, desde, b.hasta, b.nota || null, por])
   await client.query(`INSERT INTO organizacion_eventos (organizacion_id, tipo, detalle, por) VALUES ($1, $2, $3, $4)`,
     [org, o.estado === 'activo' ? 'renovada' : 'activa', `${b.plan} hasta ${b.hasta}`, por])
+  await client.query(
+    `INSERT INTO ia_creditos (empresa_id, motivo, creditos, pago_id, nota, por)
+     SELECT e.id, 'plan', $2, $3, 'Primer plan', $4 FROM empresas e
+     WHERE e.organizacion_id = $1 AND NOT EXISTS (SELECT 1 FROM ia_creditos c WHERE c.empresa_id = e.id AND c.motivo = 'plan')
+     ON CONFLICT DO NOTHING`, [org, ESCALONES[b.escalon].creditos, p.id, por])
   return { pagoId: Number(p.id), bienvenida }
 }
 
-/** Módulos del plan (los que controla el plan se reemplazan; los demás quedan) y créditos de IA del escalón. */
-async function modulosDelPlan(client: PoolClient, org: number, plan: Plan['id'], escalon: number) {
+/** Módulos del plan (los que controla el plan se reemplazan; los demás quedan). ia_limite_mes = usa su saldo (mig. 156). */
+async function modulosDelPlan(client: PoolClient, org: number, plan: Plan['id']) {
   await client.query(
     `UPDATE empresas SET
        modulos = ARRAY(SELECT DISTINCT m FROM unnest(
          ARRAY(SELECT x FROM unnest(modulos) x WHERE x <> ALL($2::text[])) || $3::text[]) m),
-       ia_limite_mes = $4
-     WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[plan]], ESCALONES[escalon].creditos])
+       ia_limite_mes = COALESCE(ia_limite_mes, 100), ia_saldo_desde = COALESCE(ia_saldo_desde, NOW())
+     WHERE organizacion_id = $1`, [org, [...MODULOS_CONTROLADOS], [...MODULOS_PLAN[plan]]])
 }
 
 export async function aprobarCobro(id: number, por: number) {
@@ -423,7 +430,7 @@ export async function aprobarCobro(id: number, por: number) {
       await client.query(
         `UPDATE organizaciones SET plan = $2, radar_pro_hasta = CASE WHEN $3 THEN $4::date ELSE radar_pro_hasta END WHERE id = $1`,
         [k.organizacion_id, k.plan, bienvenida, sumarMeses(hoy, 1)])
-      await modulosDelPlan(client, k.organizacion_id, k.plan, k.escalon)
+      await modulosDelPlan(client, k.organizacion_id, k.plan)
       const { rows: [p] } = await client.query(
         `INSERT INTO organizacion_pagos (organizacion_id, tipo, monto, plan, escalon, ciclo, desde, hasta, nota, por)
          VALUES ($1, 'upgrade', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,

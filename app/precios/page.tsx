@@ -1,6 +1,6 @@
 import { TELEGRAM_DESPEGUE } from '@/lib/despegue'
 import {
-  CUENTA_EXTRA, CUENTAS_INCLUIDAS, DESCUENTO_TRIMESTRAL, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, RECARGA_IA,
+  CREDITOS_PRUEBA, CUENTA_EXTRA, CUENTAS_INCLUIDAS, DESCUENTO_TRIMESTRAL, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, RECARGA_IA, RECARGAS_IA,
 } from '@/lib/planes'
 
 export const metadata = {
@@ -35,13 +35,13 @@ const PREGUNTAS = [
   { p: '¿Qué pasa si un mes vendo más?',
     r: 'Nada se bloquea. Si pasas dos meses seguidos por encima de tu escalón, pasas al siguiente; si bajas dos meses seguidos, también bajas.' },
   { p: '¿Qué son los créditos de IA?',
-    r: `Cada respuesta que te propone la IA usa un crédito. Las respuestas rápidas y las parecidas no gastan. Los créditos del plan se entregan juntos al contratar (trimestral = los de 3 meses) y valen hasta que vence el plan; lo que no uses no pasa al plan siguiente. Si se te acaban, recargas ${RECARGA_IA.creditos} por $${RECARGA_IA.precio} y esas no vencen.` },
+    r: `Cada respuesta de la IA (una pregunta o un mensaje) usa un crédito. Las respuestas rápidas y las parecidas no gastan. La prueba gratis trae ${CREDITOS_PRUEBA}, y tu primer plan te regala más según tus ventas, una sola vez. Los créditos no vencen: se suman y los usas cuando quieras. Si se te acaban, recargas desde ${RECARGA_IA.creditos} por $${RECARGA_IA.precio}.` },
   { p: '¿Qué trae el Radar?',
     r: `Con los planes Automatizaciones y Completo tienes el Radar de Oportunidades Gratis todos los días: los productos que más se venden en MercadoLibre con su precio real, buscador y tu lista de productos investigados. Radar PRO (sellos, filtros, productos nuevos del mes, competencia y tendencias) es los sábados y domingos por $${RADAR_PRO.precio} al mes, y el primer mes va de regalo solo en tu primer plan: después se agrega al renovar a precio completo, sin descuento.` },
   { p: '¿Cómo pago?',
     r: 'En bolívares a tasa BCV del día. Sin permanencia: si un mes no sigues, no pagas el siguiente.' },
   { p: '¿Qué incluye la prueba gratis?',
-    r: '15 días con preguntas, mensajes, calificaciones, guías y Pagos MercadoEnvíos, con tus propias ventas. Los días arrancan cuando conectas MercadoLibre.' },
+    r: `15 días con preguntas, mensajes, calificaciones, guías y Pagos MercadoEnvíos, con tus propias ventas, y ${CREDITOS_PRUEBA} créditos de IA. Los días arrancan cuando conectas MercadoLibre.` },
 ]
 
 export default function PreciosPage() {
@@ -110,7 +110,7 @@ export default function PreciosPage() {
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Ventas al mes</th>
                   {PLANES.map(p => <th key={p.id} className={`px-4 py-3 text-right font-medium ${p.destacado ? 'text-lime-800' : ''}`}>{p.nombre}</th>)}
-                  <th className="px-4 py-3 text-right font-medium">Créditos IA/mes</th>
+                  <th className="px-4 py-3 text-right font-medium">Créditos IA de regalo</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,13 +120,13 @@ export default function PreciosPage() {
                     {PLANES.map(p => (
                       <td key={p.id} className={`px-4 py-3 text-right font-semibold tabular-nums ${p.destacado ? 'bg-lime-50/60 text-neutral-900' : 'text-neutral-800'}`}>${e.precios[p.id]}</td>
                     ))}
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-700">{e.creditos}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-neutral-700">{e.creditos.toLocaleString('de-DE')}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-neutral-500">Los créditos de IA son iguales en los tres planes y se entregan juntos al contratar: en el trimestral recibes los de 3 meses para usarlos cuando quieras hasta que vence. Si necesitas más, recargas {RECARGA_IA.creditos} por ${RECARGA_IA.precio} y no vencen.</p>
+          <p className="mt-3 text-sm text-neutral-500">Los créditos de IA se regalan una sola vez, con tu primer plan, y son iguales en los tres planes. <b className="text-neutral-700">No vencen</b>: se suman a los de tu prueba y a tus recargas. 1 crédito = 1 respuesta de la IA, a pregunta o a mensaje.</p>
         </section>
 
         {/* ── Incluido y extras ── */}
@@ -143,7 +143,9 @@ export default function PreciosPage() {
             <p className="font-semibold text-neutral-900">Extras</p>
             <ul className="mt-3 space-y-2 text-sm text-neutral-700">
               <li className="flex justify-between gap-4"><span>Cuenta de MercadoLibre adicional</span><b className="whitespace-nowrap text-neutral-900">+${CUENTA_EXTRA}/mes</b></li>
-              <li className="flex justify-between gap-4"><span>Recarga de {RECARGA_IA.creditos} créditos de IA (no vencen)</span><b className="whitespace-nowrap text-neutral-900">${RECARGA_IA.precio}</b></li>
+              {RECARGAS_IA.map(r => (
+                <li key={r.creditos} className="flex justify-between gap-4"><span>Recarga de {r.creditos.toLocaleString('de-DE')} créditos de IA (no vencen)</span><b className="whitespace-nowrap text-neutral-900">${r.precio}</b></li>
+              ))}
               <li className="flex justify-between gap-4"><span>Radar PRO los sábados y domingos, con Automatizaciones o Completo (1.<sup>er</sup> mes de regalo solo en tu primer plan, luego sin descuento)</span><b className="whitespace-nowrap text-neutral-900">+${RADAR_PRO.precio}/mes</b></li>
               <li className="flex justify-between gap-4"><span>Pago trimestral</span><b className="whitespace-nowrap text-lime-700">−{DESCUENTO_TRIMESTRAL}%</b></li>
             </ul>

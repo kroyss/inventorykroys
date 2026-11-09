@@ -430,8 +430,8 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
 
               <section className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Créditos de IA por mes</h3>
-                  <p className="text-xs text-neutral-400">1 por borrador (buscar en internet, hasta 4). Vacío = sin límite.</p>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Créditos de IA</h3>
+                  <p className="text-xs text-neutral-400">Vacío = sin límite. Con un número, el cliente usa su saldo (no vence; se suma en Plan y pagos → Recargar, $0 = regalo). En tu empresa, el número es el tope del mes.</p>
                 </div>
                 <LimiteIA key={`${sel.id}-${sel.ia_limite_mes}`} valor={sel.ia_limite_mes} onGuardar={v => actualizar(sel, { ia_limite_mes: v })} />
               </section>
@@ -575,7 +575,7 @@ function LimiteIA({ valor, onGuardar }: { valor: number | null; onGuardar: (v: n
   return (
     <input value={v} onChange={ev => setV(ev.target.value.replace(/[^0-9]/g, ''))} onBlur={guardar}
       onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur() }}
-      inputMode="numeric" placeholder="sin límite" title="Créditos de IA por mes (vacío = sin límite)"
+      inputMode="numeric" placeholder="sin límite" title="Vacío = sin límite; con número = usa su saldo (la propietaria: tope del mes)"
       className="w-20 border border-neutral-200 rounded px-1.5 py-0.5 text-xs text-right num" />
   )
 }

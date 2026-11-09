@@ -37,13 +37,15 @@ export async function GET() {
         `SELECT e.id, e.nombre, e.country, o.estado = 'propietario' AS propietario, e.ia_limite_mes AS limite
          FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id ORDER BY e.id`),
     ])
-    // Créditos usados: los mismos que ve el cliente (cupoIA cuenta desde ia_creditos_desde si es más
-    // reciente que el día 1; el detalle por día no puede saberlo).
+    // Créditos: los mismos que ve el cliente (cupoIA). Clientes (mig. 156): usados desde el cambio a saldo, de todo lo
+    // recibido (prueba + primer plan + recargas); la propietaria, del mes.
     // De a UNA empresa con conEmpresa (devuelve la conexión al terminar con ella). NUNCA dbEmpresa en un
     // bucle: retiene una conexión por empresa hasta el final del request y con más empresas que
     // conexiones del pool (10) trababa la copia entera (13-10: "Interno no sirve", Plataforma paralizada).
     for (const e of empresas) {
-      e.creditos = await conEmpresa(e.id, e.country as Country, db => cupoIA(db, e.id)).then(c => c.usados).catch(() => null)
+      const c = await conEmpresa(e.id, e.country as Country, db => cupoIA(db, e.id)).catch(() => null)
+      e.creditos = c?.usados ?? null
+      if (c) e.limite = c.limite
     }
     const hoy = currentDate()
     const diasMes = new Date(Date.UTC(y, m, 0)).getUTCDate()

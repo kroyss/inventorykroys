@@ -8,14 +8,14 @@ export const avisarUsoIA = () => window.dispatchEvent(new Event('uso-ia'))
 export const CREDITOS_TXT = '1 crédito'
 export const CREDITOS_WEB_TXT = 'hasta 4 créditos'
 const AYUDA_CREDITOS = 'Cada «Proponer con IA» usa 1 crédito, se use o no la respuesta. Las respuestas parecidas y las rápidas no gastan créditos.'
-/** Cuándo vuelven (mig. 140): de la prueba, del mes de plan o recargas, que no vencen. */
-const ayuda = (u: { renueva?: string; recarga?: number }) =>
-  `${AYUDA_CREDITOS}${u.renueva ? ` Los incluidos ${u.renueva}; los que no uses no se acumulan.` : ''}${u.recarga ? ` Te quedan ${u.recarga} de recargas (no vencen).` : ''}`
+/** Cómo funcionan (mig. 156): saldo que no vence (clientes) o tope por mes (la propietaria). */
+const ayuda = (u: { renueva?: string }) =>
+  `${AYUDA_CREDITOS}${u.renueva ? ` Tus créditos ${u.renueva}.` : ''}`
 
-/** Créditos de IA usados en el período (la prueba o el mes de plan, mig. 140). El cliente ve "usados de su límite";
+/** Créditos de IA: el cliente ve su saldo (no vence, mig. 156); la propietaria, "usados de su tope del mes";
  *  el dueño de la plataforma (sin límite) ve además lo que costaron. */
 export function UsoIA() {
-  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null; renueva?: string; recarga?: number; vence?: string } | null>(null)
+  const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null; quedan?: number | null; periodo?: 'saldo' | 'mes'; renueva?: string } | null>(null)
   useEffect(() => {
     let vivo = true
     const cargar = () => fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
@@ -25,12 +25,17 @@ export function UsoIA() {
   }, [])
   if (!uso) return null
   if (uso.limite !== null) {
-    const quedan = Math.max(0, uso.limite - uso.creditos)
+    const quedan = uso.quedan ?? Math.max(0, uso.limite - uso.creditos)
+    // En ámbar desde que queda el 20% de lo recibido.
+    const ambar = quedan <= uso.limite * 0.2 ? 'text-amber-700' : 'text-neutral-500'
+    if (uso.periodo === 'saldo') return (
+      <span className={`text-xs whitespace-nowrap ${ambar}`} title={ayuda(uso)}>
+        Créditos IA: te quedan <b className="num">{quedan.toLocaleString('de-DE')}</b> · no vencen
+      </span>
+    )
     return (
-      // 08-11: en ámbar desde que queda el 20%; con plan, cuándo vencen (la bolsa es de todo el plan).
-      <span className={`text-xs whitespace-nowrap ${quedan <= uso.limite * 0.2 ? 'text-amber-700' : 'text-neutral-500'}`}
-        title={ayuda(uso)}>
-        Créditos IA: <b className="num">{uso.creditos}</b> de {uso.limite} · te quedan <b className="num">{quedan}</b>{uso.vence ? ` · vencen ${uso.vence}` : ''}
+      <span className={`text-xs whitespace-nowrap ${ambar}`} title={ayuda(uso)}>
+        Créditos IA: <b className="num">{uso.creditos}</b> de {uso.limite} · te quedan <b className="num">{quedan}</b>
       </span>
     )
   }

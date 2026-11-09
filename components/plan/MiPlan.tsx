@@ -5,12 +5,13 @@
 // `acceso`: entra desde /renovar (cuenta vencida, sin sesión) con el acceso firmado de /api/mi-plan/entrar.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
+import { RECARGAS_IA } from '@/lib/planes'
+import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 const fmtBs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
 // Suma meses a YYYY-MM-DD (como sumarMeses del servidor): para mostrar hasta cuándo valen los créditos del plan.
-const masMeses = (f: string, n: number) => { const [a, m, d] = f.split('-').map(Number); const x = new Date(Date.UTC(a, m - 1 + n, d)); return x.toISOString().slice(0, 10) }
 const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const NOMBRE_PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
 const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
@@ -207,22 +208,13 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 </button>
               ))}
             </div>
-            {s.creditosMes > 0 && (() => {
-              // 08-11 (el dueño): los créditos de IA se entregan juntos por contrato (mensual ×1, trimestral ×3) y valen
-              // desde que arranca el plan hasta que vence; no pasan al plan siguiente. Las recargas son otra bolsa.
-              const meses = ciclo === 'trimestral' ? 3 : 1
-              const fin = masMeses(s.inicioPlan, meses)
-              const despues = s.inicioPlan > hoyLocal()
-              return (
-                <p className="text-xs text-neutral-600 rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-2">
-                  Incluye <b className="num">{(s.creditosMes * meses).toLocaleString('de-DE')} créditos de IA</b> para todo el plan
-                  {meses > 1 ? ` (${s.creditosMes} × ${meses} meses)` : ''}, del <b>{ddmm(s.inicioPlan)}</b> al <b>{ddmm(fin)}</b>.
-                  {' '}Los que no uses vencen con el plan y no pasan al siguiente.
-                  {despues ? (s.estado === 'activo' ? ` Hasta el ${ddmm(s.inicioPlan)} sigues con los créditos de tu plan actual.` : ` Hasta el ${ddmm(s.inicioPlan)} sigues con los créditos de tu prueba.`) : ''}
-                  {' '}Las recargas son aparte y no vencen.
-                </p>
-              )
-            })()}
+            {s.creditosPrimerPlan > 0 && (
+              // 09-11 (el dueño, mig. 156): el primer plan suma créditos de IA una sola vez; no vencen.
+              <p className="text-xs text-neutral-600 rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-2">
+                Tu primer plan trae <b className="num">{s.creditosPrimerPlan.toLocaleString('de-DE')} créditos de IA</b> de regalo (una sola vez).
+                {' '}Se suman a los que te queden y <b>no vencen</b>. Si necesitas más, compras una recarga.
+              </p>
+            )}
             {op.radar && s.radarPro.regalo && (
               <p className="text-xs text-lime-700">
                 Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Después cuesta {fmtUsd(s.radarPro.precio)} por mes y lo agregas cuando quieras desde aquí.
@@ -299,6 +291,20 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
           </div>
         </div>
       )}
+
+      {/* Recargas de créditos de IA (09-11, mig. 156): no vencen; por ahora se piden por Telegram. */}
+      <section className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm space-y-2">
+        <h2 className="text-sm font-semibold text-neutral-800">Recargas de créditos de IA</h2>
+        <p className="text-xs text-neutral-600">1 crédito = 1 respuesta de la IA (pregunta o mensaje). Los créditos <b>no vencen</b> y se suman a los que tengas.</p>
+        <ul className="flex flex-wrap gap-2">
+          {RECARGAS_IA.map(r => (
+            <li key={r.creditos} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs text-neutral-700">
+              <b className="num">{r.creditos.toLocaleString('de-DE')}</b> créditos · <b>{fmtUsd(r.precio)}</b>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-neutral-500">Para recargar, <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="underline">escríbenos por Telegram</a>.</p>
+      </section>
 
       {/* Anteriores */}
       {(s.anteriores.length > 0 || (s.ultimo && s.ultimo.estado !== 'revision')) && (

@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
+import { ESCALONES, PLANES, RADAR_PRO, RECARGA_IA, RECARGAS_IA, montoPlan, planConRadar, sumarMeses, type Plan } from '@/lib/planes'
 
 // Plataforma → ficha del cliente → Plan y pagos (01-11-2026, migración 138): activar o renovar el plan (módulos y
 // créditos del escalón salen solos), recargar créditos de IA, Radar PRO de fin de semana y el historial de pagos.
@@ -82,7 +82,7 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
           </label>
           <label className="block">Ventas al mes (escalón)
             <select value={f.escalon} onChange={e => setF({ ...f, escalon: Number(e.target.value) })} className="mt-0.5 w-full border border-neutral-300 rounded px-2 py-1 bg-white">
-              {ESCALONES.map((e, i) => <option key={i} value={i}>{e.nombre ? `${e.nombre} · ` : ''}{e.ventas} · {usd(e.precios[f.plan])} · {e.creditos} créditos IA</option>)}
+              {ESCALONES.map((e, i) => <option key={i} value={i}>{e.nombre ? `${e.nombre} · ` : ''}{e.ventas} · {usd(e.precios[f.plan])} · {e.creditos} créditos IA (solo 1er plan)</option>)}
             </select>
           </label>
           <div className="flex flex-wrap gap-3">
@@ -118,12 +118,19 @@ export default function PlanCliente({ d, hoy, onCambio, onError }: { d: DatosPla
               {d.empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
           )}
+          <div className="flex flex-wrap gap-1.5">
+            {RECARGAS_IA.map(r => (
+              <button key={r.creditos} type="button" onClick={() => setRecarga({ ...recarga, creditos: String(r.creditos), monto: String(r.precio) })}
+                className={`rounded border px-2 py-0.5 ${num(recarga.creditos) === r.creditos ? 'border-sky-400 bg-sky-50' : 'border-neutral-300 bg-white'}`}>
+                {r.creditos.toLocaleString('de-DE')} · {usd(r.precio)}</button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-3">
             <label className="block">Créditos<input inputMode="numeric" value={recarga.creditos} onChange={e => setRecarga({ ...recarga, creditos: e.target.value })} className="mt-0.5 block w-20 border border-neutral-300 rounded px-2 py-1" /></label>
             <label className="block">Cobrado ($)<input inputMode="decimal" value={recarga.monto} onChange={e => setRecarga({ ...recarga, monto: e.target.value })} className="mt-0.5 block w-20 border border-neutral-300 rounded px-2 py-1" /></label>
           </div>
           <input value={recarga.nota} onChange={e => setRecarga({ ...recarga, nota: e.target.value })} placeholder="Nota (opcional)" className="w-full border border-neutral-300 rounded px-2 py-1" />
-          <p className="text-neutral-500">No vencen: se suman a los incluidos del plan, se gastan después de esos y lo que sobra sigue de un plan al otro. Precio de lista: {RECARGA_IA.creditos} créditos {usd(RECARGA_IA.precio)}.</p>
+          <p className="text-neutral-500">No vencen: se suman a su saldo de créditos. Cobrado $0 = regalo.</p>
           <button disabled={guardando || !(num(recarga.creditos) > 0)} onClick={() => enviar({ tipo: 'recarga', empresa_id: recarga.empresa, creditos: Math.round(num(recarga.creditos)), monto: num(recarga.monto) || 0, nota: recarga.nota })}
             className="btn-primary text-xs">{guardando ? 'Guardando…' : 'Guardar recarga'}</button>
         </div>

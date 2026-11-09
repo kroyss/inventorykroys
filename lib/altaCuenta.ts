@@ -4,6 +4,7 @@
 import type { PoolClient } from 'pg'
 import { hash } from 'bcryptjs'
 import { DIAS_ESPERA_CONEXION, DIAS_PRUEBA } from '@/lib/cuenta'
+import { CREDITOS_PRUEBA } from '@/lib/planes'
 
 export type Alta = 'fundador' | 'prueba' | 'activo' | 'demo' | 'radar'
 
@@ -50,10 +51,13 @@ export async function crearCuenta(client: PoolClient, d: DatosAlta) {
   // se ve "Créditos IA: N de 100", como lo ve un cliente; si hace falta se sube en la base).
   const demo = d.alta === 'demo'
   const { rows: [emp] } = await client.query(
-    // Prueba de 15 días: 50 créditos (27-10, decisión del dueño); el resto, 100 (se ajusta en Plataforma según el plan).
-    `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    // 09-11 (mig. 156): créditos = saldo que no vence desde hoy (ia_saldo_desde). ia_limite_mes no NULL = usa saldo.
+    `INSERT INTO empresas (organizacion_id, nombre, country, modulos, ia_limite_mes, ia_saldo_desde) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id`,
     [org.id, d.nombre, d.country, demo ? ['despachos', 'reportador', 'preguntas', 'alertas_stock'] : d.modulos,
-     d.alta === 'radar' ? 0 : d.alta === 'prueba' ? 50 : 100])
+     d.alta === 'radar' ? 0 : 100])
+  // Prueba gratis (y altas manuales, Fundador, Demo): 500 créditos una sola vez. Solo Radar: nada.
+  if (d.alta !== 'radar') await client.query(
+    `INSERT INTO ia_creditos (empresa_id, motivo, creditos, nota) VALUES ($1, 'prueba', $2, 'Prueba gratis')`, [emp.id, CREDITOS_PRUEBA])
   const { rows: [user] } = await client.query(
     `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active, email)
      VALUES ($1, $2, $3, 'admin', $4, TRUE, $5) RETURNING id`,
