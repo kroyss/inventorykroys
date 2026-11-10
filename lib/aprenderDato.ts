@@ -51,7 +51,7 @@ export async function aprenderDatoDeRespuesta(db: Pool, preguntaId: string, resp
 
     const r = await llamarClaude<{ dato: string }>({
       sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 200,
-      contenido: `PRODUCTO: ${q.item_titulo ?? '—'}\nPREGUNTA: ${q.texto}\nLO QUE FALTABA: ${q.borrador_falta}\nRESPUESTA DEL VENDEDOR: ${respuesta}`,
+      contenido: `PRODUCTO: ${q.item_titulo ?? '—'}\nPREGUNTA: ${q.texto}\nLO QUE FALTABA: ${falta}\nRESPUESTA DEL VENDEDOR: ${respuesta}`,
     })
     await registrarUso(db, 'fichas', [{ modelo: r.modelo, uso: r.uso }], usuarioId)
     const dato = (r.resultado.dato ?? '').trim().slice(0, 500)
