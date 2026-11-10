@@ -1,5 +1,6 @@
 'use client'
 import MiIA from '@/components/miia/MiIA'
+import { Nuevo } from '@/components/ui/Nuevo'
 import { conDatosDeEjemplo, rellenarVariables } from '@/lib/variablesTexto'
 import { AyudaVariables } from './AyudaVariables'
 import MensajesIAPrueba from '@/components/preguntas/MensajesIAPrueba'
@@ -121,7 +122,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         { value: 'al_comprar' as const, label: 'Al comprar' },
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
         { value: 'pedir', label: 'Pedir calificación', count: pedir },
-        ...(miIA ? [{ value: 'mi_ia' as const, label: 'Mi IA' }] : []),
+        ...(miIA ? [{ value: 'mi_ia' as const, label: <>Mi IA<Nuevo clave="mi_ia" /></> }] : []),
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
         ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
       ]} />

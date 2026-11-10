@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useEffect, useRef, useState } from 'react'
 import { espacioDe } from '@/lib/espacios'
+import { Nuevo, type ClaveNuevo } from '@/components/ui/Nuevo'
 
 interface Props {
   nombre: string
@@ -46,12 +47,12 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
     pagosME && espacioDe(pathname) === 'inventario' && { href: '/pagos-me', label: 'Pagos MercadoEnvíos' },
     // Mi plan (02-11, mig. 141): el admin de un cliente ve su plan y reporta el pago.
     // Mi IA (06-11): la misma página que en Preguntas y Mensajes.
-    miIA       && { href: '/mi-ia',      label: 'Mi IA' },
+    miIA       && { href: '/mi-ia',      label: 'Mi IA', nuevo: 'mi_ia' as const },
     miPlan     && { href: '/mi-plan',    label: 'Mi plan' },
     usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },
     demo       && { href: '/demo',       label: 'Demo · restaurar' },
-  ].filter(Boolean) as { href: string; label: string }[]
+  ].filter(Boolean) as { href: string; label: string; nuevo?: ClaveNuevo }[]
   const fila = 'block px-3 py-2 rounded-md text-sm transition-colors'
 
   return (
@@ -77,7 +78,7 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
           {links.map(l => (
             <Link key={l.href} href={l.href} role="menuitem" onClick={() => setAbierto(false)}
               className={`${fila} ${pathname.startsWith(l.href) ? 'bg-neutral-100 text-neutral-900 font-medium' : 'text-neutral-700 hover:bg-neutral-50'}`}>
-              {l.label}
+              {l.label}{l.nuevo && <Nuevo clave={l.nuevo} />}
             </Link>
           ))}
           <div className="my-1 border-t border-neutral-100" />

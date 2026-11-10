@@ -7,6 +7,7 @@ import { AbrirFicha } from './FichaPublicacion'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { DatosDeItem, DatosProductos } from './DatosProducto'
 import MiIA from '@/components/miia/MiIA'
+import { Nuevo } from '@/components/ui/Nuevo'
 import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
 import { IaAutomatica } from './IaAutomatica'
 import { useSearchParams } from 'next/navigation'
@@ -334,7 +335,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
       <Tabs value={vista} onChange={v => { setVista(v); setPage(1) }} items={[
         { value: 'pendientes', label: 'Sin responder', count: cont?.pendientes },
         { value: 'respondidas', label: 'Historial', count: cont?.respondidas },
-        ...(isAdmin ? [{ value: 'cuentas' as const, label: 'Configuración' }] : []),
+        ...(isAdmin ? [{ value: 'cuentas' as const, label: <>Configuración{miIA && <Nuevo clave="mi_ia" />}</> }] : []),
       ]} />
 
       {vista === 'cuentas' ? (
@@ -344,7 +345,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
               {/* 10-11 (el dueño): Mi IA, Datos de cada producto, Respuestas rápidas; «Respuesta automática con IA» solo la plataforma. */}
               {([['mi_ia', 'Mi IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Datos de cada producto'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA']] as const).filter(([k]) => (k !== 'ia_auto' || verAvisosInternos) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
-                  className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
+                  className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}{k === 'mi_ia' && <Nuevo clave="mi_ia" />}</button>
               ))}
             </div>
             {subConfig === 'mi_ia' && miIA && <MiIA />}

@@ -5,6 +5,7 @@ import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FrenosIA } from '@/components/preguntas/FrenosIA'
 import { ResponderTodo } from '@/components/ia/ResponderTodo'
+import { useVistoNuevo } from '@/components/ui/Nuevo'
 
 // Mi IA (06-11, lib/miIA.ts): cuestionario paso a paso (una pantalla por tema) + página con una tarjeta por tema.
 // La misma en Preguntas → Configuración, en Mensajes y en el menú de usuario (/mi-ia). Guarda en cada "Siguiente".
@@ -760,6 +761,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA() {
+  useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
   const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
