@@ -17,6 +17,7 @@ interface Orden {
   guia_impresa: boolean; reportada_at: string | null
   // 10-11: usa Pagos ME pero no se buscaron los pagos después del plazo (va a Revisar) · tiene pago en Pagos ME.
   falta_traer?: boolean; con_pago?: boolean
+  sin_traer?: boolean   // no se buscaron los pagos desde la venta
   chat?: { at: string; comprador: boolean | null } | null   // último mensaje de la venta (y si fue del comprador)
 }
 interface Plantillas {
@@ -343,7 +344,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                             ? (datos.conReportador && !o.reportada_at ? 'Falta reportar la guía' : null)
                             : o.sistema_estado ? null
                             : o.con_pago ? 'Pagó · falta la guía'
-                            : o.falta_traer ? 'Falta traer pagos (Traer pagos y guías)'
+                            : o.sin_traer ? 'Falta traer pagos (Traer pagos y guías)'
                             : 'Sin pago todavía'
                           return falta && <div className="mt-0.5 text-xs text-neutral-600">{falta}</div>
                         })()}

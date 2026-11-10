@@ -196,7 +196,7 @@ const PAGO_ME = `EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text
  *  pago" no es seguro (pudo pagar y el sistema no lo sabe). En vez de "no concretada" va a 'revisar' (decide una persona,
  *  nunca se califica sola). Tocando "Traer pagos y guías" se aclara sola. Quien no usa Pagos ME sigue igual. */
 const FALTA_TRAER = `(m.traer_ok_at IS NOT NULL AND m.traer_ok_at < o.fecha + make_interval(days => $1))`
-const EXTRA = `${FALTA_TRAER} AS falta_traer, ${PAGO_ME} AS con_pago`
+const EXTRA = `${FALTA_TRAER} AS falta_traer, (m.traer_ok_at IS NOT NULL AND m.traer_ok_at < o.fecha) AS sin_traer, ${PAGO_ME} AS con_pago`
 
 /** SQL de la bandeja: ventas sin calificar + su estado en el sistema + sugerencia. */
 export const SQL_BANDEJA = `
