@@ -713,6 +713,11 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
   toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
+  Abajo de la lista: **Vencidas** = ventas de más de N días (el plazo de «no concretada» de Calificaciones) sin pago y
+  **todavía sin calificar**: Calificaciones las sugiere como no concretadas; se ven hasta los 8 días de la compra y las
+  ya calificadas salen solas. **Calificadas como concretadas sin venta registrada** (aviso amarillo, con Inventario):
+  en ML quedaron concretadas pero aquí no hay venta ni pago; si se vendió, regístrala para descontar el inventario.
+  **No se concretaron** = las marcadas a mano «No se concretó» (se ven 30 días para ver quién y deshacer).
 - **Presupuestos** (Ventas → ícono de hoja junto a las fechas; en prueba, solo algunas empresas): cotizaciones para un cliente.
   **+ Nuevo presupuesto:** cliente (cédula/RIF y teléfono opcionales), productos del inventario (el precio se carga
   solo y se puede cambiar) o **ítems libres** (servicio, envío), moneda (US$, Bs o pesos), descuento % y cuántos días

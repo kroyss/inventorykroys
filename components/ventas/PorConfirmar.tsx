@@ -555,7 +555,9 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
     .some(t => (t ?? '').toLowerCase().includes(q))
   const filas = datos.filas.filter(coincide)
   const vigentes = filas.filter(f => !f.vencida)
-  const vencidas = filas.filter(f => f.vencida)
+  const vencidas = filas.filter(f => f.vencida && !f.concretadaSinVenta)
+  // 10-11: calificadas como concretadas sin venta ni pago en el sistema (solo con inventario: sin él no se registran ventas).
+  const concretadasSinVenta = sinInventario ? [] : filas.filter(f => f.concretadaSinVenta)
   const conPago = vigentes.filter(f => f.pago && f.pago.verificacion !== 'invalido')
   const sinPago = vigentes.filter(f => !conPago.includes(f))
   // Sin inventario: por verificar · listos para despachar (verificados en los últimos 3 días) · sin pago.
@@ -711,6 +713,17 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
               {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />)}
             </ul>
           )}
+        </div>
+      )}
+      {concretadasSinVenta.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60">
+          <div className="px-4 py-2.5">
+            <p className="text-sm font-medium text-amber-900">Calificadas como concretadas sin venta registrada <span className="text-amber-700">{concretadasSinVenta.length}</span></p>
+            <p className="text-xs text-amber-800">En MercadoLibre quedaron concretadas, pero aquí no hay venta registrada ni pago. Revisa: si se vendió, regístrala para descontar el inventario.</p>
+          </div>
+          <ul className="divide-y divide-amber-100 border-t border-amber-200 bg-white">
+            {concretadasSinVenta.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />)}
+          </ul>
         </div>
       )}
       <ListaNoConcretadas filas={datos.noConcretadas ?? []} />

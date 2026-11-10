@@ -54,6 +54,8 @@ export interface PorConfirmar {
   /** Tiene nota de la venta (la copia guardada; la escrita directo en ML se ve cuando el sistema la trae). */
   nota: boolean
   vencida: boolean
+  /** 10-11: vencida que ya se calificó como CONCRETADA en ML sin venta ni pago en el sistema: revisar. */
+  concretadaSinVenta?: boolean
   // Algún producto vinculado no alcanza en stock (con inventario): "No se concretó" propone el motivo "Sin stock".
   sinStock: boolean
   // Su guía ya está en Despachos (23-10): para no trabajarla dos veces.
@@ -84,7 +86,8 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
             p.banco_nivel, p.banco_motivo, p.banco_mov, p.banco_at,
             (SELECT CASE WHEN bool_or(e.reportado_at IS NOT NULL) THEN 'reportada' WHEN bool_or(e.impresa) THEN 'impresa' ELSE 'en_lote' END FROM despacho_etiquetas e
              WHERE e.venta IN (o.id::text, o.pack_id::text)) AS despacho,
-            (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida
+            (p.verificacion IS NULL OR p.verificacion = 'invalido') AND o.fecha < NOW() - make_interval(days => $1) AS vencida,
+            o.cal_vendedor IS NOT NULL AS calificada, COALESCE(o.cal_concretada, FALSE) AS cal_concretada
      FROM ml_ordenes o
      JOIN ml_conexiones x ON x.id = o.conexion_id
      -- Cruces por igualdad (2026-10-13): con "IN (o.id, o.pack_id)" Postgres no usaba los índices y
@@ -177,11 +180,18 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
       mensaje: r.msg_texto ? { texto: r.msg_texto, at: r.msg_at } : null,
       escribio: escribioDe.get(r.numero) ?? [], nota: !!r.tiene_nota,
       vencida: r.vencida, sinStock, despacho: r.despacho ?? null,
+      ...(r.vencida && r.calificada && r.cal_concretada ? { concretadaSinVenta: true } : {}),
+      calificada: !!r.calificada,
     }
   })
   // Un pack con varias órdenes sale una sola vez (la primera, la más nueva).
   const vistos = new Set<string>()
-  return { dias, filas: filas.filter(f => !vistos.has(f.numero) && !!vistos.add(f.numero)) }
+  // 10-11 (el dueño): las vencidas ya calificadas no son trabajo (Calificaciones no las muestra): salen de la lista, salvo
+  // la calificada como concretada sin venta ni pago, que queda aparte para revisar.
+  return { dias, filas: filas
+    .filter(f => !(f.vencida && (f as { calificada?: boolean }).calificada && !f.concretadaSinVenta))
+    .map(({ calificada: _c, ...f }: PorConfirmar & { calificada?: boolean }) => { void _c; return f })
+    .filter(f => !vistos.has(f.numero) && !!vistos.add(f.numero)) }
 }
 
 export async function noConcretadas(db: Pool): Promise<NoConcretada[]> {
