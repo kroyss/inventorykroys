@@ -409,6 +409,11 @@ usuario la tienen):
 - **Vincular:** unir cada publicación (o variante) con su producto.
 - **Stock:** el stock que muestra cada cuenta de ML contra tu inventario.
 - **Promociones** (Venezuela): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis.
+  Campañas propias: **Editar** cambia la fecha de fin (máx. 31 días desde que empezó; una vencida ya no se puede editar).
+  **Pausar** les quita el descuento a todas sus publicaciones sin borrar la campaña y recuerda cuáles eran; **Reanudar**
+  las vuelve a poner con el mismo %. **Renovar** (vencida o por vencer en 3 días) crea una campaña nueva desde hoy con
+  el mismo nombre y % y propone las mismas publicaciones. **Borrar campaña** la quita para siempre (primero les quita el
+  descuento). Por Telegram avisa 3 días antes de que venza una campaña propia.
 
 **Editar** sirve para cambiar tus publicaciones **sin entrar a ML**, con una pantalla parecida a la de ML.
 
@@ -668,7 +673,7 @@ escribe a ti.
 - Calificación contradictoria.
 - Venta sin pago que ML va a concretar sola (dos días antes).
 - Producto agotado (y opcionalmente por agotarse). Puede llegar hasta 1 hora después.
-- Promociones de MercadoLibre: campaña nueva y campañas por cerrar.
+- Promociones de MercadoLibre: campaña nueva, campañas por cerrar y tus campañas propias que vencen en 3 días.
 - **Resumen de la mañana** y **cierre del día** con lo que quedó pendiente.
 - Los **lunes**, el resumen de la mañana trae además **Tu semana** (en prueba, solo algunas empresas): ventas,
   preguntas, tiempo de respuesta y calificaciones de los últimos 7 días contra los 7 anteriores, y el termómetro de

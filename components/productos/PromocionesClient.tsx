@@ -34,7 +34,9 @@ export interface AccionHecha {
 
 type Filtro = 'todas' | 'adentro' | 'candidatas' | 'quita' | 'margen' | 'tealca' | 'destino' | 'sin_peso'
 type Modal =
-  | { tipo: 'agregar'; claves: string[]; campana: string; pct: number }
+  // pausa (11-11): al terminar bien, se olvida la pausa de esa campaña (Reanudar / Renovar).
+  | { tipo: 'agregar'; claves: string[]; campana: string; pct: number; pausa?: { conexionId: number; id: string } }
+  | { tipo: 'renovar'; campana: CampanaVista }
   | { tipo: 'nueva' }
   | { tipo: 'editar'; campana: CampanaVista }
   | null
@@ -82,8 +84,10 @@ const ENVIO: Record<EstadoEnvio, { t: string; c: string }> = {
 }
 const Chip = ({ e }: { e: EstadoEnvio }) => <span className={`inline-block px-2 py-0.5 rounded-full border text-[11px] ${ENVIO[e].c}`}>{ENVIO[e].t}</span>
 
-export default function PromocionesClient({ filas, campanas: campanasBase, cuentas, pesosAl, conPagosME, historial }: {
+export default function PromocionesClient({ filas, campanas: campanasBase, cuentas, pesosAl, conPagosME, historial, pausas = {} }: {
   filas: FilaPromo[]; campanas: CampanaVista[]
+  /** 11-11: campañas propias pausadas → las publicaciones que tenían (clave conexión|campaña). */
+  pausas?: Record<string, string[]>
   cuentas: { id: number; nombre: string; actualizado_at: string; error: string | null }[]
   pesosAl: string | null; conPagosME: boolean; historial: AccionHecha[]
 }) {
@@ -327,6 +331,50 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
       `No se pudo borrar la campaña «${c.nombre}».`)
     setBusy(null)
   }
+  // ── Pausar / Reanudar / Renovar (11-11, pedido del dueño) ──
+  const [ahora] = useState(() => Date.now())
+  const [pendiente, setPendiente] = useState<Extract<Modal, { tipo: 'agregar' }> | null>(null)
+  // Renovar: la campaña nueva aparece en la lista al recargar; recién ahí se abre la ventana de agregar.
+  useEffect(() => {
+    if (!pendiente || !campanas.some(c => `${c.conexionId}|${c.id}` === pendiente.campana)) return
+    setModal(pendiente); setPendiente(null)   // eslint-disable-line react-hooks/set-state-in-effect
+  }, [pendiente, campanas])
+  const venceProntoOVencio = (c: CampanaVista) => c.estado === 'finished' || (!!c.fin && Date.parse(c.fin) - ahora < 3 * 864e5)
+  const pausar = async (c: CampanaVista) => {
+    if (!await confirmar({
+      title: 'Pausar campaña',
+      message: `Se les quita el descuento a las ${c.adentro} publicaciones de «${c.nombre}» (vuelven a su precio). La campaña no se borra y el sistema recuerda cuáles eran: con «Reanudar» vuelven con el mismo % mientras la campaña siga vigente.`,
+      confirmText: 'Pausar', danger: true,
+    })) return
+    setBusy(`pausar-${c.id}`); setError(null); setAviso('Leyendo las publicaciones de la campaña…')
+    try {
+      const r = await fetch(`/api/promociones/pausa?conexion=${c.conexionId}&id=${encodeURIComponent(c.id)}`)
+      const d = await r.json().catch(() => ({}))
+      const items: string[] = d.items ?? []
+      if (!r.ok || !items.length) { setAviso(null); setError(d.error ?? 'No se encontraron publicaciones en la campaña.'); return }
+      const g = await fetch('/api/promociones/pausa', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conexionId: c.conexionId, id: c.id, items }) })
+      if (!g.ok) { setAviso(null); setError('No se pudo guardar la pausa; no se tocó nada.'); return }
+      let ok = 0, mal = 0
+      for (let i = 0; i < items.length; i += 10) {
+        setAviso(`Pausando «${c.nombre}»: ${Math.min(i + 10, items.length)} de ${items.length}… no cierres esta pantalla.`)
+        const q = await fetch('/api/promociones/acciones', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accion: 'quitar', conexionId: c.conexionId, campana: { id: c.id, tipo: 'SELLER_CAMPAIGN', nombre: c.nombre },
+            items: items.slice(i, i + 10).map(id => ({ id })) }) })
+        const j = await q.json().catch(() => ({}))
+        const res = (j.resultados ?? []) as { ok: boolean; error?: string }[]
+        ok += res.filter(x => x.ok || /ya no está/.test(x.error ?? '')).length; mal += res.filter(x => !x.ok && !/ya no está/.test(x.error ?? '')).length
+        if (!q.ok && !res.length) mal += items.slice(i, i + 10).length
+      }
+      if (mal) { setAviso(null); setError(`Pausada a medias: ${ok} sin descuento, ${mal} no salieron (prueba «Pausar» de nuevo).`) }
+      else setAviso(`✓ «${c.nombre}» pausada: ${ok} publicaciones volvieron a su precio. Con «Reanudar» vuelven con el mismo %.`)
+    } finally { setBusy(null); router.refresh() }
+  }
+  const reanudar = (c: CampanaVista) => {
+    const k = `${c.conexionId}|${c.id}`
+    setModal({ tipo: 'agregar', campana: k, pct: pctDe(c), pausa: { conexionId: c.conexionId, id: c.id },
+      claves: (pausas[k] ?? []).map(id => `${c.conexionId}|${id}`).filter(x => porClave.has(x)) })
+  }
   const guardarMargen = (v: number) => { setMargenMin(v); try { localStorage.setItem('promo_margen_min', String(v)) } catch { /* sin storage */ } }
 
   const sinFoto = cuentas.length === 0
@@ -401,10 +449,23 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                           disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1"
                           title="Cambiar el precio de las que ya están en esta campaña (por ejemplo, de 10% a 15%)">Cambiar % de las {c.adentro}</button>
                       )}
-                      {propia && (
+                      {propia && c.estado !== 'finished' && (
                         <button onClick={() => setModal({ tipo: 'editar', campana: c })} disabled={!!busy} className="underline text-neutral-500 hover:text-neutral-800">
                           Editar
                         </button>
+                      )}
+                      {/* 11-11: pausar (sacar todas recordando cuáles), reanudar y renovar. */}
+                      {propia && c.estado === 'started' && c.adentro > 0 && (
+                        <button onClick={() => pausar(c)} disabled={!!busy} className="underline text-neutral-500 hover:text-amber-700">
+                          {busy === `pausar-${c.id}` ? 'Pausando…' : 'Pausar'}
+                        </button>
+                      )}
+                      {propia && c.estado !== 'finished' && (pausas[k]?.length ?? 0) > 0 && (
+                        <button onClick={() => reanudar(c)} disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1">Reanudar {pausas[k].length}</button>
+                      )}
+                      {propia && venceProntoOVencio(c) && (
+                        <button onClick={() => setModal({ tipo: 'renovar', campana: c })} disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1"
+                          title="Campaña nueva con el mismo nombre y %, desde hoy, con las mismas publicaciones">Renovar</button>
                       )}
                       {propia && (
                         <button onClick={() => borrarCampana(c)} disabled={!!busy} className="underline text-neutral-400 hover:text-red-700">
@@ -560,12 +621,28 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
       {modal?.tipo === 'agregar' && (
         <AgregarModal modal={modal} setModal={setModal} filas={modal.claves.map(k => porClave.get(k)).filter(Boolean) as Vista[]}
           campanas={campanas} margenA={margenA} margenMin={margenMin} tablas={tablas}
-          onHecho={(msg, err) => { setModal(null); if (err) setError(err); else { setAviso(msg); setSel(new Set()) } router.refresh() }} />
+          onHecho={(msg, err) => {
+            const pausa = modal.pausa
+            setModal(null); if (err) setError(err); else { setAviso(msg); setSel(new Set()) }
+            // Reanudada o renovada: se olvida la pausa (si algo falló, queda para reintentar).
+            if (!err && pausa) fetch(`/api/promociones/pausa?conexion=${pausa.conexionId}&id=${encodeURIComponent(pausa.id)}`, { method: 'DELETE' }).finally(() => router.refresh())
+            else router.refresh()
+          }} />
       )}
       {modal?.tipo === 'nueva' && (
         <NuevaCampanaModal cuentas={cuentas} conexionInicial={selVistas[0]?.conexionId ?? cuentas[0]?.id}
           onCerrar={() => setModal(null)}
           onCreada={nombre => { setModal(null); setAviso(`Campaña "${nombre}" creada. Selecciona publicaciones y usa "Agregar a una campaña…".`); router.refresh() }} />
+      )}
+      {modal?.tipo === 'renovar' && (
+        <RenovarModal campana={modal.campana} onCerrar={() => setModal(null)}
+          onCreada={(nueva, items, pct, msg) => {
+            setModal(null); setAviso(msg)
+            const pausa = pausas[`${modal.campana.conexionId}|${modal.campana.id}`] ? { conexionId: modal.campana.conexionId, id: modal.campana.id } : undefined
+            if (items.length) setPendiente({ tipo: 'agregar', campana: `${modal.campana.conexionId}|${nueva}`, pct, pausa,
+              claves: items.map(id => `${modal.campana.conexionId}|${id}`).filter(x => porClave.has(x)) })
+            router.refresh()
+          }} />
       )}
       {modal?.tipo === 'editar' && (
         <EditarCampanaModal campana={modal.campana} onCerrar={() => setModal(null)}
@@ -1012,6 +1089,63 @@ function NuevaCampanaModal({ cuentas, conexionInicial, onCerrar, onCreada }: {
 
 /** Fecha YYYY-MM-DD en hora de Venezuela de un instante de ML. */
 const diaVE = (s: string | null) => s ? new Date(s).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }) : hoyMas(0)
+
+/** Renovar (11-11): campaña nueva con el mismo nombre y %, desde HOY (ML no guarda publicaciones en una que no empezó),
+ *  y después la ventana de agregar con las publicaciones que tenía la vieja (o las que se pausaron). */
+function RenovarModal({ campana, onCerrar, onCreada }: { campana: CampanaVista; onCerrar: () => void
+  onCreada: (nuevaId: string, items: string[], pct: number, msg: string) => void }) {
+  const duro = campana.inicio && campana.fin ? Math.max(1, Math.round((Date.parse(campana.fin) - Date.parse(campana.inicio)) / 864e5)) : 15
+  const [f, setF] = useState({ nombre: campana.nombre, pct: campana.pctDefecto ?? 15, hasta: hoyMas(Math.min(duro, MAX_DIAS_CAMPANA) - 1) })
+  const desde = hoyMas(0)
+  const maxHasta = sumarDias(desde, MAX_DIAS_CAMPANA - 1)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const renovar = async () => {
+    setEnviando(true); setError(null)
+    try {
+      const li = await fetch(`/api/promociones/pausa?conexion=${campana.conexionId}&id=${encodeURIComponent(campana.id)}`)
+      const items: string[] = (await li.json().catch(() => ({}))).items ?? []
+      const r = await fetch('/api/promociones/campanas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conexionIds: [campana.conexionId], nombre: f.nombre, pct: f.pct, desde, hasta: f.hasta }) })
+      const d = await r.json().catch(() => ({}))
+      const nueva = (d.resultados as { ok: boolean; id?: string }[] | undefined)?.find(x => x.ok && x.id)?.id
+      if (!r.ok || !nueva) { setError(d.error ?? 'MercadoLibre no creó la campaña. Prueba de nuevo en un momento.'); return }
+      onCreada(nueva, items, f.pct, items.length
+        ? `Campaña «${f.nombre}» creada. Revisa y confirma las ${items.length} publicaciones que tenía la anterior.`
+        : `Campaña «${f.nombre}» creada. La anterior no tenía publicaciones guardadas: agrégalas con «Agregar a una campaña…».`)
+    } finally { setEnviando(false) }
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onCerrar}>
+      <div className="bg-white rounded-xl w-full max-w-md p-4 space-y-3 text-sm" onClick={e => e.stopPropagation()}>
+        <h2 className="text-base font-semibold">Renovar · {campana.nombre}</h2>
+        <p className="text-xs text-neutral-500">Se crea una campaña nueva <b>desde hoy</b> en {campana.cuentas.join(', ')} y después eliges cuáles de sus publicaciones
+          entran (con las mismas protecciones de envío gratis). {campana.estado !== 'finished' && 'La anterior sigue hasta su fecha de fin.'}</p>
+        <label className="block space-y-1"><span className="text-xs text-neutral-500">Nombre</span>
+          <input value={f.nombre} maxLength={60} onChange={e => setF({ ...f, nombre: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1"><span className="text-xs text-neutral-500">Descuento</span>
+            <span className="flex items-center gap-1">
+              <input type="number" min={1} max={80} value={f.pct || ''} onChange={e => setF({ ...f, pct: Math.max(0, Math.min(80, Number(e.target.value) || 0)) })}
+                className="w-20 border border-neutral-300 rounded-lg px-2 py-1.5 text-right" />%
+            </span>
+          </label>
+          <label className="space-y-1"><span className="text-xs text-neutral-500">Hasta (máx. {MAX_DIAS_CAMPANA} días)</span>
+            <input type="date" value={f.hasta} min={desde} max={maxHasta} onChange={e => setF({ ...f, hasta: e.target.value })} className="w-full border border-neutral-300 rounded-lg px-2 py-1.5" />
+          </label>
+        </div>
+        {error && <p className="text-red-700 text-xs">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
+          <button onClick={renovar} disabled={enviando || f.nombre.trim().length < 3 || !f.pct || f.hasta > maxHasta || f.hasta < desde} className="btn-primary text-sm">
+            {enviando ? 'Creando…' : 'Renovar desde hoy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /** Campaña propia: cambiar nombre y fechas. Ya empezada, ML solo deja cambiar nombre y fin. */
 function EditarCampanaModal({ campana, onCerrar, onHecho }: { campana: CampanaVista; onCerrar: () => void; onHecho: (msg: string) => void }) {

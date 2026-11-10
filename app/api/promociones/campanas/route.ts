@@ -21,11 +21,12 @@ export async function POST(req: NextRequest) {
   try {
     const b = Nueva.parse(await req.json())
     const { rows: cuentas } = await s.db.query(`SELECT id, nickname FROM ml_conexiones WHERE id = ANY($1::int[]) AND estado = 'activa'`, [b.conexionIds])
-    const resultados: { cuenta: string; ok: boolean; error?: string }[] = []
+    const resultados: { cuenta: string; conexionId: number; ok: boolean; id?: string; error?: string }[] = []
     for (const c of cuentas) {
       const r = await crearCampana(s.db, c.id, s.userId, b.nombre, b.desde, b.hasta)
       if (r.ok) await guardarPctCampana(s.db, r.datos.id, b.pct)
-      resultados.push(r.ok ? { cuenta: c.nickname, ok: true } : { cuenta: c.nickname, ok: false, error: r.error })
+      // 11-11: con el id (Renovar agrega las publicaciones a la campaña nueva enseguida).
+      resultados.push(r.ok ? { cuenta: c.nickname, conexionId: c.id, ok: true, id: r.datos.id } : { cuenta: c.nickname, conexionId: c.id, ok: false, error: r.error })
     }
     const ok = resultados.filter(r => r.ok).length
     return ok ? NextResponse.json({ ok: true, resultados })

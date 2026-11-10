@@ -296,7 +296,7 @@ async function marcarEnFoto(db: Pool, conexionId: number, itemId: string, campan
 }
 
 /** ¿Qué publicaciones tiene esta campaña? Las que ML lista como adentro + las agregadas desde el sistema. */
-async function publicacionesDeCampana(db: Pool, conexionId: number, campanaId: string, tipo: string) {
+export async function publicacionesDeCampana(db: Pool, conexionId: number, campanaId: string, tipo: string) {
   const ids = new Set<string>()
   let despues: string | null = null
   for (let vuelta = 0; vuelta < 20; vuelta++) {

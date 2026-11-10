@@ -306,6 +306,21 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
           + `\n   ${n(r.candidatas)} publicaci${r.candidatas === 1 ? 'ón puede' : 'ones pueden'} entrar todavía`).join('\n')
       if (await mandar(d, e, 'promo_cierra', listaC.map(r => r.ref), html, boton)) enviados++
     }
+    // 11-11 (el dueño): campaña PROPIA que vence en 3 días o menos, para extenderla (Editar) o renovarla a tiempo. La ref lleva
+    // la fecha de fin: si se extiende, vuelve a avisar antes del nuevo fin.
+    const { rows: vencen } = await db.query(
+      `SELECT v.conexion_id || ':' || v.campana_id || ':' || to_char(v.fin, 'YYYY-MM-DD') AS ref, v.nombre, v.fin, x.nickname AS cuenta
+       FROM ml_campanas_vistas v JOIN ml_conexiones x ON x.id = v.conexion_id
+       WHERE v.tipo = 'SELLER_CAMPAIGN' AND v.fin BETWEEN NOW() AND NOW() + INTERVAL '3 days'
+       ORDER BY v.fin`)
+    const nv = await pendientes(d, e, 'promo_vence', vencen.map(r => r.ref))
+    const listaV = vencen.filter(r => nv.has(r.ref))
+    if (listaV.length) {
+      const html = `${cab}⏳ <b>${listaV.length === 1 ? 'Tu campaña vence pronto' : `${listaV.length} campañas tuyas vencen pronto`}</b>\n\n`
+        + listaV.map(r => `• <b>${esc(r.nombre)}</b> · ${esc(r.cuenta)} · vence el ${fechaCorta(r.fin)}`).join('\n')
+        + '\n\nEn Promociones: <b>Editar</b> para extenderla (máx. 31 días desde que empezó) o <b>Renovar</b> para seguir con las mismas publicaciones.'
+      if (await mandar(d, e, 'promo_vence', listaV.map(r => r.ref), html, boton)) enviados++
+    }
   }
 
   // Preguntas sin responder pasados N minutos (de las últimas 24 h; varias juntas en un mensaje).

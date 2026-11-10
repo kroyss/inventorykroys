@@ -37,6 +37,13 @@ export default async function PromocionesPage() {
               WHERE a.creado_at > NOW() - INTERVAL '60 days' ORDER BY a.creado_at DESC LIMIT 300`),
   ])
   const pctCampanas = await leerPctCampanas(db)
+  // 11-11: campañas propias pausadas (Pausar / Reanudar): las publicaciones que tenían.
+  const { rows: pausasRows } = await db.query(`SELECT key, value FROM app_settings WHERE key LIKE 'promo_pausa:%'`)
+  const pausas: Record<string, string[]> = {}
+  for (const r of pausasRows) {
+    const [, conexion, id] = String(r.key).split(':')
+    try { pausas[`${conexion}|${id}`] = JSON.parse(r.value).items ?? [] } catch { /* ignorado */ }
+  }
   const pesoPortal = new Map(portal.map(r => [r.publicacion as string, r.peso as number | null]))
   const producto = new Map(vinculados.map(r => [r.publicacion as string, r as { code: string; peso: number | null; costo: number; unidades: number }]))
   const pesosAl = portal.reduce<string | null>((m, r) => (!m || r.actualizado_at > m ? r.actualizado_at : m), null)
@@ -90,6 +97,7 @@ export default async function PromocionesPage() {
   return (<>
     <PublicacionesMLTabs user={session.user} actual="promociones" />
     <PromocionesClient
+      pausas={pausas}
       filas={filas}
       campanas={[...campanas.values()]}
       cuentas={fotos.map(f => ({ id: f.conexion_id as number, nombre: f.nickname as string, actualizado_at: f.actualizado_at as string, error: f.error as string | null }))}
