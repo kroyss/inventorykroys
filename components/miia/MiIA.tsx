@@ -4,6 +4,7 @@ import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
 import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { FrenosIA } from '@/components/preguntas/FrenosIA'
+import { ResponderTodo } from '@/components/ia/ResponderTodo'
 
 // Mi IA (06-11, lib/miIA.ts): cuestionario paso a paso (una pantalla por tema) + página con una tarjeta por tema.
 // La misma en Preguntas → Configuración, en Mensajes y en el menú de usuario (/mi-ia). Guarda en cada "Siguiente".
@@ -466,7 +467,7 @@ function GuardarDato({ itemId }: { itemId: string }) {
   )
 }
 
-function Prueba({ tipo, encendida, onCambio, abrir, quedan: quedanAl, faltan }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; onCambio: () => void; abrir: (tema: string) => void
+function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
   quedan: number | null; faltan: string[] }) {
   const [usadas, setUsadas] = useState(0)
   const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
@@ -524,6 +525,7 @@ function Prueba({ tipo, encendida, onCambio, abrir, quedan: quedanAl, faltan }: 
         <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="px-3 py-1.5 rounded-lg border border-green-300 bg-white text-sm text-green-800 disabled:opacity-50">
           {cambiando ? '…' : 'Apagar'}</button>
       </div>}
+      {encendida && <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />}
       {error && <p className="text-sm text-red-700">{error}</p>}
       {casos && !casos.length && <p className="text-sm text-neutral-500">{T.vacio}</p>}
       {casos?.map(x => (
@@ -671,7 +673,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA() {
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
   const [sugeridos, setSugeridos] = useState<string[]>([])
@@ -835,9 +837,9 @@ export default function MiIA() {
       {sug && !sugeridos.length && <p className="text-xs text-neutral-500">No encontré nada claro para los temas que faltan.</p>}
       {error && <p className="text-sm text-red-700">{error}</p>}
       {verTexto && datos.texto && <pre className="whitespace-pre-wrap rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">{datos.texto.mensajes}</pre>}
-      <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} onCambio={cargar} abrir={abrirTema}
+      <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} todo={!!datos.iaTodo} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.preguntas : null} faltan={faltan.map(i => PASOS[i].tema)} />
-      <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} onCambio={cargar} abrir={abrirTema}
+      <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
       {(datos.iaAuto !== null || datos.msgAuto != null) && <div className="space-y-1">
         <p className="text-sm font-medium text-neutral-900">Frenos de la respuesta automática</p>

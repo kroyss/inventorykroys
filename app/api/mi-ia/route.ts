@@ -7,7 +7,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
 import { leerPoliticas } from '@/lib/miIAPoliticas'
-import { CLAVE_AUTO } from '@/lib/mensajesIAPrueba'
+import { CLAVE_AUTO, autoTodo } from '@/lib/mensajesIAPrueba'
 import type { Pool } from 'pg'
 import { pruebasQuedan } from '@/lib/miIAPruebasTope'
 
@@ -36,6 +36,9 @@ export async function GET() {
       texto: miIA && esDuenoPlataforma(s.session.user) ? { preguntas: textoMiIA(miIA, 'preguntas'), mensajes: textoMiIA(miIA, 'mensajes') } : null,
       // Parte D: ¿puede encender la respuesta automática desde aquí? (módulo ia_automatica) y en qué modo está.
       iaAuto: tieneModulo(s.session.user, 'ia_automatica') ? (await configIA(s.db)).modo : null,
+      // 10-11: «Responder todo» (sin modo seguro) de cada lado.
+      iaTodo: tieneModulo(s.session.user, 'ia_automatica') ? (await configIA(s.db)).todo === true : false,
+      msgTodo: tieneModulo(s.session.user, 'mensajes_ia') ? await autoTodo(s.db) : false,
       // 09-11: Mensajes automáticos (módulo mensajes_ia): encendido sí/no; null = no lo tiene.
       msgAuto: tieneModulo(s.session.user, 'mensajes_ia') ? await mensajesAuto(s.db) : null,
       // 09-11: pruebas gratis que le quedan hoy (null = sin tope).

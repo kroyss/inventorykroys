@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
-import { CLAVE_AUTO, listaPrueba } from '@/lib/mensajesIAPrueba'
+import { CLAVE_AUTO, listaPrueba, autoTodo } from '@/lib/mensajesIAPrueba'
 import { puede } from '@/lib/permisos'
 import { errorFaltanMiIA, faltanMiIA } from '@/lib/miIA'
 import { frenosDeFabrica } from '@/lib/iaFrenos'
@@ -24,11 +24,12 @@ export async function GET() {
     const { rows: [a] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
     let auto = false
     try { auto = JSON.parse(a?.value ?? '{}').modo === 'real' } catch { /* apagado */ }
-    return NextResponse.json({ ...(await listaPrueba(s.db)), auto, puedeConfigurar: puede(s.session.user, 'automatizaciones_config') })
+    return NextResponse.json({ ...(await listaPrueba(s.db)), auto, todo: await autoTodo(s.db), puedeConfigurar: puede(s.session.user, 'automatizaciones_config') })
   } catch (err) { return apiError(err) }
 }
 
-const Auto = z.object({ auto: z.boolean() })
+// 10-11: { todo } solo cambia «Responder todo» (sin modo seguro) y deja el encendido como está.
+const Auto = z.union([z.object({ auto: z.boolean() }), z.object({ todo: z.boolean() })])
 
 export async function PUT(req: NextRequest) {
   const s = await sesion()
@@ -37,6 +38,16 @@ export async function PUT(req: NextRequest) {
   try {
     const p = Auto.safeParse(await req.json())
     if (!p.success) return NextResponse.json({ error: p.error.message }, { status: 400 })
+    const { rows: [a] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
+    let actual: Record<string, unknown> = {}
+    try { actual = JSON.parse(a?.value ?? '{}') } catch { /* vacío */ }
+    if ('todo' in p.data) {
+      await s.db.query(
+        `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+         ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [CLAVE_AUTO, JSON.stringify({ ...actual, todo: p.data.todo, todoPor: s.session.user.id, todoAt: new Date().toISOString() })])
+      return NextResponse.json({ ok: true, todo: p.data.todo })
+    }
     // 09-11: solo se enciende con Mi IA completo.
     if (p.data.auto && tieneModulo(s.session.user, 'mi_ia')) {
       const faltan = await faltanMiIA(s.db)
@@ -45,7 +56,7 @@ export async function PUT(req: NextRequest) {
     await s.db.query(
       `INSERT INTO app_settings (key, value) VALUES ($1, $2)
        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [CLAVE_AUTO, JSON.stringify({ modo: p.data.auto ? 'real' : 'apagado', por: s.session.user.id, at: new Date().toISOString() })])
+      [CLAVE_AUTO, JSON.stringify({ modo: p.data.auto ? 'real' : 'apagado', todo: p.data.auto && actual.todo === true, por: s.session.user.id, at: new Date().toISOString() })])
     if (p.data.auto) await frenosDeFabrica(s.db)
     return NextResponse.json({ ok: true, auto: p.data.auto })
   } catch (err) { return apiError(err) }

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Cargando } from '@/components/ui'
 import { FrenosIA } from './FrenosIA'
+import { NotaParaIA, ResponderTodo } from '@/components/ia/ResponderTodo'
 
 // Preguntas → Configuración → Respuesta automática con IA (01-11-2026, lib/iaAutomatica.ts).
 // Modo prueba: la IA decide qué habría salido solo, sin publicar; el vendedor marca cada una bien o mal y ve el % de
@@ -15,7 +16,7 @@ interface Eco {
 }
 interface Decision {
   modo: Modo; decision: 'sola' | 'revisar'; motivos: string[]; respuesta?: string; confianza?: string
-  publicada?: boolean; escape?: boolean; error?: string; marca?: 'bien' | 'mal' | null; costo?: number
+  publicada?: boolean; escape?: boolean; sinSeguro?: boolean; error?: string; marca?: 'bien' | 'mal' | null; costo?: number
   entrada?: number; salida?: number; eco?: Eco; eco55?: Eco
 }
 interface ResumenEco {
@@ -25,9 +26,9 @@ interface ResumenEco {
 }
 interface Lado55 { costo: number; tokens: number; solas: number; marcadas: number; bien: number }
 interface Resumen55 { comparadas: number; errores: number; costoReal: number; h45: Lado55; h55: Lado55; sinMarcar: number }
-interface Fila { id: string; texto: string; item_titulo: string | null; item_permalink: string | null; fecha: string; estado: string; respuesta: string | null; ia_auto: Decision }
+interface Fila { id: string; texto: string; item_id?: string | null; item_titulo: string | null; item_permalink: string | null; fecha: string; estado: string; respuesta: string | null; ia_auto: Decision }
 interface Info {
-  modo: Modo; desde: string | null
+  modo: Modo; desde: string | null; todo?: boolean
   faltanMiIA?: string[]
   cupo: { usados: number; limite: number | null; quedan: number | null; agotado: boolean }
   resumen: { procesadas: number; solas: number; revisar: number; marcadas: number; bien: number; costo: number
@@ -117,6 +118,7 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
             </button>
           )})}
         </div>
+        {info.modo === 'real' && <ResponderTodo tipo="preguntas" todo={!!info.todo} onCambio={cargar} />}
         {info.modo !== 'real' && !!info.faltanMiIA?.length && (
           <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
             Para activarla, primero completa <b>Mi IA</b> (pestaña de al lado). Te {info.faltanMiIA.length === 1 ? 'falta 1 tema' : `faltan ${info.faltanMiIA.length} temas`}: <b>{info.faltanMiIA.join(', ')}</b>.
@@ -178,12 +180,14 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
               </div>
               <p className="text-sm rounded-lg bg-sky-50 px-3 py-2 text-sky-950"><span className="text-xs font-semibold text-sky-700 mr-1.5">IA</span>{p.ia_auto.respuesta || '(sin respuesta)'}</p>
               {p.ia_auto.decision === 'revisar' && p.ia_auto.motivos?.length > 0 && <p className="text-xs text-amber-700">Por qué no sale sola: {p.ia_auto.motivos.join(' · ')}</p>}
+              {p.ia_auto.sinSeguro && <p className="text-xs text-amber-800"><b>Salió sin modo seguro.</b> La habría frenado: {(p.ia_auto.motivos ?? []).join(' · ')}</p>}
               {p.ia_auto.publicada && <p className="text-xs text-emerald-700">Publicada sola en MercadoLibre.</p>}
               {p.ia_auto.escape && <p className="text-xs text-sky-700">Se respondió con la frase de «Responder todo».</p>}
               {p.ia_auto.error && <p className="text-xs text-red-600">{p.ia_auto.error}</p>}
               {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
                 <p className="text-sm rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700"><span className="text-xs font-semibold text-neutral-500 mr-1.5">Publicada</span>{p.respuesta}</p>)}
               {!p.respuesta && p.estado === 'UNANSWERED' && <p className="text-xs text-neutral-400">Todavía sin responder.</p>}
+              {p.ia_auto.publicada && <NotaParaIA itemId={p.item_id} />}
               {interno && p.ia_auto.decision === 'revisar' && p.ia_auto.respuesta && (
                 <div className="flex gap-1.5">
                   {([['bien', '✓ Podía salir sola'], ['mal', 'Bien frenada']] as const).map(([m, t]) => (

@@ -23,6 +23,12 @@ async function autoReal(db: Pool) {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
   try { return JSON.parse(r?.value ?? '{}').modo === 'real' } catch { return false }
 }
+// 10-11 (el dueño, mig 163): «Responder todo» = sin modo seguro, manda también lo que iría a revisión (solo respeta los
+// frenos del vendedor: horario y máximo por comprador). Independiente de Preguntas.
+export async function autoTodo(db: Pool) {
+  const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_AUTO])
+  try { const v = JSON.parse(r?.value ?? '{}'); return v.modo === 'real' && v.todo === true } catch { return false }
+}
 
 export const CLAVE_DESDE = 'mensajes_ia_desde'
 async function encendidoDesde(db: Pool) {
@@ -121,6 +127,7 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
   const { rows: [mi] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
   const persona = leerMiIA(mi?.value)?.persona ?? []
   const real = await autoReal(db)
+  const todo = real && await autoTodo(db)
   // Frenos (07-11, lib/iaFrenos.ts): horario y tope por comprador, y la frase de escape. Solo en modo real.
   const frenos = real ? await leerFrenos(db) : null
   let listos = 0, errores = 0, enviadas = 0, escapes = 0
@@ -141,12 +148,13 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
         topeOHorario = await motivosFrenos(db, frenos, country, 'mensajes', cv?.comprador_id ?? null)
         motivos.push(...topeOHorario)
       }
-      const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length ? 'revisar' : 'sola'
+      const sinSeguro = todo && !!b.respuesta && motivos.length > 0 && !topeOHorario.length
+      const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length && !sinSeguro ? 'revisar' : 'sola'
       await registrarUso(db, cliente ? 'mensajes' : 'simulacion', [{ modelo: b.modelo, uso: b.uso }], null)
       await db.query(
         `UPDATE ml_mensajes_ia SET estado = 'listo', comprador = $2, respuesta = $3, confianza = $4, falta_dato = $5,
-           decision = $6, motivos = $7, modelo = $8, costo = $9 WHERE id = $1`,
-        [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costoDe(b.modelo, b.uso)])
+           decision = $6, motivos = $7, modelo = $8, costo = $9, sin_seguro = $10 WHERE id = $1`,
+        [r.id, comprador, b.respuesta || null, b.confianza, b.falta_dato, decision, motivos, b.modelo, costoDe(b.modelo, b.uso), sinSeguro])
       listos++
       for (const [tipo, resumen] of [['pedido', b.pedido_especial], ['reclamo', b.reclamo]] as const) {
         if (!resumen) continue
@@ -219,7 +227,7 @@ export async function borradorPrueba(db: Pool, pack: string) {
 export async function listaPrueba(db: Pool) {
   const { rows } = await db.query(
     `SELECT i.id::text, i.pack_id::text, i.mensaje_at, i.comprador, i.estado, i.respuesta, i.confianza, i.decision, i.motivos,
-            i.error, i.marca, i.enviada_at, i.escape_at, i.envio_error, c.comprador_nombre, c.comprador_nick, c.productos, x.nickname AS cuenta,
+            i.error, i.marca, i.enviada_at, i.escape_at, i.envio_error, i.sin_seguro, c.comprador_nombre, c.comprador_nick, c.productos, x.nickname AS cuenta,
             (SELECT string_agg(m.texto, E'\\n' ORDER BY m.fecha) FROM (
                SELECT texto, fecha FROM ml_mensajes m WHERE m.pack_id = i.pack_id AND m.propio AND m.fecha > i.mensaje_at
                ORDER BY fecha LIMIT 2) m) AS equipo

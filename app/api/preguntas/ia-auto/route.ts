@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     // 06-11: por defecto se mide desde el cambio a Haiku 5.5 (?todo=1 = todo el historial).
     const desde = new URL(req.url).searchParams.get('todo') ? null : CAMBIO_HAIKU55
     const { rows } = await s.db.query(
-      `SELECT id::text, texto, item_titulo, item_permalink, to_char(fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha, estado, respuesta, ia_auto
+      `SELECT id::text, texto, item_id, item_titulo, item_permalink, to_char(fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha, estado, respuesta, ia_auto
        FROM ml_preguntas WHERE ia_auto IS NOT NULL AND ia_auto->>'estado' IS DISTINCT FROM 'procesando'
          AND ($1::text IS NULL OR ia_auto->>'fecha' >= $1)
        ORDER BY fecha DESC LIMIT 400`, [desde])
@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
 
 const Accion = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('modo'), modo: z.enum(['apagado', 'real']) }),   // 09-11: sin 'sombra' (Modo prueba)
+  z.object({ accion: z.literal('todo'), todo: z.boolean() }),                      // 10-11: «Responder todo» (sin modo seguro)
   z.object({ accion: z.literal('marcar'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable() }),
   z.object({ accion: z.literal('marcar_eco'), id: z.string().regex(/^\d+$/), marca: z.enum(['bien', 'mal']).nullable(),
     campo: z.enum(['eco', 'eco55']).default('eco') }),
@@ -128,9 +129,17 @@ export async function POST(req: NextRequest) {
       await s.db.query(
         `INSERT INTO app_settings (key, value) VALUES ($1, $2)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde, v2: actual.v2 !== false,
+        [CLAVE_IA_AUTO, JSON.stringify({ modo: b.modo, desde, v2: actual.v2 !== false, todo: b.modo === 'real' && actual.todo === true,
           ...(b.modo === 'real' ? { por: s.session.user.id, at: new Date().toISOString() } : {}) })])
       if (b.modo === 'real') await frenosDeFabrica(s.db)
+    } else if (b.accion === 'todo') {
+      const { rows: [a] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [CLAVE_IA_AUTO])
+      let v: Record<string, unknown> = {}
+      try { v = JSON.parse(a?.value ?? '{}') } catch { /* vacío */ }
+      await s.db.query(
+        `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+         ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [CLAVE_IA_AUTO, JSON.stringify({ ...v, todo: b.todo, todoPor: s.session.user.id, todoAt: new Date().toISOString() })])
     } else if (b.accion === 'marcar_eco') {
       await s.db.query(
         `UPDATE ml_preguntas SET ia_auto = jsonb_set(ia_auto, ARRAY[$3::text, 'marca'], to_jsonb($2::text))

@@ -215,6 +215,14 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 5. Haz lo mismo en **Mensajes · pruébala con 10 mensajes reales** y **Encender respuestas automáticas en Mensajes**.
 - Para apagarla: el botón **Apagar** en Mi IA (o el modo Apagada en Preguntas → Configuración → Respuesta automática
   con IA). Se apaga al instante.
+- **Segura o Responder todo** (se elige aparte en Preguntas y en Mensajes, una vez encendida): **Segura** (de fábrica)
+  solo manda sola lo que la IA está segura y lo demás te lo deja escrito. **Responder todo** manda todo, sin modo
+  seguro: la IA acierta cerca del 94 % de las preguntas cuando tu Mi IA está completo. Solo se respetan tus frenos
+  (horario y máximo por comprador). Las que salieron así dicen **«Salió sin modo seguro»** y qué la habría frenado.
+- **Corregir a la IA:** en cada respuesta que salió sola (Preguntas → Configuración → Respuesta automática, y Mensajes
+  → IA en prueba) toca **Corregir a la IA** y escribe en qué falló o qué debió decir. Elige **Dato de este producto**
+  (queda en Datos del producto de esa publicación) o **Regla para todas** (queda en Mi IA → Información extra →
+  «Correcciones de mi equipo»). La IA lo usa desde la próxima respuesta.
 - Cada respuesta de la IA usa **1 crédito** (las de prueba no). Si se acaban los créditos, deja de responder sola
   hasta que recargues en Mi plan.
 - Responde solo lo que llega **después** de encenderla.

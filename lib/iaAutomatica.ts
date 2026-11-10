@@ -17,11 +17,14 @@ import { leerFrenos, motivosFrenos, MOTIVO_TOPE } from '@/lib/iaFrenos'
 import { SIN_CONFIRMAR, compatibilidadRespaldada, preguntaDeVehiculo, sinTildes } from '@/lib/iaCompatibilidad'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
-export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean }   // v2 (07-11): desde el 09-11 la de todos ("v2": false la apaga)
+// todo (10-11, el dueño): «Responder todo» = activa SIN modo seguro: publica también lo que los frenos dejarían para revisar
+// (solo respeta los frenos que configura el vendedor: horario y máximo por comprador). Independiente de Mensajes.
+export interface ConfigIA { modo: ModoIA; desde: string | null; v2?: boolean; todo?: boolean }   // v2 (07-11): desde el 09-11 la de todos ("v2": false la apaga)
 export interface DecisionIA {
   modo: ModoIA; decision: 'sola' | 'revisar'; motivos: string[]; respuesta: string; confianza: string
   verificacion: string | null; modelo: string; costo: number; fecha: string; publicada?: boolean; error?: string
   escape?: boolean                          // «Responder todo» (08-11): se contestó con la frase de Preguntas
+  sinSeguro?: boolean                       // 10-11: salió en modo «Responder todo»; motivos = lo que la habría frenado
   version?: 'v2'
   marca?: 'bien' | 'mal' | null; marcada_at?: string
   entrada?: number; salida?: number        // tokens (04-11, para comparar con la versión económica)
@@ -37,7 +40,7 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
   try {
     const v = JSON.parse(r?.value ?? '{}')
     // 09-11: el Modo prueba ('sombra') se quitó: gastaba créditos sin publicar nada. Quien lo tenía queda apagado.
-    return { modo: v.modo === 'real' ? 'real' : 'apagado', desde: v.desde ?? null, v2: v.v2 !== false }
+    return { modo: v.modo === 'real' ? 'real' : 'apagado', desde: v.desde ?? null, v2: v.v2 !== false, todo: v.todo === true }
   } catch { return { modo: 'apagado', desde: null, v2: true } }
 }
 
@@ -149,9 +152,12 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
       const b = await pedirBorrador(c, false, undefined, cfg.v2, true)
       await registrarUso(db, 'preguntas', b.llamadas, null)
       const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c), datosCompatibilidad(c))
-      if (frenos) motivos.push(...await motivosFrenos(db, frenos, country, 'preguntas', q.comprador_id))
+      const deFrenos = frenos ? await motivosFrenos(db, frenos, country, 'preguntas', q.comprador_id) : []
+      motivos.push(...deFrenos)
+      // «Responder todo»: con respuesta escrita sale igual, salvo los frenos del vendedor (horario, máximo por comprador).
+      const sinSeguro = cfg.modo === 'real' && cfg.todo === true && !!b.respuesta && motivos.length > 0 && !deFrenos.length
       const d: DecisionIA = {
-        modo: cfg.modo, decision: motivos.length ? 'revisar' : 'sola', motivos, respuesta: b.respuesta, confianza: b.confianza,
+        modo: cfg.modo, decision: motivos.length && !sinSeguro ? 'revisar' : 'sola', motivos, ...(sinSeguro ? { sinSeguro: true } : {}), respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
         fecha: new Date().toISOString(), ...(cfg.v2 ? { version: 'v2' as const } : {}),
         entrada: b.llamadas.reduce((a, l) => a + (l.uso.input_tokens ?? 0) + (l.uso.cache_creation_input_tokens ?? 0) + (l.uso.cache_read_input_tokens ?? 0), 0),
@@ -180,7 +186,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
            borrador_web = CASE WHEN borrador IS NULL AND $6 THEN FALSE ELSE borrador_web END,
            borrador_at = CASE WHEN borrador IS NULL AND $6 THEN NOW() ELSE borrador_at END
          WHERE id = $1`,
-        [q.id, JSON.stringify(d), b.respuesta || null, b.confianza, motivos.join(' · ') || null, cfg.modo === 'real'])
+        [q.id, JSON.stringify(d), b.respuesta || null, b.confianza, motivos.join(' · ') || null, cfg.modo === 'real' && d.decision === 'revisar'])
       // 08-11: la versión económica en paralelo se apagó: Haiku 5.5 ya escribe la real (la comparación queda como historial).
       // 06-11: la económica ya corre con Haiku 5.5 (MODELO_SIMPLE): la prueba aparte (eco55) quedó como historial.
     } catch (e) {

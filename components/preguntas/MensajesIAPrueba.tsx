@@ -1,13 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { FrenosIA } from './FrenosIA'
+import { NotaParaIA } from '@/components/ia/ResponderTodo'
 
 // Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts): lo que la IA habría respondido a cada mensaje nuevo
 // (NO se mandó nada), lo que respondió el equipo, si habría salido sola, y Bien / Mal para medir.
 type Caso = {
   id: string; pack_id: string; mensaje_at: string; comprador: string | null; estado: string; respuesta: string | null
   confianza: string | null; decision: 'sola' | 'revisar' | 'nada' | null; motivos: string[] | null; error: string | null
-  enviada_at?: string | null; escape_at?: string | null; envio_error?: string | null
+  enviada_at?: string | null; escape_at?: string | null; envio_error?: string | null; sin_seguro?: boolean
   marca: 'bien' | 'mal' | null; comprador_nombre: string | null; comprador_nick: string | null; productos: string | null
   cuenta: string | null; equipo: string | null
 }
@@ -109,7 +110,7 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${c.decision === 'sola' ? 'bg-green-50 text-green-800' : c.decision === 'nada' ? 'bg-neutral-100 text-neutral-600' : 'bg-amber-50 text-amber-800'}`}>
-                  {c.decision === 'sola' ? (c.enviada_at ? '✓ Enviada sola' : c.envio_error ? `No se pudo enviar: ${c.envio_error}` : 'Saldría sola') : c.decision === 'nada' ? 'No respondería' : `A revisión: ${(c.motivos ?? []).join(' · ')}${c.escape_at ? ' · se mandó la frase de escape' : ''}`}</span>
+                  {c.decision === 'sola' ? (c.enviada_at ? (c.sin_seguro ? `✓ Enviada sin modo seguro · la habría frenado: ${(c.motivos ?? []).join(' · ')}` : '✓ Enviada sola') : c.envio_error ? `No se pudo enviar: ${c.envio_error}` : 'Saldría sola') : c.decision === 'nada' ? 'No respondería' : `A revisión: ${(c.motivos ?? []).join(' · ')}${c.escape_at ? ' · se mandó la frase de escape' : ''}`}</span>
                 <div className="flex gap-1">
                   {(['bien', 'mal'] as const).map(m => (
                     <button key={m} type="button" onClick={() => marcar(c, m)}
@@ -118,6 +119,7 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
                   ))}
                 </div>
               </div>
+              {c.enviada_at && <NotaParaIA />}
             </>}
           </div>
         ))}
