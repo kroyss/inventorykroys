@@ -186,7 +186,9 @@ export async function guardarPublicacion(db: Pool, itemId: string, c: CambiosPub
   const partes: string[] = []
   const antes: Record<string, unknown> = {}
 
-  if (c.titulo !== undefined && c.titulo.trim() !== it.title) {
+  // 11-11: sin espacios de más (ver EditorPublicacion): solo cuenta un cambio de verdad.
+  const normal = (t: string) => t.replace(/\s+/g, ' ').trim()
+  if (c.titulo !== undefined && normal(c.titulo) !== normal(it.title ?? '')) {
     if ((it.sold_quantity ?? 0) > 0) errores.push({ parte: 'titulo', mensaje: 'El título no se puede cambiar: la publicación ya tiene ventas (regla de MercadoLibre)' })
     else { body.title = c.titulo.trim(); partes.push('titulo'); antes.titulo = it.title }
   }

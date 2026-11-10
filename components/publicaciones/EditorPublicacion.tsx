@@ -48,7 +48,10 @@ function diferencias(p: Publicacion, b: Borrador) {
   const c: CambiosPublicacion = {}
   const lista: { parte: string; antes: string; despues: string }[] = []
   const errores: string[] = []
-  if (b.titulo.trim() !== p.item.titulo) {
+  // 11-11: comparar sin espacios de más (un título de ML con doble espacio o espacio al final parecía «cambiado» y no
+  // dejaba pausar una publicación con ventas). Si el título no es editable, nunca se manda.
+  const normal = (t: string) => t.replace(/\s+/g, ' ').trim()
+  if (p.item.tituloEditable && normal(b.titulo) !== normal(p.item.titulo)) {
     c.titulo = b.titulo.trim(); lista.push({ parte: 'Título', antes: p.item.titulo, despues: c.titulo })
     if (!c.titulo) errores.push('El título no puede quedar vacío')
   }
