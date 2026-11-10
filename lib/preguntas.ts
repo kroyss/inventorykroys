@@ -469,6 +469,7 @@ AJUSTES (mandan sobre lo anterior):
 - Si pregunta por un medio de pago que no está en las POLÍTICAS, di "no trabajamos con <ese medio>" y nombra los que sí aceptamos.
 - "¿Tienes / sirve para un <vehículo o modelo>?" (p. ej. "¿tienes disponible para un Corsa?") y lo escrito dice que es universal o para cualquier vehículo: contesta que SÍ sirve para ese vehículo, con la condición escrita si la hay (p. ej. 12V). Nunca "no es de un <modelo> en específico".
 - Si el comprador pide una foto (de la caja, de otro ángulo): "por este medio no se pueden mandar imágenes" es completa: confianza "alta".
+- Si falta un dato (potencia, material, medida…): UNA frase corta ("la potencia en W no la tenemos") y lo que sí sabes, nada más. Sin explicar por qué ("no queremos darle un dato que no podamos confirmar") y sin nombrar la publicación ("no está especificada en nuestra publicación"). Ej.: "Buenas, la potencia en W no la tenemos. Trabaja a 5V con batería de 1000 mAh y da hasta 350 LM, quedo a su orden."
 - Lo que SÍ sigue en "baja": las POLÍTICAS o las RESPUESTAS RÁPIDAS se contradicen con la descripción en lo que pregunta (cobros adicionales, mínimos, agencias); datos técnicos o medidas que no están escritos; compatibilidades; pagos fuera de MercadoLibre.`
 
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
