@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Cargando } from '@/components/ui'
 import { FrenosIA } from './FrenosIA'
-import { NotaParaIA, ResponderTodo } from '@/components/ia/ResponderTodo'
+import { NotaParaIA, ResponderTodo, nombreModo } from '@/components/ia/ResponderTodo'
 
 // Preguntas → Configuración → Respuesta automática con IA (01-11-2026, lib/iaAutomatica.ts).
 // Modo prueba: la IA decide qué habría salido solo, sin publicar; el vendedor marca cada una bien o mal y ve el % de
@@ -47,7 +47,8 @@ const usd = (n: number, d = 2) => `$${n.toFixed(d)}`
 const miles = (n: number) => Math.round(n).toLocaleString('de-DE')
 const hora = (f: string) => new Date(`${f}Z`).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
-export function IaAutomatica({ interno = false }: { interno?: boolean }) {
+// 10-11 (el dueño): encender, el modo y los frenos se cambian solo en Mi IA (onMiIA). Sin Mi IA quedan aquí.
+export function IaAutomatica({ interno = false, onMiIA }: { interno?: boolean; onMiIA?: () => void }) {
   const confirm = useConfirm()
   const [info, setInfo] = useState<Info | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +108,12 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
             Solo salen solas las respuestas en que la IA está segura y que pasan todas las revisiones. Las demás te quedan escritas para revisar y enviar.
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
+        {onMiIA && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+          <p className="text-sm text-neutral-800">{info.modo === 'real' ? <>Encendida · <b>{nombreModo(!!info.todo)}</b></> : <>Apagada</>}</p>
+          <button type="button" onClick={onMiIA} className="px-3 py-1.5 rounded-lg border border-neutral-300 bg-white text-sm text-neutral-800 hover:bg-neutral-50">
+            {info.modo === 'real' ? 'Cambiar en Mi IA' : 'Encender en Mi IA'}</button>
+        </div>}
+        {!onMiIA && <div className="grid gap-2 sm:grid-cols-2">
           {MODOS.map(m => {
             const bloqueada = m.v === 'real' && info.modo !== 'real' && !!info.faltanMiIA?.length
             return (
@@ -117,14 +123,14 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
               <div className={`text-xs ${info.modo === m.v ? 'text-neutral-300' : 'text-neutral-500'}`}>{m.d}</div>
             </button>
           )})}
-        </div>
-        {info.modo === 'real' && <ResponderTodo tipo="preguntas" todo={!!info.todo} onCambio={cargar} />}
-        {info.modo !== 'real' && !!info.faltanMiIA?.length && (
+        </div>}
+        {!onMiIA && info.modo === 'real' && <ResponderTodo tipo="preguntas" todo={!!info.todo} onCambio={cargar} />}
+        {!onMiIA && info.modo !== 'real' && !!info.faltanMiIA?.length && (
           <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
             Para activarla, primero completa <b>Mi IA</b> (pestaña de al lado). Te {info.faltanMiIA.length === 1 ? 'falta 1 tema' : `faltan ${info.faltanMiIA.length} temas`}: <b>{info.faltanMiIA.join(', ')}</b>.
           </p>
         )}
-        {!interno && info.modo !== 'real' && !info.faltanMiIA?.length && <p className="text-xs text-sky-800 rounded-lg bg-sky-50 px-3 py-2">Antes de activarla, si quieres, pruébala gratis con 10 preguntas reales en <b>Mi IA</b> (abajo de los temas).</p>}
+        {!onMiIA && !interno && info.modo !== 'real' && !info.faltanMiIA?.length && <p className="text-xs text-sky-800 rounded-lg bg-sky-50 px-3 py-2">Antes de activarla, si quieres, pruébala gratis con 10 preguntas reales en <b>Mi IA</b> (abajo de los temas).</p>}
         <p className="text-xs text-neutral-500">
           Cada pregunta que procesa usa 1 crédito de IA.
           {info.cupo.limite !== null ? <> Te quedan <b>{info.cupo.quedan}</b> de {info.cupo.limite}{info.cupo.agotado ? ' (sin créditos: no procesa hasta recargar)' : ''}.</> : ' Sin límite de créditos.'}
@@ -133,7 +139,7 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
         {error && <p className="text-xs text-red-600">{error}</p>}
       </section>
 
-      <FrenosIA conEscape={false} />
+      {!onMiIA && <FrenosIA preguntas />}
 
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
         {interno && <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -180,9 +186,9 @@ export function IaAutomatica({ interno = false }: { interno?: boolean }) {
               </div>
               <p className="text-sm rounded-lg bg-sky-50 px-3 py-2 text-sky-950"><span className="text-xs font-semibold text-sky-700 mr-1.5">IA</span>{p.ia_auto.respuesta || '(sin respuesta)'}</p>
               {p.ia_auto.decision === 'revisar' && p.ia_auto.motivos?.length > 0 && <p className="text-xs text-amber-700">Por qué no sale sola: {p.ia_auto.motivos.join(' · ')}</p>}
-              {p.ia_auto.sinSeguro && <p className="text-xs text-amber-800"><b>Salió sin modo seguro.</b> La habría frenado: {(p.ia_auto.motivos ?? []).join(' · ')}</p>}
+              {p.ia_auto.sinSeguro && <p className="text-xs text-amber-800"><b>Salió en Modo Total.</b> En Modo Seguro la habría frenado: {(p.ia_auto.motivos ?? []).join(' · ')}</p>}
               {p.ia_auto.publicada && <p className="text-xs text-emerald-700">Publicada sola en MercadoLibre.</p>}
-              {p.ia_auto.escape && <p className="text-xs text-sky-700">Se respondió con la frase de «Responder todo».</p>}
+              {p.ia_auto.escape && <p className="text-xs text-sky-700">Se respondió con la frase de escape.</p>}
               {p.ia_auto.error && <p className="text-xs text-red-600">{p.ia_auto.error}</p>}
               {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
                 <p className="text-sm rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700"><span className="text-xs font-semibold text-neutral-500 mr-1.5">Publicada</span>{p.respuesta}</p>)}

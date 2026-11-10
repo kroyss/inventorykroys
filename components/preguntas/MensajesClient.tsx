@@ -124,7 +124,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
         ...(miIA ? [{ value: 'mi_ia' as const, label: 'Mi IA' }] : []),
       ]} />
-      {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
+      {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => setVista('mi_ia') : undefined} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo

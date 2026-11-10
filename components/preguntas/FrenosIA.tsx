@@ -7,7 +7,8 @@ type Horario = { dias: number[]; desde: string; hasta: string }
 type Frenos = { horario: Horario | null; tope: number; escape: string | null; escapePreguntas: string | null }
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
-export function FrenosIA({ conEscape }: { conEscape: boolean }) {
+// 10-11: se edita solo en Mi IA, con la frase de cada lado que esté disponible.
+export function FrenosIA({ preguntas = false, mensajes = false }: { preguntas?: boolean; mensajes?: boolean }) {
   const [f, setF] = useState<Frenos | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -63,20 +64,20 @@ export function FrenosIA({ conEscape }: { conEscape: boolean }) {
         <span className="w-full text-xs text-neutral-500">La siguiente queda para una persona.</span>
       </div>
 
-      {conEscape && (
+      {mensajes && (
         <div className="space-y-1.5">
-          <p className="text-sm text-neutral-800">Frase de escape <span className="text-neutral-400">(opcional)</span></p>
+          <p className="text-sm text-neutral-800">Frase de escape en Mensajes <span className="text-neutral-400">(opcional, Modo Seguro)</span></p>
           <p className="text-xs text-neutral-500">Cuando la IA no manda la respuesta sola, manda esta frase corta para que el comprador no quede sin contestar. La conversación sigue en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 h. Vacía = no se manda nada.</p>
           <textarea rows={2} maxLength={200} value={f.escape ?? ''} onChange={e => setF({ ...f, escape: e.target.value })}
             onBlur={() => guardar({ ...f, escape: f.escape?.trim() || null })}
             placeholder="Ej.: ¡Recibido! En un momento te confirmamos." className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
         </div>
       )}
-      {!conEscape && (
+      {preguntas && (
         <div className="space-y-1.5">
           <label className="flex items-center gap-2 text-sm text-neutral-800">
             <input type="checkbox" checked={f.escapePreguntas != null} onChange={e => e.target.checked ? setF({ ...f, escapePreguntas: '' }) : guardar({ ...f, escapePreguntas: null })} />
-            Responder todo <span className="text-neutral-400">(opcional)</span>
+            Frase de escape en Preguntas <span className="text-neutral-400">(opcional, Modo Seguro)</span>
           </label>
           <p className="text-xs text-neutral-500 pl-6">Lo que la IA deja para revisar se contesta con esta frase, así ninguna pregunta queda sin respuesta (por ejemplo de noche). Ojo: MercadoLibre acepta <b>una sola respuesta</b> por pregunta, así que esa pregunta queda respondida con la frase. La respuesta de la IA queda escrita para que la veas. No se usa con el tope por comprador ni con publicaciones pausadas.</p>
           {f.escapePreguntas != null && (

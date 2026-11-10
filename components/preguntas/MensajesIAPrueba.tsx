@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { FrenosIA } from './FrenosIA'
-import { NotaParaIA } from '@/components/ia/ResponderTodo'
+import { NotaParaIA, nombreModo } from '@/components/ia/ResponderTodo'
 
 // Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts): lo que la IA habría respondido a cada mensaje nuevo
 // (NO se mandó nada), lo que respondió el equipo, si habría salido sola, y Bien / Mal para medir.
@@ -18,8 +18,9 @@ type Resumen = { total: number; solas: number; revisar: number; nada: number; ma
 const fecha = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0)
 
-export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string) => void }) {
-  const [d, setD] = useState<{ casos: Caso[]; contradicciones?: Contra[]; resumen: Resumen; auto?: boolean; puedeConfigurar?: boolean } | null>(null)
+// 10-11: encender, el modo y los frenos se cambian solo en Mi IA (onMiIA); sin Mi IA quedan aquí.
+export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack: string) => void; onMiIA?: () => void }) {
+  const [d, setD] = useState<{ casos: Caso[]; contradicciones?: Contra[]; resumen: Resumen; auto?: boolean; todo?: boolean; puedeConfigurar?: boolean } | null>(null)
   const [cambiando, setCambiando] = useState(false)
   const cambiarAuto = async (auto: boolean) => {
     if (auto && !confirm('¿Encender los mensajes automáticos? Las respuestas que la IA da por seguras (confianza alta, sin reclamos, pagos ni datos personales) se mandarán solas al comprador.')) return
@@ -50,19 +51,21 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
     <div className="space-y-4">
       <div className={`rounded-xl border p-4 text-sm flex flex-wrap items-center justify-between gap-3 ${d.auto ? 'border-green-200 bg-green-50 text-green-900' : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
         <div className="space-y-1 min-w-0 flex-1">
-          <p className="font-medium">{d.auto ? 'Mensajes automáticos: encendido' : 'Mensajes automáticos: apagado (solo prueba, no manda nada)'}</p>
+          <p className="font-medium">{d.auto ? `Mensajes automáticos: encendido · ${nombreModo(!!d.todo)}` : 'Mensajes automáticos: apagado (solo prueba, no manda nada)'}</p>
           <p className="text-xs">{d.auto
             ? 'Las respuestas que la IA da por seguras se mandan solas unos 2 minutos después del último mensaje del comprador. Las demás quedan escritas en la conversación para que las revise una persona. Reclamos, pagos, datos personales y montos siempre van a una persona.'
             : 'A cada mensaje nuevo de un comprador la IA le deja escrita la respuesta en la conversación (la encuentras al abrirla) y anota si habría salido sola. Marca Bien o Mal para saber si se puede encender.'}</p>
         </div>
-        {d.puedeConfigurar && (
+        {d.puedeConfigurar && onMiIA && <button type="button" onClick={onMiIA}
+          className="shrink-0 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-50">Cambiar en Mi IA</button>}
+        {d.puedeConfigurar && !onMiIA && (
           <button type="button" disabled={cambiando} onClick={() => cambiarAuto(!d.auto)}
             className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${d.auto ? 'border border-green-300 bg-white text-green-800 hover:bg-green-100' : 'bg-neutral-900 text-white hover:bg-neutral-800'}`}>
             {cambiando ? '…' : d.auto ? 'Apagar automático' : 'Encender automático'}
           </button>
         )}
       </div>
-      {d.puedeConfigurar && <FrenosIA conEscape />}
+      {d.puedeConfigurar && !onMiIA && <FrenosIA mensajes />}
       <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
         {[
           ['Mensajes', `${r.total}`, ''],
@@ -110,7 +113,7 @@ export default function MensajesIAPrueba({ onAbrir }: { onAbrir?: (pack: string)
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${c.decision === 'sola' ? 'bg-green-50 text-green-800' : c.decision === 'nada' ? 'bg-neutral-100 text-neutral-600' : 'bg-amber-50 text-amber-800'}`}>
-                  {c.decision === 'sola' ? (c.enviada_at ? (c.sin_seguro ? `✓ Enviada sin modo seguro · la habría frenado: ${(c.motivos ?? []).join(' · ')}` : '✓ Enviada sola') : c.envio_error ? `No se pudo enviar: ${c.envio_error}` : 'Saldría sola') : c.decision === 'nada' ? 'No respondería' : `A revisión: ${(c.motivos ?? []).join(' · ')}${c.escape_at ? ' · se mandó la frase de escape' : ''}`}</span>
+                  {c.decision === 'sola' ? (c.enviada_at ? (c.sin_seguro ? `✓ Enviada en Modo Total · en Modo Seguro la habría frenado: ${(c.motivos ?? []).join(' · ')}` : '✓ Enviada sola') : c.envio_error ? `No se pudo enviar: ${c.envio_error}` : 'Saldría sola') : c.decision === 'nada' ? 'No respondería' : `A revisión: ${(c.motivos ?? []).join(' · ')}${c.escape_at ? ' · se mandó la frase de escape' : ''}`}</span>
                 <div className="flex gap-1">
                   {(['bien', 'mal'] as const).map(m => (
                     <button key={m} type="button" onClick={() => marcar(c, m)}

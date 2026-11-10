@@ -260,7 +260,8 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
             const i = orden.indexOf(k)
             return <button key={k} type="button" onClick={() => set(c => ({ ...c, desconocido: i >= 0 ? orden.filter(x => x !== k) : [...orden, k] }))}
               className={`w-full text-left flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${i >= 0 ? 'border-neutral-900' : 'border-neutral-200'}`}>
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${i >= 0 ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-400'}`}>{i >= 0 ? i + 1 : ''}</span>{DESC[k]}
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${i >= 0 ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-400'}`}>{i >= 0 ? i + 1 : ''}</span>
+              <span>{DESC[k]}{k === 'persona' && <span className="block text-xs text-neutral-500">Solo en Modo Seguro. En Modo Total también salen solas.</span>}</span>
             </button>
           })}
         </div>
@@ -274,7 +275,7 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
         </div>
       </Pregunta>
     }
-    case 'persona': return <Pregunta t="Marca los temas" ayuda="Esas preguntas y mensajes nunca salen solos: van a revisión.">
+    case 'persona': return <Pregunta t="Marca los temas" ayuda="En Modo Seguro esas preguntas y mensajes nunca salen solos: van a revisión. En Modo Total también salen solas.">
       <Varios valor={c.persona} opciones={PERSONA} otroPlaceholder="Otro tema" onChange={v => set(c => ({ ...c, persona: v }))} />
     </Pregunta>
     case 'cambios': return <>
@@ -437,7 +438,7 @@ const TEXTOS = {
     encender: 'Encender respuestas automáticas en Mensajes', encendido: 'Respuestas automáticas en Mensajes: encendidas.' },
 } as const
 
-const ACEPTO = 'La IA responde en tu nombre.\n\nSolo salen solas las respuestas en que está segura. Lo delicado siempre pasa a una persona: reclamos, pagos, datos personales, cuando dice que no hay y los temas que marcaste en «Siempre una persona». Esas quedan escritas para que tu equipo las revise y las mande.\n\nCada respuesta usa 1 crédito de IA. La apagas cuando quieras desde aquí.'
+const ACEPTO = 'La IA responde en tu nombre.\n\nSolo salen solas las respuestas en que está segura. Lo delicado siempre pasa a una persona: reclamos, pagos, datos personales, cuando dice que no hay y los temas que marcaste en «Siempre una persona». Esas quedan escritas para que tu equipo las revise y las mande (Modo Seguro). Después puedes pasar a Modo Total, que responde todo.\n\nCada respuesta usa 1 crédito de IA. La apagas cuando quieras desde aquí.'
 
 // 09-11 (el dueño): desde la prueba, el dato que le faltó o dio mal se guarda en «Datos del producto» de esa publicación
 // (ml_item_notas, /api/preguntas/notas): la IA lo usa desde la próxima pregunta o mensaje. El mismo cuadro de cada pregunta.
@@ -520,19 +521,21 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
           {quedan !== null && <p className="mt-1 text-xs text-neutral-500">Gratis · {quedan === 1 ? 'te queda 1 prueba hoy' : `te quedan ${quedan} pruebas hoy`}</p>}
         </div>
       </div>
-      {encendida && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-        <p className="text-sm text-green-900">{T.encendido}</p>
-        <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="px-3 py-1.5 rounded-lg border border-green-300 bg-white text-sm text-green-800 disabled:opacity-50">
-          {cambiando ? '…' : 'Apagar'}</button>
+      {encendida && <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-green-900">{T.encendido}</p>
+          <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="px-3 py-1 rounded-lg border border-green-300 bg-white text-sm text-green-800 disabled:opacity-50">
+            {cambiando ? '…' : 'Apagar'}</button>
+        </div>
+        <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />
       </div>}
-      {encendida && <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />}
       {error && <p className="text-sm text-red-700">{error}</p>}
       {casos && !casos.length && <p className="text-sm text-neutral-500">{T.vacio}</p>}
       {casos?.map(x => (
         <div key={x.id} className="rounded-lg border border-neutral-200 p-3 space-y-2 text-sm">
           {x.titulo && <p className="text-xs text-neutral-500">{x.titulo}</p>}
           <p className="font-medium text-neutral-900 whitespace-pre-line">{x.texto}</p>
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
             <div className="rounded-lg bg-neutral-50 p-2"><p className="text-xs text-neutral-400">{T.equipo}</p><p className="text-neutral-700">{x.tuya || '—'}</p></div>
             <div className="rounded-lg bg-sky-50 p-2"><p className="text-xs text-sky-700">IA</p><p className="text-neutral-900">{x.ia || (x.decision === 'nada' ? '(no hace falta responder)' : '—')}</p></div>
           </div>
@@ -837,14 +840,13 @@ export default function MiIA() {
       {sug && !sugeridos.length && <p className="text-xs text-neutral-500">No encontré nada claro para los temas que faltan.</p>}
       {error && <p className="text-sm text-red-700">{error}</p>}
       {verTexto && datos.texto && <pre className="whitespace-pre-wrap rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">{datos.texto.mensajes}</pre>}
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
       <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} todo={!!datos.iaTodo} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.preguntas : null} faltan={faltan.map(i => PASOS[i].tema)} />
       <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
-      {(datos.iaAuto !== null || datos.msgAuto != null) && <div className="space-y-1">
-        <p className="text-sm font-medium text-neutral-900">Frenos de la respuesta automática</p>
-        <FrenosIA conEscape={datos.msgAuto != null} />
-      </div>}
+      </div>
+      {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
     </div>
   )
 }

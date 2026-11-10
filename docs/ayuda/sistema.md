@@ -215,10 +215,16 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 5. Haz lo mismo en **Mensajes · pruébala con 10 mensajes reales** y **Encender respuestas automáticas en Mensajes**.
 - Para apagarla: el botón **Apagar** en Mi IA (o el modo Apagada en Preguntas → Configuración → Respuesta automática
   con IA). Se apaga al instante.
-- **Segura o Responder todo** (se elige aparte en Preguntas y en Mensajes, una vez encendida): **Segura** (de fábrica)
-  solo manda sola lo que la IA está segura y lo demás te lo deja escrito. **Responder todo** manda todo, sin modo
-  seguro: la IA acierta cerca del 94 % de las preguntas cuando tu Mi IA está completo. Solo se respetan tus frenos
-  (horario y máximo por comprador). Las que salieron así dicen **«Salió sin modo seguro»** y qué la habría frenado.
+- **Todo se enciende y se cambia en Mi IA** (abajo de los temas): Preguntas y Mensajes van lado a lado (en el
+  celular, una debajo de la otra), cada una con su encendido y su modo. «Respuesta automática con IA» (Preguntas →
+  Configuración) muestra lo que respondió la IA y el botón **Cambiar en Mi IA**.
+- **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida): **Modo Seguro** (de
+  fábrica) solo manda sola lo que la IA está segura y lo demás te lo deja escrito. **Modo Total** responde todo: la IA
+  acierta cerca del 94 % de las preguntas cuando tu Mi IA está completo. En Modo Total la IA responde también lo que en
+  Modo Seguro dejaría para revisar, incluidos los temas de **«Siempre una persona»** y la opción **«Dejarla para una
+  persona»** de «Si no sabe algo» (esas dos solo valen en Modo Seguro; si «Dejarla para una persona» era la única
+  opción, recomienda verificarlo con un técnico). Solo respeta tu horario y el máximo por comprador. Las que salieron
+  así dicen **«Salió en Modo Total»** y qué la habría frenado en Modo Seguro.
 - **Corregir a la IA:** en cada respuesta que salió sola (Preguntas → Configuración → Respuesta automática, y Mensajes
   → IA en prueba) toca **Corregir a la IA** y escribe en qué falló o qué debió decir. Elige **Dato de este producto**
   (queda en Datos del producto de esa publicación) o **Regla para todas** (queda en Mi IA → Información extra →
@@ -228,7 +234,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - Responde solo lo que llega **después** de encenderla.
 - **Siempre pasa a una persona:** reclamos, devoluciones y garantías, pagos y comprobantes, datos personales o de
   envío, cuando la IA diría que no hay, pedidos de otro color o cantidad, montos que no están escritos y los temas que
-  pusiste en «Siempre una persona». En Mensajes esos quedan con la respuesta de la IA ya escrita en la conversación
+  pusiste en «Siempre una persona» (esto es en Modo Seguro; en Modo Total salen todas). En Mensajes esos quedan con la respuesta de la IA ya escrita en la conversación
   («Borrador de la IA · Usar»); en Preguntas, en «Sin responder» con la respuesta escrita.
 - Al encenderla quedan unos **frenos de fábrica** (los cambias en Mi IA → Frenos): máximo 3 respuestas automáticas por
   comprador en 24 horas, sin horario (responde a cualquier hora) y, en Mensajes, una frase corta («¡Hola! Recibimos tu
@@ -237,6 +243,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 
 **Pantalla Respuesta automática con IA** (Preguntas → Configuración):
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
+- (Si tienes Mi IA, el encendido y el modo se cambian allí; esta pantalla solo muestra el estado y el historial.)
 - **Activa:** solo se puede elegir con todos los temas de Mi IA completos. Se publican solas solo las de confianza alta que pasan todas las revisiones. Nunca sale sola una respuesta
   que diga que no hay, que recomiende otra publicación o con datos que no están en la publicación o tus políticas. El
   resto te queda con la respuesta ya escrita para revisar y enviar.
@@ -249,7 +256,7 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   - **Frase de escape (solo Mensajes):** si la IA no manda la respuesta sola, puede mandar una frase corta
     («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
     en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas.
-  - **Responder todo (solo Preguntas, opcional, apagado de fábrica):** lo que la IA deja para revisar se contesta con
+  - **Frase de escape en Preguntas (opcional, apagada de fábrica):** lo que la IA deja para revisar se contesta con
     una frase tuya (ej. «Sí, tenemos disponible. Escríbenos por mensaje después de la compra»), así ninguna pregunta
     queda sin respuesta. Ojo: MercadoLibre acepta **una sola respuesta** por pregunta, así que queda respondida con
     esa frase; la respuesta de la IA queda escrita para que la veas. No se usa si frenó el máximo por comprador ni si

@@ -111,7 +111,9 @@ export function extraAplica(x: { titulo: string; palabras?: string; siempre?: bo
 
 /** Mi IA escrita como políticas para la IA. `modulo` decide si va la parte post-venta. `consulta` (la pregunta o el mensaje)
  *  elige las secciones de información extra; sin ella van todas. */
-export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: string): string {
+// `total` (10-11, el dueño): en Modo Total la IA responde todo, así que no recibe «Siempre una persona» ni «Dejarla para
+// una persona» (esas solo valen en Modo Seguro). Si «Dejarla para una persona» era la única opción, recomienda verificar.
+export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: string, total = false): string {
   const S: string[] = []
   const sec = (titulo: string, ls: (string | number | null | false | undefined)[]) => {
     const l = ls.filter((x): x is string => typeof x === "string" && !!x)
@@ -162,11 +164,13 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
     f.tipo === 'fiscal' ? 'Sí emitimos factura fiscal.' : f.tipo === 'nota' ? 'Emitimos nota de entrega (no factura fiscal).' : f.tipo === 'no' ? 'No emitimos factura.' : null,
     f.garantiaDias ? `Garantía de ${f.garantiaDias} días${limpio(f.garantiaNoCubre) ? `; no cubre ${limpio(f.garantiaNoCubre)}` : ''}.` : null,
   ])
-  if (c.desconocido?.length) sec('SI NO SABES UN DATO DEL PRODUCTO', [
-    `En este orden de preferencia: ${c.desconocido.map(x => DESCONOCIDO[x]).join('; si no aplica, ')}.`,
+  const desc = total ? (c.desconocido ?? []).filter(x => x !== 'persona') : (c.desconocido ?? [])
+  if (total && c.desconocido?.length && !desc.length) desc.push('verificar')
+  if (desc.length) sec('SI NO SABES UN DATO DEL PRODUCTO', [
+    `En este orden de preferencia: ${desc.map(x => DESCONOCIDO[x]).join('; si no aplica, ')}.`,
     'Nunca inventes el dato.',
   ])
-  if (c.persona?.length) sec('SIEMPRE LO RESPONDE UNA PERSONA', [
+  if (c.persona?.length && !total) sec('SIEMPRE LO RESPONDE UNA PERSONA', [
     `${lista(c.persona).replace(/^./, x => x.toUpperCase())}: no lo respondas tú, deja confianza "baja".`,
   ])
   const cb = c.cambios ?? {}
@@ -206,10 +210,13 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
 
 /** Lo que la IA recibe como POLÍTICAS DEL VENDEDOR: Mi IA (si está guardada) + el texto libre de siempre. */
 export async function politicasIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' | 'mensajes', consulta?: string): Promise<{ texto: string; miIA: MiIA | null }> {
-  const { rows } = await db.query(`SELECT key, value FROM app_settings WHERE key = ANY($1)`, [[MI_IA_KEY, 'preguntas_politicas']])
+  const claveAuto = modulo === 'preguntas' ? 'preguntas_ia_auto' : 'mensajes_ia_auto'
+  const { rows } = await db.query(`SELECT key, value FROM app_settings WHERE key = ANY($1)`, [[MI_IA_KEY, 'preguntas_politicas', claveAuto]])
   const libre = limpio(rows.find(r => r.key === 'preguntas_politicas')?.value)
   const miIA = leerMiIA(rows.find(r => r.key === MI_IA_KEY)?.value)
-  const estructurado = miIA ? textoMiIA(miIA, modulo, consulta) : ''
+  let total = false
+  try { const v = JSON.parse(rows.find(r => r.key === claveAuto)?.value ?? '{}'); total = v.modo === 'real' && v.todo === true } catch { /* sin config */ }
+  const estructurado = miIA ? textoMiIA(miIA, modulo, consulta, total) : ''
   const texto = !estructurado ? libre
     : `${estructurado}${libre ? `\n\nOTRAS INDICACIONES DEL VENDEDOR (si chocan con lo de arriba, manda lo de arriba):\n${libre}` : ''}`
   return { texto, miIA }

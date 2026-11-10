@@ -350,7 +350,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
             {subConfig === 'aprendido' && <>{!envioPorPeso && <LoAprendido />}<DatosProductos /></>}
             {subConfig === 'ia' && !miIA && <CuentasYPoliticas />}
-            {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica interno={verAvisosInternos} />}
+            {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica interno={verAvisosInternos} onMiIA={miIA ? () => setSubConfig('mi_ia') : undefined} />}
             {subConfig === 'ia_auto' && !iaAutomatica && (
               <div className="max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-2">
                 <h2 className="font-semibold text-neutral-900">Respuesta automática con IA</h2>

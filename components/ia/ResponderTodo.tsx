@@ -2,10 +2,12 @@
 import { useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
-// «Responder todo» (10-11-2026, el dueño): la respuesta automática SIN modo seguro, independiente en Preguntas y en Mensajes.
-// Con «Segura» (de fábrica) solo sale lo que la IA está segura; con «Responder todo» sale también lo que iría a revisión
-// (solo se respetan los frenos del vendedor: horario y máximo por comprador).
+// Modo Seguro / Modo Total (10-11-2026, el dueño): la respuesta automática con o sin modo seguro, independiente en Preguntas
+// y en Mensajes. Se elige solo en Mi IA. En Modo Total sale también lo que iría a revisión (incluidos «Siempre una persona»
+// y «Dejarla para una persona»); solo se respetan el horario y el máximo por comprador. En la base sigue siendo `todo`.
 export const AVISO_TODO = 'La IA acierta cerca del 94 % de las preguntas cuando tu Mi IA está completo.'
+export const MODO_TOTAL_DETALLE = 'En Modo Total la IA responde también lo que en Modo Seguro dejaría para revisar. Solo respeta tu horario y el máximo por comprador.'
+export const nombreModo = (todo: boolean) => todo ? 'Modo Total' : 'Modo Seguro'
 
 export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'mensajes'; todo: boolean; onCambio: () => void }) {
   const confirm = useConfirm()
@@ -14,9 +16,9 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
   const cambiar = async (v: boolean) => {
     if (v === todo) return
     if (v && !(await confirm({
-      title: `Responder todo en ${tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}`,
-      message: `${AVISO_TODO}\n\nCon «Responder todo» la IA responde también lo que hoy deja para revisar. Solo se respetan tus frenos (horario y máximo por comprador).`,
-      confirmText: 'Entiendo, responder todo',
+      title: `Modo Total en ${tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}`,
+      message: `${AVISO_TODO}\n\n${MODO_TOTAL_DETALLE}`,
+      confirmText: 'Entiendo, usar Modo Total',
     }))) return
     setGuardando(true); setError(null)
     const r = tipo === 'preguntas'
@@ -26,20 +28,16 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
     if (!r.ok) { setError((await r.json().catch(() => null))?.error ?? 'No se pudo cambiar'); return }
     onCambio()
   }
-  const op = (v: boolean, t: string, d: string) => (
-    <button type="button" disabled={guardando} onClick={() => cambiar(v)}
-      className={`text-left rounded-lg border px-3 py-2 disabled:opacity-60 ${todo === v ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}>
-      <div className="text-sm font-semibold">{t}</div>
-      <div className={`text-xs ${todo === v ? 'text-neutral-300' : 'text-neutral-500'}`}>{d}</div>
-    </button>
-  )
   return (
-    <div className="space-y-1.5">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {op(false, 'Segura', 'Solo sale sola lo que la IA está segura. Lo demás te queda escrito para revisar.')}
-        {op(true, 'Responder todo', 'Responde todo, sin modo seguro.')}
+    <div className="space-y-1">
+      <div className="inline-flex rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 text-sm">
+        {([[false, 'Modo Seguro'], [true, 'Modo Total']] as const).map(([v, t]) => (
+          <button key={t} type="button" disabled={guardando} onClick={() => cambiar(v)}
+            className={`px-3 py-1 rounded-md disabled:opacity-60 ${todo === v ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:text-neutral-900'}`}>{t}</button>
+        ))}
       </div>
-      {todo && <p className="text-xs text-amber-800">{AVISO_TODO}</p>}
+      <p className={`text-xs ${todo ? 'text-amber-800' : 'text-neutral-500'}`}>
+        {todo ? `Responde todo. ${AVISO_TODO}` : 'Solo sale sola lo que la IA está segura; lo demás te queda escrito para revisar.'}</p>
       {error && <p className="text-xs text-red-700">{error}</p>}
     </div>
   )
