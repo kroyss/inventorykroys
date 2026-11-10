@@ -117,12 +117,13 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
       }} items={[
         { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
         { value: 'todas', label: 'Atendidas' },
-        { value: 'pedir', label: 'Pedir calificación', count: pedir },
-        ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
+        // 10-11 (el dueño): este orden. «IA en prueba» solo la organización de la plataforma (iaPrueba), al final.
         { value: 'al_comprar' as const, label: 'Al comprar' },
         ...(conRecordatorios ? [{ value: 'recordatorios' as const, label: 'Recordatorios' }] : []),
-        ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
+        { value: 'pedir', label: 'Pedir calificación', count: pedir },
         ...(miIA ? [{ value: 'mi_ia' as const, label: 'Mi IA' }] : []),
+        ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
+        ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
       ]} />
       {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => setVista('mi_ia') : undefined} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />

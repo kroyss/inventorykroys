@@ -341,7 +341,8 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', envioPorPeso ? 'Datos de cada producto' : 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || verAvisosInternos) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
+              {/* 10-11 (el dueño): Mi IA, Datos de cada producto, Respuestas rápidas; «Respuesta automática con IA» solo la plataforma. */}
+              {([['mi_ia', 'Mi IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Datos de cada producto'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA']] as const).filter(([k]) => (k !== 'ia_auto' || verAvisosInternos) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
