@@ -410,7 +410,7 @@ usuario la tienen):
 - **Stock:** el stock que muestra cada cuenta de ML contra tu inventario.
 - **Promociones** (Venezuela): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis.
   Campañas propias: **Editar** cambia la fecha de fin (máx. 31 días desde que empezó; una vencida ya no se puede editar).
-  **Pausar** les quita el descuento a todas sus publicaciones sin borrar la campaña y recuerda cuáles eran; **Reanudar**
+  **Pausar** les quita el descuento a todas sus publicaciones sin borrar la campaña y recuerda cuáles eran (va a la cola: se puede seguir trabajando o pausar otra; avance en Publicaciones → Tareas); **Reanudar**
   las vuelve a poner con el mismo %. **Renovar** (vencida o por vencer en 3 días) crea una campaña nueva desde hoy con
   el mismo nombre y % y propone las mismas publicaciones. **Borrar campaña** la quita para siempre (primero les quita el
   descuento). Por Telegram avisa 3 días antes de que venza una campaña propia.

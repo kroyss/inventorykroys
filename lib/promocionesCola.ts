@@ -6,7 +6,7 @@
 // ~15 s y a los ~30 s (intentos 1 y 2); si sigue sin verse, error. Si quedó "procesando" por un corte, la cola la
 // devuelve con intentos ≥ 1: primero se COMPRUEBA (pudo haber entrado) en vez de mandarla dos veces.
 import type { Pool } from 'pg'
-import { agregarACampana, cambiarPrecioEnCampana, verificarEnCampana } from '@/lib/promocionesML'
+import { agregarACampana, cambiarPrecioEnCampana, quitarDeCampana, verificarEnCampana } from '@/lib/promocionesML'
 import type { ItemTarea, LoteTarea, ResultadoTarea } from '@/lib/colaML'
 
 export interface DatosPromo {
@@ -15,12 +15,19 @@ export interface DatosPromo {
   precio: number
   precioAntes: number
   cambio?: boolean
+  /** 11-11: SACAR de la campaña (Pausar). Se puede repetir sin problema: «ya no está» cuenta como hecho. */
+  quitar?: boolean
 }
 
 const NO_APARECIO = 'MercadoLibre respondió que sí, pero el precio no apareció en la publicación: no entró a la campaña. Reintenta.'
 
 export async function procesarItemPromocion(db: Pool, l: LoteTarea, it: ItemTarea): Promise<ResultadoTarea> {
   const d = it.datos as unknown as DatosPromo
+  if (d?.quitar && d.conexionId && d.campana?.id) {
+    const r = await quitarDeCampana(db, d.conexionId, l.user_id as number, it.item_id, d.campana)
+    if (r.ok || /ya no está/.test(r.error)) return { estado: 'ok', resultado: { quitada: true } }
+    return { estado: 'error', mensaje: r.error }
+  }
   if (!d?.conexionId || !d.campana?.id || !(d.precio > 0)) return { estado: 'error', mensaje: 'Datos incompletos' }
   const precio = Math.round(d.precio * 100) / 100
   if (it.intentos > 0) {

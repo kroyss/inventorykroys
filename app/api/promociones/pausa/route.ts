@@ -37,6 +37,11 @@ export async function POST(req: NextRequest) {
   if ('error' in s) return s.error
   try {
     const b = Guardar.parse(await req.json())
+    // Pausar dos veces (p. ej. la primera quedó a medias) SUMA a las que ya estaban guardadas: no se pierde ninguna.
+    const { rows: [p] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [llave(b.conexionId, b.id)])
+    let antes: string[] = []
+    try { antes = p ? (JSON.parse(p.value).items ?? []) : [] } catch { /* ignorado */ }
+    b.items = [...new Set([...antes, ...b.items])]
     await s.db.query(
       `INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`,
       [llave(b.conexionId, b.id), JSON.stringify({ items: b.items, at: new Date().toISOString() })])

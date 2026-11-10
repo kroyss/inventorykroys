@@ -41,6 +41,8 @@ type Modal =
   | { tipo: 'editar'; campana: CampanaVista }
   | null
 const POR_PAGINA = 50
+// Botón chico de las tarjetas de campaña (11-11: antes eran links subrayados que casi no se veían).
+const BTN = 'inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50'
 const RANGO: Record<EstadoEnvio, number> = { ambas: 2, tealca: 1, destino: 0, sin_peso: -1 }
 
 const usd = (n: number | null | undefined) => n == null ? '—' : `$${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -355,19 +357,13 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
       const g = await fetch('/api/promociones/pausa', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conexionId: c.conexionId, id: c.id, items }) })
       if (!g.ok) { setAviso(null); setError('No se pudo guardar la pausa; no se tocó nada.'); return }
-      let ok = 0, mal = 0
-      for (let i = 0; i < items.length; i += 10) {
-        setAviso(`Pausando «${c.nombre}»: ${Math.min(i + 10, items.length)} de ${items.length}… no cierres esta pantalla.`)
-        const q = await fetch('/api/promociones/acciones', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accion: 'quitar', conexionId: c.conexionId, campana: { id: c.id, tipo: 'SELLER_CAMPAIGN', nombre: c.nombre },
-            items: items.slice(i, i + 10).map(id => ({ id })) }) })
-        const j = await q.json().catch(() => ({}))
-        const res = (j.resultados ?? []) as { ok: boolean; error?: string }[]
-        ok += res.filter(x => x.ok || /ya no está/.test(x.error ?? '')).length; mal += res.filter(x => !x.ok && !/ya no está/.test(x.error ?? '')).length
-        if (!q.ok && !res.length) mal += items.slice(i, i + 10).length
-      }
-      if (mal) { setAviso(null); setError(`Pausada a medias: ${ok} sin descuento, ${mal} no salieron (prueba «Pausar» de nuevo).`) }
-      else setAviso(`✓ «${c.nombre}» pausada: ${ok} publicaciones volvieron a su precio. Con «Reanudar» vuelven con el mismo %.`)
+      // 11-11: a la cola de MercadoLibre (lib/colaML.ts): el servidor las saca solo, se puede seguir trabajando o pausar otra.
+      const q = await fetch('/api/promociones/cola', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campanas: [{ conexionId: c.conexionId, campana: { id: c.id, tipo: 'SELLER_CAMPAIGN', nombre: c.nombre } }],
+          items: items.map(id => ({ id, conexionId: c.conexionId, quitar: true })) }) })
+      const j = await q.json().catch(() => ({}))
+      if (!q.ok) { setAviso(null); setError(j.error ?? 'No se pudo poner en la cola.'); return }
+      setAviso(`✓ «${c.nombre}»: ${items.length} publicaciones en la cola para pausar (unas ${Math.max(1, Math.ceil(items.length / 60))} min). Puedes seguir trabajando o pausar otra; el avance se ve en Publicaciones → Tareas.`)
     } finally { setBusy(null); router.refresh() }
   }
   const reanudar = (c: CampanaVista) => {
@@ -446,30 +442,31 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                       {propia && c.adentro > 0 && (
                         <button onClick={() => setModal({ tipo: 'agregar', campana: k, pct: pctDe(c),
                           claves: vistas.filter(v => v.conexionId === c.conexionId && v.promos.some(p => p.campana === c.id && p.estado === 'started')).map(clave) })}
-                          disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1"
+                          disabled={!!busy} className={BTN}
                           title="Cambiar el precio de las que ya están en esta campaña (por ejemplo, de 10% a 15%)">Cambiar % de las {c.adentro}</button>
                       )}
                       {propia && c.estado !== 'finished' && (
-                        <button onClick={() => setModal({ tipo: 'editar', campana: c })} disabled={!!busy} className="underline text-neutral-500 hover:text-neutral-800">
-                          Editar
+                        <button onClick={() => setModal({ tipo: 'editar', campana: c })} disabled={!!busy} className={BTN} title="Cambiar el nombre o la fecha de fin">
+                          ✎ Editar
                         </button>
                       )}
                       {/* 11-11: pausar (sacar todas recordando cuáles), reanudar y renovar. */}
                       {propia && c.estado === 'started' && c.adentro > 0 && (
-                        <button onClick={() => pausar(c)} disabled={!!busy} className="underline text-neutral-500 hover:text-amber-700">
-                          {busy === `pausar-${c.id}` ? 'Pausando…' : 'Pausar'}
+                        <button onClick={() => pausar(c)} disabled={busy === `pausar-${c.id}`} className={`${BTN} hover:border-amber-300 hover:text-amber-800`}
+                          title="Quitarles el descuento a todas sin borrar la campaña">
+                          {busy === `pausar-${c.id}` ? 'Enviando…' : '⏸ Pausar'}
                         </button>
                       )}
                       {propia && c.estado !== 'finished' && (pausas[k]?.length ?? 0) > 0 && (
-                        <button onClick={() => reanudar(c)} disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1">Reanudar {pausas[k].length}</button>
+                        <button onClick={() => reanudar(c)} disabled={!!busy} className={`${BTN} border-emerald-300 text-emerald-800 hover:bg-emerald-50`}>▶ Reanudar {pausas[k].length}</button>
                       )}
                       {propia && venceProntoOVencio(c) && (
-                        <button onClick={() => setModal({ tipo: 'renovar', campana: c })} disabled={!!busy} className="btn-secondary text-xs px-2.5 py-1"
-                          title="Campaña nueva con el mismo nombre y %, desde hoy, con las mismas publicaciones">Renovar</button>
+                        <button onClick={() => setModal({ tipo: 'renovar', campana: c })} disabled={!!busy} className={`${BTN} border-sky-300 text-sky-800 hover:bg-sky-50`}
+                          title="Campaña nueva con el mismo nombre y %, desde hoy, con las mismas publicaciones">↻ Renovar</button>
                       )}
                       {propia && (
-                        <button onClick={() => borrarCampana(c)} disabled={!!busy} className="underline text-neutral-400 hover:text-red-700">
-                          {busy === `borrar-${c.id}` ? 'Borrando…' : 'Borrar campaña'}
+                        <button onClick={() => borrarCampana(c)} disabled={!!busy} className={`${BTN} ml-auto text-neutral-500 hover:border-red-300 hover:text-red-700 hover:bg-red-50`}>
+                          {busy === `borrar-${c.id}` ? 'Borrando…' : '🗑 Borrar'}
                         </button>
                       )}
                     </div>

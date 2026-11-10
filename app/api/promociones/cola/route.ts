@@ -10,8 +10,9 @@ const Body = z.object({
   campanas: z.array(z.object({ conexionId: z.number().int().positive(), campana: Campana })).min(1).max(20),
   items: z.array(z.object({
     id: z.string().regex(/^MLV\d+$/), conexionId: z.number().int().positive(),
-    precio: z.number().positive(), precioAntes: z.number().positive(), cambio: z.boolean().optional(),
-  })).min(1).max(3000),
+    precio: z.number().positive().optional(), precioAntes: z.number().positive().optional(), cambio: z.boolean().optional(),
+    quitar: z.boolean().optional(),   // 11-11: Pausar = sacarlas de la campaña
+  }).refine(x => x.quitar || (x.precio && x.precioAntes), 'Falta el precio')).min(1).max(3000),
 })
 
 /**
@@ -32,10 +33,12 @@ export async function POST(req: NextRequest) {
     const items = b.items.filter(x => validas.has(x.conexionId) && campDe.has(x.conexionId))
     if (!items.length) return NextResponse.json({ error: 'Ninguna publicación de una cuenta conectada.' }, { status: 400 })
     const nombre = b.campanas[0].campana.nombre ?? 'campaña'
-    const loteId = await crearLote(s.db, 'promocion', `«${nombre}»: ${items.length} publicacion${items.length === 1 ? '' : 'es'}`,
+    const quitar = items.every(x => x.quitar)
+    const loteId = await crearLote(s.db, 'promocion', `«${nombre}»: ${quitar ? 'pausar ' : ''}${items.length} publicacion${items.length === 1 ? '' : 'es'}`,
       { campana: nombre },
       items.map(x => ({ item: x.id, conexionId: x.conexionId,
-        datos: { conexionId: x.conexionId, campana: campDe.get(x.conexionId), precio: x.precio, precioAntes: x.precioAntes, cambio: !!x.cambio } })),
+        datos: x.quitar ? { conexionId: x.conexionId, campana: campDe.get(x.conexionId), quitar: true }
+          : { conexionId: x.conexionId, campana: campDe.get(x.conexionId), precio: x.precio, precioAntes: x.precioAntes, cambio: !!x.cambio } })),
       s.userId)
     return NextResponse.json({ loteId, total: items.length })
   } catch (err) {
