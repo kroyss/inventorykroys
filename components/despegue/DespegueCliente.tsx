@@ -48,7 +48,7 @@ const IconoTelegram = ({ className = 'w-4 h-4' }: { className?: string }) => (
 )
 
 /** "Apartar mi cupo por Telegram": abre el chat con el mensaje ya escrito. */
-export function BotonCupo({ texto = 'Apartar mi cupo por Telegram', grande = false, className = '' }: {
+export function BotonCupo({ texto = 'Quiero empezar · escríbeme por Telegram', grande = false, className = '' }: {
   texto?: string; grande?: boolean; className?: string
 }) {
   return (

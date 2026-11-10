@@ -4,7 +4,7 @@
 // cobra por chat y sube `despegue_grupos.tomados` en Plataforma).
 
 export const TELEGRAM_DESPEGUE = 'elcomerciantedigital'
-export const MENSAJE_TELEGRAM = 'Hola, quiero apartar mi cupo en el Programa Despegue 🚀'
+export const MENSAJE_TELEGRAM = 'Hola, quiero empezar el Programa Despegue 🚀'
 /** Abre el chat con el mensaje ya escrito (si la app de Telegram no lo pone, igual abre el chat). */
 export const LINK_TELEGRAM = `https://t.me/${TELEGRAM_DESPEGUE}?text=${encodeURIComponent(MENSAJE_TELEGRAM)}`
 export const COMUNIDAD_TELEGRAM = 'https://t.me/comerciantedigitalve'
@@ -127,12 +127,37 @@ export function origenDe(v: { utm_source?: string; referrer?: string }, ua: stri
   return 'directo'
 }
 
-// El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías, 2.514 búsquedas
+/** Redondea hacia abajo a un número "de vitrina" (como la entrada del Radar): 48.312 → 48.000 · 2.614 → 2.600 · 320 → 320. */
+function piso(n: number) {
+  const paso = n >= 10000 ? 1000 : n >= 1000 ? 100 : 10
+  return (Math.floor(n / paso) * paso).toLocaleString('de-DE')
+}
+
+/** Las cifras del Radar EN VIVO (10-11, el dueño: que se actualicen como en radar.elcomerciantedigital.com): las da su
+ *  endpoint público /api/cifras, guardadas 1 hora. Si el Radar no responde, las fijas de abajo. */
+export async function cifrasRadar(): Promise<{ n: string; d: string }[]> {
+  try {
+    const r = await fetch('https://radar.elcomerciantedigital.com/api/cifras', { next: { revalidate: 3600 }, signal: AbortSignal.timeout(3000) })
+    const c = r.ok ? await r.json() as { productos?: number; categorias?: number; tendencias?: number; validadas?: number } : null
+    if (!c?.productos || !c.categorias || !c.tendencias) return RADAR_CIFRAS
+    return [
+      { n: `+${piso(c.productos)}`, d: 'productos de MercadoLibre Venezuela' },
+      { n: `+${piso(c.categorias)}`, d: 'categorías' },
+      { n: `+${piso(c.tendencias)}`, d: 'búsquedas en tendencia: las que más crecen y las más populares' },
+      ...(c.validadas ? [{ n: `+${piso(c.validadas)}`, d: 'tendencias validadas con Google Trends' }] : []),
+      { n: `+${piso(c.productos)}`, d: 'productos con su actividad medida: si suben o se apagan' },
+    ]
+  } catch {
+    return RADAR_CIFRAS
+  }
+}
+
+// (Respaldo) El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías, 2.514 búsquedas
 // en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo). Lo usan /despegue y /inicio.
 export const RADAR_CIFRAS = [
-  { n: '+45.000', d: 'productos de MercadoLibre Venezuela' },
+  { n: '+48.000', d: 'productos de MercadoLibre Venezuela' },
   { n: '+320', d: 'categorías' },
-  { n: '+2.500', d: 'búsquedas en tendencia: las que más crecen y las más populares' },
+  { n: '+2.600', d: 'búsquedas en tendencia: las que más crecen y las más populares' },
   { n: '+1.100', d: 'tendencias validadas con Google Trends' },
-  { n: '+45.000', d: 'productos con su actividad medida: si suben o se apagan' },
+  { n: '+48.000', d: 'productos con su actividad medida: si suben o se apagan' },
 ]

@@ -2,14 +2,14 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, RADAR_CIFRAS, portadaSerie, diasEntre, ritmoVentas, PRECIO_DESPUES, TEMAS, INICIO_GRUPO, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, cifrasRadar, portadaSerie, diasEntre, ritmoVentas, PRECIO_DESPUES, TEMAS, TELEGRAM_DESPEGUE, type GrupoDespegue,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
 export const metadata = {
   title: 'Programa Despegue',
   description: 'Caso real: así llevé una cuenta nueva de 0, con reputación gris, a reputación verde con MercadoEnvíos activado en 5 semanas. '
-    + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Solo 8 cupos.',
+    + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Empiezas cuando quieras.',
 }
 
 // Qué incluye (21-10): 4 tarjetas, una idea cada una. El Domingo de Radar NO va aquí: es el bono de la portada.
@@ -41,9 +41,7 @@ function Encabezado({ etiqueta, titulo, children }: { etiqueta: string; titulo: 
   )
 }
 
-// El Radar en números (21-10, de su base: 44.565 productos antes de la corrida de noviembre, 320 categorías,
-// 2.514 búsquedas en tendencia, 1.143 con interés en Google Trends; la actividad se mide en todo el catálogo).
-const RADAR = RADAR_CIFRAS
+// El Radar en números: en vivo desde el Radar (cifrasRadar, 10-11).
 
 // Íconos de trazo (24×24) en lugar de emojis (21-10: los emojis se veían de WhatsApp y distintos en cada teléfono).
 const ICONO = {
@@ -69,39 +67,15 @@ export default async function DespeguePage() {
             to_char(caso_inicio, 'YYYY-MM-DD') AS caso_inicio, caso_ventas
      FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1`)
   const hoy = currentDate('America/Caracas')
-  const portada = await portadaSerie()
+  const [portada, RADAR] = await Promise.all([portadaSerie(), cifrasRadar()])
   // El caso real (mig. 113): día de la cuenta desde el 15-09 y las ventas que lleva (las sube el dueño en Plataforma).
   const diaCaso = diasEntre(g?.caso_inicio ?? '2026-09-15', hoy)
   const ventasCaso = g?.caso_ventas ?? 17
   const ritmo = ritmoVentas(diaCaso, ventasCaso)
-  const cupos = g?.cupos ?? 8
-  const tomados = Math.min(g?.tomados ?? 0, cupos)
-  const quedan = cupos - tomados
-  const completo = quedan <= 0
-  const cerrado = !g || hoy > g.aparta_hasta
-  const abierto = !completo && !cerrado
-  const inicio = g?.inicio ?? INICIO_GRUPO
   const anio = new Date().getFullYear()
-
-  const oscuro = true
-  const cuposBarra = () => (
-    <div>
-      <div className="flex gap-1.5" aria-label={`${tomados} de ${cupos} cupos tomados`}>
-        {Array.from({ length: cupos }, (_, i) => (
-          <span key={i} className={`h-2.5 flex-1 rounded-full ${i < tomados ? 'bg-lime-400' : oscuro ? 'bg-white/10' : 'bg-neutral-200'}`} />
-        ))}
-      </div>
-      <p className={`mt-2 text-xs ${oscuro ? 'text-neutral-400' : 'text-neutral-500'}`}>
-        {completo ? <b className={oscuro ? 'text-white' : 'text-neutral-900'}>Cupos completos</b>
-          : <>Quedan <b className={oscuro ? 'text-white' : 'text-neutral-900'}>{quedan} de {cupos}</b> cupos</>}
-      </p>
-    </div>
-  )
-
-  // Con cupos y en plazo: apartar. Lleno o cerrado: lista de espera (igual por Telegram).
-  const accion = (grande = false, className = '') => abierto
-    ? <BotonCupo grande={grande} className={className} />
-    : <BotonCupo grande={grande} className={className} texto="Anotarme para el próximo grupo" />
+  // 10-11 (el dueño): ya no hay grupos con fecha ni cupos: cada uno empieza cuando quiere. despegue_grupos sigue dando
+  // solo el caso real (caso_inicio, caso_ventas).
+  const accion = (grande = false, className = '') => <BotonCupo grande={grande} className={className} />
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24 sm:pb-0">
@@ -161,9 +135,9 @@ export default async function DespeguePage() {
                 <b className="text-white"> el mismo método en tu cuenta</b>, empieces de cero o ya tengas una.
               </p>
               <p className="mt-5 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border border-lime-400/30 bg-lime-400/[0.07] px-4 py-1.5 text-sm sm:rounded-full">
-                <span className="font-semibold text-lime-400">Empieza el {fechaLarga(inicio)}</span>
+                <span className="font-semibold text-lime-400">Empiezas cuando quieras</span>
                 <span className="hidden text-neutral-500 sm:inline">·</span>
-                <span className="text-neutral-300">solo {cupos} cupos</span>
+                <span className="text-neutral-300">${PRECIO} <span className="text-neutral-500 line-through">${PRECIO_DESPUES}</span> en promoción</span>
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">
                 {accion(true)}
@@ -172,7 +146,6 @@ export default async function DespeguePage() {
                   ¿Qué incluye? ↓
                 </a>
               </div>
-              <div className="mt-6 max-w-sm">{cuposBarra()}</div>
               <p className="mt-3 max-w-sm text-xs text-neutral-500">Tus resultados dependen de tu producto, tu capital y tu trabajo.</p>
             </div>
 
@@ -324,27 +297,22 @@ export default async function DespeguePage() {
             <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-lime-400/10 blur-3xl" />
             <div className="relative grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">Inversión · primer grupo</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">Inversión · precio de promoción</p>
                 <p className="mt-3 flex items-baseline gap-3">
                   <span className="text-5xl font-semibold tracking-tight sm:text-6xl">${PRECIO}</span>
                   <span className="text-lg text-neutral-500 line-through">${PRECIO_DESPUES}</span>
                 </p>
-                <p className="mt-2 text-neutral-400">Precio de lanzamiento para este primer grupo: después será <b className="text-white">${PRECIO_DESPUES}</b>.</p>
-                <p className="mt-1 text-neutral-400"><b className="text-white">Pago único</b>: las 8 semanas completas.</p>
-                <p className="mt-4 text-sm font-medium text-lime-300">El cupo se aparta con el pago.</p>
+                <p className="mt-2 text-neutral-400">Estamos en promoción: el precio normal es <b className="text-white">${PRECIO_DESPUES}</b>.</p>
+                <p className="mt-1 text-neutral-400"><b className="text-white">Pago único</b>: 8 semanas de acompañamiento.</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                 <ul className="space-y-2.5 text-sm text-neutral-300">
-                  <li className="flex justify-between gap-4"><span>Apartas tu cupo hasta</span><b className="text-right text-white">{g ? fechaLarga(g.aparta_hasta) : '—'}</b></li>
-                  <li className="flex justify-between gap-4"><span>Inicio</span><b className="text-right text-white">{fechaLarga(inicio)}</b></li>
+                  <li className="flex justify-between gap-4"><span>Inicio</span><b className="text-right text-white">Cuando quieras</b></li>
+                  <li className="flex justify-between gap-4"><span>Duración</span><b className="text-right text-white">8 semanas desde que empiezas</b></li>
                 </ul>
-                <p className="mt-2 text-xs text-neutral-500">o hasta que se llenen los {cupos} cupos.</p>
-                <div className="mt-5">{cuposBarra()}</div>
                 <div className="mt-5">{accion(true, 'w-full')}</div>
                 <p className="mt-3 text-center text-xs text-neutral-500">
-                  {abierto ? <>Te responde <b className="text-neutral-300">@{TELEGRAM_DESPEGUE}</b> con los datos de pago.</>
-                    : completo ? 'Este grupo ya se llenó: escríbenos y te avisamos del próximo.'
-                    : 'Las inscripciones de este grupo cerraron: escríbenos y te avisamos del próximo.'}
+                  Te responde <b className="text-neutral-300">@{TELEGRAM_DESPEGUE}</b> con los datos de pago y empezamos.
                 </p>
               </div>
             </div>
@@ -366,10 +334,9 @@ export default async function DespeguePage() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-neutral-950/95 px-4 py-3 backdrop-blur sm:hidden">
         <div className="flex items-center gap-3">
           <p className="min-w-0 flex-1 text-xs leading-tight text-neutral-400">
-            {abierto ? <><b className="block text-sm text-white">Quedan {quedan} cupos</b>Empieza el {fechaCorta(inicio)}</>
-              : <><b className="block text-sm text-white">{completo ? 'Cupos completos' : 'Inscripción cerrada'}</b>Próximo grupo</>}
+            <b className="block text-sm text-white">${PRECIO} <span className="font-normal text-neutral-500 line-through">${PRECIO_DESPUES}</span></b>Empiezas cuando quieras
           </p>
-          <BotonCupo texto={abierto ? 'Apartar mi cupo' : 'Anotarme'} />
+          <BotonCupo texto="Quiero empezar" />
         </div>
       </div>
     </div>

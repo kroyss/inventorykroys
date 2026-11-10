@@ -1,7 +1,5 @@
 import { connection } from 'next/server'
-import { dbGlobal } from '@/lib/db'
-import { currentDate } from '@/lib/tz'
-import { COMUNIDAD_TELEGRAM, RADAR_CIFRAS, TELEGRAM_DESPEGUE, fechaLarga, type GrupoDespegue } from '@/lib/despegue'
+import { COMUNIDAD_TELEGRAM, cifrasRadar, TELEGRAM_DESPEGUE, PRECIO, PRECIO_DESPUES } from '@/lib/despegue'
 import { CREDITOS_PRUEBA, ESCALONES, PLANES, PRECIO_DESDE } from '@/lib/planes'
 
 export const metadata = {
@@ -52,12 +50,9 @@ const HACEMOS = [
 
 export default async function InicioPage() {
   await connection()
-  const { rows: [g] } = await dbGlobal().query<GrupoDespegue>(
-    `SELECT id, nombre, cupos, tomados, to_char(inicio, 'YYYY-MM-DD') AS inicio, to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta
-     FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1`).catch(() => ({ rows: [] as GrupoDespegue[] }))
-  const hoy = currentDate('America/Caracas')
-  const quedan = g ? Math.max(0, g.cupos - g.tomados) : null
-  const abierto = !!g && quedan! > 0 && hoy <= g.aparta_hasta
+  // 10-11: Despegue ya no va por grupos (cada uno empieza cuando quiere); las cifras del Radar, en vivo.
+  const RADAR_CIFRAS = await cifrasRadar()
+  const productosRadar = RADAR_CIFRAS[0]?.n ?? '+45.000'
   const anio = new Date().getFullYear()
 
   return (
@@ -103,7 +98,7 @@ export default async function InicioPage() {
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">
             <li className="flex items-center gap-2"><Icono d={I.grupo} className="h-4 w-4 text-lime-400" /><b className="text-white">+10</b> vendedores usando el sistema</li>
-            <li className="flex items-center gap-2"><Icono d={I.radar} className="h-4 w-4 text-lime-400" /><b className="text-white">+45.000</b> productos en el Radar</li>
+            <li className="flex items-center gap-2"><Icono d={I.radar} className="h-4 w-4 text-lime-400" /><b className="text-white">{productosRadar}</b> productos en el Radar</li>
             <li className="flex items-center gap-2"><Icono d={I.check} className="h-4 w-4 text-lime-400" />Lo usamos en nuestras cuentas cada día</li>
           </ul>
         </div>
@@ -117,7 +112,7 @@ export default async function InicioPage() {
           <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
             <div>
               <p className="inline-flex items-center gap-2 rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">
-                <Icono d={I.cohete} className="h-3.5 w-3.5" /> {abierto ? 'Inscripciones abiertas' : 'Programa en curso'}
+                <Icono d={I.cohete} className="h-3.5 w-3.5" /> Empiezas cuando quieras
               </p>
               <h2 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">Programa Despegue</h2>
               <p className="mt-2 leading-relaxed text-neutral-400">
@@ -128,19 +123,11 @@ export default async function InicioPage() {
                 Conocer el programa <span aria-hidden="true">→</span>
               </a>
             </div>
-            {g && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm">
-                <p className="flex justify-between gap-4 text-neutral-300"><span>Empieza</span><b className="text-right text-white">{fechaLarga(g.inicio)}</b></p>
-                <div className="mt-4 flex gap-1.5" aria-label={`${g.tomados} de ${g.cupos} cupos tomados`}>
-                  {Array.from({ length: g.cupos }, (_, k) => (
-                    <span key={k} className={`h-2.5 flex-1 rounded-full ${k < g.tomados ? 'bg-lime-400' : 'bg-white/10'}`} />
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-neutral-400">
-                  {quedan! > 0 ? <>Quedan <b className="text-white">{quedan} de {g.cupos}</b> cupos</> : <b className="text-white">Cupos completos</b>}
-                </p>
-              </div>
-            )}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm">
+              <p className="flex items-baseline gap-3"><span className="text-4xl font-semibold tracking-tight">${PRECIO}</span>
+                <span className="text-neutral-500 line-through">${PRECIO_DESPUES}</span><span className="text-xs text-lime-400">promoción</span></p>
+              <p className="mt-2 text-neutral-300">8 semanas de acompañamiento · <b className="text-white">empiezas cuando quieras</b></p>
+            </div>
           </div>
         </section>
 
