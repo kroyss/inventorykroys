@@ -45,6 +45,10 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
 // así que siempre lo ve una persona.
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
+// 10-11 (competencia, el dueño): invitar al catálogo de la tienda ante la duda está bien: ese link no frena.
+const CATALOGO = /https?:\/\/listado\.mercadolibre\.com\.(ve|co)\/_CustId_\d+\S*/gi
+// «No lo tenemos confirmado / no lo hemos probado» no es decir que no hay.
+const SIN_CONFIRMAR_FRASE = /\bno (lo |la |los |las )?(tenemos|hemos) (confirmad|probad|verificad)\w*/gi
 // Modo prueba 01–04/11 (78 de 79 bien): el único error fue un monto inventado ("cobro destino por MRW aprox. 1.600 Bs").
 // Montos en bolívares, estimados y cobros a destino con cifra cambian a diario: siempre una persona.
 const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad|cobro (a |en )?destino[^.]*\d/i
@@ -58,10 +62,13 @@ const DIVISA = /divisas?|en d[oó]lares|precio en \$|en efectivo|\bverdes?\b|\bu
 const PAGO = /cashea|zelle|binance|paypal|zinli|wally|reserve|cripto|pago m[oó]vil|transferencia|efectivo|krece|lysto/i
 // v2 (07-11, el dueño): el medio de pago no frena si está ESCRITO en lo del vendedor (Mi IA, políticas, respuestas rápidas):
 // todos los que nombran la pregunta y la respuesta tienen que estar ahí. Cashea/Zelle inventados siguen frenando.
+// 10-11 (el dueño): un medio que NO está en lo del vendedor (Cashea) también está bien si la respuesta dice que no trabajamos
+// con él y el vendedor tiene su lista de medios escrita.
 function pagoEscrito(pregunta: string, respuesta: string, vendedor: string) {
-  const v = sinTildes(vendedor)
+  const v = sinTildes(vendedor), r = sinTildes(respuesta)
   const medios = [...sinTildes(pregunta + ' ' + respuesta).matchAll(new RegExp(PAGO.source, 'gi'))].map(m => m[0])
-  return medios.length > 0 && v.trim() !== '' && medios.every(m => v.includes(m))
+  const negado = (m: string) => /medios de pago/.test(v) && new RegExp(`no (trabajamos|aceptamos|manejamos|contamos|tenemos)( pagos?)?( con| por)? ${m}`).test(r)
+  return medios.length > 0 && v.trim() !== '' && medios.every(m => v.includes(m) || negado(m))
 }
 // Compatibilidad con un vehículo o modelo (lib/iaCompatibilidad.ts): la IA confirmó "sí para Kia Picanto" sin tenerlo.
 // Fabricante o marca: la IA inventó "fabricante nacional (Madecor)". Si nombra uno que no está en la publicación, revisar.
@@ -90,8 +97,14 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   // (nada afirmado fuera de los datos). Las demás reglas (no hay, pagos, montos, otra publicación…) siguen frenando.
   if (b.confianza !== 'alta' && b.verificacion !== 'ok') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
   else if (b.confianza === 'alta' && b.verificacion && b.verificacion !== 'ok') m.push(b.verificacion)
-  if (NEGATIVA.test(b.respuesta) && !(v2 && b.confianza === 'alta' && b.verificacion === 'ok')) m.push('Dice que no hay: lo confirma una persona')
-  if (OTRA_PUBLICACION.test(b.respuesta)) m.push('Recomienda otra publicación')
+  const sinCat = b.respuesta.replace(CATALOGO, '')
+  let paraNegativa = sinCat.replace(SIN_CONFIRMAR_FRASE, '')
+  // «No trabajamos con Cashea» con la lista de medios escrita no es «no hay» (el medio ya se revisa en pagoEscrito).
+  if (v2 && PAGO.test(pregunta) && pagoEscrito(pregunta, b.respuesta, vendedor))
+    paraNegativa = paraNegativa.replace(/no (trabajamos|aceptamos|contamos|manejamos|tenemos)( pagos?)?( con| por)? [^,.;]*/gi, '')
+  const negativa = NEGATIVA.test(paraNegativa)
+  if (negativa && !(v2 && b.confianza === 'alta' && b.verificacion === 'ok')) m.push('Dice que no hay: lo confirma una persona')
+  if (OTRA_PUBLICACION.test(sinCat)) m.push('Recomienda otra publicación')
   // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
   if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')
   if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')

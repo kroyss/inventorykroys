@@ -274,8 +274,9 @@ export interface Contexto {
   politicas: string
   plantillas: Plantilla[]
   notas: string[]
-  mismoItem: { p: string; r: string }[]
-  parecidas: { p: string; r: string }[]
+  mismoItem: { p: string; r: string; f?: string }[]     // f = fecha (10-11: lo más nuevo manda)
+  parecidas: { p: string; r: string; f?: string }[]
+  catalogo?: string | null                                   // link a todas las publicaciones de la cuenta (10-11)
   ficha: { texto: string; dudas: string | null } | null     // ficha de conocimiento de la publicación
   fotos?: ContextoFotos | null                               // lo que se ve en las fotos (mig 146)
   otras: OtraPublicacion[]                                   // otras publicaciones del vendedor
@@ -326,21 +327,28 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Mi IA (06-11, lib/miIA.ts) + el texto libre de siempre. Sin Mi IA guardada, igual que antes.
   const pol = await politicasIA(db, 'preguntas', q.texto)
   const { rows: [pl] } = await db.query(`SELECT value FROM app_settings WHERE key = 'preguntas_plantillas'`)
+  // 10-11 (el dueño): los datos anotados o aprendidos valen para TODAS las publicaciones vinculadas al mismo producto del
+  // inventario (el medidor tiene 2 publicaciones y se corregía lo mismo en las dos). Sin inventario, solo esta publicación.
   const { rows: notas } = await db.query(
-    `SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [q.item_id])
+    `SELECT texto FROM ml_item_notas
+     WHERE item_id = $1 OR item_id IN (
+       SELECT substr($1, 1, 3) || split_part(m2.ml_code, ':', 1) FROM product_ml_codes m1
+       JOIN product_ml_codes m2 ON m2.product_id = m1.product_id AND m2.is_active
+       WHERE m1.is_active AND split_part(m1.ml_code, ':', 1) = $2)
+     ORDER BY (item_id = $1) DESC, created_at DESC LIMIT 20`, [q.item_id, codigo])
   // Memoria de la IA = TODAS las respuestas del vendedor (decisión del dueño, 2026-10-03; antes
   // eran las últimas 1.000 por cuenta). Parecidas = se escribe parecido (trigramas) O comparte
   // al menos 2 palabras en español con la pregunta ("conectar/conecta", "copiloto"…), ordenadas
   // por cuántas comparte; a igual parecido, la más reciente (la logística y las políticas cambian).
   const { rows: mismo } = await db.query(
     `${PALABRAS_CTE}
-     SELECT p.texto AS p, p.respuesta AS r FROM ml_preguntas p, qw, ${COMPARTIDAS}
+     SELECT p.texto AS p, p.respuesta AS r, to_char(p.fecha, 'DD-MM-YYYY') AS f FROM ml_preguntas p, qw, ${COMPARTIDAS}
      WHERE p.item_id = $1 AND p.id <> $2 AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
      ORDER BY x.n DESC, similarity(p.texto, $3) DESC, p.fecha DESC
      LIMIT 12`, [q.item_id, q.id, q.texto])   // 12 (antes 8): sin fichas nuevas, más memoria de la misma publicación
   const { rows: parecidas } = await db.query(
     `${PALABRAS_CTE.split('$3').join('$2')}
-     SELECT p.texto AS p, p.respuesta AS r FROM ml_preguntas p, qw, ${COMPARTIDAS}
+     SELECT p.texto AS p, p.respuesta AS r, to_char(p.fecha, 'DD-MM-YYYY') AS f FROM ml_preguntas p, qw, ${COMPARTIDAS}
      WHERE p.item_id <> $1 AND p.estado = 'ANSWERED' AND p.respuesta IS NOT NULL
        AND (p.texto % $2 OR x.n >= LEAST(2, cardinality(qw.w)))
      ORDER BY x.n DESC, similarity(p.texto, $2) DESC, p.fecha DESC
@@ -362,6 +370,12 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
      WHERE p.comprador_id = $1 AND p.id <> $2 AND p.fecha < $3 AND p.fecha > $3::timestamptz - interval '7 days'
      ORDER BY p.fecha DESC LIMIT 5`,
     [q.comprador_id, q.id, q.fecha]) : { rows: [] }
+  // Catálogo de la tienda (10-11, lo que hace Mercasist ante la duda): todas las publicaciones de la cuenta. Mi IA lo apaga.
+  let catalogo: string | null = null
+  if (pol.miIA?.catalogo !== false) {
+    const { rows: [cx] } = await db.query(`SELECT ml_user_id, site_id FROM ml_conexiones WHERE id = $1`, [q.conexion_id])
+    if (cx?.ml_user_id) catalogo = `https://listado.mercadolibre.${(cx.site_id ?? String(q.item_id).slice(0, 3)) === 'MCO' ? 'com.co' : 'com.ve'}/_CustId_${cx.ml_user_id}`
+  }
 
   return {
     conexionId: q.conexion_id,
@@ -376,7 +390,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     notas: notas.map(n => n.texto),
     mismoItem: mismo, parecidas,
     ficha: ficha ?? null, otras, fotos,
-    variantes, delComprador: delComprador.reverse(),
+    variantes, delComprador: delComprador.reverse(), catalogo,
   }
 }
 
@@ -408,9 +422,9 @@ Cómo responder:
 - Las POLÍTICAS DEL VENDEDOR son lo vigente: si una respuesta anterior o la ficha de conocimiento dicen otra cosa (montos o mínimos para envío gratis, agencias, formas de pago, retiro), manda lo que dicen las POLÍTICAS.
 - Variantes (color, talla, modelo): usa la tabla VARIANTES. Confirma una variante solo si sus disponibles alcanzan para lo que pide (1 si no dice cantidad); si no alcanza o no existe, no la afirmes: di cuáles sí hay, o deja confianza "baja". Nunca sumes variantes distintas para llegar a una cantidad.
 - Si hay PREGUNTAS ANTERIORES DE ESTE MISMO COMPRADOR, úsalas para entender la pregunta (puede estar contestando algo que se le preguntó, como la ciudad).
-- Disponibilidad: si hay STOCK REAL del sistema, manda ese (si es 0, no digas que hay disponible). Si la publicación no está vinculada al sistema, guíate por la publicación: activa y con unidades = disponible (como responde siempre el vendedor); pausada o sin unidades = no lo afirmes.
+- Disponibilidad: manda DISPONIBLE EN MERCADOLIBRE: publicación activa y con unidades = disponible, sin dudar (como responde siempre el vendedor). Pausada o sin unidades = no lo afirmes. Si pide una cantidad o variante, confírmala si alcanza; si pide más de lo que hay, no la afirmes.
 - Si la publicación no tiene lo que pide el comprador y en OTRAS PUBLICACIONES DEL VENDEDOR hay una que sí lo cumple (según su título o su ficha), recomiéndala como lo hace el vendedor: dile que esta no, que la otra sí, y pon el link de esa publicación tal cual. Si ninguna cumple con certeza, no recomiendes nada.
-- Nunca inventes medidas, compatibilidades, garantías, precios ni tiempos de envío. Si el dato no está, dilo como lo diría el propio vendedor ("ese modelo no lo tenemos confirmado", "déjanos verificarlo") y, si ayuda, pregunta para qué lo necesita (por ejemplo "¿para qué equipo lo necesitas?"); anótalo en "falta_dato" y deja confianza "baja". Si ni eso sirve, deja la respuesta vacía.
+- Nunca inventes medidas, compatibilidades, garantías, precios ni tiempos de envío. Si el dato no está, di lo que sí sabes del producto y recomiéndale verificarlo con un técnico o en su equipo antes de comprar; si ayuda, pregunta para qué lo necesita. NUNCA prometas "déjanos verificarlo", "lo verificamos" ni "te confirmamos": una vez publicada la respuesta no se puede volver a contestar. Anota lo que faltó en "falta_dato" y deja confianza "baja". Si ni eso sirve, deja la respuesta vacía.
 - Si el título, la ficha y la descripción se contradicen justo en lo que pregunta (medida, material, compatibilidad), no elijas uno: anótalo en "falta_dato" con confianza "baja".
 - Si la descripción, la ficha, las notas o lo que se ve en las fotos dicen que el producto es universal o sirve para cualquier vehículo o equipo (o listan lo compatible), eso responde a CUALQUIER modelo concreto que pregunten: confirma que sirve, sin pedir el modelo y sin decir "no es de un modelo en específico", y repite lo que ahí se aclare (accesorios que se venden aparte, medidas, condiciones). Si no dice nada de compatibilidad, no lo afirmes.
 - Prohibido: links (salvo el de otra publicación del vendedor, tal cual viene en OTRAS PUBLICACIONES), páginas web, correos, teléfonos, redes sociales, "escríbeme al…". MercadoLibre borra esas respuestas.
@@ -446,6 +460,13 @@ AJUSTES (mandan sobre lo anterior):
 - ¿Sale hoy? ¿Cuándo llega? ¿Envían el mismo día? Si las POLÍTICAS no dan el plazo, NO lo dejes en "baja": responde la frase segura "El despacho se confirma al concretar la compra y lo hacemos en el menor tiempo posible" (más el envío gratis si aplica). Es completa: confianza "alta". Nunca prometas "hoy" ni un día exacto que no esté escrito.
 - "¿Tiene unidades para hoy?" = ¿hay disponible?: contesta la disponibilidad, sin prometer que sale hoy.
 - No des montos en bolívares: si preguntan el precio, el de la publicación en USD "a tasa BCV del día".
+- Conocimiento general del TIPO de producto (sin números ni compatibilidades con modelos): úsalo como lo haría un vendedor con experiencia. "¿Reproduce los audios de WhatsApp?" en un audífono Bluetooth → reproduce todo el audio del teléfono; tira RGB → se configura en tonos cálidos; "¿el color es exacto al de la foto?" → las fotos son referenciales y el tono puede variar levemente.
+- Si no tenemos lo que pide (otra medida, modelo o producto) o no sabes cuál es exactamente, y ninguna de OTRAS PUBLICACIONES lo cumple con certeza: si hay CATÁLOGO DE LA TIENDA, invítalo a revisarlo con ese link tal cual ("puedes ver todo lo que tenemos en nuestro catálogo: <link>"). Es una respuesta completa.
+- Si la publicación marca ENVÍO GRATIS ACTIVO y no hay línea ENVÍO GRATIS A ESTE PRECIO, puedes confirmar que tiene envío gratis por MercadoEnvíos (las agencias, solo si las POLÍTICAS las nombran).
+- RESPUESTAS ANTERIORES con fecha: si dos dicen cosas distintas (montos, mínimos, agencias, reglas), manda la MÁS RECIENTE. Las POLÍTICAS mandan sobre todas.
+- Lo que el vendedor anotó en DATOS QUE EL VENDEDOR ANOTÓ manda sobre las políticas generales para ESTE producto (p. ej. "envío gratis solo por TEALCA", "sirve para cualquier vehículo").
+- Si el comprador no pregunta nada (solo confirma o agradece: "ok, quedo atento", "está bien", "gracias"), responde corto y cordial ("Perfecto, quedo a su orden" con el saludo y la despedida del vendedor): confianza "alta".
+- Si pregunta por un medio de pago que no está en las POLÍTICAS, di "no trabajamos con <ese medio>" y nombra los que sí aceptamos.
 - Lo que SÍ sigue en "baja": las POLÍTICAS o las RESPUESTAS RÁPIDAS se contradicen con la descripción en lo que pregunta (cobros adicionales, mínimos, agencias); datos técnicos o medidas que no están escritos; compatibilidades; pagos fuera de MercadoLibre.`
 
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
@@ -461,7 +482,7 @@ export function bloqueContexto(c: Contexto, r: Recorte = CONTEXTO_RECORTADO) {
   if (c.item) {
     L.push(`\nPUBLICACIÓN: ${c.item.title}`)
     L.push(`Condición: ${c.item.condition} · estado: ${c.item.status}` +
-      (c.item.shipping?.free_shipping ? ' · envío gratis' : '') + (c.item.warranty ? ` · garantía: ${c.item.warranty}` : ''))
+      (c.item.shipping?.free_shipping ? ' · ENVÍO GRATIS ACTIVO EN LA PUBLICACIÓN' : '') + (c.item.warranty ? ` · garantía: ${c.item.warranty}` : ''))
     const attrs = (c.item.attributes ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`)
     if (attrs.length) L.push(`Ficha técnica: ${attrs.join(' · ')}`)
   } else if (c.titulo) {
@@ -477,11 +498,9 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM, TEALCA o envío gratis, responde según esto (manda sobre las POLÍTICAS).`)
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, r.descripcion)}`)
   for (const l of lineasFotos(c.fotos ?? null)) L.push(`\n${l}`)
-  if (c.producto) {
-    L.push(`\nSTOCK REAL (sistema): ${c.producto.stock} unidades (${c.producto.code} · ${c.producto.name})`)
-  } else {
-    L.push(`\nSTOCK REAL: esta publicación no está vinculada a un producto del sistema. En MercadoLibre: ${c.item ? `${c.item.status === 'active' ? 'activa' : c.item.status}, ${c.item.available_quantity} unidades` : 'no se pudo leer'}.`)
-  }
+  // 10-11 (el dueño): la disponibilidad sale de la PUBLICACIÓN (con o sin inventario): activa = hay. El stock del sistema
+  // confundía (productos mal vinculados, variantes en 0) y la IA dudaba donde el vendedor contesta «sí, disponible».
+  L.push(`\nDISPONIBLE EN MERCADOLIBRE: ${c.item ? `${c.item.status === 'active' ? 'publicación activa' : `publicación ${c.item.status}`}, ${c.item.available_quantity} unidades` : 'no se pudo leer la publicación'}.`)
   if (c.variantes?.length) L.push(textoVariantes(c.variantes))
   if (c.delComprador?.length) {
     L.push('\nPREGUNTAS ANTERIORES DE ESTE MISMO COMPRADOR (para entender a qué se refiere ahora):')
@@ -506,6 +525,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
   if (!minimo && c.minimo && precio !== null && precio >= c.minimo.precioMenor) L.push(`\nEN ESTE PRODUCTO NO APLICA EL MÍNIMO DE UNIDADES: cuesta $${precio.toFixed(2)} y el mínimo de ${c.minimo.unidades} unidades es solo para productos de MENOS de $${c.minimo.precioMenor} ($${c.minimo.precioMenor.toFixed(2)} exactos ya no lo pide). Tiene envío gratis desde 1 unidad: no menciones el mínimo ni bajes la confianza por eso.`)
   if (c.notas.length) L.push(`\nDATOS QUE EL VENDEDOR ANOTÓ DE ESTA PUBLICACIÓN:\n- ${c.notas.join('\n- ')}`)
   if (c.ficha) L.push(`\nFICHA DE CONOCIMIENTO (lo que el vendedor ya respondió de esta publicación, resumido):\n${c.ficha.texto}`)
+  if (c.catalogo) L.push(`\nCATÁLOGO DE LA TIENDA (todas nuestras publicaciones): ${c.catalogo}`)
   if (c.otras.length) {
     L.push('\nOTRAS PUBLICACIONES DEL VENDEDOR (activas y con stock; solo para recomendar si esta no cumple):')
     for (const o of c.otras.slice(0, r.otras)) {
@@ -513,7 +533,7 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
         (o.ficha ? `\n  Ficha: ${o.ficha.slice(0, r.fichaOtra)}` : ''))
     }
   }
-  const par = (xs: { p: string; r: string }[]) => xs.map(x => `P: ${x.p}\nR: ${x.r}`).join('\n\n')
+  const par = (xs: { p: string; r: string; f?: string }[]) => xs.map(x => `${x.f ? `(${x.f}) ` : ''}P: ${x.p}\nR: ${x.r}`).join('\n\n')
   if (c.mismoItem.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR EN ESTA MISMA PUBLICACIÓN:\n${par(c.mismoItem.slice(0, r.mismo))}`)
   if (c.parecidas.length) L.push(`\nRESPUESTAS ANTERIORES DEL VENDEDOR A PREGUNTAS PARECIDAS (otras publicaciones):\n${par(c.parecidas.slice(0, r.parecidas))}`)
   return L.join('\n')
@@ -567,6 +587,7 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   }
   // Un reintento si falla (corte de la IA o "no devolvió un borrador").
   let b = await pedir(MODELO_SIMPLE).catch(() => pedir(MODELO_SIMPLE))
+  b = { ...b, respuesta: sinTercero(b.respuesta) }
   // Verificador (31-10): lo que la IA da por seguro se busca afirmación por afirmación en los datos; si algo no está
   // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
   let verificacion: string | null = null
@@ -581,6 +602,16 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
     }
   }
   return { ...b, llamadas, verificacion }
+}
+
+/** 10-11 (el dueño): «según la descripción de la publicación» y parecidas suenan a alguien de afuera; se quitan solas.
+ *  Lo que no se puede quitar sin romper la frase («la publicación no especifica…») sigue frenando (TERCERO). */
+export function sinTercero(t: string) {
+  return t
+    .replace(/,?\s*(seg[uú]n|como (lo )?(indica|dice|menciona|muestra))\s+(la|esta|nuestra)\s+(publicaci[oó]n|ficha( t[eé]cnica)?|descripci[oó]n)( de (la|esta) publicaci[oó]n)?/gi, '')
+    .replace(/\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (indica|dice|menciona|muestra) que\s+/gi, '')
+    .replace(/\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (indica|dice|menciona|muestra)\s+/gi, 'tiene ')
+    .replace(/\s+([.,;])/g, '$1').replace(/\s{2,}/g, ' ').trim()
 }
 
 // Receta económica (04-11-2026, simulación en paralelo de lib/iaEconomica.ts): lo que usan los bots de ~$0,01 por

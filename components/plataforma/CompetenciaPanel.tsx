@@ -8,6 +8,7 @@ interface Fila {
   pregunta: string; respuesta_ellos: string | null; segundos: number | null
   respuesta_nuestra: string | null; decision: 'sola' | 'revisar' | null; motivos: string[] | null; error: string | null
   generada_at: string | null; marca: 'bien' | 'mal' | null; nota: string | null; costo: number | null
+  origen: 'bot' | 'equipo'; respuesta_antes: string | null; decision_antes: 'sola' | 'revisar' | null; motivos_antes: string[] | null; marca_antes: 'bien' | 'mal' | null
 }
 type Filtro = 'todas' | 'sin_marcar' | 'sola' | 'revisar' | 'bien' | 'mal'
 
@@ -50,6 +51,16 @@ export default function CompetenciaPanel() {
     }
     setOcupado(null)
   }
+  // Regenerar (mig 162): lo actual queda como «antes» para comparar con la IA de hoy.
+  const regenerar = async () => {
+    const quien = empresa === 'todas' ? 'todas las empresas' : empresas.find(([id]) => id === empresa)?.[1]
+    if (!window.confirm(`¿Regenerar las respuestas de ${quien} con la IA de hoy? La actual queda como «antes»; si sale igual, conserva tu marca.`)) return
+    setOcupado('Preparando…'); setError(null)
+    const r = await fetch('/api/plataforma/competencia', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'regenerar', empresa_id: empresa === 'todas' ? null : empresa }) })
+    setOcupado(null)
+    if (!r.ok) { setError('No se pudo preparar'); return }
+    await cargar(); await generar()
+  }
   const marcar = async (id: number, marca: 'bien' | 'mal' | null, nota?: string) => {
     setFilas(f => f?.map(x => x.id === id ? { ...x, marca, ...(nota !== undefined ? { nota } : {}) } : x) ?? null)
     await fetch('/api/plataforma/competencia', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, marca, nota }) })
@@ -74,6 +85,7 @@ export default function CompetenciaPanel() {
           <h3 className="font-semibold text-neutral-900">Nuestra IA vs. el bot de la competencia</h3>
           <div className="ml-auto flex gap-2">
             <button onClick={traer} disabled={!!ocupado} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">Traer últimos 5 días</button>
+            <button onClick={regenerar} disabled={!!ocupado || !generadas.length} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">Regenerar con la IA de hoy</button>
             {ocupado?.startsWith('Generando')
               ? <button onClick={() => { parar.current = true }} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm">Pausar</button>
               : <button onClick={generar} disabled={!!ocupado || base.length === generadas.length} className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
@@ -81,7 +93,7 @@ export default function CompetenciaPanel() {
           </div>
         </div>
         <p className="text-xs text-neutral-500">
-          Preguntas que Gerardo y Urdaneta respondieron fuera del sistema (su bot) y la que daría nuestra IA hoy, con sus datos y su Mi IA.
+          Preguntas que Gerardo y Urdaneta respondieron fuera del sistema (su bot), y las de tu equipo donde corrigieron a la IA (14 días), con la que daría nuestra IA hoy, con sus datos y su Mi IA.
           No se publica nada ni se cobra a ellos. Marca <b>Bien</b> o <b>Mal</b> la nuestra.
         </p>
         {ocupado && <p className="text-xs text-sky-800">{ocupado}</p>}
@@ -129,7 +141,7 @@ function Caso({ f, onMarcar }: { f: Fila; onMarcar: (id: number, m: 'bien' | 'ma
       <p className="font-medium text-neutral-900">{f.pregunta}</p>
       <div className="grid md:grid-cols-2 gap-2">
         <div className="rounded-lg bg-neutral-50 border border-neutral-100 p-3">
-          <div className="text-[11px] text-neutral-500 mb-1">Su bot{f.segundos !== null ? ` · ${f.segundos} s` : ''}</div>
+          <div className="text-[11px] text-neutral-500 mb-1">{f.origen === 'equipo' ? 'Tu equipo publicó' : 'Su bot'}{f.segundos !== null ? ` · ${f.segundos} s` : ''}</div>
           <p className="text-sm text-neutral-800 whitespace-pre-line">{f.respuesta_ellos}</p>
         </div>
         <div className={`rounded-lg border p-3 ${f.decision === 'sola' ? 'bg-green-50/60 border-green-100' : 'bg-amber-50/60 border-amber-100'}`}>
@@ -138,6 +150,12 @@ function Caso({ f, onMarcar }: { f: Fila; onMarcar: (id: number, m: 'bien' | 'ma
           </div>
           {f.error ? <p className="text-xs text-red-700">{f.error}</p> : <p className="text-sm text-neutral-800 whitespace-pre-line">{f.respuesta_nuestra || (f.generada_at ? '(sin respuesta)' : '—')}</p>}
           {!!f.motivos?.length && <ul className="mt-1 text-[11px] text-amber-900 list-disc pl-4">{f.motivos.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+          {f.respuesta_antes && f.respuesta_antes !== f.respuesta_nuestra && (
+            <details className="mt-2 text-xs text-neutral-500">
+              <summary className="cursor-pointer">Antes · {f.decision_antes === 'sola' ? 'saldría sola' : 'iría a revisión'}{f.marca_antes ? ` · la marcaste ${f.marca_antes === 'bien' ? 'Bien' : 'Mal'}` : ''}</summary>
+              <p className="mt-1 whitespace-pre-line text-neutral-600">{f.respuesta_antes}</p>
+            </details>
+          )}
         </div>
       </div>
       {f.generada_at && (

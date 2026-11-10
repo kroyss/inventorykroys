@@ -20,7 +20,8 @@ export async function variantesDe(db: Pool, itemId: string, variaciones: Variaci
     const sis = sistema.get(String(v.id)) ?? null
     return {
       nombre: (v.attribute_combinations ?? []).filter(a => a.value_name).map(a => `${a.name}: ${a.value_name}`).join(' · ') || `variante ${v.id}`,
-      ml, sistema: sis, disponibles: sis === null ? ml : Math.min(ml, sis),
+      // 10-11 (el dueño): manda la publicación (con o sin inventario); el stock del sistema confundía y frenaba de más.
+      ml, sistema: sis, disponibles: ml,
     }
   })
 }

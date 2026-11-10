@@ -33,7 +33,7 @@ const lista = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1
 const corto = (s: string, n = 60) => s.length > n ? s.slice(0, n - 1) + '…' : s
 function resumen(id: string, c: Config): string {
   switch (id) {
-    case 'tono': return [c.tono?.saludo && `«${c.tono.saludo}»`, c.tono?.despedida && `«${c.tono.despedida}»`, c.tono?.trato === 'usted' ? 'de usted' : c.tono?.trato === 'tu' ? 'tuteo' : ''].filter(Boolean).join(' · ')
+    case 'tono': return [c.tono?.saludo && `«${c.tono.saludo}»`, c.tono?.despedida && `«${c.tono.despedida}»`, c.tono?.trato === 'usted' ? 'de usted' : c.tono?.trato === 'tu' ? 'tuteo' : '', c.tono?.persona === 'yo' ? 'como «yo»' : ''].filter(Boolean).join(' · ')
     case 'oferta': return c.oferta?.texto?.trim() ? corto(c.oferta.texto.trim()) : c.oferta ? 'No tengo oferta fija' : ''
     case 'pago': return [c.pago?.tasa, c.pago?.medios?.length ? corto(lista(c.pago.medios), 70) : '', c.pago?.divisas ? `${c.pago.divisas.pct}% menos en divisas` : ''].filter(Boolean).join(' · ')
     case 'envio': {
@@ -42,12 +42,12 @@ function resumen(id: string, c: Config): string {
       return [g.length ? `${lista(g)} gratis` : '', d.length ? `${lista(d)} cobro a destino` : '',
         c.envio?.minimo ? `mínimo ${c.envio.minimo.unidades} u. bajo $${c.envio.minimo.precioMenor}` : ''].filter(Boolean).join(' · ')
     }
-    case 'despacho': return [c.despacho?.dias, c.despacho?.corte ? `mismo día antes de las ${c.despacho.corte}` : ''].filter(Boolean).join(' · ')
+    case 'despacho': return [c.despacho?.dias, c.despacho?.corte ? `mismo día antes de las ${c.despacho.corte}` : c.despacho?.plazo === 0 ? 'sale el mismo día' : c.despacho?.plazo === 1 ? 'sale al siguiente día hábil' : c.despacho?.plazo ? `sale a los ${c.despacho.plazo} días hábiles` : 'falta: ¿cuándo sale?'].filter(Boolean).join(' · ')
     case 'ubicacion': return [c.ubicacion?.zona, c.ubicacion?.decir === false ? 'no decirlo' : '',
       c.ubicacion?.retiro === 'no' ? 'sin retiro' : c.ubicacion?.retiro === 'acuerdo' ? 'retiro previo acuerdo' : c.ubicacion?.retiro === 'horario' ? `retiro ${c.ubicacion.retiroHorario ?? ''}`.trim() : ''].filter(Boolean).join(' · ')
     case 'factura': return [c.factura?.tipo === 'fiscal' ? 'Factura fiscal' : c.factura?.tipo === 'nota' ? 'Nota de entrega' : c.factura?.tipo === 'no' ? 'Sin factura' : '',
       c.factura?.garantiaDias ? `${c.factura.garantiaDias} días de garantía${c.factura.garantiaNoCubre ? ` (no cubre ${corto(c.factura.garantiaNoCubre, 40)})` : ''}` : ''].filter(Boolean).join(' · ')
-    case 'desconocido': return (c.desconocido ?? []).map((k, i) => `${i + 1}. ${{ verificar: 'lo verificamos', preguntar: 'preguntar', recomendar: 'recomendar otra', persona: 'una persona' }[k]}`).join(' · ')
+    case 'desconocido': return [(c.desconocido ?? []).map((k, i) => `${i + 1}. ${{ verificar: 'verificarlo con un técnico', preguntar: 'preguntar', recomendar: 'recomendar otra', persona: 'una persona' }[k]}`).join(' · '), c.catalogo === false ? 'sin catálogo' : 'catálogo ante la duda'].filter(Boolean).join(' · ')
     case 'persona': return corto(lista(c.persona ?? []), 90)
     case 'cambios': return [c.cambios?.acepta === 'si' ? 'Sí' : c.cambios?.acepta === 'falla' ? `Solo: ${motivosCambio(c.cambios).map(m => MOTIVOS_CAMBIO[m].texto.split(' (')[0].toLowerCase()).join(', ')}` : c.cambios?.acepta === 'no' ? 'No' : '',
       c.cambios?.dias ? `${c.cambios.dias} días` : '', c.cambios?.envio === 'comprador' ? 'envío lo paga el comprador' : c.cambios?.envio === 'nosotros' ? 'envío lo pagamos' : ''].filter(Boolean).join(' · ')
@@ -65,7 +65,7 @@ const MEDIOS = ['Pago móvil', 'Transferencia', 'Efectivo en divisas', 'Zelle', 
 const AGENCIAS = ['MercadoEnvíos', 'ZOOM', 'TEALCA', 'MRW', 'Domesa', 'Liberty Express', 'PedidosYa', 'Yummy', 'Delivery propio']
 const PERSONA = ['Reclamos', 'Ventas al mayor', 'Cambios y devoluciones', 'Pagos con problemas', 'Factura a nombre de empresa', 'Pedidos de otros productos']
 const PASOS_PV = ['Llenar el formulario de MercadoLibre', 'Mandar el comprobante de pago por el chat', 'Confirmar el color o la talla']
-const DESC = { verificar: 'Decir "lo verificamos y te confirmamos"', preguntar: 'Preguntar el modelo o para qué lo necesita', recomendar: 'Recomendar otra publicación tuya que sí lo cumpla', persona: 'Dejarla para una persona' } as const
+const DESC = { verificar: 'Decir lo que sabe y recomendar verificarlo con un técnico o en su equipo', preguntar: 'Preguntar el modelo o para qué lo necesita', recomendar: 'Recomendar otra publicación tuya que sí lo cumpla', persona: 'Dejarla para una persona' } as const
 type Desc = keyof typeof DESC
 
 const contacto = (s?: string) => !!s && (/\d[\d\s.-]{8,}\d/.test(s) || /@|https?:|www\.|\.com\b|wa\.me|whats?app|instagram|telegram/i.test(s))
@@ -131,6 +131,12 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
         <Chip activo={c.tono?.trato === 'tu'} onClick={() => set(c => ({ ...c, tono: { ...c.tono, trato: 'tu' } }))}>Tuteo</Chip>
         <Chip activo={c.tono?.trato === 'usted'} onClick={() => set(c => ({ ...c, tono: { ...c.tono, trato: 'usted' } }))}>De usted</Chip>
       </div></Pregunta>
+      <Pregunta t="¿Cómo habla de ti?" ayuda="Nunca como alguien de afuera («según la descripción…»).">
+        <div className="flex flex-wrap gap-2">
+          <Chip activo={c.tono?.persona !== 'yo'} onClick={() => set(c => ({ ...c, tono: { ...c.tono, persona: 'nosotros' } }))}>Como equipo («tenemos»)</Chip>
+          <Chip activo={c.tono?.persona === 'yo'} onClick={() => set(c => ({ ...c, tono: { ...c.tono, persona: 'yo' } }))}>Como persona («tengo»)</Chip>
+        </div>
+      </Pregunta>
     </>
     case 'oferta': return <>
       <div className="flex gap-2">
@@ -201,6 +207,15 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
             className="rounded-lg border border-neutral-300 px-2 py-1" /></>}
         </div>
       </Pregunta>
+      {!c.despacho?.corte && <Pregunta t="¿Cuándo sale el pedido?" ayuda="Después de confirmado el pago y llenado el formulario. La IA lo dice cuando preguntan cuánto tarda.">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-700">
+          {([[0, 'El mismo día'], [1, 'Al siguiente día hábil'], [2, 'A los 2 días hábiles']] as const).map(([k, t]) =>
+            <Chip key={k} activo={c.despacho?.plazo === k} onClick={() => set(c => ({ ...c, despacho: { ...c.despacho, plazo: k } }))}>{t}</Chip>)}
+          <label className="flex items-center gap-1">Otro: <input inputMode="numeric" value={c.despacho?.plazo != null && c.despacho.plazo > 2 ? c.despacho.plazo : ''}
+            onChange={e => set(c => ({ ...c, despacho: { ...c.despacho, plazo: num(e.target.value) === null ? null : Math.min(30, Math.round(num(e.target.value)!)) } }))}
+            className="w-14 rounded-lg border border-neutral-300 px-2 py-1" /> días hábiles</label>
+        </div>
+      </Pregunta>}
     </>
     case 'ubicacion': return <>
       <Pregunta t="¿En qué ciudad y zona estás?" ayuda="Sin dirección exacta: MercadoLibre no lo permite.">
@@ -247,6 +262,14 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${i >= 0 ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-400'}`}>{i >= 0 ? i + 1 : ''}</span>{DESC[k]}
             </button>
           })}
+        </div>
+        <div className="pt-2 space-y-1">
+          <p className="text-sm text-neutral-800">Si no tiene el producto que piden o no sabe cuál es, ¿invita a ver tu catálogo?</p>
+          <p className="text-xs text-neutral-500">Pone el link a todas tus publicaciones en MercadoLibre (lo arma solo).</p>
+          <div className="flex gap-2">
+            <Chip activo={c.catalogo !== false} onClick={() => set(c => ({ ...c, catalogo: true }))}>Sí</Chip>
+            <Chip activo={c.catalogo === false} onClick={() => set(c => ({ ...c, catalogo: false }))}>No</Chip>
+          </div>
         </div>
       </Pregunta>
     }

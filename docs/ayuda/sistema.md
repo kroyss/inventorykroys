@@ -248,6 +248,19 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     la publicación está pausada.
 - **Mi IA** también pregunta por cambios y devoluciones, ventas al mayor, rebajas, apartados, horario de atención e
   **información extra** por secciones (la IA lee cada sección solo cuando la pregunta trata de eso).
+- En **Despacho** hay que decir **cuándo sale el pedido** (el mismo día, al siguiente día hábil o a los N días hábiles
+  de confirmado el pago y llenado el formulario). Sin eso el tema queda incompleto: es lo que la IA responde cuando
+  preguntan cuánto tarda.
+- En **Tono** eliges si la IA habla **como equipo** («tenemos») o **como persona** («tengo»). Nunca habla como alguien
+  de afuera («según la descripción…»): si se le escapa, el sistema lo quita solo.
+- En **Si no sabe algo**, «verificarlo» ahora significa decir lo que sí sabe y **recomendarle al comprador verificarlo
+  con un técnico o en su equipo** (después de publicar no se puede volver a responder, así que no promete «lo
+  verificamos»). Ahí mismo eliges si, cuando no tienes lo que piden o no sabe cuál es, **invita a ver tu catálogo**
+  (el link a todas tus publicaciones de MercadoLibre; viene en Sí).
+- **Disponibilidad:** la IA se guía por la publicación de MercadoLibre (activa y con unidades = disponible), uses o no
+  el inventario. Solo lo deja para una persona si piden más unidades de las que tiene la publicación o la variante.
+- Si preguntan por un medio de pago que no aceptas (ej. Cashea), dice que no trabajas con ese y nombra los tuyos.
+- Si el comprador no pregunta nada («ok, quedo atento», «gracias»), contesta corto y cordial.
 
 **Para que la IA responda mejor:**
 - **Políticas para la IA:** lo general de tu negocio (horarios, envíos, formas de pago, garantía, retiro en
@@ -256,7 +269,9 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   dato de ese producto y la próxima vez lo usa sin gastar créditos de más. **No hace falta hacerlo siempre:** si la IA
   avisó «No encontré: …» y tú publicas tu propia respuesta, la IA saca de ella el dato fijo del producto (material,
   medida, qué incluye…) y lo anota sola en Datos del producto como «aprendido de tu respuesta» (sin descontar
-  créditos). Precios, stock o envíos no se anotan. Si anotó algo mal, bórralo o corrígelo ahí mismo.
+  créditos). También aprende cuando **corriges** lo que propuso la IA con un dato fijo (ej. «sirve para cualquier
+  vehículo», «envío gratis solo por TEALCA»). Lo anotado vale también para las otras publicaciones vinculadas al mismo
+  producto de tu inventario. Precios, stock o tiempos no se anotan. Si anotó algo mal, bórralo o corrígelo ahí mismo.
 - **Lo aprendido de cada producto:** el sistema aprende con tus respuestas qué publicaciones tienen envío gratis y
   cuáles no, para no sugerir la respuesta rápida de envío gratis donde no aplica (gratis). Si tu empresa tiene los
   pesos de MercadoEnvíos cargados (Promociones), esto lo calcula solo con el peso y el precio de hoy (también si es

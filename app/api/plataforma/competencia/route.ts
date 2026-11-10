@@ -3,13 +3,14 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { soloDueno } from '@/lib/plataforma'
-import { cargarCompetencia, generarCompetencia } from '@/lib/iaCompetencia'
+import { cargarCompetencia, generarCompetencia, regenerarCompetencia } from '@/lib/iaCompetencia'
 
 // Plataforma → Interno → Competencia (10-11, mig 161): nuestra IA contra el bot externo (Mercasist) de Gerardo y Urdaneta.
 // Solo el dueño de la plataforma.
 //   GET                                    → filas + resumen por empresa
 //   POST { accion: 'cargar', dias }        → trae las preguntas respondidas fuera del sistema
 //   POST { accion: 'generar' }             → genera nuestra respuesta para las siguientes 8 (la pantalla repite)
+//   POST { accion: 'regenerar', empresa_id? } → guarda lo actual como «antes» y deja todo para generar con la IA de hoy (mig 162)
 //   PATCH { id, marca, nota }              → Bien / Mal de nuestra respuesta
 export async function GET() {
   const { error } = await soloDueno()
@@ -17,7 +18,8 @@ export async function GET() {
   try {
     const { rows } = await dbGlobal().query(
       `SELECT c.id, c.empresa_id, e.nombre AS empresa, c.fecha, c.item_titulo, c.item_permalink, c.pregunta, c.respuesta_ellos,
-              c.segundos, c.respuesta_nuestra, c.decision, c.motivos, c.error, c.generada_at, c.marca, c.nota, c.costo::float AS costo
+              c.segundos, c.respuesta_nuestra, c.decision, c.motivos, c.error, c.generada_at, c.marca, c.nota, c.costo::float AS costo,
+              c.origen, c.respuesta_antes, c.decision_antes, c.motivos_antes, c.marca_antes
        FROM ia_competencia c JOIN empresas e ON e.id = c.empresa_id ORDER BY c.fecha DESC`)
     return NextResponse.json({ filas: rows })
   } catch (err) { return apiError(err) }
@@ -26,6 +28,7 @@ export async function GET() {
 const Post = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('cargar'), dias: z.number().int().min(1).max(30) }),
   z.object({ accion: z.literal('generar') }),
+  z.object({ accion: z.literal('regenerar'), empresa_id: z.number().int().positive().nullable().optional() }),
 ])
 export async function POST(req: NextRequest) {
   const { error } = await soloDueno()
@@ -33,6 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     const b = Post.parse(await req.json())
     if (b.accion === 'cargar') return NextResponse.json({ nuevas: await cargarCompetencia(b.dias) })
+    if (b.accion === 'regenerar') return NextResponse.json({ reiniciadas: await regenerarCompetencia(b.empresa_id ?? null) })
     return NextResponse.json({ quedan: await generarCompetencia(8) })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

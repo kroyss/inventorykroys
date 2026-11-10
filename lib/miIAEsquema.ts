@@ -4,7 +4,7 @@ import { z } from 'zod'
 const txt = (max = 300) => z.string().trim().max(max).optional()
 export const EsquemaMiIA = z.object({
   version: z.literal(1),
-  tono: z.object({ saludo: txt(60), despedida: txt(60), trato: z.enum(['tu', 'usted']).optional() }).optional(),
+  tono: z.object({ saludo: txt(60), despedida: txt(60), trato: z.enum(['tu', 'usted']).optional(), persona: z.enum(['nosotros', 'yo']).optional() }).optional(),
   oferta: z.object({ texto: txt(300), cuando: z.enum(['siempre', 'primera', 'precio']).optional() }).optional(),
   pago: z.object({
     tasa: txt(80), medios: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
@@ -14,7 +14,7 @@ export const EsquemaMiIA = z.object({
     agencias: z.array(z.object({ nombre: z.string().trim().min(1).max(40), gratis: z.boolean() })).max(12).optional(),
     minimo: z.object({ precioMenor: z.number().positive().max(1000), unidades: z.number().int().min(2).max(50) }).nullable().optional(),
   }).optional(),
-  despacho: z.object({ dias: txt(80), corte: z.string().regex(/^\d{1,2}:\d{2}( ?[ap]m)?$/i).nullable().optional(), sabados: z.boolean().optional() }).optional(),
+  despacho: z.object({ dias: txt(80), corte: z.string().regex(/^\d{1,2}:\d{2}( ?[ap]m)?$/i).nullable().optional(), sabados: z.boolean().optional(), plazo: z.number().int().min(0).max(30).nullable().optional() }).optional(),
   ubicacion: z.object({ zona: txt(80), decir: z.boolean().optional(), retiro: z.enum(['no', 'acuerdo', 'horario']).optional(), retiroHorario: txt(80) }).optional(),
   factura: z.object({ tipo: z.enum(['fiscal', 'nota', 'no']).optional(), garantiaDias: z.number().int().min(0).max(3650).nullable().optional(), garantiaNoCubre: txt(150) }).optional(),
   desconocido: z.array(z.enum(['verificar', 'preguntar', 'recomendar', 'persona'])).max(4).optional(),
@@ -27,5 +27,6 @@ export const EsquemaMiIA = z.object({
   atencion: z.object({ horario: txt(120) }).optional(),
   extras: z.array(z.object({ titulo: z.string().trim().min(1).max(60), texto: z.string().trim().min(1).max(1500), palabras: txt(200), siempre: z.boolean().optional() })).max(12).optional(),
   extrasNoAplica: z.boolean().optional(),
+  catalogo: z.boolean().optional(),
 })
 export type EntradaMiIA = z.infer<typeof EsquemaMiIA>

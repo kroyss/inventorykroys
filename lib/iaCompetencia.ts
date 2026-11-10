@@ -11,6 +11,9 @@ import { motivosRevisar } from '@/lib/iaAutomatica'
 
 /** Las empresas con Mercasist que se comparan (Gerardo = SHOPIT_VE, Gonzalez Urdaneta). */
 export const EMPRESAS_COMPETENCIA = [6, 24]
+/** 10-11 (mig 162): las correcciones de tu equipo (SolucionesMC VE): la IA propuso y una persona publicó otra cosa. */
+export const EMPRESA_EQUIPO = 1
+const DIAS_EQUIPO = 14
 
 /** Carga (sin generar) las preguntas de los últimos `dias` respondidas fuera del sistema. Devuelve cuántas nuevas. */
 export async function cargarCompetencia(dias: number): Promise<number> {
@@ -32,7 +35,36 @@ export async function cargarCompetencia(dias: number): Promise<number> {
       nuevas += rowCount ?? 0
     }
   }
+  // Tu equipo: lo que la IA propuso (respuesta automática) y la persona cambió al publicar.
+  const { rows: [eq] } = await dbGlobal().query(`SELECT id, country FROM empresas WHERE id = $1`, [EMPRESA_EQUIPO])
+  if (eq) {
+    const filas = await conEmpresa(eq.id, eq.country as Country, async db => (await db.query(
+      `SELECT id, fecha, item_id, item_titulo, item_permalink, texto, respuesta,
+              GREATEST(0, EXTRACT(EPOCH FROM respuesta_fecha - fecha))::int AS segundos
+       FROM ml_preguntas
+       WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL AND respondida_por IS NOT NULL AND ia_auto IS NOT NULL
+         AND lower(btrim(respuesta)) <> lower(btrim(COALESCE(ia_auto->>'respuesta', '')))
+         AND fecha > NOW() - make_interval(days => $1)
+       ORDER BY fecha DESC`, [Math.max(dias, DIAS_EQUIPO)])).rows)
+    for (const f of filas) {
+      const { rowCount } = await dbGlobal().query(
+        `INSERT INTO ia_competencia (empresa_id, pregunta_id, fecha, item_id, item_titulo, item_permalink, pregunta, respuesta_ellos, segundos, origen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'equipo') ON CONFLICT (pregunta_id) DO NOTHING`,
+        [eq.id, f.id, f.fecha, f.item_id, f.item_titulo, f.item_permalink, f.texto, f.respuesta, f.segundos])
+      nuevas += rowCount ?? 0
+    }
+  }
   return nuevas
+}
+
+/** «Regenerar con la IA de hoy»: guarda la respuesta y la marca actuales como «antes» y deja todo para generar de nuevo.
+ *  Si la nueva sale igual, recupera la marca (generarCompetencia). Devuelve cuántas quedan para generar. */
+export async function regenerarCompetencia(empresaId: number | null): Promise<number> {
+  const { rowCount } = await dbGlobal().query(
+    `UPDATE ia_competencia SET respuesta_antes = respuesta_nuestra, decision_antes = decision, motivos_antes = motivos, marca_antes = marca,
+            respuesta_nuestra = NULL, decision = NULL, motivos = NULL, marca = NULL, error = NULL, generada_at = NULL
+     WHERE generada_at IS NOT NULL AND ($1::int IS NULL OR empresa_id = $1)`, [empresaId])
+  return rowCount ?? 0
 }
 
 /** Genera nuestra respuesta para hasta `n` pendientes (de a 4 en paralelo). Devuelve cuántas quedan. */
@@ -49,7 +81,9 @@ export async function generarCompetencia(n = 8): Promise<number> {
         return { respuesta: b.respuesta, motivos, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0) }
       })
       await dbGlobal().query(
-        `UPDATE ia_competencia SET respuesta_nuestra = $2, decision = $3, motivos = $4, costo = $5, error = NULL, generada_at = NOW() WHERE id = $1`,
+        `UPDATE ia_competencia SET respuesta_nuestra = $2, decision = $3, motivos = $4, costo = $5, error = NULL, generada_at = NOW(),
+                marca = CASE WHEN marca IS NULL AND respuesta_antes IS NOT NULL AND lower(btrim(respuesta_antes)) = lower(btrim($2)) THEN marca_antes ELSE marca END
+         WHERE id = $1`,
         [r.id, out.respuesta, out.motivos.length ? 'revisar' : 'sola', JSON.stringify(out.motivos), out.costo])
     } catch (e) {
       await dbGlobal().query(`UPDATE ia_competencia SET error = $2, decision = 'revisar', generada_at = NOW() WHERE id = $1`,

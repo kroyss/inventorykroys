@@ -16,11 +16,11 @@ export type Agencia = { nombre: string; gratis: boolean }
 export interface MiIA {
   version: 1
   actualizado?: string
-  tono?: { saludo?: string; despedida?: string; trato?: 'tu' | 'usted' }
+  tono?: { saludo?: string; despedida?: string; trato?: 'tu' | 'usted'; persona?: 'nosotros' | 'yo' }   // persona (10-11): cómo habla de sí
   oferta?: { texto?: string; cuando?: 'siempre' | 'primera' | 'precio' }
   pago?: { tasa?: string; medios?: string[]; divisas?: { pct: number; medios?: string[] } | null }
   envio?: { agencias?: Agencia[]; minimo?: { precioMenor: number; unidades: number } | null }
-  despacho?: { dias?: string; corte?: string | null; sabados?: boolean }
+  despacho?: { dias?: string; corte?: string | null; sabados?: boolean; plazo?: number | null }   // plazo (10-11): días hábiles hasta que sale
   ubicacion?: { zona?: string; decir?: boolean; retiro?: 'no' | 'acuerdo' | 'horario'; retiroHorario?: string }
   factura?: { tipo?: 'fiscal' | 'nota' | 'no'; garantiaDias?: number | null; garantiaNoCubre?: string }
   /** Qué hace si no sabe un dato técnico, en orden de preferencia. */
@@ -35,6 +35,8 @@ export interface MiIA {
   /** Información extra por secciones: la IA la recibe SOLO si la pregunta o el mensaje trata de eso (título o palabras). */
   extras?: { titulo: string; texto: string; palabras?: string; siempre?: boolean }[]   // siempre: indicaciones generales, van en todas
   extrasNoAplica?: boolean
+  /** 10-11 (competencia): si no tiene lo que piden o no sabe cuál es, invita a ver el catálogo de la tienda. Sin guardar = sí. */
+  catalogo?: boolean
 }
 
 export const MI_IA_KEY = 'mi_ia'
@@ -46,7 +48,8 @@ export const TEMAS_MI_IA: { id: string; tema: string; lleno: (c: MiIA) => boolea
   { id: 'oferta', tema: 'Oferta fija', lleno: c => c.oferta !== undefined },
   { id: 'pago', tema: 'Pago', lleno: c => !!c.pago?.medios?.length },
   { id: 'envio', tema: 'Envío', lleno: c => !!c.envio?.agencias?.length },
-  { id: 'despacho', tema: 'Despacho', lleno: c => !!c.despacho?.dias },
+  // 10-11 (el dueño): sin el plazo la IA decía «en el menor tiempo posible»: el tema se completa solo con días + cuándo sale.
+  { id: 'despacho', tema: 'Despacho', lleno: c => !!c.despacho?.dias && (!!c.despacho?.corte || (c.despacho?.plazo ?? null) !== null) },
   { id: 'ubicacion', tema: 'Ubicación y retiro', lleno: c => !!(c.ubicacion?.zona || c.ubicacion?.retiro) },
   { id: 'factura', tema: 'Factura y garantía', lleno: c => !!(c.factura?.tipo || c.factura?.garantiaDias) },
   { id: 'cambios', tema: 'Cambios y devoluciones', lleno: c => !!c.cambios?.acepta },
@@ -89,7 +92,8 @@ const lista = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1
 const limpio = (s?: string | null) => (s ?? '').trim()
 
 const DESCONOCIDO: Record<NonNullable<MiIA['desconocido']>[number], string> = {
-  verificar: 'decir que lo verificamos y le confirmamos',
+  // 10-11 (el dueño): «lo verificamos y te confirmamos» no sirve: publicada la respuesta, no se puede volver a contestar.
+  verificar: 'decir lo que sí sabemos y recomendarle verificarlo con un técnico o en su equipo antes de comprar (nunca prometas "lo verificamos y te confirmamos": después de publicar no se puede volver a responder)',
   preguntar: 'preguntarle el modelo o para qué lo necesita',
   recomendar: 'recomendar otra publicación nuestra que sí lo cumpla (solo si cumple con certeza)',
   persona: 'dejarla para una persona (confianza "baja")',
@@ -118,6 +122,7 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
     limpio(t.saludo) && `Empieza con "${limpio(t.saludo)}".`,
     limpio(t.despedida) && `Termina con "${limpio(t.despedida)}".`,
     t.trato && (t.trato === 'usted' ? 'Trata al comprador de usted.' : 'Tutea al comprador.'),
+    t.persona === 'yo' ? 'Habla en primera persona del singular ("tengo", "te confirmo"), como el vendedor.' : 'Habla en primera persona del plural, como el equipo ("tenemos", "te confirmamos"). Nunca como alguien de afuera que lee la publicación ("según la descripción", "la publicación indica").',
     'Sin emojis.',
   ])
   const o = c.oferta
@@ -129,6 +134,7 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
   sec('PRECIO Y PAGO', [
     limpio(p.tasa) && `El precio es el publicado, a ${limpio(p.tasa)}.`,
     p.medios?.length && `Medios de pago: ${lista(p.medios)}.`,
+    p.medios?.length && 'Si preguntan por un medio de pago que NO está en esa lista (p. ej. Cashea), di que no trabajamos con ese y nombra los que sí aceptamos.',
     p.divisas && p.divisas.pct > 0 && `Descuento de ${p.divisas.pct}% pagando en divisas${p.divisas.medios?.length ? ` (${lista(p.divisas.medios)})` : ''}.`,
   ])
   const e = c.envio ?? {}
@@ -140,7 +146,9 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
     destino.length && `${lista(destino)}: cobro a destino.`,
     e.minimo && `Productos de menos de $${e.minimo.precioMenor}: mínimo ${e.minimo.unidades} unidades para que se active el envío gratis. Dilo SIEMPRE al confirmar disponibilidad, precio o envío de esos productos, aunque no lo pregunten.`,
     limpio(d.dias) && `Despachamos ${limpio(d.dias)}${d.sabados === false ? ' (los sábados no)' : ''}.`,
-    d.corte ? `Si paga y llena el formulario antes de las ${d.corte}, sale el mismo día; si no, al siguiente día hábil.` : null,
+    d.corte ? `Si paga y llena el formulario antes de las ${d.corte}, sale el mismo día; si no, al siguiente día hábil.`
+      : d.plazo === 0 ? 'Sale el mismo día de confirmado el pago y llenado el formulario.'
+      : d.plazo ? `Sale ${d.plazo === 1 ? 'al siguiente día hábil' : `a los ${d.plazo} días hábiles`} de confirmado el pago y llenado el formulario. Si preguntan cuándo sale o cuánto tarda, dilo así (el tiempo de la agencia no lo sabemos con exactitud).` : null,
   ])
   const u = c.ubicacion ?? {}
   sec('UBICACIÓN Y RETIRO', [

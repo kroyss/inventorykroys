@@ -10,7 +10,7 @@ const SISTEMA = `Verificas un BORRADOR de respuesta a una pregunta de MercadoLib
 1. Separa el borrador en afirmaciones concretas (hay disponible, color X, mide Y, envío gratis por Z, mínimo N unidades, retiro en tal zona, garantía, plazo, compatibilidad, qué incluye...). Saludos, despedidas y "el precio es el publicado" no son afirmaciones que verificar.
 2. Para cada afirmación, busca dónde está escrita y marca respaldada:
    - Datos del producto (color, medida, números, compatibilidad, qué incluye): en el título, ficha técnica, descripción, VARIANTES, notas del vendedor, o en una respuesta anterior del vendedor en ESTA MISMA publicación. El número o el color debe ser el MISMO (75 no es 70; "rojo" no respalda "dorado").
-   - Disponibilidad y cantidades: en STOCK REAL o VARIANTES (una cantidad pedida debe alcanzar).
+   - Disponibilidad y cantidades: en DISPONIBLE EN MERCADOLIBRE o VARIANTES (una cantidad pedida debe alcanzar).
    - Envío gratis, mínimos, agencias: en la línea ENVÍO GRATIS A ESTE PRECIO, las POLÍTICAS o las RESPUESTAS RÁPIDAS que aplican. Una respuesta anterior NO respalda montos ni mínimos de envío (pueden estar viejos).
    - Ubicación, retiro, garantía, factura, plazos, pagos: en POLÍTICAS o RESPUESTAS RÁPIDAS.
    - Si no la encuentras escrita, respaldada = false. No la deduzcas ni la des por obvia.
@@ -49,6 +49,8 @@ AJUSTES (mandan sobre lo anterior):
 - Una conversión a bolívares sale de la línea PRECIO EN MERCADOLIBRE AHORA: respaldada.
 - Lo que dice una RESPUESTA RÁPIDA del vendedor que aplica, o lo que el vendedor ya respondió igual en ESTA publicación, está respaldado.
 - partes_sin_contestar: solo si una parte quedó SIN ninguna respuesta. Una respuesta general correcta o la frase segura de despacho cuenta como contestada ("¿si compro el lunes cuándo llega?" → "normalmente son dos días" está contestada).
+- Tampoco son afirmaciones (10-11): recomendar verificarlo con un técnico o en su equipo, "las fotos son referenciales", invitar a ver el CATÁLOGO DE LA TIENDA con su link, "no trabajamos con <medio de pago>" cuando ese medio no está en las POLÍTICAS, y "perfecto, quedo a su orden" a quien no preguntó nada.
+- Un plazo de despacho o un dato del producto escrito en DATOS QUE EL VENDEDOR ANOTÓ o en las POLÍTICAS está respaldado.
 - Sigue siendo NO respaldado: colores, tallas, medidas, números, plazos, mínimos, agencias, cobros o compatibilidades que no estén escritos.`
 
 export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA }
