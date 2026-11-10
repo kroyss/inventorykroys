@@ -781,7 +781,7 @@ export default function MiIA() {
   const [paso, setPaso] = useState<number | null>(null)     // null = página; n = pantalla del cuestionario
   const [ruta, setRuta] = useState<number[]>(TODOS)         // las pantallas de este recorrido (todas, o solo las que faltan)
   const recorrer = (r: number[]) => { setRuta(r); setUnaSola(false); setPaso(r[0]) }
-  const [unaSola, setUnaSola] = useState(false)              // editando una tarjeta (vuelve a la página al guardar)
+  const [, setUnaSola] = useState(false)   // (11-11: ya no cambia la pantalla; se navega igual entre todos los temas)
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [verTexto, setVerTexto] = useState(false)
@@ -804,7 +804,7 @@ export default function MiIA() {
   // Desde las recomendaciones de la prueba (09-11): abre el tema de Mi IA que hay que mejorar ('*' = todos).
   const abrirTema = (id: string) => {
     if (id === '*') recorrer(TODOS)
-    else { const i = PASOS.findIndex(p => p.id === id); if (i >= 0) { setUnaSola(true); setPaso(i) } }
+    else { const i = PASOS.findIndex(p => p.id === id); if (i >= 0) { setRuta(TODOS); setUnaSola(true); setPaso(i) } }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -823,11 +823,17 @@ export default function MiIA() {
     if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return false }
     return true
   }
-  const siguiente = async () => {
+  // 11-11 (el dueño): moverse entre temas con un toque (barra de temas, Anterior / Siguiente con su nombre). Al moverse se
+  // guarda el tema actual; null = volver a la página de Mi IA.
+  const ir = async (destino: number | null) => {
     if (!(await guardar())) return
-    const pos = paso === null ? -1 : ruta.indexOf(paso)
-    if (unaSola || pos < 0 || pos === ruta.length - 1) { setPaso(null); setUnaSola(false); cargar() } else setPaso(ruta[pos + 1])
+    if (destino === null) { setPaso(null); setUnaSola(false); cargar() }
+    else { if (!ruta.includes(destino)) setRuta(TODOS); setPaso(destino) }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+  useEffect(() => {
+    if (paso !== null) document.getElementById(`tema-${PASOS[paso].id}`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [paso])
 
   if (error && !datos) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
   if (!datos) return <p className="text-sm text-neutral-500">Cargando…</p>
@@ -838,26 +844,57 @@ export default function MiIA() {
   if (paso !== null) {
     const p = PASOS[paso]
     const pos = Math.max(0, ruta.indexOf(paso)), ultimo = pos === ruta.length - 1
+    const anterior = pos > 0 ? ruta[pos - 1] : null, proximo = ultimo ? null : ruta[pos + 1]
+    const recorrido = ruta.length < PASOS.length   // «Continuar» con solo los que faltan
+    const cancelar = () => { setPaso(null); setUnaSola(false); if (datos.miIA) setC(datos.miIA); cargar() }
     return (
-      <div className="max-w-2xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
-        {!unaSola && <div className="h-1 rounded bg-neutral-100"><div className="h-1 rounded bg-neutral-900" style={{ width: `${((pos + 1) / ruta.length) * 100}%` }} /></div>}
-        <div>
-          <p className="text-xs text-neutral-500">{p.tema}{unaSola ? '' : ` · ${pos + 1} de ${ruta.length}`}</p>
-          <h2 className="text-lg font-semibold text-neutral-900">{p.titulo}</h2>
-        </div>
-        {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
-          Sugerido de lo que ya respondes ({ddmm(sug.fecha)}). Revísalo y cámbialo si hace falta; se guarda al dar {unaSola ? 'Guardar' : 'Siguiente'}.</p>}
-        <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
-        {error && <p className="text-sm text-red-700">{error}</p>}
-        <div className="flex items-center justify-between gap-2 pt-2">
-          <div className="flex gap-2">
-            {!unaSola && pos > 0 && <button type="button" onClick={() => setPaso(ruta[pos - 1])} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm">Atrás</button>}
-            <button type="button" onClick={() => { if (unaSola) { setPaso(null); setUnaSola(false); if (datos.miIA) setC(datos.miIA) } else if (ultimo) { setPaso(null); cargar() } else setPaso(ruta[pos + 1]) }}
-              className="px-3 py-2 rounded-lg text-sm text-neutral-500 hover:text-neutral-800">{unaSola ? 'Cancelar' : 'Saltar'}</button>
+      <div className="max-w-3xl space-y-3">
+        {/* Todos los temas a la vista: tocar uno guarda el actual y salta a ese. */}
+        <nav aria-label="Temas de Mi IA" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+          {PASOS.map((t, i) => {
+            const ok = t.lleno(c), actual = i === paso
+            return (
+              <button key={t.id} id={`tema-${t.id}`} type="button" onClick={() => !actual && ir(i)} disabled={guardando}
+                aria-current={actual ? 'step' : undefined}
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
+                  actual ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
+                  : ok ? 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400'
+                  : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'}`}>
+                {ok ? <span className={actual ? 'text-emerald-300' : 'text-emerald-600'}>✓</span>
+                  : <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-label="falta" />}
+                {t.tema}
+              </button>
+            )
+          })}
+        </nav>
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
+          {recorrido && <div className="h-1 rounded bg-neutral-100"><div className="h-1 rounded bg-neutral-900 transition-all" style={{ width: `${((pos + 1) / ruta.length) * 100}%` }} /></div>}
+          <div>
+            <p className="text-xs text-neutral-500">{p.tema} · {pos + 1} de {ruta.length}{recorrido ? ' que faltan' : ''}</p>
+            <h2 className="text-lg font-semibold text-neutral-900">{p.titulo}</h2>
           </div>
-          <button type="button" onClick={siguiente} disabled={guardando}
-            className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
-            {guardando ? 'Guardando…' : unaSola ? 'Guardar' : ultimo ? 'Terminar' : 'Siguiente →'}</button>
+          {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            Sugerido de lo que ya respondes ({ddmm(sug.fecha)}). Revísalo y cámbialo si hace falta; se guarda al pasar a otro tema.</p>}
+          <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
+          {error && <p className="text-sm text-red-700">{error}</p>}
+          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4">
+            {anterior !== null && (
+              <button type="button" onClick={() => ir(anterior)} disabled={guardando}
+                className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">
+                ← {PASOS[anterior].tema}</button>
+            )}
+            <button type="button" onClick={cancelar} disabled={guardando} className="px-2 py-2 text-sm text-neutral-500 hover:text-neutral-800"
+              title="Vuelve a Mi IA sin guardar lo que cambiaste en este tema">Cancelar</button>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {proximo !== null && (
+                <button type="button" onClick={() => ir(null)} disabled={guardando}
+                  className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">Guardar y salir</button>
+              )}
+              <button type="button" onClick={() => ir(proximo)} disabled={guardando}
+                className="inline-flex items-center gap-1 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
+                {guardando ? 'Guardando…' : proximo !== null ? <>{PASOS[proximo].tema} →</> : 'Guardar y terminar'}</button>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -910,7 +947,7 @@ export default function MiIA() {
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {PASOS.map((p, i) => {
           const ok = p.lleno(c), r = ok ? resumen(p.id, c) : ''
-          return <button key={p.id} type="button" onClick={() => { setUnaSola(true); setPaso(i) }}
+          return <button key={p.id} type="button" onClick={() => { setRuta(TODOS); setUnaSola(true); setPaso(i) }}
             className={`text-left rounded-xl border px-4 py-3 hover:border-neutral-400 ${ok ? 'border-neutral-200 bg-white' : 'border-dashed border-amber-300 bg-amber-50/40'}`}>
             <p className="text-sm font-medium text-neutral-900">{p.tema}</p>
             <p className={`text-xs mt-0.5 ${ok ? 'text-neutral-600' : 'text-amber-800'}`}>{ok ? (r || 'Completo') : 'Falta: toca para completarlo'}</p>

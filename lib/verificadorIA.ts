@@ -55,6 +55,12 @@ AJUSTES (mandan sobre lo anterior):
 - "¿Precio?" contestado con "el precio es el publicado (a tasa BCV)" está CONTESTADO: no hace falta la cifra.
 - Un mínimo de unidades o de monto para el envío gratis escrito en las POLÍTICAS o en ENVÍO GRATIS A ESTE PRECIO está respaldado (también decir que con 1 unidad no aplica, si el mínimo es 2).
 - "Por este medio no se pueden mandar imágenes/fotos" contesta un pedido de fotos: CONTESTADO.
+- (11-11) Decir que NO tenemos un dato ("la potencia en W no la tenemos", "el tiempo de llegada no lo tenemos con exactitud") no es una afirmación: no la marques.
+- (11-11) En una respuesta condicional ("si su llave tiene chip necesita un bypass; si es de 12V sirve") la condición no se verifica: solo lo que afirma fuera del "si" (p. ej. que es universal para 12V).
+- (11-11) Cómo se compra en MercadoLibre (elegir la cantidad o el color antes de comprar, comprar la cantidad que necesite, llenar el formulario) no es una afirmación del producto.
+- (11-11) El mínimo de unidades para envío gratis cuenta el TOTAL de la compra en esta publicación, aunque sean colores distintos: "3 unidades (2 rojos y 1 azul) cumplen el mínimo de 2" está respaldado si el mínimo está escrito y cada color tiene disponibles.
+- (11-11) La línea ENVÍO GRATIS PARA LA CANTIDAD QUE PIDE respalda el envío gratis de esa cantidad.
+- (11-11) Si las RESPUESTAS ANTERIORES se contradicen, decide lo escrito en la ficha, la descripción, las notas o las fotos: si eso respalda el borrador, está respaldado.
 - Sigue siendo NO respaldado: colores, tallas, medidas, números, plazos, mínimos, agencias, cobros o compatibilidades que no estén escritos.`
 
 export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA }
@@ -73,7 +79,7 @@ export async function verificarBorrador(datos: string, pregunta: string, borrado
   const sinRespaldo = (r.afirmaciones ?? []).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? '')) && !(v2 && CORTESIA.test((a.afirmacion ?? '').trim())))
   // 11-11: Haiku a veces anota como "sin contestar" una parte y en la misma línea dice que sí se contestó ("…lo cual sí
   // responde la petición"), o pide la cifra cuando "el precio es el publicado" ya contesta. Esas no cuentan.
-  const YA_CONTESTADA = /\b(s[ií] (la |lo )?(respond|contest)|lo cual (s[ií] )?(respond|contest)|(queda|quedan|est[aá]|fue) contestad|\(contestada\)|ninguna parte|responde (la|a la) petici[oó]n)/i
+  const YA_CONTESTADA = /\b(s[ií] (la |lo )?(respond|contest)|lo cual (s[ií] )?(respond|contest)|(queda|quedan|est[aá]|fue) contestad|\(contestada\)|ninguna parte|responde (la|a la) petici[oó]n|es la respuesta correcta|lo cual es correct|\(contestad[oa]:|contestad[oa]: s[ií])/i
   const precioPublicado = /precio (es )?(el )?publicado/i.test(borrador)
   const faltan = (r.partes_sin_contestar ?? []).filter(f => !(v2 && (YA_CONTESTADA.test(f) || (precioPublicado && /^\W*(el )?precio\b/i.test(f) && !/env[ií]o|agencia|bs|bol[ií]var/i.test(f.split(':')[0])))))
   const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`

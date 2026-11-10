@@ -9,7 +9,7 @@
 //     las trae: acá se muestran con aviso para que ninguna se quede colgada.
 import { politicasIA } from '@/lib/miIA'
 import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
-import { envioGratisAhora, huecoVariasUnidades, textoHueco } from '@/lib/mlShipping'
+import { envioGratisAhora, envioPorTransportista, huecoVariasUnidades, textoHueco } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { llamarClaude, MODELO_SIMPLE, type LlamadaIA } from '@/lib/ia'
 import type { Pool } from 'pg'
@@ -22,6 +22,7 @@ import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
 import { contextoFotos, fichaDeAtributos, lineasFotos, type ContextoFotos, type FotoML } from '@/lib/fotosIA'
 import { verificarBorrador } from '@/lib/verificadorIA'
+import { CODIGO_INTERNO } from '@/lib/codigoInterno'
 import { esDemo } from '@/lib/demo'
 import { riesgoDe } from '@/lib/sugerenciasPreguntas'
 import { variantesDe, textoVariantes, type Variante, type VariacionML } from '@/lib/variantesML'
@@ -268,6 +269,7 @@ export interface Contexto {
   titulo: string | null            // guardado en la bandeja (si ML no deja leer la publicación)
   precioML: { precio: number; original: number | null; moneda: string } | null   // con la promoción vigente
   envio: string | null             // envío gratis al precio de ahora (ZOOM y TEALCA / solo TEALCA / cobro a destino)
+  envioCantidad?: string | null    // 11-11: el mismo cálculo para la cantidad que pide la pregunta («4 unidades»)
   descripcion: string | null
   producto: { code: string; name: string; stock: number; precio_usd: number | null } | null
   tasa: number | null
@@ -318,11 +320,20 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
   // Envío gratis por transportista: solo empresas con Promociones (las demás, como antes).
   let envio: ReturnType<typeof envioGratisAhora> = null
   let hueco: ReturnType<typeof huecoVariasUnidades> = null
+  let envioCantidad: string | null = null
   if ((q.item_moneda ?? 'USD') === 'USD' && await empresaConPromociones(db)) {
     const { rows: [peso] } = await db.query(`SELECT ${sqlPesoPublicacion('$1::text')} AS kg`, [q.item_id]).catch(() => ({ rows: [] }))
     const tablas = await leerTablasEnvio(db)
     envio = envioGratisAhora(peso?.kg, q.item_precio, q.item_precio_original, tablas)
     hueco = envio ? huecoVariasUnidades(peso?.kg, q.item_precio, q.item_precio_original, tablas) : null
+    // 11-11 (el dueño, presentador × 4 → Valencia): con la cantidad que pide, el paquete pesa más y puede cambiar de rango.
+    const n = cantidadPedida(q.texto)
+    if (envio && n && peso?.kg > 0 && q.item_precio > 0) {
+      const e = envioPorTransportista(peso.kg * n, q.item_precio * n, tablas)
+      const kg = (peso.kg * n).toLocaleString('de-DE', { maximumFractionDigits: 2 })
+      envioCantidad = `Con ${n} unidades (${kg} kg en total, pagaría ${(q.item_precio * n).toFixed(2)} USD): `
+        + (e.estado === 'ambas' ? 'envío gratis por ZOOM y TEALCA' : e.estado === 'tealca' ? 'envío gratis SOLO por TEALCA (ZOOM no llega)' : 'sin envío gratis: cobro a destino')
+    }
   }
   // Mi IA (06-11, lib/miIA.ts) + el texto libre de siempre. Sin Mi IA guardada, igual que antes.
   const pol = await politicasIA(db, 'preguntas', q.texto)
@@ -383,6 +394,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
     item, titulo: q.item_titulo ?? prod?.name ?? null, descripcion,
     precioML: q.item_precio ? { precio: q.item_precio, original: q.item_precio_original, moneda: q.item_moneda ?? 'USD' } : null,
     envio: envio ? `${envio.texto}${envio.porPromo ? ' (es por la promoción vigente; al terminar vuelve a su envío normal)' : ''}${hueco ? `. OJO: ${textoHueco(hueco).replace(/ · la promo aguanta.*$/, '')}` : ''}` : null,
+    envioCantidad,
     producto: prod ?? null,
     tasa: country === 'VE' ? tasa?.r ?? null : null,   // Bs solo aplica en Venezuela
     politicas: pol.texto, minimo: pol.miIA?.envio?.minimo ?? null,
@@ -470,6 +482,10 @@ AJUSTES (mandan sobre lo anterior):
 - "¿Tienes / sirve para un <vehículo o modelo>?" (p. ej. "¿tienes disponible para un Corsa?") y lo escrito dice que es universal o para cualquier vehículo: contesta que SÍ sirve para ese vehículo, con la condición escrita si la hay (p. ej. 12V). Nunca "no es de un <modelo> en específico".
 - Si el comprador pide una foto (de la caja, de otro ángulo): "por este medio no se pueden mandar imágenes" es completa: confianza "alta".
 - Si falta un dato (potencia, material, medida…): UNA frase corta ("la potencia en W no la tenemos") y lo que sí sabes, nada más. Sin explicar por qué ("no queremos darle un dato que no podamos confirmar") y sin nombrar la publicación ("no está especificada en nuestra publicación"). Ej.: "Buenas, la potencia en W no la tenemos. Trabaja a 5V con batería de 1000 mAh y da hasta 350 LM, quedo a su orden."
+- Si la respuesta depende de algo del vehículo o equipo del comprador que no puedes saber (si trae chip, su voltaje), contestar con la condición ("si es de 12V sirve; si su llave tiene chip necesita un bypass, no incluido") ES una respuesta completa: confianza "alta".
+- Si las RESPUESTAS ANTERIORES se contradicen, decide lo escrito en la ficha, la descripción o las notas; si eso lo aclara, confianza "alta".
+- El mínimo de unidades para envío gratis cuenta el TOTAL de la compra en esta publicación, aunque sean colores o variantes distintas (2 rojos + 1 azul = 3 unidades): confírmalo si cada color pedido tiene disponibles.
+- Si hay línea ENVÍO GRATIS PARA LA CANTIDAD QUE PIDE, contesta con ella: confianza "alta".
 - Lo que SÍ sigue en "baja": las POLÍTICAS o las RESPUESTAS RÁPIDAS se contradicen con la descripción en lo que pregunta (cobros adicionales, mínimos, agencias); datos técnicos o medidas que no están escritos; compatibilidades; pagos fuera de MercadoLibre.`
 
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.
@@ -498,7 +514,8 @@ PUBLICACIÓN: ${c.titulo} (no se pudo leer la ficha en MercadoLibre)`)
     const bs = pml.moneda === 'USD' && c.tasa ? ` ≈ Bs ${(pml.precio * c.tasa).toFixed(2)} a tasa BCV ${c.tasa}` : ''
     L.push(`PRECIO EN MERCADOLIBRE AHORA: ${pml.precio} ${pml.moneda}${bs}` + (pml.original ? ` (en promoción; antes ${pml.original})` : ''))
   }
-  if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM, TEALCA o envío gratis, responde según esto (manda sobre las POLÍTICAS).`)
+  if (c.envio) L.push(`ENVÍO GRATIS A ESTE PRECIO (1 unidad, según el peso y los mínimos de MercadoEnvíos): ${c.envio}. Si preguntan por ZOOM, TEALCA o envío gratis, responde según esto (manda sobre las POLÍTICAS). El peso de la ficha técnica no cuenta: el envío ya está calculado con el peso real.`)
+  if (c.envioCantidad) L.push(`ENVÍO GRATIS PARA LA CANTIDAD QUE PIDE: ${c.envioCantidad}. Para esa cantidad manda esta línea (sobre la de 1 unidad).`)
   if (c.descripcion) L.push(`\nDESCRIPCIÓN:\n${c.descripcion.slice(0, r.descripcion)}`)
   for (const l of lineasFotos(c.fotos ?? null)) L.push(`\n${l}`)
   // 10-11 (el dueño): la disponibilidad sale de la PUBLICACIÓN (con o sin inventario): activa = hay. El stock del sistema
@@ -590,6 +607,9 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   }
   // Un reintento si falla (corte de la IA o "no devolvió un borrador").
   let b = await pedir(MODELO_SIMPLE).catch(() => pedir(MODELO_SIMPLE))
+  // 11-11: una vez devolvió "<parameter name=…>" en vez de la respuesta: se pide de nuevo y, si sigue, queda vacía.
+  if (CODIGO_INTERNO.test(b.respuesta)) b = await pedir(MODELO_SIMPLE).catch(() => ({ ...b, respuesta: '' }))
+  if (CODIGO_INTERNO.test(b.respuesta)) b = { ...b, respuesta: '', confianza: 'baja' }
   b = { ...b, respuesta: sinTercero(b.respuesta) }
   // Verificador (31-10): lo que la IA da por seguro se busca afirmación por afirmación en los datos; si algo no está
   // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
@@ -609,6 +629,20 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
 
 /** 10-11 (el dueño): «según la descripción de la publicación» y parecidas suenan a alguien de afuera; se quitan solas.
  *  Lo que no se puede quitar sin romper la frase («la publicación no especifica…») sigue frenando (TERCERO). */
+// 11-11: la cantidad que pide la pregunta ("compra de 4 unidades", "necesito tres") para el envío gratis de esa cantidad.
+// Solo de 2 a 10, y nunca un número pegado a una medida ("12v", "2 mm", "5 metros").
+const NUMEROS: Record<string, number> = { dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 }
+export function cantidadPedida(texto: string): number | null {
+  const t = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const N = '(\\d{1,2}|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)'
+  const a = new RegExp(`\\b${N}\\s*(unidades|unidad|unds?|piezas|packs?|pares|rollos|kits?|juegos|cajas|sets?)\\b`).exec(t)
+  const b = a ? null : new RegExp(`\\b(compra de|comprar|compro|necesito|quiero|llevar|llevo|pedir|serian|seria|para)\\s+${N}\\b(?!\\s*(v|mm|cm|w|a|kg|m|metros|gb|mah|pulgadas|anos|dias|horas|meses|personas)\\b)`).exec(t)
+  const w = a ? a[1] : b ? b[2] : null
+  if (!w) return null
+  const v = w in NUMEROS ? NUMEROS[w] : Number(w)
+  return v >= 2 && v <= 10 ? v : null
+}
+
 export function sinTercero(t: string) {
   return t
     .replace(/,?\s*(seg[uú]n|como (lo )?(indica|dice|menciona|muestra))\s+(la|esta|nuestra)\s+(publicaci[oó]n|ficha( t[eé]cnica)?|descripci[oó]n)( de (la|esta) publicaci[oó]n)?/gi, '')

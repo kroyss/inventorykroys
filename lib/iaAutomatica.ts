@@ -7,6 +7,7 @@
 // bien o mal) · real (publica las "sola"). La pausa de las respuestas automáticas (preguntas_auto_pausa) la frena igual.
 // Cada pregunta procesada usa 1 crédito de IA (ia_uso.modulo = 'preguntas'); sin créditos no procesa.
 import type { Pool } from 'pg'
+import { CODIGO_INTERNO } from '@/lib/codigoInterno'
 import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador, iaConfigurada, textoVendedor } from '@/lib/preguntas'
 import { costoDe, cupoIA, registrarUso, MODELO_ECO55 } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
@@ -51,7 +52,7 @@ const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
 // 10-11 (competencia, el dueño): invitar al catálogo de la tienda ante la duda está bien: ese link no frena.
 const CATALOGO = /https?:\/\/listado\.mercadolibre\.com\.(ve|co)\/_CustId_\d+\S*/gi
 // «No lo tenemos confirmado / no lo hemos probado» no es decir que no hay.
-const SIN_CONFIRMAR_FRASE = /\bno (lo |la |los |las )?(tenemos|hemos) (confirmad|probad|verificad)\w*/gi
+const SIN_CONFIRMAR_FRASE = /\bno (lo |la |los |las )?(tenemos|hemos) (confirmad|probad|verificad)\w*|\bno (lo |la |los |las )?(tenemos|manejamos) (con exactitud|exact\w*|especificad\w*)|\b(potencia|material|medidas?|peso|dato|datos|tiempo|voltaje|capacidad|autonom[ií]a|duraci[oó]n|rango|vatios|watts?|amperaje|dimensiones)\b[^.,;]{0,30}?\bno (lo |la |los |las )?tenemos\b/gi
 // Modo prueba 01–04/11 (78 de 79 bien): el único error fue un monto inventado ("cobro destino por MRW aprox. 1.600 Bs").
 // Montos en bolívares, estimados y cobros a destino con cifra cambian a diario: siempre una persona.
 const MONTO = /\d[\d.,]*\s?(bs\b|bs\.|bol[ií]vares)|\bbs\.?\s?\d|aproximad|cobro (a |en )?destino[^.]*\d/i
@@ -97,6 +98,7 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   itemEstado: string | null, pregunta = '', datos = '', v2 = false, vendedor = '', compat = datos): string[] {
   const m: string[] = []
   if (!b.respuesta) return ['La IA no propuso respuesta']
+  if (CODIGO_INTERNO.test(b.respuesta)) return ['La IA devolvió texto inválido: lo revisa una persona']
   // 08-11 (el dueño, con 65 marcadas): confianza baja o media SOLA ya no frena si el verificador aprobó la respuesta
   // (nada afirmado fuera de los datos). Las demás reglas (no hay, pagos, montos, otra publicación…) siguen frenando.
   if (b.confianza !== 'alta' && b.verificacion !== 'ok') m.push(`Confianza ${b.confianza}${b.falta_dato ? `: ${b.falta_dato}` : ''}`)
