@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { problemasDelTexto } from '@/lib/preguntas'
 import { OrigenRespuesta } from '@/lib/respuestasOrigen'
 import { publicarRespuesta } from '@/lib/responderPregunta'
+import { aprenderDatoDeRespuesta } from '@/lib/aprenderDato'
+import { conEmpresa } from '@/lib/db'
 
 const Body = z.object({ texto: z.string().min(1).max(2000) }).merge(OrigenRespuesta)
 
@@ -23,6 +25,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     const r = await publicarRespuesta(s.db, id, texto, { usuarioId: s.session.user.id, fuente, base, plantilla })
     if (!r.ok) return NextResponse.json({ error: r.error, ...(r.codigo ? { codigo: r.codigo } : {}) }, { status: r.status })
+    // 10-11: si la IA no tenía el dato y la persona lo escribió, lo aprende (lib/aprenderDato.ts). Al terminar, con su
+    // propia conexión: no demora la publicación.
+    if (r.publicada) {
+      const u = s.session.user
+      after(() => conEmpresa(u.empresaId, u.country, db => aprenderDatoDeRespuesta(db, id, texto, u.id)))
+    }
     return NextResponse.json({ publicada: r.publicada, estado: r.estado, respuesta_estado: r.respuesta_estado, aviso: r.aviso })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })

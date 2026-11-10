@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   try {
     if (sp.get('todas')) {
       const { rows } = await s.db.query(
-        `SELECT n.id, n.item_id, n.texto, n.created_at, u.full_name AS por,
+        `SELECT n.id, n.item_id, n.texto, n.created_at, CASE WHEN n.aprendida_de IS NOT NULL THEN 'aprendido de tu respuesta' ELSE u.full_name END AS por,
                 COALESCE(q.item_titulo, c.titulo) AS titulo, COALESCE(q.item_permalink, c.permalink) AS link,
                 q.item_imagen AS imagen, COALESCE(c.estado, q.item_estado) AS estado
          FROM ml_item_notas n
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(rows)
     }
     const { rows } = await s.db.query(
-      `SELECT n.id, n.texto, n.created_at, u.full_name AS por
+      `SELECT n.id, n.texto, n.created_at, CASE WHEN n.aprendida_de IS NOT NULL THEN 'aprendido de tu respuesta' ELSE u.full_name END AS por
        FROM ml_item_notas n LEFT JOIN users u ON u.id = n.creada_por
        WHERE n.item_id = $1 ORDER BY n.created_at DESC`, [sp.get('item_id') ?? ''])
     return NextResponse.json(rows)

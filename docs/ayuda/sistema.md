@@ -253,7 +253,10 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - **Políticas para la IA:** lo general de tu negocio (horarios, envíos, formas de pago, garantía, retiro en
   persona…). Se escriben una vez y la IA las usa en todas las respuestas.
 - **Anotar dato del producto:** cuando respondes algo que la IA no sabía (ej. «sí trae cargador»), guárdalo como
-  dato de ese producto y la próxima vez lo usa sin gastar créditos de más.
+  dato de ese producto y la próxima vez lo usa sin gastar créditos de más. **No hace falta hacerlo siempre:** si la IA
+  avisó «No encontré: …» y tú publicas tu propia respuesta, la IA saca de ella el dato fijo del producto (material,
+  medida, qué incluye…) y lo anota sola en Datos del producto como «aprendido de tu respuesta» (sin descontar
+  créditos). Precios, stock o envíos no se anotan. Si anotó algo mal, bórralo o corrígelo ahí mismo.
 - **Lo aprendido de cada producto:** el sistema aprende con tus respuestas qué publicaciones tienen envío gratis y
   cuáles no, para no sugerir la respuesta rápida de envío gratis donde no aplica (gratis). Si tu empresa tiene los
   pesos de MercadoEnvíos cargados (Promociones), esto lo calcula solo con el peso y el precio de hoy (también si es
