@@ -1,4 +1,5 @@
 'use client'
+import { leerNumero } from '@/lib/numeroTexto'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AjustesPresupuesto } from '@/lib/presupuestos'
 
@@ -15,7 +16,7 @@ const ESTADO: Record<string, [string, string]> = {
   borrador: ['Borrador', 'bg-neutral-100 text-neutral-600'], enviado: ['Enviado', 'bg-sky-100 text-sky-700'],
   aceptado: ['Aceptado', 'bg-emerald-100 text-emerald-700'], rechazado: ['Rechazado', 'bg-red-100 text-red-700'],
 }
-const num = (s: string) => { const n = Number(String(s).replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN }
+const num = (s: string) => leerNumero(s)   // 10-11: «36.45» y «36,45» (lib/numeroTexto.ts)
 const fmt = (n: number, m: string) => (m === 'COP' ? '$ ' : m === 'VES' ? 'Bs ' : 'US$ ')
   + n.toLocaleString('de-DE', { minimumFractionDigits: m === 'COP' ? 0 : 2, maximumFractionDigits: m === 'COP' ? 0 : 2 })
 const vence = (creado: string | undefined, dias: number) => {

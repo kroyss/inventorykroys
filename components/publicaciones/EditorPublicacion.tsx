@@ -1,4 +1,5 @@
 'use client'
+import { leerNumero } from '@/lib/numeroTexto'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { CambiosPublicacion, CampoFicha, Publicacion, ResultadoGuardar } from '@/lib/publicacionesML'
@@ -19,7 +20,7 @@ interface Borrador {
 }
 const sinRepetir = (a: string[]) => [...new Set(a)]
 
-const num = (s: string) => { const n = Number(s.replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN }
+const num = (s: string) => leerNumero(s)   // 10-11: «36.45» y «36,45» (lib/numeroTexto.ts)
 const dinero = (n: number, moneda: string) => (moneda === 'COP' ? '$ ' : moneda === 'USD' ? 'US$ ' : `${moneda} `)
   + n.toLocaleString('de-DE', { minimumFractionDigits: moneda === 'COP' ? 0 : 2, maximumFractionDigits: moneda === 'COP' ? 0 : 2 })
 const precioTxt = (n: number, moneda: string) => n.toLocaleString('de-DE', { maximumFractionDigits: moneda === 'COP' ? 0 : 2 })
@@ -417,6 +418,8 @@ export default function EditorPublicacion({ itemId }: { itemId: string }) {
             <span className="text-xs font-medium text-neutral-600">Precio ({moneda})</span>
             <input inputMode="decimal" value={b.precio} onChange={e => set(x => ({ ...x, precio: e.target.value }))}
               className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm num" />
+            {/[.,]/.test(String(b.precio)) && <span className={`mt-1 block text-xs ${Number.isFinite(num(String(b.precio))) ? 'text-neutral-500' : 'text-red-700'}`}>
+              {Number.isFinite(num(String(b.precio))) ? `Se guarda: ${moneda === 'USD' ? 'US$' : moneda} ${num(String(b.precio)).toLocaleString('de-DE', { maximumFractionDigits: 2 })}` : 'Precio no válido'}</span>}
           </label>
           {!p.variantes.length && (
             <label className="block text-sm">

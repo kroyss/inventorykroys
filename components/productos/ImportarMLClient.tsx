@@ -1,4 +1,5 @@
 'use client'
+import { leerNumero } from '@/lib/numeroTexto'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Cargando, EmptyState, FilterPills, KPICard, PageHeader } from '@/components/ui'
@@ -14,7 +15,7 @@ interface Datos { filas: FilaImportar[]; actualizado_at: string | null; cuentas:
 interface Borrador { costo: string; stock: string }
 
 const POR_PAGINA = 60
-const num = (s: string) => { const n = Number(s.replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN }
+const num = (s: string) => leerNumero(s)   // 10-11: «36.45» y «36,45» (lib/numeroTexto.ts)
 const fecha = (s: string | null) => s ? new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' }) : '—'
 function precioTxt(p: number | null, moneda: string | null) {
   if (p == null) return null
