@@ -121,8 +121,8 @@ export default async function InicioPage() {
               </p>
               <h2 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">Programa Despegue</h2>
               <p className="mt-2 leading-relaxed text-neutral-400">
-                8 semanas acompañado para <b className="text-white">empezar desde cero o reactivar tu cuenta</b>: reunión en vivo cada
-                semana, sesiones 1 a 1 y grupo de Telegram. <b className="text-lime-400">Bono: Domingo de Radar.</b>
+                8 semanas acompañado para <b className="text-white">empezar desde cero o reactivar tu cuenta</b>: sesiones 1 a 1 y
+                contacto directo por Telegram. <b className="text-lime-400">Bono: Domingo de Radar.</b>
               </p>
               <a href="/despegue" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300">
                 Conocer el programa <span aria-hidden="true">→</span>

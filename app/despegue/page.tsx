@@ -2,7 +2,7 @@ import { connection } from 'next/server'
 import { dbGlobal } from '@/lib/db'
 import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, RADAR_CIFRAS, portadaSerie, diasEntre, ritmoVentas, PRECIO_DESPUES, SEMANAS, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, RADAR_CIFRAS, portadaSerie, diasEntre, ritmoVentas, PRECIO_DESPUES, TEMAS, INICIO_GRUPO, TELEGRAM_DESPEGUE, fechaCorta, fechaLarga, type GrupoDespegue,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
@@ -14,19 +14,14 @@ export const metadata = {
 
 // Qué incluye (21-10): 4 tarjetas, una idea cada una. El Domingo de Radar NO va aquí: es el bono de la portada.
 // Íconos de trazo (24×24).
+// 10-11 (el dueño): sin reunión semanal ni tareas semanales; Telegram es contacto directo, no grupo.
 const INCLUYE = [
-  { t: 'Reunión en vivo cada semana', s: '60 min por Meet',
-    d: 'El tema de la semana y revisión de cuentas en vivo.',
-    i: 'M15 10l4.6-2.3A1 1 0 0 1 21 8.6v6.8a1 1 0 0 1-1.4.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z' },
   { t: '3 sesiones solo para ti', s: '45 min cada una',
     d: 'Diagnóstico al inicio, revisión a mitad del programa y plan de cierre.',
     i: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1' },
-  { t: 'Grupo de Telegram', s: 'todo el programa',
-    d: 'Tus dudas y tus avances, con gente que está en lo mismo que tú.',
+  { t: 'Contacto directo por Telegram', s: 'todo el programa',
+    d: 'Me escribes tus dudas y tus avances directo a mí, y te respondo.',
     i: 'M7 8h10M7 12h6m-9 8 3-3h11a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12z' },
-  { t: 'Tareas semanales', s: 'claras y cortas',
-    d: 'Lo que haces en tu cuenta cada semana para avanzar sin perderte.',
-    i: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9' },
 ]
 
 const PARA_TI = [
@@ -85,7 +80,7 @@ export default async function DespeguePage() {
   const completo = quedan <= 0
   const cerrado = !g || hoy > g.aparta_hasta
   const abierto = !completo && !cerrado
-  const inicio = g?.inicio ?? SEMANAS[0].fecha
+  const inicio = g?.inicio ?? INICIO_GRUPO
   const anio = new Date().getFullYear()
 
   const oscuro = true
@@ -223,7 +218,7 @@ export default async function DespeguePage() {
                 ))}
               </ul>
               <p className="relative mt-5 border-t border-white/10 pt-4 text-xs leading-relaxed text-neutral-400">
-                <b className="text-neutral-200">Además:</b> reunión semanal de 60 min · 3 sesiones 1 a 1 de 45 min · grupo de Telegram
+                <b className="text-neutral-200">Además:</b> 3 sesiones 1 a 1 de 45 min · contacto directo por Telegram
               </p>
             </div>
             </div>
@@ -268,7 +263,7 @@ export default async function DespeguePage() {
             </ul>
             <p className="mt-5 flex gap-3 border-t border-lime-200 pt-4 text-sm leading-relaxed text-neutral-600">
               <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-neutral-200 text-[11px] font-bold text-neutral-600" aria-hidden="true">✕</span>
-              <span><b className="text-neutral-900">No es para ti</b> si buscas ganar sin trabajar en tu cuenta: cada semana hay tareas.</span>
+              <span><b className="text-neutral-900">No es para ti</b> si buscas ganar sin trabajar en tu cuenta: los cambios los haces tú, con mi guía.</span>
             </p>
           </div>
         </section>
@@ -300,30 +295,27 @@ export default async function DespeguePage() {
           </a>
         </section>
 
-        {/* ── Las 8 semanas ── */}
+        {/* ── Lo que vemos (10-11: sin orden por semanas) ── */}
         <section>
-          <Encabezado etiqueta="El camino" titulo="Las 8 semanas">
+          <Encabezado etiqueta="El programa" titulo="Lo que vemos en las 8 semanas">
             <p>
-              <b className="text-neutral-900">¿Empiezas de cero?</b> Construyes cada etapa desde el principio.{' '}
-              <b className="text-neutral-900">¿Ya tienes cuenta?</b> En cada etapa revisamos lo que tienes y corregimos lo que te frena.
+              No vamos en un orden fijo: avanzamos según lo que necesita tu cuenta.{' '}
+              <b className="text-neutral-900">¿Empiezas de cero?</b> Lo construyes desde el principio.{' '}
+              <b className="text-neutral-900">¿Ya tienes cuenta?</b> Revisamos lo que tienes y corregimos lo que te frena.
             </p>
-            <p className="mt-1 text-neutral-500">Cada domingo: Radar abierto todo el día y la tarea de la semana. La reunión, en la semana.</p>
+            <p className="mt-1 text-neutral-500">Cada domingo: Radar abierto todo el día.</p>
           </Encabezado>
-          <ol className="mt-5 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-            {SEMANAS.map(s => (
-              <li key={s.fecha} className={`flex items-center gap-4 border-b border-neutral-100 px-4 py-3.5 last:border-b-0 sm:px-5 ${s.n == null ? 'bg-neutral-50' : ''}`}>
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${
-                  s.n == null ? 'bg-white text-base ring-1 ring-neutral-200' : s.n === 1 ? 'bg-lime-400 text-neutral-950' : 'bg-neutral-900 text-white'}`}>
-                  {s.n ?? <Icono d={ICONO.pino} className="h-4 w-4 text-lime-700" />}
+          <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {TEMAS.map(x => (
+              <li key={x.t} className="flex gap-3 rounded-2xl border border-neutral-200 bg-white p-4">
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime-400 text-[11px] font-bold text-neutral-950" aria-hidden="true">✓</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-neutral-900">{x.t}</span>
+                  <span className="mt-0.5 block text-sm leading-relaxed text-neutral-500">{x.d}</span>
                 </span>
-                <span className={`min-w-0 flex-1 text-sm ${s.n == null ? 'italic text-neutral-500' : 'font-medium text-neutral-900'}`}>
-                  {s.n === 1 ? <>Inicio: bienvenida · {s.tema}</> : s.tema}
-                  {s.n == null && <span className="block text-xs not-italic text-neutral-400">Sin reunión · el grupo sigue activo</span>}
-                </span>
-                <span className="shrink-0 text-xs font-medium tabular-nums text-neutral-500">{fechaCorta(s.fecha)}</span>
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
 
         {/* ── Inversión ── */}

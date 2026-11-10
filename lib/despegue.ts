@@ -1,6 +1,6 @@
 // Programa Despegue (21-10-2026, migración 112; página pública /despegue). 8 semanas para quien empieza en
-// MercadoLibre: reunión semanal por Meet, Domingo de Radar (Pro solo ese día), 3 sesiones 1 a 1 y grupo de
-// Telegram. Sin formulario: "Apartar mi cupo" abre el chat de Telegram y el cupo se aparta pagando (el dueño
+// MercadoLibre: Domingo de Radar (Pro solo ese día), 3 sesiones 1 a 1 y contacto directo por Telegram (10-11: sin
+// reunión semanal, sin tareas semanales ni grupo; los temas ya no van en orden de semanas). Sin formulario: "Apartar mi cupo" abre el chat de Telegram y el cupo se aparta pagando (el dueño
 // cobra por chat y sube `despegue_grupos.tomados` en Plataforma).
 
 export const TELEGRAM_DESPEGUE = 'elcomerciantedigital'
@@ -35,7 +35,25 @@ export async function portadaSerie(): Promise<string> {
 export const PRECIO = 99
 export const PRECIO_DESPUES = 119
 
-/** Las 8 semanas (grupo 1), como ETAPAS que sirven a quien empieza de cero (la construye) y a quien ya tiene
+/** Fecha de inicio del grupo 1 (si no hay grupo cargado en Plataforma). */
+export const INICIO_GRUPO = '2026-11-08'
+
+/** Lo que vemos en las 8 semanas (10-11, el dueño): sin orden fijo, según lo que necesite cada cuenta. */
+export const TEMAS: { t: string; d: string }[] = [
+  { t: 'Diagnóstico y qué vender', d: 'Qué conviene vender o qué está fallando en tu cuenta.' },
+  { t: 'Publicaciones que venden', d: 'Crear o corregir título, fotos, ficha y precio.' },
+  { t: 'El precio real', d: 'Comisión, envío y cuánto te queda de verdad.' },
+  { t: 'De visitas a ventas', d: 'Preguntas, mensajes y rapidez para responder.' },
+  { t: 'MercadoEnvíos', d: 'Cómo se activa, cómo trabaja y cómo despachar sin errores.' },
+  { t: 'Promociones', d: 'Cuáles usar, cuándo y cuánto descontar sin perder.' },
+  { t: 'Mi página', d: 'Tu tienda dentro de MercadoLibre: cómo armarla y usarla.' },
+  { t: 'Canales de difusión', d: 'Avisarles a tus seguidores de novedades y ofertas.' },
+  { t: 'Reputación', d: 'Subirla, cuidarla y manejar reclamos.' },
+  { t: 'Reponer y crecer en temporada', d: 'Qué y cuánto reponer para no quedarte sin stock.' },
+  { t: 'Tu plan para los próximos meses', d: 'Lo que sigue cuando termina el programa.' },
+]
+
+/** (Histórico) Las 8 semanas del grupo 1 en orden, como ETAPAS que sirven a quien empieza de cero (la construye) y a quien ya tiene
  *  cuenta (la revisa y la ajusta). El 27-12 es descanso navideño: sin reunión y con el Radar cerrado. */
 export const SEMANAS: { n: number | null; fecha: string; tema: string }[] = [
   { n: 1, fecha: '2026-11-08', tema: 'Diagnóstico y qué vender: qué conviene vender o qué está fallando en tu cuenta' },
