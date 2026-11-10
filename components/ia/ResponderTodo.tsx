@@ -28,16 +28,20 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
     if (!r.ok) { setError((await r.json().catch(() => null))?.error ?? 'No se pudo cambiar'); return }
     onCambio()
   }
+  const op = (v: boolean, t: string, d: string) => (
+    <button key={t} type="button" disabled={guardando} onClick={() => cambiar(v)}
+      className={`text-left rounded-lg border px-3 py-2 disabled:opacity-60 ${todo === v ? 'border-neutral-900 ring-1 ring-neutral-900 bg-white' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}>
+      <span className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+        <span className={`w-3.5 h-3.5 rounded-full border ${todo === v ? 'border-neutral-900 bg-neutral-900 ring-2 ring-white ring-inset' : 'border-neutral-300'}`} />{t}</span>
+      <span className="block mt-0.5 text-xs text-neutral-600">{d}</span>
+    </button>
+  )
   return (
     <div className="space-y-1">
-      <div className="inline-flex rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 text-sm">
-        {([[false, 'Modo Seguro'], [true, 'Modo Total']] as const).map(([v, t]) => (
-          <button key={t} type="button" disabled={guardando} onClick={() => cambiar(v)}
-            className={`px-3 py-1 rounded-md disabled:opacity-60 ${todo === v ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:text-neutral-900'}`}>{t}</button>
-        ))}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        {op(false, 'Modo Seguro', 'Responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.')}
+        {op(true, 'Modo Total', `Responde todo sola, sin dejarte nada para revisar. Solo respeta tu horario y el máximo por comprador. ${AVISO_TODO}`)}
       </div>
-      <p className={`text-xs ${todo ? 'text-amber-800' : 'text-neutral-500'}`}>
-        {todo ? `Responde todo. ${AVISO_TODO}` : 'Solo sale sola lo que la IA está segura; lo demás te queda escrito para revisar.'}</p>
       {error && <p className="text-xs text-red-700">{error}</p>}
     </div>
   )

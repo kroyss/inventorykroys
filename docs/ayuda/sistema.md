@@ -202,33 +202,34 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
    ya respondo»**: lee tus respuestas y descripciones y te propone cada tema. Revisa cada pantalla y corrige lo que haga
    falta (pago, envío, despacho, tono, lo que siempre responde una persona…). **Hay que completar todos los temas:**
    mientras falte alguno, la respuesta automática no se puede encender (te dice cuáles faltan).
-2. Abajo, en **Preguntas · pruébala con 10 preguntas reales**, toca **Probar**. La IA responde preguntas que tu equipo
-   ya contestó, sin publicar nada, y ves lado a lado tu respuesta y la de la IA, y si habría salido sola. La prueba es
-   **opcional y gratis** (no usa créditos), con un máximo de **2 pruebas por día** en Preguntas y 2 en Mensajes.
-3. Si una está **Mal**, elige **qué estuvo mal** (le faltó un dato, dio un dato equivocado, no siguió cómo trabajas, el
-   tono, o lo debía ver una persona). Abajo aparece **«Para mejorar»** con qué arreglar (un tema de Mi IA, la
-   descripción, la ficha o las fotos de la publicación) y un botón para ir directo. Corrige y toca **Probar otra vez**.
-   En Preguntas, si elegiste *le faltó un dato* o *dio un dato equivocado*, ahí mismo escribes **qué debió decir** y
-   tocas **Guardar**: queda en **Datos del producto** de esa publicación y la IA lo usa desde la próxima pregunta y
-   mensaje (solo datos fijos: sin precios, stock ni fechas).
-4. Cuando te guste, toca **Encender respuestas automáticas en Preguntas** y acepta el aviso.
-5. Haz lo mismo en **Mensajes · pruébala con 10 mensajes reales** y **Encender respuestas automáticas en Mensajes**.
-- Para apagarla: el botón **Apagar** en Mi IA (o el modo Apagada en Preguntas → Configuración → Respuesta automática
-  con IA). Se apaga al instante.
-- **Todo se enciende y se cambia en Mi IA** (abajo de los temas): Preguntas y Mensajes van lado a lado (en el
-  celular, una debajo de la otra), cada una con su encendido y su modo. «Respuesta automática con IA» (Preguntas →
-  Configuración) muestra lo que respondió la IA y el botón **Cambiar en Mi IA**.
-- **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida): **Modo Seguro** (de
-  fábrica) solo manda sola lo que la IA está segura y lo demás te lo deja escrito. **Modo Total** responde todo: la IA
-  acierta cerca del 94 % de las preguntas cuando tu Mi IA está completo. En Modo Total la IA responde también lo que en
-  Modo Seguro dejaría para revisar, incluidos los temas de **«Siempre una persona»** y la opción **«Dejarla para una
-  persona»** de «Si no sabe algo» (esas dos solo valen en Modo Seguro; si «Dejarla para una persona» era la única
-  opción, recomienda verificarlo con un técnico). Solo respeta tu horario y el máximo por comprador. Las que salieron
-  así dicen **«Salió en Modo Total»** y qué la habría frenado en Modo Seguro.
-- **Corregir a la IA:** en cada respuesta que salió sola (Preguntas → Configuración → Respuesta automática, y Mensajes
-  → IA en prueba) toca **Corregir a la IA** y escribe en qué falló o qué debió decir. Elige **Dato de este producto**
-  (queda en Datos del producto de esa publicación) o **Regla para todas** (queda en Mi IA → Información extra →
-  «Correcciones de mi equipo»). La IA lo usa desde la próxima respuesta.
+2. Abajo de los temas están las tarjetas **Preguntas** y **Mensajes** (en computadora, una al lado de la otra; en el
+   celular, una debajo de la otra). Cada una muestra si está **Encendida** o **Apagada** y en qué modo.
+3. **Probar (opcional y gratis):** toca **Probar con 10 preguntas reales** (o mensajes). Se abre una pantalla aparte:
+   la IA responde preguntas que tu equipo ya contestó, sin publicar nada, y ves lado a lado tu respuesta y la de la IA,
+   y si habría salido sola. No usa créditos; máximo **2 pruebas por día** en Preguntas y 2 en Mensajes.
+   - Marca cada una **Bien** o **Mal**. Si está Mal, elige **qué estuvo mal** y escribe **qué debió decir**, como se lo
+     dirías a tu equipo, y toca **Guardar**. **La IA lo aprende:** si es un dato fijo del producto lo guarda en
+     **Datos del producto** de esa publicación, y si es una forma de trabajar lo guarda como regla en Mi IA →
+     Información extra → «Correcciones de mi equipo». Te muestra qué aprendió.
+   - Arriba aparece **«Para mejorar»** con qué arreglar (un tema de Mi IA o la publicación) y un botón para ir directo.
+   - A la izquierda (arriba en el celular) quedan las **pruebas anteriores**, con sus marcas y correcciones, para ver
+     cómo va mejorando. También se abren con **Pruebas anteriores** en la tarjeta.
+4. Toca **Encender respuestas automáticas en Preguntas** (está siempre a la vista cuando está apagada; no hace falta
+   probar antes) y acepta el aviso. Haz lo mismo en Mensajes.
+- Para apagarla: **Apagar respuestas automáticas…** en la tarjeta de Mi IA. Se apaga al instante.
+- **Todo se enciende y se cambia en Mi IA**: encendido, modo y frenos.
+- **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida):
+  - **Modo Seguro** (de fábrica): responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas
+    de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.
+  - **Modo Total**: responde todo sola, sin dejarte nada para revisar. Solo respeta tu horario y el máximo por
+    comprador. Acierta cerca del 94 % con Mi IA completo. En Modo Total no valen **«Siempre una persona»** ni la
+    opción **«Dejarla para una persona»** de «Si no sabe algo» (si era la única opción, recomienda verificarlo con un
+    técnico).
+  - **En los dos modos cada pregunta o mensaje usa 1 crédito**, salga sola o quede escrita para revisar (la IA hace el
+    mismo trabajo para decidir; en Modo Seguro te deja la respuesta lista).
+- **¿Quién respondió?** En Preguntas (Respondidas) y en las conversaciones de Mensajes, lo que salió solo dice
+  **«Respondió la IA»** (o «Respondió la IA (Modo Total)»), en el mismo lugar donde sale el nombre de quien respondió
+  de tu equipo.
 - Cada respuesta de la IA usa **1 crédito** (las de prueba no). Si se acaban los créditos, deja de responder sola
   hasta que recargues en Mi plan.
 - Responde solo lo que llega **después** de encenderla.
@@ -239,9 +240,10 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - Al encenderla quedan unos **frenos de fábrica** (los cambias en Mi IA → Frenos): máximo 3 respuestas automáticas por
   comprador en 24 horas, sin horario (responde a cualquier hora) y, en Mensajes, una frase corta («¡Hola! Recibimos tu
   mensaje, en breve te respondemos por aquí.») cuando el mensaje queda para una persona.
-- El plan Esencial no la trae: en Preguntas → Configuración ves «Disponible en Automatizaciones y Completo».
+- El plan Esencial no la trae: en Mi IA, las tarjetas dicen «vienen con los planes Automatizaciones y Completo».
 
-**Pantalla Respuesta automática con IA** (Preguntas → Configuración):
+**Pantalla Respuesta automática con IA** (Preguntas → Configuración): solo la ve la organización de la plataforma
+(evaluación interna). Los clientes encienden, eligen el modo y prueban en Mi IA.
 - **Apagada:** la IA solo responde cuando tocas «Proponer con IA».
 - (Si tienes Mi IA, el encendido y el modo se cambian allí; esta pantalla solo muestra el estado y el historial.)
 - **Activa:** solo se puede elegir con todos los temas de Mi IA completos. Se publican solas solo las de confianza alta que pasan todas las revisiones. Nunca sale sola una respuesta

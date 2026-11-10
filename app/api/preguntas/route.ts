@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
               (SELECT COUNT(*)::int FROM ml_item_notas n WHERE n.item_id = p.item_id) AS datos_guardados,
               p.borrador, p.borrador_confianza, p.borrador_falta, p.borrador_web, p.borrador_at,
               c.nickname AS cuenta, u.full_name AS respondida_por,
+              -- 10-11: la marca «Respondió la IA» (respuesta automática publicada sola).
+              COALESCE(p.ia_auto->>'publicada', '') = 'true' AS por_ia, COALESCE(p.ia_auto->>'sinSeguro', '') = 'true' AS por_ia_total,
               pr.code AS producto_code, pr.name AS producto_nombre, pr.stock AS producto_stock,
               pr.precio AS producto_precio
        FROM ml_preguntas p

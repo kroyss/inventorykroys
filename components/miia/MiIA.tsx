@@ -440,33 +440,13 @@ const TEXTOS = {
 
 const ACEPTO = 'La IA responde en tu nombre.\n\nSolo salen solas las respuestas en que está segura. Lo delicado siempre pasa a una persona: reclamos, pagos, datos personales, cuando dice que no hay y los temas que marcaste en «Siempre una persona». Esas quedan escritas para que tu equipo las revise y las mande (Modo Seguro). Después puedes pasar a Modo Total, que responde todo.\n\nCada respuesta usa 1 crédito de IA. La apagas cuando quieras desde aquí.'
 
-// 09-11 (el dueño): desde la prueba, el dato que le faltó o dio mal se guarda en «Datos del producto» de esa publicación
-// (ml_item_notas, /api/preguntas/notas): la IA lo usa desde la próxima pregunta o mensaje. El mismo cuadro de cada pregunta.
-function GuardarDato({ itemId }: { itemId: string }) {
-  const [texto, setTexto] = useState('')
-  const [estado, setEstado] = useState<'' | 'guardando' | 'listo' | string>('')
-  const guardar = async () => {
-    setEstado('guardando')
-    const r = await fetch('/api/preguntas/notas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId, texto: texto.trim() }) })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { void d; setEstado('No se pudo guardar el dato'); return }
-    setEstado('listo'); setTexto('')
-  }
-  if (estado === 'listo') return <p className="text-xs text-green-800">Guardado en «Datos del producto» de esta publicación. La IA lo usa desde la próxima pregunta.</p>
-  return (
-    <div className="space-y-1 pt-1">
-      <p className="text-xs text-neutral-600"><b>¿Qué debió decir?</b> Guárdalo como dato del producto y la IA lo usa de ahora en adelante.</p>
-      <div className="flex gap-2">
-        <input value={texto} onChange={e => setTexto(e.target.value)} maxLength={500} placeholder="Ej.: Trae cargador. Mide 30 cm. Es compatible con…"
-          className="flex-1 min-w-0 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
-        <button type="button" onClick={guardar} disabled={texto.trim().length < 3 || estado === 'guardando'}
-          className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{estado === 'guardando' ? '…' : 'Guardar'}</button>
-      </div>
-      <p className="text-[11px] text-neutral-400">Solo datos fijos del producto: sin precios, stock ni fechas (esos la IA los lee al día).</p>
-      {estado && estado !== 'guardando' && <p className="text-xs text-red-700">{estado}</p>}
-    </div>
-  )
-}
+// 10-11 (el dueño): la tarjeta de cada lado (Preguntas / Mensajes) es corta: encender, el modo y probar. La prueba se abre
+// en su propia pantalla, con el historial de pruebas anteriores y sus correcciones (mig 164, lib/miIAPruebas.ts). Lo que el
+// usuario corrige se aprende: dato del producto → Datos del producto; regla → Mi IA «Correcciones de mi equipo».
+type MarcaCaso = { marca: 'bien' | 'mal' | null; error?: string | null; correccion?: string | null; aprendido?: { producto?: string; regla?: string } | null }
+type PruebaG = { id: string | null; creado_at: string; casos: Caso[]; marcas: Record<string, MarcaCaso> }
+const aCaso = (x: Caso & { pregunta?: string; mensaje?: string }): Caso => ({ ...x, texto: x.texto ?? x.pregunta ?? x.mensaje ?? '' })
+const fechaPrueba = (s: string) => new Date(s).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedanAl, faltan }: { tipo: 'preguntas' | 'mensajes'; encendida: boolean | null; todo?: boolean; onCambio: () => void; abrir: (tema: string) => void
   quedan: number | null; faltan: string[] }) {
@@ -474,21 +454,9 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
   const quedan = quedanAl === null ? null : Math.max(0, quedanAl - usadas)
   const confirm = useConfirm()
   const T = TEXTOS[tipo]
-  const [casos, setCasos] = useState<Caso[] | null>(null)
-  const [cargando, setCargando] = useState(false)
-  const [marcas, setMarcas] = useState<Record<string, 'bien' | 'mal'>>({})
-  const [errores, setErrores] = useState<Record<string, Error_>>({})
   const [error, setError] = useState<string | null>(null)
   const [cambiando, setCambiando] = useState(false)
-  const probar = async () => {
-    setCargando(true); setError(null); setMarcas({}); setErrores({})
-    const r = await fetch(T.url, { method: 'POST' }); const d = await r.json().catch(() => ({}))
-    setCargando(false)
-    if (r.status === 429) setUsadas(99)
-    if (!r.ok) { setError(d.error ?? 'No se pudo probar'); return }
-    setUsadas(u => u + 1)   // 09-11: una prueba menos hoy (sin recargar la pantalla: no pierde lo que está editando)
-    setCasos((d.casos as (Caso & { pregunta?: string; mensaje?: string })[]).map(x => ({ ...x, texto: x.pregunta ?? x.mensaje ?? '' })))
-  }
+  const [pantalla, setPantalla] = useState<null | 'probar' | 'historial'>(null)
   const cambiar = async (encender: boolean) => {
     if (encender && !(await confirm({ title: T.encender, message: ACEPTO, confirmText: 'Acepto, encender' }))) return
     if (!encender && !(await confirm({ title: 'Apagar respuestas automáticas', message: 'La IA deja de responder sola. Puedes seguir usando «Proponer con IA».', confirmText: 'Apagar' }))) return
@@ -501,86 +469,202 @@ function Prueba({ tipo, encendida, todo = false, onCambio, abrir, quedan: quedan
     if (!r.ok) { setError(d.error ?? 'No se pudo cambiar'); return }
     onCambio()
   }
-  const marcadas = Object.values(marcas)
-  const bien = marcadas.filter(m => m === 'bien').length
-  const solas = casos?.filter(x => x.decision === 'sola').length ?? 0
-  // Recomendaciones: una por tipo de error marcado (las más repetidas primero).
-  const cuenta = new Map<Error_, number>()
-  for (const [id, m] of Object.entries(marcas)) if (m === 'mal' && errores[id]) cuenta.set(errores[id], (cuenta.get(errores[id]) ?? 0) + 1)
-  const recs = [...cuenta.entries()].sort((a, b) => b[1] - a[1])
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium text-neutral-900">{tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'} · pruébala con {casos?.length || 10} {T.titulo}</p>
-          <p className="text-xs text-neutral-500">{T.sub}</p>
+        <p className="font-semibold text-neutral-900">{tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}</p>
+        {encendida !== null && <span className={`text-xs px-2 py-0.5 rounded-full ${encendida ? 'bg-green-100 text-green-800' : 'bg-neutral-100 text-neutral-600'}`}>
+          {encendida ? `Encendida · ${todo ? 'Modo Total' : 'Modo Seguro'}` : 'Apagada'}</span>}
+      </div>
+
+      {encendida === null && <div className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+        Las respuestas automáticas vienen con los planes <b>Automatizaciones</b> y <b>Completo</b>. <a href="/mi-plan" className="text-sky-700">Ver Mi plan →</a></div>}
+
+      {encendida === false && faltan.length > 0 && <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+        Para encenderla, primero completa Mi IA. Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{faltan.join(', ')}</b>.</p>}
+      {encendida === false && faltan.length === 0 && <button type="button" onClick={() => cambiar(true)} disabled={cambiando}
+        className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{cambiando ? 'Encendiendo…' : T.encender}</button>}
+
+      {encendida && <div className="space-y-2">
+        <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />
+        <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="text-xs text-neutral-500 hover:text-red-700 disabled:opacity-50">
+          {cambiando ? 'Apagando…' : `Apagar respuestas automáticas en ${tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}`}</button>
+      </div>}
+
+      {encendida !== null && <p className="text-xs text-neutral-500">En los dos modos cada {tipo === 'preguntas' ? 'pregunta' : 'mensaje'} usa 1 crédito, salga {tipo === 'preguntas' ? 'sola' : 'solo'} o quede escrit{tipo === 'preguntas' ? 'a' : 'o'} para revisar.</p>}
+      {error && <p className="text-sm text-red-700">{error}</p>}
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-neutral-100 pt-3">
+        <button type="button" onClick={() => setPantalla('probar')} disabled={quedan === 0}
+          className="px-3 py-1.5 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
+          {quedan === 0 ? 'Puedes volver a probar mañana' : `Probar con 10 ${T.titulo}`}</button>
+        <button type="button" onClick={() => setPantalla('historial')} className="text-sm text-sky-700">Pruebas anteriores</button>
+        <span className="w-full text-xs text-neutral-500">Opcional y gratis{quedan !== null ? ` · ${quedan === 1 ? 'te queda 1 prueba hoy' : `te quedan ${quedan} pruebas hoy`}` : ''}. No se publica ni se manda nada.</span>
+      </div>
+
+      {pantalla && <PantallaPruebas tipo={tipo} probarAlAbrir={pantalla === 'probar'} quedan={quedan}
+        onProbada={() => setUsadas(u => u + 1)} onCerrar={() => setPantalla(null)} abrir={t => { setPantalla(null); abrir(t) }} />}
+    </div>
+  )
+}
+
+function PantallaPruebas({ tipo, probarAlAbrir, quedan, onProbada, onCerrar, abrir }: {
+  tipo: 'preguntas' | 'mensajes'; probarAlAbrir: boolean; quedan: number | null; onProbada: () => void; onCerrar: () => void; abrir: (tema: string) => void
+}) {
+  const T = TEXTOS[tipo]
+  const [pruebas, setPruebas] = useState<PruebaG[] | null>(null)
+  const [sel, setSel] = useState<number>(0)
+  const [probando, setProbando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [arrancada, setArrancada] = useState(false)
+  const cargar = async () => {
+    const r = await fetch(`/api/mi-ia/pruebas?tipo=${tipo}`).catch(() => null)
+    const d = await r?.json().catch(() => null)
+    const ps: PruebaG[] = r?.ok ? (d.pruebas as PruebaG[]).map(p => ({ ...p, casos: (p.casos ?? []).map(aCaso), marcas: p.marcas ?? {} })) : []
+    return ps
+  }
+  const probar = async () => {
+    setProbando(true); setError(null)
+    const r = await fetch(T.url, { method: 'POST' }); const d = await r.json().catch(() => ({}))
+    setProbando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo probar'); return }
+    onProbada()
+    const nueva: PruebaG = { id: d.id ?? null, creado_at: new Date().toISOString(), casos: (d.casos as Caso[]).map(aCaso), marcas: {} }
+    const ps = await cargar()
+    setPruebas([nueva, ...ps.filter(p => p.id !== nueva.id)]); setSel(0)
+  }
+  useEffect(() => {
+    const t = document.body.style.overflow; document.body.style.overflow = 'hidden'
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
+    window.addEventListener('keydown', esc)
+    return () => { document.body.style.overflow = t; window.removeEventListener('keydown', esc) }
+  }, [onCerrar])
+  useEffect(() => {
+    if (arrancada) return
+    setArrancada(true)
+    if (probarAlAbrir) { setPruebas([]); probar() } else cargar().then(setPruebas)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const p = pruebas?.[sel] ?? null
+  const marcar = (casoId: string, m: MarcaCaso) => setPruebas(ps => ps && ps.map((x, i) => i === sel ? { ...x, marcas: { ...x.marcas, [casoId]: m } } : x))
+  const resumenDe = (x: PruebaG) => {
+    const solas = x.casos.filter(c => c.decision === 'sola').length
+    const ms = Object.values(x.marcas).filter(m => m.marca)
+    return `${solas} de ${x.casos.length} solas${ms.length ? ` · ${ms.filter(m => m.marca === 'bien').length} de ${ms.length} bien` : ''}`
+  }
+  // «Para mejorar»: una recomendación por tipo de error marcado en esta prueba (las más repetidas primero).
+  const cuenta = new Map<Error_, number>()
+  for (const m of Object.values(p?.marcas ?? {})) if (m.marca === 'mal' && m.error) cuenta.set(m.error as Error_, (cuenta.get(m.error as Error_) ?? 0) + 1)
+  const recs = [...cuenta.entries()].sort((a, b) => b[1] - a[1])
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-stretch justify-center p-0 sm:p-4" onClick={onCerrar}>
+      <div className="bg-neutral-50 w-full max-w-6xl sm:rounded-xl shadow-xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white px-4 py-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-neutral-900">Prueba de Mi IA · {tipo === 'preguntas' ? 'Preguntas' : 'Mensajes'}</p>
+            <p className="text-xs text-neutral-500">{T.sub}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={probar} disabled={probando || quedan === 0} className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
+              {probando ? 'Probando… (puede tardar 1 minuto)' : quedan === 0 ? 'Vuelve a probar mañana' : 'Probar otra vez'}</button>
+            <button type="button" onClick={onCerrar} className="px-3 py-1.5 rounded-lg border border-neutral-300 bg-white text-sm">Cerrar</button>
+          </div>
         </div>
-        <div className="text-right">
-          <button type="button" onClick={probar} disabled={cargando || quedan === 0} className="px-3 py-2 rounded-lg border border-neutral-300 text-sm disabled:opacity-50">
-            {cargando ? 'Probando… (puede tardar 1 minuto)' : quedan === 0 ? 'Puedes volver a probar mañana' : casos ? 'Probar otra vez' : 'Probar'}</button>
-          {quedan !== null && <p className="mt-1 text-xs text-neutral-500">Gratis · {quedan === 1 ? 'te queda 1 prueba hoy' : `te quedan ${quedan} pruebas hoy`}</p>}
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+          <aside className="md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-200 bg-white overflow-x-auto md:overflow-y-auto">
+            <p className="hidden md:block px-4 pt-3 pb-1 text-xs font-medium text-neutral-500">Pruebas</p>
+            <div className="flex md:flex-col gap-1 p-2">
+              {pruebas === null && <p className="px-2 py-1 text-sm text-neutral-500">Cargando…</p>}
+              {pruebas?.length === 0 && !probando && <p className="px-2 py-1 text-sm text-neutral-500">Todavía no hay pruebas.</p>}
+              {probando && <p className="px-2 py-1 text-sm text-neutral-500 whitespace-nowrap">Probando…</p>}
+              {pruebas?.map((x, i) => (
+                <button key={x.id ?? i} type="button" onClick={() => setSel(i)}
+                  className={`text-left shrink-0 rounded-lg px-3 py-2 text-sm ${i === sel ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-100 text-neutral-800'}`}>
+                  <span className="block whitespace-nowrap">{fechaPrueba(x.creado_at)}</span>
+                  <span className={`block text-xs whitespace-nowrap ${i === sel ? 'text-neutral-300' : 'text-neutral-500'}`}>{resumenDe(x)}</span>
+                </button>
+              ))}
+            </div>
+          </aside>
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 space-y-3">
+            {error && <p className="text-sm text-red-700">{error}</p>}
+            {probando && <p className="text-sm text-neutral-600">La IA está respondiendo {T.titulo} que tu equipo ya contestó…</p>}
+            {p && !p.casos.length && <p className="text-sm text-neutral-500">{T.vacio}</p>}
+            {p && p.casos.length > 0 && <p className="text-sm text-neutral-700">
+              {p.casos.filter(c => c.decision === 'sola').length} de {p.casos.length} saldrían solas en Modo Seguro; el resto quedaría escrito para revisar.
+              Marca cada una y, si está mal, escribe qué debió decir: <b>la IA lo aprende</b>.</p>}
+            {recs.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-medium text-amber-900">Para mejorar</p>
+              {recs.map(([e, n]) => {
+                const r = recomendacion(e, tipo)
+                return <div key={e} className="text-sm text-amber-900 space-y-1">
+                  <p><b>{ERRORES.find(x => x.id === e)?.t}</b>{n > 1 ? ` (${n})` : ''}: {r.texto}</p>
+                  {r.tema && r.boton && <button type="button" onClick={() => abrir(r.tema!)} className="text-sm text-sky-700">{r.boton} →</button>}
+                </div>
+              })}
+            </div>}
+            {p?.casos.map(x => <CasoPrueba key={x.id} x={x} pruebaId={p.id} m={p.marcas[x.id]} equipo={T.equipo} onMarca={m => marcar(x.id, m)} />)}
+          </div>
         </div>
       </div>
-      {encendida && <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-green-900">{T.encendido}</p>
-          <button type="button" onClick={() => cambiar(false)} disabled={cambiando} className="px-3 py-1 rounded-lg border border-green-300 bg-white text-sm text-green-800 disabled:opacity-50">
-            {cambiando ? '…' : 'Apagar'}</button>
+    </div>
+  )
+}
+
+function CasoPrueba({ x, pruebaId, m, equipo, onMarca }: { x: Caso; pruebaId: string | null; m?: MarcaCaso; equipo: string; onMarca: (m: MarcaCaso) => void }) {
+  const [error, setError] = useState<Error_ | null>((m?.error as Error_) ?? null)
+  const [texto, setTexto] = useState(m?.correccion ?? '')
+  const [estado, setEstado] = useState<'' | 'guardando' | string>('')
+  const guardar = async (n: MarcaCaso) => {
+    onMarca({ ...n, aprendido: m?.aprendido ?? null })
+    if (!pruebaId) return
+    setEstado('guardando')
+    const r = await fetch('/api/mi-ia/pruebas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: pruebaId, caso: x.id, marca: n.marca, error: n.error ?? null, correccion: n.correccion ?? null }) }).catch(() => null)
+    const d = await r?.json().catch(() => null)
+    if (!r?.ok) { setEstado(d?.error ?? 'No se pudo guardar'); return }
+    setEstado(''); onMarca(d.marca)
+  }
+  const ap = m?.aprendido
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-3 space-y-2 text-sm">
+      {x.titulo && (x.permalink ? <a href={x.permalink} target="_blank" rel="noreferrer" className="block text-xs text-sky-700 truncate">{x.titulo}</a>
+        : <p className="text-xs text-neutral-500 truncate">{x.titulo}</p>)}
+      <p className="font-medium text-neutral-900 whitespace-pre-line">{x.texto}</p>
+      <div className="grid gap-2 md:grid-cols-2">
+        <div className="rounded-lg bg-neutral-50 p-2"><p className="text-xs text-neutral-400">{equipo}</p><p className="text-neutral-700 whitespace-pre-line">{x.tuya || '—'}</p></div>
+        <div className="rounded-lg bg-sky-50 p-2"><p className="text-xs text-sky-700">IA</p><p className="text-neutral-900 whitespace-pre-line">{x.ia || (x.decision === 'nada' ? '(no hace falta responder)' : '—')}</p></div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={`text-xs px-2 py-0.5 rounded-full ${x.decision === 'revisar' ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-800'}`}>
+          {x.decision === 'sola' ? 'Saldría sola' : x.decision === 'nada' ? 'No hace falta responder' : `En Modo Seguro iría a revisar: ${x.motivos.join(' · ')}`}</span>
+        {x.ia && <div className="flex gap-1">
+          <Chip activo={m?.marca === 'bien'} onClick={() => guardar({ marca: m?.marca === 'bien' ? null : 'bien' })}>Bien</Chip>
+          <Chip activo={m?.marca === 'mal'} onClick={() => onMarca({ ...(m ?? {}), marca: 'mal' })}>Mal</Chip>
+        </div>}
+      </div>
+      {m?.marca === 'mal' && <div className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2">
+        <p className="text-xs text-neutral-600">¿Qué estuvo mal?</p>
+        <div className="flex flex-wrap gap-1">
+          {ERRORES.map(e => <Chip key={e.id} activo={error === e.id} onClick={() => setError(e.id)}>{e.t}</Chip>)}
         </div>
-        <ResponderTodo tipo={tipo} todo={todo} onCambio={onCambio} />
-      </div>}
-      {error && <p className="text-sm text-red-700">{error}</p>}
-      {casos && !casos.length && <p className="text-sm text-neutral-500">{T.vacio}</p>}
-      {casos?.map(x => (
-        <div key={x.id} className="rounded-lg border border-neutral-200 p-3 space-y-2 text-sm">
-          {x.titulo && <p className="text-xs text-neutral-500">{x.titulo}</p>}
-          <p className="font-medium text-neutral-900 whitespace-pre-line">{x.texto}</p>
-          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
-            <div className="rounded-lg bg-neutral-50 p-2"><p className="text-xs text-neutral-400">{T.equipo}</p><p className="text-neutral-700">{x.tuya || '—'}</p></div>
-            <div className="rounded-lg bg-sky-50 p-2"><p className="text-xs text-sky-700">IA</p><p className="text-neutral-900">{x.ia || (x.decision === 'nada' ? '(no hace falta responder)' : '—')}</p></div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className={`text-xs px-2 py-0.5 rounded-full ${x.decision === 'revisar' ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-800'}`}>
-              {x.decision === 'sola' ? 'Saldría sola' : x.decision === 'nada' ? 'No hace falta responder' : `Iría a una persona: ${x.motivos.join(' · ')}`}</span>
-            {x.ia && <div className="flex gap-1">
-              {(['bien', 'mal'] as const).map(m => <Chip key={m} activo={marcas[x.id] === m} onClick={() => setMarcas(v => ({ ...v, [x.id]: m }))}>{m === 'bien' ? 'Bien' : 'Mal'}</Chip>)}
-            </div>}
-          </div>
-          {marcas[x.id] === 'mal' && <div className="space-y-1">
-            <p className="text-xs text-neutral-500">¿Qué estuvo mal?</p>
-            <div className="flex flex-wrap gap-1">
-              {ERRORES.map(e => <Chip key={e.id} activo={errores[x.id] === e.id} onClick={() => setErrores(v => ({ ...v, [x.id]: e.id }))}>{e.t}</Chip>)}
+        <p className="text-xs text-neutral-600"><b>¿Qué debió decir?</b> Escríbelo como se lo dirías a tu equipo. La IA lo guarda como dato del producto o como regla para todas.</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <textarea rows={2} value={texto} onChange={e => setTexto(e.target.value)} maxLength={500}
+            placeholder="Ej.: Sirve para cualquier vehículo, no solo Twingo. / Si piden Cashea, di que no y nombra nuestros medios de pago."
+            className="flex-1 min-w-0 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm bg-white" />
+          <button type="button" disabled={estado === 'guardando'} onClick={() => guardar({ marca: 'mal', error, correccion: texto.trim() || null })}
+            className="sm:self-start px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{estado === 'guardando' ? 'Aprendiendo…' : 'Guardar'}</button>
+        </div>
+        {estado && estado !== 'guardando' && <p className="text-xs text-red-700">{estado}</p>}
+        {m?.correccion && !estado && (ap?.producto || ap?.regla
+          ? <div className="text-xs text-green-800 space-y-0.5">
+              {ap.producto && <p>✓ Aprendido en <b>Datos del producto</b>: {ap.producto}</p>}
+              {ap.regla && <p>✓ Aprendido como <b>regla para todas</b> (Mi IA → Información extra → «Correcciones de mi equipo»): {ap.regla}</p>}
             </div>
-            {x.itemId && (errores[x.id] === 'falta' || errores[x.id] === 'dato') && <GuardarDato itemId={x.itemId} />}
-          </div>}
-        </div>
-      ))}
-      {recs.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-        <p className="text-sm font-medium text-amber-900">Para mejorar</p>
-        {recs.map(([e, n]) => {
-          const r = recomendacion(e, tipo)
-          return <div key={e} className="text-sm text-amber-900 space-y-1">
-            <p><b>{ERRORES.find(x => x.id === e)!.t}</b>{n > 1 ? ` (${n})` : ''}: {r.texto}</p>
-            {r.tema && r.boton && <button type="button" onClick={() => abrir(r.tema!)} className="text-sm text-sky-700">{r.boton} →</button>}
-          </div>
-        })}
-        <p className="text-xs text-amber-800">Después de corregir, toca «Probar otra vez».</p>
+          : <p className="text-xs text-neutral-500">Guardado. No había un dato nuevo para recordar (o ya estaba anotado).</p>)}
       </div>}
-      {casos && (
-        <div className="rounded-lg bg-neutral-50 p-3 space-y-2">
-          {casos.length > 0 && <p className="text-sm text-neutral-700">{solas} de {casos.length} saldrían solas; el resto quedaría escrito para que una persona lo mande.
-            {marcadas.length > 0 && ` Marcaste ${bien} de ${marcadas.length} bien.`}</p>}
-          {encendida === false && faltan.length > 0 && <p className="text-xs text-amber-900 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            Para encenderla, primero completa Mi IA. Te {faltan.length === 1 ? 'falta 1 tema' : `faltan ${faltan.length} temas`}: <b>{faltan.join(', ')}</b>.</p>}
-          {encendida === false && faltan.length === 0 && <>
-            <button type="button" onClick={() => cambiar(true)} disabled={cambiando}
-              className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
-              {cambiando ? 'Encendiendo…' : T.encender}</button>
-            <p className="text-xs text-neutral-500">Solo salen solas las que cumplen todas las reglas; las demás quedan escritas para revisar. Cada respuesta usa 1 crédito de IA.</p>
-          </>}
-          {encendida === null && <p className="text-xs text-neutral-500">Las respuestas automáticas vienen con el plan Automatizaciones o Completo.</p>}
-        </div>
-      )}
     </div>
   )
 }

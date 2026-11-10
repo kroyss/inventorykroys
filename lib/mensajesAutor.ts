@@ -15,18 +15,24 @@ const AUTOMATICO = new RegExp(AUTOMATICOS, 'i')
 export async function autoresDelHilo(db: Pool, pack: string, mensajes: { propio: boolean; texto: string; fecha: string }[],
   plantillasRecordatorio: string[] = []): Promise<(string | null)[]> {
   if (!mensajes.some(m => m.propio)) return mensajes.map(() => null)
-  const [{ rows: regs }, { rows: [desde] }] = await Promise.all([
+  const [{ rows: regs }, { rows: [desde] }, { rows: deIA }] = await Promise.all([
     db.query(
       `SELECT r.fecha, r.texto, r.fuente, u.full_name FROM respuestas_origen r LEFT JOIN users u ON u.id = r.usuario_id
        WHERE r.modulo = 'mensajes' AND r.ref = $1 ORDER BY r.fecha`, [pack]),
     db.query(`SELECT MIN(fecha) AS f FROM respuestas_origen WHERE modulo = 'mensajes'`),
+    // 10-11: lo que mandó sola la respuesta automática con IA → «Respondió la IA».
+    db.query(`SELECT enviada_at, respuesta, sin_seguro FROM ml_mensajes_ia WHERE pack_id::text = $1 AND enviada_at IS NOT NULL`, [pack])
+      .catch(() => ({ rows: [] as { enviada_at: string; respuesta: string | null; sin_seguro: boolean }[] })),
   ])
+  const usadosIA = new Set<number>()
   const usados = new Set<number>()
   // Comienzo fijo de cada plantilla de recordatorio (hasta la primera {variable}): así se reconocen los viejos.
   const inicios = plantillasRecordatorio.map(p => normal(p.split('{')[0])).filter(s => s.length >= 12)
   return mensajes.map(m => {
     if (!m.propio) return null
     const t = Date.parse(m.fecha), txt = normal(m.texto ?? '')
+    const ia = deIA.findIndex((r, i) => !usadosIA.has(i) && Math.abs(new Date(r.enviada_at).getTime() - t) <= VENTANA_MS && normal(r.respuesta ?? '') === txt)
+    if (ia >= 0) { usadosIA.add(ia); return deIA[ia].sin_seguro ? 'Respondió la IA (Modo Total)' : 'Respondió la IA' }
     const cerca = regs.map((r, i) => ({ r, i })).filter(({ r, i }) => !usados.has(i) && Math.abs(new Date(r.fecha).getTime() - t) <= VENTANA_MS)
     const elegido = cerca.find(({ r }) => normal(r.texto) === txt)
       ?? cerca.find(({ r }) => !r.texto?.trim() && !txt)        // solo archivo

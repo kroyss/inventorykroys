@@ -27,7 +27,7 @@ interface Pregunta {
   /** Respuesta rápida que el sistema eligió (sin IA, probada en el historial): lib/sugerenciasServidor.ts */
   sugerida?: { plantilla: string; titulo: string; texto: string; respaldo: number; sin_confirmar: boolean; por_palabras?: string[]; revisada?: boolean; agregado?: boolean } | null
   probable?: string | null      // sin sugerida: el botón más probable (se resalta)
-  cuenta: string; respondida_por: string | null
+  cuenta: string; respondida_por: string | null; por_ia?: boolean; por_ia_total?: boolean
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
   producto_precio: number | null
   comprador_id: string | null; previas: number
@@ -341,7 +341,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
         datos ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
-              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', envioPorPeso ? 'Datos de cada producto' : 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || iaAutomatica || isAdmin) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
+              {([['mi_ia', 'Mi IA'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA'], ['ia', 'Políticas para la IA'], ['aprendido', envioPorPeso ? 'Datos de cada producto' : 'Lo aprendido de cada producto']] as const).filter(([k]) => (k !== 'ia_auto' || verAvisosInternos) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}</button>
               ))}
@@ -350,8 +350,8 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
             {subConfig === 'aprendido' && <>{!envioPorPeso && <LoAprendido />}<DatosProductos /></>}
             {subConfig === 'ia' && !miIA && <CuentasYPoliticas />}
-            {subConfig === 'ia_auto' && iaAutomatica && <IaAutomatica interno={verAvisosInternos} onMiIA={miIA ? () => setSubConfig('mi_ia') : undefined} />}
-            {subConfig === 'ia_auto' && !iaAutomatica && (
+            {subConfig === 'ia_auto' && iaAutomatica && verAvisosInternos && <IaAutomatica interno={verAvisosInternos} onMiIA={miIA ? () => setSubConfig('mi_ia') : undefined} />}
+            {subConfig === 'ia_auto' && !iaAutomatica && verAvisosInternos && (
               <div className="max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-2">
                 <h2 className="font-semibold text-neutral-900">Respuesta automática con IA</h2>
                 <p className="text-sm text-neutral-600">La IA contesta sola las preguntas y los mensajes en que está segura, a toda hora; lo delicado queda escrito para tu equipo.</p>
@@ -690,7 +690,7 @@ function FilaHistorial({ p }: { p: Pregunta }) {
       {p.respuesta && (
         <p className="text-neutral-600 pl-3 border-l-2 border-neutral-200">
           {p.respuesta}
-          <span className="text-xs text-neutral-400"> · {p.respondida_por ?? 'desde MercadoLibre'}</span>
+          <span className="text-xs text-neutral-400"> · {p.por_ia ? <span className="text-sky-700">Respondió la IA{p.por_ia_total ? ' (Modo Total)' : ''}</span> : p.respondida_por ?? 'desde MercadoLibre'}</span>
         </p>
       )}
       </div>
