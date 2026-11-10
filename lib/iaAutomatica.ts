@@ -97,7 +97,7 @@ const TERCERO = /\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (solo |no )
 export function motivosRevisar(b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
   itemEstado: string | null, pregunta = '', datos = '', v2 = false, vendedor = '', compat = datos): string[] {
   const m: string[] = []
-  if (!b.respuesta) return ['La IA no propuso respuesta']
+  if (!b.respuesta) return [`La IA no propuso respuesta${b.falta_dato ? `: ${b.falta_dato}` : ''}`]
   if (CODIGO_INTERNO.test(b.respuesta)) return ['La IA devolvió texto inválido: lo revisa una persona']
   // 08-11 (el dueño, con 65 marcadas): confianza baja o media SOLA ya no frena si el verificador aprobó la respuesta
   // (nada afirmado fuera de los datos). Las demás reglas (no hay, pagos, montos, otra publicación…) siguen frenando.

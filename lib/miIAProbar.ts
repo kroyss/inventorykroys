@@ -21,6 +21,7 @@ export async function probarMiIA(db: Pool, country: string, usuarioId: number | 
        SELECT DISTINCT ON (item_id) * FROM ml_preguntas
        WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL AND fecha > NOW() - INTERVAL '30 days'
          AND COALESCE(ia_auto->>'publicada', 'false') <> 'true'
+         AND COALESCE(item_estado, 'active') = 'active'   -- 11-11: una pausada siempre sale «no activa» (no mide nada)
        ORDER BY item_id, fecha DESC) x
      -- 11-11: al azar entre las del último mes (antes siempre las 10 más nuevas: dos pruebas seguidas daban lo mismo).
      ORDER BY random() LIMIT $1`, [PRUEBA_N])

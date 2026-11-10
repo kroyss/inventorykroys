@@ -22,7 +22,7 @@ import { otrasPublicaciones, type OtraPublicacion } from '@/lib/catalogoML'
 import { fichasActivas } from '@/lib/fichasIA'
 import { contextoFotos, fichaDeAtributos, lineasFotos, type ContextoFotos, type FotoML } from '@/lib/fotosIA'
 import { verificarBorrador } from '@/lib/verificadorIA'
-import { CODIGO_INTERNO } from '@/lib/codigoInterno'
+import { CODIGO_INTERNO, sinCodigo } from '@/lib/codigoInterno'
 import { esDemo } from '@/lib/demo'
 import { riesgoDe } from '@/lib/sugerenciasPreguntas'
 import { variantesDe, textoVariantes, type Variante, type VariacionML } from '@/lib/variantesML'
@@ -608,8 +608,13 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   // Un reintento si falla (corte de la IA o "no devolvió un borrador").
   let b = await pedir(MODELO_SIMPLE).catch(() => pedir(MODELO_SIMPLE))
   // 11-11: una vez devolvió "<parameter name=…>" en vez de la respuesta: se pide de nuevo y, si sigue, queda vacía.
-  if (CODIGO_INTERNO.test(b.respuesta)) b = await pedir(MODELO_SIMPLE).catch(() => ({ ...b, respuesta: '' }))
-  if (CODIGO_INTERNO.test(b.respuesta)) b = { ...b, respuesta: '', confianza: 'baja' }
+  if (CODIGO_INTERNO.test(b.respuesta)) {
+    console.warn('[ia] borrador con código interno:', JSON.stringify(b.respuesta.slice(0, 300)))
+    const limpia = sinCodigo(b.respuesta)
+    b = limpia && !CODIGO_INTERNO.test(limpia) ? { ...b, respuesta: limpia } : await pedir(MODELO_SIMPLE).catch(() => ({ ...b, respuesta: '' }))
+    if (CODIGO_INTERNO.test(b.respuesta)) b = { ...b, respuesta: '', confianza: 'baja' }
+  }
+  if (!b.respuesta) console.warn('[ia] borrador vacío:', b.confianza, JSON.stringify(b.falta_dato ?? '').slice(0, 200))
   b = { ...b, respuesta: sinTercero(b.respuesta) }
   // Verificador (31-10): lo que la IA da por seguro se busca afirmación por afirmación en los datos; si algo no está
   // escrito o falta una parte, baja a "baja" (lo revisa una persona). Con búsqueda web no aplica (ya va a verificar).
@@ -646,6 +651,9 @@ export function cantidadPedida(texto: string): number | null {
 export function sinTercero(t: string) {
   return t
     .replace(/,?\s*(seg[uú]n|como (lo )?(indica|dice|menciona|muestra))\s+(la|esta|nuestra)\s+(publicaci[oó]n|ficha( t[eé]cnica)?|descripci[oó]n)( de (la|esta) publicaci[oó]n)?/gi, '')
+    .replace(/\b(la|esta|nuestra) (publicaci[oó]n|ficha|descripci[oó]n) no (especifica|indica|dice|menciona|aclara)( si)?\s+/gi, (_m, _a, _b, _c, si) => si ? 'no tenemos confirmado si ' : 'no tenemos el dato de ')
+    .replace(/no tenemos el dato de el /gi, 'no tenemos el dato del ')
+    .replace(/\s+(indicad[oa]s?|que (aparece|dice|indica)) en (la|esta|nuestra) (publicaci[oó]n|ficha|descripci[oó]n)/gi, '')
     .replace(/\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (indica|dice|menciona|muestra) que\s+/gi, '')
     .replace(/\b(la|esta) (publicaci[oó]n|ficha|descripci[oó]n) (indica|dice|menciona|muestra)\s+/gi, 'tiene ')
     .replace(/\s+([.,;])/g, '$1').replace(/\s{2,}/g, ' ').trim()
