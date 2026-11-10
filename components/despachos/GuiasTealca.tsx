@@ -31,6 +31,8 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
   const [error, setError]     = useState<string | null>(null)
   const [aviso, setAviso]     = useState<string | null>(null)
   const [erroresApi, setErroresApi] = useState<Record<number, string>>({})
+  const [marcadas, setMarcadas] = useState<Set<number>>(new Set())
+  const [avisadas, setAvisadas] = useState<number[] | null>(null)   // las últimas «Ya avisé», para Deshacer
 
   const cargar = useCallback(async () => {
     const res = await fetch('/api/despachos/tealca')
@@ -39,6 +41,7 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
     setEnvios(d.envios)
     setDigitos(d.digitos)
     setValores({})
+    setMarcadas(new Set())
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
@@ -59,7 +62,7 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
     return out
   }, [envios, valores, digitos])
 
-  if (!envios || envios.length === 0) return null
+  if (!envios) return null
 
   const cambios = envios.filter(e => (valores[e.id] ?? e.guia_final ?? '').trim() !== (e.guia_final ?? ''))
   const conGuia = envios.filter(e => (valorDe(e).trim() !== '')).length
@@ -88,6 +91,30 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
     onGuardado?.()
   }
 
+  // «Ya avisé»: la guía ya se le pasó al comprador por fuera (foto de la guía real); sale de la lista y no se reporta.
+  const yaAvise = async (ids: number[]) => {
+    if (ids.length > 1 && !confirm(`¿Marcar ${ids.length} envíos como ya avisados por fuera? No se reportarán desde el Reportador.`)) return
+    setError(null); setAviso(null)
+    const res = await fetch('/api/despachos/tealca', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'fuera', ids }),
+    })
+    if (!res.ok) { setError('No se pudo marcar'); return }
+    setAvisadas(ids)
+    await cargar()
+    window.dispatchEvent(new Event('reportador:pendientes'))
+  }
+  const deshacer = async () => {
+    if (!avisadas) return
+    const res = await fetch('/api/despachos/tealca', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'deshacer', ids: avisadas }),
+    })
+    if (!res.ok) { setError('No se pudo deshacer'); return }
+    setAvisadas(null)
+    await cargar()
+    window.dispatchEvent(new Event('reportador:pendientes'))
+  }
+  const alternar = (id: number) => setMarcadas(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+
   const cambiarDigitos = async (n: number) => {
     if (!Number.isInteger(n) || n < 4 || n > 20) return
     const res = await fetch('/api/despachos/tealca', {
@@ -104,6 +131,12 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
     todas[todas.indexOf(e.currentTarget) + 1]?.focus()
   }
 
+  if (envios.length === 0) return avisadas ? (
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-3 text-xs text-neutral-600">
+      {avisadas.length === 1 ? '1 envío marcado' : `${avisadas.length} envíos marcados`} «Ya avisé».{' '}
+      <button onClick={deshacer} className="underline underline-offset-2">Deshacer</button>
+    </section>
+  ) : null
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
       <div className="px-4 py-3 border-b border-neutral-100 flex flex-wrap items-center gap-3">
@@ -120,6 +153,10 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
                    className="border border-neutral-300 rounded px-1 py-0.5 w-14 text-xs" />
           </label>
         )}
+        {marcadas.size > 0 && (
+          <button onClick={() => yaAvise([...marcadas])} title="Ya les pasé la guía por fuera: no se reportan desde el Reportador"
+                  className="text-xs rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50">Ya avisé ({marcadas.size})</button>
+        )}
         <button onClick={guardar} disabled={guardando || cambios.length === 0 || hayProblemas} className="btn-primary text-xs">
           {guardando ? 'Guardando…' : `Guardar guías (${cambios.length})`}
         </button>
@@ -127,19 +164,31 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
       <p className="px-4 pt-2 text-xs text-neutral-500">
         Escribe la guía que asignó Tealca a cada destinatario (la de la foto o el correo), no la pre-guía de la etiqueta.
         Debe tener {digitos} dígitos y no puede repetirse. Los envíos con guía se reportan al comprador desde el Reportador.
+        Si ya le pasaste la guía al comprador por fuera, toca <b>Ya avisé</b> y no se reporta.
       </p>
+      {avisadas && (
+        <div className="mx-4 mt-2 bg-neutral-50 border border-neutral-200 text-neutral-700 px-3 py-1.5 rounded text-xs">
+          {avisadas.length === 1 ? '1 envío marcado' : `${avisadas.length} envíos marcados`} «Ya avisé»: no se reportan. Quedan en Reportador → Historial.{' '}
+          <button onClick={deshacer} className="underline underline-offset-2">Deshacer</button>
+        </div>
+      )}
       {error && <div className="mx-4 mt-2 bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded text-xs">{error}</div>}
       {aviso && <div className="mx-4 mt-2 bg-green-50 border border-green-200 text-green-800 px-3 py-1.5 rounded text-xs">{aviso}</div>}
       <div className="overflow-x-auto">
         <table className="w-full text-sm mt-2">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>
+              <th className="pl-3 py-2 w-6">
+                <input type="checkbox" aria-label="Marcar todos" checked={visibles.length > 0 && visibles.every(e => marcadas.has(e.id))}
+                       onChange={ev => setMarcadas(ev.target.checked ? new Set(visibles.map(e => e.id)) : new Set())} />
+              </th>
               <th className="px-3 py-2 text-left">Fecha</th>
               <th className="px-3 py-2 text-left">Destinatario</th>
               <th className="px-3 py-2 text-left">Remitente</th>
               <th className="px-3 py-2 text-left">Venta</th>
               <th className="px-3 py-2 text-left">Pre-guía</th>
               <th className="px-3 py-2 text-left">Guía final</th>
+              <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -147,6 +196,7 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
               const err = erroresApi[e.id] ?? problemas[e.id]
               return (
                 <tr key={e.id} className="border-t border-neutral-100 align-middle">
+                  <td className="pl-3 py-1.5"><input type="checkbox" checked={marcadas.has(e.id)} onChange={() => alternar(e.id)} aria-label="Marcar" /></td>
                   <td className="px-3 py-1.5 text-xs text-neutral-500 whitespace-nowrap">{fechaHora(e.generated_at)}</td>
                   <td className="px-3 py-1.5 font-medium">{e.destinatario ?? '—'}</td>
                   <td className="px-3 py-1.5 text-xs">{e.remitente?.slice(0, 22) ?? '—'}</td>
@@ -162,6 +212,10 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
                         ? <span className="text-xs text-red-700">{err}</span>
                         : valorDe(e).trim() !== '' && <span className="text-xs text-green-700">✓</span>}
                     </div>
+                  </td>
+                  <td className="px-3 py-1.5 text-right">
+                    <button onClick={() => yaAvise([e.id])} title="Ya le pasé la guía al comprador por fuera: no se reporta"
+                            className="text-xs text-neutral-500 hover:text-neutral-900 underline underline-offset-2 whitespace-nowrap">Ya avisé</button>
                   </td>
                 </tr>
               )

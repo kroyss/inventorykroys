@@ -527,7 +527,9 @@ orden como completada, el sistema la deja sin tildar con la nota «Despachada po
 descartar lotes para limpiar; si igual descartas uno, sus guías de Pagos ME vuelven a entrar al marcar «Pago correcto».
 
 **Guías Tealca:** TEALCA cambia la guía en la oficina; escribe la guía final de cada envío en «Guías Tealca» para
-que el Reportador se la mande al comprador.
+que el Reportador se la mande al comprador. Si ya le pasaste la guía al comprador por fuera (p. ej. la foto de la guía
+real), toca **Ya avisé** en esa fila (o marca varias con las casillas y toca **Ya avisé (N)**): sale de la lista y no
+se reporta. Queda en Reportador → Historial como «Avisada por fuera», con **Deshacer** por si fue un error.
 
 **Video:** «Despachos».
 

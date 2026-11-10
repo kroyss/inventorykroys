@@ -19,6 +19,7 @@ const ESTADO_UI: Record<string, { label: string; cls: string }> = {
   RECHAZADO: { label: 'Rechazado por ML',     cls: 'bg-red-100 text-red-800' },
   ERROR:     { label: 'Error (se reintenta)', cls: 'bg-amber-100 text-amber-800' },
   CSV:       { label: 'Por CSV (viejo)',      cls: 'bg-neutral-100 text-neutral-600' },
+  FUERA:     { label: 'Avisada por fuera',    cls: 'bg-neutral-200 text-neutral-700' },   // Guías Tealca → «Ya avisé»
 }
 const REIMPRESION = { label: 'Reimpresión (ya reportado)', cls: 'bg-neutral-100 text-neutral-600' }
 const PENDIENTE = { label: 'Pendiente', cls: 'bg-sky-100 text-sky-800' }
@@ -37,7 +38,7 @@ function grupo(e: Envio): FiltroEstado | null {
   if (e.reimpresion) return null
   if (e.apartado === 'cancelado' && !e.reporte_estado) return null   // nunca se reporta
   if (!e.reporte_estado) return 'pendientes'
-  if (e.reporte_estado === 'ENVIADO' || e.reporte_estado === 'CSV') return 'enviados'
+  if (e.reporte_estado === 'ENVIADO' || e.reporte_estado === 'CSV' || e.reporte_estado === 'FUERA') return 'enviados'
   return 'problema'
 }
 
@@ -141,7 +142,16 @@ export default function ReportadorHistorial({ jornadaInicial }: { jornadaInicial
   )
 }
 
-function FilaDia({ d, abierto, onToggle }: { d: Dia; abierto: boolean; onToggle: () => void }) {
+function FilaDia({ d: dOrig, abierto, onToggle }: { d: Dia; abierto: boolean; onToggle: () => void }) {
+  // «Avisada por fuera» deshecha aquí: vuelve a pendiente (y a Guías Tealca) sin recargar el mes.
+  const [deshechas, setDeshechas] = useState<Set<number>>(new Set())
+  const d = useMemo(() => deshechas.size === 0 ? dOrig : { ...dOrig, envios: dOrig.envios.map(e => deshechas.has(e.id)
+    ? { ...e, reporte_estado: null, reporte_detalle: null, reportado_at: null } : e) }, [dOrig, deshechas])
+  const deshacerFuera = async (id: number) => {
+    const r = await fetch('/api/despachos/tealca', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accion: 'deshacer', ids: [id] }) })
+    if (r.ok) { setDeshechas(s => new Set(s).add(id)); window.dispatchEvent(new Event('reportador:pendientes')) }
+  }
   const [estado, setEstado] = useState<FiltroEstado>('todos')
   const [cuenta, setCuenta] = useState('todas')
   const [verMsg, setVerMsg] = useState<number | null>(null)
@@ -222,6 +232,9 @@ function FilaDia({ d, abierto, onToggle }: { d: Dia; abierto: boolean; onToggle:
                         {detalle}
                         {!e.reporte_estado && e.apartado && e.apartado_nota && <span className="text-amber-800">“{e.apartado_nota}”</span>}
                         {e.reporte_intentos > 1 ? ` · ${e.reporte_intentos} intentos` : ''}
+                        {e.reporte_estado === 'FUERA' && (
+                          <button onClick={() => deshacerFuera(e.id)} className="ml-2 underline underline-offset-2 hover:text-neutral-800">Deshacer</button>
+                        )}
                         {e.reporte_mensaje && (
                           <button onClick={() => setVerMsg(ver ? null : e.id)} className="ml-2 underline underline-offset-2 hover:text-neutral-800">
                             {ver ? 'ocultar mensaje' : 'ver mensaje'}

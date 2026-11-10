@@ -128,3 +128,39 @@ export async function PATCH(req: NextRequest) {
     return apiError(err)
   }
 }
+
+const SchemaFuera = z.object({
+  accion: z.enum(['fuera', 'deshacer']),
+  ids:    z.array(z.number().int().positive()).min(1).max(300),
+})
+
+/**
+ * POST /api/despachos/tealca — «Ya avisé» (10-11-2026, pedido de un cliente): la guía ya se le pasó al comprador por
+ * fuera del sistema (p. ej. foto de la guía real de Tealca). Queda con reporte_estado 'FUERA': sale de Guías Tealca y
+ * de la cola del Reportador (SQL_PENDIENTE solo toma NULL/RECHAZADO/ERROR). El envío y la venta no cambian.
+ * 'deshacer' la devuelve a pendiente (desde Reportador → Historial o el aviso de Guías Tealca).
+ */
+export async function POST(req: NextRequest) {
+  const { session, db } = await getSessionDb()
+  if (!session || !db) return unauthorized()
+  const denied = despachosForbidden(session)
+  if (denied) return denied
+
+  try {
+    const { accion, ids } = SchemaFuera.parse(await req.json())
+    const { rowCount } = accion === 'fuera'
+      ? await db.query(
+          `UPDATE despacho_etiquetas SET reporte_estado = 'FUERA', reporte_detalle = $2, reportado_at = NOW(),
+                  reporte_tomado_por = NULL, reporte_tomado_at = NULL
+           WHERE id = ANY($1) AND carrier = 'TEALCA' AND impresa
+             AND (reporte_estado IS NULL OR reporte_estado IN ('RECHAZADO', 'ERROR'))`,
+          [ids, `Avisada por fuera · ${session.user.name ?? 'usuario'}`])
+      : await db.query(
+          `UPDATE despacho_etiquetas SET reporte_estado = NULL, reporte_detalle = NULL, reportado_at = NULL
+           WHERE id = ANY($1) AND reporte_estado = 'FUERA'`, [ids])
+    return NextResponse.json({ ok: true, cambiadas: rowCount ?? 0 })
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })
+    return apiError(err)
+  }
+}
