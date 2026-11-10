@@ -3,7 +3,7 @@
 // reglas que la respuesta automática, lib/iaAutomatica.ts). No publica nada ni toca la pregunta. No descuenta créditos
 // del cliente (módulo 'simulacion'): es para que decida si la enciende.
 import type { Pool } from 'pg'
-import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador } from '@/lib/preguntas'
+import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador, textoVendedor } from '@/lib/preguntas'
 import { registrarUso, type LlamadaIA } from '@/lib/ia'
 import { motivosRevisar } from '@/lib/iaAutomatica'
 
@@ -22,7 +22,8 @@ export async function probarMiIA(db: Pool, country: string, usuarioId: number | 
        WHERE estado = 'ANSWERED' AND respuesta IS NOT NULL AND fecha > NOW() - INTERVAL '30 days'
          AND COALESCE(ia_auto->>'publicada', 'false') <> 'true'
        ORDER BY item_id, fecha DESC) x
-     ORDER BY fecha DESC LIMIT $1`, [PRUEBA_N])
+     -- 11-11: al azar entre las del último mes (antes siempre las 10 más nuevas: dos pruebas seguidas daban lo mismo).
+     ORDER BY random() LIMIT $1`, [PRUEBA_N])
   const llamadas: LlamadaIA[] = []
   const caso = async (q: { id: string; texto: string; item_id: string | null; item_titulo: string | null; item_permalink: string | null; respuesta: string | null }): Promise<CasoPrueba> => {
     const base = { id: q.id, pregunta: q.texto, titulo: q.item_titulo, permalink: q.item_permalink, itemId: q.item_id, tuya: q.respuesta }
@@ -30,7 +31,7 @@ export async function probarMiIA(db: Pool, country: string, usuarioId: number | 
       const c = await armarContexto(db, Number(q.id), country)
       const b = await pedirBorrador(c, false, undefined, true, true)   // v2, la misma que la automática
       llamadas.push(...b.llamadas)
-      const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), true, '', datosCompatibilidad(c))
+      const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), true, textoVendedor(c), datosCompatibilidad(c))   // 11-11: antes '' (las políticas no contaban)
       return { ...base, ia: b.respuesta, decision: motivos.length ? 'revisar' : 'sola', motivos }
     } catch (e) {
       return { ...base, ia: '', decision: 'revisar', motivos: ['Error de la IA'], error: (e instanceof Error ? e.message : String(e)).slice(0, 200) }

@@ -16,6 +16,7 @@ import { BotonComprobante } from './VerComprobante'
 import { Monto } from '@/components/pagosme/PagoME'
 import { LoQueSeHablo } from './PagoYContexto'
 import { NotasVenta } from '@/components/preguntas/MensajesClient'
+import EnlazarLocal from './EnlazarLocal'
 
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
 
@@ -719,10 +720,16 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
         <div className="rounded-xl border border-amber-200 bg-amber-50/60">
           <div className="px-4 py-2.5">
             <p className="text-sm font-medium text-amber-900">Calificadas como concretadas sin venta registrada <span className="text-amber-700">{concretadasSinVenta.length}</span></p>
-            <p className="text-xs text-amber-800">En MercadoLibre quedaron concretadas, pero aquí no hay venta registrada ni pago. Revisa: si se vendió, regístrala para descontar el inventario.</p>
+            <p className="text-xs text-amber-800">En MercadoLibre quedaron concretadas, pero aquí no hay venta registrada ni pago. Si se vendió, regístrala para descontar el inventario; si ya la registraron como venta LOCAL, tócale «La registré como venta local» y enlázala. Para las próximas: regístralas desde aquí (con el número de MercadoLibre), no como LOCAL.</p>
           </div>
           <ul className="divide-y divide-amber-100 border-t border-amber-200 bg-white">
-            {concretadasSinVenta.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />)}
+            {concretadasSinVenta.map(f => (
+              <div key={f.numero}>
+                <FilaVenta f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />
+                {/* 11-11: cobro destino registrado como LOCAL-…: se enlaza y sale del aviso (mig 165). */}
+                <div className="px-4 pb-2.5 -mt-1"><EnlazarLocal numero={f.numero} onHecho={onRecargar} /></div>
+              </div>
+            ))}
           </ul>
         </div>
       )}

@@ -203,6 +203,7 @@ export const SQL_BANDEJA = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
          o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
          x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE}, ${EXTRA},
+         (o.venta_local_id IS NOT NULL) AS enlazada_local, COALESCE(o.pack_id, o.id)::text AS numero_venta,
          CASE
            -- Descargada (o local) y, si lleva guía en Despachos, despachada. 28-10: procesada o facturada NO alcanza
            -- (una venta facturada antes de pagar, sin guía, se calificó sola y el envío nunca se pudo agendar).
@@ -219,7 +220,10 @@ export const SQL_BANDEJA = `
   FROM ml_ordenes o
   JOIN ml_conexiones x ON x.id = o.conexion_id
   -- LATERAL: busca la venta por índice orden a orden (un JOIN con IN comparaba contra todas las ventas).
-  LEFT JOIN LATERAL (SELECT s.id, s.status FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text) LIMIT 1) s ON TRUE
+  -- mig 165 (11-11): o la venta LOCAL enlazada a mano (cobro destino registrado como LOCAL-…).
+  LEFT JOIN LATERAL (SELECT * FROM (
+      SELECT s.id, s.status FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text)
+      UNION ALL SELECT s.id, s.status FROM sales s WHERE s.id = o.venta_local_id) s1 LIMIT 1) s ON TRUE
   LEFT JOIN LATERAL (SELECT i.id FROM invoices i WHERE ${sqlFacturaIncluye('i', 's.id')} AND i.status <> 'ANULADA' LIMIT 1) f ON TRUE
   ${SQL_GUIA}
   WHERE o.cal_vendedor IS NULL`

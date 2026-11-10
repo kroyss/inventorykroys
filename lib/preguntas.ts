@@ -467,6 +467,8 @@ AJUSTES (mandan sobre lo anterior):
 - Lo que el vendedor anotó en DATOS QUE EL VENDEDOR ANOTÓ manda sobre las políticas generales para ESTE producto (p. ej. "envío gratis solo por TEALCA", "sirve para cualquier vehículo").
 - Si el comprador no pregunta nada (solo confirma o agradece: "ok, quedo atento", "está bien", "gracias"), responde corto y cordial ("Perfecto, quedo a su orden" con el saludo y la despedida del vendedor): confianza "alta".
 - Si pregunta por un medio de pago que no está en las POLÍTICAS, di "no trabajamos con <ese medio>" y nombra los que sí aceptamos.
+- "¿Tienes / sirve para un <vehículo o modelo>?" (p. ej. "¿tienes disponible para un Corsa?") y lo escrito dice que es universal o para cualquier vehículo: contesta que SÍ sirve para ese vehículo, con la condición escrita si la hay (p. ej. 12V). Nunca "no es de un <modelo> en específico".
+- Si el comprador pide una foto (de la caja, de otro ángulo): "por este medio no se pueden mandar imágenes" es completa: confianza "alta".
 - Lo que SÍ sigue en "baja": las POLÍTICAS o las RESPUESTAS RÁPIDAS se contradicen con la descripción en lo que pregunta (cobros adicionales, mínimos, agencias); datos técnicos o medidas que no están escritos; compatibilidades; pagos fuera de MercadoLibre.`
 
 /** Cuánto contexto se le manda a la IA por pregunta (27-10). armarContexto trae lo máximo; aquí se recorta.

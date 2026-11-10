@@ -60,7 +60,8 @@ const MUCHAS = /\b([5-9]|\d{2,})\s*(unidades|unds?\b|packs?|piezas|pares|cajas|d
 
 // 05-11 (evaluación del dueño de la económica): 4 casos que siempre ve una persona.
 // Precio en divisa / dólares / efectivo: "el publicado BCV" no contesta lo que preguntan (fallaron la real y la económica).
-const DIVISA = /divisas?|en d[oó]lares|precio en \$|en efectivo|\bverdes?\b|\busdt?\b/i
+// 11-11: "luz verde", "color verde" no es "verdes" (dólares).
+const DIVISA = /divisas?|en d[oó]lares|precio en \$|en efectivo|(?<!(luz|luces|color|colores|tono|led|leds) )\bverdes?\b|\busdt?\b/i
 // Medios de pago fuera de MercadoLibre (Cashea, Zelle, Binance...): la IA inventó "sí contamos con Cashea".
 const PAGO = /cashea|zelle|binance|paypal|zinli|wally|reserve|cripto|pago m[oó]vil|transferencia|efectivo|krece|lysto/i
 // v2 (07-11, el dueño): el medio de pago no frena si está ESCRITO en lo del vendedor (Mi IA, políticas, respuestas rápidas):
@@ -106,7 +107,10 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   if (v2 && PAGO.test(pregunta) && pagoEscrito(pregunta, b.respuesta, vendedor))
     paraNegativa = paraNegativa.replace(/no (trabajamos|aceptamos|contamos|manejamos|tenemos)( pagos?)?( con| por)? [^,.;]*/gi, '')
   const negativa = NEGATIVA.test(paraNegativa)
-  if (negativa && !(v2 && b.confianza === 'alta' && b.verificacion === 'ok')) m.push('Dice que no hay: lo confirma una persona')
+  // 11-11 (el dueño): "no tenemos esa, mira nuestro catálogo: <link>" con el verificador conforme tampoco frena: el comprador
+  // igual encuentra lo que sí hay (pedido de la competencia, 10-11).
+  const invitaCatalogo = sinCat !== b.respuesta
+  if (negativa && !(v2 && b.verificacion === 'ok' && (b.confianza === 'alta' || invitaCatalogo))) m.push('Dice que no hay: lo confirma una persona')
   if (OTRA_PUBLICACION.test(sinCat)) m.push('Recomienda otra publicación')
   // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
   if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')

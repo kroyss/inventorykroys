@@ -100,6 +100,7 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
        AND (o.fecha > NOW() - make_interval(days => $2)
             OR (p.verificacion <> 'invalido' AND o.fecha > NOW() - make_interval(days => $3)))
        AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
+       AND o.venta_local_id IS NULL   -- mig 165: enlazada a la venta LOCAL que se registró a mano
        AND ($4::timestamptz IS NULL OR o.fecha >= $4)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)
