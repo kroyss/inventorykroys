@@ -612,7 +612,11 @@ Tus ventas de MercadoLibre **sin calificar**, cruzadas con el sistema para saber
   sistema (procesada).
 - **No concretada:** cancelada en MercadoLibre, marcada «No se concretó» (en Por confirmar o al cancelar el envío en
   Despachos, aunque tenga pago), o nunca entró al sistema ni a Despachos.
-- **Revisar:** el sistema no puede saberlo (ej. guía impresa pero no reportada en 10 días): decide tú.
+- **Revisar:** el sistema no puede saberlo (ej. guía impresa pero no reportada en 10 días): decide tú. Con
+  **Pagos ME**: si pasó el plazo sin pago pero **no tocaste «Traer pagos y guías»** después, no se sabe si pagó y queda
+  en Revisar (nunca se califica sola); al traer los pagos se aclara sola. Busca los pagos antes de calificar.
+- **Por definir:** todavía no se sabe. Cada venta dice qué falta: «Sin pago todavía», «Falta traer pagos», «Pagó ·
+  falta la guía» o «Falta reportar la guía».
 
 Sin Despachos y Reportador el sistema no sabe cuáles se concretaron: decides tú cada una (solo las canceladas en ML
 salen como no concretadas). Puedes cambiar cada una antes de calificar. Motivos de no concretada: no pagó, se

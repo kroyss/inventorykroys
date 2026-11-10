@@ -15,6 +15,8 @@ interface Orden {
   en_espera: boolean            // todavía en los días de espera (desde el reporte o la compra): pestaña Próximas
   lista_el: string              // YYYY-MM-DD: el día en que sale de la espera
   guia_impresa: boolean; reportada_at: string | null
+  // 10-11: usa Pagos ME pero no se buscaron los pagos después del plazo (va a Revisar) · tiene pago en Pagos ME.
+  falta_traer?: boolean; con_pago?: boolean
   chat?: { at: string; comprador: boolean | null } | null   // último mensaje de la venta (y si fue del comprador)
 }
 interface Plantillas {
@@ -30,7 +32,7 @@ const horaTxt = (h: number | undefined) => `${String(h ?? 10).padStart(2, '0')}:
 interface Datos {
   ordenes: Orden[]; contadores: { concretadas: number; no_concretadas: number; revisar: number; proximas: number; esperando: number }
   /** Cómo decide "concretada" (lib/calificacionesML.ts): con Reportador = guía reportada; usa Despachos = imprimió guías en 30 días. */
-  conReportador?: boolean; usaDespachos?: boolean; topeDias?: number
+  conReportador?: boolean; usaDespachos?: boolean; topeDias?: number; pagosME?: boolean
   plantillas: Plantillas; cuentas: { nickname: string; ordenes_sync_at: string | null }[]
   /** Empresa sin inventario: "en el sistema" = despachada (etiqueta impresa en Despachos). */
   desdeML?: boolean
@@ -226,7 +228,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                 <b>Concretada</b>: {datos.desdeML ? 'su guía salió en Despachos' : 'está en el sistema (procesada o facturada)'}
                 {datos.conReportador ? <>{datos.desdeML ? ' y ya la reportaste' : ' y, si lleva guía, ya la reportaste'} (Reportador); la espera cuenta desde el reporte</> : ''}.
                 {' '}<b>No concretada</b>: {datos.desdeML ? 'cancelada en MercadoLibre, o' : ''} sin {datos.desdeML ? 'guía' : 'cargar'} después de {datos.plantillas.noConcretada.dias} días.
-                {' '}<b>Revisar</b>: el sistema no puede saberlo{datos.conReportador ? ` (la guía se imprimió pero a los ${datos.topeDias ?? 10} días no se reportó)` : ''}: decides tú.
+                {' '}<b>Revisar</b>: el sistema no puede saberlo{datos.conReportador ? ` (la guía se imprimió pero a los ${datos.topeDias ?? 10} días no se reportó)` : ''}{datos.pagosME ? ', o no buscaste los pagos (Traer pagos y guías) después de la venta' : ''}: decides tú.
                 {vista === 'listas' && ' Puedes cambiar cada una antes de calificar.'}
               </>}
             {sinc && <> · Ventas actualizadas {new Date(sinc).toLocaleString('es-VE')}</>}
@@ -335,7 +337,17 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                         )}
                         {/* 23-10: ML la da por concretada sola a los 7 días de la compra y cobra la comisión. */}
                         {/* También en "Por definir" (sin cargar todavía): para ver venir las que vencen. */}
-                        {(o.sugerencia === 'no_concretada' || (o.sugerencia === 'esperar' && !o.sistema_estado)) && (() => {
+                        {/* 10-11: en Por definir, qué falta para saberlo (antes no se entendía por qué estaban ahí). */}
+                        {o.sugerencia === 'esperar' && (() => {
+                          const falta = o.guia_impresa
+                            ? (datos.conReportador && !o.reportada_at ? 'Falta reportar la guía' : null)
+                            : o.sistema_estado ? null
+                            : o.con_pago ? 'Pagó · falta la guía'
+                            : o.falta_traer ? 'Falta traer pagos (Traer pagos y guías)'
+                            : 'Sin pago todavía'
+                          return falta && <div className="mt-0.5 text-xs text-neutral-600">{falta}</div>
+                        })()}
+                        {(o.sugerencia === 'no_concretada' || (o.sugerencia === 'revisar' && o.falta_traer) || (o.sugerencia === 'esperar' && !o.sistema_estado)) && (() => {
                           const q = diasParaConcretarSola(o.fecha)
                           return (
                             <div className={`mt-0.5 text-xs font-medium ${q <= 1 ? 'text-red-700' : 'text-amber-700'}`}
@@ -347,7 +359,9 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                         {o.sugerencia === 'revisar' && (
                           <div className="mt-0.5 text-xs font-medium text-violet-700"
                             title="El sistema no puede saber si se concretó: decide tú">
-                            Revisar · {o.guia_impresa ? `impresa, sin reportar en ${datos.topeDias ?? 10} días` : 'sin guía en el sistema'}
+                            Revisar · {o.guia_impresa ? `impresa, sin reportar en ${datos.topeDias ?? 10} días`
+                              : o.falta_traer ? 'no buscaste los pagos después de esta venta: toca Traer pagos y guías y luego decide'
+                              : 'sin guía en el sistema'}
                           </div>
                         )}
                       </td>

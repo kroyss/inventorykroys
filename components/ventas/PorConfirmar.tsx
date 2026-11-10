@@ -705,7 +705,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             </span>
             <span className="text-xs text-neutral-400">
               {/* Sin inventario no se "registra" nada: vence la que no pagó (23-10). */}
-              Más de {datos.dias} días {sinInventario ? 'sin pago' : 'sin registrar'}: Calificaciones las toma como no concretadas · {verVencidas ? 'Ocultar' : 'Ver'}
+              Más de {datos.dias} días {sinInventario ? 'sin pago' : 'sin registrar'}: Calificaciones las toma como no concretadas{datos.pagosME ? ' (si no buscaste los pagos después, quedan para Revisar)' : ''} · {verVencidas ? 'Ocultar' : 'Ver'}
             </span>
           </button>
           {verVencidas && (

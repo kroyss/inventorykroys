@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { leerPlantillasCal, sqlBandeja, sqlLista, sqlListaEl, TOPE_DIAS } from '@/lib/calificacionesML'
-import { ventasDesdeML } from '@/lib/modulos'
+import { ventasDesdeML, tieneModulo } from '@/lib/modulos'
 
 // GET /api/calificaciones?vista=listas|proximas|esperando
 //   listas    → "Por calificar": con sugerencia (concretada / no concretada) y fuera de los días de espera
@@ -58,7 +58,8 @@ export async function GET(req: NextRequest) {
       `SELECT COALESCE((SELECT 'reportador' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS con_reportador,
               EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos`)
     return NextResponse.json({ ordenes: rows, contadores: n, plantillas, cuentas, desdeML, autoUltimo, autoNcUltimo,
-      conReportador: !!modo?.con_reportador, usaDespachos: !!modo?.usa_despachos, topeDias: TOPE_DIAS })
+      conReportador: !!modo?.con_reportador, usaDespachos: !!modo?.usa_despachos, topeDias: TOPE_DIAS,
+      pagosME: tieneModulo(s.session.user, 'pagos_me') })
   } catch (err) {
     return apiError(err)
   }

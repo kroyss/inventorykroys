@@ -182,19 +182,27 @@ const SQL_GUIA = `
     WHERE e.venta IN (o.id::text, o.pack_id::text) AND e.apartado IS DISTINCT FROM 'cancelado') g ON TRUE   -- cancelada en Despachos: no salió (04-11)
   CROSS JOIN (SELECT
     COALESCE((SELECT 'reportador' = ANY(modulos) FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int), FALSE) AS con_reportador,
-    EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos) m`
+    EXISTS (SELECT 1 FROM despacho_etiquetas WHERE impresa AND created_at > NOW() - INTERVAL '30 days') AS usa_despachos,
+    -- 10-11: el último "Traer pagos y guías" que terminó bien (Pagos ME, últimos 30 días; NULL = no lo usa).
+    (SELECT max((r.value->>'at')::timestamptz) FROM me_pedidos p CROSS JOIN LATERAL jsonb_each(p.resultados) r
+     WHERE p.pedido_at > NOW() - INTERVAL '30 days' AND (r.value->>'ok') = 'true') AS traer_ok_at) m`
 // La guía cuenta como despachada: impresa y, si la empresa tiene Reportador, también reportada.
 const GUIA_OK = `(g.impresa AND (NOT m.con_reportador OR g.reportada_at IS NOT NULL))`
 const BASE = `CASE WHEN o.fuera_at IS NOT NULL THEN o.fuera_at
               WHEN m.con_reportador AND g.reportada_at IS NOT NULL THEN g.reportada_at ELSE o.fecha END AS base,
          COALESCE(g.impresa, FALSE) AS guia_impresa, g.reportada_at, m.usa_despachos`
 const PAGO_ME = `EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')`
+/** 10-11 (caso Ainy): la empresa usa Pagos ME pero NO buscó los pagos después de que venció el plazo de esta venta: "sin
+ *  pago" no es seguro (pudo pagar y el sistema no lo sabe). En vez de "no concretada" va a 'revisar' (decide una persona,
+ *  nunca se califica sola). Tocando "Traer pagos y guías" se aclara sola. Quien no usa Pagos ME sigue igual. */
+const FALTA_TRAER = `(m.traer_ok_at IS NOT NULL AND m.traer_ok_at < o.fecha + make_interval(days => $1))`
+const EXTRA = `${FALTA_TRAER} AS falta_traer, ${PAGO_ME} AS con_pago`
 
 /** SQL de la bandeja: ventas sin calificar + su estado en el sistema + sugerencia. */
 export const SQL_BANDEJA = `
   SELECT o.id::text, o.fecha, o.comprador, o.productos, o.total::float, o.moneda, o.cal_comprador,
          o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
-         x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE},
+         x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE}, ${EXTRA},
          CASE
            -- Descargada (o local) y, si lleva guía en Despachos, despachada. 28-10: procesada o facturada NO alcanza
            -- (una venta facturada antes de pagar, sin guía, se calificó sola y el envío nunca se pudo agendar).
@@ -205,7 +213,7 @@ export const SQL_BANDEJA = `
            -- verificado y reembolsada quedaba "esperar" para siempre).
            WHEN s.id IS NULL AND (o.no_concretada_at IS NOT NULL OR o.estado = 'cancelled') THEN 'no_concretada'
            WHEN ${PAGO_ME} THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
-           WHEN s.id IS NULL AND o.fecha < NOW() - make_interval(days => $1) THEN 'no_concretada'
+           WHEN s.id IS NULL AND o.fecha < NOW() - make_interval(days => $1) THEN CASE WHEN ${FALTA_TRAER} THEN 'revisar' ELSE 'no_concretada' END
            ELSE 'esperar'
          END AS sugerencia
   FROM ml_ordenes o
@@ -225,7 +233,7 @@ export const SQL_BANDEJA_ML = `
          o.cal_recibida, o.cal_recibida_concretada, o.cal_recibida_msg,
          x.nickname AS cuenta,
          CASE WHEN g.reportada_at IS NOT NULL THEN 'REPORTADA' WHEN g.impresa THEN 'DESPACHADA' WHEN o.fuera_at IS NOT NULL THEN 'POR_FUERA' END AS sistema_estado,
-         FALSE AS facturada, ${BASE},
+         FALSE AS facturada, ${BASE}, ${EXTRA},
          CASE
            WHEN ${GUIA_OK} THEN 'concretada'
            -- "Ya la despaché por fuera" (mig 120): se cumplió sin pasar por el sistema. La red de seguridad no la toca.
@@ -235,7 +243,7 @@ export const SQL_BANDEJA_ML = `
            -- Marcada "No se concretó" (mig 115) o cancelada en ML: antes que el pago (23-10, ver SQL_BANDEJA).
            WHEN o.no_concretada_at IS NOT NULL OR o.estado = 'cancelled' THEN 'no_concretada'
            WHEN ${PAGO_ME} THEN 'esperar'   -- pagó (Pagos ME): válida aunque no esté registrada todavía
-           WHEN o.fecha < NOW() - make_interval(days => $1) THEN CASE WHEN m.usa_despachos THEN 'no_concretada' ELSE 'revisar' END
+           WHEN o.fecha < NOW() - make_interval(days => $1) THEN CASE WHEN m.usa_despachos AND NOT ${FALTA_TRAER} THEN 'no_concretada' ELSE 'revisar' END
            ELSE 'esperar'
          END AS sugerencia
   FROM ml_ordenes o
