@@ -29,13 +29,22 @@ const HERRAMIENTA = {
 
 const normal = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
 
+// En la respuesta automática, borrador_falta trae también los FRENOS (lib/iaAutomatica.ts → motivosRevisar), que no son
+// datos que faltan («Habla como un tercero», «Da un monto»…). Queda solo lo que la IA dijo que le faltaba.
+const FRENO = /^(La IA no propuso|Dice que no hay|Recomienda otra|Habla como un tercero|Da un monto|Pide muchas|Pregunta precio en divisa|Pregunta por un medio|Confirma compatibilidad|Menciona un fabricante|La publicación no está activa|MercadoLibre la borraría)/i
+export function datoQueFalto(falta: string | null): string {
+  return (falta ?? '').split(' · ').map(x => x.trim()).filter(x => x && !FRENO.test(x))
+    .map(x => x.replace(/^Confianza (baja|media)(: )?/i, '').trim()).filter(Boolean).join(' · ')
+}
+
 /** Después de publicar a mano: si la IA no tenía el dato, lo aprende de la respuesta. Nunca hace fallar la publicación. */
 export async function aprenderDatoDeRespuesta(db: Pool, preguntaId: string, respuesta: string, usuarioId: number | string | null | undefined) {
   if (!usuarioId || !iaConfigurada()) return
   try {
     const { rows: [q] } = await db.query(
       `SELECT item_id, texto, item_titulo, borrador, borrador_falta FROM ml_preguntas WHERE id = $1`, [preguntaId])
-    if (!q?.item_id || !q.borrador_falta?.trim()) return
+    const falta = datoQueFalto(q?.borrador_falta)
+    if (!q?.item_id || !falta) return
     if (q.borrador && normal(q.borrador) === normal(respuesta)) return   // publicó lo de la IA: nada nuevo
     const { rows: [ya] } = await db.query(`SELECT 1 FROM ml_item_notas WHERE aprendida_de = $1 LIMIT 1`, [preguntaId])
     if (ya) return
