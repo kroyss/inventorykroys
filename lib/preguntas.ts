@@ -748,3 +748,28 @@ export async function sugerenciasPregunta(db: Pool, preguntaId: number): Promise
   }
   return out
 }
+
+// ── Corrector (12-11, idea del dueño; EN MEDICIÓN, no se usa en la respuesta automática) ─────────────────────────────
+// Cuando una respuesta queda frenada por algo de FORMA o por afirmar lo que no está en los datos, se le pide a la IA que
+// la reescriba con lo que el revisor encontró. La corregida vuelve a pasar por el verificador y por todos los frenos.
+const CORRECTOR_EXTRA = `
+
+CORRECCIÓN: te paso TU BORRADOR ANTERIOR y LO QUE EL REVISOR ENCONTRÓ. Escribe una respuesta NUEVA que lo corrija:
+- Quita toda afirmación que no esté escrita en los DATOS. Lo que no está, en UNA frase corta: "ese dato no lo tenemos" (sin explicar por qué ni nombrar la publicación).
+- Contesta igual todo lo que SÍ está en los datos. Si lo principal no está, dilo en una frase y ofrece lo que sí sabes.
+- Habla como el equipo del vendedor (primera persona), nunca "la publicación indica".
+- No prometas verificar, confirmar ni avisar después (una pregunta respondida no se puede volver a contestar).
+- No inventes montos, compatibilidades ni medios de pago.
+- Corto, con el saludo y la despedida de siempre.`
+
+export async function corregirBorrador(c: Contexto, anterior: string, problemas: string[], recorte: Recorte = CONTEXTO_RECORTADO) {
+  const contenido = `${bloqueContexto(c, recorte)}\n\n────────\nTU BORRADOR ANTERIOR:\n${anterior || '(vacío)'}\n\nLO QUE EL REVISOR ENCONTRÓ:\n- ${problemas.join('\n- ')}`
+  const { resultado: b, uso, modelo } = await llamarClaude<Borrador>({
+    sistema: SISTEMA + SISTEMA_V2_EXTRA + CORRECTOR_EXTRA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 800 })
+  const respuesta = sinTercero(sinCodigo(String(b.respuesta ?? '').trim()))
+  return {
+    respuesta: CODIGO_INTERNO.test(respuesta) ? '' : respuesta,
+    confianza: (['alta', 'media', 'baja'].includes(b.confianza) ? b.confianza : 'baja') as Borrador['confianza'],
+    falta_dato: b.falta_dato || null, llamada: { modelo, uso } as LlamadaIA,
+  }
+}
