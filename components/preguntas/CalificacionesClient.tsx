@@ -4,7 +4,6 @@ import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS, EST
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 import { DIA_AUTO_NO_CONCRETADA, MAX_DIAS_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS, diasParaConcretarSola } from '@/lib/noConcretada'
-import EnlazarLocal from '@/components/ventas/EnlazarLocal'
 
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
@@ -334,10 +333,8 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
                           : o.sistema_estado ? <StatusBadge status={o.sistema_estado} label={(despachaVE && ESTADOS_VENTA_VE[o.sistema_estado]) || STATUS_LABELS[o.sistema_estado]} />
                           : <span className="text-xs text-amber-700">{datos.desdeML ? 'Sin despachar' : 'No cargada'}</span>}
                         {o.facturada && <div className="text-xs text-emerald-700 mt-0.5">Facturada</div>}
-                        {/* 11-11: con inventario, la cargada como LOCAL-… (cobro destino) se enlaza aquí mismo (mig 165). */}
-                        {!datos.desdeML && o.numero_venta && (!o.sistema_estado || o.enlazada_local) && (
-                          <div className="mt-0.5"><EnlazarLocal numero={o.numero_venta} enlazada={!!o.enlazada_local} onHecho={cargar} /></div>
-                        )}
+                        {/* 11-11: el enlace con la venta LOCAL se hace en Ventas → Por confirmar; aquí solo se muestra. */}
+                        {!datos.desdeML && o.enlazada_local && <div className="text-xs text-emerald-700 mt-0.5">Enlazada a venta LOCAL</div>}
                         {/* Con inventario: la guía en Despachos va aparte del estado de la venta. */}
                         {!datos.desdeML && o.guia_impresa && (
                           <div className={`text-xs mt-0.5 ${o.reportada_at ? 'text-emerald-700' : 'text-sky-700'}`}>{o.reportada_at ? 'Guía reportada' : 'Guía sin reportar'}</div>

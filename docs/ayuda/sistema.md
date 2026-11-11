@@ -727,7 +727,7 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   ya calificadas salen solas. **Calificadas como concretadas sin venta registrada** (aviso amarillo, con Inventario):
   en ML quedaron concretadas pero aquí no hay venta ni pago; si se vendió, regístrala para descontar el inventario.
   Si ya la registraron como venta **LOCAL** (cobro destino), toca **«La registré como venta local»** y elige cuál: queda
-  enlazada y sale del aviso (también se puede desde Calificaciones). Mejor: registra esas ventas desde Por confirmar, con
+  enlazada y sale del aviso. Mejor: registra esas ventas desde Por confirmar, con
   el número de MercadoLibre, no como LOCAL (la LOCAL no cuenta la comisión de ML).
   **No se concretaron** = las marcadas a mano «No se concretó» (se ven 30 días para ver quién y deshacer).
 - **Presupuestos** (Ventas → ícono de hoja junto a las fechas; en prueba, solo algunas empresas): cotizaciones para un cliente.
