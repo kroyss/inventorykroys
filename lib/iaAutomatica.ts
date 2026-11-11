@@ -8,7 +8,9 @@
 // Cada pregunta procesada usa 1 crédito de IA (ia_uso.modulo = 'preguntas'); sin créditos no procesa.
 import type { Pool } from 'pg'
 import { CODIGO_INTERNO } from '@/lib/codigoInterno'
-import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador, iaConfigurada, textoVendedor } from '@/lib/preguntas'
+import { armarContexto, bloqueContexto, corregirBorrador, datosCompatibilidad, datosPublicacion, pedirBorrador, iaConfigurada, textoVendedor, type Contexto } from '@/lib/preguntas'
+import { verificarBorrador } from '@/lib/verificadorIA'
+import type { LlamadaIA } from '@/lib/ia'
 import { costoDe, cupoIA, registrarUso, MODELO_ECO55 } from '@/lib/ia'
 import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
@@ -69,6 +71,9 @@ export function esDeExistencias(t: string) {
   }
   return false
 }
+// 12-11 (el dueño): cancelar, devolver, reclamar o "no me llegó" lo contesta siempre una persona (con o sin corrección).
+const POSVENTA = /cancel\w*\b[^.?!]{0,30}(compra|pedido|orden|venta)|\banul|devol|reembols|reclam|no (me )?(ha )?lleg|(lleg|vino|vinieron)\w* (da[ñn]|rot|mal|incomplet|equivocad)|defectuos|estafa|denunci/i
+export const MOTIVO_POSVENTA = 'Cancelación, devolución o reclamo: lo responde una persona'
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 // 11-11: "déjanos verificarlo / te confirmamos": una vez publicada la pregunta no se puede volver a contestar.
 const PROMESA = /d[eé]j[ae]n?(me|nos)( lo)? (verificar|revisar|confirmar)|(lo|le|te) (verificamos|confirmamos|averiguamos)|prefiero confirmarlo|confirmarlo con (una persona|el equipo)|en breve (le|te) (confirmo|confirmamos|respondo)/i
@@ -147,6 +152,7 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   if (PROMESA.test(b.respuesta)) m.push('Promete verificar o confirmar después: lo responde una persona')
   if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')
   if (MUCHAS.test(pregunta)) m.push('Pide muchas unidades: lo coordina una persona')
+  if (POSVENTA.test(pregunta)) m.push(MOTIVO_POSVENTA)
   if (DIVISA.test(pregunta)) m.push('Pregunta precio en divisa: lo contesta una persona')
   if (PAGO.test(pregunta) && !(v2 && pagoEscrito(pregunta, b.respuesta, vendedor))) m.push('Pregunta por un medio de pago: lo confirma una persona')
   // 09-11 (el dueño): lo escrito en la publicación (universal / el modelo nombrado) respalda la respuesta y no frena, siempre que
@@ -184,9 +190,17 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
   for (const q of rows) {
     try {
       const c = await armarContexto(db, Number(q.id), country)
-      const b = await pedirBorrador(c, false, undefined, cfg.v2, true)
+      let b: Awaited<ReturnType<typeof pedirBorrador>> & { corregida?: boolean; original?: string } = await pedirBorrador(c, false, undefined, cfg.v2, true)
+      let motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c), datosCompatibilidad(c))
+      // 12-11: frenada por algo que se arregla escribiendo → la IA la corrige (y vuelve a pasar por todo).
+      if (cfg.v2) {
+        const k = await corregirPregunta(c, b, motivos, c.item?.status ?? q.item_estado)
+        if (k) {
+          b = { ...b, llamadas: [...b.llamadas, ...k.llamadas], ...(k.motivos.length ? { corregida: false } : { ...k.b }) }
+          if (!k.motivos.length) motivos = []
+        }
+      }
       await registrarUso(db, 'preguntas', b.llamadas, null)
-      const motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c), datosCompatibilidad(c))
       const deFrenos = frenos ? await motivosFrenos(db, frenos, country, 'preguntas', q.comprador_id) : []
       motivos.push(...deFrenos)
       // «Responder todo»: con respuesta escrita sale igual, salvo los frenos del vendedor (horario, máximo por comprador).
@@ -194,7 +208,7 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length && !sinSeguro ? 'revisar' : 'sola', motivos, ...(sinSeguro ? { sinSeguro: true } : {}), respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),
-        fecha: new Date().toISOString(), ...(cfg.v2 ? { version: 'v2' as const } : {}),
+        fecha: new Date().toISOString(), ...(cfg.v2 ? { version: 'v2' as const } : {}), ...(b.corregida ? { corregida: true, original: b.original } : {}),
         entrada: b.llamadas.reduce((a, l) => a + (l.uso.input_tokens ?? 0) + (l.uso.cache_creation_input_tokens ?? 0) + (l.uso.cache_read_input_tokens ?? 0), 0),
         salida: b.llamadas.reduce((a, l) => a + (l.uso.output_tokens ?? 0), 0),
       }
@@ -289,4 +303,37 @@ async function repasarEconomica(db: Pool, country: string) {
     }
   }
   return rows.length
+}
+
+
+// ── Corrector (12-11, idea del dueño; medido con 90 frenadas: 61 salían solas, ~97 % bien) ───────────────────────────
+// Si la respuesta quedó frenada SOLO por cosas que se arreglan escribiendo (dato que no está, forma, vacía), la IA la
+// reescribe con lo que encontró el revisor; la nueva vuelve a pasar por el verificador y por todos los frenos. Lo demás
+// (tope, pagos, montos, compatibilidad, posventa, publicación pausada…) no se corrige: lo ve una persona.
+const ARREGLABLE = /^(Confianza (baja|media)|La IA no propuso respuesta|Dice que no hay|No está en los datos|Falta contestar|Habla como un tercero|Promete verificar|La respuesta no le habla|Recomienda otra publicación|La IA devolvió texto inválido)/
+export const corregible = (motivos: string[]) => motivos.length > 0 && motivos.every(m => ARREGLABLE.test(m))
+const MINIMO = /m[ií]nimo|\b(desde|a partir de) (2|dos|3|tres) (unidades|piezas)/i
+const PIDE_COMPAT = /\bsirve|compatib|funciona (con|en|para)|le (queda|sirve)|aplica (para|a|en)|es para (un|una|mi)\b|para (un|una|mi) [a-z]/i
+/** Lo que queda de la respuesta sin saludo, despedida ni "no tenemos ese dato": ¿aporta algo? */
+function soloSinDato(r: string) {
+  const resto = r.split(/(?<=[.;!?])\s+|,\s+(?=quedo|quedamos)/i)
+    .map(f => f.replace(/^\s*buen[oa]?s?( (d[ií]as|tardes|noches))?[,!.\s]*/i, '').trim())
+    .filter(f => f && !/quedo|quedamos|a (su|tu) orden|no (lo |la |los |las )?tenemos|dato/i.test(f))
+  return resto.join(' ').split(/\s+/).filter(Boolean).length < 4
+}
+
+export async function corregirPregunta(c: Contexto, b: { respuesta: string; confianza: string; falta_dato: string | null; verificacion: string | null },
+  motivos: string[], itemEstado: string | null): Promise<{ b: { respuesta: string; confianza: 'alta' | 'media' | 'baja'; falta_dato: string | null; verificacion: string | null; corregida: true; original: string }; motivos: string[]; llamadas: LlamadaIA[] } | null> {
+  if (!corregible(motivos)) return null
+  const k = await corregirBorrador(c, b.respuesta, motivos).catch(() => null)
+  if (!k?.respuesta) return null
+  const llamadas: LlamadaIA[] = [k.llamada]
+  const v = await verificarBorrador(bloqueContexto(c), c.pregunta.texto, k.respuesta, undefined, true, true).catch(() => null)
+  if (v) llamadas.push(v.llamada)
+  const nb = { respuesta: k.respuesta, confianza: k.confianza, falta_dato: k.falta_dato, verificacion: v ? (v.ok ? 'ok' : v.motivo) : null }
+  const m2 = motivosRevisar(nb, itemEstado, c.pregunta.texto, datosPublicacion(c), true, textoVendedor(c), datosCompatibilidad(c))
+  if (!v) m2.push('El verificador no respondió')
+  if (MINIMO.test(b.respuesta) && !MINIMO.test(k.respuesta)) m2.push('La corrección quitó el mínimo de unidades del envío gratis')
+  if (PIDE_COMPAT.test(c.pregunta.texto) && soloSinDato(k.respuesta)) m2.push('Pregunta si sirve y la respuesta solo dice que no tenemos el dato')
+  return { b: { ...nb, corregida: true, original: b.respuesta }, motivos: m2, llamadas }
 }

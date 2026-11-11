@@ -5,7 +5,7 @@
 import type { Pool } from 'pg'
 import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador, textoVendedor } from '@/lib/preguntas'
 import { registrarUso, type LlamadaIA } from '@/lib/ia'
-import { motivosRevisar } from '@/lib/iaAutomatica'
+import { corregirPregunta, motivosRevisar } from '@/lib/iaAutomatica'
 
 export const PRUEBA_N = 10
 
@@ -33,6 +33,10 @@ export async function probarMiIA(db: Pool, country: string, usuarioId: number | 
       const b = await pedirBorrador(c, false, undefined, true, true)   // v2, la misma que la automática
       llamadas.push(...b.llamadas)
       const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), true, textoVendedor(c), datosCompatibilidad(c))   // 11-11: antes '' (las políticas no contaban)
+      // 12-11: igual que la automática, la frenada que se arregla escribiendo se corrige.
+      const k = await corregirPregunta(c, b, motivos, c.item?.status ?? null)
+      if (k) llamadas.push(...k.llamadas)
+      if (k && !k.motivos.length) return { ...base, ia: k.b.respuesta, decision: 'sola', motivos: [] }
       return { ...base, ia: b.respuesta, decision: motivos.length ? 'revisar' : 'sola', motivos }
     } catch (e) {
       return { ...base, ia: '', decision: 'revisar', motivos: ['Error de la IA'], error: (e instanceof Error ? e.message : String(e)).slice(0, 200) }

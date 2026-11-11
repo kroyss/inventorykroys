@@ -87,8 +87,15 @@ export interface BorradorMensaje { respuesta: string; confianza: 'alta' | 'media
 // estado sale de la venta en ML y NO se le dice a la IA que "no está cargada" (sería falso).
 // hasta (09-11, prueba de Mi IA): la conversación solo hasta ese mensaje del comprador (lo que el equipo ya contestó
 // no se le muestra), y HOY = ese momento.
+// 12-11 (corrector): `correccion` = el borrador anterior frenado y por qué; la IA escribe uno nuevo que lo corrija.
+const CORRECCION_MENSAJE = `
+
+CORRECCIÓN: al final te paso TU BORRADOR ANTERIOR y por qué no se pudo enviar. Escribe uno NUEVO:
+- Solo lo que está en la conversación, la venta, las notas y las POLÍTICAS. Lo que no está, en una frase corta, sin explicar por qué.
+- No prometas verificar, confirmar ni avisar después si no lo dicen las POLÍTICAS.
+- Si con lo que hay ya respondes bien, confianza "alta". Si de verdad hace falta una persona, deja confianza "baja".`
 export async function borradorMensaje(db: Pool, conexionId: number, sellerId: number, pack: string, country: string,
-  conInventario = true, hasta?: string): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
+  conInventario = true, hasta?: string, correccion?: { anterior: string; problemas: string[] }): Promise<BorradorMensaje & { uso: UsoIA; modelo: string; ejemplos: number }> {
   const [hiloEntero, venta, notas, ejemplos] = await Promise.all([
     leerHilo(db, conexionId, pack, sellerId, false),
     itemsDeVenta(db, conexionId, pack).catch(() => null),
@@ -209,7 +216,8 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
   }
 
   // 08-11 (el dueño): Haiku 5.5 escribe los mensajes (antes Sonnet, ~20× más caro). Un reintento si falla.
-  const llamar = () => llamarClaude<BorradorMensaje>({ sistema: SISTEMA, contenido: L.join('\n'), herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE })
+  if (correccion) L.push(`\n────────\nTU BORRADOR ANTERIOR:\n${correccion.anterior || '(vacío)'}\n\nPOR QUÉ NO SE ENVIÓ:\n- ${correccion.problemas.join('\n- ')}`)
+  const llamar = () => llamarClaude<BorradorMensaje>({ sistema: SISTEMA + (correccion ? CORRECCION_MENSAJE : ''), contenido: L.join('\n'), herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE })
   const { resultado: b, uso, modelo } = await llamar().catch(() => llamar())
   return {
     respuesta: String(b.respuesta ?? '').trim().slice(0, 350),

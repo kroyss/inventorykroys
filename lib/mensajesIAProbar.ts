@@ -5,7 +5,7 @@
 // No descuenta créditos (módulo 'simulacion'): es para decidir si se enciende.
 import type { Pool } from 'pg'
 import { borradorMensaje } from '@/lib/mensajesIA'
-import { motivosMensaje } from '@/lib/mensajesIAPrueba'
+import { mensajeCorregible, motivosMensaje } from '@/lib/mensajesIAPrueba'
 import { AUTOMATICOS, textoPlano } from '@/lib/mensajesML'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { registrarUso, type LlamadaIA } from '@/lib/ia'
@@ -51,7 +51,17 @@ export async function probarMensajesIA(db: Pool, country: string, conInventario:
       // Lo del vendedor ANTES de ese mensaje (los montos que ya dio no frenan).
       const { rows: antes } = await db.query(
         `SELECT texto FROM ml_mensajes WHERE pack_id = $1 AND propio AND fecha < $2 ORDER BY fecha`, [r.pack, fecha])
-      const motivos = motivosMensaje(b, base.mensaje, persona, antes.map(x => String(x.texto)).join('\n'))
+      const vendedorAntes = antes.map(x => String(x.texto)).join('\n')
+      const motivos = motivosMensaje(b, base.mensaje, persona, vendedorAntes)
+      // 12-11: igual que la automática, la frenada solo por confianza, vacía o "no hay" se corrige.
+      if (mensajeCorregible(motivos)) {
+        const k = await borradorMensaje(db, r.conexion_id, Number(r.ml_user_id), r.pack, country, conInventario, fecha,
+          { anterior: b.respuesta, problemas: motivos }).catch(() => null)
+        if (k) {
+          llamadas.push({ modelo: k.modelo, uso: k.uso })
+          if (k.respuesta && !motivosMensaje(k, base.mensaje, persona, vendedorAntes).length) return { ...base, ia: k.respuesta, decision: 'sola', motivos: [] }
+        }
+      }
       const decision = !b.respuesta && b.confianza === 'alta' && !motivos.length ? 'nada' : motivos.length ? 'revisar' : 'sola'
       return { ...base, ia: b.respuesta, decision, motivos }
     } catch (e) {

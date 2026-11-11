@@ -221,6 +221,10 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida):
   - **Modo Seguro** (de fábrica): responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas
     de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.
+    Si la respuesta quedó frenada solo por cómo estaba escrita (decía algo que no está en tus datos, hablaba como
+    alguien de afuera, prometía confirmar después o salió vacía), la IA **la corrige sola** y la vuelve a revisar
+    entera; si pasa, sale. Cancelaciones, devoluciones y reclamos los contesta siempre una persona. No gasta créditos
+    extra.
   - **Modo Total**: responde todo sola, sin dejarte nada para revisar. Solo respeta tu horario y el máximo por
     comprador. Acierta cerca del 94 % con Mi IA completo. En Modo Total no valen **«Siempre una persona»** ni la
     opción **«Dejarla para una persona»** de «Si no sabe algo» (si era la única opción, recomienda verificarlo con un

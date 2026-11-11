@@ -99,6 +99,11 @@ export function motivosMensaje(b: { respuesta: string; confianza: string; falta_
   return m
 }
 
+// 12-11 (corrector): frenado SOLO por confianza, vacío o "no hay" → la IA lo reescribe con el motivo. Mensajes no tiene
+// verificador: la corregida sale solo si la IA queda con confianza ALTA y sin ningún otro freno (reclamo, pago, datos…).
+const ARREGLABLE_MSG = /^(Confianza (baja|media)|La IA no propuso respuesta|Dice que no hay)/
+export const mensajeCorregible = (motivos: string[]) => motivos.length > 0 && motivos.every(m => ARREGLABLE_MSG.test(m))
+
 /** Lo llama el cron cada minuto. `cliente` = no es la propietaria (solo encendido y con créditos). */
 export async function procesarMensajesIA(db: Pool, country: string, conInventario: boolean, cliente = false, empresaId = 0) {
   if (!iaConfigurada()) return null
@@ -135,13 +140,23 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
     try {
       // borradorMensaje relee la conversación en ML (y la guarda): después se toma lo que escribió el comprador desde el
       // último mensaje del vendedor (los seguidos, juntos).
-      const b = await borradorMensaje(db, r.conexion_id, Number(r.seller), r.pack_id, country, conInventario)
+      let b = await borradorMensaje(db, r.conexion_id, Number(r.seller), r.pack_id, country, conInventario)
       const { rows: msgs } = await db.query(
         `SELECT propio, texto FROM ml_mensajes WHERE pack_id = $1 ORDER BY fecha DESC LIMIT 10`, [r.pack_id])
       const corte = msgs.findIndex(m => m.propio)
       const comprador = (corte < 0 ? msgs : msgs.slice(0, corte)).reverse().map(m => String(m.texto)).join('\n').slice(0, 1000)
       const vendedor = msgs.filter(m => m.propio).map(m => String(m.texto)).join('\n')
-      const motivos = motivosMensaje(b, comprador, persona, vendedor)
+      let motivos = motivosMensaje(b, comprador, persona, vendedor)
+      let corregida: string | null = null
+      if (mensajeCorregible(motivos)) {
+        const k = await borradorMensaje(db, r.conexion_id, Number(r.seller), r.pack_id, country, conInventario, undefined,
+          { anterior: b.respuesta, problemas: motivos }).catch(() => null)
+        if (k) {
+          await registrarUso(db, cliente ? 'mensajes' : 'simulacion', [{ modelo: k.modelo, uso: k.uso }], null)
+          const m2 = motivosMensaje(k, comprador, persona, vendedor)
+          if (!m2.length && k.respuesta) { corregida = b.respuesta; b = k; motivos = m2 }
+        }
+      }
       let topeOHorario: string[] = []
       if (frenos) {
         const { rows: [cv] } = await db.query(`SELECT comprador_id::text FROM ml_conversaciones WHERE pack_id = $1`, [r.pack_id])

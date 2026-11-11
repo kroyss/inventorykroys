@@ -760,6 +760,9 @@ CORRECCIÓN: te paso TU BORRADOR ANTERIOR y LO QUE EL REVISOR ENCONTRÓ. Escribe
 - Habla como el equipo del vendedor (primera persona), nunca "la publicación indica".
 - No prometas verificar, confirmar ni avisar después (una pregunta respondida no se puede volver a contestar).
 - No inventes montos, compatibilidades ni medios de pago.
+- Si tu borrador decía un MÍNIMO de unidades para el envío gratis, la nueva lo dice igual.
+- Si lo principal no está en los datos pero sí tienes datos útiles (medidas, voltaje, qué incluye), dalos.
+- Lo que no tienes se dice UNA sola vez, sin explicar por qué ("no queremos afirmarle…") ni nombrar la descripción o la ficha.
 - Corto, con el saludo y la despedida de siempre.`
 
 export async function corregirBorrador(c: Contexto, anterior: string, problemas: string[], recorte: Recorte = CONTEXTO_RECORTADO) {
