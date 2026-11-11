@@ -44,6 +44,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [plan, setPlan] = useState<string>('automatizaciones')
   const [ciclo, setCiclo] = useState<'mensual' | 'trimestral'>('mensual')
+  // 12-11 (el dueño): Radar PRO junto con el plan, los meses que no cubre el regalo (1er mes gratis, los demás se pagan).
+  const [conPro, setConPro] = useState(false)
   // 06-11 (Plan A/B): qué paga — renovar el plan, 1 mes de Radar PRO aparte o pasar a un plan mejor.
   const [compra, setCompra] = useState<'plan' | 'radar_pro' | 'upgrade' | 'recarga' | 'radar_mes'>('plan')
   const [paquete, setPaquete] = useState(0)
@@ -75,8 +77,10 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const tipo = s.soloRadar ? 'radar_mes' : compra === 'radar_pro' && s.radarProCompra ? 'radar_pro' : compra === 'upgrade' && mej ? 'upgrade'
     : compra === 'recarga' && puedeRecargar ? 'recarga' : 'plan'
   const pq = RECARGAS_IA[paquete] ?? RECARGAS_IA[0]
-  const total = tipo === 'radar_mes' ? s.radarMes.precio : tipo === 'recarga' ? pq.precio : tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
-    : Math.round((ciclo === 'trimestral' ? op.trimestral : op.mensual) * 100) / 100
+  const mesesPro = op.radar ? (s.radarPro.regalo ? (ciclo === 'trimestral' ? 2 : 0) : (ciclo === 'trimestral' ? 3 : 1)) : 0
+  const pro = tipo === 'plan' && conPro && mesesPro > 0 ? s.radarPro.precio * mesesPro : 0
+  const total = pro + (tipo === 'radar_mes' ? s.radarMes.precio : tipo === 'recarga' ? pq.precio : tipo === 'radar_pro' ? s.radarProCompra!.precio : tipo === 'upgrade' ? mej!.monto
+    : Math.round((ciclo === 'trimestral' ? op.trimestral : op.mensual) * 100) / 100)
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
   const comprobante = (k: CobroFila) => `/api/mi-plan/comprobante/${k.id}${acceso ? `?acceso=${encodeURIComponent(acceso)}` : ''}`
@@ -89,6 +93,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     const f = new FormData()
     f.set('tipo', tipo); f.set('plan', tipo === 'upgrade' ? mej!.plan : plan); f.set('ciclo', ciclo); f.set('metodo', metodo)
     if (tipo === 'recarga') f.set('paquete', String(paquete))
+    if (pro > 0) f.set('radar_pro', '1')
     f.set('referencia', referencia.trim()); f.set('fecha_pago', fecha); f.set('archivo', archivo)
     const r = await fetch('/api/mi-plan', { method: 'POST', headers, body: f }).catch(() => null)
     setEnviando(false)
@@ -256,8 +261,16 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             )}
             {op.radar && s.radarPro.regalo && (
               <p className="text-xs text-lime-700">
-                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Después cuesta {fmtUsd(s.radarPro.precio)} por mes y lo agregas cuando quieras desde aquí.
+                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Los meses siguientes cuestan {fmtUsd(s.radarPro.precio)} cada uno: márcalo aquí al pagar o agrégalo después en «Agregar Radar PRO».
               </p>
+            )}
+            {mesesPro > 0 && (
+              <label className="flex items-start gap-2 rounded-lg border border-lime-200 bg-lime-50/60 px-3 py-2 text-sm text-neutral-800">
+                <input type="checkbox" className="mt-0.5" checked={conPro} onChange={e => setConPro(e.target.checked)} />
+                <span>Agregar <b>Radar PRO</b> {s.radarPro.regalo ? (mesesPro === 2 ? 'los meses 2 y 3' : '') : mesesPro === 1 ? 'este mes' : `los ${mesesPro} meses`}
+                  {' '}<b className="num">(+{fmtUsd(s.radarPro.precio * mesesPro)})</b>
+                  <span className="block text-xs text-neutral-500">{s.radarPro.regalo ? 'El mes 1 es de regalo. ' : ''}{fmtUsd(s.radarPro.precio)} por mes, sin descuento: Radar PRO los fines de semana.</span></span>
+              </label>
             )}
             {s.cuentasExtra > 0 && <p className="text-xs text-neutral-500">Incluye {s.cuentasExtra} cuenta(s) de MercadoLibre extra (tienes {s.cuentas}; el plan trae 2).</p>}
             </>}

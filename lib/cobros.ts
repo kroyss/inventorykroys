@@ -278,6 +278,8 @@ export interface Reporte {
   tipo: TipoCobro; plan: Plan['id']; ciclo: 'mensual' | 'trimestral'; metodo: Metodo
   /** recarga: el paquete (índice en RECARGAS_IA). */
   paquete?: number
+  /** plan (12-11, el dueño): Radar PRO los meses que no cubre el regalo (1er mes gratis, los demás se pagan). */
+  radarPro?: boolean
   referencia: string; fechaPago: string
   archivo: { tipo: string; datos: Buffer } | null
 }
@@ -315,9 +317,12 @@ export async function reportarCobro(orgId: number, userId: number, r: Reporte) {
     f = { plan: u.plan, escalon: s.escalon!, ciclo: cicloPlan, radar: false, extras: 0, usd: u.monto,
       detalle: { lineas: u.lineas, desde: currentDate(), hasta: s.vence } }
   } else {
-    const m = montoCobro(s, r.plan, r.ciclo, false)
-    f = { plan: r.plan, escalon: s.escalonSugerido, ciclo: r.ciclo, radar: false, extras: s.cuentasExtra, usd: m.usd,
-      detalle: { lineas: desglosePlan(r.plan, s.escalonSugerido, r.ciclo, s.fundador, s.cuentasExtra), desde: s.inicioPlan, hasta: sumarMeses(s.inicioPlan, m.meses) } }
+    // 12-11 (el dueño): Radar PRO se ofrece SIEMPRE al pagar el plan (1er mes de regalo, los demás pagados). Lo aplica
+    // aprobarCobro (k.radar_pro, a continuación del regalo).
+    const m = montoCobro(s, r.plan, r.ciclo, !!r.radarPro)
+    const radarUsd = m.pro ? RADAR_PRO.precio * mesesRadarPro(s.radarPro.regalo, m.meses) : 0
+    f = { plan: r.plan, escalon: s.escalonSugerido, ciclo: r.ciclo, radar: m.pro, extras: s.cuentasExtra, usd: m.usd,
+      detalle: { lineas: desglosePlan(r.plan, s.escalonSugerido, r.ciclo, s.fundador, s.cuentasExtra, radarUsd), desde: s.inicioPlan, hasta: sumarMeses(s.inicioPlan, m.meses) } }
   }
   const tasa = r.metodo === 'pago_movil' ? s.tasaBcv : null
   if (r.metodo === 'pago_movil' && !tasa) throw new ErrorCobro('No hay tasa BCV cargada hoy: intenta más tarde o paga por Binance.')

@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
 const Reporte = z.object({
   tipo: z.enum(['plan', 'radar_pro', 'upgrade', 'recarga', 'radar_mes']).catch('plan'),
   paquete: z.coerce.number().int().min(0).max(9).optional(),
+  radar_pro: z.string().optional(),   // '1' = Radar PRO junto con el plan (12-11)
   plan: z.enum(['esencial', 'automatizaciones', 'completo']),
   ciclo: z.enum(['mensual', 'trimestral']),
   metodo: z.enum(['pago_movil', 'binance']),
@@ -49,14 +50,14 @@ export async function POST(req: NextRequest) {
   if (q.lectura) return NextResponse.json({ error: 'Estás viendo como otra persona: el pago lo reporta el cliente.' }, { status: 403 })
   try {
     const f = await req.formData()
-    const b = Reporte.parse(Object.fromEntries(['tipo', 'plan', 'ciclo', 'metodo', 'referencia', 'fecha_pago', 'paquete'].map(k => [k, f.get(k) == null ? undefined : String(f.get(k))])))
+    const b = Reporte.parse(Object.fromEntries(['tipo', 'plan', 'ciclo', 'metodo', 'referencia', 'fecha_pago', 'paquete', 'radar_pro'].map(k => [k, f.get(k) == null ? undefined : String(f.get(k))])))
     const a = f.get('archivo')
     const archivo = a && typeof a !== 'string' && a.size > 0 ? a : null
     if (!archivo) return NextResponse.json({ error: 'Adjunta la captura del pago' }, { status: 400 })
     if (!TIPOS_COMPROBANTE[archivo.type]) return NextResponse.json({ error: 'La captura debe ser una imagen (PNG, JPG) o un PDF' }, { status: 400 })
     if (archivo.size > MAX_MB_COMPROBANTE * 1024 * 1024) return NextResponse.json({ error: `La captura pesa más de ${MAX_MB_COMPROBANTE} MB` }, { status: 400 })
     const id = await reportarCobro(q.orgId, q.userId, {
-      tipo: b.tipo, plan: b.plan, ciclo: b.ciclo, metodo: b.metodo, paquete: b.paquete, referencia: b.referencia, fechaPago: b.fecha_pago,
+      tipo: b.tipo, plan: b.plan, ciclo: b.ciclo, metodo: b.metodo, paquete: b.paquete, radarPro: b.radar_pro === '1', referencia: b.referencia, fechaPago: b.fecha_pago,
       archivo: { tipo: archivo.type, datos: Buffer.from(await archivo.arrayBuffer()) },
     })
     return NextResponse.json({ ok: true, id })
