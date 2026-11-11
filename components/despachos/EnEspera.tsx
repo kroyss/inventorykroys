@@ -16,6 +16,12 @@ const ETAPA: Record<Apartado['etapa'], string> = {
   sin_imprimir: 'sin imprimir', impresa: 'etiqueta impresa, jornada abierta', por_reportar: 'jornada cerrada, sin reportar',
 }
 const DIAS_ALERTA = 2
+// Buscar sin acentos y con las palabras en cualquier orden (lista a dedo, 12-11).
+const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const coincide = (a: Apartado, q: string) => {
+  const pajar = plano([a.venta, a.guia_ver, a.carrier, a.destinatario, a.productos].filter(Boolean).join(' '))
+  return plano(q).split(/\s+/).filter(Boolean).every(p => pajar.includes(p))
+}
 const diasDesde = (f: string | null) => (f ? (Date.now() - new Date(f).getTime()) / 864e5 : 0)
 const hace = (f: string | null) => {
   if (!f) return ''
@@ -89,6 +95,12 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
   const [ocupado, setOcupado] = useState(false)
   const [hecho, setHecho] = useState<string | null>(null)   // confirmación de lo último que se hizo (sin dudas de "¿falta algo?")
   const confirm = useConfirm()
+  // 12-11 (el dueño): la lista de lo que se puede apartar, para elegir a dedo sin tener que buscar.
+  const [disponibles, setDisponibles] = useState<Apartado[] | null>(null)
+  const cargarDisponibles = useCallback(() => {
+    fetch('/api/despachos/apartados?lista=1').then(r => r.ok ? r.json() : null).then(d => setDisponibles(d?.disponibles ?? [])).catch(() => setDisponibles([]))
+  }, [])
+  useEffect(() => { cargarDisponibles() }, [cargarDisponibles])
 
   useEffect(() => {
     const k = (ev: KeyboardEvent) => { if (ev.key === 'Escape') onCerrar() }
@@ -113,6 +125,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
     if (!r.ok) { setError(d.error ?? 'No se pudo'); setHecho(null); return false }
     setHecho(aviso)
     onCambio(aviso)
+    cargarDisponibles()
     window.dispatchEvent(new Event('reportador:pendientes'))   // el Reportador relee sus pendientes
     return true
   }
@@ -146,12 +159,20 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
           ) : (
             <section className="space-y-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Apartar un envío</h3>
-              <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Número de venta, guía o comprador…"
+              <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Filtrar por venta, guía, comprador o producto…"
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-              {buscar.trim().length >= 4 && candidatos && (candidatos.length === 0
-                ? <p className="text-xs text-neutral-400">Nada para apartar con eso (puede que ya se haya reportado).</p>
-                : <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-                    {candidatos.map(c => (
+              {(() => {
+                const q = buscar.trim()
+                // Sin buscar: la lista entera (15 días). Buscando: la lista filtrada y, desde 4 letras, también lo más viejo.
+                const base = (disponibles ?? []).filter(c => !q || coincide(c, q))
+                const extra = q.length >= 4 ? (candidatos ?? []).filter(c => !base.some(b => b.id === c.id)) : []
+                const filas = [...base, ...extra]
+                if (!disponibles) return <p className="text-xs text-neutral-400">Cargando envíos…</p>
+                if (!filas.length) return <p className="text-xs text-neutral-400">{q ? 'Nada para apartar con eso (puede que ya se haya reportado).' : 'No hay envíos para apartar: todo lo de estos días ya se reportó.'}</p>
+                return <>
+                  <p className="text-[11px] text-neutral-400">{q ? `${filas.length} encontrado${filas.length === 1 ? '' : 's'}` : `${filas.length} envío${filas.length === 1 ? '' : 's'} sin reportar (últimos 15 días) · primero los que se reportan en la próxima tanda`}</p>
+                  <ul className="max-h-[45vh] divide-y divide-neutral-100 overflow-y-auto rounded-lg border border-neutral-200">
+                    {filas.map(c => (
                       <li key={c.id} className="flex items-center gap-3 px-3 py-2">
                         <div className="min-w-0 flex-1">
                           <div className="font-mono text-xs">{c.venta ?? '—'} · {c.guia_ver ?? '—'} <span className="font-sans text-neutral-400">{c.carrier}</span></div>
@@ -161,7 +182,9 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                         <button onClick={() => setApartando(c)} className="btn-secondary text-xs">Apartar…</button>
                       </li>
                     ))}
-                  </ul>)}
+                  </ul>
+                </>
+              })()}
             </section>
           )}
 

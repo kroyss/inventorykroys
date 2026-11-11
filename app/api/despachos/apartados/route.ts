@@ -9,6 +9,8 @@ import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
 
 // Envíos apartados (20-10, migración 107): sacar un envío puntual de Despachos / Reportador sin perderlo.
 //   GET  ?buscar=venta|guía → los que están "En espera" y, si se busca, los envíos que se pueden apartar.
+//        ?lista=1 (12-11, el dueño) → además `disponibles`: los apartables de los últimos 15 días (sin buscar), para
+//        elegirlos a dedo; primero los de jornada cerrada (los que el Reportador va a reportar).
 //   POST { id, accion: 'apartar', tipo: 'espera'|'cancelado'|'enviada', nota } · { ids, accion: 'ya_enviadas' } (mig 147: ya salió por fuera, sin cancelar) · { id, accion: 'liberar' } · { id, accion: 'cancelar', nota? }
 // Se puede apartar mientras no se haya reportado: en un lote sin imprimir (además se desmarca del PDF), impresa
 // con la jornada abierta (no entra al manifiesto) o con la jornada ya cerrada (no lo reporta el Reportador).
@@ -41,7 +43,8 @@ export async function GET(req: NextRequest) {
   try {
     // Venta, guía o nombre (con espacios y acentos); sin los comodines de ILIKE.
     const buscar = (req.nextUrl.searchParams.get('buscar') ?? '').trim().replace(/[%_\\]/g, '').slice(0, 60)
-    const [{ rows: espera }, candidatos] = await Promise.all([
+    const lista = req.nextUrl.searchParams.get('lista') === '1'
+    const [{ rows: espera }, candidatos, disponibles] = await Promise.all([
       db.query(`SELECT ${COLUMNAS} ${DESDE} WHERE e.apartado = 'espera' AND ${SIGUE_EN_ESPERA} ORDER BY e.apartado_at`),
       buscar.length >= 4
         ? db.query(
@@ -50,8 +53,15 @@ export async function GET(req: NextRequest) {
                AND (e.venta ILIKE $1 OR e.guia ILIKE $1 OR e.guia_final ILIKE $1 OR e.destinatario ILIKE $1)
              ORDER BY e.created_at DESC LIMIT 10`, [`%${buscar}%`]).then(r => r.rows)
         : Promise.resolve(null),
+      lista
+        ? db.query(
+            `SELECT ${COLUMNAS} ${DESDE}
+             WHERE e.apartado IS NULL AND ${APARTABLE} AND e.created_at > NOW() - INTERVAL '15 days'
+             ORDER BY CASE WHEN NOT e.impresa THEN 2 WHEN j.status = 'CERRADA' THEN 0 ELSE 1 END, e.created_at DESC
+             LIMIT 150`).then(r => r.rows)
+        : Promise.resolve(null),
     ])
-    return NextResponse.json({ espera, candidatos })
+    return NextResponse.json({ espera, candidatos, disponibles })
   } catch (err) {
     return apiError(err)
   }
