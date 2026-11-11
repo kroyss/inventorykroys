@@ -110,6 +110,17 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
     return () => { vivo = false }
   }, [pathname])
 
+  // 12-11: ¿hay un video «Nuevo» de Aprendizaje sin ver? → etiqueta en «Más». Se consulta al abrir «Más».
+  const [videoNuevo, setVideoNuevo] = useState(false)
+  useEffect(() => {
+    if (!showMore) return
+    let vivo = true
+    fetch('/api/aprendizaje', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
+      .then(d => { if (vivo && d) setVideoNuevo(!d.exento && d.videos.some((v: { nuevo: boolean; completado: boolean }) => v.nuevo && !v.completado)) })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [showMore])
+
   const visible = (items: NavItem[]) =>
     items.filter(i => rutaPermitida(i.href, u) && i.countries.includes(country) && rutaHabilitada(i.href, modulos)
       && (i.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
@@ -160,6 +171,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
                   <span className="absolute top-1.5 right-2 flex gap-0.5">
                     {i.href === '/calificaciones' ? <NumerosCalificaciones avisos={avisos} />
                       : i.href === '/novedades' ? (novedades > 0 && <span className="w-2 h-2 rounded-full bg-lime-500" />)
+                      : i.href === '/aprendizaje' ? (videoNuevo && <span className="rounded-full bg-lime-100 px-1 text-[9px] font-semibold uppercase leading-4 text-lime-800">Nuevo</span>)
                       : aviso && <Numerito n={avisos[aviso.clave]} urgente={aviso.urgente} />}
                   </span>
                 </Link>
