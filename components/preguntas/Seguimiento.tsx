@@ -79,13 +79,20 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
   const lista = datos?.lista
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-        <span className="min-w-0 flex-1">
+      {/* 12-11 (el dueño): cabecera de 2 líneas como máximo, al lado de los botones; el detalle va en el title.
+          «Pagos traídos» solo se avisa cuando FALTA traerlos (si ya se trajeron no hace falta decirlo). */}
+      <div className="flex items-center gap-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-snug text-neutral-600">
+        <p className="line-clamp-2 min-w-0 flex-1"
+          title={filtro === 'atencion'
+            ? `Ventas sin pago que llevan más de ${horas} h sin mensajes del comprador ni del equipo. Los recordatorios automáticos no cuentan. Primero la que vence antes.`
+            : `Ventas sin guía de MercadoEnvíos ni pago registrado, dentro de tus ${datos?.plazo ?? 3} días de plazo. Primero la que vence antes.`}>
           {filtro === 'atencion'
-            ? <>Ventas sin pago que llevan más de {horas} h sin mensajes del comprador ni del equipo (los recordatorios automáticos no cuentan).</>
-            : <>Ventas sin guía de MercadoEnvíos ni pago registrado, dentro de tus {datos?.plazo ?? 3} días de plazo.</>}
-          {' '}Primero la que vence antes.
-        </span>
+            ? <>Sin pago y <b className="font-semibold text-neutral-800">+{horas} h sin mensajes</b> · primero la que vence antes</>
+            : <>Sin pago ni guía, dentro de tus <b className="font-semibold text-neutral-800">{datos?.plazo ?? 3} días</b> · primero la que vence antes</>}
+          {datos?.senal === 'completa' && !datos.traido && <>
+            {' · '}<Link href="/pagos-me" className="font-medium text-amber-700 underline underline-offset-2">Falta traer los pagos de hoy →</Link>
+          </>}
+        </p>
         {filtro === 'atencion' && (
           <span className="inline-flex shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-white" role="group" aria-label="Horas sin mensajes">
             {([12, 24] as const).map(h => (
@@ -94,9 +101,6 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
             ))}
           </span>
         )}
-        {datos?.senal === 'completa' && (datos.traido
-          ? <span className="w-full text-emerald-700 sm:w-auto">Pagos traídos hoy {datos.traido} ✓</span>
-          : <Link href="/pagos-me" className="w-full font-medium text-amber-700 underline-offset-2 hover:underline sm:w-auto">Falta traer los pagos de hoy →</Link>)}
       </div>
       {(quitada || errorQ) && (
         <div role="status" className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${errorQ ? 'bg-red-50 text-red-700' : 'bg-neutral-800 text-white'}`}>

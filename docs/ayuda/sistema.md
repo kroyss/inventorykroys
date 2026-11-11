@@ -353,7 +353,7 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   una sola fila con «N compras» y un número por compra para abrir cada una. Un clic abre la conversación. La **✕** de
   arriba a la derecha quita la venta
   del seguimiento cuando ya pagó, no va a pagar o no quieres seguirla (tampoco se le mandan más recordatorios); se puede
-  **Deshacer** unos segundos, o volver a activarla en Recordatorios. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
+  **Deshacer** unos segundos, o volver a activarla en Recordatorios. Con Pagos ME, si todavía no trajiste los pagos de hoy, arriba sale «Falta traer los pagos de hoy →». Pasado el plazo, la
   venta sigue en Calificaciones → Por definir. **Atendidas** tiene el buscador.
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.
