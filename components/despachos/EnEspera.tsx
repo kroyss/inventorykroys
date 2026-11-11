@@ -199,7 +199,7 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                       <div className="font-mono text-xs">{a.venta ?? '—'} · {a.guia_ver ?? '—'} <span className="font-sans text-neutral-400">{a.carrier}</span></div>
                       <div className="text-xs text-neutral-600">{a.destinatario ?? ''}</div>
                       {a.productos && <div className="mt-0.5 line-clamp-2 text-xs font-medium text-neutral-800">📦 {a.productos}</div>}
-                      <div className="mt-1 text-xs text-neutral-700">“{a.apartado_nota}”</div>
+                      {a.apartado_nota && <div className="mt-1 text-xs text-neutral-700">“{a.apartado_nota}”</div>}
                       {conInventario && a.venta && (
                         <a href={`/ventas?venta=${encodeURIComponent(a.venta)}`} className="mt-1 inline-block text-xs font-medium text-sky-700 hover:underline"
                           title="Cambio de última hora: corrige los productos de la venta y el inventario se ajusta solo">Corregir pedido →</a>
@@ -239,6 +239,9 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
   )
 }
 
+const MOTIVOS_ESPERA = ['Pidió para otro día', 'Falta el pago', 'Cambio de producto']
+const MOTIVOS_CANCELA = ['Desistió', 'Pagó mal', 'Error en la venta']
+
 function FormApartar({ e, ocupado, onCancelar, onApartar }: {
   e: Apartado; ocupado: boolean; onCancelar: () => void; onApartar: (tipo: 'espera' | 'cancelado' | 'enviada', nota: string) => void
 }) {
@@ -257,8 +260,23 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
           </label>
         ))}
       </div>
-      <input value={nota} onChange={ev => setNota(ev.target.value)} maxLength={200} placeholder="Motivo (ej.: el cliente pidió para el lunes)"
-        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+      {tipo !== 'enviada' && (
+        // 12-11 (el dueño): motivos de un toque. «Todavía no sale» se puede apartar sin motivo; «No se enviará» lo pide.
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Motivos rápidos">
+            {(tipo === 'espera' ? MOTIVOS_ESPERA : MOTIVOS_CANCELA).map(m => (
+              <button key={m} type="button" aria-pressed={nota === m} onClick={() => setNota(nota === m ? '' : m)}
+                className={`h-8 rounded-full border px-3 text-xs font-medium transition-colors ${nota === m ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'}`}>
+                {m}
+              </button>
+            ))}
+          </div>
+          <input value={nota} onChange={ev => setNota(ev.target.value)} maxLength={200}
+            placeholder={tipo === 'espera' ? 'Motivo (opcional), o elige uno arriba' : 'Motivo (obligatorio), o elige uno arriba'}
+            aria-required={tipo === 'cancelado'}
+            className={`w-full rounded-lg border px-3 py-2 text-sm ${tipo === 'cancelado' && nota.trim().length < 2 ? 'border-amber-300' : 'border-neutral-300'}`} />
+        </div>
+      )}
       {e.impresa && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
           ⚠️ La etiqueta ya está impresa: <b>separa el paquete físico</b> para que no salga con el resto.
@@ -267,10 +285,15 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
       )}
       <div className="flex justify-end gap-2">
         <button onClick={onCancelar} className="btn-secondary text-xs">Cancelar</button>
-        <button disabled={ocupado || (tipo !== 'enviada' && nota.trim().length < 2)} onClick={() => onApartar(tipo, nota.trim())}
-          className={`text-xs disabled:opacity-50 ${tipo === 'cancelado' ? 'btn-primary !bg-red-600 hover:!bg-red-700' : 'btn-primary'}`}>
-          {tipo === 'espera' ? 'Apartar: todavía no sale' : tipo === 'enviada' ? 'Ya la envié' : 'Cancelar el envío'}
-        </button>
+        {(() => {
+          const falta = tipo === 'cancelado' && nota.trim().length < 2
+          return (
+            <button disabled={ocupado || falta} onClick={() => onApartar(tipo, nota.trim())}
+              className={`text-xs disabled:opacity-50 ${tipo === 'cancelado' ? 'btn-primary !bg-red-600 hover:!bg-red-700' : 'btn-primary'}`}>
+              {ocupado ? 'Guardando…' : falta ? 'Elige un motivo' : tipo === 'espera' ? 'Apartar: todavía no sale' : tipo === 'enviada' ? 'Ya la envié' : 'Cancelar el envío'}
+            </button>
+          )
+        })()}
       </div>
     </section>
   )

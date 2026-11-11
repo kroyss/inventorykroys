@@ -571,7 +571,8 @@ y arma el **manifiesto** al final del día.
 **Apartar un envío:** si una guía no debe salir todavía (el cliente pidió para el lunes, pagó mal…), apártala.
 En el panel sale la **lista de los envíos sin reportar** de los últimos 15 días (primero los que se reportan en la
 próxima tanda) para elegirlos a dedo; arriba puedes filtrar por venta, guía, comprador o producto (palabras en
-cualquier orden). Al elegir uno:
+cualquier orden). Al elegir uno hay motivos de un toque («Pidió para otro día», «Falta el pago»…); para «Todavía no
+sale» el motivo es opcional y para «No se enviará» es obligatorio:
 - **En espera:** no sale en ningún manifiesto ni se le reporta la guía hasta que toques «Sale en el próximo
   manifiesto».
 - **Cancelar envío:** nunca sale ni se le manda la guía. No se puede deshacer. La venta queda marcada «No se concretó»

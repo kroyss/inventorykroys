@@ -70,7 +70,8 @@ export async function GET(req: NextRequest) {
 const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('apartar'), id: z.number().int(), tipo: z.enum(['espera', 'cancelado', 'enviada']),
              nota: z.string().trim().max(200) })
-    .refine(x => x.tipo === 'enviada' || x.nota.length >= 2, { message: 'Escribe el motivo (corto)' }),
+    // 12-11 (el dueño): el motivo solo es obligatorio para «No se enviará» (no tiene vuelta atrás); «Todavía no sale», opcional.
+    .refine(x => x.tipo !== 'cancelado' || x.nota.length >= 2, { message: 'Elige o escribe el motivo' }),
   z.object({ accion: z.literal('ya_enviadas'), ids: z.array(z.number().int()).min(1).max(300) }),
   z.object({ accion: z.literal('liberar'), id: z.number().int() }),
   z.object({ accion: z.literal('cancelar'), id: z.number().int(), nota: z.string().trim().max(200).optional() }),
@@ -132,14 +133,14 @@ export async function POST(req: NextRequest) {
       await db.query(
         `UPDATE despacho_etiquetas SET apartado = $2, apartado_nota = $3, apartado_por = $4, apartado_at = NOW(),
                 incluida = CASE WHEN impresa THEN incluida ELSE FALSE END
-         WHERE id = $1`, [b.id, b.tipo, b.nota || 'Ya enviada por fuera de Despachos', userId])
+         WHERE id = $1`, [b.id, b.tipo, b.nota || (b.tipo === 'enviada' ? 'Ya enviada por fuera de Despachos' : null), userId])
       // Las demás etiquetas de la misma venta en ese lote (paquetes de varias guías) siguen la misma suerte.
       await db.query(
         `UPDATE despacho_etiquetas x SET apartado = $2, apartado_nota = $3, apartado_por = $4, apartado_at = NOW(),
                 incluida = CASE WHEN x.impresa THEN x.incluida ELSE FALSE END
          FROM despacho_etiquetas e
          WHERE e.id = $1 AND x.lote_id = e.lote_id AND x.venta = e.venta AND x.id <> e.id AND x.apartado IS NULL`,
-        [b.id, b.tipo, b.nota || 'Ya enviada por fuera de Despachos', userId])
+        [b.id, b.tipo, b.nota || (b.tipo === 'enviada' ? 'Ya enviada por fuera de Despachos' : null), userId])
       if (b.tipo === 'cancelado') await marcarCanceladaEnML(db, e.venta, userId, b.nota)
     } else if (b.accion === 'cancelar') {
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }
