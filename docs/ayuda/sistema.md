@@ -540,8 +540,9 @@ MercadoLibre se releen solas al abrir la lista (unos segundos después se marcan
 terminada y sale sola de la lista (no queda como «No ha pagado» ni pasa a Vencidas). En Calificaciones cuenta como
 concretada. No hace falta tocar «No se concretó».
 
-**Montos:** la columna **Pagado** es lo que pagó el comprador; al lado, **vs. orden** lo compara con el total de la
-orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Si la **misma referencia de pago** aparece en otra
+**Montos:** la columna **Pagado** es lo que el comprador **declaró** en MercadoEnvíos; al lado, **vs. orden** lo compara
+con el total de la orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Mientras el pago no se cruce con
+el banco dice **«Coincide según ME»**: el monto real que llegó solo lo confirma **Comprobar con el banco**. Si la **misma referencia de pago** aparece en otra
 venta (últimos 90 días), debajo de la referencia sale **⚠️ También en …** con esas ventas: puede ser un pago de dos
 compras juntas (revisa que el monto alcance para todas) o el mismo comprobante usado dos veces. Solo avisa, no bloquea.
 

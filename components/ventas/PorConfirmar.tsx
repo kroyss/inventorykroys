@@ -307,7 +307,7 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
           {!sinInventario && <Etiqueta tono={prod.tono} title={prod.title}>{prod.texto}</Etiqueta>}
           {pago && <Etiqueta tono={pago.tono} title={pago.title}>{pago.texto}</Etiqueta>}
           {verPago && f.pago && f.pago.verificacion === 'pendiente' && f.pago.monto != null && (
-            <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} />
+            <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} banco={!!f.pago.bancoRes} />
           )}
           {f.pago?.retiro && <Etiqueta tono="ambar" title="El comprador pasa a buscarlo: no lleva guía ni pasa por Despachos">🏪 Retiro en tienda</Etiqueta>}
           {/* Solo vence la que no tiene pago (26-10: salía "Vence hoy" en una venta pagada y ya despachada). */}
@@ -450,7 +450,7 @@ function FilaCargada({ c, onVerificar }: { c: CargadaConPago; onVerificar: (sale
           {c.factura && <Etiqueta tono="gris" title="Ya tiene factura emitida">Factura #{c.factura}</Etiqueta>}
           {c.pago.verificacion === 'valido'
             ? <Etiqueta tono="verde">Pago ya verificado · falta procesar</Etiqueta>
-            : c.pago.monto != null && <Monto p={{ monto_pagado: c.pago.monto, total_orden: c.pago.totalOrden }} />}
+            : c.pago.monto != null && <Monto p={{ monto_pagado: c.pago.monto, total_orden: c.pago.totalOrden }} banco={!!c.pago.bancoRes} />}
           <span className="text-[11px] text-neutral-400">pago traído {hace(c.pago.at)}</span>
           {c.pago.guia && <BotonGuia pagoId={c.pago.id} venta={c.numero} />}
           {c.pago.comprobante && (

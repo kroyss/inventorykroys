@@ -19,13 +19,16 @@ const TONO = {
   gris:    'bg-neutral-100 text-neutral-600',
 }
 
-/** Pagado vs. total de la orden: 🟢 coincide · 🔵 de más (o embalaje) · 🟠 de menos. */
-export function Monto({ p }: { p: Pick<PagoME, 'monto_pagado' | 'total_orden'> }) {
+/** Pagado vs. total de la orden: 🟢 coincide · 🔵 de más (o embalaje) · 🟠 de menos.
+ *  12-11 (el dueño, caso Ainy: Bs 16.000 en el banco y «Coincide» con los 10.062 declarados): el monto es el que el comprador
+ *  declaró en MercadoEnvíos. Si el pago no se cruzó con el banco (`banco` false), dice «Coincide según ME». */
+export function Monto({ p, banco = false }: { p: Pick<PagoME, 'monto_pagado' | 'total_orden'>; banco?: boolean }) {
   const c = compararMonto(p.monto_pagado, p.total_orden)
+  const nota = banco ? '' : ' · Es lo que informó el comprador en MercadoEnvíos, no lo que llegó al banco. Para confirmarlo usa «Comprobar con el banco».'
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${TONO[c.tono]}`}
-      title={`Pagado ${bs(p.monto_pagado)} · total de la orden ${bs(p.total_orden)}`}>
-      {c.texto}{c.dif != null && c.tono !== 'verde' ? ` (${c.dif > 0 ? '+' : ''}${bs(c.dif)})` : ''}
+      title={`Pagado ${bs(p.monto_pagado)} · total de la orden ${bs(p.total_orden)}${nota}`}>
+      {c.tono === 'verde' && !banco ? 'Coincide según ME' : c.texto}{c.dif != null && c.tono !== 'verde' ? ` (${c.dif > 0 ? '+' : ''}${bs(c.dif)})` : ''}
     </span>
   )
 }
