@@ -341,16 +341,17 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
   salió.
 - **Leer un mensaje aquí NO lo marca como leído en MercadoLibre:** se marca cuando respondes o tocas el sobre.
-- **Por atender tiene tres chips:** **Sin respuesta** (lo de siempre: mensajes del comprador sin contestar), **Sin guía**
-  y **Sin mensaje**. «Sin guía» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en
+- **Por atender tiene tres chips:** **Responder** (lo de siempre: mensajes del comprador sin contestar), **Pedir pago**
+  y **Escribirle**. «Pedir pago» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en
   Calificaciones (no concretada). Una venta sale de la lista si tiene alguna de estas: el mensaje automático de ML «El
   número de guía para tu envío es…» (llega cuando el comprador llena el formulario de MercadoEnvíos), su pago en Pagos
-  ME, la venta registrada en Ventas, su guía en Despachos o «Ya pagó» en Recordatorios. «Sin mensaje» = de esas, las
+  ME, la venta registrada en Ventas, su guía en Despachos o «Ya pagó» en Recordatorios. «Escribirle» = de esas, las
   que llevan más de 12 h (o más de 24 h, botones «+12 h» / «+24 h») sin mensajes del comprador ni del equipo; los
   recordatorios y demás mensajes automáticos no cuentan. Cada fila dice si **nunca escribió** o **escribió y no pagó**,
   cuándo vence (en rojo si quedan menos de 12 h), cuánto lleva sin mensajes, el día del plazo y los recordatorios
   enviados; las dos listas van primero la que vence antes. Si el mismo comprador tiene varias compras sin pagar sale en
-  una sola fila con «N compras sin pagar» y un botón por compra. Un clic abre la conversación. **Quitar** saca la venta
+  una sola fila con «N compras» y un número por compra para abrir cada una. Un clic abre la conversación. La **✕** de
+  arriba a la derecha quita la venta
   del seguimiento cuando ya pagó, no va a pagar o no quieres seguirla (tampoco se le mandan más recordatorios); se puede
   **Deshacer** unos segundos, o volver a activarla en Recordatorios. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
   venta sigue en Calificaciones → Por definir. **Atendidas** tiene el buscador.

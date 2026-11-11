@@ -50,9 +50,9 @@ export function ChipsSeguimiento({ datos, valor, onCambio, sinRespuesta }: { dat
   }
   return (
     <div role="group" aria-label="Seguimiento de ventas" className="-mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-      {chip('todas', 'Sin respuesta', 'Conversaciones con mensajes del comprador sin contestar', sinRespuesta)}
-      {chip('sin_concretar', <>Sin guía<Nuevo clave="seguimiento" className="!ml-0" /></>, 'Ventas sin señal de pago (ni guía de MercadoEnvíos, ni pago, ni venta registrada, ni guía en Despachos) dentro de tu plazo', n?.sin_concretar)}
-      {chip('atencion', 'Sin mensaje', 'Sin guía y sin mensajes del comprador ni del equipo en las últimas horas (los recordatorios automáticos no cuentan)', n?.atencion, true)}
+      {chip('todas', 'Responder', 'Conversaciones con mensajes del comprador sin contestar', sinRespuesta)}
+      {chip('sin_concretar', <>Pedir pago<Nuevo clave="seguimiento" className="!ml-0" /></>, 'Ventas sin señal de pago (ni guía de MercadoEnvíos, ni pago, ni venta registrada, ni guía en Despachos) dentro de tu plazo', n?.sin_concretar)}
+      {chip('atencion', 'Escribirle', 'Sin guía y sin mensajes del comprador ni del equipo en las últimas horas (los recordatorios automáticos no cuentan)', n?.atencion, true)}
     </div>
   )
 }
@@ -118,18 +118,21 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
             const quedan = horasHasta(c.vence_at)
             const packs = c.packs ?? [c.pack_id]
             const sinMsg = horasDesde(c.ultimo_mov)
+            const abiertaAqui = packs.includes(abierta ?? '')
+            const nombre = c.comprador_nombre || c.comprador_nick || 'Comprador'
             return (
-              <div key={c.pack_id} className={packs.includes(abierta ?? '') ? 'bg-lime-50/70' : ''}>
-              <button type="button" onClick={() => onAbrir(c.pack_id)}
-                className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${packs.includes(abierta ?? '') ? '' : 'hover:bg-neutral-50'}`}>
+              // Toda la fila abre la conversación (botón estirado debajo); encima solo son clicables la ✕ y las compras.
+              <div key={c.pack_id} className={`group relative flex gap-3 px-4 py-3 transition-colors ${abiertaAqui ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
+                <button type="button" onClick={() => onAbrir(c.pack_id)} aria-label={`Abrir la conversación con ${nombre}`}
+                  className="absolute inset-0 z-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lime-500" />
                 {c.imagen
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={c.imagen} alt="" loading="lazy" className="mt-0.5 h-11 w-11 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
-                  : <span className="mt-0.5 h-11 w-11 shrink-0 rounded-md bg-neutral-100" />}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-neutral-500">
+                  ? <img src={c.imagen} alt="" loading="lazy" className="pointer-events-none relative mt-0.5 h-11 w-11 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
+                  : <span className="pointer-events-none relative mt-0.5 h-11 w-11 shrink-0 rounded-md bg-neutral-100" />}
+                <div className="pointer-events-none relative min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2 pr-7 text-xs text-neutral-500">
                     <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-semibold text-neutral-700">{c.cuenta}</span>
-                    <span className="truncate">{c.comprador_nombre || c.comprador_nick || 'Comprador'}</span>
+                    <span className="truncate">{nombre}</span>
                     {c.sin_leer > 0 && <span className="num rounded-full bg-red-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">{c.sin_leer}</span>}
                     <span className={`ml-auto shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${c.nunca_escribio ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-800'}`}>
                       {c.nunca_escribio ? 'Nunca escribió' : 'Escribió y no pagó'}
@@ -141,34 +144,38 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
                       {c.ultimo_de_comprador === false && <span className="text-neutral-400">Tú: </span>}{c.ultimo_texto}
                     </p>
                   )}
-                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
-                    <span className={`rounded-full px-2 py-0.5 font-semibold ${quedan < 12 ? 'bg-red-50 text-red-700' : 'bg-neutral-100 text-neutral-800'}`}>🕒 {venceEn(c.vence_at)}</span>
-                    <span className={`rounded-full px-2 py-0.5 font-medium ${c.atencion ? 'bg-amber-50 text-amber-800' : 'text-neutral-600'}`}>
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
+                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 font-semibold ${quedan < 12 ? 'bg-red-50 text-red-700' : 'bg-neutral-100 text-neutral-800'}`}>🕒 {venceEn(c.vence_at)}</span>
+                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 font-medium ${c.atencion ? 'bg-amber-50 text-amber-800' : 'text-neutral-600'}`}>
                       {c.sin_mensajes ? `Sin mensajes desde la compra (${tiempo(sinMsg)})` : `Sin mensajes hace ${tiempo(sinMsg)}`}
                     </span>
-                    <span>Día {Math.min(c.dia, plazo)} de {plazo}</span>
-                    {c.recordatorios > 0 && <span>· recordatorio {c.recordatorios} enviado</span>}
-                  </p>
+                    <span className="whitespace-nowrap">Día {Math.min(c.dia, plazo)} de {plazo}{c.recordatorios > 0 && ` · ${c.recordatorios} recordatorio${c.recordatorios > 1 ? 's' : ''}`}</span>
+                    {packs.length > 1 && (
+                      // Mismo comprador, varias compras sin pagar: una fila; cada compra se abre con su número.
+                      <span className="pointer-events-auto inline-flex items-center gap-1 whitespace-nowrap" role="group" aria-label={`${packs.length} compras sin pagar`}>
+                        <span className="font-medium text-neutral-700">· {packs.length} compras</span>
+                        <span className="inline-flex overflow-hidden rounded-full border border-neutral-300 bg-white">
+                          {packs.map((p, i) => (
+                            <button key={p} type="button" onClick={() => onAbrir(p)} aria-pressed={abierta === p}
+                              title={`Abrir la compra ${i + 1}`} aria-label={`Abrir la compra ${i + 1}`}
+                              className={`num h-5 min-w-5 px-1.5 text-[11px] font-semibold leading-5 transition-colors ${i ? 'border-l border-neutral-200' : ''} ${abierta === p ? 'bg-neutral-800 text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}>
+                              {i + 1}
+                            </button>
+                          ))}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </button>
-              <div className="-mt-1 flex flex-wrap items-center gap-1.5 pb-3 pl-[4.75rem] pr-4 text-xs text-neutral-500">
-                {packs.length > 1 && <>
-                  {/* Mismo comprador, varias compras sin pagar: una fila; cada compra se abre aparte. */}
-                  <span className="font-medium text-neutral-700">{packs.length} compras sin pagar:</span>
-                  {packs.map((p, i) => (
-                    <button key={p} type="button" onClick={() => onAbrir(p)} aria-pressed={abierta === p}
-                      className={`h-7 rounded-full border px-2.5 font-medium transition-colors ${abierta === p ? 'border-neutral-800 bg-neutral-800 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'}`}>
-                      Compra {i + 1}
-                    </button>
-                  ))}
-                </>}
                 <button type="button" disabled={quitando === packs[0]}
-                  onClick={() => quitar(packs, c.comprador_nombre || c.comprador_nick || 'la venta', true)}
-                  title="Ya pagó, no va a pagar o no quieres seguirla: sale de esta lista y no se le mandan más recordatorios"
-                  className="ml-auto h-7 rounded-full border border-neutral-300 bg-white px-3 font-medium text-neutral-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
-                  {quitando === packs[0] ? 'Quitando…' : packs.length > 1 ? 'Quitar las ' + packs.length : 'Quitar'}
+                  onClick={() => quitar(packs, nombre, true)}
+                  title={`Quitar de la lista definitivamente${packs.length > 1 ? ` (las ${packs.length} compras)` : ''}: ya pagó, no va a pagar o no la sigues. Tampoco se le mandan más recordatorios.`}
+                  aria-label={`Quitar a ${nombre} de la lista`}
+                  className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400 disabled:opacity-40">
+                  {quitando === packs[0]
+                    ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600" />
+                    : <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>}
                 </button>
-              </div>
               </div>
             )
           })}
