@@ -57,6 +57,9 @@ export async function GET(req: NextRequest) {
     status:       's.status',
   }
   const sortExpr = SORT_MAP[url.searchParams.get('sort_by') ?? ''] ?? 's.created_at'
+  // Para elegir la página sin agrupar todo: las unidades salen de una subconsulta por venta (índice por sale_id).
+  const sortPagina = url.searchParams.get('sort_by') === 'units'
+    ? '(SELECT COALESCE(SUM(x.quantity), 0) FROM sale_items x WHERE x.sale_id = s.id)' : sortExpr
   const sortDir  = (url.searchParams.get('sort_dir') ?? '').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
 
   // Build the shared filter (search + date range) starting at a given param index.
@@ -111,6 +114,16 @@ export async function GET(req: NextRequest) {
   const finalSearchPredicate = rowsFilter.sql
 
   const rowsSql = `
+    -- 12-11 (rapidez): primero la página (15 ids, con el orden pedido), después se arma SOLO esa página con sus
+    -- productos. Antes se agrupaban todas las ventas (10.000+) para quedarse con 15 (0,5 s).
+    WITH pagina AS (
+      SELECT s.id, ${sortPagina} AS orden, s.ml_order_number AS desempate
+      FROM sales s
+      WHERE ${finalSearchPredicate}
+      ${statusClause}
+      ORDER BY ${sortPagina} ${sortDir}, s.ml_order_number DESC
+      LIMIT $1 OFFSET $2
+    )
     SELECT
       s.id, s.ml_order_number, s.status, s.customer_name,
       s.total_amount::float    AS total_amount,
@@ -136,17 +149,15 @@ export async function GET(req: NextRequest) {
         ) FILTER (WHERE si.id IS NOT NULL),
         '[]'::json
       ) AS items
-    FROM sales s
+    FROM pagina pg
+    JOIN sales s ON s.id = pg.id
     LEFT JOIN users uc ON s.created_by          = uc.id
     LEFT JOIN users uv ON s.payment_verified_by = uv.id
     LEFT JOIN users up ON s.processed_by        = up.id
     LEFT JOIN sale_items si ON si.sale_id = s.id
     LEFT JOIN products p    ON p.id = si.product_id
-    WHERE ${finalSearchPredicate}
-    ${statusClause}
-    GROUP BY s.id, uc.username, uv.username, up.username
-    ORDER BY ${sortExpr} ${sortDir}, s.ml_order_number DESC
-    LIMIT $1 OFFSET $2
+    GROUP BY pg.orden, pg.desempate, s.id, uc.username, uv.username, up.username
+    ORDER BY pg.orden ${sortDir}, pg.desempate DESC
   `
 
   const [counts, rows] = await Promise.all([

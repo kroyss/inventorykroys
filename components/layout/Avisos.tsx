@@ -60,6 +60,8 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     ultimaCarga.current = Date.now()
     try {
       // La primera vez va junto con los demás pedidos comunes (lib/comun.ts); después, siempre fresco.
+      // La ayuda (BurbujaAyuda) monta un poco después (Suspense): se le adelanta su parte para que vaya en esta tanda.
+      if (primera.current) comun('soporte').catch(() => {})
       const d = await comun<typeof avisos & { version?: string }>('avisos', { fresco: !primera.current })
       primera.current = false
       if (d) {
