@@ -817,15 +817,24 @@ export default function MiIA() {
   const timerOk = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tarjeta = useRef<HTMLDivElement>(null)
   const colaGuardar = useRef<Promise<boolean>>(Promise.resolve(true))
+  // 12-11 (BUG: «llené Pago, Envío… y siguen faltando»): el tema por el que se pasa deja de ser «sugerido» AL INSTANTE
+  // (ref), no cuando termina de guardarse. Antes, pasando rápido de tema, el guardado siguiente todavía lo veía como
+  // sugerido sin revisar y lo borraba. El ref evita además leer una lista vieja desde un render anterior.
+  const sugeridosRef = useRef<string[]>([])
+  sugeridosRef.current = sugeridos
   const guardar = (): Promise<boolean> => {
     // Lo sugerido de los temas por los que todavía no pasó (Siguiente/Guardar) NO se guarda: solo se propone.
     const actual = paso !== null ? PASOS[paso].id : null
-    const pendientes = sugeridos.filter(t => t !== actual)
+    if (actual && sugeridosRef.current.includes(actual)) {
+      sugeridosRef.current = sugeridosRef.current.filter(t => t !== actual)
+      setSugeridos(sugeridosRef.current)
+    }
+    const pendientes = sugeridosRef.current
     const cuerpo: Config = { ...c }
     for (const t of pendientes) delete (cuerpo as unknown as Record<string, unknown>)[t]
     if (datos?.miIA) for (const t of pendientes) if ((datos.miIA as unknown as Record<string, unknown>)[t] !== undefined) (cuerpo as unknown as Record<string, unknown>)[t] = (datos.miIA as unknown as Record<string, unknown>)[t]
     const json = JSON.stringify(cuerpo)
-    if (json === ultimoGuardado.current) { if (actual) setSugeridos(s => s.filter(t => t !== actual)); return colaGuardar.current }
+    if (json === ultimoGuardado.current) return colaGuardar.current
     setGuardando(true); setError(null)
     const p = colaGuardar.current.then(async () => {
       const r = await fetch('/api/mi-ia', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: json }).catch(() => null)
@@ -833,7 +842,6 @@ export default function MiIA() {
       setGuardando(false)
       if (!r?.ok) { setError(d?.error ?? 'No se pudo guardar (revisa tu conexión)'); return false }
       ultimoGuardado.current = json
-      if (actual) setSugeridos(s => s.filter(t => t !== actual))
       setGuardadoOk(true)
       if (timerOk.current) clearTimeout(timerOk.current)
       timerOk.current = setTimeout(() => setGuardadoOk(false), 1800)
