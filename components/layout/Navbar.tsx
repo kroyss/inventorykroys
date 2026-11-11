@@ -7,7 +7,7 @@ import NavLinks from './NavLinks'
 import AprendizajeNav from './AprendizajeNav'
 import NovedadesNav from './NovedadesNav'
 import EspacioSwitcher from './EspacioSwitcher'
-import { MODULOS_AUTOMATIZACIONES, radarUrl } from '@/lib/espacios'
+import { MODULOS_AUTOMATIZACIONES } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
 import { empresasDeUsuario, esDuenoPlataforma, ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { esDemoEmpresa } from '@/lib/demo'
@@ -35,7 +35,7 @@ export default async function Navbar() {
     <nav className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2 xl:gap-4">
 
-        <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} modulos={modulos} radarUrl={conRadar ? radarUrl() : null} />
+        <EspacioSwitcher automatizaciones={conAutomatizaciones} inventario={modulos.includes('inventario')} modulos={modulos} radarUrl={conRadar ? '/api/radar/entrar' : null} />
 
         <NavLinks role={role} permisos={session?.user.permisos ?? []} country={country} modulos={session?.user.modulos ?? []} />
 
@@ -51,7 +51,7 @@ export default async function Navbar() {
               ajustes={role === 'admin' && modulos.includes('inventario')} usuarios={role === 'admin'}
               pagosME={role === 'admin' && modulos.includes('pagos_me') && modulos.includes('despachos_ventas') && session.user.country === 'VE'} plataforma={esDuenoPlataforma(session.user)} demo={demo} avisos={avisos}
               miPlan={role === 'admin' && !!session.user.organizacionId && session.user.organizacionId !== ORGANIZACION_PLATAFORMA}
-              miIA={modulos.includes('mi_ia') && modulos.includes('preguntas') && puede(session.user, 'automatizaciones_config')} />
+              miIA={modulos.includes('mi_ia') && modulos.includes('preguntas') && puede(session.user, 'automatizaciones_config')} radar={conRadar} />
           )}
         </div>
 

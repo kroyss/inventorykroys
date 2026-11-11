@@ -18,11 +18,13 @@ interface Props {
   avisos?: boolean
   miPlan?: boolean
   miIA?: boolean
+  /** 12-11: la cuenta tiene Radar → «Radar ↗» entra directo, sin volver a escribir la clave (/api/radar/entrar). */
+  radar?: boolean
 }
 
 // Menú de la cuenta (arriba a la derecha): lo que se toca poco (Ajustes, Usuarios,
 // Plataforma) y Cerrar sesión, para que la barra quede solo con el trabajo del día.
-export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false, avisos = false, miPlan = false, miIA = false }: Props) {
+export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false, avisos = false, miPlan = false, miIA = false, radar = false }: Props) {
   const pathname = usePathname()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -81,6 +83,14 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
               {l.label}{l.nuevo && <Nuevo clave={l.nuevo} />}
             </Link>
           ))}
+          {radar && (
+            <a href="/api/radar/entrar" target="_blank" rel="noopener" role="menuitem" onClick={() => setAbierto(false)}
+              title="Abre el Radar en otra pestaña, ya con tu sesión" className={`${fila} flex items-center justify-between text-neutral-700 hover:bg-neutral-50`}>
+              Radar
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" strokeWidth={2}
+                strokeLinecap="round" strokeLinejoin="round" aria-label="Abre otra aplicación"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
+            </a>
+          )}
           <div className="my-1 border-t border-neutral-100" />
           <button type="button" role="menuitem" onClick={() => signOut({ callbackUrl: '/login' })}
             className={`${fila} w-full text-left text-neutral-700 hover:bg-neutral-50`}>
