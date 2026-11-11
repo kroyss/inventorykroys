@@ -589,7 +589,7 @@ export const esPreguntaSimple = (texto: string) =>
 /** Pide el borrador a Claude. Con `web`, puede buscar en internet (el borrador queda marcado para verificar).
  *  08-11 (el dueño): Haiku 5.5 escribe TODAS (antes: Haiku las simples y Sonnet el resto). Sonnet costaba ~20× más
  *  y la competencia cobra ~$0,01 por respuesta; el verificador (Haiku) sigue frenando lo que no está en los datos. */
-export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO, v2 = false, verificarBaja = false): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
+export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte = CONTEXTO_RECORTADO, v2 = false, verificarBaja = false, v3 = V3_POR_DEFECTO): Promise<Borrador & { llamadas: LlamadaIA[]; modelo: string; verificacion: string | null }> {
   const sistema = SISTEMA + (v2 ? SISTEMA_V2_EXTRA : '') + (web
     ? '\n\nPuedes buscar en internet SOLO datos técnicos del producto (medidas, compatibilidad, especificaciones del fabricante). Nunca precios, stock ni envíos: eso sale solo de los datos del vendedor.'
     : '')
@@ -622,7 +622,7 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   // 08-11: la respuesta automática verifica también las de confianza baja (verificarBaja): si el verificador las aprueba
   // pueden salir solas (el dueño marcó 40 de 41 "podía salir sola"). La confianza no sube: queda anotada como estaba.
   if (!web && b.respuesta && (b.confianza !== 'baja' || verificarBaja)) {
-    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta, MODELO_SIMPLE, v2).catch(() => null)
+    const v = await verificarBorrador(contenido, c.pregunta.texto, b.respuesta, MODELO_SIMPLE, v2, v2 && v3).catch(() => null)
     if (v) {
       llamadas.push(v.llamada)
       if (!v.ok) { verificacion = v.motivo; b = { ...b, confianza: 'baja', falta_dato: b.falta_dato ?? v.motivo } }
@@ -647,6 +647,9 @@ export function cantidadPedida(texto: string): number | null {
   const v = w in NUMEROS ? NUMEROS[w] : Number(w)
   return v >= 2 && v <= 10 ? v : null
 }
+
+/** 11-11: verificador v3 (por tipo de afirmación). Se enciende cuando la medición sobre las marcadas lo aprueba. */
+export const V3_POR_DEFECTO = process.env.IA_VERIFICADOR_V3 === '1'
 
 export function sinTercero(t: string) {
   return t

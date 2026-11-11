@@ -8,6 +8,8 @@ import type { Country, UserRole } from '@/lib/types'
 import { permisosEfectivos } from '@/lib/permisos'
 import { soloRadar } from '@/lib/modulos'
 
+const IA_EN_PAUSA = ['mi_ia', 'ia_automatica', 'mensajes_ia']
+
 // Multiempresa: el usuario es uno solo (users es global) y entra a una de SUS empresas
 // (usuario_empresas). La sesión guarda esa empresa; su país y su rol salen de ahí.
 
@@ -222,7 +224,10 @@ export const authOptions: NextAuthOptions = {
         session.user.country       = token.country
         session.user.empresaId     = token.empresaId
         session.user.empresaNombre = token.empresaNombre
-        session.user.modulos       = token.modulos
+        // 11-11 (el dueño): Mi IA y las respuestas automáticas con IA, de momento SOLO para la organización de la plataforma
+        // (se están puliendo). Las empresas siguen con el módulo guardado: al quitar este filtro vuelve igual que estaba.
+        session.user.modulos       = token.organizacionId === ORGANIZACION_PLATAFORMA ? token.modulos
+          : (token.modulos ?? []).filter((m: string) => !IA_EN_PAUSA.includes(m))
         session.user.organizacionId = token.organizacionId
         session.user.verComo       = token.verComo ?? null
         session.user.soporte       = token.soporte ?? null

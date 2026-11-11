@@ -63,10 +63,50 @@ AJUSTES (mandan sobre lo anterior):
 - (11-11) Si las RESPUESTAS ANTERIORES se contradicen, decide lo escrito en la ficha, la descripción, las notas o las fotos: si eso respalda el borrador, está respaldado.
 - Sigue siendo NO respaldado: colores, tallas, medidas, números, plazos, mínimos, agencias, cobros o compatibilidades que no estén escritos.`
 
+// Versión 3 (11-11, el dueño con 171 marcadas: el verificador frenó 72 y solo 16 eran errores reales). Se clasifica cada
+// afirmación por TIPO y solo frenan las de riesgo sin respaldo; "falta contestar" solo si quedó sin respuesta lo PRINCIPAL.
+// Lo que respaldaba bien (inventar números, stock, compatibilidad, contradicciones) sigue frenando.
+const SISTEMA_V3_EXTRA = `
+
+VERSIÓN 3 (manda sobre todo lo anterior):
+- A cada afirmación ponle "tipo":
+  · "producto": números, medidas, voltaje, potencia, capacidad, colores, tallas, material, modelo, qué incluye o trae.
+  · "compatibilidad": si sirve para un vehículo, equipo o modelo concreto.
+  · "stock": hay disponible, cantidades, variantes que hay o no hay.
+  · "envio": agencias, envío gratis o cobro a destino, mínimos para envío gratis, plazos de despacho o de llegada, ciudades.
+  · "pago": medios de pago, descuentos, factura, garantía, montos o precios con cifra.
+  · "otro": todo lo demás: saludos, cortesía, gracias, "quedo a su orden", "el precio es el publicado a tasa BCV", cómo comprar en MercadoLibre (elegir cantidad o color, llenar el formulario), recomendaciones (verificar con un técnico, ver el catálogo), decir que NO tenemos un dato, condiciones ("si su equipo tiene X…"), aclarar cuál es esta publicación.
+- Las POLÍTICAS (incluida la sección de Mi IA) son del vendedor: lo que el borrador repite de ahí está respaldado aunque lo diga con otras palabras (mínimo de 2 unidades, envío gratis por ZOOM y TEALCA, un día hábil, retiro).
+- "principal_sin_contestar" = true SOLO si lo principal que preguntó quedó sin ninguna respuesta (preguntó si sirve y no dice nada de eso). Un detalle que falta o una respuesta general no cuenta.`
+
 export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA }
+const TIPOS_RIESGO = ['producto', 'compatibilidad', 'stock', 'envio', 'pago']
+const HERRAMIENTA_V3 = {
+  ...HERRAMIENTA,
+  input_schema: {
+    type: 'object',
+    properties: {
+      afirmaciones: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            afirmacion: { type: 'string' }, donde: { type: 'string', description: 'Dónde está escrita, o "ninguna".' }, respaldada: { type: 'boolean' },
+            tipo: { type: 'string', enum: ['producto', 'compatibilidad', 'stock', 'envio', 'pago', 'otro'] },
+          },
+          required: ['afirmacion', 'donde', 'respaldada', 'tipo'],
+        },
+      },
+      principal_sin_contestar: { type: 'boolean' },
+      que_falta: { type: 'string', description: 'Si principal_sin_contestar: qué quedó sin responder (una frase).' },
+    },
+    required: ['afirmaciones', 'principal_sin_contestar'],
+  },
+}
 
 /** `datos` = el mismo bloque de contexto que recibió la IA del borrador. */
-export async function verificarBorrador(datos: string, pregunta: string, borrador: string, modeloV = MODELO_SIMPLE, v2 = false): Promise<Verificacion> {
+export async function verificarBorrador(datos: string, pregunta: string, borrador: string, modeloV = MODELO_SIMPLE, v2 = false, v3 = false): Promise<Verificacion> {
+  if (v3) return verificarV3(datos, pregunta, borrador, modeloV)
   const { resultado: r, uso, modelo } = await llamarClaude<{
     afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean }[]; partes_sin_contestar?: string[]; mal_entendida?: boolean
   }>({
@@ -85,5 +125,19 @@ export async function verificarBorrador(datos: string, pregunta: string, borrado
   const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`
     : faltan.length ? `Falta contestar: ${faltan.join('; ')}`
     : r.mal_entendida ? 'La pregunta no se entiende sola' : null
+  return { ok: !motivo, motivo: motivo?.slice(0, 300) ?? null, llamada: { modelo, uso } }
+}
+
+async function verificarV3(datos: string, pregunta: string, borrador: string, modeloV: string): Promise<Verificacion> {
+  const { resultado: r, uso, modelo } = await llamarClaude<{
+    afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean; tipo?: string }[]; principal_sin_contestar?: boolean; que_falta?: string
+  }>({
+    sistema: SISTEMA + SISTEMA_V2_EXTRA + SISTEMA_V3_EXTRA, herramienta: HERRAMIENTA_V3, modelo: modeloV, maxTokens: 900,
+    contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
+  })
+  const sinRespaldo = (r.afirmaciones ?? []).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? ''))
+    && TIPOS_RIESGO.includes(a.tipo ?? 'producto'))
+  const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`
+    : r.principal_sin_contestar ? `Falta contestar: ${r.que_falta || 'lo principal de la pregunta'}` : null
   return { ok: !motivo, motivo: motivo?.slice(0, 300) ?? null, llamada: { modelo, uso } }
 }

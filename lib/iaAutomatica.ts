@@ -48,6 +48,8 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
 // "No tenemos / no hay / agotado": decir que no de más pierde la venta (y el stock de la publicación puede ir atrasado),
 // así que siempre lo ve una persona.
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
+// 11-11: "déjanos verificarlo / te confirmamos": una vez publicada la pregunta no se puede volver a contestar.
+const PROMESA = /d[eé]j[ae]n?(me|nos)( lo)? (verificar|revisar|confirmar)|(lo|le|te) (verificamos|confirmamos|averiguamos)|prefiero confirmarlo|confirmarlo con (una persona|el equipo)|en breve (le|te) (confirmo|confirmamos|respondo)/i
 const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
 // 10-11 (competencia, el dueño): invitar al catálogo de la tienda ante la duda está bien: ese link no frena.
 const CATALOGO = /https?:\/\/listado\.mercadolibre\.com\.(ve|co)\/_CustId_\d+\S*/gi
@@ -116,6 +118,7 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   if (OTRA_PUBLICACION.test(sinCat)) m.push('Recomienda otra publicación')
   // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
   if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')
+  if (PROMESA.test(b.respuesta)) m.push('Promete verificar o confirmar después: lo responde una persona')
   if (MONTO.test(b.respuesta)) m.push('Da un monto en bolívares o un estimado: lo confirma una persona')
   if (MUCHAS.test(pregunta)) m.push('Pide muchas unidades: lo coordina una persona')
   if (DIVISA.test(pregunta)) m.push('Pregunta precio en divisa: lo contesta una persona')
