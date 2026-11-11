@@ -484,6 +484,19 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const [error, setError] = useState<string | null>(null)
   const [revisado, setRevisado] = useState<{ at: string; nuevas: number } | null>(null)
   const [verVencidas, setVerVencidas] = useState(false)
+  // 12-11 (el dueño): las notas escritas en ML no llegaban (ML no avisa y «Traer ML» no las trae). Al cargar la lista se
+  // releen en segundo plano las de sus ventas (las de más de 5 min) y la marca amarilla se actualiza sola.
+  const [notasML, setNotasML] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    if (!datos?.filas.length) return
+    let vivo = true
+    fetch('/api/sales/por-confirmar/notas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numeros: datos.filas.map(f => f.numero) }) })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (vivo && d?.notas && Object.keys(d.notas).length) setNotasML(prev => ({ ...prev, ...d.notas })) })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [datos])
   // Buscador (20-10): nombre, apodo de ML, número de venta, producto o cuenta.
   const [buscar, setBuscar] = useState('')
   // "Traer ME" (2026-10-12; Pagos ME salió del menú de los usuarios): le pide a la PC del vigilante que traiga
@@ -557,7 +570,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   // 12-11 (el dueño, caso guía subida a mano): sin inventario, la venta con la guía ya REPORTADA y sin pago en el sistema
   // ya está terminada (Calificaciones la toma como concretada): no sale como «No ha pagado» ni cae en Vencidas. Con un pago
   // por verificar sigue (falta revisar el dinero). Con inventario no se toca: falta registrarla en Ventas.
-  const filas = datos.filas.filter(f => !(sinInventario && f.despacho === 'reportada' && (!f.pago || f.pago.verificacion === 'invalido')))
+  const filas = datos.filas.map(f => (f.numero in notasML ? { ...f, nota: notasML[f.numero] } : f))
+    .filter(f => !(sinInventario && f.despacho === 'reportada' && (!f.pago || f.pago.verificacion === 'invalido')))
     .filter(coincide)
   const vigentes = filas.filter(f => !f.vencida)
   const vencidas = filas.filter(f => f.vencida && !f.concretadaSinVenta)

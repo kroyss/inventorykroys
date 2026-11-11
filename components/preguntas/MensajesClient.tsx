@@ -816,7 +816,10 @@ export function NotasVenta({ pack, onCambio, onNotas, directo, onListo }: {
         className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white resize-y focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300" />
       <div className="flex items-center gap-2">
         <span className="text-[11px] text-neutral-400">{editando.texto.length}/300 · Enter guarda · el comprador no la ve</span>
-        <button onClick={() => { setEditando(null); onListo?.() }} className="ml-auto btn-ghost text-xs px-2.5 py-1">Cancelar</button>
+        {/* 12-11 (el dueño): en la ventanita de Pagos ME / Por confirmar no había cómo borrarla. */}
+        {(() => { const n = datos?.notas.find(x => x.id === editando.id && x.id !== 'pendiente'); return n && (
+          <button onClick={() => borrar(n)} disabled={guardando} className="ml-auto btn-ghost text-xs px-2.5 py-1 text-red-600 hover:bg-red-50">Borrar</button>) })()}
+        <button onClick={() => { setEditando(null); onListo?.() }} className={`${datos?.notas.some(x => x.id === editando.id && x.id !== 'pendiente') ? '' : 'ml-auto '}btn-ghost text-xs px-2.5 py-1`}>Cancelar</button>
         <button onClick={guardar} disabled={guardando || !editando.texto.trim()} className="btn-primary text-xs px-3 py-1">
           {guardando ? 'Guardando…' : 'Guardar en ML'}
         </button>

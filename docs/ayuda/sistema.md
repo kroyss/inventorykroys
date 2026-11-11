@@ -526,7 +526,9 @@ verificar.**
 
 **En cada venta de la lista** ves la foto del producto y dos botones: **💬 Conversación** se marca en celeste si el
 comprador escribió algo después de comprar (al pasar el mouse ves sus últimos mensajes); en blanco, no escribió nada
-y la venta es tal cual. **📝 Nota** se marca en amarillo si la venta tiene nota.
+y la venta es tal cual. **📝 Nota** se marca en amarillo si la venta tiene nota. Las notas escritas directo en
+MercadoLibre se releen solas al abrir la lista (unos segundos después se marcan). En la ventanita de la nota puedes
+**Borrar**, **Cancelar** o **Guardar en ML**; borrarla también la quita de MercadoLibre.
 
 **Guía ya reportada sin pago en el sistema** (por ejemplo, subiste la guía a mano con el PDF): la venta ya está
 terminada y sale sola de la lista (no queda como «No ha pagado» ni pasa a Vencidas). En Calificaciones cuenta como

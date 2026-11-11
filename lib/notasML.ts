@@ -138,3 +138,31 @@ export async function notaAlGuardarVenta(db: Pool, saleId: number | string, vent
   try { return await Promise.race([trabajo.catch(e => { console.error('[notas ML]', venta, e); return null }), tope]) }
   catch { return null }
 }
+
+/** 12-11 (el dueño): ML no avisa cuando se escribe una nota y «Traer ML» no las trae (vienen aparte, venta por venta).
+ *  Pagos ME / Por confirmar relee en segundo plano las notas de las ventas de su lista cuya copia tiene más de
+ *  `edadMin` minutos (máx. 60 por vez, de a 6). Solo lee. Devuelve qué ventas tienen nota ahora (las releídas). */
+export async function refrescarNotasVentas(db: Pool, numeros: string[], edadMin = 5) {
+  const validos = [...new Set(numeros.filter(n => /^\d{1,18}$/.test(n)))].slice(0, 300)
+  if (!validos.length) return {} as Record<string, boolean>
+  const { rows } = await db.query<{ numero: string; conexion_id: number }>(
+    `SELECT v.numero, o.conexion_id FROM unnest($1::text[]) AS v(numero)
+     CROSS JOIN LATERAL (SELECT o.conexion_id, max(o.notas_at) AS notas_at FROM ml_ordenes o
+                         WHERE o.id = v.numero::bigint OR o.pack_id = v.numero::bigint GROUP BY o.conexion_id LIMIT 1) o
+     LEFT JOIN ml_conversaciones c ON c.pack_id = v.numero::bigint
+     WHERE GREATEST(o.notas_at, c.notas_at) IS NULL OR GREATEST(o.notas_at, c.notas_at) < NOW() - make_interval(mins => $2)
+     LIMIT 60`, [validos, edadMin])
+  const tiene: Record<string, boolean> = {}
+  const uno = async (r: { numero: string; conexion_id: number }) => {
+    const { notas, error } = await leerNotas(db, r.conexion_id, r.numero)
+    if (error) return
+    const texto = unirNotas(notas)
+    await copiarNotas(db, r.numero, notas)
+    await db.query(`UPDATE ml_ordenes SET notas = $2, notas_at = NOW() WHERE id = $1::bigint OR pack_id = $1::bigint`, [r.numero, texto])
+    tiene[r.numero] = !!texto
+  }
+  for (let i = 0; i < rows.length; i += 6) {
+    await Promise.all(rows.slice(i, i + 6).map(r => uno(r).catch(e => console.error('[notas ML]', r.numero, e instanceof Error ? e.message : e))))
+  }
+  return tiene
+}
