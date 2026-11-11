@@ -1,6 +1,7 @@
 import { connection } from 'next/server'
 import { COMUNIDAD_TELEGRAM, cifrasRadar, TELEGRAM_DESPEGUE, PRECIO, PRECIO_DESPUES } from '@/lib/despegue'
 import { CREDITOS_PRUEBA, ESCALONES, PLANES, PRECIO_DESDE } from '@/lib/planes'
+import { dbGlobal } from '@/lib/db'
 
 export const metadata = {
   title: { absolute: 'El Comerciante Digital · MercadoLibre Venezuela' },
@@ -53,6 +54,9 @@ export default async function InicioPage() {
   // 10-11: Despegue ya no va por grupos (cada uno empieza cuando quiere); las cifras del Radar, en vivo.
   const RADAR_CIFRAS = await cifrasRadar()
   const productosRadar = RADAR_CIFRAS[0]?.n ?? '+45.000'
+  // 12-11 (el dueño): «vendedores activos» = todas las cuentas registradas (las usen o no), sin la de la plataforma.
+  const vendedores = await dbGlobal().query(`SELECT count(*)::int AS n FROM organizaciones WHERE estado <> 'propietario'`)
+    .then(r => r.rows[0]?.n as number).catch(() => null)
   const anio = new Date().getFullYear()
 
   return (
@@ -97,7 +101,7 @@ export default async function InicioPage() {
             </a>
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">
-            <li className="flex items-center gap-2"><Icono d={I.grupo} className="h-4 w-4 text-lime-400" /><b className="text-white">+10</b> vendedores usando el sistema</li>
+            <li className="flex items-center gap-2"><Icono d={I.grupo} className="h-4 w-4 text-lime-400" /><b className="text-white">+{vendedores ? vendedores.toLocaleString('de-DE') : 10}</b> vendedores activos</li>
             <li className="flex items-center gap-2"><Icono d={I.radar} className="h-4 w-4 text-lime-400" /><b className="text-white">{productosRadar}</b> productos en el Radar</li>
             <li className="flex items-center gap-2"><Icono d={I.check} className="h-4 w-4 text-lime-400" />Lo usamos en nuestras cuentas cada día</li>
           </ul>
