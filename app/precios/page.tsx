@@ -1,6 +1,8 @@
 import { TELEGRAM_DESPEGUE } from '@/lib/despegue'
+import { connection } from 'next/server'
+import { currentDate } from '@/lib/tz'
 import {
-  CREDITOS_PRUEBA, CUENTA_EXTRA, CUENTAS_INCLUIDAS, DESCUENTO_TRIMESTRAL, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, RECARGA_IA, RECARGAS_IA,
+  precioRadarMes, CREDITOS_PRUEBA, CUENTA_EXTRA, CUENTAS_INCLUIDAS, DESCUENTO_TRIMESTRAL, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, RECARGA_IA, RECARGAS_IA,
 } from '@/lib/planes'
 
 export const metadata = {
@@ -44,7 +46,11 @@ const PREGUNTAS = [
     r: `15 días con preguntas, mensajes, calificaciones, guías y Pagos MercadoEnvíos, con tus propias ventas, y ${CREDITOS_PRUEBA} créditos de IA. Los días arrancan cuando conectas MercadoLibre.` },
 ]
 
-export default function PreciosPage() {
+const RADAR_PRECIOS = 'https://radar.elcomerciantedigital.com/precios'
+
+export default async function PreciosPage() {
+  await connection()   // 12-11: el precio del Radar mensual cambia con la fecha (promo de noviembre)
+  const radarMes = precioRadarMes(currentDate('America/Caracas'))
   const anio = new Date().getFullYear()
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -178,6 +184,34 @@ export default function PreciosPage() {
               <li className="flex justify-between gap-4"><span>Pago trimestral</span><b className="whitespace-nowrap text-lime-700">−{DESCUENTO_TRIMESTRAL}%</b></li>
             </ul>
           </div>
+        </section>
+
+        {/* ── Radar (12-11, el dueño): sus precios, con link a su propia página ── */}
+        <section className="rounded-3xl bg-neutral-950 p-6 text-white sm:p-9">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">Radar de Oportunidades</p>
+          <h2 className="mt-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">Qué vender en MercadoLibre, con datos reales.</h2>
+          <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+            <li className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs font-semibold text-neutral-400">Con Automatizaciones o Completo</p>
+              <p className="mt-1 text-2xl font-semibold text-lime-400">Gratis</p>
+              <p className="mt-1 text-sm text-neutral-400">El Radar incluido todos los días.</p>
+            </li>
+            <li className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs font-semibold text-neutral-400">Radar PRO los fines de semana</p>
+              <p className="mt-1 text-2xl font-semibold">+${RADAR_PRO.precio}<span className="text-sm font-normal text-neutral-400">/mes</span></p>
+              <p className="mt-1 text-sm text-neutral-400">Sobre tu plan. El 1.<sup>er</sup> mes, de regalo.</p>
+            </li>
+            <li className="rounded-2xl border border-lime-400/40 bg-lime-400/10 p-4">
+              <p className="text-xs font-semibold text-lime-300">Solo el Radar, sin plan</p>
+              <p className="mt-1 text-2xl font-semibold">
+                {radarMes.promo && <s className="mr-1.5 text-base font-normal text-neutral-500">${radarMes.lista}</s>}${radarMes.precio}<span className="text-sm font-normal text-neutral-400">/mes</span>
+              </p>
+              <p className="mt-1 text-sm text-neutral-400">PRO todos los días.{radarMes.promo ? <> <b className="text-lime-300">{radarMes.promo.texto}</b>.</> : null}</p>
+            </li>
+          </ul>
+          <a href={RADAR_PRECIOS} className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-lime-400 hover:text-lime-300">
+            Ver precios y qué trae el Radar <span aria-hidden="true">→</span>
+          </a>
         </section>
 
         {/* ── Preguntas ── */}

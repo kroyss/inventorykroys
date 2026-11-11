@@ -1,6 +1,7 @@
 import { connection } from 'next/server'
 import { COMUNIDAD_TELEGRAM, cifrasRadar, TELEGRAM_DESPEGUE, PRECIO, PRECIO_DESPUES } from '@/lib/despegue'
-import { CREDITOS_PRUEBA, ESCALONES, PLANES, PRECIO_DESDE } from '@/lib/planes'
+import { CREDITOS_PRUEBA, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, precioRadarMes } from '@/lib/planes'
+import { currentDate } from '@/lib/tz'
 import { dbGlobal } from '@/lib/db'
 
 export const metadata = {
@@ -54,6 +55,7 @@ export default async function InicioPage() {
   // 10-11: Despegue ya no va por grupos (cada uno empieza cuando quiere); las cifras del Radar, en vivo.
   const RADAR_CIFRAS = await cifrasRadar()
   const productosRadar = RADAR_CIFRAS[0]?.n ?? '+45.000'
+  const radarMes = precioRadarMes(currentDate('America/Caracas'))
   // 12-11 (el dueño): «vendedores activos» = todas las cuentas registradas (las usen o no), sin la de la plataforma.
   const vendedores = await dbGlobal().query(`SELECT count(*)::int AS n FROM organizaciones WHERE estado <> 'propietario'`)
     .then(r => r.rows[0]?.n as number).catch(() => null)
@@ -199,6 +201,16 @@ export default async function InicioPage() {
             ))}
           </ul>
           <p className="mt-5 text-xs text-neutral-500">Datos actualizados cada mes.</p>
+          {/* 12-11 (el dueño): la acotación de precios del Radar, con su página propia. */}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+            <p className="text-sm text-neutral-300">
+              <b className="text-white">Gratis</b> con Automatizaciones o Completo · Radar PRO los fines de semana <b className="text-white">+${RADAR_PRO.precio}/mes</b> ·
+              Solo el Radar {radarMes.promo && <s className="text-neutral-500">${radarMes.lista}</s>} <b className="text-lime-400">${radarMes.precio}/mes</b>
+            </p>
+            <a href="https://radar.elcomerciantedigital.com/precios" className="inline-flex items-center gap-1.5 text-sm font-semibold text-lime-400 hover:text-lime-300">
+              Precios del Radar <span aria-hidden="true">→</span>
+            </a>
+          </div>
         </section>
 
         {/* ── Trayectoria ── */}
