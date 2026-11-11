@@ -272,7 +272,10 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
     una frase tuya (ej. «Sí, tenemos disponible. Escríbenos por mensaje después de la compra»), así ninguna pregunta
     queda sin respuesta. Ojo: MercadoLibre acepta **una sola respuesta** por pregunta, así que queda respondida con
     esa frase; la respuesta de la IA queda escrita para que la veas. No se usa si frenó el máximo por comprador ni si
-    la publicación está pausada.
+    la publicación está pausada. En **Modo Seguro** sale con todo lo que la IA deja para revisar; en **Modo Total**
+    solo con **posventa** (cancelar, devolver, reclamo: en Modo Total la IA tampoco las responde, van a una persona),
+    fuera de horario o si la IA no logró escribir nada. En Modo Total se recomienda activarla (hay un botón con una
+    frase lista).
 - **Mi IA** también pregunta por cambios y devoluciones, ventas al mayor, rebajas, apartados, horario de atención e
   **información extra** por secciones (la IA lee cada sección solo cuando la pregunta trata de eso).
 - En **Despacho** hay que decir **cuándo sale el pedido** (el mismo día, al siguiente día hábil o a los N días hábiles

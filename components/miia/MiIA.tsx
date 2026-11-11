@@ -1090,7 +1090,7 @@ export default function MiIA() {
         quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
       )}
       </div>
-      {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
+      {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} total={!!datos.iaTodo} />}
     </div>
   )
 }

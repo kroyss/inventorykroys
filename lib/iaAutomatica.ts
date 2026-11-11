@@ -204,7 +204,10 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
       const deFrenos = frenos ? await motivosFrenos(db, frenos, country, 'preguntas', q.comprador_id) : []
       motivos.push(...deFrenos)
       // «Responder todo»: con respuesta escrita sale igual, salvo los frenos del vendedor (horario, máximo por comprador).
+      // 12-11 (el dueño): en Modo Total la posventa (cancelar, devolver, reclamo) tampoco la publica la IA: va a una persona
+      // y, si hay frase de escape, se contesta con ella (así igual nada queda sin respuesta).
       const sinSeguro = cfg.modo === 'real' && cfg.todo === true && !!b.respuesta && motivos.length > 0 && !deFrenos.length
+        && !motivos.includes(MOTIVO_POSVENTA)
       const d: DecisionIA = {
         modo: cfg.modo, decision: motivos.length && !sinSeguro ? 'revisar' : 'sola', motivos, ...(sinSeguro ? { sinSeguro: true } : {}), respuesta: b.respuesta, confianza: b.confianza,
         verificacion: b.verificacion, modelo: b.modelo, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),

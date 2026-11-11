@@ -8,7 +8,7 @@ type Frenos = { horario: Horario | null; tope: number; escape: string | null; es
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 // 10-11: se edita solo en Mi IA, con la frase de cada lado que esté disponible.
-export function FrenosIA({ preguntas = false, mensajes = false }: { preguntas?: boolean; mensajes?: boolean }) {
+export function FrenosIA({ preguntas = false, mensajes = false, total = false }: { preguntas?: boolean; mensajes?: boolean; total?: boolean }) {
   const [f, setF] = useState<Frenos | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -77,9 +77,16 @@ export function FrenosIA({ preguntas = false, mensajes = false }: { preguntas?: 
         <div className="space-y-1.5">
           <label className="flex items-center gap-2 text-sm text-neutral-800">
             <input type="checkbox" checked={f.escapePreguntas != null} onChange={e => e.target.checked ? setF({ ...f, escapePreguntas: '' }) : guardar({ ...f, escapePreguntas: null })} />
-            Frase de escape en Preguntas <span className="text-neutral-400">(opcional, Modo Seguro)</span>
+            Frase de escape en Preguntas <span className="text-neutral-400">(opcional)</span>
           </label>
-          <p className="text-xs text-neutral-500 pl-6">Lo que la IA deja para revisar se contesta con esta frase, así ninguna pregunta queda sin respuesta (por ejemplo de noche). Ojo: MercadoLibre acepta <b>una sola respuesta</b> por pregunta, así que esa pregunta queda respondida con la frase. La respuesta de la IA queda escrita para que la veas. No se usa con el tope por comprador ni con publicaciones pausadas.</p>
+          <p className="text-xs text-neutral-500 pl-6">Cuando la IA no responde sola, contesta al momento con esta frase para que ninguna pregunta quede sin respuesta. <b>Modo Seguro:</b> cuando no está segura, es un reclamo, dice que «no hay» o es fuera de tu horario. <b>Modo Total:</b> solo posventa (cancelar, devolver, reclamo), fuera de tu horario o si no logró escribir nada. Ojo: MercadoLibre acepta <b>una sola respuesta</b> por pregunta, así que queda respondida con la frase; la respuesta de la IA queda escrita para que la veas. No se usa con el tope por comprador ni con publicaciones pausadas.</p>
+          {total && f.escapePreguntas == null && (
+            <p className="ml-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Estás en <b>Modo Total</b>: te recomendamos activarla. Sin frase, la posventa y lo que llega fuera de horario quedan sin respuesta hasta que alguien las conteste.
+              <button type="button" onClick={() => guardar({ ...f, escapePreguntas: '¡Hola! Lo verificamos y te confirmamos en breve por aquí.' })}
+                className="ml-1 font-medium underline underline-offset-2">Usar «¡Hola! Lo verificamos y te confirmamos en breve por aquí.»</button>
+            </p>
+          )}
           {f.escapePreguntas != null && (
             <textarea rows={2} maxLength={350} value={f.escapePreguntas} onChange={e => setF({ ...f, escapePreguntas: e.target.value })}
               onBlur={() => f.escapePreguntas?.trim() && guardar({ ...f, escapePreguntas: f.escapePreguntas.trim() })}
