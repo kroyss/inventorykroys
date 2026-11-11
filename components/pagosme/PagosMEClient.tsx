@@ -46,6 +46,7 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const [aviso, setAviso] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ver, setVer] = useState<PagoME | null>(null)
+  const [buscar, setBuscar] = useState('')
   const [clave, setClave] = useState<string | null>(null)
   const [codigo, setCodigo] = useState<{ codigo: string; vence_at: string } | null>(null)
   // "+ Agregar otra cuenta de MercadoEnvíos" (29-10): '' = sin cuenta elegida; el nombre = la que falta.
@@ -158,7 +159,15 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
   const sinConectar = !!datos && perfiles.length === 0
 
   const pagos = datos?.pagos ?? []
-  const todos = pagos.length > 0 && pagos.every(p => marcados.has(p.id))
+  // Buscador del Historial (12-11): cliente, apodo, producto, nº de venta, referencia o monto; palabras en cualquier orden, sin acentos.
+  const sinAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const palabras = sinAcento(buscar.trim()).split(/\s+/).filter(Boolean)
+  const visibles = !palabras.length ? pagos : pagos.filter(p => {
+    const texto = sinAcento([p.comprador, p.nick, p.venta, p.referencia, p.cuenta, p.monto_pagado != null ? String(p.monto_pagado) : '',
+      p.monto_pagado != null ? bs(p.monto_pagado) : '', ...(p.detalle ?? []).map(d => `${d.titulo} ${d.variante ?? ''}`)].join(' '))
+    return palabras.every(w => texto.includes(w))
+  })
+  const todos = visibles.length > 0 && visibles.every(p => marcados.has(p.id))
   const toggle = (id: number) => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   // Mientras carga no se muestra nada a medias (23-10: sin datos se veía unos segundos la vista con inventario).
@@ -327,111 +336,109 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
 
-      {datos && pagos.length === 0 ? (
-        <EmptyState message={filtro === 'pendiente'
+      {/* 12-11 (el dueño): Historial compacto. Una línea por pago (foto, cliente, producto, monto, estado) y buscador; el
+          detalle completo (pago, banco, referencia, envío, guía, comprobante) se abre en una ventana al tocar la fila. */}
+      {pagos.length > 0 && (
+        <input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar cliente, producto, nº de venta, referencia o monto…"
+          aria-label="Buscar en el historial" className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm sm:max-w-md" />
+      )}
+      {datos && visibles.length === 0 ? (
+        <EmptyState message={buscar.trim() ? 'Nada coincide con la búsqueda' : filtro === 'pendiente'
           ? 'No hay pagos por verificar. Toca "Traer pagos y guías" para buscar los nuevos en MercadoEnvíos.'
           : 'Sin pagos'} />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-xs text-neutral-500">
-              <tr>
-                <th className="px-3 py-2 w-8">
-                  <input type="checkbox" checked={todos} onChange={() => setMarcados(todos ? new Set() : new Set(pagos.map(p => p.id)))} />
-                </th>
-                <th className="px-3 py-2 text-left">Venta</th>
-                <th className="px-3 py-2 text-left">Pago</th>
-                <th className="px-3 py-2 text-left">Referencia</th>
-                <th className="px-3 py-2 text-right">Pagado</th>
-                <th className="px-3 py-2 text-left">vs. orden</th>
-                <th className="px-3 py-2 text-left">Envío</th>
-                <th className="px-3 py-2 text-left">En el sistema</th>
-                <th className="px-3 py-2 text-left">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagos.map(p => {
-                const v = VERIF[p.verificacion]
-                const especial = p.envio_metodo && !/gratis/i.test(p.envio_metodo)
-                return (
-                  <tr key={p.id} onClick={() => toggle(p.id)}
-                    className={`border-t border-neutral-100 align-top cursor-pointer ${marcados.has(p.id) ? 'bg-emerald-50/70' : 'hover:bg-neutral-50'}`}>
-                    <td className="px-3 py-2 text-center"><input type="checkbox" checked={marcados.has(p.id)} readOnly /></td>
-                    <td className="px-3 py-2">
-                      <div className="font-mono text-xs">{p.venta}</div>
-                      <div className="text-[11px] text-neutral-400">{p.cuenta ?? ''} · {hora(p.fecha_orden)}</div>
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      <div>{metodoPago(p.metodo_pago)}</div>
-                      <div className="text-neutral-500">{p.banco_emisor ?? '?'} → {p.banco_receptor ?? '?'}</div>
-                      {p.fecha_pago && <div className="text-neutral-400">{p.fecha_pago}</div>}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">{p.referencia ?? '—'}
-                      {!!p.ref_en_otras?.length && (
-                        <div className="mt-0.5 font-sans text-[11px] text-amber-700" title="La misma referencia de pago aparece en otra venta. Puede ser un pago de dos compras juntas: revisa que el monto alcance para todas.">
-                          ⚠️ También en {p.ref_en_otras.join(', ')}</div>)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium whitespace-nowrap">{bs(p.monto_pagado)}</td>
-                    <td className="px-3 py-2"><Monto p={p} /></td>
-                    <td className="px-3 py-2 text-xs">
-                      <div className={especial ? 'text-amber-700 font-medium' : ''}>{p.envio_metodo ?? '—'}</div>
-                      <div className="text-neutral-500">{[p.envio_opcion, p.carrier].filter(Boolean).join(' · ')}</div>
-                      {/* La guía a la vista (19-10): número y PDF, por si hay que consultarla. */}
-                      {p.guia && <div className="text-neutral-700">Guía <span className="font-mono">{p.guia}</span></div>}
-                      {p.tiene_guia
-                        ? <a href={`/api/pagos-me/${p.id}/archivo?tipo=guia`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                            className="underline text-sky-700">📄 Guía</a>
-                        : <div className="text-neutral-400">sin guía</div>}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {datos?.desdeML ? <>
-                        {p.ml_estado === 'cancelled' && <div className="text-red-700 font-medium">cancelada en ML</div>}
-                        {p.apartado && <div className="font-medium text-amber-700">{p.apartado === 'espera' ? '⏸ apartado: en espera' : p.apartado === 'enviada' ? '✓ ya enviada por fuera' : '✕ envío cancelado'}</div>}
-                        {p.en_despachos ? <a href="/despachos" onClick={e => e.stopPropagation()} className="text-neutral-700 underline underline-offset-2 hover:text-sky-700">{p.guia_impresa ? '✓ guía ya impresa' : 'en Despachos, sin imprimir'} →</a>
-                          : <div className="text-neutral-400">{p.tiene_guia ? 'todavía no en Despachos' : 'sin guía todavía'}</div>}
-                      </> : <>
-                        {p.sale_status ? <div>{p.sale_status}</div> : <div className="text-neutral-400">no registrada</div>}
-                        {p.apartado && <div className="font-medium text-amber-700">{p.apartado === 'espera' ? '⏸ apartado: en espera' : p.apartado === 'enviada' ? '✓ ya enviada por fuera' : '✕ envío cancelado'}</div>}
-                        {p.en_despachos && <a href="/despachos" onClick={e => e.stopPropagation()} className="block text-neutral-500 underline underline-offset-2 hover:text-sky-700">{p.guia_impresa ? '✓ guía ya impresa' : 'en Despachos, sin imprimir'} →</a>}
-                      </>}
-                    </td>
-                    <td className="px-3 py-2 text-xs" onClick={e => e.stopPropagation()}>
-                      <span className={`inline-block px-2 py-0.5 rounded-full ${v.c}`}>{v.t}</span>
-                      {p.verificado_por && <div className="text-neutral-400 mt-0.5">{p.verificado_por}</div>}
-                      {p.tiene_comprobante && (
-                        <button onClick={() => setVer(p)} className="mt-1 block underline text-sky-700">🖼 Comprobante</button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="rounded-xl border border-neutral-200 bg-white divide-y divide-neutral-100">
+          <div className="flex items-center gap-3 px-3 py-1.5 text-[11px] text-neutral-500 bg-neutral-50 rounded-t-xl">
+            <input type="checkbox" checked={todos} aria-label="Marcar todos"
+              onChange={() => setMarcados(todos ? new Set() : new Set(visibles.map(p => p.id)))} />
+            <span>{visibles.length} pago{visibles.length === 1 ? '' : 's'} · toca uno para ver el detalle</span>
+          </div>
+          {visibles.map(p => {
+            const v = VERIF[p.verificacion]
+            const prod = (p.detalle ?? []).map(d => `${d.cantidad > 1 ? `${d.cantidad}× ` : ''}${d.titulo}${d.variante ? ` (${d.variante})` : ''}`).join(' · ')
+            return (
+              <div key={p.id} role="button" tabIndex={0} onClick={() => setVer(p)} onKeyDown={e => { if (e.key === 'Enter') setVer(p) }}
+                className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${marcados.has(p.id) ? 'bg-emerald-50/70' : 'hover:bg-neutral-50'}`}>
+                <input type="checkbox" checked={marcados.has(p.id)} aria-label="Marcar" onClick={e => e.stopPropagation()} onChange={() => toggle(p.id)} />
+                {p.foto
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={p.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-neutral-200 object-cover" />
+                  : <div className="h-10 w-10 shrink-0 rounded-md bg-neutral-100" />}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">
+                    <b className="text-neutral-900">{p.comprador ?? p.nick ?? 'Comprador'}</b>
+                    {p.nick && p.comprador && <span className="ml-1.5 text-xs text-neutral-400">@{p.nick}</span>}
+                    <span className="ml-1.5 text-xs text-neutral-400">{hora(p.fecha_orden)}{p.cuenta ? ` · ${p.cuenta}` : ''}</span>
+                  </p>
+                  <p className="truncate text-xs text-neutral-600" title={prod}>{prod || <span className="font-mono text-neutral-400">{p.venta}</span>}</p>
+                </div>
+                <div className="hidden sm:flex shrink-0 flex-col items-end gap-0.5">
+                  <span className="text-sm font-medium whitespace-nowrap">{bs(p.monto_pagado)}</span>
+                  <Monto p={p} />
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px]">
+                  <span className={`inline-block px-2 py-0.5 rounded-full ${v.c}`}>{v.t}</span>
+                  {!!p.ref_en_otras?.length && <span className="text-amber-700" title="La misma referencia aparece en otra venta">⚠️ ref. repetida</span>}
+                  {p.ml_estado === 'cancelled' && <span className="text-red-700">cancelada en ML</span>}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
       </>}
 
-      {/* Comprobante en grande */}
+      {/* Detalle del pago (12-11): todo lo que antes iba en la tabla, más el comprobante, sin salir de la sección. */}
       {ver && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setVer(null)}>
-          <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-auto p-3 space-y-2" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-mono">{ver.venta}</span>
-              <button onClick={() => setVer(null)} className="text-neutral-500">Cerrar ✕</button>
-            </div>
-            <div className="text-xs text-neutral-600">
-              {metodoPago(ver.metodo_pago)} · {ver.banco_emisor ?? '?'} → {ver.banco_receptor ?? '?'} · Ref {ver.referencia ?? '—'} · <b>{bs(ver.monto_pagado)}</b> · <Monto p={ver} />
-              {!!ver.ref_en_otras?.length && <span className="text-amber-700"> · ⚠️ Misma referencia en {ver.ref_en_otras.join(', ')}</span>}
-            </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/pagos-me/${ver.id}/archivo?tipo=comprobante`} alt="Comprobante de pago" className="w-full rounded border" />
-            {ver.verificacion !== 'valido' && (
-              <div className="flex gap-2">
-                <button onClick={() => { marcar('valido', [ver.id]); setVer(null) }} className="btn-primary text-sm flex-1">✓ Verificar</button>
-                <button onClick={() => { marcar('invalido', [ver.id]); setVer(null) }} className="btn-secondary text-sm text-red-700">✗ Inválido</button>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" onClick={() => setVer(null)}>
+          <div className="bg-white w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              {ver.foto
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={ver.foto} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-neutral-200 object-cover" />
+                : <div className="h-14 w-14 shrink-0 rounded-lg bg-neutral-100" />}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-neutral-900">{ver.comprador ?? ver.nick ?? 'Comprador'}
+                  {ver.nick && ver.comprador && <span className="ml-1.5 text-xs font-normal text-neutral-400">@{ver.nick}</span>}</p>
+                <p className="text-xs text-neutral-500"><span className="font-mono">{ver.venta}</span> · {hora(ver.fecha_orden)}{ver.cuenta ? ` · ${ver.cuenta}` : ''}</p>
               </div>
+              <button onClick={() => setVer(null)} className="text-neutral-400 hover:text-neutral-700" aria-label="Cerrar">✕</button>
+            </div>
+            {!!ver.detalle?.length && (
+              <ul className="space-y-0.5 text-sm text-neutral-800">
+                {ver.detalle.map((d, k) => <li key={k}>{d.cantidad}× {d.titulo}{d.variante ? <span className="text-neutral-500"> · {d.variante}</span> : null}</li>)}
+              </ul>
             )}
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 rounded-xl bg-neutral-50 px-3 py-2.5 text-xs">
+              <dt className="text-neutral-500">Pago</dt><dd>{metodoPago(ver.metodo_pago)} · {ver.banco_emisor ?? '?'} → {ver.banco_receptor ?? '?'}{ver.fecha_pago ? ` · ${ver.fecha_pago}` : ''}</dd>
+              <dt className="text-neutral-500">Referencia</dt><dd className="font-mono">{ver.referencia ?? '—'}
+                {!!ver.ref_en_otras?.length && <span className="block font-sans text-amber-700">⚠️ También en {ver.ref_en_otras.join(', ')} (¿pagó dos compras juntas?)</span>}</dd>
+              <dt className="text-neutral-500">Pagado</dt><dd><b>{bs(ver.monto_pagado)}</b> <span className="text-neutral-500">· orden {bs(ver.total_orden)}</span> <Monto p={ver} /></dd>
+              <dt className="text-neutral-500">Envío</dt><dd>{ver.envio_metodo ?? '—'}{[ver.envio_opcion, ver.carrier].filter(Boolean).length ? ` · ${[ver.envio_opcion, ver.carrier].filter(Boolean).join(' · ')}` : ''}
+                {ver.guia && <span className="block">Guía <span className="font-mono">{ver.guia}</span></span>}
+                {ver.tiene_guia
+                  ? <a href={`/api/pagos-me/${ver.id}/archivo?tipo=guia`} target="_blank" rel="noreferrer" className="underline text-sky-700">📄 Ver guía</a>
+                  : <span className="block text-neutral-400">sin guía todavía</span>}</dd>
+              <dt className="text-neutral-500">En el sistema</dt><dd>
+                {ver.ml_estado === 'cancelled' && <span className="block text-red-700 font-medium">cancelada en ML</span>}
+                {ver.apartado && <span className="block font-medium text-amber-700">{ver.apartado === 'espera' ? '⏸ apartado: en espera' : ver.apartado === 'enviada' ? '✓ ya enviada por fuera' : '✕ envío cancelado'}</span>}
+                {!datos?.desdeML && (ver.sale_status ? <span className="block">{ver.sale_status}</span> : <span className="block text-neutral-400">no registrada</span>)}
+                {ver.en_despachos ? <a href="/despachos" className="underline underline-offset-2 hover:text-sky-700">{ver.guia_impresa ? '✓ guía ya impresa' : 'en Despachos, sin imprimir'} →</a>
+                  : datos?.desdeML && <span className="text-neutral-400">{ver.tiene_guia ? 'todavía no en Despachos' : 'sin guía todavía'}</span>}</dd>
+              <dt className="text-neutral-500">Estado</dt><dd><span className={`inline-block px-2 py-0.5 rounded-full ${VERIF[ver.verificacion].c}`}>{VERIF[ver.verificacion].t}</span>
+                {ver.verificado_por && <span className="ml-1.5 text-neutral-500">por {ver.verificado_por}{ver.verificado_at ? ` · ${hora(ver.verificado_at)}` : ''}</span>}</dd>
+            </dl>
+            {ver.tiene_comprobante && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/api/pagos-me/${ver.id}/archivo?tipo=comprobante`} alt="Comprobante de pago" className="w-full rounded-lg border" />
+            )}
+            <div className="flex flex-wrap gap-2">
+              {ver.verificacion !== 'valido' && <button onClick={() => { marcar('valido', [ver.id]); setVer(null) }} className="btn-primary text-sm flex-1">✓ Verificar</button>}
+              {ver.verificacion !== 'invalido' && <button onClick={() => { marcar('invalido', [ver.id]); setVer(null) }} className="btn-secondary text-sm text-red-700">✗ Inválido</button>}
+              {ver.verificacion !== 'pendiente' && <button onClick={() => { marcar('pendiente', [ver.id]); setVer(null) }} className="btn-secondary text-sm">Volver a sin verificar</button>}
+              <button onClick={() => setVer(null)} className="btn-ghost text-sm ml-auto">Cerrar</button>
+            </div>
           </div>
         </div>
       )}

@@ -540,6 +540,12 @@ MercadoLibre se releen solas al abrir la lista (unos segundos después se marcan
 terminada y sale sola de la lista (no queda como «No ha pagado» ni pasa a Vencidas). En Calificaciones cuenta como
 concretada. No hace falta tocar «No se concretó».
 
+**Historial de pagos (Pagados / Inválidos / Todos):** una línea por pago con la foto del producto, el nombre del
+comprador (y su @apodo), el producto, el monto y el estado. Arriba hay un **buscador**: escribe el nombre, el
+producto, el nº de venta, la referencia o el monto. **Toca un pago** para abrir su detalle en una ventanita (banco,
+referencia, monto vs. orden, envío y guía, en qué va en el sistema y el comprobante) y desde ahí Verificar, marcar
+Inválido o volver a sin verificar, sin salir de la sección.
+
 **Montos:** la columna **Pagado** es lo que el comprador **declaró** en MercadoEnvíos; al lado, **vs. orden** lo compara
 con el total de la orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Mientras el pago no se cruce con
 el banco dice **«Coincide según ME»**: el monto real que llegó solo lo confirma **Comprobar con el banco**. Si la **misma referencia de pago** aparece en otra

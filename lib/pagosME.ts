@@ -52,9 +52,18 @@ export const SELECT_PAGOS = `
              AND regexp_replace(r.referencia, '[^0-9]', '', 'g') = regexp_replace(p.referencia, '[^0-9]', '', 'g')
              AND r.creado_at > NOW() - INTERVAL '90 days') AS ref_en_otras,
          (SELECT u.estado FROM ((SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num LIMIT 1)
-           UNION ALL (SELECT o.estado FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) u LIMIT 1) AS ml_estado
+           UNION ALL (SELECT o.estado FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) u LIMIT 1) AS ml_estado,
+         -- 12-11 (el dueño): quién compró y qué, con la foto, para reconocer cada pago en el Historial.
+         mo.comprador, mo.nick, mo.detalle,
+         (SELECT k.thumbnail FROM ml_catalogo k WHERE k.item_id = (SELECT i FROM unnest(mo.items) i WHERE i NOT LIKE '%:%' LIMIT 1)
+           AND k.thumbnail IS NOT NULL LIMIT 1) AS foto
   FROM me_pagos p
   CROSS JOIN LATERAL (SELECT CASE WHEN p.venta ~ '^[0-9]{1,18}$' THEN p.venta::bigint END AS num) v
+  LEFT JOIN LATERAL (
+    SELECT COALESCE(NULLIF(o.comprador_nombre, ''), NULLIF(c.comprador_nombre, '')) AS comprador, o.comprador AS nick, o.detalle, o.items
+    FROM ((SELECT * FROM ml_ordenes o WHERE o.id = v.num LIMIT 1) UNION ALL (SELECT * FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) o
+    LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
+    LIMIT 1) mo ON TRUE
   LEFT JOIN users u ON u.id = p.verificado_por
   LEFT JOIN LATERAL (SELECT id, status, total_amount FROM sales WHERE ml_order_number = p.venta ORDER BY id DESC LIMIT 1) s ON TRUE`
 

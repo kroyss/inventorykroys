@@ -36,6 +36,11 @@ export interface PagoME {
   verificado_por: string | null
   verificado_at: string | null
   nota: string | null
+  // De la venta en MercadoLibre (12-11): quién compró y qué, con la foto del primer producto.
+  comprador?: string | null
+  nick?: string | null
+  detalle?: { titulo: string; variante: string | null; cantidad: number }[] | null
+  foto?: string | null
   // De la venta registrada en el sistema (si ya está)
   sale_id: number | null
   sale_status: string | null
