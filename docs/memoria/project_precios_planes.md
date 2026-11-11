@@ -8,6 +8,9 @@ metadata:
   modified: 2026-10-09T12:17:11.216Z
 ---
 
+> **12-11-2026: este texto es HISTÓRICO.** Los precios vigentes están en `lib/planes.ts` (ESCALONES): Esencial $8/$12/$18/$27 · Automatizaciones $10/$15/$23/$35 · Completo $15/$23/$33/$45 (hasta 50 / 51–300 / 301–1.000 / más de 1.000 ventas al mes); créditos de regalo 500/1.000/1.500/2.500.
+
+
 Texto final de los planes, tal como lo dejó el dueño el 2026-10-09 (pagaderos en bolívares a tasa BCV del día):
 
 ```

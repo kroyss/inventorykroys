@@ -18,7 +18,7 @@
 - [Caída 06-10: no dbEmpresa en layout](feedback_no_dbempresa_en_layout.md) — Navbar agotó el pool; usar conEmpresa en lo global, no esconder errores, vigilar conexiones tras deploy
 - [Siempre en español](feedback_siempre_espanol.md) — toda respuesta al usuario en español, sin excepción
 - [Idea: extensión guías MercadoEnvíos](project_idea_extension_guias.md) — pendiente 07-10: bajar en lote las guías PDF del portal (no hay lote ni API pública); extensión en la sesión del vendedor
-- [Precios y planes](project_precios_planes.md) — texto final: Emprende $6 (≤50 ventas) / Esencial $10 / Automatizaciones $14 / +Inventario $18 (Bs a BCV); Fundadores 30% de por vida
+- [Precios y planes](project_precios_planes.md) — VIGENTE en lib/planes.ts (única fuente): Esencial 8/12/18/27 · Automatizaciones 10/15/23/35 · Completo 15/23/33/45 por escalón; créditos 500/1.000/1.500/2.500; Fundadores −30%
 - [Esperar autorización](feedback_esperar_autorizacion.md) — ante un problema o comentario: responder/proponer, NO implementar ni subir a staging sin su OK
 - [Pagos ME](project_pagos_me.md) — prod SolucionesMC + versión clientes (apagada, se activa en Plataforma); extensión APROBADA en Chrome Web Store 17-10 (no listada), /extension redirige; 1.3.5 en revisión
 - [Deploy arrastra main](feedback_deploy_arrastra_main.md) — deploy.sh publica todo main: revisar commits pendientes de OK y migraciones antes de subir a prod
