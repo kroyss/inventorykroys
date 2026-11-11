@@ -116,7 +116,7 @@ export async function verificarBorrador(datos: string, pregunta: string, borrado
   // v2: Haiku a veces igual marca la cortesía o "el precio es el publicado" (07-11, 3 de 30): se descartan aquí.
   // 11-11 (revisión del dueño): también "quedamos/estaremos atentos", "con gusto le respondemos", "podemos confirmarle la compra".
   const CORTESIA = /^([\s¡!.,]*(hola|buenas?( (tardes|noches|d[ií]as))?|saludos|con gusto|quedo a (su|tu) orden|estamos a (su|tu) orden|gracias|oferta con confianza)[\s¡!.,]*)+$|precio (es )?(el )?publicado|tasa bcv|menor tiempo posible|se confirma al concretar|(estaremos|quedamos|estamos) atent|atent[oa]s? a (su|tu) consulta|con gusto le (respond|atend|ayud)|cualquier (otra )?duda|podemos confirmarle la compra/i
-  const sinRespaldo = (r.afirmaciones ?? []).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? '')) && !(v2 && CORTESIA.test((a.afirmacion ?? '').trim())))
+  const sinRespaldo = lista(r.afirmaciones).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? '')) && !(v2 && CORTESIA.test((a.afirmacion ?? '').trim())))
   // 11-11: Haiku a veces anota como "sin contestar" una parte y en la misma línea dice que sí se contestó ("…lo cual sí
   // responde la petición"), o pide la cifra cuando "el precio es el publicado" ya contesta. Esas no cuentan.
   const YA_CONTESTADA = /\b(s[ií] (la |lo )?(respond|contest)|lo cual (s[ií] )?(respond|contest)|(queda|quedan|est[aá]|fue) contestad|\(contestada\)|ninguna parte|responde (la|a la) petici[oó]n|es la respuesta correcta|lo cual es correct|\(contestad[oa]:|contestad[oa]: s[ií])/i
@@ -135,9 +135,18 @@ async function verificarV3(datos: string, pregunta: string, borrador: string, mo
     sistema: SISTEMA + SISTEMA_V2_EXTRA + SISTEMA_V3_EXTRA, herramienta: HERRAMIENTA_V3, modelo: modeloV, maxTokens: 900,
     contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
   })
-  const sinRespaldo = (r.afirmaciones ?? []).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? ''))
+  if (!esLista(r.afirmaciones)) return { ok: false, motivo: 'El verificador no respondió bien: lo revisa una persona', llamada: { modelo, uso } }
+  const sinRespaldo = lista(r.afirmaciones).filter(a => (!a.respaldada || /^ninguna/i.test(a.donde ?? ''))
     && TIPOS_RIESGO.includes(a.tipo ?? 'producto'))
   const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`
     : r.principal_sin_contestar ? `Falta contestar: ${r.que_falta || 'lo principal de la pregunta'}` : null
   return { ok: !motivo, motivo: motivo?.slice(0, 300) ?? null, llamada: { modelo, uso }, sinRespaldo: sinRespaldo.map(a => ({ afirmacion: a.afirmacion, tipo: a.tipo })) }
 }
+
+// 11-11: a veces Haiku devuelve las afirmaciones como texto JSON en vez de lista. Se intenta leer; si no se puede, en v3 frena.
+function lista<T>(x: T[] | string | undefined | null): T[] {
+  if (Array.isArray(x)) return x
+  if (typeof x === 'string') { try { const v = JSON.parse(x); if (Array.isArray(v)) return v } catch { /* no es JSON */ } }
+  return []
+}
+function esLista(x: unknown) { return Array.isArray(x) || (typeof x === 'string' && Array.isArray((() => { try { return JSON.parse(x) } catch { return null } })())) }

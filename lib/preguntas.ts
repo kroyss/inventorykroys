@@ -648,8 +648,9 @@ export function cantidadPedida(texto: string): number | null {
   return v >= 2 && v <= 10 ? v : null
 }
 
-/** 11-11: verificador v3 (por tipo de afirmación). Se enciende cuando la medición sobre las marcadas lo aprueba. */
-export const V3_POR_DEFECTO = process.env.IA_VERIFICADOR_V3 === '1'
+/** 11-11: verificador v3 (por tipo de afirmación). Medido sobre 169 marcadas: 51 % → 78 % de salida, 3 malas de 132
+ *  (97,7 % de acierto). Encendido; IA_VERIFICADOR_V3=0 vuelve al anterior sin subir código. */
+export const V3_POR_DEFECTO = process.env.IA_VERIFICADOR_V3 !== '0'
 
 export function sinTercero(t: string) {
   return t
