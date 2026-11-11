@@ -528,6 +528,10 @@ verificar.**
 comprador escribió algo después de comprar (al pasar el mouse ves sus últimos mensajes); en blanco, no escribió nada
 y la venta es tal cual. **📝 Nota** se marca en amarillo si la venta tiene nota.
 
+**Guía ya reportada sin pago en el sistema** (por ejemplo, subiste la guía a mano con el PDF): la venta ya está
+terminada y sale sola de la lista (no queda como «No ha pagado» ni pasa a Vencidas). En Calificaciones cuenta como
+concretada. No hace falta tocar «No se concretó».
+
 **Montos:** la columna **Pagado** es lo que pagó el comprador; al lado, **vs. orden** lo compara con el total de la
 orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Si la **misma referencia de pago** aparece en otra
 venta (últimos 90 días), debajo de la referencia sale **⚠️ También en …** con esas ventas: puede ser un pago de dos

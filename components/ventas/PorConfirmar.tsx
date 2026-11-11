@@ -554,7 +554,11 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const q = buscar.trim().toLowerCase()
   const coincide = (f: Fila) => !q || [f.numero, f.comprador, f.nick, f.cuenta, ...f.lineas.map(l => `${l.titulo} ${l.variante ?? ''}`)]
     .some(t => (t ?? '').toLowerCase().includes(q))
-  const filas = datos.filas.filter(coincide)
+  // 12-11 (el dueño, caso guía subida a mano): sin inventario, la venta con la guía ya REPORTADA y sin pago en el sistema
+  // ya está terminada (Calificaciones la toma como concretada): no sale como «No ha pagado» ni cae en Vencidas. Con un pago
+  // por verificar sigue (falta revisar el dinero). Con inventario no se toca: falta registrarla en Ventas.
+  const filas = datos.filas.filter(f => !(sinInventario && f.despacho === 'reportada' && (!f.pago || f.pago.verificacion === 'invalido')))
+    .filter(coincide)
   const vigentes = filas.filter(f => !f.vencida)
   const vencidas = filas.filter(f => f.vencida && !f.concretadaSinVenta)
   // 10-11: calificadas como concretadas sin venta ni pago en el sistema (solo con inventario: sin él no se registran ventas).
