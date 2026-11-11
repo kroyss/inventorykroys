@@ -168,7 +168,11 @@ const SELECT_COBRO = `SELECT k.id, k.tipo, k.plan, k.escalon, k.ciclo, k.radar_p
   k.revisado_at, k.comprobante IS NOT NULL AS tiene_comprobante, COALESCE(k.detalle->>'hasta', to_char(p.hasta, 'YYYY-MM-DD')) AS hasta
   FROM organizacion_cobros k LEFT JOIN organizacion_pagos p ON p.id = k.pago_id`
 
-export interface OpcionPlan { id: Plan['id']; nombre: string; resumen: string; mensual: number; trimestral: number; radar: boolean }
+export interface OpcionPlan {
+  id: Plan['id']; nombre: string; resumen: string; mensual: number; trimestral: number; radar: boolean
+  /** 12-11: para el resumen tipo factura de Mi plan: precio de lista por mes, cuentas extra por mes y el descuento de cada ciclo. */
+  base: number; extrasMes: number; desc: { mensual: number; trimestral: number }
+}
 export interface SituacionPlan {
   organizacion: string; estado: EstadoCuenta; fundador: boolean
   plan: Plan['id'] | null; escalon: number | null; ciclo: string | null
@@ -222,6 +226,9 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     id: p.id, nombre: p.nombre, resumen: p.resumen, radar: planConRadar(p.id),
     mensual: montoPlan(p.id, escalon, 'mensual', !!o.fundador, cuentasExtra).total,
     trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador, cuentasExtra).total,
+    base: montoPlan(p.id, escalon, 'mensual', false, cuentasExtra).base,
+    extrasMes: montoPlan(p.id, escalon, 'mensual', false, cuentasExtra).extras,
+    desc: { mensual: montoPlan(p.id, escalon, 'mensual', !!o.fundador).descuento, trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador).descuento },
   }))
   const planSugerido = (conPlan && PLANES.some(p => p.id === o.plan) ? o.plan : 'automatizaciones') as Plan['id']
   const activo = estado === 'activo' && conPlan && !!o.plan_hasta && o.plan_hasta >= hoy

@@ -138,7 +138,10 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      Puedes elegir **mensual** o **trimestral (−10%)**: cada opción muestra el precio por mes y, en el trimestral, cuánto
      pagas cada 3 meses y cuánto ahorras. Los regalos del primer plan (créditos de IA y 1 mes de Radar PRO) salen juntos
      en un recuadro. Debajo puedes marcar **Sumar Radar PRO** para los meses que no cubre el regalo. El **Resumen** muestra
-     línea por línea de dónde sale el total (plan, descuento, Radar PRO) y su equivalente en bolívares. El link **«¿Qué es el Radar?»** abre una ventanita con lo que es y
+     línea por línea de dónde sale el total (precio de lista del plan, descuento, cuentas extra, Radar PRO) y su
+     equivalente en bolívares: son las mismas líneas que quedan registradas en el cobro. Los **Fundadores** ven su precio
+     de lista tachado y el −30% Fundador (el trimestral les cuesta lo mismo por mes: el −30% ya es mayor que el −10%), con
+     el recordatorio de que lo conservan mientras renueven a tiempo. En Créditos de IA, «cada 100» es lo que cuestan 100 créditos. El link **«¿Qué es el Radar?»** abre una ventanita con lo que es y
      lo que trae cada plan.
      Con un plan activo, arriba eliges **qué pagar**: **Renovar plan**, **Agregar Radar PRO** (1 mes, $6) o
      **Mejorar mi plan** (pasar a uno más caro desde hoy: pagas solo la diferencia por mes, con el mismo descuento que

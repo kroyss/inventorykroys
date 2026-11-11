@@ -119,6 +119,11 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const porMes = (o: { mensual: number; trimestral: number }) => r2(ciclo === 'trimestral' ? o.trimestral / 3 : o.mensual)
   const ahorro = r2(op.mensual * 3 - op.trimestral)
   const pctAhorro = op.mensual > 0 ? Math.round(ahorro / (op.mensual * 3) * 100) : 0
+  const meses = ciclo === 'trimestral' ? 3 : 1
+  const descCiclo = op.desc[ciclo]
+  // Fundador: su −30% es mayor que el −10% del trimestral (no se suman), así que el que aplica es el suyo.
+  const esDescFundador = s.fundador && descCiclo === op.desc.mensual && descCiclo > 0
+  const listaMes = r2(op.base + op.extrasMes)
   // Resumen tipo factura: de dónde sale el total (12-11).
   const lineas: { t: string; usd: number }[] =
     tipo === 'radar_mes' ? [{ t: 'Radar PRO todos los días · 1 mes', usd: s.radarMes.precio }]
@@ -126,9 +131,10 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
     : tipo === 'radar_pro' ? [{ t: 'Radar PRO fines de semana · 1 mes', usd: s.radarProCompra!.precio }]
     : tipo === 'upgrade' ? [{ t: `Cambio a ${mej!.nombre} hasta el ${ddmm(s.vence)}`, usd: mej!.monto }]
     : [
-        ...(ciclo === 'trimestral'
-          ? [{ t: `${op.nombre} × 3 meses`, usd: r2(op.mensual * 3) }, ...(ahorro > 0 ? [{ t: `Descuento trimestral −${pctAhorro}%`, usd: -ahorro }] : [])]
-          : [{ t: `${op.nombre} · 1 mes`, usd: op.mensual }]),
+        // Las mismas líneas que se guardan en Plataforma → Cobros (desglosePlan): lista, descuento (solo el plan), cuentas extra.
+        { t: `${op.nombre} · ${fmtUsd(op.base)}/mes × ${meses} ${meses === 1 ? 'mes' : 'meses'}`, usd: r2(op.base * meses) },
+        ...(descCiclo > 0 ? [{ t: `Descuento ${esDescFundador ? 'Fundador' : 'trimestral'} −${descCiclo}%`, usd: -r2(op.base * meses * descCiclo / 100) }] : []),
+        ...(op.extrasMes > 0 ? [{ t: `${s.cuentasExtra} cuenta${s.cuentasExtra === 1 ? '' : 's'} de ML extra × ${meses} ${meses === 1 ? 'mes' : 'meses'}`, usd: r2(op.extrasMes * meses) }] : []),
         ...(pro > 0 ? [{ t: `Radar PRO ${mesesPro === 1 ? '· 1 mes' : `× ${mesesPro} meses`}`, usd: pro }] : []),
       ]
   // Días que le quedan a la prueba o al plan (ámbar con 3 o menos).
@@ -235,7 +241,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                       className={`text-left rounded-lg border px-3 py-2 ${paquete === i ? 'border-sky-400 bg-sky-50' : 'border-neutral-200 hover:border-neutral-300'}`}>
                       <p className="text-sm font-semibold num">{r.creditos.toLocaleString('de-DE')} créditos</p>
                       <p className="text-sm num">{fmtUsd(r.precio)}</p>
-                      <p className="text-xs text-neutral-500">{fmtUsd(Math.round(r.precio / r.creditos * 100000) / 100)} cada 100</p>
+                      <p className="text-xs text-neutral-500">{fmtUsd(r2(r.precio / r.creditos * 100))} cada 100</p>
                     </button>
                   ))}
                 </div>
@@ -282,8 +288,9 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                   <button type="button" onClick={() => setCambiarPlan(true)} className="mt-1.5 text-xs font-medium text-sky-700 hover:underline">Cambiar plan</button>
                 </div>
                 <div className="shrink-0 text-right">
-                  {ciclo === 'trimestral' && ahorro > 0 && <s className="block text-xs text-neutral-400 num">{fmtUsd(op.mensual)}</s>}
+                  {porMes(op) < listaMes && <s className="block text-xs text-neutral-400 num">{fmtUsd(listaMes)}</s>}
                   <p className="num"><span className="text-xl font-bold text-neutral-900">{fmtUsd(porMes(op))}</span><span className="text-xs text-neutral-500">/mes</span></p>
+                  {esDescFundador && <span className="mt-0.5 inline-block rounded-full bg-lime-100 px-2 py-0.5 text-[10px] font-semibold text-lime-800">−{descCiclo}% Fundador</span>}
                 </div>
               </div>
             ) : (
@@ -310,9 +317,16 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                       <span className="absolute -top-2.5 right-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">−{pctAhorro}%</span>
                     )}
                     <p className={`text-xs font-semibold ${sel ? 'text-sky-800' : 'text-neutral-500'}`}>{c === 'mensual' ? 'Mensual' : 'Trimestral'}</p>
-                    <p className="num"><span className="text-lg font-bold text-neutral-900">{fmtUsd(pm)}</span><span className="text-xs text-neutral-500">/mes</span></p>
+                    <p className="num">
+                      {pm < listaMes && <s className="mr-1 text-xs text-neutral-400">{fmtUsd(listaMes)}</s>}
+                      <span className="text-lg font-bold text-neutral-900">{fmtUsd(pm)}</span><span className="text-xs text-neutral-500">/mes</span>
+                    </p>
                     <p className="text-[11px] leading-snug text-neutral-500">
-                      {c === 'mensual' ? 'Pagas mes a mes' : <>{fmtUsd(op.trimestral)} cada 3 meses{ahorro > 0 && <> · <span className="font-semibold text-emerald-700">ahorras {fmtUsd(ahorro)}</span></>}</>}
+                      {c === 'mensual'
+                        ? (s.fundador && op.desc.mensual > 0 ? <>Pagas mes a mes · <span className="font-semibold text-lime-700">−{op.desc.mensual}% Fundador</span></> : 'Pagas mes a mes')
+                        : <>{fmtUsd(op.trimestral)} cada 3 meses{ahorro > 0
+                          ? <> · <span className="font-semibold text-emerald-700">ahorras {fmtUsd(ahorro)}</span></>
+                          : s.fundador && op.desc.mensual >= op.desc.trimestral ? <> · tu −{op.desc.mensual}% Fundador ya es mayor que el −{op.desc.trimestral}%</> : null}</>}
                     </p>
                   </button>
                 )
@@ -368,6 +382,12 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 </span>
               </div>
             </div>
+            {/* 12-11 (el dueño): el Fundador conserva el −30% mientras renueve a tiempo (lib/planesCuenta.ts lo quita al pausarse). */}
+            {tipo === 'plan' && esDescFundador && (
+              <p className="text-[11px] leading-snug text-neutral-400">
+                Conservas tu −{descCiclo}% Fundador mientras renueves a tiempo. Si tu plan vence sin pago, dejas de ser Fundador y pierdes el beneficio.
+              </p>
+            )}
           </section>
 
           <div className="space-y-4">
