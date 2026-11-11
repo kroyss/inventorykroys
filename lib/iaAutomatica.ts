@@ -47,10 +47,32 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
 
 // "No tenemos / no hay / agotado": decir que no de más pierde la venta (y el stock de la publicación puede ir atrasado),
 // así que siempre lo ve una persona.
+// 12-11 (el dueño: "no tenemos la circunferencia" se frenó como si no hubiera el producto): el "no hay" frena solo si habla
+// de EXISTENCIAS (stock, agotado, una variante o modelo que no hay). "No tenemos <un dato>" es falta de dato: lo cuida el
+// verificador (que no se invente nada), no este freno.
+const EXISTENCIA_SIEMPRE = /\bno hay\b(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|\bno (nos )?quedan?\b|agotad|sin (stock|existencia|disponibilidad)|\bno (est[aá]|se encuentra)n? disponible/i
+const NO_TENEMOS = /\bno (lo |la |los |las )?(tenemos|tengo|contamos)\b([^.;!?\n]{0,50})/gi
+const OTRA_MEDIDA = /^\s*(de|en)\s+\d|\b(el|la|los|las|ese|esa|esos|esas) de\b|\bde \d/i
+const ES_EXISTENCIA = /disponib|stock|venta\b|de momento|existencia|unidad|inventario|\bcolou?r|modelo|talla|variante|tama[ñn]o|presentaci|versi[oó]n|referencia|\bmarca\b|\b(el|la|los|las|ese|esa|esos|esas) de\b|\b(ese|esa|esos|esas|eso)\b|\b(rojo|azul|negro|blanco|verde|amarillo|gris|rosad?o|morado|naranja|marr[oó]n|dorado|plateado)s?\b|por (ahora|el momento)|en este momento|ahorita|\bm[aá]s\b|\botr[oa]s?\b|\b(en|de) venta\b/i
+// Lo que es un DATO del producto (manda sobre lo anterior: "no tenemos ese dato" no es de existencias).
+const ES_DATO = /\bdatos?\b|informaci[oó]n|medidas?\b|especificaci|detalle|ficha|circunferencia|di[aá]metro|largo|ancho|\balto\b|grosor|espesor|peso|potencia|voltaje|amperaje|capacidad|material|dimensi|cent[ií]metros|mil[ií]metros|pulgadas|exact/i
+export function esDeExistencias(t: string) {
+  if (EXISTENCIA_SIEMPRE.test(t)) return true
+  for (const m of t.matchAll(NO_TENEMOS)) {
+    const antes = t.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0).split(/[.;!?\n]/).pop() ?? ''
+    const ventana = m[1] ? `${antes} ${m[3] ?? ''}` : (m[3] ?? '')
+    if (OTRA_MEDIDA.test(m[3] ?? '')) return true        // "no tenemos de 3 pulgadas" = otra variante, no un dato
+    if (ES_DATO.test(ventana)) continue                 // "la circunferencia no la tenemos", "no tenemos ese dato"
+    if (ES_EXISTENCIA.test(ventana)) return true         // "esa talla no la tenemos", "no tenemos el rojo"
+    // "no lo tenemos." a secas (sin decir qué): se trata como del producto.
+    if (!/[a-záéíóúñ]{3,}/i.test(ventana.replace(/\b(lo|la|los|las|y|ya|pero|por|el|un|una|que|le|se)\b/gi, ''))) return true
+  }
+  return false
+}
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 // 11-11: "déjanos verificarlo / te confirmamos": una vez publicada la pregunta no se puede volver a contestar.
 const PROMESA = /d[eé]j[ae]n?(me|nos)( lo)? (verificar|revisar|confirmar)|(lo|le|te) (verificamos|confirmamos|averiguamos)|prefiero confirmarlo|confirmarlo con (una persona|el equipo)|en breve (le|te) (confirmo|confirmamos|respondo)/i
-const META = /la respuesta es|no requiere (una )?respuesta|el borrador|el comprador (dice|pregunta|escribe)|como (asistente|modelo de lenguaje)/i
+const META = /bla respuesta esb|no requiere (una )?respuesta|bel borradorb|bel comprador (dice|pregunta|escribe)|como (asistente|modelo de lenguaje)b/i
 const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
 // 10-11 (competencia, el dueño): invitar al catálogo de la tienda ante la duda está bien: ese link no frena.
 const CATALOGO = /https?:\/\/listado\.mercadolibre\.com\.(ve|co)\/_CustId_\d+\S*/gi
@@ -111,7 +133,7 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   // «No trabajamos con Cashea» con la lista de medios escrita no es «no hay» (el medio ya se revisa en pagoEscrito).
   if (v2 && PAGO.test(pregunta) && pagoEscrito(pregunta, b.respuesta, vendedor))
     paraNegativa = paraNegativa.replace(/no (trabajamos|aceptamos|contamos|manejamos|tenemos)( pagos?)?( con| por)? [^,.;]*/gi, '')
-  const negativa = NEGATIVA.test(paraNegativa)
+  const negativa = NEGATIVA.test(paraNegativa) && esDeExistencias(paraNegativa)
   // 11-11 (el dueño): "no tenemos esa, mira nuestro catálogo: <link>" con el verificador conforme tampoco frena: el comprador
   // igual encuentra lo que sí hay (pedido de la competencia, 10-11).
   const invitaCatalogo = sinCat !== b.respuesta
