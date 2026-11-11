@@ -812,6 +812,10 @@ export default function MiIA() {
   // 11-11 (el dueño: "demora al pasar de tema"): sin cambios no se guarda nada, y los guardados van en fila (uno detrás
   // de otro) para que uno lento no pise al siguiente.
   const ultimoGuardado = useRef<string | null>(null)
+  const [dir, setDir] = useState<'adelante' | 'atras'>('adelante')
+  const [guardadoOk, setGuardadoOk] = useState(false)
+  const timerOk = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tarjeta = useRef<HTMLDivElement>(null)
   const colaGuardar = useRef<Promise<boolean>>(Promise.resolve(true))
   const guardar = (): Promise<boolean> => {
     // Lo sugerido de los temas por los que todavía no pasó (Siguiente/Guardar) NO se guarda: solo se propone.
@@ -830,6 +834,9 @@ export default function MiIA() {
       if (!r?.ok) { setError(d?.error ?? 'No se pudo guardar (revisa tu conexión)'); return false }
       ultimoGuardado.current = json
       if (actual) setSugeridos(s => s.filter(t => t !== actual))
+      setGuardadoOk(true)
+      if (timerOk.current) clearTimeout(timerOk.current)
+      timerOk.current = setTimeout(() => setGuardadoOk(false), 1800)
       return true
     })
     colaGuardar.current = p
@@ -847,10 +854,16 @@ export default function MiIA() {
     }
     const desde = paso
     const g = guardar()
-    if (!ruta.includes(destino)) setRuta(TODOS)
+    const r = ruta.includes(destino) ? ruta : TODOS
+    if (r !== ruta) setRuta(r)
+    setDir(desde === null || r.indexOf(destino) > r.indexOf(desde) ? 'adelante' : 'atras')
     setPaso(destino)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    if (!(await g) && desde !== null) setPaso(desde)
+    // Solo sube si el comienzo del tema quedó fuera de la vista (no salta cuando ya se ve).
+    requestAnimationFrame(() => {
+      const top = tarjeta.current?.getBoundingClientRect().top
+      if (top !== undefined && top < 8) tarjeta.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    })
+    if (!(await g) && desde !== null) { setDir('atras'); setPaso(desde) }
   }
   useEffect(() => {
     if (paso !== null) document.getElementById(`tema-${PASOS[paso].id}`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
@@ -888,32 +901,48 @@ export default function MiIA() {
             )
           })}
         </nav>
-        <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-4">
-          {recorrido && <div className="h-1 rounded bg-neutral-100"><div className="h-1 rounded bg-neutral-900 transition-all" style={{ width: `${((pos + 1) / ruta.length) * 100}%` }} /></div>}
-          <div>
-            <p className="text-xs text-neutral-500">{p.tema} · {pos + 1} de {ruta.length}{recorrido ? ' que faltan' : ''}</p>
-            <h2 className="text-lg font-semibold text-neutral-900">{p.titulo}</h2>
+        <div ref={tarjeta} className="scroll-mt-4 overflow-x-clip rounded-xl border border-neutral-200 bg-white shadow-sm">
+          {/* Avance: una rayita por tema del recorrido (la actual más oscura); se llena con transición. */}
+          <div className="flex gap-1 px-5 pt-4" aria-hidden="true">
+            {ruta.map((t, i) => (
+              <span key={t} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${i < pos ? 'bg-neutral-400' : i === pos ? 'bg-neutral-900' : 'bg-neutral-200'}`} />
+            ))}
           </div>
-          {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
-            Sugerido de lo que ya respondes ({ddmm(sug.fecha)}). Revísalo y cámbialo si hace falta; se guarda al pasar a otro tema.</p>}
-          <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
-          {error && <p className="text-sm text-red-700">{error}</p>}
-          <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4">
-            {anterior !== null && (
-              <button type="button" onClick={() => ir(anterior)}
-                className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">
-                ← {PASOS[anterior].tema}</button>
-            )}
-            <button type="button" onClick={cancelar} disabled={guardando} className="px-2 py-2 text-sm text-neutral-500 hover:text-neutral-800"
+          <div className="space-y-4 p-5 pt-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-neutral-500">{p.tema} · {pos + 1} de {ruta.length}{recorrido ? ' que faltan' : ''}</p>
+              <span className="h-4 shrink-0 text-xs" aria-live="polite">
+                {guardando ? <span className="aparecer text-neutral-400">Guardando…</span>
+                  : guardadoOk ? <span className="aparecer text-emerald-600">Guardado ✓</span> : null}
+              </span>
+            </div>
+            <div key={paso} className={`space-y-4 ${dir === 'adelante' ? 'tema-adelante' : 'tema-atras'}`}>
+              <h2 className="-mt-3 text-lg font-semibold text-neutral-900">{p.titulo}</h2>
+              {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                Sugerido de lo que ya respondes ({ddmm(sug.fecha)}). Revísalo y cámbialo si hace falta; se guarda al pasar a otro tema.</p>}
+              <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
+            </div>
+            {error && <p className="aparecer rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          </div>
+          {/* Botones siempre a mano: quedan pegados abajo de la pantalla mientras el tema es largo. */}
+          <div className="sticky bottom-0 z-10 flex items-center gap-2 rounded-b-xl border-t border-neutral-100 bg-white/95 px-3 py-3 backdrop-blur sm:px-5">
+            {anterior !== null ? (
+              <button type="button" onClick={() => ir(anterior)} title={`Volver a ${PASOS[anterior].tema}`}
+                className="inline-flex h-10 min-w-0 items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition hover:bg-neutral-50 active:scale-[0.98]">
+                <span aria-hidden="true">←</span><span className="hidden truncate sm:inline">{PASOS[anterior].tema}</span><span className="sm:hidden">Atrás</span></button>
+            ) : <span className="hidden sm:block" />}
+            <button type="button" onClick={cancelar} disabled={guardando}
+              className="h-10 shrink-0 px-2 text-sm text-neutral-500 hover:text-neutral-800 disabled:opacity-50"
               title="Vuelve a Mi IA sin guardar lo que cambiaste en este tema">Cancelar</button>
-            <div className="ml-auto flex flex-wrap gap-2">
+            <div className="ml-auto flex min-w-0 items-center gap-2">
               {proximo !== null && (
                 <button type="button" onClick={() => ir(null)} disabled={guardando}
-                  className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">Guardar y salir</button>
+                  className="h-10 shrink-0 rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50">
+                  <span className="hidden sm:inline">Guardar y salir</span><span className="sm:hidden">Salir</span></button>
               )}
               <button type="button" onClick={() => ir(proximo)}
-                className="inline-flex items-center gap-1 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
-                {guardando ? 'Guardando…' : proximo !== null ? <>{PASOS[proximo].tema} →</> : 'Guardar y terminar'}</button>
+                className="inline-flex h-10 min-w-0 items-center gap-1.5 rounded-lg bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 active:scale-[0.98]">
+                {proximo !== null ? <><span className="truncate">{PASOS[proximo].tema}</span><span aria-hidden="true">→</span></> : 'Guardar y terminar'}</button>
             </div>
           </div>
         </div>
