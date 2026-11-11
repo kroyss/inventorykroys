@@ -57,7 +57,7 @@ interface Counts {
   REABIERTA: number
 }
 
-interface SalesResponse {
+export interface SalesResponse {
   rows: Sale[]
   page: number
   pageSize: number
@@ -74,6 +74,7 @@ interface Props {
   porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
   pagoEnFila?: boolean   // cliente con inventario y Pagos ME (25-10): ✓ / ✗ del pago también en Por confirmar
   verificarPagos?: boolean   // VE: paso "Pago verificado" antes de procesar (módulo verificar_pagos; apagado = Inventario simple)
+  inicial?: SalesResponse | null   // 12-11: la 1ª página (orden por fecha, sin filtros) ya vino en el HTML (lib/inicial.ts)
 }
 
 type Filter = 'all' | SaleStatus
@@ -83,7 +84,7 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, presupuestos = false }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, presupuestos = false, inicial = null }: Props) {
   // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
   const directoVE = country === 'VE' && !verificarPagos
   // VE con el flujo completo: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE); CO y VE simple quedan igual.
@@ -107,11 +108,12 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     } catch { /* si falla, se queda con lo último cargado */ }
   }, [])
 
-  const [sales, setSales]       = useState<Sale[]>([])
-  const [counts, setCounts]     = useState<Counts>(EMPTY_COUNTS)
-  const [total, setTotal]       = useState(0)
+  const [sales, setSales]       = useState<Sale[]>(inicial?.rows ?? [])
+  const [counts, setCounts]     = useState<Counts>(inicial?.counts ?? EMPTY_COUNTS)
+  const [total, setTotal]       = useState(inicial?.total ?? 0)
   const [page, setPage]         = useState(1)
-  const [loading, setLoading]   = useState(true)
+  const [loading, setLoading]   = useState(!inicial)
+  const saltarPrimera = useRef(!!inicial)   // la 1ª página ya vino en el HTML: no se pide de nuevo al abrir
   const [selected, setSelected] = useState<Sale | null>(null)
   const [filter, setFilter]     = useState<Filter>('all')
   const [search, setSearch]     = useState('')
@@ -279,7 +281,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
     setSelected(prev => prev ? (res.rows.find(s => s.id === prev.id) ?? prev) : null)
   }, [page, filter, search, dateFrom, dateTo, sortKey, sortDir])
 
-  useEffect(() => { fetchSales() }, [fetchSales])
+  useEffect(() => {
+    if (saltarPrimera.current) { saltarPrimera.current = false; return }
+    fetchSales()
+  }, [fetchSales])
   // La pantalla se deja abierta todo el día: sin esto, la lista se queda con lo
   // que había al abrirla y no se ven las ventas que cargan los demás.
   useRefetchOnFocus(fetchSales, true, 60_000)

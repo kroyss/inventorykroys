@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -18,7 +18,7 @@ import { usePorConfirmar, pendientesPorConfirmar, NumeroBoton } from '@/componen
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
-interface Summary {
+export interface Summary {
   por_verificar?: number
   active_products: number
   sales_count_month: number
@@ -37,7 +37,7 @@ interface Summary {
 }
 
 interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number }
-interface ChartData {
+export interface ChartData {
   chart_data: ChartPoint[]
   summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; cantidad: number }
 }
@@ -50,7 +50,8 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, metricas = false }: {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, metricas = false, inicial }: {
+  inicial?: { summary: Summary | null; chart: ChartData | null }   // 12-11: lo que ya vino en el HTML (lib/inicial.ts)
   country: Country; bonos: boolean; puedeTasas: boolean
   metricas?: boolean       // módulo metricas (08-11): botón a Reportes → Resumen
   porConfirmar?: boolean   // cuentas de ML conectadas: botón "Por confirmar" (principal) + "Nueva venta"
@@ -59,19 +60,24 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
   descuento: boolean; importaciones: boolean; analisisStock: boolean   // módulos (lib/modulos.ts)
 }) {
   const pc = usePorConfirmar(porConfirmar)
-  const [summary, setSummary] = useState<Summary | null>(null)
-  const [chart,   setChart]   = useState<ChartData | null>(null)
+  const [summary, setSummary] = useState<Summary | null>(inicial?.summary ?? null)
+  const [chart,   setChart]   = useState<ChartData | null>(inicial?.chart ?? null)
+  // Lo que vino en el HTML no se vuelve a pedir al abrir (sí al cambiar el período del gráfico).
+  const chartInicial = useRef(!!inicial?.chart)
   // Default to 'month' so today's sales show immediately on the chart.
   const [period,  setPeriod]  = useState<Period | 'custom'>('month')
   const [dateFrom, setDateFrom] = useState(monthStartStr())
   const [dateTo,   setDateTo]   = useState(todayStr())
   const [compraMenu, setCompraMenu] = useState(false)
 
+  const conSummary = !!inicial?.summary
   useEffect(() => {
+    if (conSummary) return
     fetch('/api/dashboard/summary').then(r => r.json()).then(setSummary)
-  }, [])
+  }, [conSummary])
 
   useEffect(() => {
+    if (chartInicial.current) { chartInicial.current = false; if (period === 'month') return }
     const url = period === 'custom'
       ? `/api/reports/chart-data?period=custom&date_from=${dateFrom}&date_to=${dateTo}`
       : `/api/reports/chart-data?period=${period}`

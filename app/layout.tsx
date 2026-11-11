@@ -4,6 +4,8 @@ import './globals.css'
 import Providers from '@/components/Providers'
 import { connection } from 'next/server'
 import { marca } from '@/lib/marca'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -33,11 +35,14 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // 12-11 (rapidez): la sesión va en el HTML; así el navegador no la pide aparte al abrir cada pantalla
+  // (/api/auth/session, 0,2–0,8 s). Sin sesión (login, páginas públicas) o si falla: undefined = la pide como antes.
+  const session = (await getServerSession(authOptions).catch(() => null)) ?? undefined
   return (
     <html lang="es" className={`${inter.className} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers session={session}>{children}</Providers>
       </body>
     </html>
   )

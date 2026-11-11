@@ -20,9 +20,14 @@ const ENVIO: Record<string, { t: string; c: string; title: string }> = {
   sin_peso: { t: 'Sin peso', c: 'bg-neutral-100 text-neutral-600 ring-neutral-200', title: 'Falta el peso del producto: no se sabe si tiene envío gratis' },
 }
 
-export default function StockMLClient({ buscarInicial = '', conVincular = false }: { buscarInicial?: string; conVincular?: boolean }) {
-  const [filas, setFilas] = useState<FilaStockML[] | null>(null)
-  const [puedeCambiar, setPuedeCambiar] = useState(false)
+export interface StockMLRespuesta { filas: FilaStockML[]; reserva: number | null; sinVincular: number; puedeCambiar: boolean; puedeReserva: boolean }
+
+export default function StockMLClient({ buscarInicial = '', conVincular = false, inicial = null }: {
+  buscarInicial?: string; conVincular?: boolean
+  inicial?: StockMLRespuesta | null   // 12-11: ya vino en el HTML (lib/inicial.ts); no se pide de nuevo al abrir
+}) {
+  const [filas, setFilas] = useState<FilaStockML[] | null>(inicial?.filas ?? null)
+  const [puedeCambiar, setPuedeCambiar] = useState(!!inicial?.puedeCambiar)
   const [error, setError] = useState<string | null>(null)
   // Desde Vincular («ver stock») llega ?buscar=COD-…: se abre en Todos con ese producto.
   const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : 'diferencias')
@@ -33,16 +38,18 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false 
   const [trabajando, setTrabajando] = useState<{ hechos: number; total: number } | null>(null)
   const [resultados, setResultados] = useState<Map<string, Res>>(new Map())
   const [actualizando, setActualizando] = useState(false)
-  const [reserva, setReserva] = useState<number | null>(null)
-  const [puedeReserva, setPuedeReserva] = useState(false)
-  const [sinVincular, setSinVincular] = useState(0)
+  const [reserva, setReserva] = useState<number | null>(inicial?.reserva ?? null)
+  const [puedeReserva, setPuedeReserva] = useState(!!inicial?.puedeReserva)
+  const [sinVincular, setSinVincular] = useState(inicial?.sinVincular ?? 0)
 
   const cargar = () => fetch('/api/stock-en-ml', { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
   })
-  useEffect(() => { cargar() }, [])
+  const conInicial = !!inicial
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!conInicial) cargar() }, [])
 
   const pedir = async (body: Record<string, unknown>) => {
     const r = await fetch('/api/stock-en-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

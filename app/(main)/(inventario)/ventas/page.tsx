@@ -6,6 +6,9 @@ import VentasClient from '@/components/ventas/VentasClient'
 import type { InventoryItem } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { redirect } from 'next/navigation'
+import { deApi } from '@/lib/inicial'
+import { GET as listarVentas } from '@/app/api/sales/route'
+import type { SalesResponse } from '@/components/ventas/VentasClient'
 
 export const metadata = { title: 'Ventas' }
 
@@ -16,7 +19,8 @@ export default async function VentasPage() {
 
   // Sales are fetched client-side with server pagination (10/page) via /api/sales.
   // Here we only load the active product list for the create/edit form.
-  const productsRes = await db.query(`
+  // 12-11 (rapidez): la 1ª página de ventas (la que se ve al abrir) viene en el HTML, en paralelo con los productos.
+  const [productsRes, inicial] = await Promise.all([db.query(`
     SELECT
       p.id AS product_id, p.code, p.name, p.is_active,
       COALESCE(inv.quantity, 0)::int AS quantity,
@@ -27,10 +31,11 @@ export default async function VentasPage() {
     LEFT JOIN product_pricing pp ON p.id = pp.product_id
     WHERE p.is_active = TRUE
     ORDER BY p.name
-  `)
+  `), deApi<SalesResponse>(listarVentas, '/api/sales?page=1&pageSize=15&sort_by=created_at&sort_dir=desc')])
 
   return (
     <VentasClient
+      inicial={inicial}
       products={productsRes.rows as InventoryItem[]}
       userRole={session!.user.role}
       country={session!.user.country}

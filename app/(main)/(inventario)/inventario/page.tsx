@@ -9,6 +9,8 @@ import { redirect } from 'next/navigation'
 import { dbGlobal } from '@/lib/db'
 import { COUNTRY_TZ } from '@/lib/tz'
 
+import { deApi } from '@/lib/inicial'
+import { GET as tasaUltima } from '@/app/api/rates/latest/route'
 export const metadata = { title: 'Inventario' }
 
 export default async function InventarioPage() {
@@ -73,6 +75,9 @@ export default async function InventarioPage() {
     `SELECT inventario_desde, inventario_hasta FROM empresas
      WHERE id = $1 AND inventario_hasta IS NOT NULL AND inventario_desde > inventario_hasta
        AND inventario_desde > NOW() - INTERVAL '30 days'`, [session!.user.empresaId])
+  // 12-11 (rapidez): el % de exceso (precio ML en VE) viene en el HTML: mismo GET de /api/rates/latest.
+  const exceso = session!.user.country === 'VE'
+    ? (await deApi<{ excess_percentage?: number }>(tasaUltima, '/api/rates/latest'))?.excess_percentage ?? null : null
   const fecha = (d: Date) => new Intl.DateTimeFormat('es-VE', { day: 'numeric', month: 'short', timeZone: COUNTRY_TZ[session!.user.country] }).format(d)
 
   return (<>
@@ -91,6 +96,7 @@ export default async function InventarioPage() {
       country={session!.user.country}
       etiquetas={tieneModulo(session!.user, 'etiquetas')}
       stockML={tieneModulo(session!.user, 'preguntas')}
+      excesoInicial={exceso}
     />
   </>)
 }

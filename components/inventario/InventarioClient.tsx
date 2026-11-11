@@ -130,7 +130,7 @@ interface Props {
   stockML?:     boolean   // cuentas de ML conectadas (26-10): botón «Stock en ML»
 }
 
-export default function InventarioClient({ initialItems, acceso, country, etiquetas: conEtiquetas = false, stockML = false }: Props) {
+export default function InventarioClient({ initialItems, acceso, country, etiquetas: conEtiquetas = false, stockML = false, excesoInicial = null }: Props & { excesoInicial?: number | null }) {
   // "Configurar inventario" (mín/máx, recomendados, ventas 6m) y "Ver costos" van por separado.
   const isAdmin = acceso.config
   const verCostos = acceso.costos
@@ -139,11 +139,12 @@ export default function InventarioClient({ initialItems, acceso, country, etique
   // En CO el precio de venta está en pesos (sin decimales); en VE en USD.
   const priceLabel = (n: number) => isCO ? `$${fmtPeso(n)}` : `$${fmt(n)}`
   // Precio ML (solo VE) = costo × (1+ganancia%) × (1+exceso%) = publicado con exceso.
-  const [veExcess, setVeExcess] = useState(0)
+  // 12-11 (rapidez): el exceso ya viene en el HTML (excesoInicial); si no vino, se pide como antes.
+  const [veExcess, setVeExcess] = useState(excesoInicial ?? 0)
   useEffect(() => {
-    if (country !== 'VE') return
+    if (country !== 'VE' || excesoInicial !== null) return
     fetch('/api/rates/latest').then(r => r.json()).then(d => setVeExcess(d?.excess_percentage ?? 0)).catch(() => {})
-  }, [country])
+  }, [country, excesoInicial])
   const mlPriceVE = (it: InventoryItem) =>
     it.total_cost * (1 + (it.profit_percentage ?? 0) / 100) * (1 + veExcess / 100)
   const [items,    setItems]    = useState<InventoryItem[]>(initialItems)
