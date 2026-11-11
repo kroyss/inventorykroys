@@ -7,6 +7,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 /** clave → último día (YYYY-MM-DD) en que se muestra. */
 export const NUEVOS = {
   mi_ia: '2026-12-10',
+  seguimiento: '2026-12-11',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

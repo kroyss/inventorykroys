@@ -21,6 +21,7 @@ import type { MensajeRapido } from '@/lib/mensajesRapidos'
 import RecordatoriosPago from '@/components/preguntas/RecordatoriosPago'
 import MensajeAlComprar from '@/components/preguntas/MensajeAlComprar'
 import PedirCalificacion from '@/components/preguntas/PedirCalificacion'
+import { ChipsSeguimiento, ListaSeguimiento, type DatosSeg, type FiltroSeg } from '@/components/preguntas/Seguimiento'
 
 export interface Conversacion {
   pack_id: string; sin_leer: number; ultimo_texto: string | null; ultimo_de_comprador: boolean | null
@@ -85,6 +86,33 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   }, [vista, pagina, q])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
+
+  // Seguimiento (11-11): chips en Atendidas. Sin chip activo solo trae los contadores.
+  const [seg, setSeg] = useState<FiltroSeg>('todas')
+  const [segHoras, setSegHoras] = useState<12 | 24>(24)
+  const [segPagina, setSegPagina] = useState(1)
+  const [segDatos, setSegDatos] = useState<DatosSeg | null>(null)
+  useEffect(() => { try { if (localStorage.getItem('seguimiento:horas') === '12') setSegHoras(12) } catch { /* sin almacenamiento */ } }, [])
+  const segPedido = useRef(0)
+  const cargarSeg = useCallback(async () => {
+    if (vista !== 'todas') return
+    const id = ++segPedido.current
+    const d = await fetch(`/api/mensajes/seguimiento?horas=${segHoras}&pagina=${segPagina}${seg !== 'todas' ? `&filtro=${seg}` : ''}`)
+      .then(r => r.ok ? r.json() : null).catch(() => null)
+    if (id === segPedido.current && d) setSegDatos(d)
+  }, [vista, seg, segHoras, segPagina])
+  useEffect(() => { cargarSeg() }, [cargarSeg])
+  useEffect(() => { const t = setInterval(cargarSeg, 60_000); return () => clearInterval(t) }, [cargarSeg])
+  const cambiarSeg = (f: FiltroSeg) => {
+    setSeg(f); setSegPagina(1); setAbierta(null)
+    if (f !== 'todas') { setBuscar(''); setSegDatos(d => d ? { ...d, lista: undefined } : d) }
+  }
+  const abrirVenta = (pack: string) => {
+    fetch(`/api/mensajes/de-venta?numero=${pack}`).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.conversacion) { setAbierta(d.conversacion); if (window.innerWidth < 1024) window.scrollTo({ top: 0 }) } })
+      .catch(() => setError('No se pudo abrir la conversación'))
+  }
+  const enSeg = vista === 'todas' && seg !== 'todas' && !!segDatos?.senal
   // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Calificaciones → "Escribirle"): abre
   // Atendidas con esa conversación (si no está en la lista, la pide sola) y la trae a la vista en el celular.
   const pedidoHecho = useRef(false)
@@ -134,13 +162,22 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
           <div ref={listaRef} className={`scroll-mt-4 space-y-2 min-w-0 ${abierta ? 'hidden lg:block' : ''}`}>
           {vista === 'todas' && (
-            <div className="relative">
+            <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+            <div className="relative min-w-0 flex-1">
               <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
-              <input value={buscar} onChange={e => setBuscar(e.target.value)} type="search"
+              <input value={buscar} onChange={e => { setBuscar(e.target.value); if (seg !== 'todas') { setSeg('todas'); setAbierta(null) } }} type="search"
                 placeholder="Buscar comprador, nº de venta, producto o algo que se habló…" aria-label="Buscar conversación"
                 className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm" />
             </div>
+            <ChipsSeguimiento datos={segDatos} valor={seg} onCambio={cambiarSeg} />
+            </div>
           )}
+          {enSeg ? (
+            <ListaSeguimiento datos={segDatos} filtro={seg as Exclude<FiltroSeg, 'todas'>} horas={segHoras}
+              onHoras={h => { setSegHoras(h); setSegPagina(1); try { localStorage.setItem('seguimiento:horas', String(h)) } catch { /* sin almacenamiento */ } }}
+              pagina={segPagina} onPagina={p => { setSegPagina(p); listaRef.current?.scrollIntoView({ block: 'start' }) }}
+              abierta={abierta?.pack_id ?? null} onAbrir={abrirVenta} />
+          ) : (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
             {lista.length === 0 ? (
               <EmptyState message={vista === 'sin_leer' ? 'Nada por atender. Todo al día.' : q ? `Nada encontrado con «${q}».` : 'Todavía no hay conversaciones atendidas.'} />
@@ -179,6 +216,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
               <Pagination total={pag.total} page={pagina} pageSize={pag.por} onChange={irA} />
             )}
           </div>
+          )}
           </div>
           {abierta
             ? <div ref={hiloRef} className="scroll-mt-4 min-w-0 space-y-2">
@@ -187,7 +225,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
                   <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5" /></svg>
                   Volver a la lista
                 </button>
-                <Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={cargar} />
+                <Hilo key={abierta.pack_id} c={abierta} rapidas={rapidas.lista} onCambio={() => { cargar(); cargarSeg() }} />
               </div>
             : <div className="hidden lg:block bg-white rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">Elige una conversación</div>}
         </div>

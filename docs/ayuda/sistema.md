@@ -335,6 +335,14 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
   salió.
 - **Leer un mensaje aquí NO lo marca como leído en MercadoLibre:** se marca cuando respondes o tocas el sobre.
+- **Seguimiento (Atendidas, al lado del buscador):** chips **Todas · Sin concretar · Requiere atención**.
+  «Sin concretar» = ventas de ML sin pago traído (Pagos ME), sin venta registrada, sin guía en Despachos y sin
+  «Ya pagó» en Recordatorios, dentro de los días de plazo que pusiste en Calificaciones (no concretada). «Requiere
+  atención» = de esas, las que no tienen ningún mensaje ni recordatorio en las últimas 24 h (o 12 h, se elige ahí).
+  Cada fila dice si **nunca escribió** o **escribió y no pagó**, el día del plazo, cuándo vence y los recordatorios
+  enviados; primero la que vence antes. Un clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los
+  pagos de hoy (si no, puede salir alguien que ya pagó). Sin Pagos ME se guía por Despachos y Ventas. Pasado el
+  plazo, la venta sigue en Calificaciones → Por definir.
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.
 - **Respuestas rápidas de mensajes:** botones con textos guardados; un clic pone el texto y lo puedes retocar.
