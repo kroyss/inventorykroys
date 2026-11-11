@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { detenerRecordatorio } from '@/lib/recordatoriosPago'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
@@ -100,6 +102,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ senal, plazo, horas, contadores: n, lista: rows, traido, porPagina: POR_PAGINA,
       total: filtro === 'atencion' ? n.atencion : n.sin_concretar })
   } catch (err) {
+    return apiError(err)
+  }
+}
+
+// POST { packs, quitar }  (12-11, el dueño): «Quitar» una venta del seguimiento (ya pagó, no va a pagar o no se sigue por
+// otro motivo). Usa la misma marca que «Ya pagó» de Recordatorios: tampoco se le mandan más recordatorios. quitar=false deshace.
+const Quitar = z.object({ packs: z.array(z.string().regex(/^\d{6,20}$/)).min(1).max(20), quitar: z.boolean() })
+
+export async function POST(req: NextRequest) {
+  const s = await sesionPreguntas()
+  if ('error' in s) return s.error
+  try {
+    const b = Quitar.parse(await req.json())
+    for (const p of b.packs) await detenerRecordatorio(s.db, p, Number(s.session.user.id) || null, b.quitar)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return apiError(err)
   }
 }

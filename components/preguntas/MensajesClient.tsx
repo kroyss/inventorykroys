@@ -175,7 +175,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
             <ListaSeguimiento datos={segDatos} filtro={seg as Exclude<FiltroSeg, 'todas'>} horas={segHoras}
               onHoras={h => { setSegHoras(h); setSegPagina(1); setSegDatos(d => d ? { ...d, lista: undefined } : d); try { localStorage.setItem('seguimiento:horas', String(h)) } catch { /* sin almacenamiento */ } }}
               pagina={segPagina} onPagina={p => { setSegPagina(p); setSegDatos(d => d ? { ...d, lista: undefined } : d); listaRef.current?.scrollIntoView({ block: 'start' }) }}
-              abierta={abierta?.pack_id ?? null} onAbrir={abrirVenta} />
+              abierta={abierta?.pack_id ?? null} onAbrir={abrirVenta} onRecargar={cargarSeg} />
           ) : (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 overflow-hidden">
             {lista.length === 0 ? (

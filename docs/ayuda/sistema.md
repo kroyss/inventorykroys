@@ -350,7 +350,9 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   recordatorios y demás mensajes automáticos no cuentan. Cada fila dice si **nunca escribió** o **escribió y no pagó**,
   cuándo vence (en rojo si quedan menos de 12 h), cuánto lleva sin mensajes, el día del plazo y los recordatorios
   enviados; las dos listas van primero la que vence antes. Si el mismo comprador tiene varias compras sin pagar sale en
-  una sola fila con «N compras sin pagar» y un botón por compra. Un clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
+  una sola fila con «N compras sin pagar» y un botón por compra. Un clic abre la conversación. **Quitar** saca la venta
+  del seguimiento cuando ya pagó, no va a pagar o no quieres seguirla (tampoco se le mandan más recordatorios); se puede
+  **Deshacer** unos segundos, o volver a activarla en Recordatorios. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
   venta sigue en Calificaciones → Por definir. **Atendidas** tiene el buscador.
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.

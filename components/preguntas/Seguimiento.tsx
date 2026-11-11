@@ -2,6 +2,7 @@
 // Mensajes → Por atender → Seguimiento (11-11, pedido del dueño; 12-11 pasó de Atendidas a Por atender): «Sin respuesta»
 // es la lista de siempre; «Sin guía» y «Sin mensaje», las ventas que todavía no muestran pago antes de que venza el plazo.
 // La lista la arma /api/mensajes/seguimiento.
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Nuevo, vistoNuevo } from '@/components/ui/Nuevo'
 import { Pagination } from '@/components/ui'
@@ -57,10 +58,24 @@ export function ChipsSeguimiento({ datos, valor, onCambio, sinRespuesta }: { dat
 }
 
 /** La lista de seguimiento (reemplaza la de Atendidas mientras un chip está activo). */
-export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagina, abierta, onAbrir }: {
+export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagina, abierta, onAbrir, onRecargar }: {
   datos: DatosSeg | null; filtro: Exclude<FiltroSeg, 'todas'>; horas: 12 | 24; onHoras: (h: 12 | 24) => void
-  pagina: number; onPagina: (p: number) => void; abierta: string | null; onAbrir: (pack: string) => void
+  pagina: number; onPagina: (p: number) => void; abierta: string | null; onAbrir: (pack: string) => void; onRecargar: () => void
 }) {
+  // «Quitar» (12-11): saca la venta del seguimiento y frena los recordatorios; se puede deshacer unos segundos.
+  const [quitando, setQuitando] = useState<string | null>(null)
+  const [quitada, setQuitada] = useState<{ packs: string[]; nombre: string } | null>(null)
+  const [errorQ, setErrorQ] = useState<string | null>(null)
+  useEffect(() => { if (!quitada) return; const t = setTimeout(() => setQuitada(null), 10_000); return () => clearTimeout(t) }, [quitada])
+  const quitar = async (packs: string[], nombre: string, si: boolean) => {
+    setQuitando(packs[0]); setErrorQ(null)
+    const r = await fetch('/api/mensajes/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packs, quitar: si }) }).catch(() => null)
+    setQuitando(null)
+    if (!r?.ok) { setErrorQ(si ? 'No se pudo quitar. Prueba de nuevo.' : 'No se pudo deshacer. Prueba de nuevo.'); return }
+    setQuitada(si ? { packs, nombre } : null)
+    onRecargar()
+  }
   const lista = datos?.lista
   return (
     <div className="space-y-2">
@@ -83,6 +98,15 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
           ? <span className="w-full text-emerald-700 sm:w-auto">Pagos traídos hoy {datos.traido} ✓</span>
           : <Link href="/pagos-me" className="w-full font-medium text-amber-700 underline-offset-2 hover:underline sm:w-auto">Falta traer los pagos de hoy →</Link>)}
       </div>
+      {(quitada || errorQ) && (
+        <div role="status" className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${errorQ ? 'bg-red-50 text-red-700' : 'bg-neutral-800 text-white'}`}>
+          <span className="min-w-0 flex-1 truncate">{errorQ ?? <>Quitaste a <b>{quitada!.nombre}</b> del seguimiento (y de los recordatorios).</>}</span>
+          {quitada && !errorQ && (
+            <button type="button" disabled={!!quitando} onClick={() => quitar(quitada.packs, quitada.nombre, false)}
+              className="shrink-0 font-semibold text-lime-300 underline-offset-2 hover:underline disabled:opacity-50">Deshacer</button>
+          )}
+        </div>
+      )}
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm divide-y divide-neutral-100">
         {!lista ? <p className="px-4 py-8 text-center text-sm text-neutral-400">Cargando…</p>
           : lista.length === 0 ? (
@@ -127,9 +151,9 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
                   </p>
                 </div>
               </button>
-              {packs.length > 1 && (
-                // Mismo comprador, varias compras sin pagar: una fila; cada compra se abre aparte.
-                <div className="-mt-1 flex flex-wrap items-center gap-1.5 pb-3 pl-[4.75rem] pr-4 text-xs text-neutral-500">
+              <div className="-mt-1 flex flex-wrap items-center gap-1.5 pb-3 pl-[4.75rem] pr-4 text-xs text-neutral-500">
+                {packs.length > 1 && <>
+                  {/* Mismo comprador, varias compras sin pagar: una fila; cada compra se abre aparte. */}
                   <span className="font-medium text-neutral-700">{packs.length} compras sin pagar:</span>
                   {packs.map((p, i) => (
                     <button key={p} type="button" onClick={() => onAbrir(p)} aria-pressed={abierta === p}
@@ -137,8 +161,14 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
                       Compra {i + 1}
                     </button>
                   ))}
-                </div>
-              )}
+                </>}
+                <button type="button" disabled={quitando === packs[0]}
+                  onClick={() => quitar(packs, c.comprador_nombre || c.comprador_nick || 'la venta', true)}
+                  title="Ya pagó, no va a pagar o no quieres seguirla: sale de esta lista y no se le mandan más recordatorios"
+                  className="ml-auto h-7 rounded-full border border-neutral-300 bg-white px-3 font-medium text-neutral-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
+                  {quitando === packs[0] ? 'Quitando…' : packs.length > 1 ? 'Quitar las ' + packs.length : 'Quitar'}
+                </button>
+              </div>
               </div>
             )
           })}
