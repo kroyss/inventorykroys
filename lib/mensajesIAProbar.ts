@@ -5,7 +5,7 @@
 // No descuenta créditos (módulo 'simulacion'): es para decidir si se enciende.
 import type { Pool } from 'pg'
 import { borradorMensaje } from '@/lib/mensajesIA'
-import { mensajeCorregible, motivosMensaje } from '@/lib/mensajesIAPrueba'
+import { CORREGIR_MENSAJES, mensajeCorregible, motivosMensaje } from '@/lib/mensajesIAPrueba'
 import { AUTOMATICOS, textoPlano } from '@/lib/mensajesML'
 import { leerMiIA, MI_IA_KEY } from '@/lib/miIA'
 import { registrarUso, type LlamadaIA } from '@/lib/ia'
@@ -54,7 +54,7 @@ export async function probarMensajesIA(db: Pool, country: string, conInventario:
       const vendedorAntes = antes.map(x => String(x.texto)).join('\n')
       const motivos = motivosMensaje(b, base.mensaje, persona, vendedorAntes)
       // 12-11: igual que la automática, la frenada solo por confianza, vacía o "no hay" se corrige.
-      if (mensajeCorregible(motivos)) {
+      if (CORREGIR_MENSAJES && mensajeCorregible(motivos)) {
         const k = await borradorMensaje(db, r.conexion_id, Number(r.ml_user_id), r.pack, country, conInventario, fecha,
           { anterior: b.respuesta, problemas: motivos }).catch(() => null)
         if (k) {

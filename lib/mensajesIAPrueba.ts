@@ -102,6 +102,7 @@ export function motivosMensaje(b: { respuesta: string; confianza: string; falta_
 // 12-11 (corrector): frenado SOLO por confianza, vacío o "no hay" → la IA lo reescribe con el motivo. Mensajes no tiene
 // verificador: la corregida sale solo si la IA queda con confianza ALTA y sin ningún otro freno (reclamo, pago, datos…).
 const ARREGLABLE_MSG = /^(Confianza (baja|media)|La IA no propuso respuesta|Dice que no hay)/
+export const CORREGIR_MENSAJES = false
 export const mensajeCorregible = (motivos: string[]) => motivos.length > 0 && motivos.every(m => ARREGLABLE_MSG.test(m))
 
 /** Lo llama el cron cada minuto. `cliente` = no es la propietaria (solo encendido y con créditos). */
@@ -148,7 +149,8 @@ export async function procesarMensajesIA(db: Pool, country: string, conInventari
       const vendedor = msgs.filter(m => m.propio).map(m => String(m.texto)).join('\n')
       let motivos = motivosMensaje(b, comprador, persona, vendedor)
       let corregida: string | null = null
-      if (mensajeCorregible(motivos)) {
+      // 12-11: la corrección en Mensajes quedó APAGADA (medida: 3 de 50 salían; no paga lo que cuesta). Se enciende con CORREGIR_MENSAJES.
+      if (CORREGIR_MENSAJES && mensajeCorregible(motivos)) {
         const k = await borradorMensaje(db, r.conexion_id, Number(r.seller), r.pack_id, country, conInventario, undefined,
           { anterior: b.respuesta, problemas: motivos }).catch(() => null)
         if (k) {

@@ -87,7 +87,8 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
 
-  // Seguimiento (11-11): chips en Atendidas. Sin chip activo solo trae los contadores.
+  // Seguimiento (11-11; 12-11 pasó a Por atender, pedido del dueño): chips Sin respuesta (la lista de siempre) · Sin guía ·
+  // Sin mensaje. Sin chip activo solo trae los contadores.
   const [seg, setSeg] = useState<FiltroSeg>('todas')
   const [segHoras, setSegHoras] = useState<12 | 24>(24)
   const [segPagina, setSegPagina] = useState(1)
@@ -95,7 +96,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   useEffect(() => { try { if (localStorage.getItem('seguimiento:horas') === '12') setSegHoras(12) } catch { /* sin almacenamiento */ } }, [])
   const segPedido = useRef(0)
   const cargarSeg = useCallback(async () => {
-    if (vista !== 'todas') return
+    if (vista !== 'sin_leer') return
     const id = ++segPedido.current
     const d = await fetch(`/api/mensajes/seguimiento?horas=${segHoras}&pagina=${segPagina}${seg !== 'todas' ? `&filtro=${seg}` : ''}`)
       .then(r => r.ok ? r.json() : null).catch(() => null)
@@ -105,14 +106,14 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   useEffect(() => { const t = setInterval(cargarSeg, 60_000); return () => clearInterval(t) }, [cargarSeg])
   const cambiarSeg = (f: FiltroSeg) => {
     setSeg(f); setSegPagina(1); setAbierta(null)
-    if (f !== 'todas') { setBuscar(''); setSegDatos(d => d ? { ...d, lista: undefined } : d) }
+    if (f !== 'todas') setSegDatos(d => d ? { ...d, lista: undefined } : d)
   }
   const abrirVenta = (pack: string) => {
     fetch(`/api/mensajes/de-venta?numero=${pack}`).then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.conversacion) { setAbierta(d.conversacion); if (window.innerWidth < 1024) window.scrollTo({ top: 0 }) } })
       .catch(() => setError('No se pudo abrir la conversación'))
   }
-  const enSeg = vista === 'todas' && seg !== 'todas' && !!segDatos?.senal
+  const enSeg = vista === 'sin_leer' && seg !== 'todas' && !!segDatos?.senal
   // Link directo a una conversación (/mensajes?pack=…, p. ej. desde Calificaciones → "Escribirle"): abre
   // Atendidas con esa conversación (si no está en la lista, la pide sola) y la trae a la vista en el celular.
   const pedidoHecho = useRef(false)
@@ -142,7 +143,7 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         // Pestaña de lista nueva: "cargando" en vez de la lista de la anterior mientras llega.
         const lista_ = (x: string) => x === 'todas' ? 'todas' : 'sin_leer'
         if (lista_(v) !== lista_(vista)) setLista(null)
-        setVista(v); setAbierta(null); setPagina(1)
+        setVista(v); setAbierta(null); setPagina(1); setSeg('todas')
       }} items={[
         { value: 'sin_leer', label: 'Por atender', count: cont?.conversaciones },
         { value: 'todas', label: 'Atendidas' },
@@ -161,16 +162,13 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         // de la conversación estiraba la página y todo se corría de lado), y lista O conversación, no las dos.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
           <div ref={listaRef} className={`scroll-mt-4 space-y-2 min-w-0 ${abierta ? 'hidden lg:block' : ''}`}>
+          {vista === 'sin_leer' && <ChipsSeguimiento datos={segDatos} valor={seg} onCambio={cambiarSeg} sinRespuesta={cont?.conversaciones} />}
           {vista === 'todas' && (
-            // Buscador chico que crece con el espacio y, al tocarlo, ocupa toda la línea (los chips bajan).
-            <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-0 flex-1 basis-40 focus-within:basis-full">
+            <div className="relative">
               <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
-              <input value={buscar} onChange={e => { setBuscar(e.target.value); if (seg !== 'todas') { setSeg('todas'); setAbierta(null) } }} type="search"
+              <input value={buscar} onChange={e => setBuscar(e.target.value)} type="search"
                 placeholder="Buscar comprador, nº de venta, producto o algo que se habló…" aria-label="Buscar conversación"
                 className="w-full rounded-lg border border-neutral-300 bg-white py-2 pl-9 pr-3 text-sm" />
-            </div>
-            <ChipsSeguimiento datos={segDatos} valor={seg} onCambio={cambiarSeg} />
             </div>
           )}
           {enSeg ? (

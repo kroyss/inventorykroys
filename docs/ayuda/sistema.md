@@ -218,6 +218,8 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
    probar antes) y acepta el aviso. Haz lo mismo en Mensajes.
 - Para apagarla: **Apagar respuestas automáticas…** en la tarjeta de Mi IA. Se apaga al instante.
 - **Todo se enciende y se cambia en Mi IA**: encendido, modo y frenos.
+- **Mensajes automáticos: Próximamente.** Por ahora la IA responde sola solo en **Preguntas**; en Mi IA la tarjeta de
+  Mensajes aparece deshabilitada mientras se afina. En Mensajes sigue funcionando «Proponer con IA».
 - **Modo Seguro o Modo Total** (se elige aparte en Preguntas y en Mensajes, una vez encendida):
   - **Modo Seguro** (de fábrica): responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas
     de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.
@@ -339,15 +341,15 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
   salió.
 - **Leer un mensaje aquí NO lo marca como leído en MercadoLibre:** se marca cuando respondes o tocas el sobre.
-- **Seguimiento (Atendidas, al lado del buscador):** chips **Todo · Sin guía · Atender**.
-  «Sin guía» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en Calificaciones (no
-  concretada). Una venta sale de la lista si tiene alguna de estas: el mensaje automático de ML «El número de guía
-  para tu envío es…» (llega cuando el comprador llena el formulario de MercadoEnvíos), su pago en Pagos ME, la venta
-  registrada en Ventas, su guía en Despachos o «Ya pagó» en Recordatorios. «Atender» = de esas, las que no tienen
-  ningún mensaje ni recordatorio en las últimas 24 h (o 12 h, se elige ahí). Cada fila dice si **nunca escribió** o
-  **escribió y no pagó**, el día del plazo, cuándo vence y los recordatorios enviados; primero la que vence antes. Un
-  clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Funciona para toda empresa con
-  Mensajes. Pasado el plazo, la venta sigue en Calificaciones → Por definir. El buscador se agranda al tocarlo.
+- **Por atender tiene tres chips:** **Sin respuesta** (lo de siempre: mensajes del comprador sin contestar), **Sin guía**
+  y **Sin mensaje**. «Sin guía» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en
+  Calificaciones (no concretada). Una venta sale de la lista si tiene alguna de estas: el mensaje automático de ML «El
+  número de guía para tu envío es…» (llega cuando el comprador llena el formulario de MercadoEnvíos), su pago en Pagos
+  ME, la venta registrada en Ventas, su guía en Despachos o «Ya pagó» en Recordatorios. «Sin mensaje» = de esas, las
+  que no tienen ningún mensaje ni recordatorio en las últimas 24 h (o 12 h, se elige ahí). Cada fila dice si **nunca
+  escribió** o **escribió y no pagó**, el día del plazo, cuándo vence y los recordatorios enviados; primero la que vence
+  antes. Un clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
+  venta sigue en Calificaciones → Por definir. **Atendidas** tiene el buscador.
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.
 - **Respuestas rápidas de mensajes:** botones con textos guardados; un clic pone el texto y lo puedes retocar.

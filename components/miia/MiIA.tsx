@@ -762,7 +762,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA() {
   useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
   const [sugeridos, setSugeridos] = useState<string[]>([])
@@ -1027,8 +1027,19 @@ export default function MiIA() {
       <div className="grid gap-4 lg:grid-cols-2 items-start">
       <Prueba tipo="preguntas" encendida={datos.iaAuto === null ? null : datos.iaAuto === 'real'} todo={!!datos.iaTodo} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.preguntas : null} faltan={faltan.map(i => PASOS[i].tema)} />
+      {datos.msgPronto ? (
+        <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/60 p-4 space-y-2" aria-disabled="true">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold text-neutral-500">Mensajes</p>
+            <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium text-neutral-600">Próximamente</span>
+          </div>
+          <p className="text-sm text-neutral-500">Las respuestas automáticas en Mensajes (después de la venta) las estamos afinando. Por ahora la IA responde sola en <b>Preguntas</b>; en Mensajes puedes seguir usando «Proponer con IA».</p>
+          <button type="button" disabled className="w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-400">Encender en Mensajes</button>
+        </div>
+      ) : (
       <Prueba tipo="mensajes" encendida={datos.msgAuto ?? null} todo={!!datos.msgTodo} onCambio={cargar} abrir={abrirTema}
         quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
+      )}
       </div>
       {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
     </div>

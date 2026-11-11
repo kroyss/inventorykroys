@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { sesionMiIA } from '@/lib/miIASesion'
 import { configIA } from '@/lib/iaAutomatica'
-import { esDuenoPlataforma } from '@/lib/empresa'
+import { esDuenoPlataforma, ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { tieneModulo } from '@/lib/modulos'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
@@ -41,6 +41,8 @@ export async function GET() {
       msgTodo: tieneModulo(s.session.user, 'mensajes_ia') ? await autoTodo(s.db) : false,
       // 09-11: Mensajes automáticos (módulo mensajes_ia): encendido sí/no; null = no lo tiene.
       msgAuto: tieneModulo(s.session.user, 'mensajes_ia') ? await mensajesAuto(s.db) : null,
+      // 12-11: Mensajes automáticos todavía solo para la plataforma: el resto lo ve «Próximamente».
+      msgPronto: s.session.user.organizacionId !== ORGANIZACION_PLATAFORMA,
       // 09-11: pruebas gratis que le quedan hoy (null = sin tope).
       pruebas: await pruebasQuedan(s.db, s.session.user),
     })

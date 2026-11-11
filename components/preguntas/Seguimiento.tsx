@@ -1,6 +1,7 @@
 'use client'
-// Mensajes → Atendidas → Seguimiento (11-11, pedido del dueño): chips al lado del buscador para ver las ventas que
-// todavía no muestran pago, antes de que venza el plazo de cierre. La lista la arma /api/mensajes/seguimiento.
+// Mensajes → Por atender → Seguimiento (11-11, pedido del dueño; 12-11 pasó de Atendidas a Por atender): «Sin respuesta»
+// es la lista de siempre; «Sin guía» y «Sin mensaje», las ventas que todavía no muestran pago antes de que venza el plazo.
+// La lista la arma /api/mensajes/seguimiento.
 import Link from 'next/link'
 import { Nuevo, vistoNuevo } from '@/components/ui/Nuevo'
 import { Pagination } from '@/components/ui'
@@ -26,7 +27,7 @@ function venceEn(f: string) {
 }
 
 /** Los chips (van al lado del buscador). */
-export function ChipsSeguimiento({ datos, valor, onCambio }: { datos: DatosSeg | null; valor: FiltroSeg; onCambio: (f: FiltroSeg) => void }) {
+export function ChipsSeguimiento({ datos, valor, onCambio, sinRespuesta }: { datos: DatosSeg | null; valor: FiltroSeg; onCambio: (f: FiltroSeg) => void; sinRespuesta?: number }) {
   if (!datos?.senal) return null
   const n = datos.contadores
   const chip = (f: FiltroSeg, texto: React.ReactNode, titulo: string, cuenta?: number, alerta = false) => {
@@ -45,9 +46,9 @@ export function ChipsSeguimiento({ datos, valor, onCambio }: { datos: DatosSeg |
   }
   return (
     <div role="group" aria-label="Seguimiento de ventas" className="-mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-      {chip('todas', 'Todo', 'Todas las conversaciones atendidas')}
-      {chip('sin_concretar', 'Sin guía', 'Ventas sin señal de pago (ni guía de MercadoEnvíos, ni pago, ni venta registrada, ni guía en Despachos) dentro de tu plazo', n?.sin_concretar)}
-      {chip('atencion', <>Atender<Nuevo clave="seguimiento" className="!ml-0" /></>, 'Sin guía y sin mensajes ni recordatorios en las últimas horas', n?.atencion, true)}
+      {chip('todas', 'Sin respuesta', 'Conversaciones con mensajes del comprador sin contestar', sinRespuesta)}
+      {chip('sin_concretar', <>Sin guía<Nuevo clave="seguimiento" className="!ml-0" /></>, 'Ventas sin señal de pago (ni guía de MercadoEnvíos, ni pago, ni venta registrada, ni guía en Despachos) dentro de tu plazo', n?.sin_concretar)}
+      {chip('atencion', 'Sin mensaje', 'Sin guía y sin mensajes ni recordatorios en las últimas horas', n?.atencion, true)}
     </div>
   )
 }
