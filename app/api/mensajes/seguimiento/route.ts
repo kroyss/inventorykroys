@@ -27,25 +27,30 @@ export async function GET(req: NextRequest) {
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_plantillas'`)
     const plazo = Math.max(1, leerPlantillasCal(pl?.value).noConcretada.dias || 3)
     const BASE = `
-      WITH v AS (
+      WITH v AS MATERIALIZED (
         SELECT DISTINCT ON (COALESCE(o.pack_id, o.id)) COALESCE(o.pack_id, o.id) AS pack, o.id, o.conexion_id, o.fecha,
                o.comprador, o.comprador_nombre, o.productos, split_part(o.items[1], ':', 1) AS item, x.nickname AS cuenta
         FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id AND x.estado = 'activa'
         WHERE o.fecha > NOW() - make_interval(days => $1)
         ORDER BY COALESCE(o.pack_id, o.id), o.fecha
+      ),
+      -- Las señales de pago se juntan UNA vez solo para estas ventas (11-11: con un NOT EXISTS por venta y tabla, con
+      -- IN (id, pack), Postgres recorría Ventas entera por cada una: 1,1 s → 0,07 s).
+      claves AS MATERIALIZED (SELECT id::text AS k FROM v UNION SELECT pack::text FROM v),
+      pagadas AS MATERIALIZED (
+        SELECT venta AS k FROM me_pagos WHERE verificacion <> 'invalido' AND venta IN (SELECT k FROM claves)
+        UNION SELECT ml_order_number FROM sales WHERE ml_order_number IN (SELECT k FROM claves)
+        UNION SELECT venta FROM despacho_etiquetas WHERE venta IN (SELECT k FROM claves)
+        UNION SELECT pack_id::text FROM ml_mensajes WHERE pack_id IN (SELECT pack FROM v) AND propio
+                AND texto ~* 'n[uú]mero de gu[ií]a para tu env[ií]o'
+        UNION SELECT COALESCE(pack_id, id)::text FROM ml_ordenes WHERE COALESCE(pack_id, id) IN (SELECT pack FROM v)
+                AND (estado = 'cancelled' OR cal_vendedor IS NOT NULL)
       ), s AS (
         SELECT v.*, COALESCE(r.enviados, 0) AS recordatorios, r.ultimo_at AS rec_at,
                (SELECT max(m.fecha) FROM ml_mensajes m WHERE m.pack_id = v.pack AND NOT m.propio AND m.fecha > v.fecha) AS comprador_at,
                (SELECT max(m.fecha) FROM ml_mensajes m WHERE m.pack_id = v.pack AND m.fecha > v.fecha) AS mensaje_at
         FROM v LEFT JOIN ml_recordatorios r ON r.pack_id = v.pack
-        WHERE r.detenido IS NULL
-          AND NOT EXISTS (SELECT 1 FROM ml_ordenes o2 WHERE COALESCE(o2.pack_id, o2.id) = v.pack
-                            AND (o2.estado = 'cancelled' OR o2.cal_vendedor IS NOT NULL))
-          AND NOT EXISTS (SELECT 1 FROM me_pagos p WHERE p.venta IN (v.id::text, v.pack::text) AND p.verificacion <> 'invalido')
-          AND NOT EXISTS (SELECT 1 FROM sales sa WHERE sa.ml_order_number IN (v.id::text, v.pack::text))
-          AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (v.id::text, v.pack::text))
-          AND NOT EXISTS (SELECT 1 FROM ml_mensajes g WHERE g.pack_id = v.pack AND g.propio
-                            AND g.texto ~* 'n[uú]mero de gu[ií]a para tu env[ií]o')
+        WHERE r.detenido IS NULL AND NOT EXISTS (SELECT 1 FROM pagadas p WHERE p.k IN (v.id::text, v.pack::text))
       ), t AS (
         SELECT s.*, GREATEST(s.fecha, s.mensaje_at, s.rec_at) AS ultimo_mov,
                (GREATEST(s.fecha, s.mensaje_at, s.rec_at) < NOW() - make_interval(hours => $2)) AS atencion
