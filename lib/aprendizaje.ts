@@ -18,7 +18,7 @@ export interface VideoAprendizaje {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string; serie: Serie
   duracion_video: number | null   // la que se muestra (aprendizaje_videos.duracion_seg)
   visto_seg: number; duracion_seg: number; posicion_seg: number; completado: boolean
-  nuevo: boolean   // agregado hace menos de 14 días (etiqueta "Nuevo" en Aprendizaje, 23-10)
+  nuevo: boolean   // agregado (o reemplazado por versión nueva, mig 166) hace menos de 14 días (etiqueta "Nuevo" en Aprendizaje, 23-10)
 }
 
 /** "https://youtu.be/abc…", "youtube.com/watch?v=…", "/shorts/…", "/embed/…" o el id solo → id (11). */
@@ -50,7 +50,7 @@ export async function videosDeUsuario(userId: number | string, inventario: boole
     `SELECT v.id, v.orden, v.titulo, v.descripcion, v.youtube_id, v.serie, v.duracion_seg AS duracion_video,
             COALESCE(p.visto_seg, 0) AS visto_seg, COALESCE(p.duracion_seg, 0) AS duracion_seg,
             COALESCE(p.posicion_seg, 0) AS posicion_seg,
-            p.completado_at IS NOT NULL AS completado, v.created_at > NOW() - INTERVAL '14 days' AS nuevo
+            p.completado_at IS NOT NULL AS completado, COALESCE(v.renovado_at, v.created_at) > NOW() - INTERVAL '14 days' AS nuevo
      FROM aprendizaje_videos v
      LEFT JOIN aprendizaje_progreso p ON p.video_id = v.id AND p.user_id = $1
      WHERE v.activo AND (v.serie = 'automatizaciones' OR (v.serie = 'inventario' AND $2::boolean) OR (v.serie = 'mercadoenvios' AND $3::boolean))

@@ -822,7 +822,7 @@ ventas de ML no canceladas y preguntas por venta. Flecha verde = mejoró, roja =
 
 *Cómo lo pregunta la gente:* videos, tutoriales, cómo se usa, qué hay de nuevo.
 
-- **Central de aprendizaje** (menú Aprendizaje): videos cortos paso a paso; guarda por dónde vas en cada uno.
+- **Central de aprendizaje** (menú Aprendizaje): videos cortos paso a paso; guarda por dónde vas en cada uno. Los videos nuevos o con versión nueva muestran «Nuevo» durante 14 días.
   **Cuando un video explica lo que preguntan, recomiéndalo** (además de responder), con su título:
 
   | Video | Qué enseña | Secciones |

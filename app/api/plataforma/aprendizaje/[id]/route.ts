@@ -13,6 +13,8 @@ const Cambio = z.object({
   mover: z.enum(['arriba', 'abajo']).optional(),
   serie: z.enum(['automatizaciones', 'mercadoenvios', 'inventario']).optional(),
   duracion: z.string().trim().max(10).optional(),   // "6:12"; vacío = sin duración
+  // 12-11: al cambiar el link, ¿es una versión nueva? → visto reiniciado a todos y «Nuevo» 14 días.
+  version_nueva: z.boolean().optional(),
 })
 
 // PUT /api/plataforma/aprendizaje/[id] → editar, activar/ocultar o mover un video · DELETE → borrarlo.
@@ -61,10 +63,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
        WHERE id = $1`,
       [id, b.titulo ?? null, b.descripcion !== undefined, b.descripcion ?? null, youtube, b.activo ?? null,
        b.serie ?? null, b.duracion !== undefined, duracion])
-    // Video reemplazado: quien ya lo completó lo conserva; al resto se le reinicia el avance (los
-    // segundos vistos y la duración eran del video anterior).
+    // Video reemplazado. Versión nueva (por defecto): se reinicia el visto a TODOS y vuelve a salir «Nuevo» 14 días.
+    // Si no (solo una corrección): quien ya lo completó lo conserva; al resto se le reinicia el avance (los segundos
+    // vistos y la duración eran del video anterior).
     if (youtube && youtube !== antes?.youtube_id) {
-      await db.query(`DELETE FROM aprendizaje_progreso WHERE video_id = $1 AND completado_at IS NULL`, [id])
+      if (b.version_nueva !== false) {
+        await db.query(`DELETE FROM aprendizaje_progreso WHERE video_id = $1`, [id])
+        await db.query(`UPDATE aprendizaje_videos SET renovado_at = NOW() WHERE id = $1`, [id])
+      } else {
+        await db.query(`DELETE FROM aprendizaje_progreso WHERE video_id = $1 AND completado_at IS NULL`, [id])
+      }
     }
     return NextResponse.json({ ok: true })
   } catch (err) {

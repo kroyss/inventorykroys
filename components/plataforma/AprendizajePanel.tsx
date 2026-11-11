@@ -41,7 +41,7 @@ export default function AprendizajePanel() {
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [vez, setVez] = useState(0)
-  const [editando, setEditando] = useState<{ id: number; titulo: string; descripcion: string; url: string; serie: Serie; duracion: string } | null>(null)
+  const [editando, setEditando] = useState<{ id: number; titulo: string; descripcion: string; url: string; serie: Serie; duracion: string; nueva?: boolean } | null>(null)
   const recargar = () => setVez(n => n + 1)
 
   useEffect(() => {
@@ -154,13 +154,22 @@ export default function AprendizajePanel() {
                   <input className={input} placeholder="Duración (ej. 6:12)" value={editando.duracion}
                     onChange={e => setEditando({ ...editando, duracion: e.target.value })} />
                 </div>
-                <p className="text-xs text-neutral-500">Si cambias el video, quien ya lo había completado lo mantiene visto; a los demás se les reinicia el avance de ese video.</p>
+                {editando.url.trim() !== `https://youtu.be/${v.youtube_id}` && (
+                  <label className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                    <input type="checkbox" className="mt-0.5" checked={editando.nueva !== false}
+                      onChange={e => setEditando({ ...editando, nueva: e.target.checked })} />
+                    <span>Es una versión nueva: avisar a todos
+                      <span className="block text-xs text-sky-800/80">{editando.nueva !== false
+                        ? 'Se reinicia el visto a todos (también a quien ya lo había terminado) y sale «Nuevo» durante 14 días.'
+                        : 'Solo una corrección: quien ya lo terminó lo mantiene visto, al resto se le reinicia el avance y no sale «Nuevo».'}</span></span>
+                  </label>
+                )}
                 <div className="flex gap-2">
                   <button disabled={editando.titulo.trim().length < 2 || !editando.url.trim()}
                     onClick={async () => {
                       const cambio: Record<string, unknown> = { titulo: editando.titulo, descripcion: editando.descripcion.trim() || null,
                         serie: editando.serie, duracion: editando.duracion }
-                      if (editando.url.trim() !== `https://youtu.be/${v.youtube_id}`) cambio.url = editando.url
+                      if (editando.url.trim() !== `https://youtu.be/${v.youtube_id}`) { cambio.url = editando.url; cambio.version_nueva = editando.nueva !== false }
                       if (await pedir(`/api/plataforma/aprendizaje/${v.id}`, 'PUT', cambio, `Video "${editando.titulo.trim()}" guardado.`)) setEditando(null)
                     }}
                     className="btn-primary text-sm disabled:opacity-40">Guardar</button>
