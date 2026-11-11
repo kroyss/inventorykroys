@@ -183,6 +183,7 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
       vencida: r.vencida, sinStock, despacho: r.despacho ?? null,
       ...(r.vencida && r.calificada && r.cal_concretada ? { concretadaSinVenta: true } : {}),
       calificada: !!r.calificada,
+      calNoConcretada: !!r.calificada && !r.cal_concretada,
     }
   })
   // Un pack con varias órdenes sale una sola vez (la primera, la más nueva).
@@ -191,7 +192,10 @@ export async function ventasPorConfirmar(db: Pool, desde: string | null = null) 
   // la calificada como concretada sin venta ni pago, que queda aparte para revisar.
   return { dias, filas: filas
     .filter(f => !(f.vencida && (f as { calificada?: boolean }).calificada && !f.concretadaSinVenta))
-    .map(({ calificada: _c, ...f }: PorConfirmar & { calificada?: boolean }) => { void _c; return f })
+    // 12-11 (el dueño): ya calificada como NO concretada (en Calificaciones o en ML) → sale al momento, aunque no haya
+    // vencido; igual que «No se concretó». Con un pago traído (por verificar o correcto) se queda: que no se pierda.
+    .filter(f => !((f as { calNoConcretada?: boolean }).calNoConcretada && (!f.pago || f.pago.verificacion === 'invalido')))
+    .map(({ calificada: _c, calNoConcretada: _n, ...f }: PorConfirmar & { calificada?: boolean; calNoConcretada?: boolean }) => { void _c; void _n; return f })
     .filter(f => !vistos.has(f.numero) && !!vistos.add(f.numero)) }
 }
 
