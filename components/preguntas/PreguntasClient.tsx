@@ -343,7 +343,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
           <div className="space-y-4">
             <div className="flex flex-wrap gap-1.5">
               {/* 10-11 (el dueño): Mi IA, Datos de cada producto, Respuestas rápidas; «Respuesta automática con IA» solo la plataforma. */}
-              {([['mi_ia', 'Mi IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Datos de cada producto'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA']] as const).filter(([k]) => (k !== 'ia_auto' || verAvisosInternos) && (k !== 'mi_ia' || miIA) && (k !== 'ia' || !miIA)).map(([k, t]) => (
+              {([['mi_ia', 'Mi IA'], ['ia', 'Políticas para la IA'], ['aprendido', 'Datos de cada producto'], ['respuestas', 'Respuestas rápidas'], ['ia_auto', 'Respuesta automática con IA']] as const).filter(([k]) => (k !== 'ia_auto' || verAvisosInternos) && (k !== 'mi_ia' || miIA) && k !== 'ia').map(([k, t]) => (
                 <button key={k} onClick={() => setSubConfig(k)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${subConfig === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>{t}{k === 'mi_ia' && <Nuevo clave="mi_ia" />}</button>
               ))}
@@ -351,7 +351,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
             {subConfig === 'mi_ia' && miIA && <MiIA />}
             {subConfig === 'respuestas' && <RespuestasRapidas iniciales={datos.plantillas} onGuardado={cargar} />}
             {subConfig === 'aprendido' && <>{!envioPorPeso && <LoAprendido />}<DatosProductos /></>}
-            {subConfig === 'ia' && !miIA && <CuentasYPoliticas />}
+            {/* 12-11: «Políticas para la IA» (texto libre) eliminada: la reemplaza Mi IA. */}
             {subConfig === 'ia_auto' && iaAutomatica && verAvisosInternos && <IaAutomatica interno={verAvisosInternos} onMiIA={miIA ? () => setSubConfig('mi_ia') : undefined} />}
             {subConfig === 'ia_auto' && !iaAutomatica && verAvisosInternos && (
               <div className="max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-2">
@@ -702,43 +702,6 @@ function FilaHistorial({ p }: { p: Pregunta }) {
 
 // ── Cuentas conectadas + políticas para la IA ──────────────────────────────
 // Las cuentas de ML viven en su pantalla (/cuentas-ml); aquí quedan las políticas para la IA.
-function CuentasYPoliticas() {
-  const [politicas, setPoliticas] = useState('')
-  const [guardando, setGuardando] = useState(false)
-  const [ok, setOk] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(s => setPoliticas(s.preguntas_politicas ?? '')).catch(() => {})
-  }, [])
-
-  const guardar = async () => {
-    setGuardando(true); setOk(false)
-    const r = await fetch('/api/settings', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preguntas_politicas: politicas }),
-    })
-    setGuardando(false); setOk(r.ok)
-  }
-
-  return (
-    <div className="grid gap-4">
-      <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-        <h2 className="font-semibold text-neutral-900">Políticas para la IA</h2>
-        <p className="text-xs text-neutral-500">
-          Lo que la IA debe saber de tu negocio. Escríbelo como se lo explicarías a un empleado nuevo. La IA no inventa nada fuera de esto.
-        </p>
-        <textarea value={politicas} onChange={e => { setPoliticas(e.target.value); setOk(false) }} rows={12}
-          placeholder={'Ej.:\n- Pagos: pago móvil y transferencia (Banesco, Mercantil, Venezuela) a tasa BCV del día.\n- Envíos: por Zoom o Tealca, cobro a destino; salen de lunes a viernes.\n- Entregas en Caracas: …\n- Factura: sí emitimos, pedir datos por la mensajería de la venta.\n- Horario: lunes a sábado de 9 a 6.'}
-          className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm font-mono resize-y" />
-        <div className="flex items-center justify-end gap-3">
-          {ok && <span className="text-xs text-emerald-700">Guardado</span>}
-          <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Guardando…' : 'Guardar políticas'}</button>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-
 /** Publicación pausada (sin stock): MercadoLibre no deja responder. Reponer la cantidad desde aquí
  *  (admin) y, si ya hay respuesta escrita, publicarla en el mismo paso. */
 // Publicación pausada: ML no deja responder. Se queda el aviso; el stock se cambia en la ventana única

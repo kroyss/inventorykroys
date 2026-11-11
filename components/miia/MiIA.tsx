@@ -1028,7 +1028,6 @@ export default function MiIA() {
     <div className="max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm space-y-3">
       <h2 className="text-lg font-semibold text-neutral-900">Configura tu IA</h2>
       <p className="text-sm text-neutral-600">Unos 4 minutos: {PASOS.length} pantallas cortas sobre cómo trabajas (envío, pago, tono, límites). Con eso la IA responde como tú en Preguntas y en Mensajes.</p>
-      <p className="text-xs text-neutral-500">Tus “Políticas para la IA” de texto siguen valiendo. Lo que contestes aquí manda si algo choca.</p>
       {error && <p className="text-sm text-red-700">{error}</p>}
       <button type="button" onClick={() => sugerir(true)} disabled={sugiriendo} className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
         {sugiriendo ? 'Leyendo tus respuestas y descripciones… (unos segundos)' : 'Empezar con lo que ya respondo (recomendado)'}</button>
@@ -1054,11 +1053,6 @@ export default function MiIA() {
           <button type="button" onClick={() => recorrer(faltan)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Continuar →</button>
         </div>
       )}
-      {datos.politicas && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-        <p className="text-sm text-sky-900">Tienes <b>Políticas para la IA</b> escritas aparte. Pásalas aquí para tener todo en un solo lugar: si algo no coincide, eliges tú.</p>
-        <button type="button" onClick={pasarPoliticas} disabled={pasando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
-          {pasando ? 'Leyendo tus Políticas…' : 'Pasar mis Políticas a Mi IA'}</button>
-      </div>}
       {pase && <PasarPoliticas c={c} pase={pase} onCerrar={() => setPase(null)} onListo={() => { setPase(null); cargar() }} />}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {PASOS.map((p, i) => {

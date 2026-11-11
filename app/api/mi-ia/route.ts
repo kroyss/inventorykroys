@@ -6,7 +6,6 @@ import { esDuenoPlataforma, ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { tieneModulo } from '@/lib/modulos'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { leerMiIA, MI_IA_KEY, textoMiIA, datoDeContacto } from '@/lib/miIA'
-import { leerPoliticas } from '@/lib/miIAPoliticas'
 import { CLAVE_AUTO, autoTodo } from '@/lib/mensajesIAPrueba'
 import type { Pool } from 'pg'
 import { pruebasQuedan } from '@/lib/miIAPruebasTope'
@@ -26,12 +25,9 @@ export async function GET() {
   try {
     const { rows: [c] } = await s.db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
     const { rows: [n] } = await s.db.query(`SELECT COUNT(*)::int AS n FROM ml_conexiones WHERE estado = 'activa'`)
-    const politicas = await leerPoliticas(s.db)
     const miIA = leerMiIA(c?.value)
     return NextResponse.json({
       miIA, pais: s.session.user.country, cuentas: n?.n ?? 0,
-      // 08-11: ¿tiene "Políticas para la IA" escritas aparte? → ofrece pasarlas a Mi IA (un solo lugar).
-      politicas: politicas.length > 0,
       // 06-11 (el dueño): cómo se lo pasamos a la IA solo lo ve el dueño de la plataforma (no a clientes: se puede copiar).
       texto: miIA && esDuenoPlataforma(s.session.user) ? { preguntas: textoMiIA(miIA, 'preguntas'), mensajes: textoMiIA(miIA, 'mensajes') } : null,
       // Parte D: ¿puede encender la respuesta automática desde aquí? (módulo ia_automatica) y en qué modo está.
@@ -66,6 +62,8 @@ export async function PUT(req: NextRequest) {
     await s.db.query(
       `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
        ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [MI_IA_KEY, valor])
+    // 12-11 (el dueño): con Mi IA guardado, las «Políticas para la IA» viejas quedan desechadas: se borran.
+    await s.db.query(`DELETE FROM app_settings WHERE key = 'preguntas_politicas'`)
     return NextResponse.json({ ok: true })
   } catch (err) { return apiError(err) }
 }

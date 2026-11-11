@@ -208,7 +208,9 @@ export function textoMiIA(c: MiIA, modulo: 'preguntas' | 'mensajes', consulta?: 
   return S.join('\n\n')
 }
 
-/** Lo que la IA recibe como POLÍTICAS DEL VENDEDOR: Mi IA (si está guardada) + el texto libre de siempre. */
+/** Lo que la IA recibe como POLÍTICAS DEL VENDEDOR. 12-11 (el dueño): Mi IA reemplaza las «Políticas para la IA» de
+ *  texto libre. El texto viejo SOLO se usa si la empresa nunca guardó Mi IA; con Mi IA guardado no se lee nunca más
+ *  (y al guardar Mi IA se borra: PUT /api/mi-ia). */
 export async function politicasIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' | 'mensajes', consulta?: string): Promise<{ texto: string; miIA: MiIA | null }> {
   const claveAuto = modulo === 'preguntas' ? 'preguntas_ia_auto' : 'mensajes_ia_auto'
   const { rows } = await db.query(`SELECT key, value FROM app_settings WHERE key = ANY($1)`, [[MI_IA_KEY, 'preguntas_politicas', claveAuto]])
@@ -217,8 +219,7 @@ export async function politicasIA(db: Pick<Pool, 'query'>, modulo: 'preguntas' |
   let total = false
   try { const v = JSON.parse(rows.find(r => r.key === claveAuto)?.value ?? '{}'); total = v.modo === 'real' && v.todo === true } catch { /* sin config */ }
   const estructurado = miIA ? textoMiIA(miIA, modulo, consulta, total) : ''
-  const texto = !estructurado ? libre
-    : `${estructurado}${libre ? `\n\nOTRAS INDICACIONES DEL VENDEDOR (si chocan con lo de arriba, manda lo de arriba):\n${libre}` : ''}`
+  const texto = miIA ? estructurado : libre
   return { texto, miIA }
 }
 

@@ -200,7 +200,7 @@ La IA contesta sola, a toda hora, las preguntas y los mensajes en que está segu
 para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Para arrancar (unos 10 minutos):
 1. Abre **Mi IA** (Preguntas → Configuración → Mi IA, o en Mensajes). Si es la primera vez, toca **«Empezar con lo que
    ya respondo»**: lee tus respuestas y descripciones y te propone cada tema. Si tus fuentes no coinciden, elige
-   sola (primero tus Políticas, luego tus respuestas más recientes, luego tus descripciones) y dentro de ese tema te
+   sola (primero tus respuestas más recientes, luego tus descripciones) y dentro de ese tema te
    deja una línea chica: «Usé X (de tus respuestas). En tus descripciones dice Y». Los temas que llenó el sistema salen
    en **azul («por revisar»)** hasta que pasas por ellos; **no se puede salir** sin revisarlos (te lleva al primero).
    Si falta completar algún tema te avisa cuáles, y puedes «Salir igual y completar después». Revisa cada pantalla y corrige lo que haga
@@ -290,8 +290,9 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - Si el comprador no pregunta nada («ok, quedo atento», «gracias»), contesta corto y cordial.
 
 **Para que la IA responda mejor:**
-- **Políticas para la IA:** lo general de tu negocio (horarios, envíos, formas de pago, garantía, retiro en
-  persona…). Se escriben una vez y la IA las usa en todas las respuestas.
+- **Mi IA:** lo general de tu negocio (horarios, envíos, formas de pago, garantía, retiro en persona…), tema por
+  tema. Se llena una vez y la IA lo usa en todas las respuestas. (La vieja pestaña «Políticas para la IA» ya no existe:
+  la reemplazó Mi IA.)
 - **Anotar dato del producto:** cuando respondes algo que la IA no sabía (ej. «sí trae cargador»), guárdalo como
   dato de ese producto y la próxima vez lo usa sin gastar créditos de más. **No hace falta hacerlo siempre:** si la IA
   avisó «No encontré: …» y tú publicas tu propia respuesta, la IA saca de ella el dato fijo del producto (material,
