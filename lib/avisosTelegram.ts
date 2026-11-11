@@ -723,6 +723,31 @@ async function pendienteAhora(db: Pool, e: EmpresaAvisos, d: Destinatario, disp:
   return pend
 }
 
+/** 12-11 (el dueño): los SÁBADOS desde las 9:00 (hora Venezuela), UNA vez, a quien tiene Radar PRO vigente (mes de regalo o
+ *  pagado) y acceso al Radar: «Radar PRO activo» con el botón que entra directo (/api/radar/entrar). Lo mismo que la barra
+ *  del sistema (components/layout/AvisoRadarPro.tsx). Uno por persona aunque tenga varias empresas. */
+type FilaAviso = Destinatario & { empresa_id: number; empresa: string; country: Country; modulos: string[]; organizacion_id: number; con_radar: boolean }
+async function avisoRadarPro(rows: FilaAviso[]) {
+  const { rows: [h] } = await dbGlobal().query(
+    `SELECT EXTRACT(ISODOW FROM t)::int = 6 AND EXTRACT(HOUR FROM t)::int >= 9 AS toca, to_char(t, 'YYYY-MM-DD') AS hoy
+     FROM (SELECT NOW() AT TIME ZONE 'America/Caracas' AS t) x`)
+  if (!h.toca) return 0
+  const { rows: orgs } = await dbGlobal().query(
+    `SELECT id FROM organizaciones WHERE radar_pro_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date`)
+  const conPro = new Set(orgs.map(o => Number(o.id)))
+  const vistos = new Set<number>()
+  let k = 0
+  for (const r of rows) {
+    if (!r.con_radar || !conPro.has(Number(r.organizacion_id)) || !r.modulos.includes('radar') || vistos.has(r.user_id)) continue
+    vistos.add(r.user_id)
+    const e: EmpresaAvisos = { id: r.empresa_id, nombre: r.empresa, country: r.country, modulos: r.modulos, organizacion_id: r.organizacion_id }
+    if (await mandar(r, e, 'radar_pro', [h.hoy],
+      '🟢 <b>Radar PRO activo este fin de semana</b> (sábado y domingo): sellos, filtros, Competencia y Tendencias. Aprovecha para buscar productos ganadores.',
+      [[{ texto: 'Entrar al Radar', url: urlSistema('/api/radar/entrar') }]])) k++
+  }
+  return k
+}
+
 /** Lo llama el cron de preguntas cada minuto: conecta a quien tocó "Iniciar" y manda los avisos. */
 export async function enviarAvisosTelegram() {
   if (!telegramConfigurado()) return null
@@ -731,7 +756,8 @@ export async function enviarAvisosTelegram() {
   const { rows: abierto } = await dbGlobal().query(`SELECT 1 FROM plataforma_ajustes WHERE key = 'avisos_telegram_abierto' AND value = 'true'`)
   const { rows } = await dbGlobal().query(
     `SELECT t.user_id, t.chat_id::text, COALESCE(u.full_name, u.username) AS nombre, ue.role, ue.permisos, ue.avisos,
-            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos, e.organizacion_id
+            t.vinculado_at, e.id AS empresa_id, e.nombre AS empresa, e.country, e.modulos, e.organizacion_id,
+            ('radar' = ANY(u.productos)) AS con_radar
      FROM telegram_usuarios t
      JOIN users u ON u.id = t.user_id AND u.is_active
      JOIN usuario_empresas ue ON ue.user_id = t.user_id
@@ -765,6 +791,7 @@ export async function enviarAvisosTelegram() {
       console.error('[avisos telegram]', e.id, err instanceof Error ? err.message : err)
     }
   }
+  enviados += await avisoRadarPro(rows).catch(err => { console.error('[avisos telegram] radar pro', err instanceof Error ? err.message : err); return 0 })
   // Limpieza: lo mandado hace más de 30 días ya no hace falta para no repetir.
   if (new Date().getMinutes() === 0) await dbGlobal().query(`DELETE FROM avisos_enviados WHERE enviado_at < NOW() - INTERVAL '30 days'`).catch(() => {})
   return enviados ? { enviados } : null

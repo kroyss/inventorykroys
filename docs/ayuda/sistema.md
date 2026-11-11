@@ -117,7 +117,9 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   marca **«Agregar Radar PRO»** (en el trimestral con regalo, los meses 2 y 3: +$12), o después, con el plan activo, en
   **Mi plan → Agregar Radar PRO** (1 mes, cada uno a continuación del que ya tengas). Los sábados y domingos, con Radar PRO
   vigente, arriba de todas las pantallas sale **«Radar PRO activo hoy»** con el botón **Entrar al Radar** (la ✕ lo cierra
-  hasta el próximo fin de semana). Sin plan, el Radar queda en
+  hasta el próximo fin de semana). Con los avisos por Telegram conectados, el sábado a las 9:00 llega
+  también un mensaje con el mismo botón. **Entrar al Radar** (y «Radar» en tu menú) entra directo, sin volver a
+  escribir la clave. Sin plan, el Radar queda en
   solo lectura (ve lo que guardó).
 - **Vencimiento del plan:** el plan queda pagado hasta una fecha. Los últimos 5 días aparece un aviso arriba de
   todas las pantallas (en rojo el último día y el anterior; el mismo aviso que al terminar la prueba gratis, que
