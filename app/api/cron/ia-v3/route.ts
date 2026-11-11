@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
       `SELECT p.id::text, p.texto, p.item_estado, p.ia_auto FROM ml_preguntas p
        WHERE p.ia_auto->>'marca' IS NOT NULL AND p.ia_auto->>'fecha' >= $3 AND COALESCE(p.ia_auto->>'respuesta', '') <> ''
        ORDER BY p.ia_auto->>'fecha' OFFSET $1 LIMIT $2`, [offset, n, desde])
-    return Promise.all(rows.map(async r => {
+    const out = []
+    for (const r of rows) out.push(await (async () => {
       try {
         const a = r.ia_auto
         const c = await armarContexto(db, Number(r.id), e.country)
@@ -34,11 +35,12 @@ export async function GET(req: NextRequest) {
         const motivos = motivosRevisar(b, r.item_estado ?? 'active', c.pregunta.texto, datosPublicacion(c), true, textoVendedor(c), datosCompatibilidad(c))
         return { id: r.id, pregunta: r.texto, respuesta: a.respuesta, marca: a.marca, antes: a.decision,
           antesMotivos: (a.motivos ?? []).filter((m: string) => !m.startsWith('Tope por comprador')),
-          v3: motivos.length ? 'revisar' : 'sola', motivos, costo: costoDe(v.llamada.modelo, v.llamada.uso) }
+          v3: motivos.length ? 'revisar' : 'sola', motivos, verificacion: v.motivo, sinRespaldo: v.sinRespaldo ?? [], costo: costoDe(v.llamada.modelo, v.llamada.uso) }
       } catch (err) {
         return { id: r.id, pregunta: r.texto, error: err instanceof Error ? err.message : String(err) }
       }
-    }))
+    })())
+    return out
   })
   return NextResponse.json({ resultados })
 }

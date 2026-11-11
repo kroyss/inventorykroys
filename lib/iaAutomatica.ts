@@ -50,6 +50,7 @@ export async function configIA(db: Pool): Promise<ConfigIA> {
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 // 11-11: "déjanos verificarlo / te confirmamos": una vez publicada la pregunta no se puede volver a contestar.
 const PROMESA = /d[eé]j[ae]n?(me|nos)( lo)? (verificar|revisar|confirmar)|(lo|le|te) (verificamos|confirmamos|averiguamos)|prefiero confirmarlo|confirmarlo con (una persona|el equipo)|en breve (le|te) (confirmo|confirmamos|respondo)/i
+const META = /la respuesta es|no requiere (una )?respuesta|el borrador|el comprador (dice|pregunta|escribe)|como (asistente|modelo de lenguaje)/i
 const OTRA_PUBLICACION = /https?:\/\/|mercadolibre\.com|\bML[A-Z]-?\d{6,}/i
 // 10-11 (competencia, el dueño): invitar al catálogo de la tienda ante la duda está bien: ese link no frena.
 const CATALOGO = /https?:\/\/listado\.mercadolibre\.com\.(ve|co)\/_CustId_\d+\S*/gi
@@ -115,7 +116,10 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
   // igual encuentra lo que sí hay (pedido de la competencia, 10-11).
   const invitaCatalogo = sinCat !== b.respuesta
   if (negativa && !(v2 && b.verificacion === 'ok' && (b.confianza === 'alta' || invitaCatalogo))) m.push('Dice que no hay: lo confirma una persona')
-  if (OTRA_PUBLICACION.test(sinCat)) m.push('Recomienda otra publicación')
+  // 11-11 (medición v3: 4 de 4 podían salir): el link a OTRA publicación del vendedor con el verificador conforme no frena.
+  if (OTRA_PUBLICACION.test(sinCat) && !(v2 && b.verificacion === 'ok' && !/https?:\/\/(?!articulo\.mercadolibre\.com\.(ve|co)\/)/i.test(sinCat))) m.push('Recomienda otra publicación')
+  // 11-11: la IA a veces contesta "hablando de" la pregunta ("la respuesta es…", "no requiere respuesta"): nunca sale sola.
+  if (META.test(b.respuesta)) m.push('La respuesta no le habla al comprador: lo revisa una persona')
   // 04-11 (el dueño): habla como un tercero ("la publicación no especifica"), no como el equipo.
   if (TERCERO.test(b.respuesta)) m.push('Habla como un tercero («la publicación indica…»)')
   if (PROMESA.test(b.respuesta)) m.push('Promete verificar o confirmar después: lo responde una persona')

@@ -79,7 +79,7 @@ VERSIÓN 3 (manda sobre todo lo anterior):
 - Las POLÍTICAS (incluida la sección de Mi IA) son del vendedor: lo que el borrador repite de ahí está respaldado aunque lo diga con otras palabras (mínimo de 2 unidades, envío gratis por ZOOM y TEALCA, un día hábil, retiro).
 - "principal_sin_contestar" = true SOLO si lo principal que preguntó quedó sin ninguna respuesta (preguntó si sirve y no dice nada de eso). Un detalle que falta o una respuesta general no cuenta.`
 
-export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA }
+export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA; sinRespaldo?: { afirmacion: string; tipo?: string }[] }
 const TIPOS_RIESGO = ['producto', 'compatibilidad', 'stock', 'envio', 'pago']
 const HERRAMIENTA_V3 = {
   ...HERRAMIENTA,
@@ -139,5 +139,5 @@ async function verificarV3(datos: string, pregunta: string, borrador: string, mo
     && TIPOS_RIESGO.includes(a.tipo ?? 'producto'))
   const motivo = sinRespaldo.length ? `No está en los datos: ${sinRespaldo.map(a => a.afirmacion).join('; ')}`
     : r.principal_sin_contestar ? `Falta contestar: ${r.que_falta || 'lo principal de la pregunta'}` : null
-  return { ok: !motivo, motivo: motivo?.slice(0, 300) ?? null, llamada: { modelo, uso } }
+  return { ok: !motivo, motivo: motivo?.slice(0, 300) ?? null, llamada: { modelo, uso }, sinRespaldo: sinRespaldo.map(a => ({ afirmacion: a.afirmacion, tipo: a.tipo })) }
 }
