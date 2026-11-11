@@ -32,6 +32,32 @@ export function dbGlobal() {
   return pool
 }
 
+// ── Medidor (12-11, fase 0 del plan de rapidez) ─────────────────────────────────────────────────────────────
+// Anota en el log (docker logs) lo lento, con la pantalla/API de donde vino, para medir con datos reales:
+//   [LENTO] 1710ms emp=1 ruta=api/inventory · WITH v AS ( SELECT p.id …      (una consulta > LENTO_MS, def. 200)
+//   [ESPERA] 350ms emp=1 ruta=api/avisos                                      (esperó conexión libre > 100 ms)
+//   [REQ_DB] 2300ms 11 consultas emp=1 ruta=page/dashboard                    (suma del request > 3×LENTO_MS)
+// Resumen en el VPS: ./scripts/lentos.sh [horas]. Apagar: LENTO_MS=0.
+const LENTO_MS = Number(process.env.LENTO_MS ?? 200)
+
+/** De dónde viene la consulta: el primer archivo de la app en la pila (route.js o page.js del build). */
+function rutaActual(): string {
+  if (!LENTO_MS) return ''
+  const antes = Error.stackTraceLimit
+  Error.stackTraceLimit = 25
+  const pila = new Error().stack ?? ''
+  Error.stackTraceLimit = antes
+  const m = pila.match(/(?:server|migracion)[\\/]app[\\/](.+?)[\\/](route|page|layout)\.(?:js|ts|tsx)/)
+  if (!m) return ''
+  const ruta = m[1].replace(/\\/g, '/').replace(/\([^/]*\)\//g, '')
+  return m[2] === 'route' ? ruta : `${m[2]}:${ruta}`
+}
+
+function anotarLenta(ms: number, empresa: number | string, ruta: string, sql: unknown) {
+  const texto = typeof sql === 'string' ? sql : (sql as { text?: string } | null)?.text ?? ''
+  console.warn(`[LENTO] ${ms}ms emp=${empresa} ruta=${ruta || '?'} · ${texto.replace(/\s+/g, ' ').trim().slice(0, 160)}`)
+}
+
 type Query = PoolClient['query']
 
 /**
@@ -49,13 +75,19 @@ export class EmpresaDb {
   private listo: Promise<PoolClient> | null = null
   private enTransaccion = false
   private liberada = false
+  private msDb = 0
+  private consultas = 0
+  private ruta = ''
 
   constructor(readonly empresaId: number, readonly country: Country) {}
 
   private conexion(): Promise<PoolClient> {
     if (!this.listo) {
       this.listo = (async () => {
+        const t0 = Date.now()
         const client = await pool.connect()
+        const espera = Date.now() - t0
+        if (LENTO_MS && espera > 100) console.warn(`[ESPERA] ${espera}ms emp=${this.empresaId} ruta=${this.ruta || '?'} (pool: ${pool.totalCount} abiertas, ${pool.waitingCount} en cola)`)
         try {
           await client.query(
             `SELECT set_config('app.empresa_id', $1, false), set_config('TimeZone', $2, false)`,
@@ -84,6 +116,7 @@ export class EmpresaDb {
   private async liberar(client: PoolClient) {
     if (this.liberada) return
     this.liberada = true
+    if (LENTO_MS && this.msDb > LENTO_MS * 3) console.warn(`[REQ_DB] ${this.msDb}ms ${this.consultas} consultas emp=${this.empresaId} ruta=${this.ruta || '?'}`)
     let rota: Error | undefined
     try {
       if (this.enTransaccion) await client.query('ROLLBACK')
@@ -103,7 +136,19 @@ export class EmpresaDb {
 
   query: Query = ((...args: unknown[]) => {
     this.seguir(args)
-    return this.conexion().then(c => (c.query as (...a: unknown[]) => unknown).apply(c, args))
+    if (!LENTO_MS) return this.conexion().then(c => (c.query as (...a: unknown[]) => unknown).apply(c, args))
+    const ruta = rutaActual()
+    if (ruta && !this.ruta) this.ruta = ruta
+    return this.conexion().then(async c => {
+      const t0 = Date.now()
+      try {
+        return await (c.query as (...a: unknown[]) => Promise<unknown>).apply(c, args)
+      } finally {
+        const ms = Date.now() - t0
+        this.msDb += ms; this.consultas++
+        if (ms > LENTO_MS) anotarLenta(ms, this.empresaId, ruta || this.ruta, args[0])
+      }
+    })
   }) as Query
 
   /** Mismo contrato que Pool#connect: el `release()` del que llama no hace nada (la
@@ -139,7 +184,16 @@ export async function conEmpresa<T>(empresaId: number, country: Country, fn: (db
     throw e
   }
   const db = {
-    query: client.query.bind(client),
+    query: !LENTO_MS ? client.query.bind(client) : (async (...args: unknown[]) => {
+      const ruta = rutaActual()
+      const t0 = Date.now()
+      try {
+        return await (client.query as (...a: unknown[]) => Promise<unknown>).apply(client, args)
+      } finally {
+        const ms = Date.now() - t0
+        if (ms > LENTO_MS) anotarLenta(ms, empresaId, ruta || 'global', args[0])
+      }
+    }),
     connect: async () => new Proxy(client, {
       get: (target, prop) => {
         if (prop === 'release') return () => {}
