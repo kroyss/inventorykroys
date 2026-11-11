@@ -90,10 +90,10 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   // Seguimiento (11-11; 12-11 pasó a Por atender, pedido del dueño): chips Sin respuesta (la lista de siempre) · Sin guía ·
   // Sin mensaje. Sin chip activo solo trae los contadores.
   const [seg, setSeg] = useState<FiltroSeg>('todas')
-  const [segHoras, setSegHoras] = useState<12 | 24>(24)
+  const [segHoras, setSegHoras] = useState<12 | 24>(12)
   const [segPagina, setSegPagina] = useState(1)
   const [segDatos, setSegDatos] = useState<DatosSeg | null>(null)
-  useEffect(() => { try { if (localStorage.getItem('seguimiento:horas') === '12') setSegHoras(12) } catch { /* sin almacenamiento */ } }, [])
+  useEffect(() => { try { if (localStorage.getItem('seguimiento:horas') === '24') setSegHoras(24) } catch { /* sin almacenamiento */ } }, [])
   const segPedido = useRef(0)
   const cargarSeg = useCallback(async () => {
     if (vista !== 'sin_leer') return

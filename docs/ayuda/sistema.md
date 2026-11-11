@@ -346,9 +346,11 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
   Calificaciones (no concretada). Una venta sale de la lista si tiene alguna de estas: el mensaje automático de ML «El
   número de guía para tu envío es…» (llega cuando el comprador llena el formulario de MercadoEnvíos), su pago en Pagos
   ME, la venta registrada en Ventas, su guía en Despachos o «Ya pagó» en Recordatorios. «Sin mensaje» = de esas, las
-  que no tienen ningún mensaje ni recordatorio en las últimas 24 h (o 12 h, se elige ahí). Cada fila dice si **nunca
-  escribió** o **escribió y no pagó**, el día del plazo, cuándo vence y los recordatorios enviados; primero la que vence
-  antes. Un clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
+  que llevan más de 12 h (o más de 24 h, botones «+12 h» / «+24 h») sin mensajes del comprador ni del equipo; los
+  recordatorios y demás mensajes automáticos no cuentan. Cada fila dice si **nunca escribió** o **escribió y no pagó**,
+  cuándo vence (en rojo si quedan menos de 12 h), cuánto lleva sin mensajes, el día del plazo y los recordatorios
+  enviados; las dos listas van primero la que vence antes. Si el mismo comprador tiene varias compras sin pagar sale en
+  una sola fila con «N compras sin pagar» y un botón por compra. Un clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Pasado el plazo, la
   venta sigue en Calificaciones → Por definir. **Atendidas** tiene el buscador.
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.

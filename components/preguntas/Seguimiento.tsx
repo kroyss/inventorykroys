@@ -12,6 +12,7 @@ export interface FilaSeg {
   nunca_escribio: boolean; dia: number; vence_at: string; sin_leer: number; ultimo_texto: string | null
   ultimo_de_comprador: boolean | null; ultimo_at: string | null; productos: string | null; notas: string | null
   comprador_nick: string | null; comprador_nombre: string | null; imagen: string | null
+  compras?: number; packs?: string[]; sin_mensajes?: boolean
 }
 export interface DatosSeg {
   senal: 'completa' | 'ml' | null; plazo?: number; horas?: number; traido?: string | null
@@ -19,12 +20,14 @@ export interface DatosSeg {
 }
 
 const horasDesde = (f: string) => Math.max(0, Math.round((Date.now() - new Date(f).getTime()) / 3_600_000))
+const horasHasta = (f: string) => Math.round((new Date(f).getTime() - Date.now()) / 3_600_000)
 function venceEn(f: string) {
-  const h = Math.round((new Date(f).getTime() - Date.now()) / 3_600_000)
-  if (h < 1) return 'vence ya'
-  if (h < 24) return `vence en ${h} h`
-  return `vence ${new Date(f).toLocaleDateString('es', { weekday: 'short', day: 'numeric' })}`
+  const h = horasHasta(f)
+  if (h < 1) return 'Vence ya'
+  if (h < 24) return `Vence en ${h} h`
+  return `Vence el ${new Date(f).toLocaleDateString('es', { weekday: 'short', day: 'numeric' })}`
 }
+const tiempo = (h: number) => h < 48 ? `${h} h` : `${Math.floor(h / 24)} días`
 
 /** Los chips (van al lado del buscador). */
 export function ChipsSeguimiento({ datos, valor, onCambio, sinRespuesta }: { datos: DatosSeg | null; valor: FiltroSeg; onCambio: (f: FiltroSeg) => void; sinRespuesta?: number }) {
@@ -48,7 +51,7 @@ export function ChipsSeguimiento({ datos, valor, onCambio, sinRespuesta }: { dat
     <div role="group" aria-label="Seguimiento de ventas" className="-mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
       {chip('todas', 'Sin respuesta', 'Conversaciones con mensajes del comprador sin contestar', sinRespuesta)}
       {chip('sin_concretar', <>Sin guía<Nuevo clave="seguimiento" className="!ml-0" /></>, 'Ventas sin señal de pago (ni guía de MercadoEnvíos, ni pago, ni venta registrada, ni guía en Despachos) dentro de tu plazo', n?.sin_concretar)}
-      {chip('atencion', 'Sin mensaje', 'Sin guía y sin mensajes ni recordatorios en las últimas horas', n?.atencion, true)}
+      {chip('atencion', 'Sin mensaje', 'Sin guía y sin mensajes del comprador ni del equipo en las últimas horas (los recordatorios automáticos no cuentan)', n?.atencion, true)}
     </div>
   )
 }
@@ -64,15 +67,15 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
         <span className="min-w-0 flex-1">
           {filtro === 'atencion'
-            ? <>Sin pago y sin ningún mensaje ni recordatorio en las últimas {horas} h.</>
+            ? <>Ventas sin pago que llevan más de {horas} h sin mensajes del comprador ni del equipo (los recordatorios automáticos no cuentan).</>
             : <>Ventas sin guía de MercadoEnvíos ni pago registrado, dentro de tus {datos?.plazo ?? 3} días de plazo.</>}
           {' '}Primero la que vence antes.
         </span>
         {filtro === 'atencion' && (
-          <span className="inline-flex shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-white" role="group" aria-label="Horas sin movimiento">
+          <span className="inline-flex shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-white" role="group" aria-label="Horas sin mensajes">
             {([12, 24] as const).map(h => (
               <button key={h} type="button" aria-pressed={horas === h} onClick={() => onHoras(h)}
-                className={`h-7 px-2.5 text-[11px] font-medium ${horas === h ? 'bg-neutral-800 text-white' : 'text-neutral-600 hover:bg-neutral-50'}`}>{h} h</button>
+                className={`h-7 px-2.5 text-[11px] font-medium ${horas === h ? 'bg-neutral-800 text-white' : 'text-neutral-600 hover:bg-neutral-50'}`}>+{h} h</button>
             ))}
           </span>
         )}
@@ -84,13 +87,17 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
         {!lista ? <p className="px-4 py-8 text-center text-sm text-neutral-400">Cargando…</p>
           : lista.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-neutral-500">
-              {filtro === 'atencion' ? 'Nada pendiente: todas las ventas sin guía tienen movimiento reciente.' : 'Todas tus ventas recientes ya tienen guía o pago. ¡Al día!'}
+              {filtro === 'atencion' ? 'Nada pendiente: todas las ventas sin guía tienen mensajes recientes.' : 'Todas tus ventas recientes ya tienen guía o pago. ¡Al día!'}
             </p>
           ) : lista.map(c => {
             const plazo = datos?.plazo ?? 3
+            const quedan = horasHasta(c.vence_at)
+            const packs = c.packs ?? [c.pack_id]
+            const sinMsg = horasDesde(c.ultimo_mov)
             return (
-              <button key={c.pack_id} type="button" onClick={() => onAbrir(c.pack_id)}
-                className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${abierta === c.pack_id ? 'bg-lime-50/70' : 'hover:bg-neutral-50'}`}>
+              <div key={c.pack_id} className={packs.includes(abierta ?? '') ? 'bg-lime-50/70' : ''}>
+              <button type="button" onClick={() => onAbrir(c.pack_id)}
+                className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${packs.includes(abierta ?? '') ? '' : 'hover:bg-neutral-50'}`}>
                 {c.imagen
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={c.imagen} alt="" loading="lazy" className="mt-0.5 h-11 w-11 shrink-0 rounded-md border border-neutral-200 bg-white object-contain" />
@@ -110,13 +117,29 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
                       {c.ultimo_de_comprador === false && <span className="text-neutral-400">Tú: </span>}{c.ultimo_texto}
                     </p>
                   )}
-                  <p className="flex flex-wrap gap-x-2 text-xs text-neutral-500">
-                    <span className={c.dia >= plazo ? 'font-medium text-red-600' : ''}>🕒 Día {Math.min(c.dia, plazo)} de {plazo} · {venceEn(c.vence_at)}</span>
+                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-neutral-500">
+                    <span className={`rounded-full px-2 py-0.5 font-semibold ${quedan < 12 ? 'bg-red-50 text-red-700' : 'bg-neutral-100 text-neutral-800'}`}>🕒 {venceEn(c.vence_at)}</span>
+                    <span className={`rounded-full px-2 py-0.5 font-medium ${c.atencion ? 'bg-amber-50 text-amber-800' : 'text-neutral-600'}`}>
+                      {c.sin_mensajes ? `Sin mensajes desde la compra (${tiempo(sinMsg)})` : `Sin mensajes hace ${tiempo(sinMsg)}`}
+                    </span>
+                    <span>Día {Math.min(c.dia, plazo)} de {plazo}</span>
                     {c.recordatorios > 0 && <span>· recordatorio {c.recordatorios} enviado</span>}
-                    <span>· {c.ultimo_at || c.recordatorios ? `último movimiento hace ${horasDesde(c.ultimo_mov)} h` : `compró hace ${horasDesde(c.fecha)} h`}</span>
                   </p>
                 </div>
               </button>
+              {packs.length > 1 && (
+                // Mismo comprador, varias compras sin pagar: una fila; cada compra se abre aparte.
+                <div className="-mt-1 flex flex-wrap items-center gap-1.5 pb-3 pl-[4.75rem] pr-4 text-xs text-neutral-500">
+                  <span className="font-medium text-neutral-700">{packs.length} compras sin pagar:</span>
+                  {packs.map((p, i) => (
+                    <button key={p} type="button" onClick={() => onAbrir(p)} aria-pressed={abierta === p}
+                      className={`h-7 rounded-full border px-2.5 font-medium transition-colors ${abierta === p ? 'border-neutral-800 bg-neutral-800 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'}`}>
+                      Compra {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+              </div>
             )
           })}
         {datos?.total !== undefined && datos.porPagina && datos.total > datos.porPagina && (
