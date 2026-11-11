@@ -83,10 +83,10 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 
 | Ventas al mes | Esencial | Automatizaciones | Completo | Créditos IA de regalo (1er plan) |
 |---|---|---|---|---|
-| Hasta 50 | $8 | $10 | $14 | 500 |
-| 51 a 300 | $12 | $15 | $20 | 1.000 |
-| 301 a 1.000 | $18 | $22 | $27 | 1.500 |
-| Más de 1.000 | $25 | $30 | $35 | 2.000 |
+| Hasta 50 | $8 | $10 | $15 | 500 |
+| 51 a 300 | $12 | $15 | $23 | 1.000 |
+| 301 a 1.000 | $18 | $22 | $33 | 1.500 |
+| Más de 1.000 | $25 | $30 | $45 | 2.000 |
 
 - **Esencial:** Preguntas con IA, Mensajes, Calificaciones, Stock + avisos por Telegram, guías ZOOM/TEALCA
   (Despachos) y Reporte de guías (Reportador).
