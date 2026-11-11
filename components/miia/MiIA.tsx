@@ -880,7 +880,16 @@ export default function MiIA() {
     const pos = Math.max(0, ruta.indexOf(paso)), ultimo = pos === ruta.length - 1
     const anterior = pos > 0 ? ruta[pos - 1] : null, proximo = ultimo ? null : ruta[pos + 1]
     const recorrido = ruta.length < PASOS.length   // «Continuar» con solo los que faltan
-    const cancelar = () => { setPaso(null); setUnaSola(false); if (datos.miIA) setC(datos.miIA); cargar() }
+    // 11-11 (el dueño): sin «Cancelar» (confundía: solo descartaba el tema actual). Si cambió algo de este tema y se
+    // arrepiente, «Deshacer cambios de este tema» lo deja como está guardado.
+    const guardadoTema = (() => { try { return ultimoGuardado.current ? (JSON.parse(ultimoGuardado.current) as Record<string, unknown>)[p.id] : undefined } catch { return undefined } })()
+    const actualTema = (c as unknown as Record<string, unknown>)[p.id]
+    const cambiado = !sugeridos.includes(p.id) && JSON.stringify(actualTema ?? null) !== JSON.stringify(guardadoTema ?? null)
+    const deshacer = () => setC(prev => {
+      const n = { ...prev } as unknown as Record<string, unknown>
+      if (guardadoTema === undefined) delete n[p.id]; else n[p.id] = guardadoTema
+      return n as unknown as Config
+    })
     return (
       <div className="max-w-3xl space-y-3">
         {/* Todos los temas a la vista: tocar uno guarda el actual y salta a ese. */}
@@ -923,6 +932,11 @@ export default function MiIA() {
               <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
             </div>
             {error && <p className="aparecer rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+            {cambiado && (
+              <button type="button" onClick={deshacer}
+                className="aparecer inline-flex items-center gap-1 text-xs text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline">
+                <span aria-hidden="true">↺</span> Deshacer cambios de este tema</button>
+            )}
           </div>
           {/* Botones siempre a mano: quedan pegados abajo de la pantalla mientras el tema es largo. */}
           <div className="sticky bottom-0 z-10 flex items-center gap-2 rounded-b-xl border-t border-neutral-100 bg-white/95 px-3 py-3 backdrop-blur sm:px-5">
@@ -931,12 +945,9 @@ export default function MiIA() {
                 className="inline-flex h-10 min-w-0 items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition hover:bg-neutral-50 active:scale-[0.98]">
                 <span aria-hidden="true">←</span><span className="hidden truncate sm:inline">{PASOS[anterior].tema}</span><span className="sm:hidden">Atrás</span></button>
             ) : <span className="hidden sm:block" />}
-            <button type="button" onClick={cancelar} disabled={guardando}
-              className="h-10 shrink-0 px-2 text-sm text-neutral-500 hover:text-neutral-800 disabled:opacity-50"
-              title="Vuelve a Mi IA sin guardar lo que cambiaste en este tema">Cancelar</button>
             <div className="ml-auto flex min-w-0 items-center gap-2">
               {proximo !== null && (
-                <button type="button" onClick={() => ir(null)} disabled={guardando}
+                <button type="button" onClick={() => ir(null)} disabled={guardando} title="Guarda lo que cambiaste y vuelve a Mi IA"
                   className="h-10 shrink-0 rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50">
                   <span className="hidden sm:inline">Guardar y salir</span><span className="sm:hidden">Salir</span></button>
               )}
