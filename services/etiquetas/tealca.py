@@ -18,6 +18,8 @@ import re
 
 import fitz  # PyMuPDF
 
+import cantidad
+
 # ===== Lectura =====
 # Zonas de los datos en la etiqueta original (puntos, origen arriba-izquierda).
 ZONA_PREGUIA = fitz.Rect(120, 48, 260, 80)
@@ -148,7 +150,7 @@ def celda(out_page, cell, pdf_bytes, lineas_producto, nota, fuentes):
     x, y0 = dest.x1 + 6, dest.y1 - 2
     for l in lineas:
         f = _ajusta(l, FS_PROD, largo)
-        out_page.insert_text((x + 9, y0), l, fontsize=f, fontname="helv", rotate=90)
+        cantidad.dibujar_linea(out_page, (x + 9, y0), l, f, rotate=90)
         x += PASO_PROD
     for l in lineas_nota:
         out_page.insert_text((x + 9, y0), l, fontsize=FS_NOTA, fontname="helv", rotate=90)

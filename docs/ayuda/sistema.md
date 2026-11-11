@@ -562,7 +562,9 @@ banco, no el que escribió el comprador.
 *Cómo lo pregunta la gente:* etiquetas, imprimir guías, guías ZOOM, guías TEALCA, PDF de MercadoEnvíos, 4 por hoja, lote, jornada, manifiesto, apartar, en espera, cancelar envío.
 
 Imprime las etiquetas de MercadoEnvíos (ZOOM / TEALCA) **4 por hoja**, con la cantidad y la nota de cada paquete,
-y arma el **manifiesto** al final del día.
+y arma el **manifiesto** al final del día. Cuando un producto va **2 o más unidades**, la cantidad sale en un círculo
+negro y escrita en palabra y negrita («❷ DOS - …», «❸ TRES - …») para no equivocarse al armar el paquete; con 1
+unidad queda normal («1 - …»).
 
 **Cómo se usa:**
 1. Las guías entran solas desde Pagos ME, o **arrastra los PDFs** de MercadoEnvíos (o pégalos con Ctrl+V, o haz

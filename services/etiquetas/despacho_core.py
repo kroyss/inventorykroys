@@ -17,6 +17,7 @@ import unicodedata
 
 import fitz  # PyMuPDF
 
+import cantidad
 import datos_factura
 import tealca
 
@@ -165,7 +166,7 @@ def envolver_lineas(lineas, ancho, fs=TEXT_SIZE, max_lineas=MAX_PRODUCT_LINES):
         if largo(l) <= ancho:
             salida.append(l)
             continue
-        m = re.match(r"^(\S+ - )", l)
+        m = re.match(r"^((?:\(\d+\) \S+|\S+) - )", l)   # 12-11: también "(2) DOS - " (cantidad.py)
         sangria = " " * int(round(largo(m.group(1)) / largo(" "))) if m else ""
         palabras, primera = l.split(" "), ""
         while palabras and largo((primera + " " + palabras[0]).strip()) <= ancho:
@@ -210,8 +211,8 @@ def armar_sales_map(filas):
         lineas, nota_previa = sales_map.get(venta, ([], ""))
         producto = (f.get("producto") or "").strip()
         # Sin título (opción de la empresa): solo la cantidad; lo que va es lo que dice la nota.
-        lineas.append(f"{str(f['cantidad']).strip()} - {clip_text(producto)}" if producto
-                      else f"{str(f['cantidad']).strip()} und.")
+        # 12-11: con 2 o más unidades la línea lleva la marca de cantidad resaltada (cantidad.py).
+        lineas.append(cantidad.linea_producto(f['cantidad'], clip_text(producto) if producto else ''))
         nota = (f.get("nota") or "").strip()
         sales_map[venta] = (lineas, nota_previa or nota)
     return sales_map
@@ -270,12 +271,7 @@ def armar_pdf(etiquetas, sales_map, ventas=None):
             lineas, fs = ajustar_lineas(envolver_lineas(lineas, ancho), ancho)
 
             for k, linea in enumerate(lineas):
-                out_page.insert_text(
-                    (x, y + k * PRODUCT_LINE_STEP_PT),
-                    linea,
-                    fontsize=fs,
-                    fontname=TEXT_FONT,
-                )
+                cantidad.dibujar_linea(out_page, (x, y + k * PRODUCT_LINE_STEP_PT), linea, fs)
 
             if linea_nota:
                 y_nota = y + (len(lineas) - 1) * PRODUCT_LINE_STEP_PT + NOTE_LINE_OFFSET_PT
