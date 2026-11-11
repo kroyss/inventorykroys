@@ -162,8 +162,9 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start">
           <div ref={listaRef} className={`scroll-mt-4 space-y-2 min-w-0 ${abierta ? 'hidden lg:block' : ''}`}>
           {vista === 'todas' && (
-            <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-            <div className="relative min-w-0 flex-1">
+            // Buscador chico que crece con el espacio y, al tocarlo, ocupa toda la línea (los chips bajan).
+            <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1 basis-40 focus-within:basis-full">
               <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
               <input value={buscar} onChange={e => { setBuscar(e.target.value); if (seg !== 'todas') { setSeg('todas'); setAbierta(null) } }} type="search"
                 placeholder="Buscar comprador, nº de venta, producto o algo que se habló…" aria-label="Buscar conversación"

@@ -13,7 +13,7 @@ export interface FilaSeg {
   comprador_nick: string | null; comprador_nombre: string | null; imagen: string | null
 }
 export interface DatosSeg {
-  senal: 'completa' | 'parcial' | null; plazo?: number; horas?: number; traido?: string | null
+  senal: 'completa' | 'ml' | null; plazo?: number; horas?: number; traido?: string | null
   contadores?: { sin_concretar: number; atencion: number }; lista?: FilaSeg[]; total?: number; porPagina?: number
 }
 
@@ -25,14 +25,14 @@ function venceEn(f: string) {
   return `vence ${new Date(f).toLocaleDateString('es', { weekday: 'short', day: 'numeric' })}`
 }
 
-/** Los chips (van al lado del buscador). Sin señal de pago (ni Pagos ME, ni Despachos, ni Ventas) no se muestran. */
+/** Los chips (van al lado del buscador). */
 export function ChipsSeguimiento({ datos, valor, onCambio }: { datos: DatosSeg | null; valor: FiltroSeg; onCambio: (f: FiltroSeg) => void }) {
   if (!datos?.senal) return null
   const n = datos.contadores
-  const chip = (f: FiltroSeg, texto: React.ReactNode, cuenta?: number, alerta = false) => {
+  const chip = (f: FiltroSeg, texto: React.ReactNode, titulo: string, cuenta?: number, alerta = false) => {
     const activo = valor === f
     return (
-      <button type="button" aria-pressed={activo} onClick={() => { vistoNuevo('seguimiento'); onCambio(f) }}
+      <button type="button" aria-pressed={activo} title={titulo} onClick={() => { vistoNuevo('seguimiento'); onCambio(f) }}
         className={`inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${
           activo ? (alerta ? 'border-amber-500 bg-amber-500 text-white' : 'border-neutral-800 bg-neutral-800 text-white')
             : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'}`}>
@@ -44,10 +44,10 @@ export function ChipsSeguimiento({ datos, valor, onCambio }: { datos: DatosSeg |
     )
   }
   return (
-    <div role="group" aria-label="Seguimiento de ventas" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-      {chip('todas', 'Todas')}
-      {chip('sin_concretar', 'Sin concretar', n?.sin_concretar)}
-      {chip('atencion', <>Requiere atención<Nuevo clave="seguimiento" className="!ml-0" /></>, n?.atencion, true)}
+    <div role="group" aria-label="Seguimiento de ventas" className="-mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
+      {chip('todas', 'Todo', 'Todas las conversaciones atendidas')}
+      {chip('sin_concretar', 'Sin guía', 'Ventas sin señal de pago (ni guía de MercadoEnvíos, ni pago, ni venta registrada, ni guía en Despachos) dentro de tu plazo', n?.sin_concretar)}
+      {chip('atencion', <>Atender<Nuevo clave="seguimiento" className="!ml-0" /></>, 'Sin guía y sin mensajes ni recordatorios en las últimas horas', n?.atencion, true)}
     </div>
   )
 }
@@ -64,7 +64,7 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
         <span className="min-w-0 flex-1">
           {filtro === 'atencion'
             ? <>Sin pago y sin ningún mensaje ni recordatorio en las últimas {horas} h.</>
-            : <>Ventas sin pago, ni guía, ni venta registrada, dentro de tus {datos?.plazo ?? 3} días de plazo.</>}
+            : <>Ventas sin guía de MercadoEnvíos ni pago registrado, dentro de tus {datos?.plazo ?? 3} días de plazo.</>}
           {' '}Primero la que vence antes.
         </span>
         {filtro === 'atencion' && (
@@ -78,15 +78,12 @@ export function ListaSeguimiento({ datos, filtro, horas, onHoras, pagina, onPagi
         {datos?.senal === 'completa' && (datos.traido
           ? <span className="w-full text-emerald-700 sm:w-auto">Pagos traídos hoy {datos.traido} ✓</span>
           : <Link href="/pagos-me" className="w-full font-medium text-amber-700 underline-offset-2 hover:underline sm:w-auto">Falta traer los pagos de hoy →</Link>)}
-        {datos?.senal === 'parcial' && (
-          <span className="w-full text-neutral-500">Se mira si tiene guía en Despachos o venta registrada: un pago reciente puede no verse todavía.</span>
-        )}
       </div>
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm divide-y divide-neutral-100">
         {!lista ? <p className="px-4 py-8 text-center text-sm text-neutral-400">Cargando…</p>
           : lista.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-neutral-500">
-              {filtro === 'atencion' ? 'Nada pendiente: todas las ventas sin pago tienen movimiento reciente.' : 'Todas tus ventas recientes ya tienen pago o guía. ¡Al día!'}
+              {filtro === 'atencion' ? 'Nada pendiente: todas las ventas sin guía tienen movimiento reciente.' : 'Todas tus ventas recientes ya tienen guía o pago. ¡Al día!'}
             </p>
           ) : lista.map(c => {
             const plazo = datos?.plazo ?? 3

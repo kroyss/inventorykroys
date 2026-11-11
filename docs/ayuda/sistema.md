@@ -335,14 +335,15 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - Elige una conversación. Ves los mensajes, los productos, el total de la venta y, si usas Despachos, si su guía ya
   salió.
 - **Leer un mensaje aquí NO lo marca como leído en MercadoLibre:** se marca cuando respondes o tocas el sobre.
-- **Seguimiento (Atendidas, al lado del buscador):** chips **Todas · Sin concretar · Requiere atención**.
-  «Sin concretar» = ventas de ML sin pago traído (Pagos ME), sin venta registrada, sin guía en Despachos y sin
-  «Ya pagó» en Recordatorios, dentro de los días de plazo que pusiste en Calificaciones (no concretada). «Requiere
-  atención» = de esas, las que no tienen ningún mensaje ni recordatorio en las últimas 24 h (o 12 h, se elige ahí).
-  Cada fila dice si **nunca escribió** o **escribió y no pagó**, el día del plazo, cuándo vence y los recordatorios
-  enviados; primero la que vence antes. Un clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los
-  pagos de hoy (si no, puede salir alguien que ya pagó). Sin Pagos ME se guía por Despachos y Ventas. Pasado el
-  plazo, la venta sigue en Calificaciones → Por definir.
+- **Seguimiento (Atendidas, al lado del buscador):** chips **Todo · Sin guía · Atender**.
+  «Sin guía» = ventas de ML sin ninguna señal de pago dentro de los días de plazo que pusiste en Calificaciones (no
+  concretada). Una venta sale de la lista si tiene alguna de estas: el mensaje automático de ML «El número de guía
+  para tu envío es…» (llega cuando el comprador llena el formulario de MercadoEnvíos), su pago en Pagos ME, la venta
+  registrada en Ventas, su guía en Despachos o «Ya pagó» en Recordatorios. «Atender» = de esas, las que no tienen
+  ningún mensaje ni recordatorio en las últimas 24 h (o 12 h, se elige ahí). Cada fila dice si **nunca escribió** o
+  **escribió y no pagó**, el día del plazo, cuándo vence y los recordatorios enviados; primero la que vence antes. Un
+  clic abre la conversación. Con Pagos ME arriba dice si ya trajiste los pagos de hoy. Funciona para toda empresa con
+  Mensajes. Pasado el plazo, la venta sigue en Calificaciones → Por definir. El buscador se agranda al tocarlo.
 - Escribe la respuesta. Puedes **adjuntar fotos (JPG/PNG) o PDF**, también pegándolas con **Ctrl+V**. **Ctrl+Enter**
   envía.
 - **Respuestas rápidas de mensajes:** botones con textos guardados; un clic pone el texto y lo puedes retocar.

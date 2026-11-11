@@ -9,16 +9,16 @@ import { leerPlantillasCal } from '@/lib/calificacionesML'
 // pago (ni pago traído en Pagos ME, ni venta registrada, ni guía en Despachos, ni "Ya pagó" en Recordatorios), dentro
 // del plazo que la empresa le da antes de marcarla no concretada (Calificaciones). Pasado el plazo ya la ve Calificaciones.
 // «Requiere atención» = además, sin ningún movimiento (mensaje de cualquiera de los dos o recordatorio) en las últimas N h.
-// `senal`: 'completa' con Pagos ME; 'parcial' con Despachos o Ventas (puede no ver pagos recientes); null = no se muestra.
+// 11-11 (el dueño): también sale de la lista si en la conversación está el mensaje automático de ML «El número de guía
+// para tu envío es…» (llega al llenar el formulario de MercadoEnvíos = pagó; 99 % de las pagadas en Pagos ME lo tienen).
+// Con eso sirve a toda empresa con Mensajes. `senal`: 'completa' con Pagos ME (muestra si se trajeron los pagos hoy); 'ml' el resto.
 const POR_PAGINA = 10
 
 export async function GET(req: NextRequest) {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
   const u = s.session.user
-  const senal = tieneModulo(u, 'pagos_me') ? 'completa'
-    : tieneModulo(u, 'despachos') || tieneModulo(u, 'inventario') ? 'parcial' : null
-  if (!senal) return NextResponse.json({ senal: null })
+  const senal = tieneModulo(u, 'pagos_me') ? 'completa' : 'ml'
   const sp = new URL(req.url).searchParams
   const filtro = sp.get('filtro') === 'atencion' ? 'atencion' : sp.get('filtro') === 'sin_concretar' ? 'sin_concretar' : null
   const horas = sp.get('horas') === '12' ? 12 : 24
@@ -44,6 +44,8 @@ export async function GET(req: NextRequest) {
           AND NOT EXISTS (SELECT 1 FROM me_pagos p WHERE p.venta IN (v.id::text, v.pack::text) AND p.verificacion <> 'invalido')
           AND NOT EXISTS (SELECT 1 FROM sales sa WHERE sa.ml_order_number IN (v.id::text, v.pack::text))
           AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (v.id::text, v.pack::text))
+          AND NOT EXISTS (SELECT 1 FROM ml_mensajes g WHERE g.pack_id = v.pack AND g.propio
+                            AND g.texto ~* 'n[uú]mero de gu[ií]a para tu env[ií]o')
       ), t AS (
         SELECT s.*, GREATEST(s.fecha, s.mensaje_at, s.rec_at) AS ultimo_mov,
                (GREATEST(s.fecha, s.mensaje_at, s.rec_at) < NOW() - make_interval(hours => $2)) AS atencion
