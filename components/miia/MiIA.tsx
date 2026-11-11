@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
 import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -799,6 +799,7 @@ export default function MiIA() {
     const r = await fetch('/api/mi-ia'); const d = await r.json()
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setDatos(d); if (d.miIA) setC(d.miIA); setSugeridos([])
+    ultimoGuardado.current = d.miIA ? JSON.stringify(d.miIA) : null
   }
   useEffect(() => { cargar() }, [])
   // Desde las recomendaciones de la prueba (09-11): abre el tema de Mi IA que hay que mejorar ('*' = todos).
@@ -808,28 +809,48 @@ export default function MiIA() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const guardar = async () => {
-    setGuardando(true); setError(null)
+  // 11-11 (el dueño: "demora al pasar de tema"): sin cambios no se guarda nada, y los guardados van en fila (uno detrás
+  // de otro) para que uno lento no pise al siguiente.
+  const ultimoGuardado = useRef<string | null>(null)
+  const colaGuardar = useRef<Promise<boolean>>(Promise.resolve(true))
+  const guardar = (): Promise<boolean> => {
     // Lo sugerido de los temas por los que todavía no pasó (Siguiente/Guardar) NO se guarda: solo se propone.
     const actual = paso !== null ? PASOS[paso].id : null
     const pendientes = sugeridos.filter(t => t !== actual)
     const cuerpo: Config = { ...c }
     for (const t of pendientes) delete (cuerpo as unknown as Record<string, unknown>)[t]
     if (datos?.miIA) for (const t of pendientes) if ((datos.miIA as unknown as Record<string, unknown>)[t] !== undefined) (cuerpo as unknown as Record<string, unknown>)[t] = (datos.miIA as unknown as Record<string, unknown>)[t]
-    const r = await fetch('/api/mi-ia', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
-    if (r.ok && actual) setSugeridos(s => s.filter(t => t !== actual))
-    const d = await r.json().catch(() => ({}))
-    setGuardando(false)
-    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return false }
-    return true
+    const json = JSON.stringify(cuerpo)
+    if (json === ultimoGuardado.current) { if (actual) setSugeridos(s => s.filter(t => t !== actual)); return colaGuardar.current }
+    setGuardando(true); setError(null)
+    const p = colaGuardar.current.then(async () => {
+      const r = await fetch('/api/mi-ia', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: json }).catch(() => null)
+      const d = await r?.json().catch(() => ({}))
+      setGuardando(false)
+      if (!r?.ok) { setError(d?.error ?? 'No se pudo guardar (revisa tu conexión)'); return false }
+      ultimoGuardado.current = json
+      if (actual) setSugeridos(s => s.filter(t => t !== actual))
+      return true
+    })
+    colaGuardar.current = p
+    return p
   }
   // 11-11 (el dueño): moverse entre temas con un toque (barra de temas, Anterior / Siguiente con su nombre). Al moverse se
   // guarda el tema actual; null = volver a la página de Mi IA.
+  // Entre temas se pasa al instante y se guarda por detrás; si no se pudo guardar, vuelve al tema con el aviso.
   const ir = async (destino: number | null) => {
-    if (!(await guardar())) return
-    if (destino === null) { setPaso(null); setUnaSola(false); cargar() }
-    else { if (!ruta.includes(destino)) setRuta(TODOS); setPaso(destino) }
+    if (destino === null) {
+      if (!(await guardar())) return
+      setPaso(null); setUnaSola(false); cargar()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    const desde = paso
+    const g = guardar()
+    if (!ruta.includes(destino)) setRuta(TODOS)
+    setPaso(destino)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (!(await g) && desde !== null) setPaso(desde)
   }
   useEffect(() => {
     if (paso !== null) document.getElementById(`tema-${PASOS[paso].id}`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
@@ -854,7 +875,7 @@ export default function MiIA() {
           {PASOS.map((t, i) => {
             const ok = t.lleno(c), actual = i === paso
             return (
-              <button key={t.id} id={`tema-${t.id}`} type="button" onClick={() => !actual && ir(i)} disabled={guardando}
+              <button key={t.id} id={`tema-${t.id}`} type="button" onClick={() => !actual && ir(i)}
                 aria-current={actual ? 'step' : undefined}
                 className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
                   actual ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
@@ -879,7 +900,7 @@ export default function MiIA() {
           {error && <p className="text-sm text-red-700">{error}</p>}
           <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4">
             {anterior !== null && (
-              <button type="button" onClick={() => ir(anterior)} disabled={guardando}
+              <button type="button" onClick={() => ir(anterior)}
                 className="inline-flex items-center gap-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">
                 ← {PASOS[anterior].tema}</button>
             )}
@@ -890,7 +911,7 @@ export default function MiIA() {
                 <button type="button" onClick={() => ir(null)} disabled={guardando}
                   className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">Guardar y salir</button>
               )}
-              <button type="button" onClick={() => ir(proximo)} disabled={guardando}
+              <button type="button" onClick={() => ir(proximo)}
                 className="inline-flex items-center gap-1 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
                 {guardando ? 'Guardando…' : proximo !== null ? <>{PASOS[proximo].tema} →</> : 'Guardar y terminar'}</button>
             </div>
