@@ -201,7 +201,9 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 1. Abre **Mi IA** (Preguntas → Configuración → Mi IA, o en Mensajes). Si es la primera vez, toca **«Empezar con lo que
    ya respondo»**: lee tus respuestas y descripciones y te propone cada tema. Si tus fuentes no coinciden, elige
    sola (primero tus Políticas, luego tus respuestas más recientes, luego tus descripciones) y dentro de ese tema te
-   deja una línea chica: «Usé X (de tus respuestas). En tus descripciones dice Y». Revisa cada pantalla y corrige lo que haga
+   deja una línea chica: «Usé X (de tus respuestas). En tus descripciones dice Y». Los temas que llenó el sistema salen
+   en **azul («por revisar»)** hasta que pasas por ellos; **no se puede salir** sin revisarlos (te lleva al primero).
+   Si falta completar algún tema te avisa cuáles, y puedes «Salir igual y completar después». Revisa cada pantalla y corrige lo que haga
    falta (pago, envío, despacho, tono, lo que siempre responde una persona…). Arriba de cada pantalla están **todos los temas** (✓ = completo, punto naranja = falta): tocas uno y saltas directo; abajo, **← tema anterior** y **tema siguiente →** con su nombre. Al pasar de un tema a otro se guarda solo; **Guardar y salir** vuelve a Mi IA; si te arrepientes de lo que cambiaste en un tema, **Deshacer cambios de este tema** lo deja como estaba. **Hay que completar todos los temas:**
    mientras falte alguno, la respuesta automática no se puede encender (te dice cuáles faltan).
 2. Abajo de los temas están las tarjetas **Preguntas** y **Mensajes** (en computadora, una al lado de la otra; en el

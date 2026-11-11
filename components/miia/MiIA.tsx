@@ -853,8 +853,24 @@ export default function MiIA() {
   // 11-11 (el dueño): moverse entre temas con un toque (barra de temas, Anterior / Siguiente con su nombre). Al moverse se
   // guarda el tema actual; null = volver a la página de Mi IA.
   // Entre temas se pasa al instante y se guarda por detrás; si no se pudo guardar, vuelve al tema con el aviso.
-  const ir = async (destino: number | null) => {
+  // 12-11 (el dueño: "no debería dejarlo salir hasta que revise y complete los temas"): con temas que llenó el sistema y
+  // nadie revisó NO se sale (lo lleva al primero); con temas vacíos avisa cuáles y deja «Salir igual» (para volver otro día).
+  const [freno, setFreno] = useState<{ tipo: 'revisar' | 'vacios'; temas: string[] } | null>(null)
+  const ir = async (destino: number | null, salirIgual = false) => {
     if (destino === null) {
+      const actualId = paso !== null ? PASOS[paso].id : null
+      const sinRevisar = sugeridosRef.current.filter(t => t !== actualId)
+      if (sinRevisar.length) {
+        setFreno({ tipo: 'revisar', temas: sinRevisar })
+        return ir(PASOS.findIndex(p => p.id === sinRevisar[0]))
+      }
+      const vacios = PASOS.filter(p => !p.lleno(c)).map(p => p.id)
+      if (vacios.length && !salirIgual) {
+        setFreno({ tipo: 'vacios', temas: vacios })
+        if (paso !== null && !vacios.includes(PASOS[paso].id)) return ir(PASOS.findIndex(p => p.id === vacios[0]))
+        return
+      }
+      setFreno(null)
       if (!(await guardar())) return
       setPaso(null); setUnaSola(false); cargar()
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -876,6 +892,20 @@ export default function MiIA() {
   useEffect(() => {
     if (paso !== null) document.getElementById(`tema-${PASOS[paso].id}`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
   }, [paso])
+  // Si cierra la pestaña con temas sugeridos sin revisar, el navegador pregunta (esos temas todavía no están guardados).
+  useEffect(() => {
+    if (paso === null || !sugeridos.length) return
+    const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [paso, sugeridos.length])
+  // El aviso de freno se va solo cuando ya no queda nada de lo que avisaba.
+  useEffect(() => {
+    if (!freno) return
+    const quedan = freno.tipo === 'revisar' ? freno.temas.filter(t => sugeridos.includes(t)) : freno.temas.filter(t => !PASOS.find(p => p.id === t)!.lleno(c))
+    if (!quedan.length) setFreno(null)
+    else if (quedan.length !== freno.temas.length) setFreno({ ...freno, temas: quedan })
+  }, [freno, sugeridos, c])
 
   if (error && !datos) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
   if (!datos) return <p className="text-sm text-neutral-500">Cargando…</p>
@@ -903,21 +933,41 @@ export default function MiIA() {
         {/* Todos los temas a la vista: tocar uno guarda el actual y salta a ese. */}
         <nav aria-label="Temas de Mi IA" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
           {PASOS.map((t, i) => {
-            const ok = t.lleno(c), actual = i === paso
+            // 12-11: lo que llenó el sistema y nadie revisó NO sale con ✓: punto azul «por revisar».
+            const revisar = sugeridos.includes(t.id) && !(i === paso)
+            const ok = t.lleno(c) && !revisar, actual = i === paso
             return (
               <button key={t.id} id={`tema-${t.id}`} type="button" onClick={() => !actual && ir(i)}
-                aria-current={actual ? 'step' : undefined}
+                aria-current={actual ? 'step' : undefined} title={revisar ? 'Lo llené con lo que ya respondes: pasa por aquí para revisarlo' : undefined}
                 className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
                   actual ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
+                  : revisar ? 'border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
                   : ok ? 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400'
                   : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'}`}>
-                {ok ? <span className={actual ? 'text-emerald-300' : 'text-emerald-600'}>✓</span>
+                {ok || (actual && t.lleno(c)) ? <span className={actual ? 'text-emerald-300' : 'text-emerald-600'}>✓</span>
+                  : revisar ? <span className="h-1.5 w-1.5 rounded-full bg-sky-500" aria-label="por revisar" />
                   : <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-label="falta" />}
                 {t.tema}
               </button>
             )
           })}
         </nav>
+        {sugeridos.filter(t => t !== p.id).length > 0 && !freno && (
+          <p className="flex items-center gap-1.5 text-xs text-sky-800"><span className="h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true" />
+            Los temas en azul los llené con lo que ya respondes: pasa por cada uno para revisarlo y guardarlo.</p>
+        )}
+        {freno && (
+          <div role="alert" className={`aparecer flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border px-3 py-2 text-sm ${freno.tipo === 'revisar' ? 'border-sky-200 bg-sky-50 text-sky-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+            <span className="min-w-0 flex-1">
+              {freno.tipo === 'revisar'
+                ? <>Antes de salir revisa {freno.temas.length === 1 ? 'el tema' : `los ${freno.temas.length} temas`} que llené con lo que ya respondes: <b>{freno.temas.map(t => PASOS.find(x => x.id === t)!.tema).join(', ')}</b>. Si está bien, solo pasa al siguiente.</>
+                : <>Te {freno.temas.length === 1 ? 'falta 1 tema' : `faltan ${freno.temas.length} temas`} para poder encender la IA: <b>{freno.temas.map(t => PASOS.find(x => x.id === t)!.tema).join(', ')}</b>.</>}
+            </span>
+            {freno.tipo === 'vacios' && (
+              <button type="button" onClick={() => ir(null, true)} className="shrink-0 text-xs font-medium underline underline-offset-2">Salir igual y completar después</button>
+            )}
+          </div>
+        )}
         <div ref={tarjeta} className="scroll-mt-4 overflow-x-clip rounded-xl border border-neutral-200 bg-white shadow-sm">
           {/* Avance: una rayita por tema del recorrido (la actual más oscura); se llena con transición. */}
           <div className="flex gap-1 px-5 pt-4" aria-hidden="true">
