@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useCallback, useEffect, useState } from 'react'
 import { Cargando, PageHeader } from '@/components/ui'
 

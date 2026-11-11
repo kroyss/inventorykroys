@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import Renovar from '@/components/plan/Renovar'
 import { RADAR_URL } from '@/lib/cuenta'
 

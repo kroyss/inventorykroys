@@ -17,7 +17,15 @@ export default async function InventarioPage() {
   const db      = dbDeSesion(session!)
 
   const { rows } = await db.query(`
-    WITH v AS (
+    -- Ventas de 6 meses en una sola pasada (12-11, antes subconsulta por producto).
+    WITH v6 AS (
+      SELECT si.product_id, SUM(si.quantity) AS q
+      FROM sales s JOIN sale_items si ON s.id = si.sale_id
+      WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
+        AND s.created_at >= NOW() - INTERVAL '6 months'
+      GROUP BY si.product_id
+    ),
+    v AS (
       SELECT
         p.id                                        AS product_id,
         p.code, p.name, p.is_active, p.stock_por_verificar,
@@ -32,15 +40,9 @@ export default async function InventarioPage() {
         COALESCE(inv.max_stock,  0)::int            AS max_stock,
         COALESCE(inv.sale_price, 0)::float          AS sale_price,
         inv.last_updated,
-        COALESCE((
-          SELECT SUM(si.quantity)
-          FROM sales s
-          JOIN sale_items si ON s.id = si.sale_id
-          WHERE si.product_id = p.id
-            AND s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-            AND s.created_at >= NOW() - INTERVAL '6 months'
-        ), 0)::int AS ventas_6m
+        COALESCE(v6.q, 0)::int AS ventas_6m
       FROM products p
+      LEFT JOIN v6 ON v6.product_id = p.id
       LEFT JOIN product_pricing pp  ON p.id = pp.product_id
       LEFT JOIN profit_categories pc ON pc.id = pp.profit_category_id
       LEFT JOIN inventory       inv ON p.id = inv.product_id

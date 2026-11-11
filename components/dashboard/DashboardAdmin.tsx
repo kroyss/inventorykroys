@@ -7,7 +7,7 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js'
 import type { ChartOptions } from 'chart.js'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import type { Country } from '@/lib/types'
 import { KPICard, PageHeader, Cargando, chipCls } from '@/components/ui'
 import BonusPipeline from './BonusPipeline'

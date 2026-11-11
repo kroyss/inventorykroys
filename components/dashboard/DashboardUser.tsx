@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import type { Country } from '@/lib/types'
 import BonusPipeline from './BonusPipeline'
 import SalesMiniChart from './SalesMiniChart'

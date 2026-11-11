@@ -1,5 +1,6 @@
 'use client'
-import Link from 'next/link'
+import { comun } from '@/lib/comun'
+import Link from '@/components/ui/Link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { UserRole, Country } from '@/lib/types'
@@ -106,7 +107,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const [novedades, setNovedades] = useState(0)
   useEffect(() => {
     let vivo = true
-    fetch('/api/novedades', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setNovedades(d.nuevas ?? 0) }).catch(() => {})
+    comun<{ nuevas: number }>('novedades').then(d => { if (vivo && d) setNovedades(d.nuevas ?? 0) }).catch(() => {})
     return () => { vivo = false }
   }, [pathname])
 
@@ -115,7 +116,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   useEffect(() => {
     if (!showMore) return
     let vivo = true
-    fetch('/api/aprendizaje', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
+    comun<{ exento: boolean; videos: { nuevo: boolean; completado: boolean }[] }>('aprendizaje')
       .then(d => { if (vivo && d) setVideoNuevo(!d.exento && d.videos.some((v: { nuevo: boolean; completado: boolean }) => v.nuevo && !v.completado)) })
       .catch(() => {})
     return () => { vivo = false }

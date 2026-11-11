@@ -1,7 +1,7 @@
 'use client'
 import { leerNumero } from '@/lib/numeroTexto'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { Cargando, EmptyState, FilterPills, KPICard, PageHeader } from '@/components/ui'
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { matchTokens } from '@/lib/search'

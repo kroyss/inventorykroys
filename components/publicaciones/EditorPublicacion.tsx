@@ -1,7 +1,7 @@
 'use client'
 import { leerNumero } from '@/lib/numeroTexto'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import type { CambiosPublicacion, CampoFicha, Publicacion, ResultadoGuardar } from '@/lib/publicacionesML'
 import { componer, mismoTexto, caracteresNoPermitidos, limpiarTexto, tieneContacto, MAX_DESCRIPCION } from '@/lib/descripcionTexto'
 

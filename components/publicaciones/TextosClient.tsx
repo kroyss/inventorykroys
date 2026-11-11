@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useSearchParams } from 'next/navigation'
 import { caracteresNoPermitidos, limpiarTexto } from '@/lib/descripcionTexto'
 

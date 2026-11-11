@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 
 /** Inicio: productos importados desde MercadoLibre con el stock sin verificar (lib/importarML.ts). */
 export default function AvisoStockVerificar({ n }: { n: number }) {

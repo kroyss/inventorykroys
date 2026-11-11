@@ -1,4 +1,5 @@
 'use client'
+import { olvidar } from '@/lib/comun'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui'
 
@@ -247,6 +248,7 @@ export function Reproductor({ video, onAvance }: {
       const clave = b.visto_seg * 100000 + b.posicion_seg
       if (clave === guardado) return
       guardado = clave
+      olvidar('aprendizaje')
       const r = await fetch('/api/aprendizaje/progreso', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b),
       }).catch(() => null)

@@ -27,7 +27,9 @@ import type { Country } from '@/lib/types'
 // jit=off (02-11): con consultas que Postgres cree grandes (subconsultas sobre ml_mensajes) compilaba JIT en cada
 // carga: Por confirmar tardaba 3 s y 2,7 eran solo de compilar. Las consultas de la app son cortas: JIT solo estorba.
 // Va en el arranque de la conexión, así RESET ALL lo conserva.
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 15, connectionTimeoutMillis: 20_000, options: '-c jit=off' })
+// idleTimeoutMillis 5 min (12-11, antes 10 s por defecto): abrir una conexión cuesta 40–150 ms y con 10 s se cerraban
+// entre pantalla y pantalla. 3 copias × 15 = 45 de 100 igual que antes: solo se quedan abiertas, no hay más.
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 15, connectionTimeoutMillis: 20_000, idleTimeoutMillis: 300_000, options: '-c jit=off' })
 
 export function dbGlobal() {
   return pool

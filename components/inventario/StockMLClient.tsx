@@ -3,7 +3,7 @@
 // TODAS sus publicaciones (cuentas y variantes): lo que muestra ML y lo que debería mostrar. Se marcan varios y
 // «Igualar y reactivar» los deja todos al día de una vez (antes: de a una publicación, cuenta por cuenta).
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
 import type { FilaStockML, PubStockML } from '@/lib/stockConML'
 

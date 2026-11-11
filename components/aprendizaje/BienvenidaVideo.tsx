@@ -1,4 +1,5 @@
 'use client'
+import { comun } from '@/lib/comun'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Reproductor, type Video } from './AprendizajeClient'
@@ -17,11 +18,10 @@ export default function BienvenidaVideo() {
     if (pathname.startsWith('/aprendizaje')) return
     try { if (sessionStorage.getItem(POSPUESTO)) return } catch { /* sin storage: se muestra */ }
     let vivo = true
-    fetch('/api/aprendizaje', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
+    comun<{ videos: Video[]; exento: boolean; demo: boolean }>('aprendizaje')
       .then(d => {
         const primero: Video | undefined = d?.videos?.[0]
-        if (vivo && primero && !primero.completado && !d.exento && !d.demo) setVideo(primero)
+        if (vivo && primero && !primero.completado && !d?.exento && !d?.demo) setVideo(primero)
       })
       .catch(() => {})
     return () => { vivo = false }

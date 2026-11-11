@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 // Plataforma → Interno: los avisos por Telegram se prueban primero en la organización de la

@@ -1,6 +1,7 @@
 'use client'
+import { comun } from '@/lib/comun'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { usePathname } from 'next/navigation'
 
 /** Acceso a Aprendizaje (ícono de libro) en la barra superior. Sin videos se muestra igual: ahí están
@@ -14,8 +15,7 @@ export default function AprendizajeNav() {
   const [n, setN] = useState<{ hechos: number; total: number; exento: boolean; dias: number; nuevos: number } | null>(null)
   useEffect(() => {
     let vivo = true
-    fetch('/api/aprendizaje', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
+    comun<{ videos: { completado: boolean; nuevo: boolean }[]; exento: boolean; dias: number }>('aprendizaje')
       .then(d => {
         if (!vivo || !d) return
         setN({ hechos: d.videos.filter((v: { completado: boolean }) => v.completado).length, total: d.videos.length, exento: !!d.exento,

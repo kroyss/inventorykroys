@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { conEmpresa } from '@/lib/db'
 import type { Country } from '@/lib/types'
 import { cupoIA, nivelCreditos } from '@/lib/ia'

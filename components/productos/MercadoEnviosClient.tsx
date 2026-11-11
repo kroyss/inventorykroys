@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import type { Product } from '@/lib/types'
 import { shipInfo, parseShippingTable, type ShipInfo, type ShipStatus } from '@/lib/mlShipping'
 import { matchTokens } from '@/lib/search'

@@ -9,7 +9,7 @@ import { coPublishedPrice } from '@/lib/coPricing'
 import { matchTokens } from '@/lib/search'
 import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import { liveBaseVE, liveFinalVE, livePublishedVE, recDiscountVE, mlNetFor, storedPricesVE, type VeRate } from '@/lib/pricingVE'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import MlBreakdown from './MlBreakdown'
 import { etiquetaCategoria } from '@/lib/categoriasGanancia'
 

@@ -5,8 +5,9 @@
 //   · Al terminar: «✓ Tareas terminadas» (o «con errores»); abierta muestra cómo quedaron y «Ver cómo quedaron».
 //   · La ✕ quita el aviso de las terminadas (no vuelven a salir).
 // Pregunta una vez al abrir; si hay algo en curso, cada 5 s hasta que termine. Despierta con el evento 'cola-ml'.
-import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
+import { comun } from '@/lib/comun'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from '@/components/ui/Link'
 
 interface Lote { id: number; tipo: string; titulo: string; estado: string; total: number; ok: number; sin_cambio: number
   saltadas: number; errores: number; pendientes: number }
@@ -22,8 +23,11 @@ export default function AvisoColaML() {
   const [abierto, setAbierto] = useState<boolean>(() => (typeof window === 'undefined' ? false : leer<boolean>(ABIERTO, false)))
   const [mirando, setMirando] = useState(0)
 
+  const primera = useRef(true)
   const cargar = useCallback(async () => {
-    const d = await fetch('/api/cola-ml').then(r => (r.ok ? r.json() : null)).catch(() => null)
+    // La primera vez va junto con los demás pedidos comunes; las vueltas siguientes (cada 5 s con algo en curso), frescas.
+    const d = await comun<{ lotes: Lote[] }>('cola', { fresco: !primera.current }).catch(() => null)
+    primera.current = false
     const l: Lote[] = d?.lotes ?? []
     setLotes(l)
     return l.some(x => x.estado === 'en_curso')

@@ -1,6 +1,7 @@
 'use client'
+import { comun, olvidar } from '@/lib/comun'
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { usePathname } from 'next/navigation'
 import type { Novedad } from '@/lib/novedades'
 
@@ -73,7 +74,7 @@ export default function NovedadesNav() {
 
   useEffect(() => {
     let vivo = true
-    fetch('/api/novedades', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setDatos(d) }).catch(() => {})
+    comun<{ items: Novedad[]; nuevas: number }>('novedades').then(d => { if (vivo && d) setDatos(d) }).catch(() => {})
     return () => { vivo = false }
   }, [pathname])
 
@@ -93,6 +94,7 @@ export default function NovedadesNav() {
     setAbierto(a)
     // Se dan por vistas al abrir; el "Nuevo" de cada una se mantiene mientras el panel está abierto.
     if (a && datos.nuevas > 0) {
+      olvidar('novedades')
       fetch('/api/novedades/vistas', { method: 'POST' }).catch(() => {})
       setDatos({ ...datos, nuevas: 0 })
     }

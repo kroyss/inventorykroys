@@ -1,4 +1,5 @@
 'use client'
+import { comun } from '@/lib/comun'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
@@ -54,12 +55,14 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
   // (<html data-dpl-id>, la pone Next con deploymentId). Ver scripts/rolling.sh.
   const [versionNueva, setVersionNueva] = useState(false)
 
+  const primera = useRef(true)
   const cargar = useCallback(async () => {
     ultimaCarga.current = Date.now()
     try {
-      const r = await fetch('/api/avisos', { cache: 'no-store' })
-      if (r.ok) {
-        const d = await r.json()
+      // La primera vez va junto con los demás pedidos comunes (lib/comun.ts); después, siempre fresco.
+      const d = await comun<typeof avisos & { version?: string }>('avisos', { fresco: !primera.current })
+      primera.current = false
+      if (d) {
         setAvisos(d)
         const mia = document.documentElement.dataset.dplId
         if (d.version && mia && d.version !== mia) setVersionNueva(true)

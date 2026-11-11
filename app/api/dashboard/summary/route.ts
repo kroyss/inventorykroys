@@ -76,44 +76,31 @@ export async function GET(_: NextRequest) {
     const profitMonth = salesAmount - costsMonth - commMonth
     const profitPct   = costsMonth > 0 ? (profitMonth / costsMonth) * 100 : 0
 
-    const { rows: [a9] } = await db.query(`
-      SELECT COUNT(DISTINCT p.id) AS n
-      FROM products p
-      JOIN inventory i ON p.id = i.product_id
-      WHERE p.is_active = TRUE AND i.quantity > 0
-        AND (
-          SELECT COALESCE(SUM(si.quantity), 0)
-          FROM sale_items si
-          JOIN sales s ON si.sale_id = s.id
-          WHERE si.product_id = p.id
-            AND s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-            AND s.created_at >= NOW() - INTERVAL '6 months'
-        ) < 6
-    `)
-
-    // Reposición: productos que necesitan recompra (< 4 meses de stock según venta mensual)
-    const { rows: [a10] } = await db.query(`
-      SELECT COUNT(*) AS n FROM (
-        SELECT
-          COALESCE(i.quantity, 0) AS stock,
-          COALESCE((
-            SELECT SUM(si.quantity)
-            FROM sale_items si JOIN sales s ON si.sale_id = s.id
-            WHERE si.product_id = p.id
-              AND s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-              AND s.created_at >= NOW() - INTERVAL '6 months'
-          ), 0) AS ventas_6m
+    // Sin rotación, reposición e importados por verificar en UNA consulta, con las ventas de 6 meses en una
+    // sola pasada (12-11: antes 3 consultas seguidas y una subconsulta por producto, 0,3–0,4 s cada una).
+    //   a9  sin rotación: con stock y < 6 vendidas en 6 meses
+    //   a10 reposición: necesitan recompra (< 4 meses de stock según venta mensual)
+    const { rows: [r9] } = await db.query(`
+      WITH v6 AS (
+        SELECT si.product_id, SUM(si.quantity) AS q
+        FROM sales s JOIN sale_items si ON s.id = si.sale_id
+        WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
+          AND s.created_at >= NOW() - INTERVAL '6 months'
+        GROUP BY si.product_id
+      ),
+      t AS (
+        SELECT COALESCE(i.quantity, 0) AS stock, i.id AS inv_id, COALESCE(v6.q, 0) AS ventas_6m, p.stock_por_verificar
         FROM products p
         LEFT JOIN inventory i ON i.product_id = p.id
+        LEFT JOIN v6 ON v6.product_id = p.id
         WHERE p.is_active = TRUE
-      ) t
-      WHERE ventas_6m > 0
-        AND NOT (ventas_6m < 6 AND stock > 0)
-        AND stock < (ventas_6m / 6.0) * 4
+      )
+      SELECT COUNT(*) FILTER (WHERE inv_id IS NOT NULL AND stock > 0 AND ventas_6m < 6) AS a9,
+             COUNT(*) FILTER (WHERE ventas_6m > 0 AND NOT (ventas_6m < 6 AND stock > 0) AND stock < (ventas_6m / 6.0) * 4) AS a10,
+             COUNT(*) FILTER (WHERE stock_por_verificar) AS a11
+      FROM t
     `)
-
-    // Importados desde MercadoLibre con el stock sin confirmar (aviso en Inicio).
-    const { rows: [a11] } = await db.query(`SELECT COUNT(*) AS n FROM products WHERE is_active AND stock_por_verificar`)
+    const a9 = { n: r9.a9 }, a10 = { n: r9.a10 }, a11 = { n: r9.a11 }
 
     return NextResponse.json({
       por_verificar:           parseInt(a11.n, 10),

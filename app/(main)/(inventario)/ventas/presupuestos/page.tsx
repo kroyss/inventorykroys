@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'

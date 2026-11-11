@@ -3,7 +3,7 @@
 // es la lista de siempre; «Sin guía» y «Sin mensaje», las ventas que todavía no muestran pago antes de que venza el plazo.
 // La lista la arma /api/mensajes/seguimiento.
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { Nuevo, vistoNuevo } from '@/components/ui/Nuevo'
 import { Pagination } from '@/components/ui'
 

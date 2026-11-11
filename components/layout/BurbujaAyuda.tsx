@@ -1,4 +1,5 @@
 'use client'
+import { comun } from '@/lib/comun'
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { nombrePantalla, sugerenciasDe, type Sugerencia } from '@/lib/ayudaSugerencias'
@@ -50,14 +51,14 @@ export default function BurbujaAyuda() {
   const [videos, setVideos] = useState<Video[]>([])
   const fin = useRef<HTMLDivElement>(null)
 
-  const cargarCasos = useCallback(async () => {
-    const d = await fetch('/api/soporte', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null)
+  const cargarCasos = useCallback(async (fresco = true) => {
+    const d = await comun<{ casos: typeof casos; nuevos: typeof nuevos }>('soporte', { fresco }).catch(() => null)
     if (d) { setCasos(d.casos); setNuevos(d.nuevos) }
   }, [])
 
   // Respuestas nuevas de soporte: al entrar y cada 3 minutos (solo con la pestaña a la vista).
   useEffect(() => {
-    cargarCasos()
+    cargarCasos(false)
     const t = setInterval(() => { if (document.visibilityState === 'visible') cargarCasos() }, 3 * 60_000)
     return () => clearInterval(t)
   }, [cargarCasos])
@@ -71,7 +72,7 @@ export default function BurbujaAyuda() {
   // Los videos (para enlazar las sugerencias por título), una vez al abrir.
   useEffect(() => {
     if (!abierta || videos.length) return
-    fetch('/api/aprendizaje', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
+    comun<{ videos: Video[] }>('aprendizaje')
       .then(d => d?.videos && setVideos(d.videos.map((v: Video) => ({ id: v.id, titulo: v.titulo })))).catch(() => {})
   }, [abierta, videos.length])
 

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'

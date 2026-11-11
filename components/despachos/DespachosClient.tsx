@@ -2,7 +2,7 @@
 import { AvisoEnEspera, BotonEnEspera, PanelEnEspera, useEnEspera, type Apartado } from '@/components/despachos/EnEspera'
 import PrimeraJornada from '@/components/despachos/PrimeraJornada'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 

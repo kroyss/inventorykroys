@@ -33,7 +33,7 @@ export async function GET() {
   const s = await sesion(false)
   if ('error' in s) return s.error
   try {
-    const [filas, reserva, catalogo] = await Promise.all([filasStockML(s.db, s.session.user.country), leerReserva(s.db), filasImportar(s.db)])
+    const [filas, reserva, catalogo] = await Promise.all([filasStockML(s.db, s.session.user.country), leerReserva(s.db), filasImportar(s.db, { parecidas: false })])
     // Activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
     const sinVincular = catalogo.filter(f => f.estado !== 'vinculada' && f.estado_ml === 'active' && f.disponible > 0).length
     return NextResponse.json({ filas, reserva, sinVincular, puedeCambiar: puede(s.session.user, 'reponer_stock'),

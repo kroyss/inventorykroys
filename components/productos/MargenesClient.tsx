@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
 import type { Product, ProfitCategory } from '@/lib/types'
 import { KPICard, exportRows } from '@/components/ui'

@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import EtiquetasModal from './EtiquetasModal'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useEscape } from '@/components/ui/useEscape'

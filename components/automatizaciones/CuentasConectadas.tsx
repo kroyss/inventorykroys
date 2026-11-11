@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useEffect, useRef, useState } from 'react'
 
 export interface CuentaML { nickname: string; estado: string; con_error: boolean }

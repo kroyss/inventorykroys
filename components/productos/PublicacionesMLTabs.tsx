@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import type { UserRole } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'

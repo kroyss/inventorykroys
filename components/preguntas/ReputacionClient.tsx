@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import CorregirCalificacion from './CorregirCalificacion'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { Cargando, EmptyState, PageHeader } from '@/components/ui'
 import type { Reputacion } from '@/lib/reputacionML'
 

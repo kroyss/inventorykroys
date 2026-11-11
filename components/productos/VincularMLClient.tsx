@@ -3,7 +3,7 @@
 // más vende a la que menos; dentro, una fila por variante (cada color/modelo es un producto aparte). Cada vínculo lo
 // hace una persona con un clic: el sistema solo sugiere. "No sé, para Marcos" (en clientes, "para el administrador") deja la duda con su nota.
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import AvisoPesos from '@/components/preguntas/AvisoPesos'

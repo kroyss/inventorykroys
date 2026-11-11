@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useAvisos } from '@/components/layout/Avisos'
 
 /** Las dos vistas de Calificaciones con su número (los mismos avisos del menú):

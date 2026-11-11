@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
 import { LinkConectar } from '@/components/preguntas/CuentasMLClient'
 

@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { dbGlobal } from '@/lib/db'
 import { DIAS_PRUEBA } from '@/lib/cuenta'
 import { corteQueLeToca } from '@/lib/fundadoresCorte'

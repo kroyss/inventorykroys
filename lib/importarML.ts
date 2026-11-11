@@ -53,7 +53,9 @@ function similitud(a: Set<string>, b: Set<string>) {
   return comunes / (a.size + b.size - comunes)
 }
 
-export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
+/** `parecidas: false` (12-11): sin buscar parecidas por nombre (trigramas contra todos los productos, pesado de
+ *  CPU y traba el servidor): para quien solo necesita saber cuáles están vinculadas (aviso de Stock en ML). */
+export async function filasImportar(db: Pool, { parecidas = true } = {}): Promise<FilaImportar[]> {
   const { rows: cat } = await db.query(
     `SELECT c.item_id, c.titulo, c.precio::float AS precio, c.moneda, c.disponible, c.estado, c.permalink,
             c.thumbnail, c.sku, c.variantes, c.sin_movimiento, UPPER(x.nickname) AS cuenta   -- como lib/mlCuentas (ficha del producto)
@@ -99,7 +101,7 @@ export async function filasImportar(db: Pool): Promise<FilaImportar[]> {
 
   // Parecidas: SKU = código del producto, o nombre parecido (trigramas, como pg_trgm). Se calcula en
   // memoria: en SQL eran ~8 ms por publicación aun con índice (títulos de ML largos) → 3 s por lista.
-  const libres = filas.filter(f => f.estado === 'nueva')
+  const libres = parecidas ? filas.filter(f => f.estado === 'nueva') : []
   if (libres.length) {
     const { rows: prods } = await db.query(`SELECT id, code, name FROM products WHERE is_active`)
     const conTri = prods.map(p => ({ id: p.id as number, code: p.code as string, name: p.name as string, tri: trigramas(p.name) }))

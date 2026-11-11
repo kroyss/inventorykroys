@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/ui/Link'
 import { useAvisos, type Avisos } from '@/components/layout/Avisos'
 
 // Íconos de trazo (24x24)

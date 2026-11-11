@@ -40,6 +40,27 @@ function datosEmpresa(e: EmpresaAcceso) {
 // Sesión (2026-10-14, antes 12 h fijas desde el login): se cierra tras SESION_HORAS SIN USO; usándola
 // sigue abierta, con un tope de SESION_MAX_DIAS desde el login (ahí se pide la contraseña igual).
 const SESION_HORAS = 12
+
+// Rapidez (12-11, fase 1): cada pedido revalidaba la sesión con 3 consultas seguidas (empresas, usuario,
+// última actividad); una pantalla con 9 pedidos lo hacía ~11 veces y llenaba las conexiones. Ahora lo leído
+// se reusa SESION_CACHE_MS por usuario (por copia de la app): un cambio de permisos, módulos o una
+// desactivación tarda como mucho eso en aplicarse. Cambiar de empresa (update) siempre lee de nuevo.
+const SESION_CACHE_MS = 15_000
+type Revalidado = { at: number; empresas: EmpresaAcceso[]; u: { is_active: boolean; sv: number; ultima_actividad: Date | null } | undefined }
+const revalidados = new Map<string, Revalidado>()
+const actividadAnotada = new Map<string, number>()
+async function revalidar(sub: string, fresco: boolean): Promise<Revalidado> {
+  const c = revalidados.get(sub)
+  if (!fresco && c && Date.now() - c.at < SESION_CACHE_MS) return c
+  const [empresas, { rows: [u] }] = await Promise.all([
+    empresasDeUsuario(sub),
+    dbGlobal().query(`SELECT is_active, session_version AS sv, ultima_actividad FROM users WHERE id = $1`, [sub]),
+  ])
+  const r: Revalidado = { at: Date.now(), empresas, u }
+  if (revalidados.size > 5000) revalidados.clear()
+  revalidados.set(sub, r)
+  return r
+}
 const SESION_MAX_DIAS = 7
 
 export const authOptions: NextAuthOptions = {
@@ -119,9 +140,7 @@ export const authOptions: NextAuthOptions = {
       // Cada request: el usuario sigue activo, con la misma versión de sesión (contraseña)
       // y con acceso a la empresa. Rol y módulos se refrescan de la base: un cambio de
       // permisos o de módulos se aplica sin volver a entrar.
-      const empresas = await empresasDeUsuario(token.sub!)
-      const { rows: [u] } = await dbGlobal().query(
-        `SELECT is_active, session_version AS sv, ultima_actividad FROM users WHERE id = $1`, [token.sub])
+      const { empresas, u } = await revalidar(token.sub!, trigger === 'update' || !!user)
       if (!u || !u.is_active || u.sv !== (token.sv ?? 0)) {
         throw new Error('Sesión cerrada: el usuario fue desactivado o cambió su contraseña')
       }
@@ -134,9 +153,14 @@ export const authOptions: NextAuthOptions = {
       // Última actividad (migración 069), como máximo cada 2 minutos (antes cada hora): la usa el cron
       // de ML para saber qué empresas están en uso, y Plataforma para mostrar quién está "en línea ahora"
       // (lib/plataforma: EN_LINEA_MINUTOS) y no actualizar producción mientras alguien trabaja.
-      await dbGlobal().query(
-        `UPDATE users SET ultima_actividad = NOW()
-         WHERE id = $1 AND (ultima_actividad IS NULL OR ultima_actividad < NOW() - INTERVAL '2 minutes')`, [token.sub]).catch(() => {})
+      // (La memoria evita mandar el UPDATE en cada pedido: esta copia ya lo anotó hace menos de 1 min.)
+      if (Date.now() - (actividadAnotada.get(token.sub!) ?? 0) > 60_000) {
+        actividadAnotada.set(token.sub!, Date.now())
+        if (actividadAnotada.size > 5000) actividadAnotada.clear()
+        await dbGlobal().query(
+          `UPDATE users SET ultima_actividad = NOW()
+           WHERE id = $1 AND (ultima_actividad IS NULL OR ultima_actividad < NOW() - INTERVAL '2 minutes')`, [token.sub]).catch(() => {})
+      }
 
       // Cambio de empresa en caliente, vía useSession().update({ empresaId }) — o
       // update({ country }), el selector VE/CO de siempre.
