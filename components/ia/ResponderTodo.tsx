@@ -40,7 +40,10 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
     <div className="space-y-1">
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         {op(false, 'Modo Seguro', 'Responde sola solo cuando está segura. Lo dudoso (reclamos, pagos, «no hay», temas de «Siempre una persona») te lo deja escrito para que lo revises y lo mandes tú.')}
-        {op(true, 'Modo Total', `Responde todo sola, sin dejarte nada para revisar. Solo respeta tu horario y el máximo por comprador. ${AVISO_TODO}`)}
+        {op(true, 'Modo Total', tipo === 'preguntas'
+          // 12-11 (el dueño): todo tiene respuesta; la posventa sale con la frase de escape (Frenos) y la sigues tú.
+          ? `Responde todo sola. Lo de posventa (cancelar, devolver, reclamo) lo contesta con tu frase de escape para que tú sigas el caso. Respeta tu horario y el máximo por comprador. ${AVISO_TODO}`
+          : `Responde todo sola, sin dejarte nada para revisar. Solo respeta tu horario y el máximo por comprador. ${AVISO_TODO}`)}
       </div>
       {error && <p className="text-xs text-red-700">{error}</p>}
     </div>

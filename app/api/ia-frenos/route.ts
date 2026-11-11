@@ -20,6 +20,7 @@ const Body = z.object({
   tope: z.number().int().min(1, 'El tope mínimo es 1').max(50),
   escape: z.string().trim().max(200).nullable(),
   escapePreguntas: z.string().trim().max(350).nullable().optional(),
+  escapeSeguro: z.boolean().optional(),
 })
 
 export async function PUT(req: NextRequest) {

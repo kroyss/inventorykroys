@@ -18,7 +18,13 @@ export const CLAVE_FRENOS = 'ia_frenos'
 export const TOPE_DEFAULT = 3
 
 export interface HorarioIA { dias: number[]; desde: string; hasta: string }   // dias: 0 = domingo … 6 = sábado; "HH:MM"
-export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: string | null; escapePreguntas: string | null }
+// 12-11 (el dueño): la frase de escape de Preguntas viene PRECARGADA con la de fábrica (escapePreguntas null = esa).
+// Modo Total la usa SIEMPRE (todo tiene respuesta: la posventa, fuera de horario o si la IA no escribió nada). Modo Seguro
+// solo si `escapeSeguro` (lo que ya la tenían activada antes de esto la siguen usando).
+export const ESCAPE_PREGUNTAS_FABRICA = '¡Hola! Lo verificamos y te confirmamos en breve por aquí.'
+export interface FrenosIA { horario: HorarioIA | null; tope: number; escape: string | null; escapePreguntas: string | null; escapeSeguro: boolean }
+/** El texto que se publica en Preguntas: el propio o el de fábrica. */
+export const fraseEscapePreguntas = (f: Pick<FrenosIA, 'escapePreguntas'>) => f.escapePreguntas ?? ESCAPE_PREGUNTAS_FABRICA
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -30,8 +36,11 @@ export function normalizarFrenos(v: unknown): FrenosIA {
     ? { dias, desde: String(h.desde), hasta: String(h.hasta) } : null
   const tope = Number.isInteger(o.tope) && (o.tope as number) >= 0 && (o.tope as number) <= 50 ? o.tope as number : TOPE_DEFAULT
   const escape = typeof o.escape === 'string' && o.escape.trim() ? o.escape.trim().slice(0, 200) : null
-  const escapePreguntas = typeof o.escapePreguntas === 'string' && o.escapePreguntas.trim() ? o.escapePreguntas.trim().slice(0, 350) : null
-  return { horario, tope, escape, escapePreguntas }
+  const propia = typeof o.escapePreguntas === 'string' && o.escapePreguntas.trim() ? o.escapePreguntas.trim().slice(0, 350) : null
+  const escapePreguntas = propia === ESCAPE_PREGUNTAS_FABRICA ? null : propia
+  // Antes de 12-11 tener frase = usarla en Modo Seguro: se respeta.
+  const escapeSeguro = typeof o.escapeSeguro === 'boolean' ? o.escapeSeguro : propia !== null
+  return { horario, tope, escape, escapePreguntas, escapeSeguro }
 }
 
 // 09-11 (el dueño, activación para clientes): al ENCENDER la IA automática por primera vez quedan unos frenos de fábrica
@@ -40,7 +49,7 @@ export function normalizarFrenos(v: unknown): FrenosIA {
 // Si la empresa ya tiene sus frenos guardados no se tocan. Se editan en Mi IA → Frenos.
 export const FRENOS_FABRICA: FrenosIA = {
   horario: null, tope: TOPE_DEFAULT,
-  escape: '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.', escapePreguntas: null,
+  escape: '¡Hola! Recibimos tu mensaje, en breve te respondemos por aquí.', escapePreguntas: null, escapeSeguro: false,
 }
 export async function frenosDeFabrica(db: Pick<Pool, 'query'>) {
   await db.query(

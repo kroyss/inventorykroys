@@ -16,7 +16,7 @@ import { problemasDelTexto } from '@/lib/preguntasTexto'
 import { publicarRespuesta } from '@/lib/responderPregunta'
 import { automaticasPausadas } from '@/lib/automaticasPreguntas'
 import { simularEconomica, type DecisionEco } from '@/lib/iaEconomica'
-import { leerFrenos, motivosFrenos, MOTIVO_TOPE } from '@/lib/iaFrenos'
+import { fraseEscapePreguntas, leerFrenos, motivosFrenos, MOTIVO_TOPE } from '@/lib/iaFrenos'
 import { SIN_CONFIRMAR, compatibilidadRespaldada, preguntaDeVehiculo, sinTildes } from '@/lib/iaCompatibilidad'
 
 export type ModoIA = 'apagado' | 'sombra' | 'real'
@@ -220,10 +220,12 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
         d.publicada = r.ok && !!r.publicada
         if (!r.ok) d.error = r.error
         if (d.publicada) publicadas++; else fallas++
-      } else if (d.decision === 'revisar' && cfg.modo === 'real' && frenos?.escapePreguntas
+      } else if (d.decision === 'revisar' && cfg.modo === 'real' && frenos && (cfg.todo === true || frenos.escapeSeguro)
                  && !motivos.some(m => m.startsWith(MOTIVO_TOPE)) && (c.item?.status ?? q.item_estado) !== 'paused') {
+        // 12-11: Modo Total la usa siempre (precargada con la de fábrica); Modo Seguro solo si la activó.
+        const frase = fraseEscapePreguntas(frenos)
         // «Responder todo» (opcional): la pregunta no queda sin contestar; la respuesta de la IA queda escrita para ver.
-        const r = await publicarRespuesta(db, q.id, frenos.escapePreguntas, { fuente: 'ia_escape', base: frenos.escapePreguntas })
+        const r = await publicarRespuesta(db, q.id, frase, { fuente: 'ia_escape', base: frase })
         if (r.ok && r.publicada) d.escape = true
         else if (!r.ok) d.error = r.error
       }

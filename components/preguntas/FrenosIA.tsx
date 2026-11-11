@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 // Frenos de la IA automática (07-11, lib/iaFrenos.ts): horario, tope por comprador y (en Mensajes) frase de escape.
 // Valen para Preguntas y Mensajes a la vez (mismo guardado). Solo actúan con la IA automática ACTIVA.
 type Horario = { dias: number[]; desde: string; hasta: string }
-type Frenos = { horario: Horario | null; tope: number; escape: string | null; escapePreguntas: string | null }
+type Frenos = { horario: Horario | null; tope: number; escape: string | null; escapePreguntas: string | null; escapeSeguro: boolean }
+// La misma de lib/iaFrenos.ts (ESCAPE_PREGUNTAS_FABRICA): viene escrita para que se vea cuál se usa si no la cambian.
+const ESCAPE_FABRICA = '¡Hola! Lo verificamos y te confirmamos en breve por aquí.'
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 // 10-11: se edita solo en Mi IA, con la frase de cada lado que esté disponible.
@@ -74,24 +76,20 @@ export function FrenosIA({ preguntas = false, mensajes = false, total = false }:
         </div>
       )}
       {preguntas && (
+        // 12-11 (el dueño): precargada con la de fábrica. Modo Total la usa siempre; Modo Seguro solo si se marca.
         <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-sm text-neutral-800">
-            <input type="checkbox" checked={f.escapePreguntas != null} onChange={e => e.target.checked ? setF({ ...f, escapePreguntas: '' }) : guardar({ ...f, escapePreguntas: null })} />
-            Frase de escape en Preguntas <span className="text-neutral-400">(opcional)</span>
+          <p className="text-sm text-neutral-800">Frase de escape en Preguntas</p>
+          <p className="text-xs text-neutral-500">Cuando la IA no responde sola, contesta al momento con esta frase para que ninguna pregunta quede sin respuesta. <b>Modo Total:</b> se usa siempre, en posventa (cancelar, devolver, reclamo), fuera de tu horario o si la IA no logró escribir nada. Ojo: MercadoLibre acepta <b>una sola respuesta</b> por pregunta, así que queda respondida con la frase; la respuesta de la IA queda escrita para que sigas tú. No se usa con el tope por comprador ni con publicaciones pausadas.</p>
+          <textarea rows={2} maxLength={350} value={f.escapePreguntas ?? ESCAPE_FABRICA} onChange={e => setF({ ...f, escapePreguntas: e.target.value })}
+            onBlur={() => { const t = (f.escapePreguntas ?? '').trim(); guardar({ ...f, escapePreguntas: !t || t === ESCAPE_FABRICA ? null : t }) }}
+            aria-label="Frase de escape en Preguntas" className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
+          {f.escapePreguntas != null && f.escapePreguntas.trim() !== ESCAPE_FABRICA && (
+            <button type="button" onClick={() => guardar({ ...f, escapePreguntas: null })} className="text-xs text-neutral-500 underline-offset-2 hover:underline">Volver a la de fábrica</button>
+          )}
+          <label className="flex items-start gap-2 text-sm text-neutral-800">
+            <input type="checkbox" className="mt-0.5" checked={f.escapeSeguro} onChange={e => guardar({ ...f, escapeSeguro: e.target.checked })} />
+            <span>Usarla también en <b>Modo Seguro</b> <span className="block text-xs text-neutral-500">Ahí contesta con la frase todo lo que la IA deja para revisar (no está segura, reclamos, «no hay», fuera de horario). Sirve de noche; de día conviene dejarlas para responderlas tú.</span></span>
           </label>
-          <p className="text-xs text-neutral-500 pl-6">Cuando la IA no responde sola, contesta al momento con esta frase para que ninguna pregunta quede sin respuesta. <b>Modo Seguro:</b> cuando no está segura, es un reclamo, dice que «no hay» o es fuera de tu horario. <b>Modo Total:</b> solo posventa (cancelar, devolver, reclamo), fuera de tu horario o si no logró escribir nada. Ojo: MercadoLibre acepta <b>una sola respuesta</b> por pregunta, así que queda respondida con la frase; la respuesta de la IA queda escrita para que la veas. No se usa con el tope por comprador ni con publicaciones pausadas.</p>
-          {total && f.escapePreguntas == null && (
-            <p className="ml-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Estás en <b>Modo Total</b>: te recomendamos activarla. Sin frase, la posventa y lo que llega fuera de horario quedan sin respuesta hasta que alguien las conteste.
-              <button type="button" onClick={() => guardar({ ...f, escapePreguntas: '¡Hola! Lo verificamos y te confirmamos en breve por aquí.' })}
-                className="ml-1 font-medium underline underline-offset-2">Usar «¡Hola! Lo verificamos y te confirmamos en breve por aquí.»</button>
-            </p>
-          )}
-          {f.escapePreguntas != null && (
-            <textarea rows={2} maxLength={350} value={f.escapePreguntas} onChange={e => setF({ ...f, escapePreguntas: e.target.value })}
-              onBlur={() => f.escapePreguntas?.trim() && guardar({ ...f, escapePreguntas: f.escapePreguntas.trim() })}
-              placeholder="Ej.: Hola, sí tenemos disponible. Escríbenos por mensaje después de la compra y te confirmamos todos los detalles." className="ml-6 w-[calc(100%-1.5rem)] rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-          )}
         </div>
       )}
       {(guardando || msg) && <p className={`text-xs ${guardando ? 'text-neutral-500' : msg?.ok ? 'text-lime-700' : 'text-red-600'}`}>{guardando ? 'Guardando…' : msg?.t}</p>}

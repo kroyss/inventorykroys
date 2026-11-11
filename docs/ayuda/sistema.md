@@ -268,14 +268,13 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   - **Frase de escape (solo Mensajes):** si la IA no manda la respuesta sola, puede mandar una frase corta
     («¡Recibido! En un momento te confirmamos») para que el comprador no quede sin contestar. La conversación sigue
     en «Por atender» con la respuesta de la IA escrita. Una vez por conversación cada 24 horas.
-  - **Frase de escape en Preguntas (opcional, apagada de fábrica):** lo que la IA deja para revisar se contesta con
-    una frase tuya (ej. «Sí, tenemos disponible. Escríbenos por mensaje después de la compra»), así ninguna pregunta
-    queda sin respuesta. Ojo: MercadoLibre acepta **una sola respuesta** por pregunta, así que queda respondida con
-    esa frase; la respuesta de la IA queda escrita para que la veas. No se usa si frenó el máximo por comprador ni si
-    la publicación está pausada. En **Modo Seguro** sale con todo lo que la IA deja para revisar; en **Modo Total**
-    solo con **posventa** (cancelar, devolver, reclamo: en Modo Total la IA tampoco las responde, van a una persona),
-    fuera de horario o si la IA no logró escribir nada. En Modo Total se recomienda activarla (hay un botón con una
-    frase lista).
+  - **Frase de escape en Preguntas:** viene **escrita de fábrica** («¡Hola! Lo verificamos y te confirmamos en breve
+    por aquí.»); la cambias si quieres (o «Volver a la de fábrica»). En **Modo Total** se usa **siempre**: la posventa
+    (cancelar, devolver, reclamo: la IA no las responde), lo que llega fuera de horario o si la IA no logró escribir
+    nada se contestan con la frase, así **todo tiene respuesta**. En **Modo Seguro** solo si marcas «Usarla también en
+    Modo Seguro» (contesta con la frase todo lo que la IA deja para revisar). Ojo: MercadoLibre acepta **una sola
+    respuesta** por pregunta, así que queda respondida con la frase; la respuesta de la IA queda escrita para que sigas
+    tú. No se usa si frenó el máximo por comprador ni si la publicación está pausada.
 - **Mi IA** también pregunta por cambios y devoluciones, ventas al mayor, rebajas, apartados, horario de atención e
   **información extra** por secciones (la IA lee cada sección solo cuando la pregunta trata de eso).
 - En **Despacho** hay que decir **cuándo sale el pedido** (el mismo día, al siguiente día hábil o a los N días hábiles
