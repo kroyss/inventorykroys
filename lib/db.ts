@@ -55,6 +55,22 @@ function rutaActual(): string {
   }
 }
 
+// [LAG]: si el proceso estuvo trabado (un trabajo pesado de CPU frena TODO lo demás, también el reloj de
+// las consultas), se anota cada minuto: p99 y máximo de la demora del event loop.
+const g = globalThis as { __lagMedidor?: boolean }
+if (LENTO_MS && !g.__lagMedidor && typeof setInterval === 'function') {
+  g.__lagMedidor = true
+  import('node:perf_hooks').then(({ monitorEventLoopDelay }) => {
+    const h = monitorEventLoopDelay({ resolution: 20 })
+    h.enable()
+    setInterval(() => {
+      const p99 = Math.round(h.percentile(99) / 1e6), max = Math.round(h.max / 1e6)
+      if (max > LENTO_MS) console.warn(`[LAG] p99 ${p99}ms máx ${max}ms (último minuto)`)
+      h.reset()
+    }, 60_000).unref?.()
+  }).catch(() => {})
+}
+
 function anotarLenta(ms: number, empresa: number | string, ruta: string, sql: unknown) {
   const texto = typeof sql === 'string' ? sql : (sql as { text?: string } | null)?.text ?? ''
   console.warn(`[LENTO] ${ms}ms emp=${empresa} ruta=${ruta || '?'} · ${texto.replace(/\s+/g, ' ').trim().slice(0, 160)}`)
