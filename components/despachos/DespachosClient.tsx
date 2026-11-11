@@ -31,6 +31,8 @@ interface Etiqueta {
   items: { product_name: string; quantity: number; notes: string | null }[]
   // Pagos MercadoEnvíos (solo la empresa de la plataforma): pago traído del portal
   pago?: { verificacion: 'pendiente' | 'valido' | 'invalido'; forzado_por: string | null } | null
+  reimprimir?: boolean        // 12-11: «Reimprimir igual» pedido (la guía ya salió en otro lote)
+  impresa?: boolean
   estado: Estado
   detalle: string | null
 }
@@ -94,7 +96,7 @@ function descargar(href: string) {
   document.body.removeChild(a)
 }
 
-interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; ya_estaban?: number; subidas?: number; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number; manifiestos?: string[] }
+interface ApiBody { error?: string; fallas?: Falla[]; rechazados?: string[]; ya_estaban?: number; ya_impresas?: string[]; subidas?: number; pendientes?: number; lote_id?: number; jornada_id?: number; reportando?: number; manifiestos?: string[] }
 
 // Respuestas que no son JSON las corta el proxy (nginx) antes de llegar a la app.
 async function errorDe(res: Response): Promise<ApiBody> {
@@ -168,6 +170,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     let lote = loteId
     const rechazados: string[] = [...ignorados]
     let yaEstaban = 0, subidas = 0
+    const yaImpresas: string[] = []
     for (let i = 0; i < files.length; i += TANDA) {
       const fd = new FormData()
       files.slice(i, i + TANDA).forEach(f => fd.append('files', f))
@@ -183,10 +186,12 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
       lote = body.lote_id ?? lote
       yaEstaban += body.ya_estaban ?? 0
       subidas += body.subidas ?? 0
+      yaImpresas.push(...(body.ya_impresas ?? []))
     }
     setBusy(null)
     const avisos = [
       yaEstaban > 0 && `${yaEstaban} guía${yaEstaban === 1 ? '' : 's'} ya estaba${yaEstaban === 1 ? '' : 'n'} en el lote (entraron solas desde Pagos ME o se subieron antes): no se agregaron de nuevo. Se agregaron ${subidas}.`,
+      yaImpresas.length > 0 && `${yaImpresas.length === 1 ? '1 guía ya se había impreso' : `${yaImpresas.length} guías ya se habían impreso`} en otro lote: ${yaImpresas.join(', ')}. Quedan marcadas «Ya impresa» y no se imprimen; quítalas del lote o toca «Reimprimir igual».`,
       rechazados.length > 0 && `No se tomaron: ${rechazados.join(' · ')}`,
     ].filter(Boolean)
     if (avisos.length) setAviso(avisos.join(' '))
@@ -200,8 +205,8 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
   // Marcar/desmarcar y la nota se ven al instante y se guardan de fondo (recargar el lote entero
   // revalida todo y, sin inventario, consulta ML: era lento en cada clic). "Despachar igual"
   // cambia el estado de la etiqueta, así que ese sí recarga el lote.
-  const patchEtiqueta = async (loteId: number, e: Etiqueta, body: { incluida?: boolean; forzar_pago?: boolean; nota?: string | null }) => {
-    const local = body.forzar_pago === undefined
+  const patchEtiqueta = async (loteId: number, e: Etiqueta, body: { incluida?: boolean; forzar_pago?: boolean; reimprimir?: boolean; nota?: string | null }) => {
+    const local = body.forzar_pago === undefined && body.reimprimir === undefined
     const aplicar = (cambio: (x: Etiqueta) => Etiqueta) => setLotes(prev => {
       const l = prev[loteId]
       if (!l) return prev
@@ -236,6 +241,22 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
     }
     const d = await fetch(`/api/despachos/lotes/${loteId}`).then(r => r.json())
     setLotes(prev => ({ ...prev, [loteId]: d }))
+  }
+
+  // «Quitar del lote» (12-11): la fila sale al instante; si falla, vuelve.
+  const quitarEtiqueta = async (loteId: number, e: Etiqueta) => {
+    const antes = lotes[loteId]
+    setLotes(prev => {
+      const l = prev[loteId]
+      if (!l) return prev
+      const etiquetas = l.etiquetas.filter(x => x.id !== e.id)
+      return { ...prev, [loteId]: { ...l, etiquetas, imprimibles: etiquetas.filter(x => x.incluida && !x.apartado && IMPRIMIBLE[x.estado]).length } }
+    })
+    const r = await fetch(`/api/despachos/lotes/${loteId}/etiquetas/${e.id}`, { method: 'DELETE' }).catch(() => null)
+    if (!r?.ok) {
+      if (antes) setLotes(prev => ({ ...prev, [loteId]: antes }))
+      setError('No se pudo quitar la guía del lote. Vuelve a intentar.')
+    }
   }
 
   // Sin inventario: imprimir o no el título y la nota en la etiqueta (opción de la empresa, admin).
@@ -373,6 +394,8 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
           onNota={(e, nota) => patchEtiqueta(l.id, e, { nota })}
           onToggle={e => patchEtiqueta(l.id, e, { incluida: !e.incluida })}
           onForzarPago={(e, v) => patchEtiqueta(l.id, e, { forzar_pago: v })}
+          onReimprimir={(e, v) => patchEtiqueta(l.id, e, { reimprimir: v })}
+          onQuitar={e => quitarEtiqueta(l.id, e)}
           onApartar={e => setPanelEspera({ pre: {
             id: e.id, venta: e.venta, guia_ver: e.guia, carrier: e.carrier, destinatario: e.comprador_nombre ?? e.destinatario,
             remitente: e.remitente, impresa: false, apartado: null, apartado_nota: null, apartado_at: null, apartado_por: null, etapa: 'sin_imprimir',
@@ -582,7 +605,7 @@ function NotaEditable({ e, onGuardar }: { e: Etiqueta; onGuardar: (nota: string 
 }
 
 // ── Lote pendiente (revisión antes de generar) ──────────────────────────────
-function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, onToggle, onForzarPago, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
+function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, onToggle, onForzarPago, onReimprimir, onQuitar, onApartar, onRevalidar, onAgregar, onGenerar, onDescartar }: {
   lote: LoteDetalle
   desdeML: boolean
   impresion: Impresion
@@ -591,6 +614,8 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
   busy: string | null
   onToggle: (e: Etiqueta) => void
   onForzarPago: (e: Etiqueta, forzar: boolean) => void
+  onReimprimir: (e: Etiqueta, si: boolean) => void
+  onQuitar: (e: Etiqueta) => void
   onApartar: (e: Etiqueta) => void
   onRevalidar: () => void
   onAgregar: (f: File[]) => void
@@ -598,6 +623,7 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
   onDescartar: () => void
 }) {
   const conProblema = lote.etiquetas.filter(e => !IMPRIMIBLE[e.estado]).length
+  const [quitando, setQuitando] = useState<number | null>(null)
   const generando = busy === `generar-${lote.id}`
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
@@ -716,6 +742,31 @@ function LotePendiente({ lote, busy, desdeML, impresion, onImpresion, onNota, on
                       </div>
                     )}
                     {e.pago?.verificacion === 'valido' && <div className="mt-0.5 text-green-700">✓ Pago verificado</div>}
+                    {/* 12-11: guía que ya salió en otro lote → reimprimirla a propósito, o deshacerlo. */}
+                    {!e.apartado && e.estado === 'YA_IMPRESA' && (
+                      <button onClick={() => onReimprimir(e, true)} className="mt-1 block text-amber-800 underline hover:text-amber-950"
+                        title="Se imprimió mal o se dañó la etiqueta: imprimirla otra vez en este lote">
+                        Reimprimir igual
+                      </button>
+                    )}
+                    {!e.apartado && e.reimprimir && (
+                      <button onClick={() => onReimprimir(e, false)} className="mt-1 block text-neutral-500 underline hover:text-neutral-800">
+                        No reimprimir
+                      </button>
+                    )}
+                    {/* «Quitar del lote» en las que no se imprimen (ya impresa, duplicada, con error…). */}
+                    {!e.apartado && !IMPRIMIBLE[e.estado] && (quitando === e.id ? (
+                      <span className="mt-1 flex items-center gap-2">
+                        <span className="text-neutral-600">¿Quitar del lote?</span>
+                        <button onClick={() => { setQuitando(null); onQuitar(e) }} className="font-medium text-red-700 underline">Sí, quitar</button>
+                        <button onClick={() => setQuitando(null)} className="text-neutral-500 underline">No</button>
+                      </span>
+                    ) : (
+                      <button onClick={() => setQuitando(e.id)} className="mt-1 block text-red-700 underline hover:text-red-900"
+                        title="Sacar esta guía de la lista (no toca la que ya se imprimió)">
+                        Quitar del lote
+                      </button>
+                    ))}
                   </td>
                 </tr>
               )

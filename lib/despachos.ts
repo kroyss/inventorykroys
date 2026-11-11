@@ -274,10 +274,10 @@ const SQL_DESDE_ML = `
            SELECT 1 FROM despacho_etiquetas p
            WHERE p.venta = e.venta AND p.impresa AND p.id <> e.id
          ) AS venta_ya_impresa,
-         EXISTS (
-           SELECT 1 FROM despacho_etiquetas o2
-           WHERE o2.guia = e.guia AND o2.impresa AND o2.id <> e.id
-         ) AS ya_impresa,
+         (SELECT o2.lote_id FROM despacho_etiquetas o2
+           WHERE o2.guia = e.guia AND o2.impresa AND o2.id <> e.id ORDER BY o2.id DESC LIMIT 1) AS ya_impresa,
+         e.reimprimir_at IS NOT NULL AS reimprimir,
+         (SELECT u.username FROM users u WHERE u.id = e.reimprimir_por) AS reimprimir_por,
          (SELECT MIN(d.id) FROM despacho_etiquetas d
            WHERE d.lote_id = e.lote_id AND d.guia = e.guia) AS primera_con_guia
   FROM despacho_etiquetas e
@@ -372,10 +372,10 @@ async function validarConInventario(db: Pool, loteId: number): Promise<EtiquetaV
               FROM sale_items si JOIN products p ON p.id = si.product_id
               WHERE si.sale_id = s.id
             ), '[]'::json) AS items,
-            EXISTS (
-              SELECT 1 FROM despacho_etiquetas o
-              WHERE o.guia = e.guia AND o.impresa AND o.id <> e.id
-            ) AS ya_impresa,
+            (SELECT o.lote_id FROM despacho_etiquetas o
+              WHERE o.guia = e.guia AND o.impresa AND o.id <> e.id ORDER BY o.id DESC LIMIT 1) AS ya_impresa,
+            e.reimprimir_at IS NOT NULL AS reimprimir,
+            (SELECT u.username FROM users u WHERE u.id = e.reimprimir_por) AS reimprimir_por,
             (SELECT MIN(d.id) FROM despacho_etiquetas d
               WHERE d.lote_id = e.lote_id AND d.guia = e.guia) AS primera_con_guia
      FROM despacho_etiquetas e
@@ -401,7 +401,7 @@ async function validarConInventario(db: Pool, loteId: number): Promise<EtiquetaV
         : `No tiene guía ${r.carrier}`
     }
     else if (r.impresa)                        { estado = 'OK' }
-    else if (r.ya_impresa)                     { estado = 'YA_IMPRESA';  detalle = `La guía ${r.guia} ya se imprimió en otro lote` }
+    else if (r.ya_impresa && !r.reimprimir)    { estado = 'YA_IMPRESA';  detalle = `La guía ${r.guia} ya se imprimió en el lote #${r.ya_impresa}` }
     else if (r.primera_con_guia !== r.id)      { estado = 'DUPLICADA';   detalle = 'La misma guía está dos veces en este lote' }
     else if (!r.sale_id)                       { estado = 'SIN_VENTA';   detalle = `La venta ${r.venta} no está cargada en el sistema` }
     else if (!ESTADOS_IMPRIMIBLES.has(r.sale_status)) { estado = 'ESTADO'; detalle = `La venta está en ${r.sale_status}; debe estar PROCESADA` }
@@ -410,6 +410,10 @@ async function validarConInventario(db: Pool, loteId: number): Promise<EtiquetaV
     else if (r.items.length === 0)             { estado = 'SIN_PRODUCTOS'; detalle = 'La venta no tiene productos' }
     else if (r.sale_status === 'DESCARGADA')   { estado = 'REIMPRESION'; detalle = 'La venta ya estaba DESCARGADA' }
 
+    // 12-11: «Reimprimir igual» pedido sobre una guía que ya salió en otro lote.
+    if ((estado === 'OK' || estado === 'REIMPRESION') && r.ya_impresa && r.reimprimir) {
+      estado = 'REIMPRESION'; detalle = `Reimpresión pedida${r.reimprimir_por ? ` por ${r.reimprimir_por}` : ''}: la guía ya salió en el lote #${r.ya_impresa}`
+    }
     if (estado === 'OK' && r.page_count > 1) detalle = `El PDF tiene ${r.page_count} páginas: se usa solo la primera`
 
     const out = { ...r, estado, detalle }
@@ -433,7 +437,7 @@ async function validarDesdeML(db: Pool, loteId: number): Promise<EtiquetaValidad
         : `No tiene guía ${r.carrier}`
     }
     else if (r.impresa)                        { estado = 'OK' }
-    else if (r.ya_impresa)                     { estado = 'YA_IMPRESA';  detalle = `La guía ${r.guia} ya se imprimió en otro lote` }
+    else if (r.ya_impresa && !r.reimprimir)    { estado = 'YA_IMPRESA';  detalle = `La guía ${r.guia} ya se imprimió en el lote #${r.ya_impresa}` }
     else if (r.primera_con_guia !== r.id)      { estado = 'DUPLICADA';   detalle = 'La misma guía está dos veces en este lote' }
     else if (!r.orden_ml)                      { estado = 'SIN_VENTA';   detalle = `La venta ${r.venta} no está en las ventas de MercadoLibre de tus cuentas conectadas` }
     else if (r.sale_status === 'cancelled')    { estado = 'ESTADO';      detalle = 'La venta está cancelada en MercadoLibre' }
@@ -443,6 +447,10 @@ async function validarDesdeML(db: Pool, loteId: number): Promise<EtiquetaValidad
     else if (r.items.length === 0)             { estado = 'SIN_PRODUCTOS'; detalle = 'MercadoLibre no trajo los productos de la venta' }
     else if (r.venta_ya_impresa)               { estado = 'REIMPRESION'; detalle = 'Esta venta ya salió en otro lote' }
 
+    // 12-11: «Reimprimir igual» pedido sobre una guía que ya salió en otro lote.
+    if ((estado === 'OK' || estado === 'REIMPRESION') && r.ya_impresa && r.reimprimir) {
+      estado = 'REIMPRESION'; detalle = `Reimpresión pedida${r.reimprimir_por ? ` por ${r.reimprimir_por}` : ''}: la guía ya salió en el lote #${r.ya_impresa}`
+    }
     if (estado === 'OK' && r.page_count > 1) detalle = `El PDF tiene ${r.page_count} páginas: se usa solo la primera`
 
     const out = { ...r, estado, detalle }

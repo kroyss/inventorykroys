@@ -112,7 +112,13 @@ export async function POST(req: NextRequest) {
         )
       }
       await client.query('COMMIT')
-      return NextResponse.json({ lote_id: loteId, subidas: nuevos.length, ya_estaban: yaEstaban, rechazados }, { status: 201 })
+      // 12-11: las que ya salieron en un lote impreso entran marcadas «Ya impresa» (no se imprimen): se avisa cuáles.
+      const guias = leidas.map(e => e.guia).filter((g): g is string => !!g)
+      const { rows: impresas } = guias.length ? await db.query(
+        `SELECT DISTINCT ON (e.guia) e.guia, e.venta, e.lote_id FROM despacho_etiquetas e
+         WHERE e.impresa AND e.guia = ANY($1::text[]) ORDER BY e.guia, e.id DESC`, [guias]) : { rows: [] }
+      const ya_impresas = impresas.map(r => `${r.venta ?? r.guia} (lote #${r.lote_id})`)
+      return NextResponse.json({ lote_id: loteId, subidas: nuevos.length, ya_estaban: yaEstaban, ya_impresas, rechazados }, { status: 201 })
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {})
       throw err

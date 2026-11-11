@@ -596,6 +596,12 @@ unidad queda normal («1 - …»).
 4. Al final del día: **Cerrar jornada → Manifiesto**. Se genera un manifiesto por transportista (ZOOM / TEALCA) con
    todos los envíos de la jornada. La jornada se abre sola con el primer lote.
 
+**Guía ya impresa en otro lote:** si subes de nuevo un PDF que ya se imprimió (por ejemplo, lo bajaste otra vez de
+MercadoEnvíos), entra al lote marcada en rojo **«Ya impresa»** y dice en qué lote salió: **no se imprime dos veces**. Al
+subirla también sale un aviso. Puedes tocar **Quitar del lote** para sacarla de la lista, o **Reimprimir igual** si de
+verdad la necesitas otra vez (se imprimió mal, se dañó la etiqueta). «Quitar del lote» aparece en todas las guías que
+no se imprimen (ya impresa, repetida, con error).
+
 **Apartar un envío:** si una guía no debe salir todavía (el cliente pidió para el lunes, pagó mal…), apártala.
 En el panel sale la **lista de los envíos sin reportar** de los últimos 15 días (primero los que se reportan en la
 próxima tanda) para elegirlos a dedo; arriba puedes filtrar por venta, guía, comprador o producto (palabras en

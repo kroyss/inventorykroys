@@ -12,6 +12,7 @@ import { LARGO_NOTA, sincronizarNotaDeVenta } from '@/lib/notasML'
 // Pagos ME, Mensajes y ML); si ML falla, queda solo en la etiqueta (nota_despacho) y se avisa.
 const Schema = z.object({
   incluida: z.boolean().optional(), forzar_pago: z.boolean().optional(),
+  reimprimir: z.boolean().optional(),   // 12-11: «Reimprimir igual» una guía que ya salió en otro lote
   nota: z.string().trim().max(LARGO_NOTA, `Máximo ${LARGO_NOTA} caracteres`).nullable().optional(),
 })
 
@@ -59,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
          WHERE e.lote_id = $3 AND l.id = e.lote_id AND l.status = 'PENDIENTE'
            AND (e.id = $2 OR e.venta = (SELECT venta FROM despacho_etiquetas WHERE id = $2 AND lote_id = $3))`,
         [local, eid, id, userId])
-      if (b.incluida === undefined && b.forzar_pago === undefined) return NextResponse.json({
+      if (b.incluida === undefined && b.forzar_pago === undefined && b.reimprimir === undefined) return NextResponse.json({
         ok: true, ml: ml ?? null,
         ...(ml === false ? { aviso: 'No se pudo guardar la nota en MercadoLibre: quedó solo en esta etiqueta. Vuelve a intentarlo en un rato.' } : {}),
       })
@@ -68,14 +69,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `UPDATE despacho_etiquetas e SET
          incluida = CASE WHEN e.apartado IS NULL THEN COALESCE($1, e.incluida) ELSE e.incluida END,   -- apartado: se libera en "En espera"
          pago_forzado_por = CASE WHEN $4::boolean IS NULL THEN e.pago_forzado_por WHEN $4 THEN $5::int ELSE NULL END,
-         pago_forzado_at  = CASE WHEN $4::boolean IS NULL THEN e.pago_forzado_at  WHEN $4 THEN NOW() ELSE NULL END
+         pago_forzado_at  = CASE WHEN $4::boolean IS NULL THEN e.pago_forzado_at  WHEN $4 THEN NOW() ELSE NULL END,
+         reimprimir_por   = CASE WHEN $6::boolean IS NULL THEN e.reimprimir_por   WHEN $6 THEN $5::int ELSE NULL END,
+         reimprimir_at    = CASE WHEN $6::boolean IS NULL THEN e.reimprimir_at    WHEN $6 THEN NOW() ELSE NULL END
        FROM despacho_lotes l
        WHERE e.id = $2 AND e.lote_id = $3 AND l.id = e.lote_id AND l.status = 'PENDIENTE'`,
-      [b.incluida ?? null, eid, id, b.forzar_pago ?? null, userId])
+      [b.reimprimir ? true : (b.incluida ?? null), eid, id, b.forzar_pago ?? null, userId, b.reimprimir ?? null])
     if (!rowCount) return NextResponse.json({ error: 'Etiqueta no encontrada en un lote pendiente' }, { status: 400 })
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })
+    return apiError(err)
+  }
+}
+
+/** DELETE /api/despachos/lotes/[id]/etiquetas/[eid] — «Quitar del lote» (12-11): saca una etiqueta de un lote pendiente
+ *  (p.ej. una guía que ya salió en otro lote). Solo la fila: el PDF queda en disco (puede ser el mismo de Pagos ME). */
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string; eid: string }> }) {
+  const { id, eid } = await params
+  if (!/^\d+$/.test(id) || !/^\d+$/.test(eid)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+  const { session, db } = await getSessionDb()
+  if (!session || !db) return unauthorized()
+  const denied = despachosForbidden(session)
+  if (denied) return denied
+  try {
+    const { rowCount } = await db.query(
+      `DELETE FROM despacho_etiquetas e USING despacho_lotes l
+       WHERE e.id = $1 AND e.lote_id = $2 AND l.id = e.lote_id AND l.status = 'PENDIENTE' AND NOT e.impresa`, [eid, id])
+    if (!rowCount) return NextResponse.json({ error: 'Etiqueta no encontrada en un lote pendiente' }, { status: 400 })
+    return NextResponse.json({ ok: true })
+  } catch (err) {
     return apiError(err)
   }
 }
