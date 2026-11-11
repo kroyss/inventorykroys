@@ -7,68 +7,23 @@ export async function GET(_: NextRequest) {
   if (!session || !db) return unauthorized()
 
   try {
-    const [
-      { rows: [a1] },
-      { rows: [a2] },
-      { rows: [a3] },
-      { rows: [a4] },
-      { rows: [a5] },
-      { rows: [a6] },
-      { rows: [a7] },
-      { rows: [a8] },
-      { rows: [a8c] },
-    ] = await Promise.all([
-      db.query(`SELECT COUNT(*) AS n FROM products WHERE is_active = TRUE`),
-      db.query(`
-        SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
-        FROM sales
-        WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW())
-      `),
-      db.query(`
-        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total,
-               COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission
-        FROM sale_items si
-        JOIN sales s ON s.id = si.sale_id
-        WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW())
-      `),
-      db.query(`
-        SELECT COUNT(*) AS n FROM inventory i
-        JOIN products p ON i.product_id = p.id
-        WHERE p.is_active = TRUE AND i.quantity <= i.min_stock AND i.min_stock > 0
-      `),
-      db.query(`
-        SELECT COUNT(*) AS n FROM inventory i
-        JOIN products p ON i.product_id = p.id
-        WHERE p.is_active = TRUE AND i.quantity = 0
-      `),
-      db.query(`SELECT COUNT(*) AS n FROM sales WHERE status = 'BORRADOR'`),
-      db.query(`
-        SELECT COUNT(*) AS n FROM purchase_orders
-        WHERE status IN ('PAGADA','EN_CAMINO','PAGO_PARCIAL','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR')
-      `),
-      db.query(`
-        -- Mes anterior pero solo hasta el mismo día/hora transcurridos del mes actual
-        -- (p.ej. hoy 8 jun → compara contra 1–8 may, no contra mayo completo),
-        -- para que sea una comparación justa de días calendario equivalentes.
-        SELECT COALESCE(SUM(total_amount), 0) AS total
-        FROM sales
-        WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-          AND COALESCE(processed_at, created_at) < NOW() - INTERVAL '1 month'
-      `),
-      db.query(`
-        -- Costos del mes anterior, mismo tramo de días (para ganancia comparable)
-        SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total,
-               COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission
-        FROM sale_items si
-        JOIN sales s ON s.id = si.sale_id
-        WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-          AND COALESCE(s.processed_at, s.created_at) < NOW() - INTERVAL '1 month'
-      `),
-    ])
+    // 12-11 (rapidez): las 9 cifras en UNA consulta (cada una es la misma de antes, como subconsulta). Antes eran
+    // 9 pedidos que, sobre la misma conexión del request, iban en fila (0,8–3,7 s con el server ocupado).
+    const { rows: [t] } = await db.query(`
+      SELECT a1.n AS a1_n, a2.cnt AS a2_cnt, a2.total AS a2_total, a3.total AS a3_total, a3.commission AS a3_commission, a4.n AS a4_n, a5.n AS a5_n, a6.n AS a6_n, a7.n AS a7_n, a8.total AS a8_total, a8c.total AS a8c_total, a8c.commission AS a8c_commission
+      FROM (SELECT COUNT(*) AS n FROM products WHERE is_active = TRUE) a1,
+           (SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL') AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW())) a2,
+           (SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total, COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL') AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW())) a3,
+           (SELECT COUNT(*) AS n FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.is_active = TRUE AND i.quantity <= i.min_stock AND i.min_stock > 0) a4,
+           (SELECT COUNT(*) AS n FROM inventory i JOIN products p ON i.product_id = p.id WHERE p.is_active = TRUE AND i.quantity = 0) a5,
+           (SELECT COUNT(*) AS n FROM sales WHERE status = 'BORRADOR') a6,
+           (SELECT COUNT(*) AS n FROM purchase_orders WHERE status IN ('PAGADA','EN_CAMINO','PAGO_PARCIAL','EN_TRANSITO','ADUANA','EN_IMPORTADOR_PAGAR')) a7,
+           (SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL') AND DATE_TRUNC('month', COALESCE(processed_at, created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND COALESCE(processed_at, created_at) < NOW() - INTERVAL '1 month') a8,
+           (SELECT COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)), 0) AS total, COALESCE(SUM(si.quantity * COALESCE(si.unit_commission, 0)), 0) AS commission FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL') AND DATE_TRUNC('month', COALESCE(s.processed_at, s.created_at)) = DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND COALESCE(s.processed_at, s.created_at) < NOW() - INTERVAL '1 month') a8c
+    `)
+    const a1 = { n: t.a1_n }, a2 = { cnt: t.a2_cnt, total: t.a2_total }, a3 = { total: t.a3_total, commission: t.a3_commission }
+    const a4 = { n: t.a4_n }, a5 = { n: t.a5_n }, a6 = { n: t.a6_n }, a7 = { n: t.a7_n }, a8 = { total: t.a8_total }
+    const a8c = { total: t.a8c_total, commission: t.a8c_commission }
 
     const salesAmount = parseFloat(a2.total ?? 0)
     const costsMonth  = parseFloat(a3.total ?? 0)
