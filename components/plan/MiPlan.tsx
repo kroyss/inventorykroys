@@ -5,7 +5,7 @@
 // `acceso`: entra desde /renovar (cuenta vencida, sin sesión) con el acceso firmado de /api/mi-plan/entrar.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
-import { RECARGAS_IA } from '@/lib/planes'
+import { PLANES_PROXIMAMENTE, RECARGAS_IA } from '@/lib/planes'
 import QueEsRadar from './QueEsRadar'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
@@ -295,14 +295,18 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
               </div>
             ) : (
               <div className="grid gap-2 sm:grid-cols-3">
-                {s.opciones.map(o => (
-                  <button key={o.id} type="button" onClick={() => { setPlan(o.id) }}
-                    className={`text-left rounded-xl border-2 px-3 py-2.5 transition ${plan === o.id ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-100' : 'border-neutral-200 hover:border-neutral-300'}`}>
+                {s.opciones.map(o => {
+                  const pronto = PLANES_PROXIMAMENTE.includes(o.id)
+                  return (
+                  <button key={o.id} type="button" disabled={pronto} onClick={() => { setPlan(o.id) }} aria-disabled={pronto}
+                    className={`relative text-left rounded-xl border-2 px-3 py-2.5 transition ${pronto ? 'cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-60' : plan === o.id ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-100' : 'border-neutral-200 hover:border-neutral-300'}`}>
+                    {pronto && <span className="absolute -top-2.5 right-2 rounded-full bg-neutral-500 px-2 py-0.5 text-[10px] font-bold text-white">Próximamente</span>}
                     <p className="text-sm font-semibold">{o.nombre}{s.plan === o.id ? <span className="ml-1 text-xs font-normal text-neutral-500">(tu plan)</span> : null}</p>
                     <p className="num"><span className="text-base font-bold">{fmtUsd(porMes(o))}</span><span className="text-xs text-neutral-500">/mes</span></p>
                     <p className="text-xs text-neutral-500 mt-1">{o.resumen}</p>
                   </button>
-                ))}
+                  )
+                })}
               </div>
             )}
             {/* Mensual o trimestral (12-11): dos tarjetas con el precio por mes y lo que se ahorra. */}
@@ -326,7 +330,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                         ? (s.fundador && op.desc.mensual > 0 ? <>Pagas mes a mes · <span className="font-semibold text-lime-700">−{op.desc.mensual}% Fundador</span></> : 'Pagas mes a mes')
                         : <>{fmtUsd(op.trimestral)} cada 3 meses{ahorro > 0
                           ? <> · <span className="font-semibold text-emerald-700">ahorras {fmtUsd(ahorro)}</span></>
-                          : s.fundador && op.desc.mensual >= op.desc.trimestral ? <> · tu −{op.desc.mensual}% Fundador ya es mayor que el −{op.desc.trimestral}%</> : null}</>}
+                          : esDescFundador ? <> · <span className="font-semibold text-lime-700">−{op.desc.trimestral}% Fundador</span></> : null}</>}
                     </p>
                   </button>
                 )
@@ -385,7 +389,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             {/* 12-11 (el dueño): el Fundador conserva el −30% mientras renueve a tiempo (lib/planesCuenta.ts lo quita al pausarse). */}
             {tipo === 'plan' && esDescFundador && (
               <p className="text-[11px] leading-snug text-neutral-400">
-                Conservas tu −{descCiclo}% Fundador mientras renueves a tiempo. Si tu plan vence sin pago, dejas de ser Fundador y pierdes el beneficio.
+                <b className="font-semibold text-neutral-500">Importante:</b> Conservas tu −{descCiclo}% Fundador mientras renueves a tiempo. Si tu plan vence sin pago, dejas de ser Fundador y pierdes el beneficio.
               </p>
             )}
           </section>

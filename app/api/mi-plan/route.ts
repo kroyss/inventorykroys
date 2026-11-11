@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { apiError } from '@/lib/apiError'
 import { forbidden, unauthorized } from '@/lib/session'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
+import { PLANES_PROXIMAMENTE } from '@/lib/planes'
 import { ErrorCobro, MAX_MB_COMPROBANTE, TIPOS_COMPROBANTE, reportarCobro, situacionPlan, verificarAcceso } from '@/lib/cobros'
 
 // Mi plan (02-11-2026, migración 141): lo que paga según sus ventas, los datos de pago y "Ya pagué".
@@ -51,6 +52,9 @@ export async function POST(req: NextRequest) {
   try {
     const f = await req.formData()
     const b = Reporte.parse(Object.fromEntries(['tipo', 'plan', 'ciclo', 'metodo', 'referencia', 'fecha_pago', 'paquete', 'radar_pro'].map(k => [k, f.get(k) == null ? undefined : String(f.get(k))])))
+    if ((b.tipo === 'plan' || b.tipo === 'upgrade') && PLANES_PROXIMAMENTE.includes(b.plan)) {
+      return NextResponse.json({ error: 'Ese plan estará disponible próximamente: elige otro.' }, { status: 400 })
+    }
     const a = f.get('archivo')
     const archivo = a && typeof a !== 'string' && a.size > 0 ? a : null
     if (!archivo) return NextResponse.json({ error: 'Adjunta la captura del pago' }, { status: 400 })

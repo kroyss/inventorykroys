@@ -19,7 +19,7 @@ import { compare } from 'bcryptjs'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
 import { estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
-import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, RADAR_PRO, RECARGAS_IA, montoPlan, planConRadar, precioRadarMes, sumarMeses, type Plan } from '@/lib/planes'
+import { CUENTAS_INCLUIDAS, CUENTA_EXTRA, DESCUENTO_FUNDADOR, DESCUENTO_TRIMESTRAL, ESCALONES, MODULOS_CONTROLADOS, MODULOS_PLAN, PLANES, PLANES_PROXIMAMENTE, RADAR_PRO, RECARGAS_IA, montoPlan, planConRadar, precioRadarMes, sumarMeses, type Plan } from '@/lib/planes'
 import { soloRadar } from '@/lib/modulos'
 import { currentDate } from '@/lib/tz'
 import { UPLOAD_DIR } from '@/lib/uploads'
@@ -230,7 +230,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     extrasMes: montoPlan(p.id, escalon, 'mensual', false, cuentasExtra).extras,
     desc: { mensual: montoPlan(p.id, escalon, 'mensual', !!o.fundador).descuento, trimestral: montoPlan(p.id, escalon, 'trimestral', !!o.fundador).descuento },
   }))
-  const planSugerido = (conPlan && PLANES.some(p => p.id === o.plan) ? o.plan : 'automatizaciones') as Plan['id']
+  const planSugerido = (conPlan && PLANES.some(p => p.id === o.plan) && !PLANES_PROXIMAMENTE.includes(o.plan) ? o.plan : 'automatizaciones') as Plan['id']
   const activo = estado === 'activo' && conPlan && !!o.plan_hasta && o.plan_hasta >= hoy
   const proDesde = o.radar_pro_hasta && o.radar_pro_hasta >= hoy ? o.radar_pro_hasta : hoy
   const inicioPlan = [o.plan_hasta, o.estado === 'prueba' ? o.prueba_hasta : null, hoy]
@@ -248,7 +248,7 @@ export async function situacionPlan(orgId: number): Promise<SituacionPlan> {
     // trimestral) y siempre se ofrece al elegir o renovar el plan.
     radarPro: { precio: RADAR_PRO.precio, regalo: !o.radar_pro_hasta },
     radarProCompra: activo && planConRadar(o.plan) ? { precio: RADAR_PRO.precio, desde: proDesde, hasta: sumarMeses(proDesde, 1) } : null,
-    mejoras: activo ? PLANES.map(p => calcularMejora(o.plan, p.id, Number(o.escalon), o.ciclo, !!o.fundador, hoy, o.plan_hasta))
+    mejoras: activo ? PLANES.filter(p => !PLANES_PROXIMAMENTE.includes(p.id)).map(p => calcularMejora(o.plan, p.id, Number(o.escalon), o.ciclo, !!o.fundador, hoy, o.plan_hasta))
       .filter((m): m is Mejora => !!m) : [],
     inicioPlan,
     soloRadar: !!o.solo_radar,

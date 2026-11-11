@@ -61,6 +61,9 @@ export const CUENTA_EXTRA = 3
 /** Créditos de la prueba gratis (una vez, al registrarse). */
 export const CREDITOS_PRUEBA = 500
 /** Paquetes de recarga (09-11): no vencen. 1 crédito = 1 respuesta de la IA (pregunta o mensaje). */
+/** 12-11 (el dueño): planes que se ven en Mi plan pero todavía no se pueden contratar («Próximamente»). */
+export const PLANES_PROXIMAMENTE: readonly string[] = ['completo']
+
 export const RECARGAS_IA = [
   { creditos: 500, precio: 4 },
   { creditos: 2000, precio: 15 },
