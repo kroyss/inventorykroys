@@ -7,6 +7,9 @@
 //   - Sus "Políticas para la IA" de texto libre, si las tiene.
 // Una sola llamada a la IA (no descuenta créditos del cliente: módulo 'simulacion'). Si algo se contradice entre
 // las fuentes (p. ej. a veces "envío gratis por MRW" y otras "cobro a destino"), lo devuelve como aviso.
+// 12-11 (el dueño: "esa lista es confusa, ¿no lo arregla el sistema?"): las contradicciones las RESUELVE la IA con un
+// orden fijo (indicaciones escritas > respuestas más recientes > descripciones) y cada aviso va con su tema: la pantalla
+// lo muestra como una línea chica DENTRO de ese tema ("Usé X (de…). En … dice Y."), no como lista aparte.
 import type { Pool } from 'pg'
 import { llamarClaude, registrarUso, MODELO_IA } from '@/lib/ia'
 import { mlFetch } from '@/lib/ml'
@@ -15,9 +18,12 @@ import { EsquemaMiIA, type EntradaMiIA } from '@/lib/miIAEsquema'
 const RESPUESTAS = 60
 const DESCRIPCIONES = 10
 
+export const TEMAS_AVISO = ['tono', 'oferta', 'pago', 'envio', 'despacho', 'ubicacion', 'factura', 'persona', 'postventa'] as const
+export type AvisoMiIA = { tema: typeof TEMAS_AVISO[number]; texto: string }
+
 export interface SugerenciaMiIA {
   sugerido: Partial<EntradaMiIA>
-  avisos: string[]
+  avisos: AvisoMiIA[]
   fuentes: { respuestas: number; descripciones: number; bloque: string | null; politicas: boolean }
   fecha: string
 }
@@ -62,7 +68,8 @@ Reglas:
 - oferta: solo si repite SIEMPRE una frase comercial (un descuento, un regalo). Nunca teléfonos, correos ni links.
 - despacho.corte en formato HH:MM de 24 horas.
 - persona: temas que él siempre manda a hablar aparte o que deja para revisar (reclamos, al mayor…), solo si se ve.
-- avisos: contradicciones entre las fuentes o cosas que conviene que el vendedor confirme (frases cortas, en español, tuteando). Ej.: "En unas respuestas el envío por MRW es gratis y en otras cobro a destino: confírmalo."`
+- Si las fuentes se CONTRADICEN, decide tú y llena el tema con lo elegido, en este orden: 1) sus indicaciones escritas, 2) sus respuestas más recientes (vienen de la más nueva a la más vieja), 3) el texto de las descripciones. No dejes el tema vacío por una contradicción.
+- avisos: SOLO las contradicciones que resolviste, una por tema, con el tema al que pertenece y una frase corta (máximo 120 caracteres, tuteando) que diga qué usaste y qué decía la otra fuente. Formato: "Usé <lo elegido> (de <fuente>). En <otra fuente> dice <lo otro>." Fuentes: "tus indicaciones", "tus respuestas", "tus descripciones". Ej.: {"tema":"envio","texto":"Usé MRW gratis (de tus respuestas). En tus descripciones dice cobro a destino."}. Nada de "confírmalo" ni consejos; si no hubo contradicciones, lista vacía.`
 
 export const HERRAMIENTA = {
   name: 'mi_ia',
@@ -82,7 +89,8 @@ export const HERRAMIENTA = {
       factura: { type: 'object', properties: { tipo: { type: 'string', enum: ['fiscal', 'nota', 'no'] }, garantiaDias: { type: 'integer' }, garantiaNoCubre: { type: 'string' } } },
       persona: { type: 'array', items: { type: 'string' } },
       postventa: { type: 'object', properties: { pasos: { type: 'array', items: { type: 'string' } } } },
-      avisos: { type: 'array', items: { type: 'string' } },
+      avisos: { type: 'array', items: { type: 'object', properties: {
+        tema: { type: 'string', enum: [...TEMAS_AVISO] }, texto: { type: 'string' } }, required: ['tema', 'texto'] } },
     },
   },
 }
@@ -120,6 +128,10 @@ export async function sugerirMiIA(db: Pool, usuarioId: number | string | null): 
   ].filter(Boolean).join('\n\n')
   const { resultado, uso, modelo } = await llamarClaude<Record<string, unknown>>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 2000 })
   await registrarUso(db, 'simulacion', [{ modelo, uso }], usuarioId)
-  const avisos = Array.isArray(resultado.avisos) ? resultado.avisos.map(String).filter(Boolean).slice(0, 8) : []
+  const avisos: AvisoMiIA[] = Array.isArray(resultado.avisos)
+    ? (resultado.avisos as { tema?: unknown; texto?: unknown }[])
+        .filter(a => a && TEMAS_AVISO.includes(a.tema as AvisoMiIA['tema']) && typeof a.texto === 'string' && a.texto.trim())
+        .map(a => ({ tema: a.tema as AvisoMiIA['tema'], texto: String(a.texto).trim().slice(0, 200) })).slice(0, 9)
+    : []
   return { sugerido: limpiar(resultado), avisos, fuentes, fecha: new Date().toISOString() }
 }

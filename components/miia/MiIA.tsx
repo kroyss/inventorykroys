@@ -384,7 +384,7 @@ function Pantalla({ id, c, set, pais }: { id: string; c: Config; set: (f: (c: Co
 }
 
 // ── Parte C: sugerencia (solo propone) ───────────────────────────────────────
-type Sugerencia = { sugerido: Partial<Config>; avisos: string[]; fuentes: { respuestas: number; descripciones: number; bloque: string | null; politicas: boolean }; fecha: string }
+type Sugerencia = { sugerido: Partial<Config>; avisos: { tema: string; texto: string }[]; fuentes: { respuestas: number; descripciones: number; bloque: string | null; politicas: boolean }; fecha: string }
 const TEMA_DE_CAMPO: Record<string, string> = { tono: 'tono', oferta: 'oferta', pago: 'pago', envio: 'envio', despacho: 'despacho', ubicacion: 'ubicacion', factura: 'factura', desconocido: 'desconocido', persona: 'persona', postventa: 'postventa', cambios: 'cambios', negocio: 'negocio', atencion: 'atencion', extras: 'extras' }
 const ddmm = (iso: string) => { const d = new Date(iso); return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}` }
 
@@ -937,6 +937,10 @@ export default function MiIA() {
               <h2 className="-mt-3 text-lg font-semibold text-neutral-900">{p.titulo}</h2>
               {sugeridos.includes(p.id) && sug && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">
                 Sugerido de lo que ya respondes ({ddmm(sug.fecha)}). Revísalo y cámbialo si hace falta; se guarda al pasar a otro tema.</p>}
+              {/* 12-11: la diferencia entre fuentes que la IA ya resolvió, solo en su tema y en una línea. */}
+              {sugeridos.includes(p.id) && sug?.avisos.filter(a => a.tema === p.id).map((a, i) => (
+                <p key={i} className="-mt-2 flex gap-1.5 text-xs text-neutral-500"><span aria-hidden="true">ℹ︎</span><span>{a.texto}</span></p>
+              ))}
               <Pantalla id={p.id} c={c} set={f => setC(f)} pais={datos.pais} />
             </div>
             {error && <p className="aparecer rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -983,12 +987,6 @@ export default function MiIA() {
     </div>
   )
 
-  const avisosSug = sug?.avisos.length ? (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 space-y-1">
-      <p className="font-medium">Para confirmar (de tus respuestas y descripciones)</p>
-      <ul className="list-disc pl-5 space-y-0.5">{sug.avisos.map((a, i) => <li key={i}>{a}</li>)}</ul>
-    </div>
-  ) : null
 
   // Página Mi IA (el título lo pone la página o la pestaña: aquí no se repite)
   const n = lleno(c)
@@ -1006,7 +1004,6 @@ export default function MiIA() {
           <button type="button" onClick={() => recorrer(faltan)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">Continuar →</button>
         </div>
       )}
-      {avisosSug}
       {datos.politicas && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
         <p className="text-sm text-sky-900">Tienes <b>Políticas para la IA</b> escritas aparte. Pásalas aquí para tener todo en un solo lugar: si algo no coincide, eliges tú.</p>
         <button type="button" onClick={pasarPoliticas} disabled={pasando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">
