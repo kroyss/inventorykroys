@@ -16,6 +16,7 @@
 // endpoints no cambia: sigue recibiendo algo con `.query()` y `.connect()`.
 import { after } from 'next/server'
 import { Pool, type PoolClient } from 'pg'
+import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external'
 import { COUNTRY_TZ } from '@/lib/tz'
 import type { Country } from '@/lib/types'
 
@@ -40,17 +41,18 @@ export function dbGlobal() {
 // Resumen en el VPS: ./scripts/lentos.sh [horas]. Apagar: LENTO_MS=0.
 const LENTO_MS = Number(process.env.LENTO_MS ?? 200)
 
-/** De dónde viene la consulta: el primer archivo de la app en la pila (route.js o page.js del build). */
+/** De dónde viene la consulta: la página/API que Next está atendiendo (su almacén del request;
+ *  la pila no sirve en el build, el código va en chunks). Ej.: "api/inventory", "page:inventario". */
 function rutaActual(): string {
   if (!LENTO_MS) return ''
-  const antes = Error.stackTraceLimit
-  Error.stackTraceLimit = 25
-  const pila = new Error().stack ?? ''
-  Error.stackTraceLimit = antes
-  const m = pila.match(/(?:server|migracion)[\\/]app[\\/](.+?)[\\/](route|page|layout)\.(?:js|ts|tsx)/)
-  if (!m) return ''
-  const ruta = m[1].replace(/\\/g, '/').replace(/\([^/]*\)\//g, '')
-  return m[2] === 'route' ? ruta : `${m[2]}:${ruta}`
+  try {
+    const p = workAsyncStorage.getStore()?.page ?? ''
+    const m = p.replace(/\([^/]*\)\//g, '').match(/^\/?(.*?)\/(route|page|layout)$/)
+    if (!m) return p
+    return m[2] === 'route' ? m[1] : `${m[2]}:${m[1] || 'inicio'}`
+  } catch {
+    return ''
+  }
 }
 
 function anotarLenta(ms: number, empresa: number | string, ruta: string, sql: unknown) {
