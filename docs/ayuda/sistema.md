@@ -135,16 +135,19 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      escalón. Para pagar tienes que haber conectado tu cuenta de MercadoLibre (al conectarla se traen tus ventas de
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
-     Puedes elegir mensual o trimestral (−10%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo. Debajo puedes marcar **Agregar Radar PRO** para
-     los meses que no cubre el regalo. El link **«¿Qué es el Radar?»** abre una ventanita con lo que es y
+     Puedes elegir **mensual** o **trimestral (−10%)**: cada opción muestra el precio por mes y, en el trimestral, cuánto
+     pagas cada 3 meses y cuánto ahorras. Los regalos del primer plan (créditos de IA y 1 mes de Radar PRO) salen juntos
+     en un recuadro. Debajo puedes marcar **Sumar Radar PRO** para los meses que no cubre el regalo. El **Resumen** muestra
+     línea por línea de dónde sale el total (plan, descuento, Radar PRO) y su equivalente en bolívares. El link **«¿Qué es el Radar?»** abre una ventanita con lo que es y
      lo que trae cada plan.
      Con un plan activo, arriba eliges **qué pagar**: **Renovar plan**, **Agregar Radar PRO** (1 mes, $6) o
      **Mejorar mi plan** (pasar a uno más caro desde hoy: pagas solo la diferencia por mes, con el mismo descuento que
      tiene tu plan, por los días que le quedan; la fecha de vencimiento no cambia y ahí renuevas ya con el nuevo).
      Para **bajar de plan**, elige el otro al renovar (no hay devolución de lo ya pagado).
   2. Pagas por **Pago Móvil** (en bolívares, a tasa BCV del día: el monto ya sale convertido) o **Binance** (USDT).
-     Los datos tienen botón de copiar.
-  3. Tocas **Ya pagué**: escribes la referencia (en Binance, el ID de la orden), la fecha y adjuntas la captura.
+     El monto a pagar sale grande, y los datos tienen botón de copiar.
+  3. Tocas **Ya pagué**: escribes la referencia (en Binance, el ID de la orden), la fecha y adjuntas la captura
+     (con el botón, arrastrándola o pegándola con Ctrl+V; ves la miniatura antes de enviar).
   El pago queda **En revisión**: lo confirmamos a mano y, al aprobarlo, tu plan se activa o renueva solo y lo ves
   como **Pago aprobado · activo hasta dd/mm** (y por Telegram, si lo tienes conectado). Si algo no cuadra, ves el
   motivo y lo puedes volver a reportar. **Si lo reportas antes de que venza, tu cuenta no se pausa** mientras lo

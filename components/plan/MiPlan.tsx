@@ -10,7 +10,19 @@ import QueEsRadar from './QueEsRadar'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 const fmtBs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const r2 = (n: number) => Math.round(n * 100) / 100
 const ddmm = (f: string | null) => f ? f.split('-').reverse().join('/') : '—'
+const TIPOS_CAPTURA = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
+
+// 12-11 (el dueño): pasos con número en círculo, como una página de pago.
+function Titulo({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-2.5 text-[15px] font-semibold text-neutral-900">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-700 text-xs font-bold text-white">{n}</span>
+      {children}
+    </h2>
+  )
+}
 // Suma meses a YYYY-MM-DD (como sumarMeses del servidor): para mostrar hasta cuándo valen los créditos del plan.
 const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const NOMBRE_PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
@@ -67,6 +79,24 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   }, [headers])
   useEffect(() => { cargar() }, [cargar])
 
+  // Captura: botón, arrastrar o pegar (Ctrl+V), con vista previa antes de enviar (12-11).
+  const [arrastrando, setArrastrando] = useState(false)
+  const tomarArchivo = useCallback((f: File | null | undefined) => {
+    if (!f) return
+    if (!TIPOS_CAPTURA.includes(f.type)) { setError('La captura debe ser una imagen (PNG, JPG) o un PDF'); return }
+    setError(null); setArchivo(f)
+  }, [])
+  const vista = useMemo(() => (archivo?.type.startsWith('image/') ? URL.createObjectURL(archivo) : null), [archivo])
+  useEffect(() => () => { if (vista) URL.revokeObjectURL(vista) }, [vista])
+  useEffect(() => {
+    const pegar = (e: ClipboardEvent) => {
+      const f = Array.from(e.clipboardData?.files ?? [])[0]
+      if (f) { e.preventDefault(); tomarArchivo(f) }
+    }
+    window.addEventListener('paste', pegar)
+    return () => window.removeEventListener('paste', pegar)
+  }, [tomarArchivo])
+
   if (error && !s) return <p className="text-sm text-red-700">{error}</p>
   if (!s) return <p className="text-sm text-neutral-500">Cargando tu plan…</p>
 
@@ -85,6 +115,25 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   const bs = s.tasaBcv ? Math.round(total * s.tasaBcv * 100) / 100 : null
   const enRevision = s.ultimo?.estado === 'revision'
   const comprobante = (k: CobroFila) => `/api/mi-plan/comprobante/${k.id}${acceso ? `?acceso=${encodeURIComponent(acceso)}` : ''}`
+  // Precio por mes según el ciclo elegido y lo que se ahorra con el trimestral (Fundadores: su −30% ya está en el mensual).
+  const porMes = (o: { mensual: number; trimestral: number }) => r2(ciclo === 'trimestral' ? o.trimestral / 3 : o.mensual)
+  const ahorro = r2(op.mensual * 3 - op.trimestral)
+  const pctAhorro = op.mensual > 0 ? Math.round(ahorro / (op.mensual * 3) * 100) : 0
+  // Resumen tipo factura: de dónde sale el total (12-11).
+  const lineas: { t: string; usd: number }[] =
+    tipo === 'radar_mes' ? [{ t: 'Radar PRO todos los días · 1 mes', usd: s.radarMes.precio }]
+    : tipo === 'recarga' ? [{ t: `${pq.creditos.toLocaleString('de-DE')} créditos de IA`, usd: pq.precio }]
+    : tipo === 'radar_pro' ? [{ t: 'Radar PRO fines de semana · 1 mes', usd: s.radarProCompra!.precio }]
+    : tipo === 'upgrade' ? [{ t: `Cambio a ${mej!.nombre} hasta el ${ddmm(s.vence)}`, usd: mej!.monto }]
+    : [
+        ...(ciclo === 'trimestral'
+          ? [{ t: `${op.nombre} × 3 meses`, usd: r2(op.mensual * 3) }, ...(ahorro > 0 ? [{ t: `Descuento trimestral −${pctAhorro}%`, usd: -ahorro }] : [])]
+          : [{ t: `${op.nombre} · 1 mes`, usd: op.mensual }]),
+        ...(pro > 0 ? [{ t: `Radar PRO ${mesesPro === 1 ? '· 1 mes' : `× ${mesesPro} meses`}`, usd: pro }] : []),
+      ]
+  // Días que le quedan a la prueba o al plan (ámbar con 3 o menos).
+  const dias = s.vence && !s.soloRadar && s.estado !== 'vencido' ? Math.round((Date.parse(s.vence) - Date.parse(hoyLocal())) / 864e5) : null
+  const textoDias = dias == null ? null : dias <= 0 ? 'vence hoy' : dias === 1 ? 'queda 1 día' : `quedan ${dias} días`
 
   const enviar = async () => {
     setError(null)
@@ -113,9 +162,12 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   return (
     <div className="space-y-4">
       {/* Estado */}
-      <section className={`rounded-xl border px-4 py-3 text-sm ${s.estado === 'vencido' && !s.soloRadar ? 'bg-red-50 border-red-200 text-red-900' : 'bg-white border-neutral-200 text-neutral-800'}`}>
-        {estadoTexto}
-        {s.fundador && <span className="ml-2 text-xs bg-lime-100 text-lime-800 rounded px-1.5 py-0.5">Fundador −30%</span>}
+      <section className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border px-4 py-3 text-sm shadow-sm ${s.estado === 'vencido' && !s.soloRadar ? 'bg-red-50 border-red-200 text-red-900' : 'bg-white border-neutral-200 text-neutral-800'}`}>
+        <span>{estadoTexto}</span>
+        {textoDias && (
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${dias! <= 3 ? 'bg-amber-100 text-amber-900' : 'bg-neutral-100 text-neutral-600'}`}>{textoDias}</span>
+        )}
+        {s.fundador && <span className="text-xs bg-lime-100 text-lime-800 rounded-full px-2.5 py-0.5 font-semibold">Fundador −30%</span>}
       </section>
 
       {/* Último pago */}
@@ -149,8 +201,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
         // 06-11 (el dueño): en pantalla ancha, a la izquierda el plan y a la derecha cómo pagar (antes una columna angosta).
         <div className="grid gap-4 lg:grid-cols-2 items-start">
           {/* 1 · Lo que te toca */}
-          <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-800">1 · {s.soloRadar ? 'Tu Radar' : s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</h2>
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+            <Titulo n={1}>{s.soloRadar ? 'Tu Radar' : s.estado === 'activo' ? 'Qué quieres pagar' : 'Elige tu plan'}</Titulo>
             {s.soloRadar && (
               <div className="space-y-2">
                 <div className="rounded-lg border border-lime-200 bg-lime-50 px-3 py-2 text-sm text-neutral-800 space-y-1">
@@ -223,84 +275,132 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
               te corresponde el escalón <b>{s.escalonNombre} ventas al mes</b>.
             </p>
             {!cambiarPlan ? (
-              <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-900">{op.nombre}</p>
-                  <p className="text-xs text-neutral-600">{op.resumen}</p>
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold text-neutral-900">{op.nombre}</p>
+                  <p className="mt-0.5 text-xs text-neutral-600">{op.resumen}</p>
+                  <button type="button" onClick={() => setCambiarPlan(true)} className="mt-1.5 text-xs font-medium text-sky-700 hover:underline">Cambiar plan</button>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold num">{fmtUsd(op.mensual)}<span className="text-xs font-normal text-neutral-500">/mes</span></p>
-                  <button type="button" onClick={() => setCambiarPlan(true)} className="text-xs text-sky-700 hover:underline">cambiar plan</button>
+                <div className="shrink-0 text-right">
+                  {ciclo === 'trimestral' && ahorro > 0 && <s className="block text-xs text-neutral-400 num">{fmtUsd(op.mensual)}</s>}
+                  <p className="num"><span className="text-xl font-bold text-neutral-900">{fmtUsd(porMes(op))}</span><span className="text-xs text-neutral-500">/mes</span></p>
                 </div>
               </div>
             ) : (
               <div className="grid gap-2 sm:grid-cols-3">
                 {s.opciones.map(o => (
                   <button key={o.id} type="button" onClick={() => { setPlan(o.id) }}
-                    className={`text-left rounded-lg border px-3 py-2 ${plan === o.id ? 'border-sky-400 bg-sky-50' : 'border-neutral-200 hover:border-neutral-300'}`}>
+                    className={`text-left rounded-xl border-2 px-3 py-2.5 transition ${plan === o.id ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-100' : 'border-neutral-200 hover:border-neutral-300'}`}>
                     <p className="text-sm font-semibold">{o.nombre}{s.plan === o.id ? <span className="ml-1 text-xs font-normal text-neutral-500">(tu plan)</span> : null}</p>
-                    <p className="text-sm num">{fmtUsd(o.mensual)}<span className="text-xs text-neutral-500">/mes</span></p>
+                    <p className="num"><span className="text-base font-bold">{fmtUsd(porMes(o))}</span><span className="text-xs text-neutral-500">/mes</span></p>
                     <p className="text-xs text-neutral-500 mt-1">{o.resumen}</p>
                   </button>
                 ))}
               </div>
             )}
-            <div className="flex flex-wrap gap-2 text-sm">
-              {(['mensual', 'trimestral'] as const).map(c => (
-                <button key={c} type="button" onClick={() => setCiclo(c)}
-                  className={`rounded-full border px-3 py-1 ${ciclo === c ? 'border-sky-400 bg-sky-50 text-sky-900' : 'border-neutral-200 text-neutral-600'}`}>
-                  {c === 'mensual' ? 'Mensual' : `Trimestral${s.fundador ? '' : ' (−10%)'}`}
-                </button>
-              ))}
+            {/* Mensual o trimestral (12-11): dos tarjetas con el precio por mes y lo que se ahorra. */}
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cada cuánto pagas">
+              {(['mensual', 'trimestral'] as const).map(c => {
+                const sel = ciclo === c
+                const pm = r2(c === 'trimestral' ? op.trimestral / 3 : op.mensual)
+                return (
+                  <button key={c} type="button" role="radio" aria-checked={sel} onClick={() => setCiclo(c)}
+                    className={`relative rounded-xl border-2 px-3 py-2.5 text-left transition ${sel ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-100' : 'border-neutral-200 bg-white hover:border-neutral-300'}`}>
+                    {c === 'trimestral' && ahorro > 0 && (
+                      <span className="absolute -top-2.5 right-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">−{pctAhorro}%</span>
+                    )}
+                    <p className={`text-xs font-semibold ${sel ? 'text-sky-800' : 'text-neutral-500'}`}>{c === 'mensual' ? 'Mensual' : 'Trimestral'}</p>
+                    <p className="num"><span className="text-lg font-bold text-neutral-900">{fmtUsd(pm)}</span><span className="text-xs text-neutral-500">/mes</span></p>
+                    <p className="text-[11px] leading-snug text-neutral-500">
+                      {c === 'mensual' ? 'Pagas mes a mes' : <>{fmtUsd(op.trimestral)} cada 3 meses{ahorro > 0 && <> · <span className="font-semibold text-emerald-700">ahorras {fmtUsd(ahorro)}</span></>}</>}
+                    </p>
+                  </button>
+                )
+              })}
             </div>
-            {s.creditosPrimerPlan > 0 && (
-              // 09-11 (el dueño, mig. 156): el primer plan suma créditos de IA una sola vez; no vencen.
-              <p className="text-xs text-neutral-600 rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-2">
-                Tu primer plan trae <b className="num">{s.creditosPrimerPlan.toLocaleString('de-DE')} créditos de IA</b> de regalo (una sola vez).
-                {' '}Se suman a los que te queden y <b>no vencen</b>. Si necesitas más, compras una recarga.
-              </p>
-            )}
-            {op.radar && s.radarPro.regalo && (
-              <p className="text-xs text-lime-700">
-                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Los meses siguientes cuestan {fmtUsd(s.radarPro.precio)} cada uno: márcalo aquí al pagar o agrégalo después en «Agregar Radar PRO». <QueEsRadar />
-              </p>
+            {/* Regalos del primer plan (créditos de IA, mig. 156 · 1 mes de Radar PRO) en un solo bloque. */}
+            {(s.creditosPrimerPlan > 0 || (op.radar && s.radarPro.regalo)) && (
+              <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 px-4 py-3">
+                <p className="text-xs font-semibold text-emerald-900">🎁 Tu primer plan incluye de regalo</p>
+                <ul className="mt-1.5 space-y-1 text-xs text-neutral-700">
+                  {s.creditosPrimerPlan > 0 && (
+                    <li className="flex gap-1.5"><span className="text-emerald-600">✓</span><span><b className="num">{s.creditosPrimerPlan.toLocaleString('de-DE')} créditos de IA</b> · no vencen y se suman a los que tengas</span></li>
+                  )}
+                  {op.radar && s.radarPro.regalo && (
+                    <li className="flex gap-1.5"><span className="text-emerald-600">✓</span><span><b>1 mes de Radar PRO</b> los fines de semana · <QueEsRadar /></span></li>
+                  )}
+                </ul>
+                {op.radar && s.radarPro.regalo && (
+                  <p className="mt-1.5 text-[11px] text-neutral-500">Después, Radar PRO cuesta {fmtUsd(s.radarPro.precio)} por mes{mesesPro > 0 ? ': puedes sumarlo abajo' : ''} o agregarlo cuando quieras en «Agregar Radar PRO».</p>
+                )}
+              </div>
             )}
             {mesesPro > 0 && (
-              <label className="flex items-start gap-2 rounded-lg border border-lime-200 bg-lime-50/60 px-3 py-2 text-sm text-neutral-800">
-                <input type="checkbox" className="mt-0.5" checked={conPro} onChange={e => setConPro(e.target.checked)} />
-                <span>Agregar <b>Radar PRO</b> {s.radarPro.regalo ? (mesesPro === 2 ? 'los meses 2 y 3' : '') : mesesPro === 1 ? 'este mes' : `los ${mesesPro} meses`}
-                  {' '}<b className="num">(+{fmtUsd(s.radarPro.precio * mesesPro)})</b>
-                  <span className="block text-xs text-neutral-500">{s.radarPro.regalo ? 'El mes 1 es de regalo. ' : ''}{fmtUsd(s.radarPro.precio)} por mes, sin descuento: Radar PRO los fines de semana. <QueEsRadar /></span></span>
+              <label className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 px-4 py-3 text-sm transition ${conPro ? 'border-lime-500 bg-lime-50' : 'border-neutral-200 hover:border-lime-300'}`}>
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-lime-600" checked={conPro} onChange={e => setConPro(e.target.checked)} />
+                <span className="flex-1 text-neutral-800">
+                  <span className="flex flex-wrap items-baseline justify-between gap-x-2">
+                    <span>Sumar <b>Radar PRO</b> {s.radarPro.regalo ? (mesesPro === 2 ? 'los meses 2 y 3' : '') : mesesPro === 1 ? 'este mes' : `los ${mesesPro} meses`}</span>
+                    <b className="num">+{fmtUsd(s.radarPro.precio * mesesPro)}</b>
+                  </span>
+                  <span className="block text-xs text-neutral-500">{s.radarPro.regalo ? 'El mes 1 es de regalo. ' : ''}{fmtUsd(s.radarPro.precio)} por mes, sin descuento: Radar PRO los fines de semana. <QueEsRadar /></span>
+                </span>
               </label>
             )}
             {s.cuentasExtra > 0 && <p className="text-xs text-neutral-500">Incluye {s.cuentasExtra} cuenta(s) de MercadoLibre extra (tienes {s.cuentas}; el plan trae 2).</p>}
             </>}
-            <div className="flex items-baseline justify-between border-t border-neutral-100 pt-3">
-              <span className="text-sm text-neutral-600">Total a pagar{tipo === 'plan' && ciclo === 'trimestral' ? ' (3 meses)' : ''}</span>
-              <span className="text-lg font-semibold num">{fmtUsd(total)}</span>
+            {/* Resumen tipo factura (12-11): de dónde sale el total. */}
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Resumen</p>
+              <ul className="mt-1.5 space-y-1 text-sm">
+                {lineas.map((l, i) => (
+                  <li key={i} className="flex justify-between gap-3">
+                    <span className="text-neutral-600">{l.t}</span>
+                    <span className={`num whitespace-nowrap ${l.usd < 0 ? 'font-medium text-emerald-700' : 'text-neutral-800'}`}>{l.usd < 0 ? '−' : ''}{fmtUsd(Math.abs(l.usd))}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex items-end justify-between gap-3 border-t border-neutral-200 pt-2">
+                <span className="text-sm font-semibold text-neutral-800">Total a pagar{tipo === 'plan' && ciclo === 'trimestral' ? ' (3 meses)' : ''}</span>
+                <span className="text-right">
+                  <span className="block text-2xl font-bold text-neutral-900 num">{fmtUsd(total)}</span>
+                  {bs && <span className="block text-xs text-neutral-500 num">≈ {fmtBs(bs)} a tasa BCV</span>}
+                </span>
+              </div>
             </div>
           </section>
 
           <div className="space-y-4">
           {/* 2 · Paga */}
-          <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-800">2 · Paga</h2>
-            <div className="flex gap-2 text-sm">
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+            <Titulo n={2}>Paga</Titulo>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1 text-sm" role="radiogroup" aria-label="Cómo pagas">
               {(['pago_movil', 'binance'] as const).map(m => (
-                <button key={m} type="button" onClick={() => setMetodo(m)}
-                  className={`rounded-full border px-3 py-1 ${metodo === m ? 'border-sky-400 bg-sky-50 text-sky-900' : 'border-neutral-200 text-neutral-600'}`}>{METODO[m]}</button>
+                <button key={m} type="button" role="radio" aria-checked={metodo === m} onClick={() => setMetodo(m)}
+                  className={`rounded-lg px-3 py-1.5 font-medium transition ${metodo === m ? 'bg-white text-sky-800 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'}`}>{METODO[m]}</button>
               ))}
+            </div>
+            {/* El monto exacto, grande y con copiar (12-11). */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+              <div>
+                <p className="text-xs font-medium text-sky-800">Monto a pagar</p>
+                <p className="text-2xl font-bold text-sky-950 num">
+                  {metodo === 'pago_movil' ? (bs ? fmtBs(bs) : 'Sin tasa BCV hoy') : `${total} ${s.datos.binance.moneda}`}
+                </p>
+                {metodo === 'pago_movil' && bs && s.tasaBcv && (
+                  <p className="text-[11px] text-sky-800/70 num">{fmtUsd(total)} × tasa BCV {s.tasaBcv.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</p>
+                )}
+              </div>
+              {(metodo === 'binance' || bs) && <Copiar texto={metodo === 'pago_movil' ? fmtBs(bs!).replace(/^Bs /, '') : String(total)} />}
             </div>
             {metodo === 'pago_movil' ? (
               <div>
-                <Dato etiqueta="Monto" valor={bs ? fmtBs(bs) : 'sin tasa BCV hoy'} copiar={!!bs} />
                 <Dato etiqueta="Banco" valor={s.datos.pago_movil.banco} copiar={false} />
                 <Dato etiqueta="Teléfono" valor={s.datos.pago_movil.telefono} />
                 <Dato etiqueta="Cédula" valor={s.datos.pago_movil.cedula} />
               </div>
             ) : (
               <div>
-                <Dato etiqueta="Monto" valor={`${total} ${s.datos.binance.moneda}`} />
                 <Dato etiqueta="Binance Pay ID" valor={s.datos.binance.id} />
                 <Dato etiqueta="Nombre" valor={s.datos.binance.nombre} copiar={false} />
                 <Dato etiqueta="Correo" valor={s.datos.binance.correo} />
@@ -310,33 +410,54 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
           </section>
 
           {/* 3 · Ya pagué */}
-          <section className="rounded-xl border border-neutral-200 bg-white px-4 py-4 space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-800">3 · Ya pagué</h2>
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+            <Titulo n={3}>Ya pagué</Titulo>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 <span className="text-neutral-600">{metodo === 'binance' ? 'ID de la orden (Binance)' : 'Referencia del pago'}</span>
                 <input value={referencia} onChange={e => setReferencia(e.target.value)} maxLength={80}
-                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5" placeholder={metodo === 'binance' ? 'Ej.: 3189...' : 'Ej.: 001234'} />
+                  className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" placeholder={metodo === 'binance' ? 'Ej.: 3189...' : 'Ej.: 001234'} />
               </label>
               <label className="text-sm">
                 <span className="text-neutral-600">Fecha del pago</span>
                 <input type="date" value={fecha} max={hoyLocal()} onChange={e => setFecha(e.target.value)}
-                  className="mt-1 w-full border border-neutral-300 rounded px-2 py-1.5" />
+                  className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" />
               </label>
             </div>
             <div className="text-sm">
               <span className="text-neutral-600">Captura del pago (imagen o PDF)</span>
-              {/* El input de archivo sin estilo quedaba invisible (un espacio vacío clickeable): botón visible + nombre. */}
-              <label className="mt-1 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-neutral-300 px-3 py-2.5 hover:border-sky-500 hover:bg-sky-50">
-                <span className="shrink-0 rounded-md bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white">📎 Adjuntar captura</span>
-                <span className={`truncate ${archivo ? 'text-neutral-900' : 'text-neutral-500'}`}>{archivo ? archivo.name : 'Ningún archivo elegido'}</span>
-                <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={e => setArchivo(e.target.files?.[0] ?? null)}
-                  className="sr-only" />
-              </label>
+              {archivo ? (
+                // Vista previa antes de enviar: así no se manda la imagen equivocada.
+                <div className="mt-1 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+                  {vista
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={vista} alt="Captura elegida" className="h-14 w-14 shrink-0 rounded-lg border border-neutral-200 bg-white object-cover" />
+                    : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-xl">📄</span>}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-neutral-900">{archivo.name}</span>
+                    <span className="text-xs text-emerald-700">✓ Lista para enviar</span>
+                  </span>
+                  <label className="cursor-pointer text-xs font-medium text-sky-700 hover:underline">
+                    Cambiar
+                    <input type="file" accept={TIPOS_CAPTURA.join(',')} onChange={e => { tomarArchivo(e.target.files?.[0]); e.target.value = '' }} className="sr-only" />
+                  </label>
+                  <button type="button" onClick={() => setArchivo(null)} className="text-xs text-neutral-500 hover:text-red-700" aria-label="Quitar captura">Quitar</button>
+                </div>
+              ) : (
+                <label
+                  onDragOver={e => { e.preventDefault(); setArrastrando(true) }}
+                  onDragLeave={() => setArrastrando(false)}
+                  onDrop={e => { e.preventDefault(); setArrastrando(false); tomarArchivo(e.dataTransfer.files?.[0]) }}
+                  className={`mt-1 flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-3 py-4 text-center transition ${arrastrando ? 'border-sky-500 bg-sky-50' : 'border-neutral-300 hover:border-sky-400 hover:bg-sky-50/50'}`}>
+                  <span className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white">📎 Adjuntar captura</span>
+                  <span className="text-xs text-neutral-500">o arrástrala aquí · también puedes pegarla con Ctrl+V</span>
+                  <input type="file" accept={TIPOS_CAPTURA.join(',')} onChange={e => { tomarArchivo(e.target.files?.[0]); e.target.value = '' }} className="sr-only" />
+                </label>
+              )}
             </div>
-            {error && <p className="text-sm text-red-700">{error}</p>}
+            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             <button type="button" onClick={enviar} disabled={enviando}
-              className="w-full sm:w-auto rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800 disabled:opacity-50">
+              className="w-full rounded-xl bg-sky-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-50">
               {enviando ? 'Enviando…' : `Enviar pago de ${fmtUsd(total)}`}
             </button>
             <p className="text-xs text-neutral-500">Lo confirmamos a mano y te avisamos. Si lo reportas antes de que venza, tu cuenta no se corta mientras lo revisamos.</p>
