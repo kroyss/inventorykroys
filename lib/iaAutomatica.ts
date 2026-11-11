@@ -72,7 +72,7 @@ export function esDeExistencias(t: string) {
   return false
 }
 // 12-11 (el dueño): cancelar, devolver, reclamar o "no me llegó" lo contesta siempre una persona (con o sin corrección).
-const POSVENTA = /cancel\w*\b[^.?!]{0,30}(compra|pedido|orden|venta)|\banul|devol|reembols|reclam|no (me )?(ha )?lleg|(lleg|vino|vinieron)\w* (da[ñn]|rot|mal|incomplet|equivocad)|defectuos|estafa|denunci/i
+const POSVENTA = /can[cs]el\w*\b[^.?!]{0,30}(compra|pedido|orden|venta)|\banul|devol|reembols|reclam|no (me )?(ha )?lleg|(lleg|vino|vinieron)\w* (da[ñn]|rot|mal|incomplet|equivocad)|defectuos|estafa|denunci/i
 export const MOTIVO_POSVENTA = 'Cancelación, devolución o reclamo: lo responde una persona'
 const NEGATIVA = /\bno (lo |la |los |las )?(tenemos|tengo|hay(?! (ning[uú]n )?(problema|inconveniente|rollo|drama))|queda|quedan|contamos)\b|\bno (est[aá]|se encuentra)n? disponible|agotad|sin (stock|existencia|disponibilidad)/i
 // 11-11: "déjanos verificarlo / te confirmamos": una vez publicada la pregunta no se puede volver a contestar.
