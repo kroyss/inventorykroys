@@ -85,8 +85,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 |---|---|---|---|---|
 | Hasta 50 | $8 | $10 | $15 | 500 |
 | 51 a 300 | $12 | $15 | $23 | 1.000 |
-| 301 a 1.000 | $18 | $22 | $33 | 1.500 |
-| Más de 1.000 | $25 | $30 | $45 | 2.000 |
+| 301 a 1.000 | $18 | $23 | $33 | 1.500 |
+| Más de 1.000 | $27 | $35 | $45 | 2.500 |
 
 - **Esencial:** Preguntas con IA, Mensajes, Calificaciones, Stock + avisos por Telegram, guías ZOOM/TEALCA
   (Despachos) y Reporte de guías (Reportador).
@@ -102,7 +102,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
   Preguntas o en Mensajes. Las respuestas rápidas, las parecidas y las que el sistema ya aprendió son **gratis**.
   Los créditos son **un solo saldo que no vence**: se suman y se usan cuando quieras.
   - La **prueba gratis** trae **500 créditos**.
-  - El **primer plan** que contratas regala créditos según tus ventas: 500, 1.000, 1.500 o 2.000 (tabla de arriba),
+  - El **primer plan** que contratas regala créditos según tus ventas: 500, 1.000, 1.500 o 2.500 (tabla de arriba),
     **una sola vez**. Renovar, cambiar de plan, pausar o reactivar no vuelve a dar créditos; lo que te quede sigue ahí.
   - **Recargas** (no vencen): 500 por $4, 2.000 por $15, 5.000 por $35. Se compran en **Mi plan → Créditos de IA**,
     igual que se paga el plan (Pago Móvil o Binance + captura); al confirmar el pago se suman al saldo y llega aviso.

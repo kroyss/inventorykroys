@@ -48,12 +48,13 @@ export const PLANES: Plan[] = [
 /** Escalones por ventas al mes (todas tus cuentas, sin canceladas): precio en USD de cada plan y créditos de IA de
  *  BIENVENIDA. 09-11 (el dueño): los créditos se dan UNA sola vez, con el primer plan que contrata (como el mes de Radar
  *  PRO); no vencen, se acumulan con las recargas y no se vuelven a dar al renovar, cambiar de plan o reactivar. */
-// 12-11 (el dueño): Completo pasa a 15/23/33/45 (antes 14/20/27/35).
+// 12-11 (el dueño): Completo 15/23/33/45 (antes 14/20/27/35); Automatizaciones 301–1.000 $23 (antes 22) y +1.000 $35
+// (antes 30); Esencial +1.000 $27 (antes 25); créditos de regalo de +1.000: 2.500 (antes 2.000).
 export const ESCALONES: { nombre?: string; ventas: string; creditos: number; precios: Record<Plan['id'], number> }[] = [
   { nombre: 'Emprende', ventas: 'Hasta 50', creditos: 500, precios: { esencial: 8, automatizaciones: 10, completo: 15 } },
   { ventas: '51 a 300', creditos: 1000, precios: { esencial: 12, automatizaciones: 15, completo: 23 } },
-  { ventas: '301 a 1.000', creditos: 1500, precios: { esencial: 18, automatizaciones: 22, completo: 33 } },
-  { ventas: 'Más de 1.000', creditos: 2000, precios: { esencial: 25, automatizaciones: 30, completo: 45 } },
+  { ventas: '301 a 1.000', creditos: 1500, precios: { esencial: 18, automatizaciones: 23, completo: 33 } },
+  { ventas: 'Más de 1.000', creditos: 2500, precios: { esencial: 27, automatizaciones: 35, completo: 45 } },
 ]
 
 export const PRECIO_DESDE = Math.min(...ESCALONES.flatMap(e => Object.values(e.precios)))
