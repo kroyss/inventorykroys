@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
 import { RECARGAS_IA } from '@/lib/planes'
+import QueEsRadar from './QueEsRadar'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 const fmtBs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -261,7 +262,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
             )}
             {op.radar && s.radarPro.regalo && (
               <p className="text-xs text-lime-700">
-                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Los meses siguientes cuestan {fmtUsd(s.radarPro.precio)} cada uno: márcalo aquí al pagar o agrégalo después en «Agregar Radar PRO».
+                Tu primer plan trae <b>1 mes de Radar PRO</b> los fines de semana <b>de regalo</b> (una sola vez). Los meses siguientes cuestan {fmtUsd(s.radarPro.precio)} cada uno: márcalo aquí al pagar o agrégalo después en «Agregar Radar PRO». <QueEsRadar />
               </p>
             )}
             {mesesPro > 0 && (
@@ -269,7 +270,7 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 <input type="checkbox" className="mt-0.5" checked={conPro} onChange={e => setConPro(e.target.checked)} />
                 <span>Agregar <b>Radar PRO</b> {s.radarPro.regalo ? (mesesPro === 2 ? 'los meses 2 y 3' : '') : mesesPro === 1 ? 'este mes' : `los ${mesesPro} meses`}
                   {' '}<b className="num">(+{fmtUsd(s.radarPro.precio * mesesPro)})</b>
-                  <span className="block text-xs text-neutral-500">{s.radarPro.regalo ? 'El mes 1 es de regalo. ' : ''}{fmtUsd(s.radarPro.precio)} por mes, sin descuento: Radar PRO los fines de semana.</span></span>
+                  <span className="block text-xs text-neutral-500">{s.radarPro.regalo ? 'El mes 1 es de regalo. ' : ''}{fmtUsd(s.radarPro.precio)} por mes, sin descuento: Radar PRO los fines de semana. <QueEsRadar /></span></span>
               </label>
             )}
             {s.cuentasExtra > 0 && <p className="text-xs text-neutral-500">Incluye {s.cuentasExtra} cuenta(s) de MercadoLibre extra (tienes {s.cuentas}; el plan trae 2).</p>}

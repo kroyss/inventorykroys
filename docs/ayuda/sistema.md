@@ -136,7 +136,8 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
      los últimos 90 días, así que no hace falta esperar un mes).
      El plan viene elegido (el tuyo, o Automatizaciones si vienes de la prueba); «cambiar plan» muestra los tres.
      Puedes elegir mensual o trimestral (−10%). En tu primer plan con Radar el primer mes de Radar PRO es de regalo. Debajo puedes marcar **Agregar Radar PRO** para
-     los meses que no cubre el regalo.
+     los meses que no cubre el regalo. El link **«¿Qué es el Radar?»** abre una ventanita con lo que es y
+     lo que trae cada plan.
      Con un plan activo, arriba eliges **qué pagar**: **Renovar plan**, **Agregar Radar PRO** (1 mes, $6) o
      **Mejorar mi plan** (pasar a uno más caro desde hoy: pagas solo la diferencia por mes, con el mismo descuento que
      tiene tu plan, por los días que le quedan; la fecha de vencimiento no cambia y ahí renuevas ya con el nuevo).
