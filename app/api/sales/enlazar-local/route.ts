@@ -6,8 +6,13 @@ import { tieneModulo } from '@/lib/modulos'
 
 // Enlazar una venta de ML con la venta LOCAL que se registró a mano (mig 165, 11-11): cobro destino cargado como LOCAL-….
 // GET  ?numero=<orden o pack> → ventas LOCAL de los últimos 20 días (las más parecidas primero) + a cuál está enlazada hoy
+//      &q=<texto> (12-11, el dueño) → busca en 180 días por cliente, producto, código o número: cada palabra, en
+//      cualquier orden y sin acentos, tiene que aparecer en alguno de esos datos.
 // POST { numero, saleId }     → enlaza todas las órdenes del número; saleId null = deshacer
 const DIAS = 20
+const DIAS_BUSCAR = 180
+const sinAcentos = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const SQL_SIN_ACENTOS = (x: string) => `translate(lower(${x}), 'áàäâéèëêíìïîóòöôúùüûñ', 'aaaaeeeeiiiioooouuuun')`
 
 async function sesion() {
   const s = await sesionPreguntas()
@@ -30,6 +35,14 @@ export async function GET(req: NextRequest) {
     if (!o?.fecha) return NextResponse.json({ error: 'No se encontró la venta de MercadoLibre' }, { status: 404 })
     // Productos de la venta de ML (por sus publicaciones vinculadas), para poner primero las LOCAL con el mismo producto.
     const pubs = ((o.items as string[] | null) ?? []).map(i => i.replace(/^[A-Z]{3}/, ''))
+    const palabras = sinAcentos(req.nextUrl.searchParams.get('q') ?? '').split(/\s+/).slice(0, 6)
+      .map(p => p.replace(/[%_\\]/g, ''))
+      .filter(Boolean)
+    const pajar = SQL_SIN_ACENTOS(`concat_ws(' ', s.customer_name, s.ml_order_number, s.notes,
+      (SELECT string_agg(concat_ws(' ', p.name, p.code), ' ') FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = s.id))`)
+    const filtro = palabras.length
+      ? `s.created_at > NOW() - make_interval(days => ${DIAS_BUSCAR}) AND ${palabras.map((_, i) => `${pajar} LIKE '%' || $${i + 4} || '%'`).join(' AND ')}`
+      : `s.created_at > $1::timestamptz - make_interval(days => ${DIAS}) AND s.created_at < $1::timestamptz + make_interval(days => ${DIAS})`
     const { rows } = await s.db.query(
       `SELECT s.id, s.ml_order_number AS numero, s.customer_name AS cliente, s.total_amount::float AS total, s.created_at, s.status,
               (SELECT string_agg(p.name, ' · ' ORDER BY p.name) FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = s.id) AS productos,
@@ -38,10 +51,9 @@ export async function GET(req: NextRequest) {
               similarity(COALESCE(s.customer_name, ''), COALESCE($3, ''))::float AS parecido,
               (SELECT string_agg(DISTINCT COALESCE(x.pack_id, x.id)::text, ', ') FROM ml_ordenes x WHERE x.venta_local_id = s.id) AS enlazada_a
        FROM sales s
-       WHERE s.ml_order_number LIKE 'LOCAL-%' AND s.created_at > $1::timestamptz - make_interval(days => ${DIAS})
-         AND s.created_at < $1::timestamptz + make_interval(days => ${DIAS})
+       WHERE s.ml_order_number LIKE 'LOCAL-%' AND ${filtro}
        ORDER BY mismo_producto DESC, parecido DESC, abs(EXTRACT(EPOCH FROM s.created_at - $1::timestamptz)) LIMIT 40`,
-      [o.fecha, pubs, o.comprador ?? ''])
+      [o.fecha, pubs, o.comprador ?? '', ...palabras])
     return NextResponse.json({ enlazada: o.enlazada ?? null, comprador: o.comprador, ventas: rows })
   } catch (err) {
     return apiError(err)
