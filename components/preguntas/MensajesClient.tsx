@@ -1,5 +1,6 @@
 'use client'
 import MiIA from '@/components/miia/MiIA'
+import { DatosProductos } from './DatosProducto'
 import { Nuevo } from '@/components/ui/Nuevo'
 import { conDatosDeEjemplo, rellenarVariables } from '@/lib/variablesTexto'
 import { AyudaVariables } from './AyudaVariables'
@@ -47,7 +48,7 @@ function hace(fecha: string | null) {
 export default function MensajesClient({ pack: packPedido = null, miIA = false, iaPrueba = false, inicial = null }: { pack?: string | null; miIA?: boolean; iaPrueba?: boolean
   /** 12-11 (rapidez): Por atender y los contadores del seguimiento, ya en el HTML. */
   inicial?: { lista: unknown; seg: unknown } | null }) {
-  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia' | 'ia_prueba'>(packPedido ? 'todas' : 'sin_leer')
+  const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia' | 'ia_prueba' | 'datos'>(packPedido ? 'todas' : 'sin_leer')
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
   const [conRecordatorios, setConRecordatorios] = useState(false)
@@ -165,9 +166,11 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
         { value: 'pedir', label: 'Pedir calificación', count: pedir },
         ...(miIA ? [{ value: 'mi_ia' as const, label: <>Mi IA<Nuevo clave="mi_ia" /></> }] : []),
         ...(rapidas.esAdmin ? [{ value: 'rapidas' as const, label: 'Respuestas rápidas' }] : []),
+        // 12-11 (el dueño): los mismos datos de cada producto de Preguntas (la IA de Mensajes también los usa).
+        ...(rapidas.esAdmin ? [{ value: 'datos' as const, label: 'Datos de cada producto' }] : []),
         ...(iaPrueba ? [{ value: 'ia_prueba' as const, label: 'IA en prueba' }] : []),
       ]} />
-      {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => setVista('mi_ia') : undefined} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
+      {vista === 'ia_prueba' ? <MensajesIAPrueba onAbrir={p => { window.location.href = `/mensajes?pack=${p}` }} onMiIA={miIA ? () => setVista('mi_ia') : undefined} /> : vista === 'mi_ia' ? <MiIA /> : vista === 'datos' ? <DatosProductos /> : vista === 'pedir' ? <PedirCalificacion onCambio={cargar} /> : vista === 'recordatorios' ? <RecordatoriosPago /> : vista === 'al_comprar' ? <MensajeAlComprar /> : vista === 'rapidas' ? (
         <EditorRapidos key={JSON.stringify(rapidas.lista)} iniciales={rapidas.lista} sugeridas={rapidas.sugeridas} onGuardado={cargar} />
       ) : !lista ? <Cargando /> : (
         // Celular: una sola columna que no se ensancha con el contenido (minmax(0,1fr): antes un texto largo

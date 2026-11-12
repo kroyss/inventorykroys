@@ -17,6 +17,24 @@ export async function GET(req: NextRequest) {
   if ('error' in s) return s.error
   const sp = new URL(req.url).searchParams
   try {
+    // ?buscar=texto (12-11, el dueño): publicaciones de todas las cuentas (activas y pausadas, ml_catalogo) por título o
+    // código, para anotarles datos ANTES de que lleguen las preguntas. Con cuántos datos tiene ya cada una.
+    const buscar = sp.get('buscar')
+    if (buscar !== null) {
+      const codigo = /^(?:ml[a-z])?-?(\d{5,15})$/i.exec(buscar.trim())?.[1] ?? null
+      const palabras = buscar.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .split(/\s+/).map(p => p.replace(/[%_\\]/g, '')).filter(p => p.length >= 2).slice(0, 5)
+      if (!codigo && !palabras.length) return NextResponse.json([])
+      const titulo = `translate(lower(m.titulo), 'áéíóúüñ', 'aeiouun')`
+      const { rows } = await s.db.query(
+        `SELECT m.item_id, m.titulo, m.estado, m.permalink AS link, m.thumbnail AS imagen, x.nickname AS cuenta,
+                (SELECT COUNT(*)::int FROM ml_item_notas n WHERE n.item_id = m.item_id) AS datos
+         FROM ml_catalogo m JOIN ml_conexiones x ON x.id = m.conexion_id
+         WHERE CASE WHEN $2::text <> '' THEN regexp_replace(m.item_id, '^[A-Z]{3}', '') LIKE $2 ELSE ${titulo} LIKE ALL ($1::text[]) END
+         ORDER BY (m.estado = 'active') DESC, (${titulo} LIKE $3::text) DESC, m.titulo LIMIT 20`,
+        [palabras.map(p => `%${p}%`), codigo ? `${codigo}%` : '', `${palabras[0] ?? ''}%`])
+      return NextResponse.json(rows)
+    }
     if (sp.get('todas')) {
       const { rows } = await s.db.query(
         `SELECT n.id, n.item_id, n.texto, n.created_at, CASE WHEN n.aprendida_de IS NOT NULL THEN 'aprendido de tu respuesta' ELSE u.full_name END AS por,
