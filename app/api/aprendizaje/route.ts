@@ -16,10 +16,12 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return unauthorized()
   try {
-    const [videos, agendar, sinCuentas, { rows: [u] }] = await Promise.all([videosDeUsuario(session.user.id, llevaInventario(session.user), tieneModulo(session.user, 'pagos_me')), linkAgendar(),
+    // 12-11: en «Ver como» (soporte) se muestra el avance de la persona que se está viendo, no el de quien entró.
+    const userId = session.user.verComo?.id ?? session.user.id
+    const [videos, agendar, sinCuentas, { rows: [u] }] = await Promise.all([videosDeUsuario(userId, llevaInventario(session.user), tieneModulo(session.user, 'pagos_me')), linkAgendar(),
       session.user.empresaId && tieneModulo(session.user, 'preguntas') ? sinCuentasML(session).catch(() => false) : false,
       // Días desde que el usuario empezó: el botón de la barra se achica al 5º (AprendizajeNav).
-      dbGlobal().query(`SELECT FLOOR(EXTRACT(EPOCH FROM NOW() - created_at) / 86400)::int AS dias FROM users WHERE id = $1`, [session.user.id])])
+      dbGlobal().query(`SELECT FLOOR(EXTRACT(EPOCH FROM NOW() - created_at) / 86400)::int AS dias FROM users WHERE id = $1`, [userId])])
     // Exento: la organización de la plataforma (SolucionesMC) ya está capacitada. Ve Aprendizaje como
     // completado (libro gris, sin ventana de bienvenida) aunque su avance real no lo esté.
     const exento = session.user.organizacionId === ORGANIZACION_PLATAFORMA
