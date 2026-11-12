@@ -169,6 +169,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const [abierta, setAbierta]   = useState<number | null>(null)
   const [eligiendoRadar, setEligiendoRadar] = useState<number | null>(null)   // empresa a la que se le está prendiendo el Radar
   const [verInactivos, setVerInactivos] = useState(false)
+  const [verRadar, setVerRadar] = useState(false)
   const [reactivar, setReactivar] = useState<Empresa | null>(null)
   const [buscar, setBuscar]     = useState('')
   const confirm = useConfirm()
@@ -244,10 +245,15 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   }, [abierta])
   const q = buscar.trim().toLowerCase()
   const coincide = (e: Empresa) => !q || e.nombre.toLowerCase().includes(q) || (e.admins ?? '').toLowerCase().includes(q) || e.organizacion.toLowerCase().includes(q)
-  const activas = empresas.filter(e => puedeEntrar(e, hoy) && coincide(e))
+  // 12-11 (el dueño): los de solo Radar no piden seguimiento: van plegados aparte, como los inactivos.
+  const soloRadar = (e: Empresa) => e.origen === 'radar' && e.estado === 'prueba'
+  const activas = empresas.filter(e => puedeEntrar(e, hoy) && !soloRadar(e) && coincide(e))
+  const radares = empresas.filter(e => puedeEntrar(e, hoy) && soloRadar(e) && coincide(e))
+  const totalRadar = empresas.filter(e => puedeEntrar(e, hoy) && soloRadar(e))
+  const mostrarRadar = verRadar || (!!q && radares.length > 0)
   const inactivas = empresas.filter(e => !puedeEntrar(e, hoy) && coincide(e))
   const totalInactivas = empresas.filter(e => !puedeEntrar(e, hoy))
-  const clientesActivos = empresas.filter(e => puedeEntrar(e, hoy) && e.estado !== 'propietario').length
+  const clientesActivos = empresas.filter(e => puedeEntrar(e, hoy) && !soloRadar(e) && e.estado !== 'propietario').length
   const mostrarInactivas = verInactivos || (!!q && inactivas.length > 0)
 
   return (
@@ -296,6 +302,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-neutral-600">
           <b className="text-neutral-900">{clientesActivos}</b> clientes pueden entrar
+          {totalRadar.length > 0 && <span className="text-neutral-400"> · {totalRadar.length} solo Radar</span>}
           {totalInactivas.length > 0 && <span className="text-neutral-400"> · {totalInactivas.length} inactivos guardados abajo</span>}
         </p>
         <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Buscar empresa o admin…"
@@ -313,6 +320,31 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
           cuenta: <FraseCuenta e={e} hoy={hoy} />,
           extra: e.inventario ? <LineaInventario u={e.inventario} conPagos={e.modulos.includes('pagos_me')} /> : undefined,
         }))} />
+
+      {/* Solo Radar (12-11): plegados como los inactivos. Con la búsqueda se abren solos si hay coincidencias. */}
+      {totalRadar.length > 0 && (
+        <div className="rounded-xl border border-neutral-200 bg-white">
+          <button onClick={() => setVerRadar(v => !v)} aria-expanded={mostrarRadar}
+            className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-50">
+            <span>{mostrarRadar ? '▾' : '▸'} 📡 Solo Radar: <b className="text-neutral-800">{totalRadar.length}</b></span>
+            <span className="text-xs text-neutral-400">{mostrarRadar ? 'Ocultar' : 'Ver todos'}</span>
+          </button>
+          {mostrarRadar && (
+            <ul className="divide-y divide-neutral-100 border-t border-neutral-100">
+              {radares.length === 0 && <li className="px-4 py-3 text-sm text-neutral-400">Ninguno coincide con la búsqueda.</li>}
+              {radares.map(e => (
+                <li key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5">
+                  <button onClick={() => { setError(null); setAviso(null); setAbierta(e.id) }} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-sm font-medium text-neutral-800 hover:underline">{e.nombre}</div>
+                    <div className="truncate text-[11px] text-neutral-400">{e.country}{e.admins ? ` · ${e.admins}` : ''}</div>
+                  </button>
+                  <FraseCuenta e={e} hoy={hoy} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Inactivos: guardados, fuera de la vista rápida. Con la búsqueda se abren solos si hay coincidencias. */}
       {totalInactivas.length > 0 && (
