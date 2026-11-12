@@ -51,12 +51,14 @@ export function ResponderTodo({ tipo, todo, onCambio }: { tipo: 'preguntas' | 'm
 }
 
 /** Nota para corregir a la IA desde una respuesta: dato de ese producto (Datos del producto) o regla general (Mi IA). */
-export function NotaParaIA({ itemId }: { itemId?: string | null }) {
+// 12-11 (el dueño): también desde el historial de Preguntas («✗ Corregir», al lado de «Respondió la IA»); al guardar avisa
+// (onGuardado) para marcar esa respuesta como Mal.
+export function NotaParaIA({ itemId, etiqueta = 'Corregir a la IA', onGuardado }: { itemId?: string | null; etiqueta?: string; onGuardado?: () => void }) {
   const [abierta, setAbierta] = useState(false)
   const [texto, setTexto] = useState('')
   const [donde, setDonde] = useState<'producto' | 'general'>(itemId ? 'producto' : 'general')
   const [estado, setEstado] = useState<string>('')
-  if (!abierta) return <button type="button" onClick={() => setAbierta(true)} className="text-xs text-sky-700 hover:underline">Corregir a la IA</button>
+  if (!abierta) return <button type="button" onClick={() => setAbierta(true)} className="text-xs text-sky-700 hover:underline">{etiqueta}</button>
   const guardar = async () => {
     setEstado('guardando')
     const r = donde === 'producto'
@@ -65,6 +67,7 @@ export function NotaParaIA({ itemId }: { itemId?: string | null }) {
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setEstado(d.error ?? 'No se pudo guardar'); return }
     setEstado('listo'); setTexto('')
+    onGuardado?.()
   }
   if (estado === 'listo') return <p className="text-xs text-green-800">Guardado: la IA lo usa desde la próxima respuesta. {donde === 'producto' ? 'Está en Datos del producto de esta publicación.' : 'Está en Mi IA → Información extra → «Correcciones de mi equipo».'}</p>
   return (
@@ -76,12 +79,15 @@ export function NotaParaIA({ itemId }: { itemId?: string | null }) {
             className={`px-2.5 py-1 rounded-full border ${donde === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
         ))}
       </div>}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap sm:flex-nowrap gap-2">
         <input value={texto} onChange={e => setTexto(e.target.value)} maxLength={300}
           placeholder={donde === 'producto' ? 'Ej.: Sirve para cualquier vehículo. Envío gratis solo por TEALCA.' : 'Ej.: Si preguntan por Cashea, di que no y nombra nuestros medios de pago.'}
           className="flex-1 min-w-0 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm" />
-        <button type="button" onClick={guardar} disabled={texto.trim().length < 3 || estado === 'guardando'}
-          className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{estado === 'guardando' ? '…' : 'Guardar'}</button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => { setAbierta(false); setEstado('') }} className="px-3 py-1.5 rounded-lg text-sm text-neutral-600">Cancelar</button>
+          <button type="button" onClick={guardar} disabled={texto.trim().length < 3 || estado === 'guardando'}
+            className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-sm disabled:opacity-50">{estado === 'guardando' ? '…' : 'Guardar'}</button>
+        </div>
       </div>
       {estado && estado !== 'guardando' && <p className="text-xs text-red-700">{estado}</p>}
     </div>

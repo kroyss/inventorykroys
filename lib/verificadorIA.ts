@@ -77,7 +77,8 @@ VERSIÓN 3 (manda sobre todo lo anterior):
   · "pago": medios de pago, descuentos, factura, garantía, montos o precios con cifra.
   · "otro": todo lo demás: saludos, cortesía, gracias, "quedo a su orden", "el precio es el publicado a tasa BCV", cómo comprar en MercadoLibre (elegir cantidad o color, llenar el formulario), recomendaciones (verificar con un técnico, ver el catálogo), decir que NO tenemos un dato, condiciones ("si su equipo tiene X…"), aclarar cuál es esta publicación.
 - Las POLÍTICAS (incluida la sección de Mi IA) son del vendedor: lo que el borrador repite de ahí está respaldado aunque lo diga con otras palabras (mínimo de 2 unidades, envío gratis por ZOOM y TEALCA, un día hábil, retiro).
-- "principal_sin_contestar" = true SOLO si lo principal que preguntó quedó sin ninguna respuesta (preguntó si sirve y no dice nada de eso). Un detalle que falta o una respuesta general no cuenta.`
+- "principal_sin_contestar" = true SOLO si lo principal que preguntó quedó sin ninguna respuesta (preguntó si sirve y no dice nada de eso). Un detalle que falta o una respuesta general no cuenta.
+- También es "principal_sin_contestar" = true si el SÍ/NO del borrador contesta lo contrario de lo que se preguntó, sobre todo con negaciones: preguntó "¿los tienes SIN protección UV?" y el borrador dice "Sí, tienen protección UV" (debía ser "No, vienen con protección UV"). En "que_falta" pon "El sí/no no corresponde a lo que preguntó".`
 
 export interface Verificacion { ok: boolean; motivo: string | null; llamada: LlamadaIA; sinRespaldo?: { afirmacion: string; tipo?: string }[] }
 const TIPOS_RIESGO = ['producto', 'compatibilidad', 'stock', 'envio', 'pago']

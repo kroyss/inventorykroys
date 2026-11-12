@@ -11,6 +11,7 @@ import MiIA from '@/components/miia/MiIA'
 import { Nuevo } from '@/components/ui/Nuevo'
 import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
 import { IaAutomatica } from './IaAutomatica'
+import { NotaParaIA } from '@/components/ia/ResponderTodo'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -700,6 +701,15 @@ function FilaHistorial({ p }: { p: Pregunta }) {
           {p.respuesta}
           <span className="text-xs text-neutral-400"> · {p.por_ia ? <span className="text-sky-700">Respondió la IA{p.por_ia_total ? ' (Modo Total)' : ''}</span> : p.respondida_por ?? 'desde MercadoLibre'}</span>
         </p>
+      )}
+      {/* 12-11 (el dueño): corregir a la IA desde donde se ve el error. Guarda el dato del producto o la regla y marca la
+          respuesta como Mal (cuenta en el acierto de la IA). Solo en las que respondió la IA. */}
+      {p.respuesta && p.por_ia && (
+        <div className="pl-3">
+          <NotaParaIA itemId={p.item_id} etiqueta="✗ Corregir a la IA"
+            onGuardado={() => { fetch('/api/preguntas/ia-auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accion: 'marcar', id: p.id, marca: 'mal' }) }).catch(() => {}) }} />
+        </div>
       )}
       </div>
     </div>

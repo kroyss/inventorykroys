@@ -253,6 +253,10 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
 - **¿Quién respondió?** En Preguntas (Respondidas) y en las conversaciones de Mensajes, lo que salió solo dice
   **«Respondió la IA»** (o «Respondió la IA (Modo Total)»), en el mismo lugar donde sale el nombre de quien respondió
   de tu equipo.
+- **¿La IA respondió mal?** En Preguntas (Respondidas), debajo de esa respuesta toca **✗ Corregir a la IA**, elige
+  **Dato de este producto** (queda en Datos del producto de esa publicación) o **Regla para todas** (queda en Mi IA →
+  Información extra → «Correcciones de mi equipo»), escribe qué debió decir y toca **Guardar**. La IA lo usa desde la
+  siguiente pregunta. La respuesta ya publicada en MercadoLibre no cambia.
 - Cada respuesta de la IA usa **1 crédito** (las de prueba no). Si se acaban los créditos, deja de responder sola
   hasta que recargues en Mi plan.
 - Responde solo lo que llega **después** de encenderla.
