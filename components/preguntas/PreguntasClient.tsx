@@ -30,7 +30,7 @@ interface Pregunta {
   /** Respuesta rápida que el sistema eligió (sin IA, probada en el historial): lib/sugerenciasServidor.ts */
   sugerida?: { plantilla: string; titulo: string; texto: string; respaldo: number; sin_confirmar: boolean; por_palabras?: string[]; revisada?: boolean; agregado?: boolean } | null
   probable?: string | null      // sin sugerida: el botón más probable (se resalta)
-  cuenta: string; respondida_por: string | null; por_ia?: boolean; por_ia_total?: boolean
+  cuenta: string; respondida_por: string | null; por_ia?: boolean; por_ia_total?: boolean; por_escape?: boolean; escape_motivos?: string | null
   producto_code: string | null; producto_nombre: string | null; producto_stock: number | null
   producto_precio: number | null
   comprador_id: string | null; previas: number
@@ -699,13 +699,15 @@ function FilaHistorial({ p }: { p: Pregunta }) {
       {p.respuesta && (
         <p className="text-neutral-600 pl-3 border-l-2 border-neutral-200">
           {p.respuesta}
-          <span className="text-xs text-neutral-400"> · {p.por_ia ? <span className="text-sky-700">Respondió la IA{p.por_ia_total ? ' (Modo Total)' : ''}</span> : p.respondida_por ?? 'desde MercadoLibre'}</span>
+          <span className="text-xs text-neutral-400"> · {p.por_ia ? <span className="text-sky-700">Respondió la IA{p.por_ia_total ? ' (Modo Total)' : ''}</span>
+            : p.por_escape && !p.respondida_por ? <span className="text-violet-700" title={p.escape_motivos ? `La IA se frenó: ${p.escape_motivos}` : undefined}>Frase de escape de la IA</span>
+            : p.respondida_por ?? 'desde MercadoLibre'}</span>
           {/* 12-11 (el dueño): corregir a la IA en la misma línea (otro color), abre una ventana. Lo aprendido va al dato
               del producto o a la regla, y la respuesta queda marcada como Mal (cuenta en el acierto de la IA). */}
-          {p.por_ia && <>
+          {(p.por_ia || (p.por_escape && !p.respondida_por)) && <>
             <span className="text-xs text-neutral-300"> · </span>
             <CorregirIA tipo="preguntas" itemId={p.item_id} producto={p.item_titulo} texto={p.texto} ia={p.respuesta}
-              onGuardado={() => { fetch('/api/preguntas/ia-auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              onGuardado={() => { if (p.por_ia) fetch('/api/preguntas/ia-auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ accion: 'marcar', id: p.id, marca: 'mal' }) }).catch(() => {}) }} />
             <span className="text-xs text-neutral-300"> · </span>
             <BotonDatos itemId={p.item_id} titulo={p.item_titulo} n={p.datos_guardados ?? 0} />

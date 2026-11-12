@@ -41,6 +41,9 @@ export async function GET(req: NextRequest) {
               c.nickname AS cuenta, u.full_name AS respondida_por,
               -- 10-11: la marca «Respondió la IA» (respuesta automática publicada sola).
               COALESCE(p.ia_auto->>'publicada', '') = 'true' AS por_ia, COALESCE(p.ia_auto->>'sinSeguro', '') = 'true' AS por_ia_total,
+              -- 12-11: frase de escape de la IA (se frenó y contestó con la frase): su motivo y lo que la IA había escrito.
+              COALESCE(p.ia_auto->>'escape', '') = 'true' AS por_escape,
+              (SELECT string_agg(m, ' · ') FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(p.ia_auto->'motivos') = 'array' THEN p.ia_auto->'motivos' ELSE '[]'::jsonb END) m) AS escape_motivos,
               pr.code AS producto_code, pr.name AS producto_nombre, pr.stock AS producto_stock,
               pr.precio AS producto_precio
        FROM ml_preguntas p

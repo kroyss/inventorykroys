@@ -259,6 +259,8 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   sus datos guardados) y lo que vale para todas (queda en Mi IA → Información extra → «Correcciones de mi equipo»), y te
   muestra lo que aprendió. Si ya lo tenía anotado, no guarda nada repetido. No pongas precios ni teléfonos: no se guardan.
   La respuesta ya publicada en MercadoLibre no cambia.
+- **Frase de escape de la IA**: en el historial marca las preguntas que la IA no se animó a responder y contestó con la
+  frase de escape (al pasar el mouse se ve por qué se frenó). También tienen **✗ Corregir a la IA** para enseñarle.
 - **N datos guardados** (al lado, o en cada pregunta sin responder) abre una ventana con lo que la IA sabe de esa
   publicación: ahí se editan o borran.
 - **Agregar datos antes de que pregunten:** Preguntas → Configuración → Datos de cada producto (también en Mensajes →
