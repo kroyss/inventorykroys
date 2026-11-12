@@ -4,6 +4,7 @@ import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { useTraidaME } from '@/components/pagosme/useTraidaME'
 import {
   envioPorTransportista, topeDescuento, unidadesParaGratis, huecoVariasUnidades, textoHueco, tierFor, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
 } from '@/lib/mlShipping'
@@ -254,11 +255,27 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
   // y, si la PC tardaba, nunca se leía.
   const [pedidoME, setPedidoME] = useState<{ id: number; desde: number } | null>(null)
   const [estadoPesos, setEstadoPesos] = useState<string | null>(null)
+  // 12-11 (el dueño): la traída en curso sale del servidor (también después de recargar). Con pesos: se sigue como si se
+  // hubiera pedido aquí. Sin pesos (la de pagos): se avisa que hay que esperar a que termine.
+  const tme = useTraidaME(conPagosME)
+  const tomada = useRef<number | null>(null)
+  useEffect(() => {
+    const t = tme.traida
+    if (!tme.ocupada || !t || tomada.current === t.id || pedidoME) return
+    tomada.current = t.id
+    if (t.pesos) { setPedidoME({ id: t.id, desde: new Date(t.pedido_at).getTime() }); setEstadoPesos('trayendo con la PC de Pagos ME…') }
+    else setEstadoPesos('hay una traída de pagos en curso (sin pesos): cuando termine, toca «Traer ME y ML» para traer los pesos')
+  }, [tme.ocupada, tme.traida, pedidoME])
+  useEffect(() => {
+    // Terminó la de pagos que se estaba esperando: se quita el aviso.
+    if (!tme.ocupada && !pedidoME && estadoPesos?.startsWith('hay una traída')) setEstadoPesos(null)
+  }, [tme.ocupada, pedidoME, estadoPesos])
   const traerTodo = async () => {
     if (conPagosME && !pedidoME) {
       const r = await fetch('/api/promociones/pesos', { method: 'POST' }).catch(() => null)
       const d = await r?.json().catch(() => null)
-      if (r?.ok && d?.pedido) { setPedidoME({ id: d.pedido, desde: Date.now() }); setEstadoPesos('trayendo con la PC de Pagos ME…') }
+      if (r?.ok && d?.pedido) { tomada.current = Number(d.pedido); setPedidoME({ id: d.pedido, desde: Date.now() }); setEstadoPesos('trayendo con la PC de Pagos ME…'); tme.recargar() }
+      else if (r?.status === 409) setEstadoPesos(d?.error ?? 'hay una traída de pagos en curso: cuando termine, vuelve a tocar')
       else setEstadoPesos('no se pudo pedir a la PC de Pagos ME')
     }
     await actualizarML()

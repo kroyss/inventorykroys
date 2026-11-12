@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { tieneModulo } from '@/lib/modulos'
 import { sesionPromociones } from '@/lib/promocionesSesion'
+import { estadoTraida, ocupada } from '@/lib/meTraida'
 
 // Perfiles vigentes de la PC: UNO por cuenta de ML, el más reciente (19-10: al reconectar la extensión queda un
 // perfil nuevo para la misma cuenta y el viejo sigue en me_latidos; se contaban los dos → "2 de 4 cuentas").
@@ -20,15 +21,12 @@ export async function POST() {
     return NextResponse.json({ error: 'Los pesos los trae el programa de Pagos ME, que no está activo en esta empresa' }, { status: 400 })
   }
   try {
-    // El último pedido de los últimos 15 min que todavía no terminaron todas las cuentas: se suma a ese.
-    const { rows: [ya] } = await s.db.query(
-      `SELECT p.id FROM me_pedidos p
-       WHERE p.pedido_at > NOW() - INTERVAL '15 minutes'
-         AND EXISTS (SELECT 1 FROM (${PERFILES_VIGENTES}) v WHERE NOT p.resultados ? v.perfil)
-       ORDER BY p.id DESC LIMIT 1`)
-    if (ya) {
-      await s.db.query(`UPDATE me_pedidos SET pesos = TRUE WHERE id = $1`, [ya.id])
-      return NextResponse.json({ ok: true, pedido: ya.id })
+    // 12-11 (el dueño): UNA traída a la vez. Si hay una corriendo con pesos, se usa esa; si corre una SIN pesos, se espera
+    // a que termine (antes se le sumaban los pesos, pero si la PC ya la había empezado no los leía).
+    const e = await estadoTraida(s.db)
+    if (ocupada(e)) {
+      if (e!.pesos) return NextResponse.json({ ok: true, pedido: e!.id })
+      return NextResponse.json({ error: 'Hay una traída de pagos en curso (sin pesos): cuando termine, vuelve a tocar para traer los pesos.', en_curso: true }, { status: 409 })
     }
     const { rows: [p] } = await s.db.query(
       `INSERT INTO me_pedidos (pedido_por, pesos) VALUES ($1, TRUE) RETURNING id`, [s.userId])

@@ -549,6 +549,12 @@ de MercadoLibre (**un perfil de Chrome por cada cuenta de ML**). Ser administrad
    entra ahí a MercadoEnvíos con esa cuenta y repite los pasos 3 y 4. Si el código venció, genera otro: lo ya
    conectado sigue funcionando.
 
+**Una traída a la vez:** mientras corre una traída de MercadoEnvíos (pedida desde Pagos ME, Por confirmar, una venta o
+Promociones, por ti o por otra persona), los botones «Traer» quedan en «Buscando…» aunque recargues la página, y no se
+pide otra. Abajo a la derecha, el aviso de tareas muestra cada cuenta (órdenes, y pesos ✓ o ⚠ si no se pudieron leer), o
+«Esperando la PC» si el programa no está conectado. Si en Promociones pides pesos mientras corre una de pagos, espera a
+que termine y vuelve a tocar «Traer ME y ML».
+
 **Uso diario:** toca **Traer pagos y guías** y espera el aviso verde. Chrome se abre solo, trabaja y se cierra: no
 lo toques. Luego verifica cada pago (Pago correcto / inválido). **Despachos no imprime guías con el pago sin
 verificar.**

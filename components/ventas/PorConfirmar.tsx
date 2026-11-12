@@ -17,6 +17,7 @@ import { Monto } from '@/components/pagosme/PagoME'
 import { LoQueSeHablo } from './PagoYContexto'
 import { NotasVenta } from '@/components/preguntas/MensajesClient'
 import EnlazarLocal from './EnlazarLocal'
+import { useTraidaME } from '@/components/pagosme/useTraidaME'
 
 const chipCls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset transition-colors'
 
@@ -503,6 +504,16 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   // los pagos y guías del portal. Tarda 1-3 min: se recarga la lista cada 10 s hasta que llega la búsqueda nueva.
   const [pidiendoME, setPidiendoME] = useState<number | null>(null)
   const [avisoME, setAvisoME] = useState<string | null>(null)
+  // 12-11 (el dueño): la traída en curso sale del servidor: si ya hay una (pedida aquí, en otra pantalla o por otra
+  // persona), el botón queda «Buscando…» aunque se recargue la página, y no se pide otra. Cada traída se toma una vez.
+  const tme = useTraidaME(!!datos?.pagosME)
+  const tomada = useRef<number | null>(null)
+  useEffect(() => {
+    const t = tme.traida
+    if (!tme.ocupada || !t || tomada.current === t.id || pidiendoME != null) return
+    tomada.current = t.id
+    setPidiendoME(new Date(t.pedido_at).getTime())
+  }, [tme.ocupada, tme.traida, pidiendoME])
   // "Comprobar con el banco" (20-10): cualquier usuario sube los estados de cuenta; el resultado queda en cada venta.
   const [banco, setBanco] = useState(false)
   // Estados de cuenta de hoy en este navegador (22-10, lib/bancoMemoria.ts): cuando llegan pagos nuevos sin lo que
@@ -547,7 +558,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const traerME = async () => {
     setAvisoME(null)
     const r = await fetch('/api/pagos-me/traer', { method: 'POST' }).catch(() => null)
-    if (r?.ok) setPidiendoME(Date.now())
+    const d = await r?.json().catch(() => null)
+    if (r?.ok) { if (d?.pedido) tomada.current = Number(d.pedido); setPidiendoME(Date.now() - (d?.reusado ? 60_000 : 0)); tme.recargar() }
     else setAvisoME('No se pudo pedir la búsqueda de pagos.')
   }
 
@@ -624,10 +636,10 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             </button>
           )}
           {datos.pagosME && !sinInventario && (
-            <button type="button" onClick={traerME} disabled={buscandoME} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
+            <button type="button" onClick={traerME} disabled={buscandoME || tme.ocupada} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
               className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
-              <IconoActualizar girando={buscandoME} />
-              {buscandoME ? 'Buscando pagos…' : 'Traer ME'}
+              <IconoActualizar girando={buscandoME || tme.ocupada} />
+              {buscandoME || tme.ocupada ? 'Buscando pagos…' : 'Traer ME'}
             </button>
           )}
           {!sinInventario && <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"

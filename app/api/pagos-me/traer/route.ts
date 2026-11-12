@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { sesionPagosME } from '@/lib/pagosME'
 import { esDemo } from '@/lib/demo'
 import { asegurarPagosDemo, traerDemo } from '@/lib/demoDatos'
+import { estadoTraida, ocupada } from '@/lib/meTraida'
 
 /** POST /api/pagos-me/traer → "Traer pagos y guías": cada perfil del vigilante lo toma en su próximo latido (~1 min). */
 export async function POST() {
@@ -14,10 +15,9 @@ export async function POST() {
       await asegurarPagosDemo(s.db)
       return NextResponse.json({ ok: true, pedido: await traerDemo(s.db, s.userId), demo: true })
     }
-    // Doble clic o dos personas a la vez: si hay uno de hace menos de 2 minutos, se reusa.
-    const { rows: [ya] } = await s.db.query(
-      `SELECT id FROM me_pedidos WHERE pedido_at > NOW() - INTERVAL '2 minutes' ORDER BY id DESC LIMIT 1`)
-    if (ya) return NextResponse.json({ ok: true, pedido: ya.id, reusado: true })
+    // 12-11 (el dueño): UNA traída a la vez. Si hay una corriendo (o esperando a la PC), no se crea otra: se usa esa.
+    const e = await estadoTraida(s.db)
+    if (ocupada(e)) return NextResponse.json({ ok: true, pedido: e!.id, reusado: true })
     const { rows: [p] } = await s.db.query(`INSERT INTO me_pedidos (pedido_por) VALUES ($1) RETURNING id`, [s.userId])
     return NextResponse.json({ ok: true, pedido: p.id })
   } catch (err) {

@@ -18,11 +18,15 @@ export async function POST(req: NextRequest) {
   if ('error' in a) return a.error
   try {
     const b = Body.parse(await req.json())
+    // 12-11: si la traída pedía pesos, ¿llegaron? (la extensión los manda antes del fin; si no pudo leer el portal, no
+    // avisa). pesos = true/false solo cuando se pidieron; null si no.
     await a.db.query(
-      `UPDATE me_pedidos SET resultados = resultados || jsonb_build_object($2::text,
+      `UPDATE me_pedidos p SET resultados = p.resultados || jsonb_build_object($2::text,
          jsonb_build_object('ok', $3::boolean, 'cuenta', $4::text, 'vistas', $5::int, 'nuevas', $6::int,
-                            'error', $7::text, 'at', NOW()))
-       WHERE id = $1`,
+                            'error', $7::text, 'at', NOW(),
+                            'pesos', CASE WHEN p.pesos AND $3::boolean THEN EXISTS (SELECT 1 FROM me_productos m
+                                       WHERE m.cuenta = COALESCE($4::text, $2::text) AND m.actualizado_at >= p.pedido_at) END))
+       WHERE p.id = $1`,
       [b.pedido, a.perfil, b.ok, b.cuenta ?? null, b.vistas, b.nuevas, b.error ?? null])
     // Nombre de la cuenta de MercadoEnvíos (093): la pantalla lo muestra en vez del nombre técnico del perfil.
     if (b.cuenta) await a.db.query(
