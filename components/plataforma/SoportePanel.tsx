@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 
 // Plataforma → Soporte (30-10-2026): la bandeja ÚNICA de soporte (Sistema, Radar…, cada caso con su origen), para
 // responder desde aquí (o con "Responder" en Telegram), y el conteo de gasto de la ayuda con IA con lo que el
@@ -14,6 +14,8 @@ interface Dia { dia: string; origen: string; consultas: number; costo: number; s
 interface Falta { id: number; origen: string; pantalla: string | null; pregunta: string; respuesta: string | null; sabia: boolean; util: number | null; created_at: string; empresa: string | null }
 interface Datos { casos: Caso[]; ayuda: { mes: { consultas: number; costo: number; personas: number }; dias: Dia[]; falta: Falta[] } }
 
+interface Consulta { id: number; created_at: string; pantalla: string | null; pregunta: string; respuesta: string | null; sabia: boolean; util: number | null; costo: number; persona: string | null; empresa: string | null }
+
 const ORIGEN: Record<string, string> = { sistema: '🧩 Sistema', radar: '📡 Radar' }
 const ESTADO: Record<string, string> = { abierto: 'Por responder', respondido: 'Respondido', resuelto: 'Resuelto' }
 const hora = (s: string) => new Date(s).toLocaleString('es-VE', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas' })
@@ -26,6 +28,16 @@ export default function SoportePanel({ inicial }: { inicial?: number | null }) {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [verResueltos, setVerResueltos] = useState(false)
+  // 12-11: tocar un día de la Ayuda abre sus preguntas (quién, qué preguntó y qué se le respondió).
+  const [diaAbierto, setDiaAbierto] = useState<string | null>(null)
+  const [consultas, setConsultas] = useState<Consulta[] | null>(null)
+  const abrirDia = (dia: string, origen: string) => {
+    const k = `${dia}|${origen}`
+    if (diaAbierto === k) { setDiaAbierto(null); return }
+    setDiaAbierto(k); setConsultas(null)
+    fetch(`/api/plataforma/casos-soporte?dia=${dia}&origen=${encodeURIComponent(origen)}`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : { consultas: [] })).then(x => setConsultas(x.consultas ?? [])).catch(() => setConsultas([]))
+  }
 
   const cargar = useCallback(() => {
     fetch('/api/plataforma/casos-soporte', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(x => x && setD(x)).catch(() => {})
@@ -124,6 +136,7 @@ export default function SoportePanel({ inicial }: { inicial?: number | null }) {
 
       <section className="space-y-3">
         <h2 className="font-semibold text-neutral-900">Ayuda con IA · gasto</h2>
+        <p className="text-xs text-neutral-500">Toca un día para ver cada pregunta: quién la hizo y qué le respondió la IA.</p>
         <p className="text-xs text-neutral-500">Lo pagamos nosotros (no usa créditos del cliente). Modelo barato con el manual en caché; tope por persona y día.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[['Este mes', `${d.ayuda.mes.consultas} preguntas`], ['Costo del mes', usd(d.ayuda.mes.costo)],
@@ -142,13 +155,40 @@ export default function SoportePanel({ inicial }: { inicial?: number | null }) {
                 <th className="px-3 py-1.5 text-right">Sin respuesta</th><th className="px-3 py-1.5 text-right">👍 / 👎</th><th className="px-3 py-1.5 text-right">Costo</th>
               </tr></thead>
               <tbody>
-                {d.ayuda.dias.map(x => (
-                  <tr key={x.dia + x.origen} className="border-b border-neutral-50 tabular-nums">
-                    <td className="px-3 py-1">{x.dia.split('-').reverse().join('/')}</td><td className="px-3 py-1">{ORIGEN[x.origen] ?? x.origen}</td>
-                    <td className="px-3 py-1 text-right">{x.consultas}</td><td className="px-3 py-1 text-right">{x.sin_respuesta || ''}</td>
-                    <td className="px-3 py-1 text-right">{x.utiles} / {x.no_utiles}</td><td className="px-3 py-1 text-right">{usd(x.costo)}</td>
-                  </tr>
-                ))}
+                {d.ayuda.dias.map(x => {
+                  const k = `${x.dia}|${x.origen}`, abiertoDia = diaAbierto === k
+                  return (
+                    <Fragment key={k}>
+                      <tr onClick={() => abrirDia(x.dia, x.origen)} title="Ver las preguntas de ese día"
+                        className={`border-b border-neutral-50 tabular-nums cursor-pointer hover:bg-neutral-50 ${abiertoDia ? 'bg-neutral-50' : ''}`}>
+                        <td className="px-3 py-1"><span className="mr-1 text-neutral-400">{abiertoDia ? '▾' : '▸'}</span>{x.dia.split('-').reverse().join('/')}</td><td className="px-3 py-1">{ORIGEN[x.origen] ?? x.origen}</td>
+                        <td className="px-3 py-1 text-right">{x.consultas}</td><td className="px-3 py-1 text-right">{x.sin_respuesta || ''}</td>
+                        <td className="px-3 py-1 text-right">{x.utiles} / {x.no_utiles}</td><td className="px-3 py-1 text-right">{usd(x.costo)}</td>
+                      </tr>
+                      {abiertoDia && (
+                        <tr className="border-b border-neutral-100 bg-neutral-50/60">
+                          <td colSpan={6} className="px-3 py-2">
+                            {!consultas ? <p className="text-xs text-neutral-500">Cargando…</p> : consultas.length === 0 ? <p className="text-xs text-neutral-500">Sin preguntas.</p> : (
+                              <ul className="space-y-2">
+                                {consultas.map(c => (
+                                  <li key={c.id} className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
+                                    <p className="text-xs text-neutral-500">
+                                      {hora(c.created_at)} · <b className="text-neutral-700">{c.persona ?? 'Sin usuario'}</b>{c.empresa ? ` · ${c.empresa}` : ''}{c.pantalla ? ` · ${c.pantalla}` : ''}
+                                      {!c.sabia && <span className="ml-1 text-amber-700">· no supo</span>}
+                                      {c.util === 1 && <span className="ml-1">· 👍</span>}{c.util === -1 && <span className="ml-1">· 👎</span>}
+                                    </p>
+                                    <p className="mt-1 font-medium text-neutral-900 whitespace-pre-wrap">{c.pregunta}</p>
+                                    {c.respuesta && <p className="mt-1 text-sm text-neutral-600 whitespace-pre-wrap border-l-2 border-neutral-200 pl-2">{c.respuesta}</p>}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
                 <tr className="font-semibold tabular-nums"><td className="px-3 py-1.5" colSpan={2}>30 días</td><td className="px-3 py-1.5 text-right">{totDias.c}</td>
                   <td className="px-3 py-1.5 text-right">{totDias.n}</td><td className="px-3 py-1.5 text-right">{totDias.u} / {totDias.nu}</td><td className="px-3 py-1.5 text-right">{usd(totDias.s)}</td></tr>
               </tbody>

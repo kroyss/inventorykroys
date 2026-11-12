@@ -33,14 +33,18 @@ export default function IaClientesPanel() {
   if (error) return <p className="text-sm text-red-600">{error}</p>
   if (!filas) return <p className="text-sm text-neutral-500">Cargando…</p>
   const on = (f: Fila) => f.preguntas?.modo === 'real' || f.mensajes?.encendido
-  const ver = soloEncendidas ? filas.filter(on) : filas
+  // 12-11 (el dueño): primero las encendidas y, dentro, de la que más la usa a la que menos (respuestas de la IA en
+  // preguntas + mensajes en 30 días; a igualdad, créditos usados).
+  const uso = (f: Fila) => (f.preguntas?.total ?? 0) + (f.mensajes?.total ?? 0)
+  const orden = [...filas].sort((a, b) => Number(!!on(b)) - Number(!!on(a)) || uso(b) - uso(a) || (b.creditos?.usados ?? 0) - (a.creditos?.usados ?? 0))
+  const ver = soloEncendidas ? orden.filter(on) : orden
   const encendidas = filas.filter(on).length
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-neutral-900">IA automática por cliente</h2>
-          <p className="text-sm text-neutral-500">Últimos 30 días. «Solas» = las que la IA mandó sin que nadie las viera. {encendidas} de {filas.length} la tienen encendida.</p>
+          <p className="text-sm text-neutral-500">Últimos 30 días. «Solas» = las que la IA mandó sin que nadie las viera. Primero las encendidas, de la que más la usa a la que menos. {encendidas} de {filas.length} la tienen encendida.</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-neutral-600">
           <input type="checkbox" checked={soloEncendidas} onChange={e => setSoloEncendidas(e.target.checked)} /> Solo las encendidas

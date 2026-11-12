@@ -9,7 +9,6 @@ import ProgramasPanel from './ProgramasPanel'
 import AvisosTelegramCard from './AvisosTelegramCard'
 import InternoPanel from './InternoPanel'
 import IaClientesPanel from './IaClientesPanel'
-import CompetenciaPanel from './CompetenciaPanel'
 import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
 import AdopcionPanel from './AdopcionPanel'
@@ -161,7 +160,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   // 12-11 (fase 2): Novedades y cursos (antes Contenido), Programas y promos (precios vigentes + historial de Fundadores
   // y Despegue) e Interno con todo lo técnico adentro (IA, Soporte, Telegram, cuentas de personas).
   const [vista, setVista]       = useState<'uso' | 'cuentas' | 'novedades' | 'programas' | 'interno'>('uso')
-  const [interno, setInterno]   = useState<'ia' | 'auto' | 'competencia' | 'soporte' | 'telegram' | 'personas'>('ia')
+  const [interno, setInterno]   = useState<'ia' | 'auto' | 'soporte' | 'telegram' | 'personas'>('ia')
   const verSoporte = () => { setVista('interno'); setInterno('soporte') }
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('soporte'))
@@ -300,13 +299,13 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         : vista === 'programas' ? <ProgramasPanel hoy={hoy} visitas={inicial?.visitas ?? null} />
         : vista === 'interno' ? <>
           <div className="flex flex-wrap gap-1.5">
-            {([['ia', 'Gasto de IA'], ['auto', 'IA automática por cliente'], ['competencia', 'Calidad de la IA'],
+            {([['ia', 'Gasto de IA'], ['auto', 'IA automática por cliente'],
                ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['telegram', 'Telegram'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
               <button key={k} onClick={() => setInterno(k)}
                 className={`px-3 py-1 rounded-full text-sm border ${interno === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
             ))}
           </div>
-          {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel /> : interno === 'competencia' ? <CompetenciaPanel />
+          {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel />
             : interno === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : interno === 'telegram' ? <AvisosTelegramCard /> : <CuentasPanel />}
         </> : <>
 

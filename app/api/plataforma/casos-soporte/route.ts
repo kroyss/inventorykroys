@@ -1,14 +1,27 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { dbGlobal } from '@/lib/db'
 import { soloDueno } from '@/lib/plataforma'
 
 // GET /api/plataforma/casos-soporte → la bandeja única de soporte (todos los orígenes) + el gasto de la ayuda con IA.
-export async function GET() {
+// ?dia=AAAA-MM-DD&origen=… (12-11, el dueño: "ver qué preguntaron, quién y qué se le respondió") → las preguntas a la
+// Ayuda de ese día, una por una.
+export async function GET(req: NextRequest) {
   const { error } = await soloDueno()
   if (error) return error
   try {
     const db = dbGlobal()
+    const dia = req.nextUrl.searchParams.get('dia')
+    if (dia) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 })
+      const { rows } = await db.query(
+        `SELECT a.id, a.created_at, a.pantalla, a.pregunta, a.respuesta, a.sabia, a.util, a.costo::float AS costo,
+                COALESCE(u.full_name, u.username) AS persona, e.nombre AS empresa
+         FROM ayuda_consultas a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN empresas e ON e.id = a.empresa_id
+         WHERE (a.created_at AT TIME ZONE 'America/Caracas')::date = $1::date AND ($2::text IS NULL OR a.origen = $2)
+         ORDER BY a.created_at DESC LIMIT 200`, [dia, req.nextUrl.searchParams.get('origen')])
+      return NextResponse.json({ consultas: rows }, { headers: { 'Cache-Control': 'no-store' } })
+    }
     const [{ rows: casos }, { rows: dias }, { rows: falta }, { rows: [tot] }] = await Promise.all([
       db.query(
         `SELECT c.id, c.origen, c.estado, c.pantalla, c.navegador, c.created_at, c.updated_at,
