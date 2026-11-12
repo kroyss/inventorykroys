@@ -19,3 +19,15 @@ export const EN_LINEA_MINUTOS = 5
  *  encendida y cuenta en prueba vigente, pagando o propietaria. Alias: e = empresas, o = organizaciones. */
 export const SQL_PUEDE_ENTRAR = `(e.is_active AND (o.estado IN ('activo', 'propietario')
   OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date))))`
+
+/** 12-11 (rapidez de Interno): recorre las empresas de a `n` a la vez, cada una con su conEmpresa. De a una tardaba
+ *  ~0,1 s por empresa (Gasto de IA 2,4 s, IA automática 2,7 s). Pocas a la vez (4): cada una toma una conexión del
+ *  pool (15 por copia) y Plataforma pide otras cosas al mismo tiempo. Devuelve los resultados en el mismo orden. */
+export async function enTandas<T, R>(items: T[], fn: (x: T) => Promise<R>, n = 4): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let i = 0
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const k = i++; out[k] = await fn(items[k]) }
+  }))
+  return out
+}

@@ -3,7 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { cupoIA } from '@/lib/ia'
 import type { Country } from '@/lib/types'
-import { soloDueno } from '@/lib/plataforma'
+import { enTandas, soloDueno } from '@/lib/plataforma'
 import { CLAVE_IA_AUTO } from '@/lib/iaAutomatica'
 import { CLAVE_AUTO } from '@/lib/mensajesIAPrueba'
 
@@ -19,9 +19,9 @@ export async function GET() {
       `SELECT e.id, e.nombre, e.country, o.estado, o.plan FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
        WHERE e.is_active AND o.estado <> 'propietario' AND e.modulos && ARRAY['ia_automatica', 'mensajes_ia']
        ORDER BY e.nombre`)
-    const filas = []
-    for (const e of empresas) {
-      const f = await conEmpresa(e.id, e.country as Country, async db => {
+    // 12-11: de a 4 empresas a la vez (antes de a una: 2,7 s).
+    const filas = await enTandas(empresas, e =>
+      conEmpresa(e.id, e.country as Country, async db => {
         const { rows: cfg } = await db.query(`SELECT key, value FROM app_settings WHERE key = ANY($1::text[])`, [[CLAVE_IA_AUTO, CLAVE_AUTO]])
         const leer = (k: string) => { try { return JSON.parse(cfg.find(c => c.key === k)?.value ?? '{}') } catch { return {} } }
         const p = leer(CLAVE_IA_AUTO), m = leer(CLAVE_AUTO)
@@ -38,9 +38,7 @@ export async function GET() {
           mensajes: { encendido: m.modo === 'real', desde: m.modo === 'real' ? m.at ?? null : null, total: x.total, solas: x.solas, acuses: x.acuses },
           creditos: { usados: cupo.usados, quedan: cupo.quedan },
         }
-      }).catch(err => ({ id: e.id, nombre: e.nombre, estado: e.estado, plan: e.plan, error: err instanceof Error ? err.message : String(err) }))
-      filas.push(f)
-    }
+      }).catch(err => ({ id: e.id, nombre: e.nombre, estado: e.estado, plan: e.plan, error: err instanceof Error ? err.message : String(err) })))
     return NextResponse.json({ filas })
   } catch (err) { return apiError(err) }
 }

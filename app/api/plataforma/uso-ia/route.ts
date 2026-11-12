@@ -3,7 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { cupoIA } from '@/lib/ia'
 import type { Country } from '@/lib/types'
-import { soloDueno } from '@/lib/plataforma'
+import { enTandas, soloDueno } from '@/lib/plataforma'
 import { currentDate } from '@/lib/tz'
 
 // 12-11 (el dueño): el consumo se mide desde que salió Mi IA (06-11); lo de antes eran otros modelos y otro diseño.
@@ -70,11 +70,13 @@ export async function GET(req: NextRequest) {
     // De a UNA empresa con conEmpresa (devuelve la conexión al terminar con ella). NUNCA dbEmpresa en un
     // bucle: retiene una conexión por empresa hasta el final del request y con más empresas que
     // conexiones del pool (10) trababa la copia entera (13-10: "Interno no sirve", Plataforma paralizada).
-    for (const e of empresas) {
+    // 12-11: solo las que usaron la IA en el período (las demás no se muestran) y de a 4 a la vez (antes de a una: 2,4 s).
+    const conUso = new Set(detalle.map(d => d.empresa_id))
+    await enTandas(empresas.filter(e => conUso.has(e.id)), async e => {
       const c = await conEmpresa(e.id, e.country as Country, db => cupoIA(db, e.id)).catch(() => null)
       e.creditos = c?.usados ?? null
       if (c) e.limite = c.limite
-    }
+    })
     const hoy = currentDate()
     const dias = Math.round((Date.parse(hoy) - Date.parse(desde)) / 864e5) + 1
     return NextResponse.json({ desde, dias, detalle, empresas, cuadre, gasto: gasto.map(g => ({ dia: g.dia, modelo: g.modelo, tipo: g.tipo, para: g.para, llamadas: g.llamadas, fallidas: g.fallidas, costo: g.costo })) })
