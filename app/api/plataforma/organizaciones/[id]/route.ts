@@ -9,6 +9,7 @@ const Body = z.object({
   estado: z.enum(['prueba', 'activo', 'vencido']).optional(),
   prueba_hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida').nullable().optional(),
   fundador: z.boolean().optional(),
+  interna: z.boolean().optional(),   // mig. 172: no paga ni vence, no suma en pagos ni clientes
 })
 
 // PUT /api/plataforma/organizaciones/[id] { estado?, prueba_hasta?, fundador? } → la cuenta de un
@@ -35,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
          -- una fecha cambiada a mano (o salir de prueba) manda: ya no se recalcula al conectar ML (mig. 067)
          prueba_dias  = CASE WHEN ($4 AND $3::date IS DISTINCT FROM prueba_hasta) OR $2 IN ('activo', 'vencido') THEN NULL ELSE prueba_dias END,
          fundador     = COALESCE($5, fundador),
+         interna      = COALESCE($6, interna),
          -- Créditos de IA (mig. 140): una activación o reactivación arranca su período desde ahora.
          creditos_desde = CASE WHEN ($2 = 'prueba' AND estado <> 'prueba') OR ($2 = 'activo' AND estado <> 'activo')
                                THEN NOW() ELSE creditos_desde END,
@@ -45,7 +47,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
          pausa_fecha  = CASE WHEN $2 IN ('prueba', 'activo') THEN NULL
                              WHEN $2 = 'vencido' AND estado <> 'vencido' THEN CURRENT_DATE ELSE pausa_fecha END
        WHERE id = $1`,
-      [id, b.estado ?? null, b.prueba_hasta ?? null, b.prueba_hasta !== undefined, b.fundador ?? null])
+      [id, b.estado ?? null, b.prueba_hasta ?? null, b.prueba_hasta !== undefined, b.fundador ?? null, b.interna ?? null])
     if (!rowCount) return NextResponse.json({ error: 'Organización no encontrada' }, { status: 404 })
     // Historia de la cuenta (mig. 106): qué cambió.
     const nuevo = b.estado ?? antes.estado

@@ -42,7 +42,7 @@ export async function GET() {
     const { rows } = await dbGlobal().query(
       `SELECT e.id, e.nombre, e.country, e.modulos, e.is_active, e.created_at, e.ia_limite_mes,
               o.id AS organizacion_id, o.nombre AS organizacion,
-              o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.prueba_dias, o.fundador,
+              o.estado, to_char(o.prueba_hasta, 'YYYY-MM-DD') AS prueba_hasta, o.prueba_dias, o.fundador, o.interna,
               o.origen, o.registro - 'ip_hash' - 'navegador' AS registro,
               o.motivo_pausa, o.plan, o.escalon, o.ciclo, to_char(o.plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta, to_char(o.radar_mes_hasta, 'YYYY-MM-DD') AS radar_mes_hasta, to_char(o.pausa_fecha, 'YYYY-MM-DD') AS pausa_fecha,
               to_char(o.created_at AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') AS creada, u.cuentas,

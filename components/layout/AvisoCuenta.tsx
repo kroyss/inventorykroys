@@ -47,8 +47,10 @@ export default async function AvisoCuenta({ organizacionId, esAdmin }: { organiz
     `SELECT estado, fundador, prueba_dias, to_char(prueba_hasta, 'YYYY-MM-DD') AS hasta,
             prueba_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan,
             to_char(plan_hasta, 'YYYY-MM-DD') AS plan_hasta, plan_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS plan_quedan,
-            EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = organizaciones.id AND k.estado = 'revision' AND k.tipo = 'plan') AS en_revision
+            EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = organizaciones.id AND k.estado = 'revision' AND k.tipo = 'plan') AS en_revision,
+            interna
      FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] }))
+  if (o?.interna) return null   // cuenta interna (mig. 172): no vence
   // Plan pagado (mig 138): aviso desde AVISAR_DESDE días antes; al día siguiente del vencimiento se pausa sola.
   if (o?.estado === 'activo' && o.plan_hasta) {
     const q = Number(o.plan_quedan)

@@ -33,6 +33,7 @@ interface Empresa {
   prueba_hasta: string | null
   prueba_dias: number | null
   fundador: boolean
+  interna?: boolean          // mig. 172: cuenta interna (EmpresaPruebas, DEMO): no paga ni vence
   origen?: string | null      // 'autoregistro' = se registró solo en /registro (26-10); 'radar' = desde el Radar (29-10)
   registro?: { correo?: string; whatsapp?: string; telegram?: string | null } | null
   ia_limite_mes: number | null
@@ -68,7 +69,7 @@ function LineaInventario({ u, conPagos }: { u: UsoInventario; conPagos: boolean 
 // Clientes (20-10, "los inactivos me hacen ruido"): a la vista solo los que PUEDEN ENTRAR (en prueba o pagando);
 // las pausadas y las apagadas a mano quedan guardadas y plegadas al final ("Inactivos guardados"), con su motivo y
 // el botón Reactivar. El buscador las encuentra igual.
-const puedeEntrar = (e: Empresa, hoy: string) => e.is_active && estadoEfectivo(e.estado, e.prueba_hasta, hoy) !== 'vencido'
+const puedeEntrar = (e: Empresa, hoy: string) => e.is_active && (!!e.interna || estadoEfectivo(e.estado, e.prueba_hasta, hoy) !== 'vencido')
 const diasHasta = (f: string, hoy: string) => Math.round((Date.parse(`${f}T12:00:00Z`) - Date.parse(`${hoy}T12:00:00Z`)) / 86_400_000)
 
 /** El estado de la cuenta en una frase (lo que se lee en la lista). */
@@ -76,6 +77,7 @@ function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; e
   const est = estadoEfectivo(e.estado, e.prueba_hasta, hoy)
   if (!e.is_active) return { icono: '⛔', texto: 'Apagada a mano', extra: 'nadie puede entrar' }
   if (est === 'propietario') return { icono: '🏠', texto: 'Tu empresa' }
+  if (e.interna) return { icono: '🧪', texto: 'Interna', extra: 'no paga ni vence' }
   if (est === 'activo') {
     // Con plan registrado (mig 138): hasta cuándo pagó; al día siguiente del vencimiento el cron la pausa.
     const d = e.plan_hasta ? diasHasta(e.plan_hasta, hoy) : null
@@ -230,6 +232,23 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
     cargar()
   }
 
+  // 12-11 (mig. 172): interna = no paga ni vence y no suma en pagos, ingresos ni clientes.
+  const marcarInterna = async (e: Empresa, interna: boolean) => {
+    if (!await confirm({
+      title: interna ? `${e.organizacion}: marcar como interna` : `${e.organizacion}: quitar «Interna»`, confirmText: interna ? 'Marcar' : 'Quitar',
+      message: interna ? 'No paga ni vence, y no suma en pagos, ingresos ni clientes. Por dentro se ve igual que un cliente.'
+        : 'Vuelve a contar como cliente: vence según su plan o su prueba.',
+    })) return
+    setError(null); setAviso(null)
+    const r = await fetch(`/api/plataforma/organizaciones/${e.organizacion_id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interna }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    setAviso(interna ? `${e.organizacion}: interna.` : `${e.organizacion}: ya no es interna.`)
+    cargar()
+  }
+
   const renombrar = (e: Empresa) => {
     const nombre = window.prompt(`Nuevo nombre para "${e.nombre}"`, e.nombre)?.trim()
     if (nombre && nombre !== e.nombre) actualizar(e, { nombre })
@@ -270,7 +289,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const mostrarRadar = verRadar || (!!q && radares.length > 0)
   const inactivas = empresas.filter(e => !puedeEntrar(e, hoy) && coincide(e))
   const totalInactivas = empresas.filter(e => !puedeEntrar(e, hoy))
-  const clientesActivos = empresas.filter(e => puedeEntrar(e, hoy) && !soloRadar(e) && e.estado !== 'propietario').length
+  const clientesActivos = empresas.filter(e => puedeEntrar(e, hoy) && !soloRadar(e) && e.estado !== 'propietario' && !e.interna).length
   const mostrarInactivas = verInactivos || (!!q && inactivas.length > 0)
 
   return (
@@ -331,7 +350,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
 
       {/* Lo que espera por ti: solo aparece si hay algo. */}
       {(() => {
-        const vencenYa = activas.filter(e => e.estado !== 'propietario' && (() => {
+        const vencenYa = activas.filter(e => e.estado !== 'propietario' && !e.interna && (() => {
           const f = e.estado === 'activo' ? e.plan_hasta : e.prueba_dias == null ? e.prueba_hasta : null
           return !!f && diasHasta(f, hoy) <= 1
         })())
@@ -450,7 +469,10 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                 <div className="mb-2"><FraseCuenta e={sel} hoy={hoy} /></div>
                 {sel.estado !== 'propietario' && sel.is_active && (
                   <div className="mb-2 flex flex-wrap gap-2">
-                    {puedeEntrar(sel, hoy)
+                    <button onClick={() => marcarInterna(sel, !sel.interna)} className="btn-secondary text-xs"
+                      title="Interna: no paga ni vence y no suma en pagos, ingresos ni clientes. Por dentro se ve igual que un cliente.">
+                      {sel.interna ? 'Quitar «Interna»' : '🧪 Marcar como interna'}</button>
+                    {sel.interna ? null : puedeEntrar(sel, hoy)
                       ? <button onClick={() => pausar(sel)} className="btn-secondary text-xs">Pausar (no podrá entrar)</button>
                       : <button onClick={() => setReactivar(sel)} className="btn-primary text-xs">Reactivar…</button>}
                   </div>

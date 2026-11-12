@@ -628,7 +628,8 @@ async function resumenDiario(db: Pool, e: EmpresaAvisos, d: Destinatario, disp: 
  *  la prueba espera la conexión de ML no se avisa. */
 const AVISAR_FIN_PRUEBA_DIAS = 3
 /** Hasta cuándo puede entrar: la prueba o el plan pagado (mig 138). */
-const SQL_VENCE = `CASE o.estado WHEN 'prueba' THEN o.prueba_hasta WHEN 'activo' THEN o.plan_hasta END`
+// Interna (mig. 172): no vence → sin aviso.
+const SQL_VENCE = `CASE WHEN o.interna THEN NULL WHEN o.estado = 'prueba' THEN o.prueba_hasta WHEN o.estado = 'activo' THEN o.plan_hasta END`
 async function finDePrueba(empresaId: number) {
   const { rows: [o] } = await dbGlobal().query(
     `SELECT o.estado, o.fundador, o.prueba_dias, to_char(${SQL_VENCE}, 'DD/MM') AS hasta,

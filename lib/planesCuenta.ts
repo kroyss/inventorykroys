@@ -14,7 +14,7 @@ export async function vencerPlanes() {
     `WITH v AS (
        UPDATE organizaciones o SET estado = 'vencido', motivo_pausa = 'plan', pausa_fecha = o.plan_hasta, fundador = false
        FROM organizaciones antes
-       WHERE antes.id = o.id AND o.estado = 'activo' AND o.plan_hasta IS NOT NULL
+       WHERE antes.id = o.id AND o.estado = 'activo' AND o.plan_hasta IS NOT NULL AND NOT o.interna
          AND o.plan_hasta < (NOW() AT TIME ZONE 'America/Caracas')::date
          AND NOT EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision' AND k.tipo = 'plan'
                            AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= o.plan_hasta)

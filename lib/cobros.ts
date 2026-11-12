@@ -608,7 +608,7 @@ export async function panelCobros() {
                      ${ULTIMA} AS ultima, o.registro - 'ip_hash' - 'navegador' AS registro, o.fundador,
                      EXISTS (SELECT 1 FROM empresas e JOIN ml_conexiones c ON c.empresa_id = e.id WHERE e.organizacion_id = o.id) AS con_ml
               FROM organizaciones o
-              WHERE o.id <> $1 AND o.estado IN ('prueba', 'activo')
+              WHERE o.id <> $1 AND NOT o.interna AND o.estado IN ('prueba', 'activo')
                 AND COALESCE(CASE WHEN o.estado = 'activo' THEN o.plan_hasta END, o.prueba_hasta)
                     BETWEEN (NOW() AT TIME ZONE 'America/Caracas')::date AND (NOW() AT TIME ZONE 'America/Caracas')::date + 7
               ORDER BY 5, o.nombre`, [ORGANIZACION_PLATAFORMA]),
@@ -617,12 +617,13 @@ export async function panelCobros() {
     db.query(`SELECT o.id, o.nombre, o.plan, o.escalon, o.ciclo, o.fundador, to_char(o.plan_hasta, 'YYYY-MM-DD') AS hasta, ${ULTIMA} AS ultima,
                      (SELECT p.monto::float FROM organizacion_pagos p WHERE p.organizacion_id = o.id AND p.tipo IN ('plan', 'upgrade')
                       ORDER BY p.fecha DESC LIMIT 1) AS monto
-              FROM organizaciones o WHERE o.id <> $1 AND o.estado = 'activo' ORDER BY o.plan_hasta NULLS LAST, o.nombre`, [ORGANIZACION_PLATAFORMA]),
+              FROM organizaciones o WHERE o.id <> $1 AND NOT o.interna AND o.estado = 'activo' ORDER BY o.plan_hasta NULLS LAST, o.nombre`, [ORGANIZACION_PLATAFORMA]),
     db.query(`SELECT COALESCE(SUM(monto) FILTER (WHERE (fecha AT TIME ZONE 'America/Caracas') >= ${MES}), 0)::float AS mes,
                      COUNT(*) FILTER (WHERE (fecha AT TIME ZONE 'America/Caracas') >= ${MES})::int AS pagos_mes,
                      COALESCE(SUM(monto) FILTER (WHERE (fecha AT TIME ZONE 'America/Caracas') >= ${MES} - INTERVAL '1 month'
                                                    AND (fecha AT TIME ZONE 'America/Caracas') < ${MES}), 0)::float AS anterior
-              FROM organizacion_pagos WHERE organizacion_id <> $1`, [ORGANIZACION_PLATAFORMA]),
+              FROM organizacion_pagos WHERE organizacion_id <> $1
+                AND organizacion_id NOT IN (SELECT id FROM organizaciones WHERE interna)`, [ORGANIZACION_PLATAFORMA]),
   ])
   return { pendientes: pendientes.map(conDesglose), vencen, recientes: recientes.map(conDesglose), datos, pagando, ingresos }
 }

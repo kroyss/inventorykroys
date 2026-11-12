@@ -13,7 +13,8 @@ export const DIAS_ESPERA_CONEXION = 5
 /** Condición SQL (alias `o` = organizaciones): ¿sus usuarios pueden entrar hoy? Una prueba con la
  *  fecha ya pasada (hora Caracas) cuenta como vencida, salvo que haya reportado su pago en Mi plan antes de
  *  vencer y siga en revisión (mig. 141: no se corta a quien ya pagó mientras el dueño lo confirma). */
-export const SQL_CUENTA_HABILITADA = `(o.estado IN ('propietario', 'activo')
+// 12-11 (mig. 172): una cuenta interna (EmpresaPruebas, DEMO) entra siempre: no paga ni vence.
+export const SQL_CUENTA_HABILITADA = `(o.interna OR o.estado IN ('propietario', 'activo')
   OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date
       OR EXISTS (SELECT 1 FROM organizacion_cobros k WHERE k.organizacion_id = o.id AND k.estado = 'revision' AND k.tipo = 'plan'
                    AND (k.creado_at AT TIME ZONE 'America/Caracas')::date <= o.prueba_hasta))))`

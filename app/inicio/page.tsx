@@ -57,7 +57,7 @@ export default async function InicioPage() {
   const productosRadar = RADAR_CIFRAS[0]?.n ?? '+45.000'
   const radarMes = precioRadarMes(currentDate('America/Caracas'))
   // 12-11 (el dueño): «vendedores activos» = todas las cuentas registradas (las usen o no), sin la de la plataforma.
-  const vendedores = await dbGlobal().query(`SELECT count(*)::int AS n FROM organizaciones WHERE estado <> 'propietario'`)
+  const vendedores = await dbGlobal().query(`SELECT count(*)::int AS n FROM organizaciones WHERE estado <> 'propietario' AND NOT interna`)
     .then(r => r.rows[0]?.n as number).catch(() => null)
   const anio = new Date().getFullYear()
 

@@ -17,7 +17,7 @@ export const EN_LINEA_MINUTOS = 5
 
 /** Puede entrar (20-10, Plataforma muestra solo a estos; los inactivos quedan plegados en Clientes): empresa
  *  encendida y cuenta en prueba vigente, pagando o propietaria. Alias: e = empresas, o = organizaciones. */
-export const SQL_PUEDE_ENTRAR = `(e.is_active AND (o.estado IN ('activo', 'propietario')
+export const SQL_PUEDE_ENTRAR = `(e.is_active AND (o.interna OR o.estado IN ('activo', 'propietario')
   OR (o.estado = 'prueba' AND (o.prueba_hasta IS NULL OR o.prueba_hasta >= (NOW() AT TIME ZONE 'America/Caracas')::date))))`
 
 /** 12-11 (rapidez de Interno): recorre las empresas de a `n` a la vez, cada una con su conEmpresa. De a una tardaba
