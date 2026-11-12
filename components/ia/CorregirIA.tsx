@@ -106,6 +106,8 @@ export function CorregirIA({ tipo, itemId, producto, texto, ia, onGuardado }: {
           </div>
         ) : (
           <div className="space-y-2">
+            {/* 12-11: si la publicación no la debe responder la IA (p. ej. el precio publicado no es el real), un clic. */}
+            {itemId && <SoloEquipo itemId={itemId} />}
             <label className="block text-sm font-medium text-neutral-900" htmlFor="corregir-ia">¿Cómo la hubieras respondido tú?</label>
             <textarea id="corregir-ia" value={correccion} onChange={e => setCorreccion(e.target.value)} rows={4} maxLength={800} autoFocus
               placeholder="Responde como tú hubieses respondido esta pregunta, para que la IA aprenda cómo lo haces…"
