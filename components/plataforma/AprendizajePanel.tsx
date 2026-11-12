@@ -35,7 +35,7 @@ export default function AprendizajePanel() {
   const confirm = useConfirm()
   const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null; uso: Uso[]; enLinea: EnLinea[]; enLineaMinutos: number } | null>(null)
   const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '', serie: 'automatizaciones' as Serie, duracion: '' })
-  const [sub, setSub] = useState<'clientes' | 'videos'>('clientes')
+  const [sub, setSub] = useState<'clientes' | 'videos'>('videos')   // 12-11: lo que más se usa es editar el curso
   const [agregando, setAgregando] = useState(false)
   const [agendar, setAgendar] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +85,7 @@ export default function AprendizajePanel() {
   return (
     <div className="space-y-6">
       <div className="flex gap-1.5">
-        {([['clientes', 'Avance en los cursos'], ['videos', `Curso (${activos} videos)`]] as const).map(([k, t]) => (
+        {([['videos', `Curso (${activos} videos)`], ['clientes', 'Quién vio los cursos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setSub(k)}
             className={`px-3 py-1 rounded-full text-sm border ${sub === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
         ))}

@@ -5,13 +5,13 @@ import { useSession } from 'next-auth/react'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import CuentasPanel from './CuentasPanel'
-import FundadoresPanel from './FundadoresPanel'
+import ProgramasPanel from './ProgramasPanel'
+import AvisosTelegramCard from './AvisosTelegramCard'
 import InternoPanel from './InternoPanel'
 import IaClientesPanel from './IaClientesPanel'
 import CompetenciaPanel from './CompetenciaPanel'
 import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
-import { VisitasRegistro } from './ResumenPanel'
 import AdopcionPanel from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
@@ -158,14 +158,17 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const [casoSoporte, setCasoSoporte] = useState<number | null>(null)
   // 12-11 (el dueño, fase 1): Uso (quién usa y cuánto: antes Hoy + Clientes) y Cuentas y cobros (vencimientos, quién paga
   // y los pagos: antes repartido en Hoy, Clientes y Cobros).
-  const [vista, setVista]       = useState<'uso' | 'cuentas' | 'soporte' | 'fundadores' | 'contenido' | 'interno'>('uso')
+  // 12-11 (fase 2): Novedades y cursos (antes Contenido), Programas y promos (precios vigentes + historial de Fundadores
+  // y Despegue) e Interno con todo lo técnico adentro (IA, Soporte, Telegram, cuentas de personas).
+  const [vista, setVista]       = useState<'uso' | 'cuentas' | 'novedades' | 'programas' | 'interno'>('uso')
+  const [interno, setInterno]   = useState<'ia' | 'auto' | 'competencia' | 'soporte' | 'telegram' | 'personas'>('ia')
+  const verSoporte = () => { setVista('interno'); setInterno('soporte') }
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('soporte'))
-    if (id) { setCasoSoporte(id); setVista('soporte') }
+    if (id) { setCasoSoporte(id); setVista('interno'); setInterno('soporte') }
     // ?vista=cobros: el botón del aviso de Telegram de un pago reportado (mig. 141).
     if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVista('cuentas')
   }, [])
-  const [interno, setInterno]   = useState<'ia' | 'auto' | 'competencia' | 'personas'>('ia')
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
@@ -283,8 +286,8 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {([['uso', `Uso${empresas.length ? ` (${clientesActivos})` : ''}`], ['cuentas', `Cuentas y cobros${pendientes.pagos ? ` (${pendientes.pagos})` : ''}`], ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['fundadores', 'Fundadores'],
-           ['contenido', 'Contenido'], ['interno', 'Interno']] as const).map(([v, t]) => (
+        {([['uso', `Uso${empresas.length ? ` (${clientesActivos})` : ''}`], ['cuentas', `Cuentas y cobros${pendientes.pagos ? ` (${pendientes.pagos})` : ''}`],
+           ['novedades', 'Novedades y cursos'], ['programas', 'Programas y promos'], ['interno', `Interno${pendientes.casos ? ` (${pendientes.casos})` : ''}`]] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
             {t}
@@ -292,17 +295,19 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         ))}
       </div>
 
-      {vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'cuentas' ? <CobrosPanel inicial={inicial?.cobros ?? null} onCambio={leerPendientes} />
-        : vista === 'fundadores' ? <div className="space-y-5"><VisitasRegistro inicial={inicial?.visitas ?? null} /><FundadoresPanel /></div>
-        : vista === 'contenido' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
+      {vista === 'cuentas' ? <CobrosPanel inicial={inicial?.cobros ?? null} onCambio={leerPendientes} />
+        : vista === 'novedades' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
+        : vista === 'programas' ? <ProgramasPanel hoy={hoy} visitas={inicial?.visitas ?? null} />
         : vista === 'interno' ? <>
-          <div className="flex gap-1.5">
-            {([['ia', 'IA y Telegram'], ['auto', 'IA automática por cliente'], ['competencia', 'Competencia'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
+          <div className="flex flex-wrap gap-1.5">
+            {([['ia', 'Gasto de IA'], ['auto', 'IA automática por cliente'], ['competencia', 'Calidad de la IA'],
+               ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['telegram', 'Telegram'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
               <button key={k} onClick={() => setInterno(k)}
                 className={`px-3 py-1 rounded-full text-sm border ${interno === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
             ))}
           </div>
-          {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel /> : interno === 'competencia' ? <CompetenciaPanel /> : <CuentasPanel />}
+          {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel /> : interno === 'competencia' ? <CompetenciaPanel />
+            : interno === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : interno === 'telegram' ? <AvisosTelegramCard /> : <CuentasPanel />}
         </> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
@@ -333,7 +338,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         })())
         const items: [string, () => void][] = []
         if (pendientes.pagos) items.push([`💳 ${pendientes.pagos} pago${pendientes.pagos === 1 ? '' : 's'} por revisar`, () => setVista('cuentas')])
-        if (pendientes.casos) items.push([`🆘 ${pendientes.casos} caso${pendientes.casos === 1 ? '' : 's'} de soporte abierto${pendientes.casos === 1 ? '' : 's'}`, () => setVista('soporte')])
+        if (pendientes.casos) items.push([`🆘 ${pendientes.casos} caso${pendientes.casos === 1 ? '' : 's'} de soporte abierto${pendientes.casos === 1 ? '' : 's'}`, verSoporte])
         if (vencenYa.length) items.push([`⏳ ${vencenYa.length} vence${vencenYa.length === 1 ? '' : 'n'} hoy o mañana`, () => setVista('cuentas')])
         if (!items.length) return null
         return (

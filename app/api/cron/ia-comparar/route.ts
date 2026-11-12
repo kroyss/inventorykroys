@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { conEmpresa, dbGlobal } from '@/lib/db'
-import { costoDe } from '@/lib/ia'
+import { costoDe, comoPruebaInterna } from '@/lib/ia'
 import { armarContexto, bloqueContexto, CONTEXTO_ACTUAL, CONTEXTO_RECORTADO, pedirBorrador } from '@/lib/preguntas'
 import type { Country } from '@/lib/types'
 
@@ -9,7 +9,10 @@ import type { Country } from '@/lib/types'
 // la real del vendedor, los tokens y el costo. No publica nada ni descuenta créditos (no se registra en ia_uso).
 // Solo con CRON_SECRET, desde el servidor:
 //   curl "http://127.0.0.1:8504/api/cron/ia-comparar?key=…&empresa=1&n=10&offset=0"
-export async function GET(req: NextRequest) {
+// 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+
+async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams
   if (!process.env.CRON_SECRET || q.get('key') !== process.env.CRON_SECRET) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const empresa = Number(q.get('empresa') ?? 1)

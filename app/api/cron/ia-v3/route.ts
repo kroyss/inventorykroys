@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { conEmpresa, dbGlobal } from '@/lib/db'
-import { costoDe } from '@/lib/ia'
+import { costoDe, comoPruebaInterna } from '@/lib/ia'
 import { armarContexto, bloqueContexto, datosCompatibilidad, datosPublicacion, textoVendedor } from '@/lib/preguntas'
 import { motivosRevisar } from '@/lib/iaAutomatica'
 import { verificarBorrador } from '@/lib/verificadorIA'
@@ -10,7 +10,10 @@ import type { Country } from '@/lib/types'
 // automática ya procesó y el dueño MARCÓ. Se vuelve a verificar LA MISMA respuesta guardada (no se pide otra) y se
 // recalculan los frenos: así se compara solo el verificador. No publica, no guarda, no descuenta créditos.
 //   curl "http://127.0.0.1:8504/api/cron/ia-v3?key=…&empresa=1&n=10&offset=0&desde=2026-11-07"
-export async function GET(req: NextRequest) {
+// 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+
+async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams
   if (!process.env.CRON_SECRET || q.get('key') !== process.env.CRON_SECRET) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const empresa = Number(q.get('empresa') ?? 1)

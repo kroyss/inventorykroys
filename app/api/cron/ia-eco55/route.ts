@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { comoPruebaInterna } from '@/lib/ia'
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import { repasarEco55 } from '@/lib/iaAutomatica'
 import type { Country } from '@/lib/types'
@@ -7,7 +8,10 @@ import type { Country } from '@/lib/types'
 // ya procesó (primero las que el dueño marcó bien/mal). No publica nada; se compara en Preguntas → Configuración →
 // Versión económica. Solo con CRON_SECRET, desde el servidor:
 //   curl "http://127.0.0.1:8504/api/cron/ia-eco55?key=…&empresa=1&n=20"
-export async function GET(req: NextRequest) {
+// 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+
+async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams
   if (!process.env.CRON_SECRET || q.get('key') !== process.env.CRON_SECRET) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const empresa = Number(q.get('empresa') ?? 1)

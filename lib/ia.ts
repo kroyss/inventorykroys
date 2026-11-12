@@ -117,7 +117,25 @@ export async function llamarClaude<T>(o: Pedido): Promise<{ resultado: T; uso: U
   })
   const d = await r.json().catch(() => null)
   if (!r.ok) throw new Error(`IA ${r.status}: ${d?.error?.message ?? 'sin detalle'}`)
-  return { resultado: inputDeHerramienta<T>(d.content, o.herramienta.name), uso: d.usage ?? {}, modelo: cuerpo.model }
+  let resultado: T
+  try { resultado = inputDeHerramienta<T>(d.content, o.herramienta.name) } catch (e) { anotarGasto(cuerpo.model, d.usage ?? {}, true); throw e }
+  anotarGasto(cuerpo.model, d.usage ?? {}, false)
+  return { resultado, uso: d.usage ?? {}, modelo: cuerpo.model }
+}
+
+/** 12-11 (mig. 169): cada llamada pagada suma en ia_gasto, sea de quien sea. Es el total real contra el que se
+ *  cuadra lo asignado a las cuentas. No espera ni hace fallar nada. */
+function anotarGasto(modelo: string, u: UsoIA, fallida: boolean) {
+  const tipo = pruebaInterna.getStore() ? 'interna' : 'cuenta'
+  dbGlobal().query(
+    `INSERT INTO ia_gasto (dia, modelo, tipo, llamadas, entrada, salida, busquedas, fallidas, costo)
+     VALUES (CURRENT_DATE, $1, $2, 1, $3, $4, $5, $6, $7)
+     ON CONFLICT (dia, modelo, tipo) DO UPDATE SET llamadas = ia_gasto.llamadas + 1, entrada = ia_gasto.entrada + EXCLUDED.entrada,
+       salida = ia_gasto.salida + EXCLUDED.salida, busquedas = ia_gasto.busquedas + EXCLUDED.busquedas,
+       fallidas = ia_gasto.fallidas + EXCLUDED.fallidas, costo = ia_gasto.costo + EXCLUDED.costo`,
+    [modelo, tipo, (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+     u.output_tokens ?? 0, u.server_tool_use?.web_search_requests ?? 0, fallida ? 1 : 0, costoDe(modelo, u)],
+  ).catch(e => console.error('[ia_gasto]', e))
 }
 
 // ── API de lotes (Message Batches): mitad de precio, responde en minutos u horas ─────────────

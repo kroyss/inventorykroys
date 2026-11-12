@@ -2,16 +2,20 @@
 import { useEffect, useState } from 'react'
 import { FUNCIONES_INTERNAS } from '@/lib/funcionesInternas'
 import { MODULOS } from '@/lib/modulos'
-import AvisosTelegramCard from './AvisosTelegramCard'
 
 interface Detalle {
   empresa_id: number; dia: string; modulo: string; modelo: string; usuario: string
   usos: number; entrada: number; salida: number; busquedas: number; costo: number
 }
 interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null; creditos?: number | null }
-interface Datos { desde: string; dias: number; detalle: Detalle[]; empresas: EmpresaMeta[] }
+interface Cuadre { desde: string; pagado: number; internas: number; asignado: number; asignadoInternas: number; fallidas: number }
+interface Gasto { dia: string; modelo: string; tipo: string; llamadas: number; fallidas: number; costo: number }
+interface Datos { desde: string; dias: number; detalle: Detalle[]; empresas: EmpresaMeta[]; cuadre: Cuadre | null; gasto: Gasto[] }
 
-const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Lectura de publicaciones y fotos', revisor: 'Revisor de sugeridas', simulacion: 'Configuración y pruebas (Mi IA)', interna: 'Prueba interna tuya (Competencia)' }
+// Fechas en hora de Caracas (las del negocio).
+const fechaCaracas = (dMenos = 0) => new Date(Date.now() - dMenos * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
+
+const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Lectura de publicaciones y fotos', revisor: 'Revisor de sugeridas', simulacion: 'Configuración y pruebas (Mi IA)', interna: 'Prueba interna tuya (Competencia, comparadores)', ayuda: 'Ayuda (preguntas al manual)' }
 const modeloTxt = (m: string) => m
   .replace(/claude-haiku-[\w.-]+/g, 'Haiku').replace(/claude-sonnet-[\w.-]+/g, 'Sonnet').replace(/claude-opus-[\w.-]+/g, 'Opus')
 const tok = (n: number) => n >= 1e6 ? `${(n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M` : n >= 1e3 ? `${Math.round(n / 1e3).toLocaleString('de-DE')} mil` : String(n)
@@ -23,14 +27,15 @@ const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
 const ES_RESPUESTA = (m: string) => m === 'preguntas' || m === 'mensajes'
 
 /** Lo de una empresa (o de todas) desde que se mide, separado por para qué fue. */
-interface Cuenta { respuestas: number; creditos: number; costoResp: number; lectura: number; config: number; revisor: number; total: number }
+interface Cuenta { respuestas: number; creditos: number; costoResp: number; lectura: number; config: number; revisor: number; ayuda: number; total: number }
 function cuentaDe(filas: Detalle[]): Cuenta {
-  const c: Cuenta = { respuestas: 0, creditos: 0, costoResp: 0, lectura: 0, config: 0, revisor: 0, total: 0 }
+  const c: Cuenta = { respuestas: 0, creditos: 0, costoResp: 0, lectura: 0, config: 0, revisor: 0, ayuda: 0, total: 0 }
   for (const d of filas) {
     c.total += d.costo
     if (ES_RESPUESTA(d.modulo)) { c.respuestas += d.usos; c.creditos += d.usos + d.busquedas; c.costoResp += d.costo }
     else if (d.modulo === 'fichas') c.lectura += d.costo
     else if (d.modulo === 'simulacion' || d.modulo === 'interna') c.config += d.costo
+    else if (d.modulo === 'ayuda') c.ayuda += d.costo
     else c.revisor += d.costo
   }
   return c
@@ -40,14 +45,17 @@ function cuentaDe(filas: Detalle[]): Cuenta {
 export default function InternoPanel() {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Período: desde que salió Mi IA (06-11), desde ayer o solo hoy (12-11, el dueño).
+  const [periodo, setPeriodo] = useState<'mi-ia' | 'ayer' | 'hoy'>('mi-ia')
 
   useEffect(() => {
     let vivo = true
-    fetch('/api/plataforma/uso-ia')
+    const desde = periodo === 'ayer' ? fechaCaracas(1) : periodo === 'hoy' ? fechaCaracas() : ''
+    fetch(`/api/plataforma/uso-ia${desde ? `?desde=${desde}` : ''}`)
       .then(async r => { const d = await r.json().catch(() => ({})); if (!vivo) return; if (r.ok) setDatos(d); else setError(d.error ?? 'No se pudo cargar') })
       .catch(() => { if (vivo) setError('No se pudo cargar') })
     return () => { vivo = false }
-  }, [])
+  }, [periodo])
 
   // 12-11 (el dueño): se mide desde que salió Mi IA (lo de antes eran otros modelos y otro diseño). Todo lo que gasta
   // cada cuenta cuenta: respuestas, lectura de publicaciones y fotos, configuración/pruebas de Mi IA y revisor.
@@ -57,10 +65,10 @@ export default function InternoPanel() {
   const internas = detalle.filter(d => d.modulo === 'interna')
   const filas = [...new Set(deCuentas.map(d => d.empresa_id))].map(id => {
     const meta = datos!.empresas.find(e => e.id === id)
-    return { id, nombre: meta?.nombre ?? `Empresa ${id}`, nota: meta?.propietario ? 'tu empresa · incluye pruebas internas' : null,
+    return { id, nombre: meta?.nombre ?? (id === -2 ? 'Ayuda sin empresa' : `Empresa ${id} (borrada)`), nota: meta?.propietario ? 'tu empresa · incluye tus pruebas de Mi IA' : id === -2 ? 'preguntas al manual desde el Radar' : null,
       propietario: !!meta?.propietario, c: cuentaDe(deCuentas.filter(d => d.empresa_id === id)) }
   })
-  if (internas.length) filas.push({ id: -1, nombre: 'Pruebas internas', nota: 'Competencia, sobre cuentas de clientes (no les cuenta)', propietario: true, c: cuentaDe(internas) })
+  if (internas.length) filas.push({ id: -1, nombre: 'Pruebas internas', nota: 'Competencia y comparadores (no cuentan al cliente)', propietario: true, c: cuentaDe(internas) })
   filas.sort((a, b) => b.c.total - a.c.total)
   const clientes = cuentaDe(deCuentas.filter(d => !datos?.empresas.find(e => e.id === d.empresa_id)?.propietario))
   const total = cuentaDe(detalle)
@@ -68,10 +76,17 @@ export default function InternoPanel() {
 
   return (
     <div className="space-y-8">
-      <AvisosTelegramCard />
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-neutral-500">Período:</span>
+        {([['mi-ia', 'Desde 06/11 (Mi IA)'], ['ayer', 'Desde ayer'], ['hoy', 'Hoy']] as const).map(([k, t]) => (
+          <button key={k} onClick={() => { setPeriodo(k); setDatos(null) }}
+            className={`px-3 py-1 rounded-full text-sm border ${periodo === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-400'}`}>{t}</button>
+        ))}
+      </div>
+      {datos?.cuadre && <CuadreGasto c={datos.cuadre} gasto={datos.gasto} />}
       {datos && filas.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Numero titulo={`Gasto de IA desde ${ddmm(datos.desde)}`} valor={usd(total.total)}
+          <Numero titulo={`Gasto por cuenta desde ${ddmm(datos.desde)}`} valor={usd(total.total)}
             detalle={`${datos.dias} días · a este ritmo ≈ ${usd(alMes(total.total))} al mes`} />
           <Numero titulo="Clientes: costo real por crédito" valor={clientes.creditos ? usd4(clientes.total / clientes.creditos) : '—'}
             detalle={clientes.creditos ? `todo lo que gastan ÷ ${clientes.creditos} créditos cobrados` : 'todavía no cobraron créditos'} />
@@ -104,6 +119,7 @@ export default function InternoPanel() {
                   <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="Leer publicaciones y fotos (una vez, se reutiliza)">Lectura</th>
                   <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="Prellenado, prueba con 10 reales y simulaciones de Mi IA">Config. Mi IA</th>
                   <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Revisor</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="Botón Ayuda: preguntas al manual (no cobran créditos)">Ayuda</th>
                   <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap border-l border-neutral-100">Total</th>
                   <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Por respuesta</th>
                   <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Real por crédito</th>
@@ -121,6 +137,7 @@ export default function InternoPanel() {
                     <td className="px-3 py-2.5 text-right num text-neutral-600">{c.lectura ? usd(c.lectura) : '—'}</td>
                     <td className="px-3 py-2.5 text-right num text-neutral-600">{c.config ? usd(c.config) : '—'}</td>
                     <td className="px-3 py-2.5 text-right num text-neutral-600">{c.revisor ? usd(c.revisor) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right num text-neutral-600">{c.ayuda ? usd(c.ayuda) : '—'}</td>
                     <td className="px-3 py-2.5 text-right num font-medium text-neutral-900 border-l border-neutral-100">{usd(c.total)}</td>
                     <td className="px-3 py-2.5 text-right num text-neutral-600">{c.respuestas ? usd4(c.costoResp / c.respuestas) : '—'}</td>
                     <td className={`px-4 py-2.5 text-right num ${c.creditos && c.total / c.creditos > 0.007 ? 'font-medium text-amber-700' : 'text-neutral-600'}`}>
@@ -138,6 +155,7 @@ export default function InternoPanel() {
                   <td className="px-3 py-2 text-right num">{usd(total.lectura)}</td>
                   <td className="px-3 py-2 text-right num">{usd(total.config)}</td>
                   <td className="px-3 py-2 text-right num">{usd(total.revisor)}</td>
+                  <td className="px-3 py-2 text-right num">{usd(total.ayuda)}</td>
                   <td className="px-3 py-2 text-right num border-l border-neutral-100">{usd(total.total)}</td>
                   <td colSpan={2} />
                 </tr>
@@ -147,7 +165,7 @@ export default function InternoPanel() {
         )}
         <p className="text-xs text-neutral-400">
           En ámbar: la cuenta gasta más de $0,007 por crédito cobrado (al precio de las recargas perdería). La configuración de Mi IA
-          se gasta una vez al armarla; al principio pesa mucho y se diluye con el uso.
+          se gasta una vez al armarla; al principio pesa mucho y se diluye con el uso. Ayuda y lectura no cobran créditos: son costo tuyo.
         </p>
       </section>
 
@@ -208,7 +226,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
   const ids = [...new Set(datos.detalle.map(d => d.empresa_id))]
   const costoDe = (id: number) => datos.detalle.filter(d => d.empresa_id === id).reduce((a, d) => a + d.costo, 0)
   const metas = ids
-    .map(id => datos.empresas.find(e => e.id === id) ?? { id, nombre: `Empresa ${id}`, propietario: false, limite: null })
+    .map(id => datos.empresas.find(e => e.id === id) ?? { id, nombre: id === -2 ? 'Ayuda sin empresa' : `Empresa ${id} (borrada)`, propietario: false, limite: null })
     .sort((a, b) => costoDe(b.id) - costoDe(a.id))
   const total = datos.detalle.reduce((a, d) => a + d.costo, 0)
   const alMes = (c: number) => (datos.dias ? (c / datos.dias) * 30 : c)
@@ -243,7 +261,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
           return [...m.entries()].sort((a, b) => b[1].costo - a[1].costo)
         }
         const porModelo = agrupar(d => `${MODULO_TXT[d.modulo] ?? d.modulo}|${modeloTxt(d.modelo)}`)
-        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.modulo === 'simulacion' ? 'Sistema (configuración y pruebas)' : d.modulo === 'interna' ? 'Tu prueba interna (Competencia)' : d.usuario))
+        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.modulo === 'simulacion' ? 'Sistema (configuración y pruebas)' : d.modulo === 'interna' ? 'Tu prueba interna' : d.modulo === 'ayuda' ? `${d.usuario} (Ayuda)` : d.usuario))
         const porDia = agrupar(d => d.dia).sort((a, b) => a[0].localeCompare(b[0]))
         const maxDia = Math.max(...porDia.map(([, g]) => g.costo), 0.0001)
         const cupo = e.limite
@@ -340,6 +358,30 @@ function DetalleMes({ datos }: { datos: Datos }) {
         Créditos = lo que ve el cliente: 1 por cada «Proponer con IA» (se use o no la respuesta) + 1 por cada búsqueda en internet.
         Todo va con Haiku; «lote» = fichas a mitad de precio. «Al mes» = lo gastado por día llevado a 30 días.
       </p>
+    </section>
+  )
+}
+
+/** Lo que se pagó a Anthropic (cada llamada, mig. 169) contra lo asignado a las cuentas: si algo se escapa, se ve aquí. */
+function CuadreGasto({ c, gasto }: { c: Cuadre; gasto: Gasto[] }) {
+  const sinAsignar = c.pagado - c.asignado
+  const inicio = new Date(c.desde).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas' })
+  const porModelo = new Map<string, number>()
+  for (const g of gasto) porModelo.set(modeloTxt(g.modelo), (porModelo.get(modeloTxt(g.modelo)) ?? 0) + g.costo)
+  const llamadas = gasto.reduce((a, g) => a + g.llamadas, 0)
+  return (
+    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
+      <div>
+        <h2 className="text-base font-semibold text-neutral-900">Lo que pagas a Anthropic</h2>
+        <p className="text-sm text-neutral-500">Cada llamada a la IA, sea de quien sea, anotada desde el {inicio}. Sirve para cuadrar con la factura y ver si algo se escapa del conteo por cuenta.</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Numero titulo="Pagado (todo)" valor={usd(c.pagado + c.internas)} detalle={`${llamadas} llamadas · ${[...porModelo].map(([m, v]) => `${m} ${usd(v)}`).join(' · ')}`} />
+        <Numero titulo="Uso de las cuentas" valor={usd(c.pagado)} detalle={`asignado por cuenta: ${usd(c.asignado)}`} />
+        <Numero titulo="Tus pruebas internas" valor={usd(c.internas)} detalle="Competencia y comparadores" />
+        <Numero titulo="Sin asignar a una cuenta" valor={usd(Math.max(0, sinAsignar))}
+          detalle={c.fallidas ? `${c.fallidas} respuestas fallidas (se pagan igual)` : sinAsignar > 0.01 ? 'revisar: algo gasta sin anotarse' : 'cuadra'} />
+      </div>
     </section>
   )
 }
