@@ -218,11 +218,12 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
    Si falta completar algún tema te avisa cuáles, y puedes «Salir igual y completar después». Revisa cada pantalla y corrige lo que haga
    falta (pago, envío, despacho, tono, lo que siempre responde una persona…). Arriba de cada pantalla están **todos los temas** (✓ = completo, punto naranja = falta): tocas uno y saltas directo; abajo, **← tema anterior** y **tema siguiente →** con su nombre. Al pasar de un tema a otro se guarda solo; **Guardar y salir** vuelve a Mi IA; si te arrepientes de lo que cambiaste en un tema, **Deshacer cambios de este tema** lo deja como estaba. **Hay que completar todos los temas:**
    mientras falte alguno, la respuesta automática no se puede encender (te dice cuáles faltan).
+   **Sugerir lo que falta desde mis respuestas** (y «Empezar con lo que ya respondo») se puede usar hasta **3 veces por día**; dice cuántas te quedan.
 2. Abajo de los temas están las tarjetas **Preguntas** y **Mensajes** (en computadora, una al lado de la otra; en el
    celular, una debajo de la otra). Cada una muestra si está **Encendida** o **Apagada** y en qué modo.
 3. **Probar (opcional y gratis):** toca **Probar con 10 preguntas reales** (o mensajes). Se abre una pantalla aparte:
    la IA responde preguntas que tu equipo ya contestó, sin publicar nada, y ves lado a lado tu respuesta y la de la IA,
-   y si habría salido sola. No usa créditos; máximo **2 pruebas por día** en Preguntas y 2 en Mensajes.
+   y si habría salido sola. No usa créditos; máximo **2 pruebas por día** en Preguntas y 2 en Mensajes (cuando ya encendiste la respuesta automática de ese módulo, **1 por día**).
    - Marca cada una **Bien** o **Mal**. Si está Mal, elige **qué estuvo mal** y escribe **qué debió decir**, como se lo
      dirías a tu equipo, y toca **Guardar**. **La IA lo aprende:** si es un dato fijo del producto lo guarda en
      **Datos del producto** de esa publicación, y si es una forma de trabajar lo guarda como regla en Mi IA →

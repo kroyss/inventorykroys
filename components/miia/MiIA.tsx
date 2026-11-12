@@ -763,7 +763,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 // ── componente ───────────────────────────────────────────────────────────────
 export default function MiIA({ inicial = null, frenosInicial = null }: { inicial?: unknown; frenosInicial?: unknown }) {
   useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
-  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
+  const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number; sugerir?: number; politicas?: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
   const [sug, setSug] = useState<Sugerencia | null>(null)
   const [sugeridos, setSugeridos] = useState<string[]>([])
@@ -773,6 +773,8 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
     const r = await fetch('/api/mi-ia/sugerir', { method: 'POST' }); const d = await r.json().catch(() => ({}))
     setSugiriendo(false)
     if (!r.ok) { setError(d.error ?? 'No se pudo sugerir'); return }
+    // 12-11: tope de 3 por día; se descuenta aquí para no recargar (recargar pisaría lo sugerido).
+    setDatos(x => x?.pruebas?.sugerir != null ? { ...x, pruebas: { ...x.pruebas, sugerir: Math.max(0, x.pruebas.sugerir - 1) } } : x)
     const { nueva, temas } = mezclar(c, d.sugerido ?? {})
     setSug(d); setC(nueva); setSugeridos(temas)
     // Arranca en el primer tema sugerido (o el primero que falte): revisar y dar Siguiente lo guarda.
@@ -1071,8 +1073,9 @@ export default function MiIA({ inicial = null, frenosInicial = null }: { inicial
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <button type="button" onClick={() => recorrer(TODOS)} className="text-sm text-sky-700">Revisar todo paso a paso</button>
-        {n < PASOS.length && <button type="button" onClick={() => sugerir(false)} disabled={sugiriendo} className="text-sm text-sky-700 disabled:opacity-50">
-          {sugiriendo ? 'Leyendo tus respuestas…' : 'Sugerir lo que falta desde mis respuestas'}</button>}
+        {n < PASOS.length && <button type="button" onClick={() => sugerir(false)} disabled={sugiriendo || datos.pruebas?.sugerir === 0} className="text-sm text-sky-700 disabled:opacity-50">
+          {sugiriendo ? 'Leyendo tus respuestas…' : 'Sugerir lo que falta desde mis respuestas'}
+          {!sugiriendo && datos.pruebas?.sugerir != null && <span className="ml-1 text-xs text-neutral-400">({datos.pruebas.sugerir === 1 ? 'te queda 1 hoy' : `te quedan ${datos.pruebas.sugerir} hoy`})</span>}</button>}
         {datos.texto && <button type="button" onClick={() => setVerTexto(v => !v)} className="text-sm text-neutral-500">{verTexto ? 'Ocultar' : 'Ver'} cómo lo lee la IA (solo tú)</button>}
       </div>
       {sug && !sugeridos.length && <p className="text-xs text-neutral-500">No encontré nada claro para los temas que faltan.</p>}

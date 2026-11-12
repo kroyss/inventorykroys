@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionMiIA } from '@/lib/miIASesion'
 import { iaConfigurada } from '@/lib/ia'
+import { contarPrueba, ERROR_TOPE_SUGERIR, puedeProbar } from '@/lib/miIAPruebasTope'
 import { EsquemaMiIA } from '@/lib/miIAEsquema'
 import { MI_IA_KEY, datoDeContacto } from '@/lib/miIA'
 import { pasarPoliticas } from '@/lib/miIAPoliticas'
@@ -14,7 +15,11 @@ export async function POST() {
   if ('error' in s) return s.error
   if (!iaConfigurada()) return NextResponse.json({ error: 'La IA no está configurada' }, { status: 503 })
   try {
-    return NextResponse.json(await pasarPoliticas(s.db, s.session.user.id))
+    // 12-11 (el dueño): hasta 3 por día.
+    if (!(await puedeProbar(s.db, s.session.user, 'politicas'))) return NextResponse.json({ error: ERROR_TOPE_SUGERIR }, { status: 429 })
+    const r = await pasarPoliticas(s.db, s.session.user.id)
+    await contarPrueba(s.db, s.session.user, 'politicas')
+    return NextResponse.json(r)
   } catch (err) { return apiError(err) }
 }
 
