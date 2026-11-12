@@ -589,7 +589,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   const vencidas = filas.filter(f => f.vencida && !f.concretadaSinVenta)
   // 10-11: calificadas como concretadas sin venta ni pago en el sistema (solo con inventario: sin él no se registran ventas).
   const concretadasSinVenta = sinInventario ? [] : filas.filter(f => f.concretadaSinVenta)
-  const conPago = vigentes.filter(f => f.pago && f.pago.verificacion !== 'invalido')
+  // 12-11 (el dueño): con inventario, «Con pago» va primero con los pagos por verificar (el más nuevo arriba) y después
+  // los verificados que faltan registrar, el más viejo arriba para que no se olviden.
+  const t = (f: Fila) => new Date(f.fecha).getTime()
+  const conPagoTodos = vigentes.filter(f => f.pago && f.pago.verificacion !== 'invalido')
+  const conPago = [
+    ...conPagoTodos.filter(f => f.pago!.verificacion !== 'valido').sort((x, y) => t(y) - t(x)),
+    ...conPagoTodos.filter(f => f.pago!.verificacion === 'valido').sort((x, y) => t(x) - t(y)),
+  ]
   const sinPago = vigentes.filter(f => !conPago.includes(f))
   // Sin inventario: por verificar · listos para despachar (verificados en los últimos 3 días) · sin pago.
   const porVerificar = conPago.filter(f => f.pago!.verificacion === 'pendiente')
