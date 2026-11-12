@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { Ventana } from '@/components/ui/Ventana'
-import { FilaDato, type Dato } from '@/components/preguntas/DatosProducto'
+import { FilaDato, SoloEquipo, type Dato } from '@/components/preguntas/DatosProducto'
 
 // 12-11 (el dueño): una sola forma de corregir a la IA en todos lados. El botón va en la misma línea que «Respondió la IA»
 // (otro color) y abre una ventana: «¿Cómo la hubieras respondido tú?». La IA saca de ahí el dato del producto y/o la regla
@@ -18,6 +18,7 @@ export function VentanaDatos({ itemId, titulo, onCerrar, onCambio }: { itemId: s
     <Ventana titulo="Datos guardados de esta publicación" onCerrar={onCerrar}>
       {titulo && <p className="text-xs text-neutral-500 -mt-2">{titulo}</p>}
       <p className="text-xs text-neutral-500">La IA los usa al responder esta publicación. Corrige o borra los que ya no apliquen.</p>
+      <SoloEquipo itemId={itemId} />
       {!lista ? <p className="text-sm text-neutral-400">Cargando…</p>
         : lista.length === 0 ? <p className="text-sm text-neutral-500">No hay datos guardados.</p>
         : <div className="divide-y divide-neutral-100">{lista.map(d => <FilaDato key={d.id} d={d} onCambio={cargar} />)}</div>}

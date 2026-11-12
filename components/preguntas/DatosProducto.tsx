@@ -58,6 +58,34 @@ export function FilaDato({ d, onCambio }: { d: Dato; onCambio: () => void }) {
   )
 }
 
+/** 12-11 (mig 171): casilla «Esta publicación solo la responde mi equipo». `onCambio` avisa a la lista. */
+export function SoloEquipo({ itemId, onCambio }: { itemId: string; onCambio?: (solo: boolean) => void }) {
+  const [solo, setSolo] = useState<boolean | null>(null)
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    fetch('/api/preguntas/solo-equipo').then(r => (r.ok ? r.json() : [])).then((l: { item_id: string }[]) => { if (vivo) setSolo(l.some(x => x.item_id === itemId)) }).catch(() => {})
+    return () => { vivo = false }
+  }, [itemId])
+  const cambiar = async (v: boolean) => {
+    setSolo(v); setError(false)
+    const r = await fetch('/api/preguntas/solo-equipo', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: itemId, solo: v }) }).catch(() => null)
+    if (!r?.ok) { setSolo(!v); setError(true); return }
+    onCambio?.(v)
+  }
+  return (
+    <label className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${solo ? 'border-amber-300 bg-amber-50' : 'border-neutral-200 bg-neutral-50'}`}>
+      <input type="checkbox" checked={!!solo} disabled={solo === null} onChange={e => cambiar(e.target.checked)} className="mt-0.5 accent-amber-600" />
+      <span>
+        <span className="font-medium text-neutral-900">Esta publicación solo la responde mi equipo</span>
+        <span className="block text-[11px] text-neutral-500">La IA no responde sola aquí (ni en Modo Total): las preguntas quedan en Sin responder para tu equipo.</span>
+        {error && <span className="block text-xs text-red-600">No se pudo guardar</span>}
+      </span>
+    </label>
+  )
+}
+
 interface Publicacion { item_id: string; titulo: string; estado: string | null; link: string | null; imagen: string | null; cuenta?: string; datos?: number }
 
 function Miniatura({ src }: { src: string | null }) {
@@ -73,7 +101,7 @@ function Miniatura({ src }: { src: string | null }) {
 
 /** 12-11 (el dueño): anotar datos a cualquier publicación ANTES de que lleguen las preguntas. Buscar (activas y pausadas,
  *  todas las cuentas) → elegir → escribir uno o varios datos seguidos. `inicial` = abrir ya con esa publicación. */
-function VentanaAgregar({ inicial, onCerrar, onCambio }: { inicial: Publicacion | null; onCerrar: () => void; onCambio: () => void }) {
+function VentanaAgregar({ inicial, onCerrar, onCambio, onSolo }: { inicial: Publicacion | null; onCerrar: () => void; onCambio: () => void; onSolo: (item: Publicacion, solo: boolean) => void }) {
   const [q, setQ] = useState('')
   const [res, setRes] = useState<Publicacion[] | null>(null)
   const [elegida, setElegida] = useState<Publicacion | null>(inicial)
@@ -141,6 +169,7 @@ function VentanaAgregar({ inicial, onCerrar, onCambio }: { inicial: Publicacion 
           </div>
           {!inicial && <button type="button" onClick={() => { setElegida(null); setDatos(null) }} className="text-xs text-sky-700 hover:underline shrink-0">Cambiar</button>}
         </div>
+        <SoloEquipo itemId={elegida.item_id} onCambio={v => onSolo(elegida, v)} />
         <div className="space-y-1.5">
           <label htmlFor="dato-nuevo" className="block text-sm font-medium text-neutral-900">¿Qué debe saber la IA de este producto?</label>
           <textarea id="dato-nuevo" value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={500} autoFocus
@@ -170,18 +199,31 @@ export function DatosProductos() {
   const [lista, setLista] = useState<DatoConItem[] | null>(null)
   const [buscar, setBuscar] = useState('')
   const [agregar, setAgregar] = useState<{ inicial: Publicacion | null } | null>(null)
+  // Marcadas «solo mi equipo» (las que no tienen datos se muestran igual, con lo que se sepa de ellas).
+  const [solo, setSolo] = useState<Map<string, Publicacion>>(new Map())
   const cargar = () => fetch('/api/preguntas/notas?todas=1').then(r => (r.ok ? r.json() : [])).then(setLista)
-  useEffect(() => { cargar() }, [])
+  useEffect(() => {
+    cargar()
+    fetch('/api/preguntas/solo-equipo').then(r => (r.ok ? r.json() : [])).then((l: Publicacion[]) =>
+      setSolo(new Map(l.map(x => [x.item_id, x])))).catch(() => {})
+  }, [])
+  const marcarSolo = (it: Publicacion, v: boolean) => setSolo(m => { const n = new Map(m); if (v) n.set(it.item_id, it); else n.delete(it.item_id); return n })
 
+  // Grupos por publicación: las que tienen datos y las marcadas «solo mi equipo» (aunque no tengan datos), primero esas.
   const grupos = useMemo(() => {
     const q = buscar.trim().toLowerCase()
-    const m = new Map<string, DatoConItem[]>()
+    const m = new Map<string, { it: Publicacion; datos: DatoConItem[] }>()
     for (const d of lista ?? []) {
       if (q && !d.texto.toLowerCase().includes(q) && !(d.titulo ?? '').toLowerCase().includes(q) && !d.item_id.toLowerCase().includes(q)) continue
-      m.set(d.item_id, [...(m.get(d.item_id) ?? []), d])
+      const g = m.get(d.item_id) ?? { it: { item_id: d.item_id, titulo: d.titulo ?? d.item_id, estado: d.estado, link: d.link, imagen: d.imagen }, datos: [] }
+      g.datos.push(d); m.set(d.item_id, g)
     }
-    return [...m.values()]
-  }, [lista, buscar])
+    for (const it of solo.values()) {
+      if (m.has(it.item_id) || (q && !it.titulo.toLowerCase().includes(q) && !it.item_id.toLowerCase().includes(q))) continue
+      m.set(it.item_id, { it, datos: [] })
+    }
+    return [...m.values()].sort((a, b) => Number(solo.has(b.it.item_id)) - Number(solo.has(a.it.item_id)))
+  }, [lista, buscar, solo])
 
   return (
     <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
@@ -200,15 +242,14 @@ export function DatosProductos() {
           <button type="button" onClick={() => setAgregar({ inicial: null })} className="btn-primary text-sm whitespace-nowrap">+ Agregar datos a un producto</button>
         </div>
       </div>
-      {agregar && <VentanaAgregar inicial={agregar.inicial} onCerrar={() => setAgregar(null)} onCambio={cargar} />}
+      {agregar && <VentanaAgregar inicial={agregar.inicial} onCerrar={() => setAgregar(null)} onCambio={cargar} onSolo={marcarSolo} />}
 
       {!lista ? <p className="text-sm text-neutral-400">Cargando…</p>
-        : lista.length === 0 ? <p className="text-sm text-neutral-500">Todavía no hay datos. Toca «+ Agregar datos a un producto», o se anotan desde cada pregunta y al corregir a la IA.</p>
+        : lista.length === 0 && solo.size === 0 ? <p className="text-sm text-neutral-500">Todavía no hay datos. Toca «+ Agregar datos a un producto», o se anotan desde cada pregunta y al corregir a la IA.</p>
         : grupos.length === 0 ? <p className="text-sm text-neutral-500">Nada coincide con la búsqueda.</p>
         : (
           <div className="divide-y divide-neutral-100">
-            {grupos.map(g => {
-              const it = g[0]
+            {grupos.map(({ it, datos: g }) => {
               const inactiva = it.estado && it.estado !== 'active'
               return (
                 <div key={it.item_id} className="flex gap-3 py-3">
@@ -225,12 +266,13 @@ export function DatosProductos() {
                         : <span className="font-medium text-neutral-800 text-sm truncate">{it.titulo ?? it.item_id}</span>}
                       <span className="font-mono text-neutral-400">{it.item_id}</span>
                       {inactiva && <span className="rounded-full bg-neutral-100 text-neutral-600 px-2 py-0.5">publicación {it.estado === 'paused' ? 'pausada' : 'inactiva'}</span>}
+                      {solo.has(it.item_id) && <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 font-medium">Solo la responde tu equipo</span>}
                     </div>
                     <div className="divide-y divide-neutral-50">
                       {g.map(d => <FilaDato key={d.id} d={d} onCambio={cargar} />)}
                     </div>
-                    <button type="button" onClick={() => setAgregar({ inicial: { item_id: it.item_id, titulo: it.titulo ?? it.item_id, estado: it.estado, link: it.link, imagen: it.imagen } })}
-                      className="text-xs text-sky-700 hover:underline">+ Agregar otro dato</button>
+                    <button type="button" onClick={() => setAgregar({ inicial: it })}
+                      className="text-xs text-sky-700 hover:underline">{g.length ? '+ Agregar otro dato' : '+ Agregar dato'} · Responde solo mi equipo</button>
                   </div>
                 </div>
               )

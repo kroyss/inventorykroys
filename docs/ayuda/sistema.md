@@ -261,6 +261,12 @@ para que tu equipo lo revise y lo mande. Viene **apagada**: la enciendes tú. Pa
   La respuesta ya publicada en MercadoLibre no cambia.
 - **N datos guardados** (al lado, o en cada pregunta sin responder) abre una ventana con lo que la IA sabe de esa
   publicación: ahí se editan o borran.
+- **Agregar datos antes de que pregunten:** Preguntas → Configuración → Datos de cada producto (también en Mensajes →
+  Datos de cada producto) → **+ Agregar datos a un producto**. Buscas la publicación (activas y pausadas, todas tus
+  cuentas), la eliges y escribes uno o varios datos fijos (material, medidas, compatibilidad). La IA los usa en Preguntas y Mensajes.
+- **Esta publicación solo la responde mi equipo:** casilla en «Datos para la IA» de cada publicación. La IA no responde
+  sola en esa publicación (ni en Modo Total ni con la frase de escape): las preguntas quedan en Sin responder con el motivo
+  «Esta publicación la responde tu equipo». Se quita desmarcando la casilla. Sirve, por ejemplo, si el precio publicado no es el real.
 - Cada respuesta de la IA usa **1 crédito** (las de prueba no). Si se acaban los créditos, deja de responder sola
   hasta que recargues en Mi plan.
 - Responde solo lo que llega **después** de encenderla.

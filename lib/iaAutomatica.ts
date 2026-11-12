@@ -167,6 +167,8 @@ export function motivosRevisar(b: { respuesta: string; confianza: string; falta_
 }
 
 /** Lo llama el cron (después de las respuestas rápidas automáticas). Devuelve el resumen de la pasada o null. */
+export const MOTIVO_SOLO_EQUIPO = 'Esta publicación la responde tu equipo'
+
 export async function procesarIAAutomatica(db: Pool, empresaId: number, country: string) {
   const cfg = await configIA(db)
   if (cfg.modo === 'apagado' || !iaConfigurada()) return null
@@ -182,13 +184,24 @@ export async function procesarIAAutomatica(db: Pool, empresaId: number, country:
                   WHERE estado = 'UNANSWERED' AND ia_auto IS NULL
                     AND fecha > NOW() - make_interval(hours => $1) AND fecha >= COALESCE($2::timestamptz, NOW())
                   ORDER BY fecha LIMIT $3 FOR UPDATE SKIP LOCKED)
-     RETURNING id::text, item_estado, comprador_id::text`,
+     RETURNING id::text, item_id, item_estado, comprador_id::text`,
     [HORAS_MAX, cfg.desde, Math.min(POR_PASADA, cupo.quedan ?? POR_PASADA)])
   let solas = 0, revisar = 0, publicadas = 0, fallas = 0
   // Frenos (07-11, lib/iaFrenos.ts): horario y tope por comprador. Solo en modo real (la prueba mide sin ellos).
   const frenos = cfg.modo === 'real' && rows.length ? await leerFrenos(db) : null
+  // 12-11 (el dueño, mig 171): publicaciones marcadas «solo la responde mi equipo». La IA no responde sola ahí, en Modo
+  // Seguro ni en Modo Total (ni frase de escape): queda en Sin responder, sin llamar a la IA.
+  const soloEquipo = new Set<string>(rows.length
+    ? (await db.query(`SELECT item_id FROM ml_item_solo_equipo`).catch(() => ({ rows: [] as { item_id: string }[] }))).rows.map(r => r.item_id)
+    : [])
   for (const q of rows) {
     try {
+      if (soloEquipo.has(q.item_id)) {
+        await db.query(`UPDATE ml_preguntas SET ia_auto = $2 WHERE id = $1`, [q.id, JSON.stringify({
+          modo: cfg.modo, decision: 'revisar', motivos: [MOTIVO_SOLO_EQUIPO], soloEquipo: true, respuesta: '', confianza: '', fecha: new Date().toISOString() })])
+        revisar++
+        continue
+      }
       const c = await armarContexto(db, Number(q.id), country)
       let b: Awaited<ReturnType<typeof pedirBorrador>> & { corregida?: boolean; original?: string } = await pedirBorrador(c, false, undefined, cfg.v2, true)
       let motivos = motivosRevisar(b, c.item?.status ?? q.item_estado, c.pregunta.texto, datosPublicacion(c), cfg.v2, textoVendedor(c), datosCompatibilidad(c))
