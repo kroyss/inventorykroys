@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import type { MiIA as Config, Agencia, MotivoCambio } from '@/lib/miIA'
 import { MOTIVOS_CAMBIO, motivosCambio, TEMAS_MI_IA } from '@/lib/miIA'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -760,7 +761,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 }
 
 // ── componente ───────────────────────────────────────────────────────────────
-export default function MiIA() {
+export default function MiIA({ inicial = null }: { inicial?: unknown }) {
   useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
   const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
@@ -795,9 +796,13 @@ export default function MiIA() {
     setPase(d)
   }
 
+  const primera = usePrimera(inicial as any)   // eslint-disable-line @typescript-eslint/no-explicit-any -- 12-11 (rapidez): la primera carga viene en el HTML
   const cargar = async () => {
-    const r = await fetch('/api/mi-ia'); const d = await r.json()
-    if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    let d = primera()
+    if (!d) {
+      const r = await fetch('/api/mi-ia'); d = await r.json()
+      if (!r.ok) { setError(d!.error ?? 'No se pudo cargar'); return }
+    }
     setDatos(d); if (d.miIA) setC(d.miIA); setSugeridos([])
     ultimoGuardado.current = d.miIA ? JSON.stringify(d.miIA) : null
   }

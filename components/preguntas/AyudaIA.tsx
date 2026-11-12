@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { comun } from '@/lib/comun'
 
 /** Avisa a <UsoIA /> que se pidió un borrador (para que actualice el contador). */
 export const avisarUsoIA = () => window.dispatchEvent(new Event('uso-ia'))
@@ -18,8 +19,9 @@ export function UsoIA() {
   const [uso, setUso] = useState<{ total?: number; creditos: number; limite: number | null; quedan?: number | null; periodo?: 'saldo' | 'mes'; renueva?: string } | null>(null)
   useEffect(() => {
     let vivo = true
-    const cargar = () => fetch('/api/ia/uso').then(r => r.ok ? r.json() : null).then(d => { if (vivo) setUso(d) })
-    cargar()
+    // Al abrir va junto con los pedidos comunes (lib/comun.ts, 12-11); después de usar la IA, fresco.
+    comun<NonNullable<typeof uso>>('ia_uso').then(d => { if (vivo) setUso(d) })
+    const cargar = () => comun<NonNullable<typeof uso>>('ia_uso', { fresco: true }).then(d => { if (vivo) setUso(d) })
     window.addEventListener('uso-ia', cargar)
     return () => { vivo = false; window.removeEventListener('uso-ia', cargar) }
   }, [])

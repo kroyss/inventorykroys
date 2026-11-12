@@ -11,6 +11,7 @@ import TextoConPublicaciones from './TextoConPublicaciones'
 import { BotonEditar, BotonEliminar } from './BotonesEdicion'
 import { AbrirFicha, VerME } from './FichaPublicacion'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { PreguntasPrevias } from '@/components/preguntas/PreguntasPrevias'
 import type { PreguntaPrevia } from '@/lib/preguntasComprador'
 import { PageHeader, Tabs, EmptyState, Cargando, Pagination } from '@/components/ui'
@@ -43,7 +44,9 @@ function hace(fecha: string | null) {
 }
 
 /** Bandeja de mensajes post-venta de todas las cuentas de MercadoLibre de la empresa. */
-export default function MensajesClient({ pack: packPedido = null, miIA = false, iaPrueba = false }: { pack?: string | null; miIA?: boolean; iaPrueba?: boolean }) {
+export default function MensajesClient({ pack: packPedido = null, miIA = false, iaPrueba = false, inicial = null }: { pack?: string | null; miIA?: boolean; iaPrueba?: boolean
+  /** 12-11 (rapidez): Por atender y los contadores del seguimiento, ya en el HTML. */
+  inicial?: { lista: unknown; seg: unknown } | null }) {
   const [vista, setVista] = useState<'sin_leer' | 'todas' | 'pedir' | 'rapidas' | 'recordatorios' | 'al_comprar' | 'mi_ia' | 'ia_prueba'>(packPedido ? 'todas' : 'sin_leer')
   const [pedir, setPedir] = useState<number | undefined>(undefined)     // "Pedir calificación": cuántas hay hoy
   const [rapidas, setRapidas] = useState<{ lista: MensajeRapido[]; esAdmin: boolean; sugeridas: MensajeRapido[] }>({ lista: [], esAdmin: false, sugeridas: [] })
@@ -69,21 +72,27 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   // Solo vale la respuesta del ÚLTIMO pedido (2026-10-16): al cambiar rápido de pestaña, la respuesta lenta
   // de la anterior llegaba después y pisaba la lista (en el celular la pestaña "se quedaba pegada").
   const ultimoPedido = useRef(0)
+  const primera = usePrimera(inicial?.lista as Record<string, any> | null | undefined)
   const cargar = useCallback(async () => {
     const id = ++ultimoPedido.current
     const v = vista === 'rapidas' || vista === 'recordatorios' || vista === 'pedir' || vista === 'mi_ia' || vista === 'ia_prueba' ? 'sin_leer' : vista
-    const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`).catch(() => null)
-    if (id !== ultimoPedido.current) return
-    if (!r) { setError('Sin conexión: no se pudo cargar'); return }
-    const d = await r.json().catch(() => ({}))
-    if (id !== ultimoPedido.current) return
-    if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    const pre = primera()
+    let d: Record<string, any>
+    if (pre && v === 'sin_leer' && pagina === 1) d = pre
+    else {
+      const r = await fetch(`/api/mensajes?vista=${v}&pagina=${pagina}${v === 'todas' && q ? `&q=${encodeURIComponent(q)}` : ''}`).catch(() => null)
+      if (id !== ultimoPedido.current) return
+      if (!r) { setError('Sin conexión: no se pudo cargar'); return }
+      d = await r.json().catch(() => ({}))
+      if (id !== ultimoPedido.current) return
+      if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    }
     setError(null)
     setLista(d.conversaciones); setPag(d.total != null ? { total: d.total, por: d.por_pagina } : null); setCont(d.sin_leer)
     setRapidas({ lista: d.rapidas ?? [], esAdmin: !!d.esAdmin, sugeridas: d.sugeridas ?? [] })
     setConRecordatorios(!!d.recordatorios)
     setPedir(typeof d.pedir === 'number' ? d.pedir : undefined)
-  }, [vista, pagina, q])
+  }, [vista, pagina, q, primera])
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
 
@@ -95,13 +104,16 @@ export default function MensajesClient({ pack: packPedido = null, miIA = false, 
   const [segDatos, setSegDatos] = useState<DatosSeg | null>(null)
   useEffect(() => { try { if (localStorage.getItem('seguimiento:horas') === '24') setSegHoras(24) } catch { /* sin almacenamiento */ } }, [])
   const segPedido = useRef(0)
+  const primeraSeg = usePrimera(inicial?.seg as DatosSeg | null | undefined)
   const cargarSeg = useCallback(async () => {
     if (vista !== 'sin_leer') return
     const id = ++segPedido.current
+    const pre = primeraSeg()
+    if (pre && segHoras === 12 && segPagina === 1 && seg === 'todas') { setSegDatos(pre); return }
     const d = await fetch(`/api/mensajes/seguimiento?horas=${segHoras}&pagina=${segPagina}${seg !== 'todas' ? `&filtro=${seg}` : ''}`)
       .then(r => r.ok ? r.json() : null).catch(() => null)
     if (id === segPedido.current && d) setSegDatos(d)
-  }, [vista, seg, segHoras, segPagina])
+  }, [vista, seg, segHoras, segPagina, primeraSeg])
   useEffect(() => { cargarSeg() }, [cargarSeg])
   useEffect(() => { const t = setInterval(cargarSeg, 60_000); return () => clearInterval(t) }, [cargarSeg])
   const cambiarSeg = (f: FiltroSeg) => {

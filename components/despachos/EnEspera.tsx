@@ -2,7 +2,7 @@
 // Envíos apartados (20-10, migración 107; API /api/despachos/apartados): el botón "En espera" junto a Historial,
 // su panel al costado y el formulario para apartar. Un solo lugar para todo lo frenado, lo hayan detenido al armar
 // etiquetas o cuando ya estaba por reportar.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 export interface Apartado {
@@ -30,19 +30,21 @@ const hace = (f: string | null) => {
 }
 
 /** Los apartados en espera (se recargan con `recargar`). */
-export function useEnEspera() {
-  const [lista, setLista] = useState<Apartado[]>([])
-  const [disponible, setDisponible] = useState(false)   // sin Despachos (403) no se muestra nada
+export function useEnEspera(inicial: Apartado[] | null = null) {
+  const [lista, setLista] = useState<Apartado[]>(inicial ?? [])
+  const [disponible, setDisponible] = useState(!!inicial)   // sin Despachos (403) no se muestra nada
   const recargar = useCallback(() =>
     fetch('/api/despachos/apartados').then(r => { setDisponible(r.ok); return r.ok ? r.json() : null })
       .then(d => { if (d) setLista(d.espera) }).catch(() => {}), [])
-  useEffect(() => { recargar() }, [recargar])
+  // 12-11 (rapidez): si la lista vino en el HTML, no se pide al abrir.
+  const yaVino = useRef(!!inicial)
+  useEffect(() => { if (yaVino.current) { yaVino.current = false; return } recargar() }, [recargar])
   return { lista, recargar, disponible }
 }
 
 /** En el Reportador (20-10): el mismo "En espera" de Despachos, para apartar una guía antes de que se reporte. */
-export function EnEsperaReportador() {
-  const espera = useEnEspera()
+export function EnEsperaReportador({ inicial = null }: { inicial?: Apartado[] | null }) {
+  const espera = useEnEspera(inicial)
   const [abierto, setAbierto] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   if (!espera.disponible) return null

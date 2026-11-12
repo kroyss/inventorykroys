@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { type PagoME } from '@/lib/pagosMEComun'
 import { Monto, VERIF, bs, metodoPago } from './PagoME'
@@ -38,7 +39,7 @@ const ERROR_PERFIL: Record<string, string> = {
   sin_sesion: 'no tiene la sesión de MercadoEnvíos iniciada: en la PC quedó abierta esa ventana; inicia sesión ahí y vuelve a traer',
 }
 
-export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
+export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: boolean; inicial?: unknown }) {
   const [filtro, setFiltro] = useState<Filtro>('pendiente')
   const [datos, setDatos] = useState<Datos | null>(null)
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
@@ -59,11 +60,14 @@ export default function PagosMEClient({ isAdmin }: { isAdmin: boolean }) {
     const r = await fetch(`/api/pagos-me?estado=${filtro}`)
     if (r.ok) setDatos(await r.json())
   }, [filtro])
+  const primera = usePrimera(inicial as Datos | null)   // 12-11 (rapidez): la primera carga viene en el HTML
   useEffect(() => {
     let vivo = true
+    const pre = primera()
+    if (pre && filtro === 'pendiente') { setDatos(pre); return }
     fetch(`/api/pagos-me?estado=${filtro}`).then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setDatos(d) }).catch(() => {})
     return () => { vivo = false }
-  }, [filtro])
+  }, [filtro, primera])
 
   // Mientras el vigilante trabaja (pedido vigente sin el resultado de todos los perfiles), se refresca solo.
   const pedido = datos?.vigilante.pedido

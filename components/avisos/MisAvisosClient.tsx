@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
@@ -34,7 +35,7 @@ const minTxt = (m: number) => m === 0 ? 'al instante (cada una que entre)' : m <
 const horaTxt = (h: number) => `${String(h).padStart(2, '0')}:00`
 const HORAS = Array.from({ length: 24 }, (_, h) => h)
 
-export default function MisAvisosClient() {
+export default function MisAvisosClient({ inicial = null }: { inicial?: unknown }) {
   const confirmar = useConfirm()
   const [e, setE] = useState<Estado | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -44,13 +45,16 @@ export default function MisAvisosClient() {
   const [ocupado, setOcupado] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const primera = usePrimera(inicial as Estado | null)   // 12-11 (rapidez): la primera carga viene en el HTML
   const cargar = useCallback(async (revisar = false) => {
+    const pre = revisar ? null : primera()
+    if (pre) { setE(pre); setError(null); return pre }
     const r = await fetch(`/api/avisos-telegram${revisar ? '?revisar=1' : ''}`, { cache: 'no-store' })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return null }
     setE(d); setError(null)
     return d as Estado
-  }, [])
+  }, [primera])
   useEffect(() => { cargar() }, [cargar])
 
   // Esperando que toque "Iniciar" en Telegram: revisa cada 2,5 s (hasta 15 min, lo que dura el código).

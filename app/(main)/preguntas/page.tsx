@@ -7,6 +7,8 @@ import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
+import { deApi } from '@/lib/inicial'
+import { GET as listarPreguntas } from '@/app/api/preguntas/route'
 
 export const metadata = { title: 'Preguntas' }
 
@@ -23,7 +25,9 @@ export default async function PreguntasPage({ searchParams }: { searchParams: Pr
         'La IA te propone cada respuesta con tus políticas; tú la revisas y la publicas.',
         'Respuestas rápidas y tus respuestas anteriores a preguntas parecidas, gratis y a un clic.']} />
   }
-  return <PreguntasClient isAdmin={puede(session!.user, 'automatizaciones_config')}
+  // 12-11 (rapidez): la primera página viene en el HTML (mismo GET de la API).
+  const inicial = await deApi(listarPreguntas, '/api/preguntas?vista=pendientes&page=1&q=')
+  return <PreguntasClient inicial={inicial} isAdmin={puede(session!.user, 'automatizaciones_config')}
     puedeCuentas={puede(session!.user, 'ml_cuentas')} puedeReponer={puede(session!.user, 'reponer_stock')}
     iaAutomatica={tieneModulo(session!.user, 'ia_automatica')}
     miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')}

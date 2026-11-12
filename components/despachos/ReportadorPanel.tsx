@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface Cuenta { nombre: string; filtro: string; pagina: string }
@@ -64,7 +65,7 @@ function VistaPrevia({ plantilla, bloque, pagina, pdf = false }: { plantilla: st
 }
 
 /** Mensajes y cuentas del Reportador + programa de escritorio (respaldo de la API). */
-export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { isAdmin: boolean; conEscritorio?: boolean }) {
+export default function ReportadorPanel({ isAdmin, conEscritorio = false, inicial = null }: { isAdmin: boolean; conEscritorio?: boolean; inicial?: unknown }) {
   const confirm = useConfirm()
   const [estado, setEstado]   = useState<Estado | null>(null)
   const [editando, setEditando] = useState<Config | null>(null)
@@ -73,9 +74,13 @@ export default function ReportadorPanel({ isAdmin, conEscritorio = false }: { is
   // Primer mensaje: la casilla del PDF se elige en el recuadro y se guarda con "Usar este mensaje".
   const [pdfInicial, setPdfInicial] = useState(false)
 
-  const cargar = useCallback(() => fetch('/api/despachos/reportador').then(async r => {
+  const primera = usePrimera(inicial as Estado | null)   // 12-11 (rapidez): vino en el HTML
+  const cargar = useCallback(async () => {
+    const pre = primera()
+    if (pre) { setEstado(pre); return }
+    const r = await fetch('/api/despachos/reportador')
     if (r.ok) setEstado(await r.json())
-  }), [])
+  }, [primera])
   // Se refresca solo: rápido mientras un equipo reporta (para ver el avance), lento en espera.
   const enMarcha = !!estado?.equipos.some(e => activa(e.orden))
   useEffect(() => {

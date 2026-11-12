@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import Link from '@/components/ui/Link'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
@@ -32,18 +33,21 @@ const hora = (s: string) => new Date(s).toLocaleTimeString('es-VE', { hour: '2-d
 
 /** Reportador por API: el servidor le escribe la guía a cada comprador, sin el programa. La corrida
  *  sigue EN EL SERVIDOR aunque se cierre esta pantalla (lib/reportadorCorrida.ts); aquí se ve el avance. */
-export default function ReportadorApi({ conEscritorio = false }: { conEscritorio?: boolean }) {
+export default function ReportadorApi({ conEscritorio = false, inicial = null }: { conEscritorio?: boolean; inicial?: unknown }) {
   const confirm = useConfirm()
   const [estado, setEstado] = useState<Estado | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pidiendo, setPidiendo] = useState(false)
   const [verDetalle, setVerDetalle] = useState(false)
 
+  const primera = usePrimera(inicial as Estado | null)   // 12-11 (rapidez): vino en el HTML
   const cargar = useCallback(async () => {
+    const pre = primera()
+    if (pre) { setEstado(pre); setError(null); return }
     const r = await fetch('/api/despachos/reportador/api', { cache: 'no-store' })
     const d = await r.json().catch(() => ({}))
     if (r.ok) { setEstado(d); setError(null) } else setError(d.error ?? 'No se pudo cargar')
-  }, [])
+  }, [primera])
   useEffect(() => { cargar() }, [cargar])
   // Lo pendiente cambia sin tocar esta sección (apartar una guía, guías nuevas): se relee cada 30 s y al volver a la pestaña.
   useEffect(() => {

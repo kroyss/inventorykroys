@@ -4,6 +4,7 @@ import { GET as novedades } from '@/app/api/novedades/route'
 import { GET as aprendizaje } from '@/app/api/aprendizaje/route'
 import { GET as soporte } from '@/app/api/soporte/route'
 import { GET as cola } from '@/app/api/cola-ml/route'
+import { GET as iaUso } from '@/app/api/ia/uso/route'
 
 // GET /api/comun?q=avisos,novedades,aprendizaje,soporte,cola (12-11, rapidez fase 1)
 // Lo que piden TODAS las pantallas (menú, avisos, ayuda, cola de ML) en un solo pedido: antes eran 7–9 pedidos
@@ -15,6 +16,7 @@ const PARTES = {
   aprendizaje: () => aprendizaje(),
   soporte: () => soporte(),
   cola: (req: NextRequest) => cola(new NextRequest(new URL('/api/cola-ml', req.url))),
+  ia_uso: () => iaUso(),   // créditos de IA (Preguntas, Mensajes), 12-11
 } as const
 type Parte = keyof typeof PARTES
 
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest) {
   await Promise.all([...new Set(pedidas)].map(async k => {
     try {
       const r = await PARTES[k](req)
-      out[k] = { status: r.status, data: r.ok ? await r.json() : null }
+      out[k] = r ? { status: r.status, data: r.ok ? await r.json() : null } : { status: 500, data: null }
     } catch {
       out[k] = { status: 500, data: null }
     }

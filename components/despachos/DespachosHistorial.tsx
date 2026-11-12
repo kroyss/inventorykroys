@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import Link from '@/components/ui/Link'
 import { PageHeader, EmptyState, Pagination } from '@/components/ui'
 
@@ -48,7 +49,7 @@ async function descargarSeguro(href: string, onError: (m: string) => void) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-export default function DespachosHistorial() {
+export default function DespachosHistorial({ inicial = null }: { inicial?: unknown }) {
   const [page, setPage]         = useState(1)
   const [jornadas, setJornadas] = useState<Jornada[]>([])
   const [total, setTotal]       = useState(0)
@@ -67,10 +68,12 @@ export default function DespachosHistorial() {
   }, [qInput])
 
   const reqId = useRef(0)
+  const primera = usePrimera(inicial as Record<string, never> | null)   // 12-11 (rapidez): la primera carga viene en el HTML
   const cargar = useCallback(() => {
     const my = ++reqId.current
     const url = q ? `/api/despachos/historial?q=${encodeURIComponent(q)}` : `/api/despachos/historial?page=${page}`
-    return fetch(url).then(r => r.json()).catch(() => null).then(data => {
+    const pre = primera()
+    return (pre && !q && page === 1 ? Promise.resolve(pre) : fetch(url).then(r => r.json()).catch(() => null)).then(data => {
       if (my !== reqId.current || !data) return
       if (q) {
         setHallazgos(data.etiquetas ?? [])
@@ -82,7 +85,7 @@ export default function DespachosHistorial() {
       }
       setLoading(false)
     })
-  }, [q, page])
+  }, [q, page, primera])
   useEffect(() => { cargar() }, [cargar])
 
   const toggle = async (id: number) => {

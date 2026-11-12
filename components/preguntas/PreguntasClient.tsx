@@ -1,5 +1,6 @@
 'use client'
 import SituacionChip, { type Situacion } from './SituacionChip'
+import { usePrimera } from '@/lib/primera'
 import { rellenarVariables } from '@/lib/variablesTexto'
 import CambiarStock from './CambiarStock'
 import TextoConPublicaciones from './TextoConPublicaciones'
@@ -240,7 +241,9 @@ const ESTADO_RESP: Record<string, { status: string; label: string }> = {
 
 // isAdmin = "Configurar automatizaciones" (pestaña Configuración); conectar cuentas y reponer stock
 // son permisos aparte (lib/permisos.ts).
-export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, iaAutomatica = false, verAvisosInternos = false, miIA = false, envioPorPeso = false }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean; iaAutomatica?: boolean; miIA?: boolean
+export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, iaAutomatica = false, verAvisosInternos = false, miIA = false, envioPorPeso = false, inicial = null }: { isAdmin: boolean; puedeCuentas: boolean; puedeReponer: boolean; iaAutomatica?: boolean; miIA?: boolean
+  /** 12-11 (rapidez): la primera página de Sin responder, ya en el HTML. */
+  inicial?: unknown
   /** 08-11: con pesos cargados el envío gratis sale del cálculo por peso: «Lo aprendido» (envío sí/no) no se muestra. */
   envioPorPeso?: boolean
   /** Solo la organización dueña de la plataforma (22-10): "envío gratis sin confirmar" confundía a los Fundadores. */
@@ -264,9 +267,12 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
   const [sincronizando, setSincronizando] = useState(false)
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
+  const primera = usePrimera(inicial as Datos | null)
   const cargar = useCallback(async () => {
     const v = vista === 'respondidas' ? 'respondidas' : 'pendientes'
     const n = ++ultimoPedido.current
+    const pre = primera()
+    if (pre && v === 'pendientes' && page === 1 && !q) { setDatos(pre); setDatosDe(v); return }
     const r = await fetch(`/api/preguntas?vista=${v}&page=${page}&q=${encodeURIComponent(q)}`)
     const d = await r.json().catch(() => ({}))
     // Una respuesta vieja (de la pestaña o página anterior) que llega tarde no pisa la actual.
@@ -274,7 +280,7 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
     if (!r.ok) { setAviso({ tipo: 'error', texto: d.error ?? 'No se pudo cargar' }); return }
     setDatos(d)
     setDatosDe(v)
-  }, [vista, page, q])
+  }, [vista, page, q, primera])
 
   useEffect(() => { cargar() }, [cargar])
   // Refresco suave cada minuto (el cron trae lo nuevo de ML).

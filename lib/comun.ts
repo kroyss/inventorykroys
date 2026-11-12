@@ -6,7 +6,7 @@
 //
 // Lo que se pide en el mismo momento (al abrir una pantalla, todos los componentes del menú a la vez) sale en
 // UN solo pedido a /api/comun; lo ya traído se reusa unos segundos (cambiar de pantalla no vuelve a pedir todo).
-export type ParteComun = 'avisos' | 'novedades' | 'aprendizaje' | 'soporte' | 'cola'
+export type ParteComun = 'avisos' | 'novedades' | 'aprendizaje' | 'soporte' | 'cola' | 'ia_uso'
 
 const MEMORIA_MS = 10_000
 const memoria = new Map<ParteComun, { at: number; p: Promise<unknown> }>()

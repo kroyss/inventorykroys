@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { PageHeader, StatusBadge, Cargando } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 
@@ -16,17 +17,20 @@ function hace(fecha: string) {
 /** Automatizaciones → Cuentas de MercadoLibre: las cuentas que usan TODAS las herramientas (antes vivía
  *  en Preguntas → Cuentas y políticas). Conectar, link para otra PC, estado y desconectar. Aquí vuelve
  *  el OAuth (api/ml/callback → ?conectada= / ?ml_error=). */
-export default function CuentasMLClient() {
+export default function CuentasMLClient({ inicial = null }: { inicial?: unknown }) {
   const confirm = useConfirm()
   const [datos, setDatos] = useState<{ cuentas: Cuenta[]; mlListo: boolean; esAdmin: boolean } | null>(null)
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
+  const primera = usePrimera(inicial as { cuentas: Cuenta[]; mlListo: boolean; esAdmin: boolean } | null)   // 12-11 (rapidez): la primera carga viene en el HTML
   const cargar = useCallback(async () => {
+    const pre = primera()
+    if (pre) { setDatos(pre); return }
     const r = await fetch('/api/ml/conexiones', { cache: 'no-store' })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setAviso({ tipo: 'error', texto: d.error ?? 'No se pudo cargar' }); return }
     setDatos(d)
-  }, [])
+  }, [primera])
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)

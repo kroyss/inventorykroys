@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import CorregirCalificacion from './CorregirCalificacion'
 import Link from '@/components/ui/Link'
 import { Cargando, EmptyState, PageHeader } from '@/components/ui'
@@ -207,18 +208,22 @@ function FilaCalificacion({ c, pais, onVista, onPedido, onCorregir, ocupado }: {
   )
 }
 
-export default function ReputacionClient() {
+export default function ReputacionClient({ inicial = null }: { inicial?: unknown }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [corrigiendo, setCorrigiendo] = useState<Calificacion | null>(null)
 
+  // 12-11 (rapidez): la primera carga viene en el HTML.
+  const primera = usePrimera(inicial as Datos | null)
   const cargar = useCallback(async () => {
+    const pre = primera()
+    if (pre) { setDatos(pre); return }
     const r = await fetch('/api/reputacion', { cache: 'no-store' })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setDatos(d)
-  }, [])
+  }, [primera])
   useEffect(() => { cargar() }, [cargar])
 
   const marcar = async (c: Calificacion, vista: boolean) => {

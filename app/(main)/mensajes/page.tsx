@@ -7,6 +7,9 @@ import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
+import { deApi } from '@/lib/inicial'
+import { GET as listarMensajes } from '@/app/api/mensajes/route'
+import { GET as seguimiento } from '@/app/api/mensajes/seguimiento/route'
 
 export const metadata = { title: 'Mensajes' }
 
@@ -21,7 +24,13 @@ export default async function MensajesPage({ searchParams }: { searchParams: Pro
         'La IA te propone la respuesta; tú la revisas y la envías.']} />
   }
   const { pack } = await searchParams
-  return <MensajesClient pack={pack && /^\d{6,20}$/.test(pack) ? pack : null}
+  const packOk = pack && /^\d{6,20}$/.test(pack) ? pack : null
+  // 12-11 (rapidez): Por atender y el seguimiento vienen en el HTML (mismos GET de la API). Con ?pack= abre Atendidas: lo pide el navegador.
+  const inicial = packOk ? null : await Promise.all([
+    deApi(listarMensajes, '/api/mensajes?vista=sin_leer&pagina=1'),
+    deApi(seguimiento, '/api/mensajes/seguimiento?horas=12&pagina=1'),
+  ]).then(([lista, seg]) => ({ lista, seg }))
+  return <MensajesClient inicial={inicial} pack={packOk}
     miIA={tieneModulo(session!.user, 'mi_ia') && puede(session!.user, 'automatizaciones_config')}
     // 09-11 (el dueño): la pestaña «IA en prueba» (marcar Bien/Mal) es solo del equipo interno; los clientes
     // encienden y prueban en Mi IA y ven el borrador de la IA en cada conversación.

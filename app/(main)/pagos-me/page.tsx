@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { llevaInventario, tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import PagosMEClient from '@/components/pagosme/PagosMEClient'
+import { deApi } from '@/lib/inicial'
+import { GET as pagosME } from '@/app/api/pagos-me/route'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
@@ -27,5 +29,6 @@ export default async function PagosMEPage({ searchParams }: { searchParams: Prom
         'Compáralos con el movimiento de tu banco en un clic y marca los que no coinciden.',
         'Las guías de las ventas pagadas pasan solas a Despachos.']} />
   }
-  return <PagosMEClient isAdmin={puede(session!.user, 'pagos_me_config')} />
+  // 12-11 (rapidez): la primera carga viene en el HTML (mismo GET de la API).
+  return <PagosMEClient inicial={await deApi(pagosME, '/api/pagos-me?estado=pendiente')} isAdmin={puede(session!.user, 'pagos_me_config')} />
 }

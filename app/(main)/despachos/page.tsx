@@ -1,6 +1,11 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import DespachosClient from '@/components/despachos/DespachosClient'
+import DespachosClient, { type DespachosInicial } from '@/components/despachos/DespachosClient'
+import { deApi } from '@/lib/inicial'
+import { GET as resumenDespachos } from '@/app/api/despachos/route'
+import { GET as detalleLote } from '@/app/api/despachos/lotes/[id]/route'
+import { GET as apartados } from '@/app/api/despachos/apartados/route'
+import { GET as primeraJornada } from '@/app/api/despachos/primera/route'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import NegocioSettings from '@/components/tasas/NegocioSettings'
@@ -26,9 +31,19 @@ export default async function DespachosPage() {
         'Guías Tealca, cierre de jornada y manifiesto para la transportista.',
         'Las ventas y los productos salen directo de MercadoLibre: no cargas nada a mano.']} />
   }
+  // 12-11 (rapidez): la primera carga viene en el HTML (mismos GET de la API). El detalle de los lotes pendientes
+  // solo con inventario: sin inventario ese GET consulta ML (lo sigue pidiendo el navegador).
+  const [ov, espera, primera] = await Promise.all([
+    deApi<NonNullable<DespachosInicial['ov']>>(() => resumenDespachos(), '/api/despachos'),
+    deApi<{ espera: DespachosInicial['espera'] }>(apartados, '/api/despachos/apartados'),
+    deApi<DespachosInicial['primera']>(() => primeraJornada(), '/api/despachos/primera'),
+  ])
+  const lotes = ov && !desdeML ? (await Promise.all(ov.pendientes.map(p => deApi<NonNullable<DespachosInicial['lotes']>[number]>(
+    req => detalleLote(req, { params: Promise.resolve({ id: String(p.id) }) }), `/api/despachos/lotes/${p.id}`)))).filter(l => l !== null) : null
+  const inicial: DespachosInicial = { ov, lotes, espera: espera?.espera ?? null, primera }
   return (
     <div className="space-y-6">
-      <DespachosClient isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} />
+      <DespachosClient inicial={inicial} isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} />
       {/* El remitente del manifiesto se cambia aquí, para todas las empresas (ya no está en Ajustes). */}
       {isAdmin && <NegocioSettings conDespachos soloRemitente />}
     </div>

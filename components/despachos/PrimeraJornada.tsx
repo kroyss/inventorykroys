@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // Primera jornada (07-11-2026, migración 147, caso Urdaneta): el primer día en Despachos llegan también las guías de
 // días anteriores, que muchas veces ya se enviaron por fuera. Se pregunta cuáles ya salieron y se sacan de la jornada
@@ -11,14 +11,15 @@ interface Envio {
 
 const dm = (f: string | null) => (f ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : '—')
 
-export default function PrimeraJornada({ onCambio }: { onCambio: (msg: string) => void }) {
-  const [d, setD] = useState<{ hoy: string; envios: Envio[] } | null>(null)
+export default function PrimeraJornada({ onCambio, inicial = null }: { onCambio: (msg: string) => void; inicial?: { hoy: string; envios: Envio[] } | null }) {
+  const [d, setD] = useState<{ hoy: string; envios: Envio[] } | null>(inicial)
   const [abierto, setAbierto] = useState(false)
   const [marcadas, setMarcadas] = useState<Set<number>>(new Set())
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cargar = useCallback(() => fetch('/api/despachos/primera').then(r => (r.ok ? r.json() : null)).then(setD).catch(() => {}), [])
-  useEffect(() => { cargar() }, [cargar])
+  const yaVino = useRef(!!inicial)   // 12-11 (rapidez): vino en el HTML
+  useEffect(() => { if (yaVino.current) { yaVino.current = false; return } cargar() }, [cargar])
   if (!d?.envios.length) return null
   const viejas = d.envios.filter(e => e.compra && e.compra < d.hoy)
   const marcar = (id: number) => setMarcadas(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })

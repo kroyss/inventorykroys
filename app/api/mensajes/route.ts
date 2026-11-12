@@ -42,7 +42,11 @@ export async function GET(req: NextRequest) {
               NULLIF(c.comprador_nick, '') AS comprador_nick, c.comprador_nombre,
               x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos,
               ${q ? `(SELECT m.texto FROM ml_mensajes m WHERE m.pack_id = c.pack_id AND m.texto ILIKE $2 ORDER BY m.fecha DESC LIMIT 1)` : 'NULL'} AS coincide
-       FROM ml_conversaciones c
+       -- 12-11 (rapidez): primero la página (o el tope) y recién ahí despacho, venta y foto: antes se buscaban para
+       -- las 2.600 conversaciones de Atendidas y se mostraban 10 (135 ms → pocos ms).
+       FROM (SELECT c.* FROM ml_conversaciones c ${filtro}
+             ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC
+             ${paginado ? `LIMIT ${POR_PAGINA} OFFSET ${(pagina! - 1) * POR_PAGINA}` : `LIMIT ${tope}`}) c
        JOIN ml_conexiones x ON x.id = c.conexion_id
        -- Lo que sirve para responder "¿ya lo enviaste?": si su guía ya salió en Despachos (en
        -- ZOOM/TEALCA ML no lo sabe). Dato informativo: pudo despacharse sin registrarlo aquí.
@@ -62,9 +66,7 @@ export async function GET(req: NextRequest) {
          SELECT COALESCE((SELECT thumbnail FROM ml_catalogo k WHERE k.item_id = o.item),
                          (SELECT item_imagen FROM ml_preguntas q WHERE q.item_id = o.item AND q.item_imagen IS NOT NULL LIMIT 1)) AS imagen
        ) img ON TRUE
-       ${filtro}
-       ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC
-       ${paginado ? `LIMIT ${POR_PAGINA} OFFSET ${(pagina! - 1) * POR_PAGINA}` : `LIMIT ${tope}`}`, [tieneModulo(s.session.user, 'despachos'), ...params])
+       ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC`, [tieneModulo(s.session.user, 'despachos'), ...params])
     const hayMas = !paginado && tope === limite + 1 && rows.length > limite
     if (hayMas) rows.pop()
     let total: number | null = null

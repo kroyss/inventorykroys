@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { PageHeader, Tabs, EmptyState, Cargando, StatusBadge, STATUS_LABELS, ESTADOS_VENTA_VE } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
@@ -82,7 +83,9 @@ const MOTIVOS: Record<string, string> = {
 }
 
 /** Calificaciones en bloque: ventas de ML sin calificar, cruzadas con el sistema. */
-export default function CalificacionesClient({ isAdmin, despachaVE = false }: { isAdmin: boolean; despachaVE?: boolean }) {
+export default function CalificacionesClient({ isAdmin, despachaVE = false, inicial = null }: { isAdmin: boolean; despachaVE?: boolean
+  /** 12-11 (rapidez): «Por calificar», ya en el HTML. */
+  inicial?: unknown }) {
   const confirm = useConfirm()
   const [vista, setVista] = useState<'listas' | 'proximas' | 'esperando' | 'config'>('listas')
   const [datos, setDatos] = useState<Datos | null>(null)
@@ -95,10 +98,17 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
   const [aviso, setAviso] = useState<string | null>(null)
   const parar = useRef(false)
 
+  const primera = usePrimera(inicial as Datos | null)
   const cargar = useCallback(async () => {
-    const r = await fetch(`/api/calificaciones?vista=${vista === 'config' ? 'listas' : vista}`)
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setAviso(d.error ?? 'No se pudo cargar'); return }
+    const pre = primera()
+    let d: Datos
+    if (pre && vista === 'listas') d = pre
+    else {
+      const r = await fetch(`/api/calificaciones?vista=${vista === 'config' ? 'listas' : vista}`)
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setAviso(j.error ?? 'No se pudo cargar'); return }
+      d = j
+    }
     setDatos(d)
     // Por defecto, cada una con su sugerencia marcada (salvo las que siguen en días de espera y las de
     // "Revisar": esas las decide una persona, venta por venta).
@@ -119,7 +129,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false }: { 
       setElegidas(x => ({ ...x, ...Object.fromEntries([...res].filter(([id, v]) => v.concretada === true && x[id] === 'no_concretada').map(([id]) => [id, 'concretada' as Tipo])) }))
       setLeyendo(x => { const n = new Set(x); lote.forEach(id => n.delete(id)); return n })
     }
-  }, [vista])
+  }, [vista, primera])
   useEffect(() => { cargar() }, [cargar])
 
   const actualizar = async () => {

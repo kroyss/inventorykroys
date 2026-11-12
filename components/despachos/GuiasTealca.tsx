@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 
 interface Envio {
   id: number
@@ -22,7 +23,7 @@ const fechaHora = (s: string) => new Date(s).toLocaleString('es-VE', {
  * genera Tealca después y se escribe aquí, al lado del nombre del destinatario. Un envío
  * con guía entra a la cola del Reportador; sin guía se queda esperando.
  */
-export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean; onGuardado?: () => void }) {
+export default function GuiasTealca({ isAdmin, onGuardado, inicial = null }: { isAdmin: boolean; onGuardado?: () => void; inicial?: unknown }) {
   const [envios, setEnvios]   = useState<Envio[] | null>(null)
   const [digitos, setDigitos] = useState(8)
   const [valores, setValores] = useState<Record<number, string>>({})
@@ -34,15 +35,19 @@ export default function GuiasTealca({ isAdmin, onGuardado }: { isAdmin: boolean;
   const [marcadas, setMarcadas] = useState<Set<number>>(new Set())
   const [avisadas, setAvisadas] = useState<number[] | null>(null)   // las últimas «Ya avisé», para Deshacer
 
+  const primera = usePrimera(inicial as { digitos: number; envios: Envio[] } | null)   // 12-11 (rapidez): vino en el HTML
   const cargar = useCallback(async () => {
-    const res = await fetch('/api/despachos/tealca')
-    if (!res.ok) return
-    const d = await res.json() as { digitos: number; envios: Envio[] }
+    let d = primera()
+    if (!d) {
+      const res = await fetch('/api/despachos/tealca')
+      if (!res.ok) return
+      d = await res.json() as { digitos: number; envios: Envio[] }
+    }
     setEnvios(d.envios)
     setDigitos(d.digitos)
     setValores({})
     setMarcadas(new Set())
-  }, [])
+  }, [primera])
   useEffect(() => { cargar() }, [cargar])
 
   const valorDe = (e: Envio) => valores[e.id] ?? e.guia_final ?? ''

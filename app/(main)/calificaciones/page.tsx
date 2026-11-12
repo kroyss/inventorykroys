@@ -8,6 +8,9 @@ import VistasCalificaciones from '@/components/preguntas/VistasCalificaciones'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
+import { deApi } from '@/lib/inicial'
+import { GET as calificaciones } from '@/app/api/calificaciones/route'
+import { GET as reputacion } from '@/app/api/reputacion/route'
 
 export const metadata = { title: 'Calificaciones' }
 
@@ -24,10 +27,12 @@ export default async function CalificacionesPage({ searchParams }: { searchParam
         'Los 30 días que tienes para pedirle al comprador que la cambie, contados para cada una.']} />
   }
   const recibidas = (await searchParams).ver === 'recibidas'
+  // 12-11 (rapidez): la primera carga viene en el HTML (mismo GET de la API).
+  const inicial = recibidas ? await deApi(() => reputacion(), '/api/reputacion') : await deApi(calificaciones, '/api/calificaciones?vista=listas')
   return (
     <div className="space-y-3">
       <VistasCalificaciones recibidas={recibidas} />
-      {recibidas ? <ReputacionClient /> : <CalificacionesClient isAdmin={puede(session!.user, 'automatizaciones_config')}
+      {recibidas ? <ReputacionClient inicial={inicial} /> : <CalificacionesClient inicial={inicial} isAdmin={puede(session!.user, 'automatizaciones_config')}
         despachaVE={session!.user.country === 'VE' && tieneModulo(session!.user, 'verificar_pagos')} />}
     </div>
   )

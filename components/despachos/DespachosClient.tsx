@@ -2,6 +2,7 @@
 import { AvisoEnEspera, BotonEnEspera, PanelEnEspera, useEnEspera, type Apartado } from '@/components/despachos/EnEspera'
 import PrimeraJornada from '@/components/despachos/PrimeraJornada'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import Link from '@/components/ui/Link'
 import { PageHeader, EmptyState } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -114,7 +115,10 @@ const TANDA = 60  // PDFs por envío al servidor (MAX_PDFS_POR_SUBIDA)
 const esPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
 
 // ── Pantalla ────────────────────────────────────────────────────────────────
-export default function DespachosClient({ isAdmin, reportador, desdeML = false }: { isAdmin: boolean; reportador: boolean; desdeML?: boolean }) {
+/** 12-11 (rapidez): lo de la primera carga que viene en el HTML (cada parte null = la pide el navegador). */
+export interface DespachosInicial { ov: Overview | null; lotes: LoteDetalle[] | null; espera: Apartado[] | null; primera: { hoy: string; envios: never[] } | null }
+
+export default function DespachosClient({ isAdmin, reportador, desdeML = false, inicial = null }: { isAdmin: boolean; reportador: boolean; desdeML?: boolean; inicial?: DespachosInicial | null }) {
   const confirm = useConfirm()
   const [data, setData]         = useState<Overview | null>(null)
   const [lotes, setLotes]       = useState<Record<number, LoteDetalle>>({})
@@ -126,17 +130,25 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
   const [recienCerrada, setRecienCerrada] = useState<{ id: number; transportistas: string[] } | null>(null)
   const [fallas, setFallas]     = useState<Falla[]>([])
   // En espera (apartados, mig. 107): botón junto a Historial, línea de aviso y panel al costado.
-  const espera = useEnEspera()
+  const espera = useEnEspera(inicial?.espera ?? null)
   const [panelEspera, setPanelEspera] = useState<{ pre: Apartado | null } | null>(null)
 
-  const cargar = useCallback(() => fetch('/api/despachos').then(async res => {
-    if (!res.ok) { setError((await errorDe(res)).error ?? 'Error'); return }
-    const ov: Overview = await res.json()
-    const detalles = await Promise.all(ov.pendientes.map(p =>
+  const primeraCarga = usePrimera(inicial?.ov ? inicial : null)
+  const cargar = useCallback(async () => {
+    const pre = primeraCarga()
+    let ov: Overview
+    if (pre?.ov) ov = pre.ov
+    else {
+      const res = await fetch('/api/despachos')
+      if (!res.ok) { setError((await errorDe(res)).error ?? 'Error'); return }
+      ov = await res.json()
+    }
+    const yaTraidos = new Map((pre?.lotes ?? []).map(l => [l.id, l]))
+    const detalles = await Promise.all(ov.pendientes.map(p => yaTraidos.get(p.id) ??
       fetch(`/api/despachos/lotes/${p.id}`).then(r => r.ok ? r.json() as Promise<LoteDetalle> : null)))
     setData(ov)
     setLotes(Object.fromEntries(detalles.filter((d): d is LoteDetalle => !!d).map(d => [d.id, d])))
-  }), [])
+  }, [primeraCarga])
 
   useEffect(() => { cargar() }, [cargar])
 
@@ -358,7 +370,7 @@ export default function DespachosClient({ isAdmin, reportador, desdeML = false }
       />
 
       <AvisoEnEspera lista={espera.lista} onAbrir={() => setPanelEspera({ pre: null })} />
-      <PrimeraJornada onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />
+      <PrimeraJornada inicial={inicial?.primera ?? null} onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />
       {panelEspera && (
         <PanelEnEspera lista={espera.lista} preseleccion={panelEspera.pre} onCerrar={() => setPanelEspera(null)} conInventario={!desdeML}
           onCambio={msg => { setAviso(msg); setError(null); espera.recargar(); cargar() }} />

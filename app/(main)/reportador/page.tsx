@@ -11,6 +11,11 @@ import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
 import { ORGANIZACION_PLATAFORMA } from '@/lib/empresa'
+import { deApi } from '@/lib/inicial'
+import { GET as apartados } from '@/app/api/despachos/apartados/route'
+import { GET as estadoApi } from '@/app/api/despachos/reportador/api/route'
+import { GET as tealca } from '@/app/api/despachos/tealca/route'
+import { GET as reportador } from '@/app/api/despachos/reportador/route'
 
 export const metadata = { title: 'Reportador' }
 
@@ -33,14 +38,21 @@ export default async function ReportadorPage({ searchParams }: { searchParams: P
   }
   const sp = await searchParams
   const jornada = /^\d+$/.test(sp.jornada ?? '') ? Number(sp.jornada) : null
+  // 12-11 (rapidez): la primera carga de cada sección viene en el HTML (mismos GET de la API).
+  const [espera, iApi, iTealca, iPanel] = await Promise.all([
+    deApi<{ espera: never[] }>(apartados, '/api/despachos/apartados'),
+    deApi(() => estadoApi(), '/api/despachos/reportador/api'),
+    deApi(() => tealca(), '/api/despachos/tealca'),
+    deApi(() => reportador(), '/api/despachos/reportador'),
+  ])
   return (
     <div className="space-y-4">
       <PageHeader title="Reportador" subtitle="Le escribe a cada comprador su número de guía en MercadoLibre." />
-      <ReportadorVistas vistaInicial={sp.vista === 'historial' || jornada ? 'historial' : 'reportar'} jornadaInicial={jornada}
+      <ReportadorVistas esperaInicial={espera?.espera ?? null} vistaInicial={sp.vista === 'historial' || jornada ? 'historial' : 'reportar'} jornadaInicial={jornada}
         reportar={<>
-          <ReportadorApi conEscritorio={conEscritorio} />
-          <GuiasTealca isAdmin={isAdmin} />
-          <ReportadorPanel isAdmin={isAdmin} conEscritorio={conEscritorio} />
+          <ReportadorApi inicial={iApi} conEscritorio={conEscritorio} />
+          <GuiasTealca inicial={iTealca} isAdmin={isAdmin} />
+          <ReportadorPanel inicial={iPanel} isAdmin={isAdmin} conEscritorio={conEscritorio} />
         </>} />
     </div>
   )
