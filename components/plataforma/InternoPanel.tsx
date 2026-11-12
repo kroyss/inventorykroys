@@ -99,7 +99,7 @@ export default function InternoPanel() {
         <div>
           <h2 className="text-base font-semibold text-neutral-900">Consumo de IA por cuenta</h2>
           <p className="text-sm text-neutral-500">
-            Desde que salió Mi IA ({datos ? ddmm(datos.desde) : '…'}). Todo lo que gasta cada cuenta, separado por para qué fue.
+            Desde el {datos ? ddmm(datos.desde) : '…'}{datos?.desde === '2026-11-06' ? ' (salió Mi IA)' : ''}. Todo lo que gasta cada cuenta, separado por para qué fue.
             <b className="text-neutral-700"> Costo real por crédito</b> = todo su gasto ÷ los créditos que se le cobraron: compáralo con lo que
             vale el crédito (≈ $0,007–0,008).
           </p>
