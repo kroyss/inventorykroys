@@ -4,7 +4,7 @@
 // Información extra (lo general con siempre=true). Al guardar, preguntas_politicas queda vacío.
 // Una llamada a la IA como la del prellenado (módulo 'simulacion': no descuenta créditos del cliente).
 import type { Pool } from 'pg'
-import { llamarClaude, registrarUso, MODELO_IA } from '@/lib/ia'
+import { llamarClaude, registrarUso, MODELO_SIMPLE } from '@/lib/ia'
 import { HERRAMIENTA as BASE, limpiar } from '@/lib/miIASugerir'
 import type { EntradaMiIA } from '@/lib/miIAEsquema'
 
@@ -56,7 +56,8 @@ export async function pasarPoliticas(db: Pool, usuarioId: number | string | null
   const politicas = await leerPoliticas(db)
   if (!politicas) return { propuesto: {}, politicas }
   const { resultado, uso, modelo } = await llamarClaude<Record<string, unknown>>({
-    sistema: SISTEMA, contenido: `SUS INDICACIONES ESCRITAS PARA LA IA:\n${politicas.slice(0, 6000)}`, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 2500 })
+    sistema: SISTEMA, contenido: `SUS INDICACIONES ESCRITAS PARA LA IA:\n${politicas.slice(0, 6000)}`, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE,   // 12-11 (el dueño): Haiku también aquí (Sonnet costaba ~$0,03 por llamada)
+    maxTokens: 2500 })
   await registrarUso(db, 'simulacion', [{ modelo, uso }], usuarioId)
   return { propuesto: limpiar(resultado), politicas }
 }

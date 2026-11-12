@@ -4,27 +4,37 @@ import { FUNCIONES_INTERNAS } from '@/lib/funcionesInternas'
 import { MODULOS } from '@/lib/modulos'
 import AvisosTelegramCard from './AvisosTelegramCard'
 
-interface Fila {
-  empresa_id: number; empresa: string; mes: string; modulo: string
-  borradores: number; entrada: number; salida: number; busquedas: number; costo: number
-}
-interface Empresa { id: number; nombre: string; porMes: Record<string, { costo: number; borradores: number; preguntas: number; mensajes: number; fichas: number }> }
 interface Detalle {
   empresa_id: number; dia: string; modulo: string; modelo: string; usuario: string
   usos: number; entrada: number; salida: number; busquedas: number; costo: number
 }
 interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null; creditos?: number | null }
-interface Datos { meses: string[]; filas: Fila[]; detalle: Detalle[]; empresas: EmpresaMeta[]; diasMes: number; diaHoy: number }
+interface Datos { desde: string; dias: number; detalle: Detalle[]; empresas: EmpresaMeta[] }
 
-const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Fichas (segundo plano)', revisor: 'Revisor de sugeridas' }
+const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Lectura de publicaciones y fotos', revisor: 'Revisor de sugeridas', simulacion: 'Configuración y pruebas (Mi IA)' }
 const modeloTxt = (m: string) => m
   .replace(/claude-haiku-[\w.-]+/g, 'Haiku').replace(/claude-sonnet-[\w.-]+/g, 'Sonnet').replace(/claude-opus-[\w.-]+/g, 'Opus')
 const tok = (n: number) => n >= 1e6 ? `${(n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M` : n >= 1e3 ? `${Math.round(n / 1e3).toLocaleString('de-DE')} mil` : String(n)
 
 // Montos chicos (centavos de dólar) con más decimales: si no, $0,0026 se vería como $0,00.
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: n > 0 && n < 0.995 ? 4 : 2 })}`
-const nombreMes = (m: string) => new Intl.DateTimeFormat('es-VE', { month: 'short', year: '2-digit', timeZone: 'UTC' })
-  .format(new Date(`${m}-15T12:00:00Z`)).replace('.', '')
+const usd4 = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
+const ES_RESPUESTA = (m: string) => m === 'preguntas' || m === 'mensajes'
+
+/** Lo de una empresa (o de todas) desde que se mide, separado por para qué fue. */
+interface Cuenta { respuestas: number; creditos: number; costoResp: number; lectura: number; config: number; revisor: number; total: number }
+function cuentaDe(filas: Detalle[]): Cuenta {
+  const c: Cuenta = { respuestas: 0, creditos: 0, costoResp: 0, lectura: 0, config: 0, revisor: 0, total: 0 }
+  for (const d of filas) {
+    c.total += d.costo
+    if (ES_RESPUESTA(d.modulo)) { c.respuestas += d.usos; c.creditos += d.usos + d.busquedas; c.costoResp += d.costo }
+    else if (d.modulo === 'fichas') c.lectura += d.costo
+    else if (d.modulo === 'simulacion') c.config += d.costo
+    else c.revisor += d.costo
+  }
+  return c
+}
 
 /** Plataforma → Interno: consumo de IA de cada empresa y la lista de lo que los clientes no ven. */
 export default function InternoPanel() {
@@ -39,102 +49,90 @@ export default function InternoPanel() {
     return () => { vivo = false }
   }, [])
 
-  const empresas: Empresa[] = []
-  for (const f of datos?.filas ?? []) {
-    let e = empresas.find(x => x.id === f.empresa_id)
-    if (!e) { e = { id: f.empresa_id, nombre: f.empresa, porMes: {} }; empresas.push(e) }
-    const c = (e.porMes[f.mes] ??= { costo: 0, borradores: 0, preguntas: 0, mensajes: 0, fichas: 0 })
-    c.costo += f.costo
-    // Borradores = lo pedido con el botón (Preguntas + Mensajes). Las fichas suman al costo, no acá.
-    if (f.modulo === 'preguntas') { c.preguntas += f.borradores; c.borradores += f.borradores }
-    if (f.modulo === 'mensajes') { c.mensajes += f.borradores; c.borradores += f.borradores }
-    if (f.modulo === 'fichas' || f.modulo === 'revisor' || f.modulo === 'simulacion') c.fichas += f.costo   // gasto del sistema (fichas, revisor de sugeridas, simulación económica)
-  }
-  const meses = datos?.meses ?? []
-  const mesActual = meses[meses.length - 1]
-  const totalMes = (m: string) => empresas.reduce((a, e) => a + (e.porMes[m]?.costo ?? 0), 0)
-  const resumen = (e: Empresa) => {
-    const conUso = meses.filter(m => e.porMes[m]?.costo)
-    const costo = conUso.reduce((a, m) => a + e.porMes[m].costo, 0)
-    const borradores = conUso.reduce((a, m) => a + e.porMes[m].borradores, 0)
-    return { promedioMes: conUso.length ? costo / conUso.length : 0, porBorrador: borradores ? costo / borradores : 0 }
-  }
-
-  // Los 3 números del mes: cuánto va, cuánto cuesta cada borrador y quién consume más.
-  const gastoMes = mesActual ? totalMes(mesActual) : 0
-  const borradoresMes = mesActual ? empresas.reduce((a, e) => a + (e.porMes[mesActual]?.borradores ?? 0), 0) : 0
-  const top = mesActual ? [...empresas].sort((a, b) => (b.porMes[mesActual]?.costo ?? 0) - (a.porMes[mesActual]?.costo ?? 0))[0] : undefined
-  const cierre = datos && datos.diaHoy ? (gastoMes / datos.diaHoy) * datos.diasMes : gastoMes
+  // 12-11 (el dueño): se mide desde que salió Mi IA (lo de antes eran otros modelos y otro diseño). Todo lo que gasta
+  // cada cuenta cuenta: respuestas, lectura de publicaciones y fotos, configuración/pruebas de Mi IA y revisor.
+  const detalle = datos?.detalle ?? []
+  const filas = [...new Set(detalle.map(d => d.empresa_id))].map(id => {
+    const meta = datos!.empresas.find(e => e.id === id)
+    return { id, nombre: meta?.nombre ?? `Empresa ${id}`, propietario: !!meta?.propietario, c: cuentaDe(detalle.filter(d => d.empresa_id === id)) }
+  }).sort((a, b) => b.c.total - a.c.total)
+  const clientes = cuentaDe(detalle.filter(d => !datos?.empresas.find(e => e.id === d.empresa_id)?.propietario))
+  const total = cuentaDe(detalle)
+  const alMes = (n: number) => (datos?.dias ? (n / datos.dias) * 30 : n)
 
   return (
     <div className="space-y-8">
       <AvisosTelegramCard />
-      {datos && empresas.length > 0 && (
+      {datos && filas.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Numero titulo="Gasto de IA este mes" valor={usd(gastoMes)} detalle={`al ritmo actual cierra en ${usd(cierre)}`} />
-          <Numero titulo="Costo por borrador" valor={borradoresMes ? `$${(gastoMes / borradoresMes).toLocaleString('de-DE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}` : '—'}
-            detalle={`${borradoresMes} borradores este mes`} />
-          <Numero titulo="Más consume" valor={top && top.porMes[mesActual!]?.costo ? top.nombre : '—'}
-            detalle={top && top.porMes[mesActual!]?.costo ? usd(top.porMes[mesActual!].costo) : 'nadie usó la IA este mes'} />
+          <Numero titulo={`Gasto de IA desde ${ddmm(datos.desde)}`} valor={usd(total.total)}
+            detalle={`${datos.dias} días · a este ritmo ≈ ${usd(alMes(total.total))} al mes`} />
+          <Numero titulo="Clientes: costo real por crédito" valor={clientes.creditos ? usd4(clientes.total / clientes.creditos) : '—'}
+            detalle={clientes.creditos ? `todo lo que gastan ÷ ${clientes.creditos} créditos cobrados` : 'todavía no cobraron créditos'} />
+          <Numero titulo="Clientes: costo por respuesta" valor={clientes.respuestas ? usd4(clientes.costoResp / clientes.respuestas) : '—'}
+            detalle={`solo la respuesta · ${clientes.respuestas} respuestas`} />
         </div>
       )}
 
       <section className="space-y-3">
         <div>
-          <h2 className="text-base font-semibold text-neutral-900">Consumo de IA por empresa</h2>
+          <h2 className="text-base font-semibold text-neutral-900">Consumo de IA por cuenta</h2>
           <p className="text-sm text-neutral-500">
-            Lo que cuestan los borradores de la IA en Preguntas y Mensajes. En la fase Fundadores lo paga la plataforma;
-            sirve para saber cuánto consume una cuenta en promedio y ponerle precio.
+            Desde que salió Mi IA ({datos ? ddmm(datos.desde) : '…'}). Todo lo que gasta cada cuenta, separado por para qué fue.
+            <b className="text-neutral-700"> Costo real por crédito</b> = todo su gasto ÷ los créditos que se le cobraron: compáralo con lo que
+            vale el crédito (≈ $0,007–0,008).
           </p>
         </div>
         {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
-        {!datos ? !error && <p className="text-sm text-neutral-400">Cargando…</p> : empresas.length === 0 ? (
-          <p className="text-sm text-neutral-400 py-6 text-center bg-white rounded-xl border border-neutral-200">Todavía ninguna empresa usó la IA.</p>
+        {!datos ? !error && <p className="text-sm text-neutral-400">Cargando…</p> : filas.length === 0 ? (
+          <p className="text-sm text-neutral-400 py-6 text-center bg-white rounded-xl border border-neutral-200">Todavía ninguna cuenta usó la IA.</p>
         ) : (
           <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-neutral-500 border-b border-neutral-200">
-                  <th className="px-4 py-2.5 font-medium">Empresa</th>
-                  {meses.map(m => (
-                    <th key={m} className={`px-3 py-2.5 font-medium text-right whitespace-nowrap ${m === mesActual ? 'text-neutral-900' : ''}`}>
-                      {nombreMes(m)}{m === mesActual ? ' (en curso)' : ''}
-                    </th>
-                  ))}
-                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap border-l border-neutral-100">Promedio/mes</th>
-                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Por borrador</th>
+                  <th className="px-4 py-2.5 font-medium">Cuenta</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="Preguntas y mensajes con IA (borradores y automáticas)">Respuestas</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="1 por respuesta + búsquedas en internet">Créditos</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">En respuestas</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="Leer publicaciones y fotos (una vez, se reutiliza)">Lectura</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap" title="Prellenado, prueba con 10 reales y simulaciones de Mi IA">Config. Mi IA</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Revisor</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap border-l border-neutral-100">Total</th>
+                  <th className="px-3 py-2.5 font-medium text-right whitespace-nowrap">Por respuesta</th>
+                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Real por crédito</th>
                 </tr>
               </thead>
               <tbody>
-                {empresas.map(e => {
-                  const r = resumen(e)
-                  return (
-                    <tr key={e.id} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-4 py-2.5 font-medium text-neutral-900 whitespace-nowrap">{e.nombre}</td>
-                      {meses.map(m => {
-                        const c = e.porMes[m]
-                        return (
-                          <td key={m} className="px-3 py-2.5 text-right whitespace-nowrap"
-                            title={c ? `${c.preguntas} de Preguntas · ${c.mensajes} de Mensajes${c.fichas ? ` · fichas ${usd(c.fichas)}` : ''}` : undefined}>
-                            {c ? <>
-                              <span className="num text-neutral-900">{usd(c.costo)}</span>
-                              <span className="block text-[11px] text-neutral-400 num">{c.borradores} borr.</span>
-                            </> : <span className="text-neutral-300">—</span>}
-                          </td>
-                        )
-                      })}
-                      <td className="px-3 py-2.5 text-right num border-l border-neutral-100">{usd(r.promedioMes)}</td>
-                      <td className="px-4 py-2.5 text-right num text-neutral-600">
-                        ${r.porBorrador.toLocaleString('de-DE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {filas.map(({ id, nombre, propietario, c }) => (
+                  <tr key={id} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2.5 font-medium text-neutral-900 whitespace-nowrap">
+                      {nombre}{propietario && <span className="block text-[11px] font-normal text-neutral-400">tu empresa · incluye pruebas internas</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-right num">{c.respuestas}</td>
+                    <td className="px-3 py-2.5 text-right num">{c.creditos}</td>
+                    <td className="px-3 py-2.5 text-right num">{c.costoResp ? usd(c.costoResp) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right num text-neutral-600">{c.lectura ? usd(c.lectura) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right num text-neutral-600">{c.config ? usd(c.config) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right num text-neutral-600">{c.revisor ? usd(c.revisor) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right num font-medium text-neutral-900 border-l border-neutral-100">{usd(c.total)}</td>
+                    <td className="px-3 py-2.5 text-right num text-neutral-600">{c.respuestas ? usd4(c.costoResp / c.respuestas) : '—'}</td>
+                    <td className={`px-4 py-2.5 text-right num ${c.creditos && c.total / c.creditos > 0.007 ? 'font-medium text-amber-700' : 'text-neutral-600'}`}>
+                      {c.creditos ? usd4(c.total / c.creditos) : '—'}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
               <tfoot>
                 <tr className="bg-neutral-50 text-xs font-semibold text-neutral-700">
-                  <td className="px-4 py-2">Total plataforma</td>
-                  {meses.map(m => <td key={m} className="px-3 py-2 text-right num">{totalMes(m) ? usd(totalMes(m)) : '—'}</td>)}
+                  <td className="px-4 py-2">Total</td>
+                  <td className="px-3 py-2 text-right num">{total.respuestas}</td>
+                  <td className="px-3 py-2 text-right num">{total.creditos}</td>
+                  <td className="px-3 py-2 text-right num">{usd(total.costoResp)}</td>
+                  <td className="px-3 py-2 text-right num">{usd(total.lectura)}</td>
+                  <td className="px-3 py-2 text-right num">{usd(total.config)}</td>
+                  <td className="px-3 py-2 text-right num">{usd(total.revisor)}</td>
+                  <td className="px-3 py-2 text-right num border-l border-neutral-100">{usd(total.total)}</td>
                   <td colSpan={2} />
                 </tr>
               </tfoot>
@@ -142,7 +140,8 @@ export default function InternoPanel() {
           </div>
         )}
         <p className="text-xs text-neutral-400">
-          Promedio/mes: solo cuenta los meses en que la empresa usó la IA. Pasa el mouse por una celda para ver cuántos borradores fueron de Preguntas y cuántos de Mensajes (y lo que costaron las fichas).
+          En ámbar: la cuenta gasta más de $0,007 por crédito cobrado (al precio de las recargas perdería). La configuración de Mi IA
+          se gasta una vez al armarla; al principio pesa mucho y se diluye con el uso.
         </p>
       </section>
 
@@ -196,8 +195,8 @@ export default function InternoPanel() {
   )
 }
 
-/** Detalle del mes en curso, por empresa: cupo usado, módulo × modelo (usos, tokens, costo),
- *  quién lo usó y cuánto por día, con la proyección al cierre del mes. Para evaluar y ajustar. */
+/** Detalle desde que se mide, por empresa: créditos, módulo × modelo (usos, tokens, costo),
+ *  quién lo usó y cuánto por día. Para evaluar y ajustar. */
 function DetalleMes({ datos }: { datos: Datos }) {
   const [abierta, setAbierta] = useState<number | null>(null)
   const ids = [...new Set(datos.detalle.map(d => d.empresa_id))]
@@ -206,20 +205,19 @@ function DetalleMes({ datos }: { datos: Datos }) {
     .map(id => datos.empresas.find(e => e.id === id) ?? { id, nombre: `Empresa ${id}`, propietario: false, limite: null })
     .sort((a, b) => costoDe(b.id) - costoDe(a.id))
   const total = datos.detalle.reduce((a, d) => a + d.costo, 0)
-  const proyeccion = (c: number) => (datos.diaHoy ? (c / datos.diaHoy) * datos.diasMes : c)
+  const alMes = (c: number) => (datos.dias ? (c / datos.dias) * 30 : c)
 
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-base font-semibold text-neutral-900">Detalle de este mes</h2>
+        <h2 className="text-base font-semibold text-neutral-900">Detalle por cuenta</h2>
         <p className="text-sm text-neutral-500">
-          En qué se fue cada centavo: módulo, modelo, tokens, quién y qué día. Total de la plataforma:{' '}
-          <b className="text-neutral-800">{usd(total)}</b> · al ritmo actual cerraría el mes en{' '}
-          <b className="text-neutral-800">{usd(proyeccion(total))}</b>.
+          En qué se fue cada centavo desde el {ddmm(datos.desde)}: módulo, modelo, tokens, quién y qué día. Total:{' '}
+          <b className="text-neutral-800">{usd(total)}</b> · a este ritmo ≈ <b className="text-neutral-800">{usd(alMes(total))}</b> al mes.
         </p>
       </div>
       {metas.length === 0 ? (
-        <p className="text-sm text-neutral-400 py-6 text-center bg-white rounded-xl border border-neutral-200">Este mes nadie usó la IA todavía.</p>
+        <p className="text-sm text-neutral-400 py-6 text-center bg-white rounded-xl border border-neutral-200">Nadie usó la IA todavía.</p>
       ) : metas.map(e => {
         const filas = datos.detalle.filter(d => d.empresa_id === e.id)
         const costo = filas.reduce((a, d) => a + d.costo, 0)
@@ -239,7 +237,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
           return [...m.entries()].sort((a, b) => b[1].costo - a[1].costo)
         }
         const porModelo = agrupar(d => `${MODULO_TXT[d.modulo] ?? d.modulo}|${modeloTxt(d.modelo)}`)
-        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.modulo === 'simulacion' ? 'Sistema (simulación económica)' : d.usuario))
+        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.modulo === 'simulacion' ? 'Sistema (configuración y pruebas)' : d.usuario))
         const porDia = agrupar(d => d.dia).sort((a, b) => a[0].localeCompare(b[0]))
         const maxDia = Math.max(...porDia.map(([, g]) => g.costo), 0.0001)
         const cupo = e.limite
@@ -262,7 +260,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
               </span>
               <span className="text-sm text-neutral-600">
                 Costo: <b className="num text-neutral-900">{usd(costo)}</b>
-                <span className="text-xs text-neutral-400"> → {usd(proyeccion(costo))} al cierre</span>
+                <span className="text-xs text-neutral-400"> · ≈ {usd(alMes(costo))} al mes</span>
               </span>
               <span className="text-sm text-neutral-600">
                 Tokens: <span className="num">{tok(entrada)}</span> leídos · <span className="num">{tok(salida)}</span> escritos
@@ -334,8 +332,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
       })}
       <p className="text-xs text-neutral-400">
         Créditos = lo que ve el cliente: 1 por cada «Proponer con IA» (se use o no la respuesta) + 1 por cada búsqueda en internet.
-        Haiku = preguntas simples (~$0,004); Sonnet = difíciles (~$0,03); «lote» = fichas a mitad de precio.
-        Al cierre = lo gastado hasta hoy llevado a todo el mes.
+        Todo va con Haiku; «lote» = fichas a mitad de precio. «Al mes» = lo gastado por día llevado a 30 días.
       </p>
     </section>
   )

@@ -11,7 +11,7 @@
 // orden fijo (indicaciones escritas > respuestas más recientes > descripciones) y cada aviso va con su tema: la pantalla
 // lo muestra como una línea chica DENTRO de ese tema ("Usé X (de…). En … dice Y."), no como lista aparte.
 import type { Pool } from 'pg'
-import { llamarClaude, registrarUso, MODELO_IA } from '@/lib/ia'
+import { llamarClaude, registrarUso, MODELO_SIMPLE } from '@/lib/ia'
 import { mlFetch } from '@/lib/ml'
 import { EsquemaMiIA, type EntradaMiIA } from '@/lib/miIAEsquema'
 
@@ -126,7 +126,8 @@ export async function sugerirMiIA(db: Pool, usuarioId: number | string | null): 
     bloque ? `TEXTO QUE REPITE EN SUS DESCRIPCIONES:\n${bloque}` : '',
     politicas ? `SUS INDICACIONES ESCRITAS PARA LA IA:\n${politicas.slice(0, 3000)}` : '',
   ].filter(Boolean).join('\n\n')
-  const { resultado, uso, modelo } = await llamarClaude<Record<string, unknown>>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 2000 })
+  const { resultado, uso, modelo } = await llamarClaude<Record<string, unknown>>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE,   // 12-11 (el dueño): Haiku también aquí (Sonnet costaba ~$0,03 por llamada)
+    maxTokens: 2000 })
   await registrarUso(db, 'simulacion', [{ modelo, uso }], usuarioId)
   const avisos: AvisoMiIA[] = Array.isArray(resultado.avisos)
     ? (resultado.avisos as { tema?: unknown; texto?: unknown }[])
