@@ -77,12 +77,15 @@ export async function costosEnviosML(db: Pool, mes: string, conFactura: boolean)
      WHERE rate_date < $1::date ORDER BY rate_date DESC, id DESC LIMIT 1`, [hasta])
 
   // Una fila por guía (la primera vez que se subió), su cuenta ML (por la orden) y el peso del paquete (Σ cantidad × peso).
+  // 12-11 (el dueño, comparado con MercadoEnvíos → Cargos especiales): ML cuenta cada envío en el mes en que se CERRÓ LA
+  // ORDEN, no el día que se subió la guía (las órdenes del 31 se suben el 1 y van al mes anterior). Se buscan guías
+  // subidas 20 días antes y después y se queda con las de órdenes del mes (sin orden conocida: la fecha de la guía).
   const { rows } = await db.query(`
     WITH g AS (
       SELECT DISTINCT ON (e.guia) e.guia, e.venta, e.sale_id, e.carrier, e.created_at,
              CASE WHEN e.venta ~ '^[0-9]{1,18}$' THEN e.venta::bigint END AS venta_num
       FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
-      WHERE e.guia IS NOT NULL AND e.guia <> '' AND e.created_at >= $1::date AND e.created_at < $2::date
+      WHERE e.guia IS NOT NULL AND e.guia <> '' AND e.created_at >= $1::date - 20 AND e.created_at < $2::date + 20
       ORDER BY e.guia, e.created_at),
     g2 AS (SELECT g.*, coalesce(g.sale_id, (SELECT s.id FROM sales s WHERE s.ml_order_number = g.venta LIMIT 1)) AS sid FROM g),
     p AS (
@@ -94,8 +97,11 @@ export async function costosEnviosML(db: Pool, mes: string, conFactura: boolean)
     SELECT g.guia, g.venta, g.carrier, to_char(g.created_at, 'YYYY-MM-DD') AS fecha, o.conexion_id,
            p.peso::float AS peso, coalesce(p.sin_peso, true) AS sin_peso, p.productos
     FROM g2 g
-    LEFT JOIN LATERAL (SELECT conexion_id FROM ml_ordenes o WHERE o.id = g.venta_num OR o.pack_id = g.venta_num LIMIT 1) o ON true
+    LEFT JOIN LATERAL (SELECT conexion_id, fecha FROM ml_ordenes o WHERE o.id = g.venta_num OR o.pack_id = g.venta_num ORDER BY fecha LIMIT 1) o ON true
     LEFT JOIN p ON p.sale_id = g.sid
+    WHERE COALESCE(o.fecha, g.created_at) >= $1::date AND COALESCE(o.fecha, g.created_at) < $2::date
+      -- «Cobro a destino» (lo paga el comprador al retirar): ML no se lo cobra al vendedor (Pagos ME lo sabe).
+      AND NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE (mp.guia = g.guia OR mp.venta = g.venta) AND mp.envio_metodo = 'Cobro a destino')
     ORDER BY g.created_at`, [desde, hasta])
 
   const { rows: conexiones } = await db.query(

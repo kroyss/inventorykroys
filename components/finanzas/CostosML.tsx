@@ -41,7 +41,7 @@ export default function CostosML() {
           {verTabla ? 'Ocultar tabla de costos' : 'Ver / editar tabla de costos de ML'}</button>
       </div>
       <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 space-y-1">
-        <p>MercadoLibre Venezuela cobra los envíos gratis del <b>mes calendario</b> según el peso y cuántos envíos tuvo cada cuenta, a tasa BCV, en los primeros 7 días del mes siguiente (&laquo;Cargo Especial&raquo;). Aquí se calcula con las guías subidas a <b>Despachos</b> y el peso de cada producto.</p>
+        <p>MercadoLibre Venezuela cobra los envíos gratis del <b>mes calendario</b> según el peso y cuántos envíos tuvo cada cuenta, a tasa BCV, en los primeros 7 días del mes siguiente (&laquo;Cargo Especial&raquo;). Aquí se calcula con las guías subidas a <b>Despachos</b> y el peso de cada producto. Como ML, cada guía cuenta en el mes en que se <b>cerró la orden</b> (las del 31 que se suben el 1 van al mes anterior) y no se cuentan las de <b>cobro a destino</b> (esas las paga el comprador).</p>
         <p className="text-xs">Una guía generada se cobra aunque la venta se cancele: si lo facturado da un poco más, suele ser por guías que no se subieron a Despachos. Las que vienen <b>a cobro destino</b> no se cobran.</p>
       </div>
 
