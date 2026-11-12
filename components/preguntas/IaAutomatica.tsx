@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { Cargando } from '@/components/ui'
 import { FrenosIA } from './FrenosIA'
-import { NotaParaIA, ResponderTodo, nombreModo } from '@/components/ia/ResponderTodo'
+import { ResponderTodo, nombreModo } from '@/components/ia/ResponderTodo'
+import { CorregirIA } from '@/components/ia/CorregirIA'
 
 // Preguntas → Configuración → Respuesta automática con IA (01-11-2026, lib/iaAutomatica.ts).
 // Modo prueba: la IA decide qué habría salido solo, sin publicar; el vendedor marca cada una bien o mal y ve el % de
@@ -193,7 +194,7 @@ export function IaAutomatica({ interno = false, onMiIA }: { interno?: boolean; o
               {p.respuesta && p.respuesta.trim() !== (p.ia_auto.respuesta ?? '').trim() && (
                 <p className="text-sm rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700"><span className="text-xs font-semibold text-neutral-500 mr-1.5">Publicada</span>{p.respuesta}</p>)}
               {!p.respuesta && p.estado === 'UNANSWERED' && <p className="text-xs text-neutral-400">Todavía sin responder.</p>}
-              {p.ia_auto.publicada && <NotaParaIA itemId={p.item_id} />}
+              {p.ia_auto.publicada && p.ia_auto.respuesta && <CorregirIA tipo="preguntas" itemId={p.item_id} producto={p.item_titulo} texto={p.texto} ia={p.ia_auto.respuesta} />}
               {interno && p.ia_auto.decision === 'revisar' && p.ia_auto.respuesta && (
                 <div className="flex gap-1.5">
                   {([['bien', '✓ Podía salir sola'], ['mal', 'Bien frenada']] as const).map(([m, t]) => (

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 // "Datos del producto" que la IA usa al responder (ml_item_notas): verlos, corregirlos y borrarlos,
-// en la pregunta (DatosDeItem) y todos juntos en Preguntas → Configuración (DatosProductos).
+// en la pregunta (BotonDatos, ventana en components/ia/CorregirIA.tsx) y todos juntos en Preguntas → Configuración (DatosProductos).
 
 export interface Dato { id: number; texto: string; created_at: string; por: string | null }
 interface DatoConItem extends Dato { item_id: string; titulo: string | null; link: string | null; imagen: string | null; estado: string | null }
@@ -10,7 +10,7 @@ interface DatoConItem extends Dato { item_id: string; titulo: string | null; lin
 const fecha = (s: string) => new Date(s).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 /** Un dato: texto, fecha y quién lo anotó; Editar (en el lugar) y Borrar. */
-function FilaDato({ d, onCambio }: { d: Dato; onCambio: () => void }) {
+export function FilaDato({ d, onCambio }: { d: Dato; onCambio: () => void }) {
   const [editando, setEditando] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,37 +55,6 @@ function FilaDato({ d, onCambio }: { d: Dato; onCambio: () => void }) {
       {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
   )
-}
-
-/** En la pregunta: "N datos guardados" despliega los de esa publicación. */
-export function DatosDeItem({ itemId, n, version }: { itemId: string; n: number; version: number }) {
-  const [abierto, setAbierto] = useState(false)
-  // La lista leída y en qué `version` (datos anotados desde la tarjeta) se leyó: el total suma lo
-  // anotado después sin releer.
-  const [leido, setLeido] = useState<{ lista: Dato[]; version: number } | null>(null)
-  const lista = leido?.lista ?? null
-
-  const cargar = () => {
-    const v = version
-    fetch(`/api/preguntas/notas?item_id=${itemId}`).then(r => (r.ok ? r.json() : [])).then((d: Dato[]) => setLeido({ lista: d, version: v }))
-  }
-  // Se anotó uno nuevo con la lista abierta: se relee.
-  useEffect(() => { if (version > 0 && abierto) cargar() }, [version]) // eslint-disable-line react-hooks/exhaustive-deps
-  const total = leido ? leido.lista.length + (version - leido.version) : n + version
-
-  if (total === 0) return null
-  return <>
-    <button onClick={() => { const a = !abierto; setAbierto(a); if (a) cargar() }}
-      className="btn-ghost text-sm text-sky-700" title="Lo que la IA ya sabe de esta publicación">
-      {total} dato{total === 1 ? '' : 's'} guardado{total === 1 ? '' : 's'} {abierto ? '▲' : '▼'}
-    </button>
-    {abierto && (
-      <div className="basis-full order-last rounded-lg border border-sky-100 bg-sky-50/50 px-3 py-1.5 divide-y divide-sky-100">
-        {!lista ? <p className="text-xs text-neutral-400 py-1.5">Cargando…</p>
-          : lista.map(d => <FilaDato key={d.id} d={d} onCambio={cargar} />)}
-      </div>
-    )}
-  </>
 }
 
 /** Preguntas → Configuración: todos los datos, agrupados por publicación, con buscador. */

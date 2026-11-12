@@ -6,12 +6,12 @@ import CambiarStock from './CambiarStock'
 import TextoConPublicaciones from './TextoConPublicaciones'
 import { AbrirFicha } from './FichaPublicacion'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { DatosDeItem, DatosProductos } from './DatosProducto'
+import { DatosProductos } from './DatosProducto'
 import MiIA from '@/components/miia/MiIA'
 import { Nuevo } from '@/components/ui/Nuevo'
 import { RespuestasRapidas, LoAprendido } from './RespuestasRapidas'
 import { IaAutomatica } from './IaAutomatica'
-import { NotaParaIA } from '@/components/ia/ResponderTodo'
+import { BotonDatos, CorregirIA } from '@/components/ia/CorregirIA'
 import { useSearchParams } from 'next/navigation'
 import { PageHeader, Tabs, Pagination, EmptyState, Cargando, StatusBadge } from '@/components/ui'
 import { CREDITOS_TXT, Sugerencias, UsoIA, avisarUsoIA, type Sugerencia } from '@/components/preguntas/AyudaIA'
@@ -659,7 +659,7 @@ function TarjetaPendiente({ p, esAdmin, verAvisosInternos, iaLista, plantillas, 
           title="Un dato de esta publicación que la IA debe saber la próxima vez">
           Anotar dato del producto
         </button>
-        <DatosDeItem itemId={p.item_id} n={p.datos_guardados ?? 0} version={notasNuevas} />
+        <BotonDatos itemId={p.item_id} titulo={p.item_titulo} n={(p.datos_guardados ?? 0) + notasNuevas} className="btn-ghost text-sm text-sky-700" />
         <button onClick={eliminar} disabled={eliminando} className="btn-ghost text-sm text-red-600 hover:text-red-700"
           title="Para preguntas imprudentes u ofensivas: la quita de la publicación en MercadoLibre">
           {eliminando ? 'Eliminando…' : 'Eliminar'}
@@ -700,16 +700,17 @@ function FilaHistorial({ p }: { p: Pregunta }) {
         <p className="text-neutral-600 pl-3 border-l-2 border-neutral-200">
           {p.respuesta}
           <span className="text-xs text-neutral-400"> · {p.por_ia ? <span className="text-sky-700">Respondió la IA{p.por_ia_total ? ' (Modo Total)' : ''}</span> : p.respondida_por ?? 'desde MercadoLibre'}</span>
+          {/* 12-11 (el dueño): corregir a la IA en la misma línea (otro color), abre una ventana. Lo aprendido va al dato
+              del producto o a la regla, y la respuesta queda marcada como Mal (cuenta en el acierto de la IA). */}
+          {p.por_ia && <>
+            <span className="text-xs text-neutral-300"> · </span>
+            <CorregirIA tipo="preguntas" itemId={p.item_id} producto={p.item_titulo} texto={p.texto} ia={p.respuesta}
+              onGuardado={() => { fetch('/api/preguntas/ia-auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion: 'marcar', id: p.id, marca: 'mal' }) }).catch(() => {}) }} />
+            <span className="text-xs text-neutral-300"> · </span>
+            <BotonDatos itemId={p.item_id} titulo={p.item_titulo} n={p.datos_guardados ?? 0} />
+          </>}
         </p>
-      )}
-      {/* 12-11 (el dueño): corregir a la IA desde donde se ve el error. Guarda el dato del producto o la regla y marca la
-          respuesta como Mal (cuenta en el acierto de la IA). Solo en las que respondió la IA. */}
-      {p.respuesta && p.por_ia && (
-        <div className="pl-3">
-          <NotaParaIA itemId={p.item_id} etiqueta="✗ Corregir a la IA"
-            onGuardado={() => { fetch('/api/preguntas/ia-auto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accion: 'marcar', id: p.id, marca: 'mal' }) }).catch(() => {}) }} />
-        </div>
       )}
       </div>
     </div>

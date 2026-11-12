@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { FrenosIA } from './FrenosIA'
-import { NotaParaIA, nombreModo } from '@/components/ia/ResponderTodo'
+import { nombreModo } from '@/components/ia/ResponderTodo'
+import { CorregirIA } from '@/components/ia/CorregirIA'
 
 // Mensajes → IA en prueba (mig 145, lib/mensajesIAPrueba.ts): lo que la IA habría respondido a cada mensaje nuevo
 // (NO se mandó nada), lo que respondió el equipo, si habría salido sola, y Bien / Mal para medir.
@@ -122,7 +123,7 @@ export default function MensajesIAPrueba({ onAbrir, onMiIA }: { onAbrir?: (pack:
                   ))}
                 </div>
               </div>
-              {c.enviada_at && <NotaParaIA />}
+              {c.enviada_at && c.respuesta && <CorregirIA tipo="mensajes" texto={c.comprador || ''} ia={c.respuesta} />}
             </>}
           </div>
         ))}

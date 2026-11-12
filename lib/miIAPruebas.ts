@@ -8,7 +8,7 @@ import { leerMiIA, MI_IA_KEY, datoDeContacto } from '@/lib/miIA'
 
 type Db = Pool
 export type TipoPrueba = 'preguntas' | 'mensajes'
-export interface Aprendido { producto?: string; regla?: string }
+export interface Aprendido { producto?: string; productoId?: number; regla?: string }
 export interface MarcaCaso { marca: 'bien' | 'mal' | null; error?: string | null; correccion?: string | null; aprendido?: Aprendido | null }
 
 export async function guardarPrueba(db: Db, tipo: TipoPrueba, casos: unknown[], usuarioId: number | string | null): Promise<string | null> {
@@ -104,8 +104,8 @@ export async function aprenderCorreccion(db: Db, o: {
   const out: Aprendido = {}
   const dato = (r.resultado.producto ?? '').trim().slice(0, 500)
   if (o.itemId && dato.length >= 3 && !datoDeContacto(dato)) {
-    await db.query(`INSERT INTO ml_item_notas (item_id, texto, creada_por) VALUES ($1, $2, $3)`, [o.itemId, dato, Number(o.usuarioId)])
-    out.producto = dato
+    const { rows: [n] } = await db.query(`INSERT INTO ml_item_notas (item_id, texto, creada_por) VALUES ($1, $2, $3) RETURNING id`, [o.itemId, dato, Number(o.usuarioId)])
+    out.producto = dato; out.productoId = n?.id
   }
   const regla = (r.resultado.regla ?? '').trim().slice(0, 300)
   if (regla.length >= 5 && !(await agregarCorreccionGeneral(db, regla))) out.regla = regla
