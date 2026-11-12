@@ -34,7 +34,13 @@ export const TRAIDA_EN_CURSO_MIN = 5
 export const LATIDO_MIN = 3
 
 
+// 12-11 (rapidez): la misma referencia en otras ventas sale de un agrupado hecho UNA vez (refs) y el nombre del comprador
+// de la conversación por su clave: antes cada pago recorría todas las conversaciones y todos los pagos (Historial: 9 s → 0,14 s).
 export const SELECT_PAGOS = `
+  WITH refs AS MATERIALIZED (
+    SELECT regexp_replace(r.referencia, '[^0-9]', '', 'g') AS d, array_agg(DISTINCT r.venta ORDER BY r.venta) AS ventas
+    FROM me_pagos r WHERE r.creado_at > NOW() - INTERVAL '90 days' AND length(regexp_replace(r.referencia, '[^0-9]', '', 'g')) >= 6
+    GROUP BY 1 HAVING count(DISTINCT r.venta) > 1)
   SELECT p.id, p.venta, p.cuenta, p.estado_me, p.fecha_orden, p.total_orden::float, p.total_orden_usd::float,
          p.metodo_pago, p.banco_emisor, p.banco_receptor, p.referencia, p.fecha_pago, p.monto_pagado::float,
          p.envio_metodo, p.envio_opcion, p.carrier, p.guia,
@@ -47,22 +53,20 @@ export const SELECT_PAGOS = `
          (SELECT e.apartado FROM despacho_etiquetas e WHERE e.venta = p.venta AND e.apartado IS NOT NULL LIMIT 1) AS apartado,
          -- 06-11 (Gerardo): la misma referencia (solo dígitos, 6 o más) en OTRAS ventas de los últimos 90 días: aviso,
          -- no bloquea (a veces un comprador paga dos compras juntas).
-         (SELECT array_agg(DISTINCT r.venta) FROM me_pagos r
-           WHERE r.empresa_id = p.empresa_id AND r.venta <> p.venta AND length(regexp_replace(p.referencia, '[^0-9]', '', 'g')) >= 6
-             AND regexp_replace(r.referencia, '[^0-9]', '', 'g') = regexp_replace(p.referencia, '[^0-9]', '', 'g')
-             AND r.creado_at > NOW() - INTERVAL '90 days') AS ref_en_otras,
+         (SELECT array_agg(x ORDER BY x) FROM refs rf CROSS JOIN unnest(rf.ventas) x
+           WHERE rf.d = regexp_replace(p.referencia, '[^0-9]', '', 'g') AND x <> p.venta) AS ref_en_otras,
          (SELECT u.estado FROM ((SELECT o.estado FROM ml_ordenes o WHERE o.id = v.num LIMIT 1)
            UNION ALL (SELECT o.estado FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) u LIMIT 1) AS ml_estado,
          -- 12-11 (el dueño): quién compró y qué, con la foto, para reconocer cada pago en el Historial.
-         mo.comprador, mo.nick, mo.detalle,
+         COALESCE(NULLIF(mo.comprador_nombre, ''), NULLIF((SELECT c.comprador_nombre FROM ml_conversaciones c WHERE c.pack_id = mo.paquete), '')) AS comprador,
+         mo.nick, mo.detalle,
          (SELECT k.thumbnail FROM ml_catalogo k WHERE k.item_id = (SELECT i FROM unnest(mo.items) i WHERE i NOT LIKE '%:%' LIMIT 1)
            AND k.thumbnail IS NOT NULL LIMIT 1) AS foto
   FROM me_pagos p
   CROSS JOIN LATERAL (SELECT CASE WHEN p.venta ~ '^[0-9]{1,18}$' THEN p.venta::bigint END AS num) v
   LEFT JOIN LATERAL (
-    SELECT COALESCE(NULLIF(o.comprador_nombre, ''), NULLIF(c.comprador_nombre, '')) AS comprador, o.comprador AS nick, o.detalle, o.items
+    SELECT o.comprador_nombre, COALESCE(o.pack_id, o.id) AS paquete, o.comprador AS nick, o.detalle, o.items
     FROM ((SELECT * FROM ml_ordenes o WHERE o.id = v.num LIMIT 1) UNION ALL (SELECT * FROM ml_ordenes o WHERE o.pack_id = v.num LIMIT 1)) o
-    LEFT JOIN ml_conversaciones c ON c.pack_id = COALESCE(o.pack_id, o.id)
     LIMIT 1) mo ON TRUE
   LEFT JOIN users u ON u.id = p.verificado_por
   LEFT JOIN LATERAL (SELECT id, status, total_amount FROM sales WHERE ml_order_number = p.venta ORDER BY id DESC LIMIT 1) s ON TRUE`

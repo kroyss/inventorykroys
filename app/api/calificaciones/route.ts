@@ -32,9 +32,11 @@ export async function GET(req: NextRequest) {
       `SELECT b.*, ${espera} AS en_espera, ${sqlListaEl(plantillas.esperaDias)} AS lista_el,
               -- Si hubo mensajes en la venta (2026-10-17, pedido de un usuario): antes de calificar una no
               -- concretada se ve si el comprador dio señales de vida, sin salir a MercadoLibre.
+              -- 12-11: la conversación por su clave (paquete de la venta); unida por COALESCE recorría todas (3–4 s → 30 ms).
               (SELECT json_build_object('at', c.ultimo_at, 'comprador', c.ultimo_de_comprador)
-               FROM ml_ordenes oo JOIN ml_conversaciones c ON c.pack_id = COALESCE(oo.pack_id, oo.id)
-               WHERE oo.id = b.id::bigint AND c.ultimo_at IS NOT NULL LIMIT 1) AS chat
+               FROM ml_conversaciones c
+               WHERE c.pack_id = (SELECT COALESCE(oo.pack_id, oo.id) FROM ml_ordenes oo WHERE oo.id = b.id::bigint)
+                 AND c.ultimo_at IS NOT NULL LIMIT 1) AS chat
        FROM (${SQL_BANDEJA}) b
        -- La más vieja primero (2026-10-13): es la que menos plazo le queda para calificar en ML.
        ORDER BY fecha ASC`, [dias]),
