@@ -11,7 +11,7 @@ import IaClientesPanel from './IaClientesPanel'
 import CompetenciaPanel from './CompetenciaPanel'
 import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
-import ResumenPanel from './ResumenPanel'
+import { VisitasRegistro } from './ResumenPanel'
 import AdopcionPanel from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
@@ -145,7 +145,7 @@ function claveInicial() {
 
 export default function PlataformaClient({ empresaActual, inicial = null }: { empresaActual: number
   /** 12-11 (rapidez): empresas y el resumen de Hoy, ya en el HTML. */
-  inicial?: { empresas: unknown; resumen: import('./ResumenPanel').ResumenInicial } | null }) {
+  inicial?: { empresas: unknown; cobros: unknown; visitas: unknown } | null }) {
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [modulos, setModulos]   = useState<Record<string, string>>({})
   const [nueva, setNueva]       = useState(false)
@@ -156,12 +156,14 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   // ven los clientes) · Interno (IA, Telegram, cuentas de personas).
   // ?soporte=ID (el botón del aviso de Telegram) abre la bandeja de Soporte en ese caso.
   const [casoSoporte, setCasoSoporte] = useState<number | null>(null)
-  const [vista, setVista]       = useState<'hoy' | 'clientes' | 'cobros' | 'soporte' | 'fundadores' | 'contenido' | 'interno'>('hoy')
+  // 12-11 (el dueño, fase 1): Uso (quién usa y cuánto: antes Hoy + Clientes) y Cuentas y cobros (vencimientos, quién paga
+  // y los pagos: antes repartido en Hoy, Clientes y Cobros).
+  const [vista, setVista]       = useState<'uso' | 'cuentas' | 'soporte' | 'fundadores' | 'contenido' | 'interno'>('uso')
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('soporte'))
     if (id) { setCasoSoporte(id); setVista('soporte') }
     // ?vista=cobros: el botón del aviso de Telegram de un pago reportado (mig. 141).
-    if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVista('cobros')
+    if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVista('cuentas')
   }, [])
   const [interno, setInterno]   = useState<'ia' | 'auto' | 'competencia' | 'personas'>('ia')
   const [hoy, setHoy]           = useState('')
@@ -174,6 +176,19 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const [buscar, setBuscar]     = useState('')
   const confirm = useConfirm()
 
+  // Lo que espera por ti (franja de Uso y número en las pestañas): pagos reportados y casos de soporte abiertos.
+  const [pendientes, setPendientes] = useState<{ pagos: number; casos: number }>(() => ({
+    pagos: ((inicial?.cobros as { pendientes?: unknown[] } | null)?.pendientes ?? []).length, casos: 0 }))
+  const leerPendientes = useCallback(() => {
+    Promise.all([
+      fetch('/api/plataforma/cobros').then(r => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/plataforma/casos-soporte').then(r => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([c, s]) => setPendientes(p => ({
+      pagos: c?.pendientes ? c.pendientes.length : p.pagos,
+      casos: s?.casos ? s.casos.filter((x: { estado: string }) => x.estado === 'abierto').length : p.casos,
+    })))
+  }, [])
+  useEffect(() => { leerPendientes(); const t = setInterval(leerPendientes, 120_000); return () => clearInterval(t) }, [leerPendientes])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const primera = usePrimera(inicial?.empresas as any)
   const cargar = useCallback(async () => {
@@ -261,14 +276,14 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
       <PageHeader
         title="Plataforma"
         subtitle="Tus clientes, cómo usan el sistema y lo interno de El Comerciante Digital. Solo lo ves tú."
-        actions={vista === 'clientes'
+        actions={vista === 'uso'
           ? <button onClick={() => { setNueva(true); setError(null) }} className="btn-primary text-sm">+ Nueva empresa</button>
           : undefined}
       />
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {([['hoy', 'Hoy'], ['clientes', `Clientes${empresas.length ? ` (${clientesActivos})` : ''}`], ['cobros', 'Cobros'], ['soporte', 'Soporte'], ['fundadores', 'Fundadores'],
+        {([['uso', `Uso${empresas.length ? ` (${clientesActivos})` : ''}`], ['cuentas', `Cuentas y cobros${pendientes.pagos ? ` (${pendientes.pagos})` : ''}`], ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['fundadores', 'Fundadores'],
            ['contenido', 'Contenido'], ['interno', 'Interno']] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
@@ -277,7 +292,8 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         ))}
       </div>
 
-      {vista === 'hoy' ? <ResumenPanel inicial={inicial?.resumen ?? null} onIr={setVista} /> : vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'cobros' ? <CobrosPanel /> : vista === 'fundadores' ? <FundadoresPanel />
+      {vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'cuentas' ? <CobrosPanel inicial={inicial?.cobros ?? null} onCambio={leerPendientes} />
+        : vista === 'fundadores' ? <div className="space-y-5"><VisitasRegistro inicial={inicial?.visitas ?? null} /><FundadoresPanel /></div>
         : vista === 'contenido' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
         : vista === 'interno' ? <>
           <div className="flex gap-1.5">
@@ -309,11 +325,32 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
           className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-64" />
       </div>
 
+      {/* Lo que espera por ti: solo aparece si hay algo. */}
+      {(() => {
+        const vencenYa = activas.filter(e => e.estado !== 'propietario' && (() => {
+          const f = e.estado === 'activo' ? e.plan_hasta : e.prueba_dias == null ? e.prueba_hasta : null
+          return !!f && diasHasta(f, hoy) <= 1
+        })())
+        const items: [string, () => void][] = []
+        if (pendientes.pagos) items.push([`💳 ${pendientes.pagos} pago${pendientes.pagos === 1 ? '' : 's'} por revisar`, () => setVista('cuentas')])
+        if (pendientes.casos) items.push([`🆘 ${pendientes.casos} caso${pendientes.casos === 1 ? '' : 's'} de soporte abierto${pendientes.casos === 1 ? '' : 's'}`, () => setVista('soporte')])
+        if (vencenYa.length) items.push([`⏳ ${vencenYa.length} vence${vencenYa.length === 1 ? '' : 'n'} hoy o mañana`, () => setVista('cuentas')])
+        if (!items.length) return null
+        return (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+            <span className="font-medium">Por atender:</span>
+            {items.map(([t, ir]) => (
+              <button key={t} onClick={ir} className="rounded-full bg-white px-3 py-1 text-xs font-medium ring-1 ring-inset ring-amber-200 hover:bg-amber-100">{t} →</button>
+            ))}
+          </div>
+        )
+      })()}
+
       {/* Una sola lista (2026-10-15): cada empresa con su estado de cuenta y su uso del sistema; la ficha
           (módulos, IA, acciones) se abre al tocarla, como antes. */}
       <AdopcionPanel abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
         base={activas.map(e => ({
-          id: e.id, nombre: e.nombre, activa: true,
+          id: e.id, nombre: e.nombre, activa: true, pagando: e.estado === 'activo', prueba: e.estado === 'prueba',
           porVencer: (e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5)
             || (e.estado === 'activo' && !!e.plan_hasta && diasHasta(e.plan_hasta, hoy) <= 3),
           detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.admins ? ` · ${e.admins}` : ''}`,

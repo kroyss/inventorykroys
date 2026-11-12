@@ -597,10 +597,16 @@ export async function panelCobros() {
                      ${SQL_REF_REPETIDA} AS repetida
               FROM organizacion_cobros k JOIN organizaciones o ON o.id = k.organizacion_id LEFT JOIN users u ON u.id = k.user_id
               LEFT JOIN organizacion_pagos p ON p.id = k.pago_id`
-  const [{ rows: pendientes }, { rows: vencen }, { rows: recientes }, datos] = await Promise.all([
+  // 12-11 (el dueño, Cuentas y cobros): la última vez que alguien de la cuenta entró y su contacto del registro.
+  const ULTIMA = `(SELECT max(u.ultima_actividad) FROM empresas e JOIN usuario_empresas ue ON ue.empresa_id = e.id
+                   JOIN users u ON u.id = ue.user_id WHERE e.organizacion_id = o.id)`
+  const MES = `date_trunc('month', NOW() AT TIME ZONE 'America/Caracas')`
+  const [{ rows: pendientes }, { rows: vencen }, { rows: recientes }, datos, { rows: pagando }, { rows: [ingresos] }] = await Promise.all([
     db.query(`${SELECT_PANEL} WHERE k.estado = 'revision' ORDER BY k.creado_at`),
     db.query(`SELECT o.id, o.nombre, o.estado, o.plan, to_char(COALESCE(CASE WHEN o.estado = 'activo' THEN o.plan_hasta END, o.prueba_hasta, o.plan_hasta), 'YYYY-MM-DD') AS vence,
-                     (SELECT k.estado FROM organizacion_cobros k WHERE k.organizacion_id = o.id ORDER BY k.creado_at DESC LIMIT 1) AS ultimo_cobro
+                     (SELECT k.estado FROM organizacion_cobros k WHERE k.organizacion_id = o.id ORDER BY k.creado_at DESC LIMIT 1) AS ultimo_cobro,
+                     ${ULTIMA} AS ultima, o.registro - 'ip_hash' - 'navegador' AS registro, o.fundador,
+                     EXISTS (SELECT 1 FROM empresas e JOIN ml_conexiones c ON c.empresa_id = e.id WHERE e.organizacion_id = o.id) AS con_ml
               FROM organizaciones o
               WHERE o.id <> $1 AND o.estado IN ('prueba', 'activo')
                 AND COALESCE(CASE WHEN o.estado = 'activo' THEN o.plan_hasta END, o.prueba_hasta)
@@ -608,8 +614,17 @@ export async function panelCobros() {
               ORDER BY 5, o.nombre`, [ORGANIZACION_PLATAFORMA]),
     db.query(`${SELECT_PANEL} WHERE k.estado <> 'revision' ORDER BY k.revisado_at DESC NULLS LAST LIMIT 20`),
     leerDatosCobro(),
+    db.query(`SELECT o.id, o.nombre, o.plan, o.escalon, o.ciclo, o.fundador, to_char(o.plan_hasta, 'YYYY-MM-DD') AS hasta, ${ULTIMA} AS ultima,
+                     (SELECT p.monto::float FROM organizacion_pagos p WHERE p.organizacion_id = o.id AND p.tipo IN ('plan', 'upgrade')
+                      ORDER BY p.fecha DESC LIMIT 1) AS monto
+              FROM organizaciones o WHERE o.id <> $1 AND o.estado = 'activo' ORDER BY o.plan_hasta NULLS LAST, o.nombre`, [ORGANIZACION_PLATAFORMA]),
+    db.query(`SELECT COALESCE(SUM(monto) FILTER (WHERE (fecha AT TIME ZONE 'America/Caracas') >= ${MES}), 0)::float AS mes,
+                     COUNT(*) FILTER (WHERE (fecha AT TIME ZONE 'America/Caracas') >= ${MES})::int AS pagos_mes,
+                     COALESCE(SUM(monto) FILTER (WHERE (fecha AT TIME ZONE 'America/Caracas') >= ${MES} - INTERVAL '1 month'
+                                                   AND (fecha AT TIME ZONE 'America/Caracas') < ${MES}), 0)::float AS anterior
+              FROM organizacion_pagos WHERE organizacion_id <> $1`, [ORGANIZACION_PLATAFORMA]),
   ])
-  return { pendientes: pendientes.map(conDesglose), vencen, recientes: recientes.map(conDesglose), datos }
+  return { pendientes: pendientes.map(conDesglose), vencen, recientes: recientes.map(conDesglose), datos, pagando, ingresos }
 }
 
 /** El desglose guardado, o reconstruido de las columnas para los cobros de antes de la mig. 143. */

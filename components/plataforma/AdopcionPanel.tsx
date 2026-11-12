@@ -16,7 +16,7 @@ export interface Empresa {
   pagos_me_estado?: 'vinculado' | 'intento' | 'sin_intentar' | null   // en qué quedó la conexión (23-10)
 }
 type Nivel = 'integrado' | 'parcial' | 'sin_uso' | 'no_entra' | 'sin_ventas' | 'sin_conectar'
-type FiltroUso = 'todos' | 'sin_conectar' | 'por_vencer' | 'dormidos'
+type FiltroUso = 'todos' | 'pagando' | 'sin_conectar' | 'por_vencer' | 'dormidos'
 type Orden = 'actividad' | 'ultimo' | 'ventas' | 'nombre'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : null)
@@ -38,6 +38,12 @@ const PAGOS_ME_ESTADO = {
   intento:      { t: 'Pagos ME: lo intentó', c: 'bg-amber-50 text-amber-800 ring-amber-200', ayuda: 'Generó el código o instaló el programa, pero el Asistente nunca se conectó en Chrome' },
   sin_intentar: { t: 'Pagos ME: sin intentar', c: 'bg-neutral-50 text-neutral-500 ring-neutral-200', ayuda: 'Tiene el módulo activo, pero nunca generó el código ni instaló nada' },
 } as const
+
+/** Qué usa, en una línea corta (12-11: la fila compacta; antes una columna de chips). */
+export const queUsa = (e: Empresa) => ([
+  ['preguntas', e.preguntas_sistema], ['mensajes', e.mensajes_sistema], ['guías', e.guias], ['reportes', e.reportadas],
+  ['calificaciones', e.calificadas_sistema], ['stock', e.stock], ['IA', e.ia], ['pagos ME', e.pagos_me ?? 0],
+] as [string, number][]).filter(([, n]) => n > 0).map(([t, n]) => `${n} ${t}`).join(' · ')
 
 /** Qué usa, con cuántas veces (solo lo que usó). */
 export function UsoChips({ e }: { e: Empresa }) {
@@ -104,7 +110,7 @@ function siguiente(e: Empresa, n: Nivel) {
 
 /** Una empresa de la lista de Plataforma (búsqueda y estado de la cuenta los pone PlataformaClient; 20-10 aquí
  *  solo llegan las que pueden entrar: las inactivas van plegadas aparte). porVencer = le quedan ≤ 5 días. */
-export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean; extra?: ReactNode }
+export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean; extra?: ReactNode; pagando?: boolean; prueba?: boolean }
 
 export const CEROS = {
   propia: false, cuentas: null, ventas: 0, preguntas: 0, preguntas_sistema: 0, guias: 0, reportadas: 0, calificadas: 0,
@@ -113,7 +119,7 @@ export const CEROS = {
 }
 
 const FILTROS_USO: { k: FiltroUso; t: string }[] = [
-  { k: 'todos', t: 'Todos' }, { k: 'sin_conectar', t: 'Sin conectar ML' },
+  { k: 'todos', t: 'Todos' }, { k: 'pagando', t: 'Pagando' }, { k: 'sin_conectar', t: 'Sin conectar ML' },
   { k: 'por_vencer', t: 'Por vencer' }, { k: 'dormidos', t: 'Dormidos (7+ días sin entrar)' },
 ]
 
@@ -148,7 +154,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
   const esActivo = (x: typeof filas[number]) => x.act > 0
   const esDormido = (x: typeof filas[number]) => !!x.e.cuentas && diasSin(x.e.ultimo_uso ?? x.e.abierta_at) > 7
   const pasa: Record<FiltroUso, (x: typeof filas[number]) => boolean> = {
-    todos: () => true, dormidos: esDormido, sin_conectar: x => !x.e.cuentas, por_vencer: x => x.b.porVencer,
+    todos: () => true, pagando: x => !!x.b.pagando, dormidos: esDormido, sin_conectar: x => !x.e.cuentas, por_vencer: x => x.b.porVencer,
   }
   const maxAct = Math.max(1, ...clientes.map(x => x.act))
   const ordenar = (x: typeof filas[number], y: typeof filas[number]) =>
@@ -160,21 +166,24 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
   const vistas = filas.filter(x => x.e.propia || pasa[filtroUso](x))
     .sort((x, y) => Number(y.e.propia) - Number(x.e.propia) || Number(y.b.activa) - Number(x.b.activa) || ordenar(x, y))
 
-  const TARJETAS: [string, number, string][] = [
-    ['Lo usaron', clientes.filter(esActivo).length, `hicieron algo en el sistema en ${dias} días`],
-    ['Dormidos', clientes.filter(esDormido).length, 'más de 7 días sin entrar'],
-    ['Sin conectar ML', clientes.filter(x => !x.e.cuentas).length, 'no pueden usar nada aún'],
-    ['Integrados', clientes.filter(x => x.n === 'integrado').length, 'preguntas y guías por el sistema'],
+  // 12-11 (el dueño): lo que mira seguido, en 4 números.
+  const enLinea = clientes.filter(x => x.e.en_linea)
+  const conectados = clientes.filter(x => x.e.cuentas)
+  const TARJETAS: [string, ReactNode, string, boolean?][] = [
+    ['En línea ahora', enLinea.length, enLinea.length ? enLinea.map(x => x.b.nombre).join(', ') : 'ningún cliente usando ahora', enLinea.length > 0],
+    [`Lo usaron (${dias} días)`, <>{clientes.filter(esActivo).length}<span className="text-sm font-normal text-neutral-400"> / {conectados.length}</span></>, 'de los que tienen ML conectado'],
+    ['Pagando', clientes.filter(x => x.b.pagando).length, `${clientes.filter(x => x.b.pagando && esActivo(x)).length} lo usaron en ${dias} días`],
+    ['En prueba con ML', clientes.filter(x => x.b.prueba && x.e.cuentas).length, `${clientes.filter(x => x.b.prueba && !x.e.cuentas).length} más sin conectar ML`],
   ]
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {TARJETAS.map(([t, n, d]) => (
-          <div key={t} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
-            <p className="text-xs text-neutral-500">{t}</p>
-            <p className="text-2xl font-semibold tabular-nums text-neutral-900">{n}<span className="text-sm font-normal text-neutral-400"> / {clientes.length}</span></p>
-            <p className="text-[11px] text-neutral-400">{d}</p>
+        {TARJETAS.map(([t, n, d, vivo]) => (
+          <div key={t} className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-neutral-500">{vivo && <span className="h-2 w-2 rounded-full bg-emerald-500" />}{t}</p>
+            <p className="text-2xl font-semibold tabular-nums text-neutral-900">{n}</p>
+            <p className="truncate text-[11px] text-neutral-400" title={d}>{d}</p>
           </div>
         ))}
       </div>
@@ -212,12 +221,12 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
         <table className="w-full text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr className="[&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-medium">
-              <th>Empresa</th><th>Cuenta</th><th>Último uso</th><th>Actividad ({dias} días)</th><th>Qué usa</th><th>Uso</th><th className="w-6" />
+              <th>Empresa</th><th>Cuenta</th><th>Último uso</th><th>Actividad ({dias} días)</th><th>Uso</th><th className="w-6" />
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {vistas.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-neutral-400">Ninguna empresa con ese filtro.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-400">Ninguna empresa con ese filtro.</td></tr>
             )}
             {vistas.map(({ b, e, n, act }) => {
               const paso = b.activa ? siguiente(e, n) : null
@@ -238,15 +247,14 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
                     <div className="text-[11px] text-neutral-400">{e.usuarios_7d} persona{e.usuarios_7d === 1 ? '' : 's'} en 7 d</div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex min-w-[7rem] items-center gap-2" title={`${act} cosas hechas en el sistema en ${dias} días`}>
+                    <div className="flex min-w-[7rem] items-center gap-2" title={`${act} cosas hechas en el sistema en ${dias} días${queUsa(e) ? `: ${queUsa(e)}` : ''}`}>
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
                         <div className="h-full rounded-full bg-lime-500" style={{ width: `${e.propia ? 100 : Math.round((act / maxAct) * 100)}%` }} />
                       </div>
                       <b className="tabular-nums text-xs text-neutral-800">{act}</b>
                     </div>
-                    <div className="mt-0.5 text-[11px] text-neutral-400">{e.ventas} ventas en ML</div>
+                    <div className="mt-0.5 max-w-[16rem] truncate text-[11px] text-neutral-400" title={queUsa(e) || undefined}>{e.ventas} ventas en ML{queUsa(e) ? ` · ${queUsa(e)}` : ''}</div>
                   </td>
-                  <td className="px-3 py-2.5"><UsoChips e={e} /></td>
                   <td className="px-3 py-2.5">
                     <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${NIVEL[n].c}`}>{NIVEL[n].t}</span>
                     {paso && !e.propia && <div className="mt-1 max-w-[12rem] text-[11px] text-neutral-500">→ {paso}</div>}

@@ -184,7 +184,7 @@ interface Visitas {
 }
 
 /** Visitas a /registro (27-10, migración 128): para medir la publicidad del link. Personas = navegadores distintos. */
-function VisitasRegistro({ inicial = null }: { inicial?: unknown }) {
+export function VisitasRegistro({ inicial = null }: { inicial?: unknown }) {
   const [v, setV] = useState<Visitas | null>((inicial as Visitas | null) ?? null)
   useEffect(() => {
     let vivo = true
