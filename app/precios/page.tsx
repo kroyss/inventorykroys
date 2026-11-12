@@ -43,7 +43,7 @@ const PREGUNTAS = [
   { p: '¿Cómo pago?',
     r: 'En bolívares a tasa BCV del día. Sin permanencia: si un mes no sigues, no pagas el siguiente.' },
   { p: '¿Qué incluye la prueba gratis?',
-    r: `15 días con preguntas, mensajes, calificaciones, guías y Pagos MercadoEnvíos, con tus propias ventas, y ${CREDITOS_PRUEBA} créditos de IA. Los días arrancan cuando conectas MercadoLibre.` },
+    r: `15 días con preguntas, mensajes, calificaciones, guías y Pagos MercadoEnvíos, con tus propias ventas, y ${CREDITOS_PRUEBA} créditos de IA. Los días corren desde que te registras.` },
 ]
 
 const RADAR_PRECIOS = 'https://radar.elcomerciantedigital.com/precios'

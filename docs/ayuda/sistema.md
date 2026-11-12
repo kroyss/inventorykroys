@@ -59,8 +59,8 @@ el portal de MercadoEnvíos de Venezuela.
   contraseña**. Si el olvido es del administrador, escríbenos a Soporte.
 - **Crear cuenta:** app.elcomerciantedigital.com/registro (nombre del negocio, tu nombre, usuario, contraseña y un
   contacto: WhatsApp o Telegram).
-- **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **empiezan a contar
-  cuando conectas tu primera cuenta de MercadoLibre**, no al registrarte. Cada cuenta de MercadoLibre puede usar
+- **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **corren desde que te
+  registras**: conecta tu cuenta de MercadoLibre cuanto antes para aprovecharlos. Cada cuenta de MercadoLibre puede usar
   una sola prueba. Al terminar la prueba, para seguir se elige el plan y se paga en **Mi plan** (ver
   [Planes](#3-planes-y-créditos-de-ia)).
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al

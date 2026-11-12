@@ -40,13 +40,17 @@ export async function crearCuenta(client: PoolClient, d: DatosAlta) {
   // Cuenta: Fundador = 30 días gratis + marca permanente; Prueba = 15 días; Activo = ya paga.
   // Los días arrancan al conectar la primera cuenta de ML (api/ml/callback, migración 067); hasta
   // entonces prueba_hasta es el TOPE: hoy + DIAS_ESPERA_CONEXION + días de prueba.
+  // 12-11 (el dueño): el AUTOREGISTRO tiene sus 15 días desde el alta, sin espera: prueba_hasta fija y prueba_dias NULL
+  // (conectar ML no la cambia). Si no conecta en esos días, queda fuera.
   const dias = d.alta === 'fundador' ? DIAS_PRUEBA.fundador : d.alta === 'prueba' ? DIAS_PRUEBA.normal : null
+  const fija = d.origen === 'autoregistro'
   const { rows: [org] } = await client.query(
     `INSERT INTO organizaciones (nombre, estado, prueba_hasta, prueba_dias, fundador, origen, registro)
-     VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $5::int + $3::int END, $3, $4, $6, $7)
+     VALUES ($1, $2, CASE WHEN $3::int IS NULL THEN NULL ELSE (NOW() AT TIME ZONE 'America/Caracas')::date + $5::int + $3::int END,
+             CASE WHEN $8 THEN NULL ELSE $3::int END, $4, $6, $7)
      RETURNING id`,
     // Radar (29-10): 'prueba' sin vencimiento: qué días entra lo decide su grupo en el Radar, no el Sistema.
-    [d.nombre, dias || d.alta === 'radar' ? 'prueba' : 'activo', dias, d.alta === 'fundador', DIAS_ESPERA_CONEXION, d.origen ?? null, d.registro ?? null])
+    [d.nombre, dias || d.alta === 'radar' ? 'prueba' : 'activo', dias, d.alta === 'fundador', fija ? 0 : DIAS_ESPERA_CONEXION, d.origen ?? null, d.registro ?? null, fija])
   // Demo: los módulos de Automatizaciones de un Fundador y sus mismos 100 créditos de IA (en los videos
   // se ve "Créditos IA: N de 100", como lo ve un cliente; si hace falta se sube en la base).
   const demo = d.alta === 'demo'

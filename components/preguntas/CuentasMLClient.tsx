@@ -63,7 +63,7 @@ export default function CuentasMLClient({ inicial = null }: { inicial?: unknown 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
             {datos.cuentas.length === 0 ? (
-              <p className="p-6 text-sm text-neutral-500 text-center">Ninguna conectada todavía. Si estás en prueba, tus días gratis empiezan cuando conectes la primera.</p>
+              <p className="p-6 text-sm text-neutral-500 text-center">Ninguna conectada todavía. Conecta la primera para empezar a usar el sistema.</p>
             ) : (
               <ul className="divide-y divide-neutral-100">
                 {datos.cuentas.map(c => (

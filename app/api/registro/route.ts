@@ -104,7 +104,7 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
       ? `📡 <b>Nuevo registro al Radar</b> ${b.promo ? `(promo ${esc(b.promo)})` : `(Radar mensual ${precioRadarMes(currentDate()).precio} USD: falta que pague)`}\n${esc(b.negocio)} · ${esc(b.nombre)} · ${esc(b.usuario)}\n${contacto}`
       : `🆕 <b>Nueva prueba gratis (15 días)</b>\n${esc(b.negocio)} · ${esc(b.nombre)}\n`
         + contacto + '\n'
-        + 'Los días arrancan cuando conecte MercadoLibre.')
+        + 'Sus 15 días corren desde hoy.')
       .catch(e => console.error('[registro] aviso', e instanceof Error ? e.message : e))
     return NextResponse.json({ ok: true, empresa: c.empresaId, radar }, { status: 201 })
   } catch (err) {

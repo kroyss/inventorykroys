@@ -16,7 +16,7 @@ const INCLUYE = [
 ]
 const PASOS = [
   'Crea tu cuenta (1 minuto).',
-  'Conecta tu cuenta de MercadoLibre: ahí arrancan tus 15 días.',
+  'Conecta tu cuenta de MercadoLibre: tus 15 días corren desde que te registras.',
   'Al terminar, escríbenos para seguir sin perder nada.',
 ]
 
@@ -97,7 +97,7 @@ export default function RegistroForm({ marca }: { marca: Marca }) {
         <p className="relative mt-1 text-xl font-semibold leading-snug tracking-tight">
           Prueba todo con <span className="text-lime-400">tus propias ventas.</span>
         </p>
-        <p className="relative mt-1 text-xs text-neutral-400">Los días arrancan cuando conectas MercadoLibre.</p>
+        <p className="relative mt-1 text-xs text-neutral-400">Los 15 días corren desde que te registras.</p>
       </header>
 
       {/* Formulario */}
