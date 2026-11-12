@@ -97,8 +97,8 @@ export function quitarParecido(texto: string, referencias: string[], lado: 'fina
 }
 
 // Lo que MercadoLibre acepta en la descripción: texto plano. Letras (con acentos y ñ), números, espacios y los signos
-// básicos. Lo demás (emojis, símbolos raros, viñetas especiales) ML lo rechaza o lo borra.
-const PERMITIDO = /[\p{L}\p{N}\s.,;:¿?¡!()[\]{}"'`´\-_+*/\\#%&@$=<>|°ºª~^€£¥…·•–—“”‘’]/u
+// básicos (12-11: también × ½ ¼ ¾ ² ³ ± ÷ ® ™ ©, que ML acepta: vienen en descripciones ya publicadas). Lo demás (emojis, símbolos raros, viñetas especiales) ML lo rechaza o lo borra.
+const PERMITIDO = /[\p{L}\p{N}\s.,;:¿?¡!()[\]{}"'`´\-_+*/\\#%&@$=<>|°ºª~^€£¥…·•–—“”‘’×½¼¾²³±÷®™©]/u
 
 /** Los caracteres que ML no acepta (sin repetir), para avisar antes de guardar. */
 export function caracteresNoPermitidos(texto: string): string[] {
