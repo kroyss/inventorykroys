@@ -40,11 +40,12 @@ export async function GET(req: NextRequest) {
     const { rows } = await s.db.query(
       `SELECT c.pack_id::text, c.sin_leer, c.ultimo_texto, c.ultimo_de_comprador, c.ultimo_at, c.productos, c.notas,
               NULLIF(c.comprador_nick, '') AS comprador_nick, c.comprador_nombre,
-              x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos,
+              c.total_filas, x.nickname AS cuenta, d.despachada_at, img.imagen, (o.estado = 'cancelled') AS cancelada, $1::boolean AS con_despachos,
               ${q ? `(SELECT m.texto FROM ml_mensajes m WHERE m.pack_id = c.pack_id AND m.texto ILIKE $2 ORDER BY m.fecha DESC LIMIT 1)` : 'NULL'} AS coincide
        -- 12-11 (rapidez): primero la página (o el tope) y recién ahí despacho, venta y foto: antes se buscaban para
        -- las 2.600 conversaciones de Atendidas y se mostraban 10 (135 ms → pocos ms).
-       FROM (SELECT c.* FROM ml_conversaciones c ${filtro}
+       -- total_filas: el total de la búsqueda/página en la MISMA pasada (antes un COUNT aparte: buscar recorría los mensajes dos veces).
+       FROM (SELECT c.*, COUNT(*) OVER () AS total_filas FROM ml_conversaciones c ${filtro}
              ORDER BY (c.sin_leer > 0) DESC, c.ultimo_at DESC NULLS LAST, c.pack_id DESC
              ${paginado ? `LIMIT ${POR_PAGINA} OFFSET ${(pagina! - 1) * POR_PAGINA}` : `LIMIT ${tope}`}) c
        JOIN ml_conexiones x ON x.id = c.conexion_id
@@ -70,7 +71,8 @@ export async function GET(req: NextRequest) {
     const hayMas = !paginado && tope === limite + 1 && rows.length > limite
     if (hayMas) rows.pop()
     let total: number | null = null
-    if (paginado) {
+    if (paginado && rows.length) total = Number(rows[0].total_filas)
+    else if (paginado) {   // página más allá del final: el total aparte, como antes
       const { rows: [t] } = await s.db.query(
         `SELECT COUNT(*)::int AS n FROM ml_conversaciones c ${filtro.replaceAll('$2', '$1')}`, params)
       total = t.n
@@ -82,6 +84,7 @@ export async function GET(req: NextRequest) {
     // Respuestas rápidas (botones en cada conversación); `sugeridas` = ejemplos para el editor.
     const { rows: [pl] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'mensajes_plantillas'`)
     const { rows: [cta] } = await s.db.query(`SELECT nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id LIMIT 1`)
+    for (const r of rows) delete r.total_filas
     return NextResponse.json({
       conversaciones: rows, hay_mas: hayMas, total, por_pagina: POR_PAGINA, sin_leer: n, rapidas: leerMensajesRapidos(pl?.value), esAdmin: puede(s.session.user, 'automatizaciones_config'),
       sugeridas: MENSAJES_SUGERIDOS(cta?.nickname),
