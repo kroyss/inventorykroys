@@ -6,6 +6,7 @@ import { tieneModulo } from '@/lib/modulos'
 import MercadoEnviosClient from '@/components/productos/MercadoEnviosClient'
 import type { Product } from '@/lib/types'
 import { puede } from '@/lib/permisos'
+import { tasaYAjustes } from '@/lib/inicial'
 
 export const metadata = { title: 'MercadoEnvíos' }
 
@@ -41,5 +42,6 @@ export default async function MercadoEnviosPage() {
     ORDER BY p.name
   `)
 
-  return <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} />
+  // 12-11 (rapidez): tasa y Ajustes en el HTML.
+  return <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} />
 }

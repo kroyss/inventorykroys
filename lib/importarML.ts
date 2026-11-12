@@ -181,3 +181,22 @@ export async function crearProductos(db: PoolClient, lista: NuevoProducto[], use
     throw e
   }
 }
+
+/** Cuántas publicaciones (o variantes) activas y con unidades en ML no están vinculadas a ningún producto (12-11, el
+ *  aviso de Stock en ML). Mismo criterio que filasImportar (código exacto o el de toda la publicación) pero contado en
+ *  la base: antes se traía el catálogo entero (~900 kB) para contar. */
+export async function contarSinVincular(db: Pool): Promise<number> {
+  const { rows: [r] } = await db.query(
+    `WITH filas AS (
+       SELECT substring(c.item_id FROM 4) AS pub, v->>'id' AS var,
+              CASE WHEN v IS NULL THEN c.disponible ELSE (v->>'disponible')::int END AS disp
+       FROM ml_catalogo c JOIN ml_conexiones x ON x.id = c.conexion_id
+       LEFT JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.variantes) = 'array' THEN c.variantes ELSE '[]'::jsonb END) v ON TRUE
+       WHERE c.estado = 'active'),
+     vinc AS (SELECT DISTINCT m.ml_code FROM product_ml_codes m JOIN products p ON p.id = m.product_id WHERE m.is_active AND p.is_active)
+     SELECT COUNT(*)::int AS n FROM filas f
+     LEFT JOIN vinc v1 ON v1.ml_code = f.pub || COALESCE(':' || f.var, '')
+     LEFT JOIN vinc v2 ON v2.ml_code = f.pub
+     WHERE f.disp > 0 AND v1.ml_code IS NULL AND v2.ml_code IS NULL`)
+  return r?.n ?? 0
+}

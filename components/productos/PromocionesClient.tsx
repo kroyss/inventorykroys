@@ -86,7 +86,8 @@ const ENVIO: Record<EstadoEnvio, { t: string; c: string }> = {
 }
 const Chip = ({ e }: { e: EstadoEnvio }) => <span className={`inline-block px-2 py-0.5 rounded-full border text-[11px] ${ENVIO[e].c}`}>{ENVIO[e].t}</span>
 
-export default function PromocionesClient({ filas, campanas: campanasBase, cuentas, pesosAl, conPagosME, historial, pausas = {} }: {
+export default function PromocionesClient({ filas, campanas: campanasBase, cuentas, pesosAl, conPagosME, historial, pausas = {}, inicialTasa = null }: {
+  inicialTasa?: import('@/lib/inicial').TasaYAjustes | null   // 12-11: tasa y Ajustes ya vinieron en el HTML
   filas: FilaPromo[]; campanas: CampanaVista[]
   /** 11-11: campañas propias pausadas → las publicaciones que tenían (clave conexión|campaña). */
   pausas?: Record<string, string[]>
@@ -123,13 +124,15 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
   const [margenMin, setMargenMin] = useState(15)
   const [pctSug, setPctSug] = useState(10)
   // Margen neto (Fase 3): tasas y parámetros de ML de Ajustes, como el catálogo.
-  const [veRate, setVeRate] = useState<VeRate | null>(null)
-  const [ml, setMl] = useState<Record<string, string>>({})
+  const tIni = inicialTasa?.rate
+  const [veRate, setVeRate] = useState<VeRate | null>(tIni?.official_rate ? { official: tIni.official_rate, parallel: tIni.parallel_rate, excess: tIni.excess_percentage } : null)
+  const [ml, setMl] = useState<Record<string, string>>(inicialTasa?.settings ?? {})
+  const conTasa = !!(inicialTasa?.rate && inicialTasa?.settings)
   useEffect(() => {
     let vivo = true
     Promise.all([
-      fetch('/api/rates/latest').then(r => r.json()).catch(() => null),
-      fetch('/api/settings').then(r => r.json()).catch(() => ({})),
+      conTasa ? inicialTasa!.rate : fetch('/api/rates/latest').then(r => r.json()).catch(() => null),
+      conTasa ? inicialTasa!.settings : fetch('/api/settings').then(r => r.json()).catch(() => ({})),
     ]).then(([r, s]) => {
       if (!vivo) return
       if (r?.official_rate) setVeRate({ official: r.official_rate, parallel: r.parallel_rate, excess: r.excess_percentage })

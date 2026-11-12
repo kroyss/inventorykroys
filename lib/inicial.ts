@@ -19,3 +19,15 @@ export async function deApi<T>(get: (req: NextRequest) => Promise<Response | und
     clearTimeout(reloj)
   }
 }
+
+/** Tasa VE (/api/rates/latest) y parámetros de Ajustes (/api/settings), que piden Productos, Promociones y
+ *  MercadoEnvíos al abrir. null en lo que no se pudo (el componente lo pide él). */
+export type TasaYAjustes = { rate: Record<string, number> | null; settings: Record<string, string> | null }
+export async function tasaYAjustes(): Promise<TasaYAjustes> {
+  const [{ GET: tasa }, { GET: ajustes }] = await Promise.all([import('@/app/api/rates/latest/route'), import('@/app/api/settings/route')])
+  const [rate, settings] = await Promise.all([
+    deApi<Record<string, number>>(tasa, '/api/rates/latest'),
+    deApi<Record<string, string>>(ajustes, '/api/settings'),
+  ])
+  return { rate, settings }
+}

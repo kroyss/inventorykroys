@@ -8,6 +8,7 @@ import { puede } from '@/lib/permisos'
 import type { FotoPromociones } from '@/lib/promocionesML'
 import PublicacionesMLTabs from '@/components/productos/PublicacionesMLTabs'
 import PromocionesClient, { type CampanaVista, type FilaPromo, type AccionHecha } from '@/components/productos/PromocionesClient'
+import { tasaYAjustes } from '@/lib/inicial'
 
 export const metadata = { title: 'Promociones' }
 
@@ -97,6 +98,7 @@ export default async function PromocionesPage() {
   return (<>
     <PublicacionesMLTabs user={session.user} actual="promociones" />
     <PromocionesClient
+      inicialTasa={await tasaYAjustes()}
       pausas={pausas}
       filas={filas}
       campanas={[...campanas.values()]}

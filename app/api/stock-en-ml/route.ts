@@ -8,7 +8,7 @@ import { registrarUso } from '@/lib/usoAcciones'
 import { actualizarCatalogo } from '@/lib/catalogoML'
 import { aplicarCambio, type Resultado } from '@/lib/stockML'
 import { filasStockML, leerReserva } from '@/lib/stockConML'
-import { filasImportar } from '@/lib/importarML'
+import { contarSinVincular } from '@/lib/importarML'
 
 // Stock en ML, Fase 1 (26-10; lib/stockConML.ts, pantalla Inventario → «Stock en ML»).
 //   GET → cada producto vinculado con sus publicaciones, lo que muestran en ML y lo que deberían mostrar
@@ -33,9 +33,8 @@ export async function GET() {
   const s = await sesion(false)
   if ('error' in s) return s.error
   try {
-    const [filas, reserva, catalogo] = await Promise.all([filasStockML(s.db, s.session.user.country), leerReserva(s.db), filasImportar(s.db, { parecidas: false })])
-    // Activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
-    const sinVincular = catalogo.filter(f => f.estado !== 'vinculada' && f.estado_ml === 'active' && f.disponible > 0).length
+    // sinVincular: activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
+    const [filas, reserva, sinVincular] = await Promise.all([filasStockML(s.db, s.session.user.country), leerReserva(s.db), contarSinVincular(s.db)])
     return NextResponse.json({ filas, reserva, sinVincular, puedeCambiar: puede(s.session.user, 'reponer_stock'),
                                puedeReserva: puede(s.session.user, 'inventario_config') })
   } catch (err) {

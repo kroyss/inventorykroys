@@ -7,6 +7,7 @@ import { cuentasML } from '@/lib/mlCuentas'
 import { tieneModulo } from '@/lib/modulos'
 import type { Product, ProfitCategory } from '@/lib/types'
 import { puede } from '@/lib/permisos'
+import { tasaYAjustes } from '@/lib/inicial'
 
 export const metadata = { title: 'Productos' }
 
@@ -47,6 +48,7 @@ export default async function ProductosPage() {
 
   return (
     <ProductosClient
+      inicialTasa={await tasaYAjustes()}
       initialProducts={productsRes.rows as Product[]}
       profitCategories={catsRes.rows as ProfitCategory[]}
       country={session.user.country}

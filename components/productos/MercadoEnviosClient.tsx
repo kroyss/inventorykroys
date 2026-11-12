@@ -20,7 +20,7 @@ const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
 
 type Filter = 'all' | 'unregistered' | 'capped' | 'aggregate' | 'impossible'
 
-export default function MercadoEnviosClient({ initialProducts }: { initialProducts: Product[] }) {
+export default function MercadoEnviosClient({ initialProducts, inicialTasa = null }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState<Filter>('all')
@@ -31,14 +31,19 @@ export default function MercadoEnviosClient({ initialProducts }: { initialProduc
   const [error, setError]       = useState('')
 
   // Tasa VE + settings (exceso, descuento global, tabla de envíos)
-  const [rate, setRate] = useState<{ official: number; parallel: number; excess: number; recommended: number } | null>(null)
-  const [settings, setSettings] = useState<Record<string, string>>({})
+  // 12-11 (rapidez): tasa y Ajustes vienen en el HTML (inicialTasa); lo que falte se pide como antes.
+  const tIni = inicialTasa?.rate
+  const [rate, setRate] = useState<{ official: number; parallel: number; excess: number; recommended: number } | null>(
+    tIni ? { official: tIni.official_rate, parallel: tIni.parallel_rate, excess: tIni.excess_percentage, recommended: tIni.recommended_discount } : null)
+  const [settings, setSettings] = useState<Record<string, string>>(inicialTasa?.settings ?? {})
+  const conTasa = !!(inicialTasa?.rate && inicialTasa?.settings)
   useEffect(() => {
+    if (conTasa) return
     fetch('/api/rates/latest').then(r => r.json()).then(d =>
       setRate({ official: d.official_rate, parallel: d.parallel_rate, excess: d.excess_percentage, recommended: d.recommended_discount })
     ).catch(() => {})
     fetch('/api/settings').then(r => r.json()).then(d => setSettings(d && typeof d === 'object' ? d : {})).catch(() => {})
-  }, [])
+  }, [conTasa])
 
   const shipTable = useMemo(() => parseShippingTable(settings.ml_shipping_table), [settings.ml_shipping_table])
   const globalDiscount = useMemo(() => {

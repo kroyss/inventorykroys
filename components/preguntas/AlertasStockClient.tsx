@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PageHeader, Tabs, Cargando } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { AbrirFicha } from './FichaPublicacion'
@@ -14,7 +14,7 @@ interface Fila {
   caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
   inventario?: number | null      // lo que hay en el inventario del producto vinculado (solo empresas con inventario; 28-10 en las 3 vistas)
 }
-interface Datos {
+export interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
   revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean; puedeStock: boolean
 }
@@ -30,13 +30,13 @@ const hace = (s: string | null) => {
 }
 
 /** Automatizaciones → Stock: publicaciones (y variantes) de MercadoLibre vendidas en 30 días, agotadas o por agotarse. */
-export default function AlertasStockClient() {
+export default function AlertasStockClient({ inicial = null }: { inicial?: Datos | null }) {   // 12-11: Agotadas ya vino en el HTML
   const [vista, setVista] = useState<Vista>('agotadas')
-  const [datos, setDatos] = useState<Datos | null>(null)
-  const [datosDe, setDatosDe] = useState<Vista | null>(null)   // de qué pestaña son los datos cargados
+  const [datos, setDatos] = useState<Datos | null>(inicial)
+  const [datosDe, setDatosDe] = useState<Vista | null>(inicial ? 'agotadas' : null)   // de qué pestaña son los datos cargados
   const [buscar, setBuscar] = useState('')
   const [revisando, setRevisando] = useState(false)
-  const [umbral, setUmbral] = useState('')
+  const [umbral, setUmbral] = useState(inicial ? String(inicial.umbral) : '')
   const [guardandoUmbral, setGuardandoUmbral] = useState(false)
   const [vez, setVez] = useState(0)
   // Reponer desde aquí (admin): nuevo stock por fila (clave item:variante); solo las marcadas se envían.
@@ -61,7 +61,9 @@ export default function AlertasStockClient() {
     } finally { setQuitando(null); setVez(n => n + 1) }
   }
 
+  const saltarPrimera = useRef(!!inicial)
   useEffect(() => {
+    if (saltarPrimera.current) { saltarPrimera.current = false; return }
     let vivo = true
     fetch(`/api/alertas-stock?vista=${vista}`, { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))

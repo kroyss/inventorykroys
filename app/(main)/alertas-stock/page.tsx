@@ -6,6 +6,9 @@ import AlertasStockClient from '@/components/preguntas/AlertasStockClient'
 import SinCuentaML from '@/components/automatizaciones/SinCuentaML'
 import { sinCuentasML } from '@/lib/preguntasSesion'
 import { puede } from '@/lib/permisos'
+import { deApi } from '@/lib/inicial'
+import { GET as alertas } from '@/app/api/alertas-stock/route'
+import type { Datos } from '@/components/preguntas/AlertasStockClient'
 
 export const metadata = { title: 'Stock' }
 
@@ -19,5 +22,6 @@ export default async function AlertasStockPage() {
         'Solo lo que se vendió en los últimos 30 días: lo urgente de reponer.',
         'Se revisa solo cada hora, con el link a cada publicación.']} />
   }
-  return <AlertasStockClient />
+  // 12-11 (rapidez): la pestaña Agotadas viene en el HTML (mismo GET de la API).
+  return <AlertasStockClient inicial={await deApi<Datos>(alertas, '/api/alertas-stock?vista=agotadas')} />
 }

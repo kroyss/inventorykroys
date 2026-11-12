@@ -127,7 +127,7 @@ interface Props {
   promociones?: boolean  // módulo promociones + permiso (migración 094): link a Promociones
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false }: Props) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false, inicialTasa = null }: Props & { inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
   // Inventario simple: el precio de venta es el que se guardó (lo publicado en ML), no costo × categoría × exceso.
   const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
@@ -149,13 +149,16 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const confirm = useConfirm()
 
   // Tasa VE (para exceso/descuento sugerido). Solo aplica en VE.
-  const [veRate, setVeRate] = useState<VeRate | null>(null)
+  // 12-11 (rapidez): tasa y Ajustes vienen en el HTML (inicialTasa); lo que falte se pide como antes.
+  const tIni = country === 'VE' ? inicialTasa?.rate : null
+  const [veRate, setVeRate] = useState<VeRate | null>(tIni?.official_rate ? { official: tIni.official_rate, parallel: tIni.parallel_rate, excess: tIni.excess_percentage } : null)
+  const conRate = !!tIni?.official_rate
   useEffect(() => {
-    if (country !== 'VE') return
+    if (country !== 'VE' || conRate) return
     fetch('/api/rates/latest').then(r => r.json()).then(d => {
       setVeRate({ official: d.official_rate, parallel: d.parallel_rate, excess: d.excess_percentage })
     }).catch(() => {})
-  }, [country])
+  }, [country, conRate])
 
   // Tasa TRM (CO): para sugerir el precio de venta en pesos a partir del costo USD.
   const [coTrm, setCoTrm] = useState(0)
@@ -167,11 +170,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   }, [country])
 
   // Parámetros de costos ML (Ajustes) para la ganancia neta.
-  const [mlSettings, setMlSettings] = useState<Record<string, string>>({})
+  const [mlSettings, setMlSettings] = useState<Record<string, string>>(inicialTasa?.settings ?? {})
+  const conSettings = !!inicialTasa?.settings
   useEffect(() => {
+    if (conSettings) return
     fetch('/api/settings').then(r => r.json())
       .then(d => setMlSettings(d && typeof d === 'object' ? d : {})).catch(() => {})
-  }, [])
+  }, [conSettings])
 
   // derived calculator values
   const selectedCat = profitCategories.find(c => c.id === form.profit_category_id)
