@@ -45,12 +45,12 @@ function cuentaDe(filas: Detalle[]): Cuenta {
 export default function InternoPanel() {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Período: desde que salió Mi IA (06-11), desde ayer o solo hoy (12-11, el dueño).
-  const [periodo, setPeriodo] = useState<'mi-ia' | 'ayer' | 'hoy'>('mi-ia')
+  // Período: desde que salió Mi IA oficialmente (11-11), desde ayer, hoy, o desde el 06-11 con las pruebas del equipo (12-11, el dueño).
+  const [periodo, setPeriodo] = useState<'mi-ia' | 'pruebas' | 'ayer' | 'hoy'>('mi-ia')
 
   useEffect(() => {
     let vivo = true
-    const desde = periodo === 'ayer' ? fechaCaracas(1) : periodo === 'hoy' ? fechaCaracas() : ''
+    const desde = periodo === 'pruebas' ? '2026-11-06' : periodo === 'ayer' ? fechaCaracas(1) : periodo === 'hoy' ? fechaCaracas() : ''
     fetch(`/api/plataforma/uso-ia${desde ? `?desde=${desde}` : ''}`)
       .then(async r => { const d = await r.json().catch(() => ({})); if (!vivo) return; if (r.ok) setDatos(d); else setError(d.error ?? 'No se pudo cargar') })
       .catch(() => { if (vivo) setError('No se pudo cargar') })
@@ -78,7 +78,7 @@ export default function InternoPanel() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-neutral-500">Período:</span>
-        {([['mi-ia', 'Desde 06/11 (Mi IA)'], ['ayer', 'Desde ayer'], ['hoy', 'Hoy']] as const).map(([k, t]) => (
+        {([['mi-ia', 'Desde 11/11 (salió Mi IA)'], ['ayer', 'Desde ayer'], ['hoy', 'Hoy'], ['pruebas', 'Desde 06/11 (con las pruebas, Sonnet)']] as const).map(([k, t]) => (
           <button key={k} onClick={() => { setPeriodo(k); setDatos(null) }}
             className={`px-3 py-1 rounded-full text-sm border ${periodo === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-400'}`}>{t}</button>
         ))}
@@ -99,7 +99,7 @@ export default function InternoPanel() {
         <div>
           <h2 className="text-base font-semibold text-neutral-900">Consumo de IA por cuenta</h2>
           <p className="text-sm text-neutral-500">
-            Desde el {datos ? ddmm(datos.desde) : '…'}{datos?.desde === '2026-11-06' ? ' (salió Mi IA)' : ''}. Todo lo que gasta cada cuenta, separado por para qué fue.
+            Desde el {datos ? ddmm(datos.desde) : '…'}{datos?.desde === '2026-11-11' ? ' (salió Mi IA)' : datos?.desde === '2026-11-06' ? ' (incluye las pruebas de tu equipo con Sonnet)' : ''}. Todo lo que gasta cada cuenta, separado por para qué fue.
             <b className="text-neutral-700"> Costo real por crédito</b> = todo su gasto ÷ los créditos que se le cobraron: compáralo con lo que
             vale el crédito (≈ $0,007–0,008).
           </p>

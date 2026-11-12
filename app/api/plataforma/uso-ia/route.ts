@@ -7,7 +7,10 @@ import { enTandas, soloDueno } from '@/lib/plataforma'
 import { currentDate } from '@/lib/tz'
 
 // 12-11 (el dueño): el consumo se mide desde que salió Mi IA (06-11); lo de antes eran otros modelos y otro diseño.
-export const IA_MEDIR_DESDE = '2026-11-06'
+// 12-11 (corrección del dueño): Mi IA salió OFICIALMENTE el 11-11 (del 06 al 10 fueron pruebas de su equipo, con
+// Sonnet). Por defecto se mide desde el 11-11; se puede ver desde el 06-11 como historial.
+export const IA_MEDIR_DESDE = '2026-11-11'
+const IA_HISTORIAL_DESDE = '2026-11-06'
 
 // GET /api/plataforma/uso-ia → consumo de IA de cada empresa desde IA_MEDIR_DESDE, por día, módulo, modelo y usuario
 // (migración 065), y los créditos de cada empresa. Solo el dueño de la plataforma (funciones SECURITY DEFINER).
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
   if (error) return error
   try {
     const pedido = req.nextUrl.searchParams.get('desde') ?? ''
-    const desde = /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido > IA_MEDIR_DESDE ? pedido : IA_MEDIR_DESDE
+    const desde = /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido >= IA_HISTORIAL_DESDE ? pedido : IA_MEDIR_DESDE
     const [{ rows: detalle }, { rows: empresas }, { rows: ayuda }, { rows: gasto }] = await Promise.all([
       dbGlobal().query(
         `SELECT empresa_id, to_char(dia, 'YYYY-MM-DD') AS dia, modulo, modelo, usuario, usos,
