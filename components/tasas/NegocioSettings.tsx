@@ -10,7 +10,9 @@ import { useEffect, useState } from 'react'
  * Si la empresa no escribió cuentas y tiene cuentas conectadas por API, el campo no se muestra: se usan
  * las conectadas (lib/mlCuentas.ts). Queda para quien ya las escribió (p.ej. SolucionesMC) o no conectó ninguna.
  */
-export default function NegocioSettings({ conDespachos, soloRemitente = false }: { conDespachos: boolean; soloRemitente?: boolean }) {
+export default function NegocioSettings({ conDespachos, soloRemitente = false, inicial = null }: { conDespachos: boolean; soloRemitente?: boolean
+  /** 12-11 (rapidez): ml_cuentas y despacho_remitente ya leídos por la página (Despachos). */
+  inicial?: Record<string, string> | null }) {
   const [cuentas, setCuentas]     = useState('')
   const [remitente, setRemitente] = useState('')
   const [guardadas, setGuardadas] = useState(false)          // la empresa ya escribió cuentas a mano
@@ -20,7 +22,7 @@ export default function NegocioSettings({ conDespachos, soloRemitente = false }:
   const [okMsg, setOkMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(s => {
+    (inicial ? Promise.resolve(inicial) : fetch('/api/settings').then(r => r.json())).then((s: Record<string, string>) => {
       let v: string[] = []
       try { v = JSON.parse(s.ml_cuentas ?? '[]') as string[] } catch { /* vacío */ }
       setCuentas(v.join(', ')); setGuardadas(v.length > 0)
@@ -31,7 +33,7 @@ export default function NegocioSettings({ conDespachos, soloRemitente = false }:
         .then(d => setConectadas((d.cuentas ?? []).filter((c: { estado: string }) => c.estado === 'activa').map((c: { nickname: string }) => c.nickname.toUpperCase())))
         .catch(() => setConectadas([]))
     }
-  }, [soloRemitente])
+  }, [soloRemitente, inicial])
   const automaticas = !soloRemitente && !guardadas && !!conectadas?.length
   const conCampoCuentas = !soloRemitente && !automaticas
 

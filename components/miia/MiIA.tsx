@@ -761,7 +761,7 @@ function PasarPoliticas({ c, pase, onListo, onCerrar }: { c: Config; pase: Pase;
 }
 
 // ── componente ───────────────────────────────────────────────────────────────
-export default function MiIA({ inicial = null }: { inicial?: unknown }) {
+export default function MiIA({ inicial = null, frenosInicial = null }: { inicial?: unknown; frenosInicial?: unknown }) {
   useVistoNuevo('mi_ia')   // al entrar se quita la marca «Nuevo» de los menús
   const [datos, setDatos] = useState<{ miIA: Config | null; pais: string; texto: { preguntas: string; mensajes: string } | null; iaAuto: string | null; msgAuto?: boolean | null; msgPronto?: boolean; iaTodo?: boolean; msgTodo?: boolean; politicas?: boolean; pruebas?: { preguntas: number; mensajes: number } | null } | null>(null)
   const [c, setC] = useState<Config>({ version: 1 })
@@ -1095,7 +1095,7 @@ export default function MiIA({ inicial = null }: { inicial?: unknown }) {
         quedan={datos.pruebas ? datos.pruebas.mensajes : null} faltan={faltan.map(i => PASOS[i].tema)} />
       )}
       </div>
-      {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
+      {(datos.iaAuto !== null || datos.msgAuto != null) && <FrenosIA inicial={frenosInicial} preguntas={datos.iaAuto !== null} mensajes={datos.msgAuto != null} />}
     </div>
   )
 }

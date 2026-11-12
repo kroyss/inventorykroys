@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
     // 23-10: la espera es para las concretadas (que le llegue al comprador). Una NO concretada no espera: ML la concreta
     // sola a los 7 días y cobra la comisión, así que se puede calificar apenas se sugiere.
     const espera = `(b.sugerencia <> 'no_concretada' AND NOT ${sqlLista(plantillas.esperaDias)})`
-    const { rows } = await s.db.query(
+    // 12-11 (rapidez): la bandeja se arma UNA vez (antes dos: la lista y los contadores, 0,45–0,6 s la API) y de ahí
+    // salen la pestaña pedida y los contadores. en_espera NULL (sin fecha) no entra en ninguna, igual que en SQL.
+    const [{ rows: todas }, { rows: ajustes }] = await Promise.all([s.db.query(
       `SELECT b.*, ${espera} AS en_espera, ${sqlListaEl(plantillas.esperaDias)} AS lista_el,
               -- Si hubo mensajes en la venta (2026-10-17, pedido de un usuario): antes de calificar una no
               -- concretada se ve si el comprador dio señales de vida, sin salir a MercadoLibre.
@@ -34,23 +36,25 @@ export async function GET(req: NextRequest) {
                FROM ml_ordenes oo JOIN ml_conversaciones c ON c.pack_id = COALESCE(oo.pack_id, oo.id)
                WHERE oo.id = b.id::bigint AND c.ultimo_at IS NOT NULL LIMIT 1) AS chat
        FROM (${SQL_BANDEJA}) b
-       WHERE ${vista === 'esperando' ? `sugerencia = 'esperar'` : vista === 'proximas' ? `sugerencia <> 'esperar' AND ${espera}` : `sugerencia <> 'esperar' AND NOT ${espera}`}
        -- La más vieja primero (2026-10-13): es la que menos plazo le queda para calificar en ML.
-       ORDER BY fecha ASC LIMIT 1000`, [dias])
-    const { rows: [n] } = await s.db.query(
-      `SELECT COUNT(*) FILTER (WHERE sugerencia = 'concretada' AND NOT ${espera})::int AS concretadas,
-              COUNT(*) FILTER (WHERE sugerencia = 'no_concretada' AND NOT ${espera})::int AS no_concretadas,
-              COUNT(*) FILTER (WHERE sugerencia = 'revisar' AND NOT ${espera})::int AS revisar,
-              COUNT(*) FILTER (WHERE sugerencia <> 'esperar' AND ${espera})::int AS proximas,
-              COUNT(*) FILTER (WHERE sugerencia = 'esperar')::int AS esperando
-       FROM (${SQL_BANDEJA}) b`, [dias])
-    const { rows: [ua] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_auto_ultimo'`)
-    let autoUltimo: unknown = null
-    try { autoUltimo = ua ? JSON.parse(ua.value) : null } catch { /* ignorado */ }
+       ORDER BY fecha ASC`, [dias]),
+      s.db.query(`SELECT key, value FROM app_settings WHERE key IN ('calificaciones_auto_ultimo', 'calificaciones_auto_nc')`)])
+    type Fila = { sugerencia: string; en_espera: boolean | null }
+    const lista = (f: Fila) => f.en_espera === false, enEspera = (f: Fila) => f.en_espera === true
+    const rows = (todas as Fila[]).filter(f => vista === 'esperando' ? f.sugerencia === 'esperar'
+      : f.sugerencia !== 'esperar' && (vista === 'proximas' ? enEspera(f) : lista(f))).slice(0, 1000)
+    const cuenta = (pasa: (f: Fila) => boolean) => (todas as Fila[]).filter(pasa).length
+    const n = {
+      concretadas: cuenta(f => f.sugerencia === 'concretada' && lista(f)),
+      no_concretadas: cuenta(f => f.sugerencia === 'no_concretada' && lista(f)),
+      revisar: cuenta(f => f.sugerencia === 'revisar' && lista(f)),
+      proximas: cuenta(f => f.sugerencia !== 'esperar' && enEspera(f)),
+      esperando: cuenta(f => f.sugerencia === 'esperar'),
+    }
+    const ajuste = (k: string) => { const v = ajustes.find(r => r.key === k)?.value; try { return v ? JSON.parse(v) as unknown : null } catch { return null } }
+    const autoUltimo = ajuste('calificaciones_auto_ultimo')
     // La de no concretadas (red de seguridad, 23-10).
-    const { rows: [un] } = await s.db.query(`SELECT value FROM app_settings WHERE key = 'calificaciones_auto_nc'`)
-    let autoNcUltimo: unknown = null
-    try { autoNcUltimo = un ? JSON.parse(un.value) : null } catch { /* ignorado */ }
+    const autoNcUltimo = ajuste('calificaciones_auto_nc')
     const { rows: cuentas } = await s.db.query(
       `SELECT nickname, ordenes_sync_at FROM ml_conexiones WHERE estado = 'activa' ORDER BY nickname`)
     // Cómo decide "concretada" esta empresa (para el aviso de la pantalla).

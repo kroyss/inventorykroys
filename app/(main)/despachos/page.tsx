@@ -12,6 +12,7 @@ import NegocioSettings from '@/components/tasas/NegocioSettings'
 import { redirect } from 'next/navigation'
 import { tieneModulo, ventasDesdeML } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
+import { dbDeSesion } from '@/lib/session'
 
 export const metadata = { title: 'Despachos' }
 
@@ -41,11 +42,14 @@ export default async function DespachosPage() {
   const lotes = ov && !desdeML ? (await Promise.all(ov.pendientes.map(p => deApi<NonNullable<DespachosInicial['lotes']>[number]>(
     req => detalleLote(req, { params: Promise.resolve({ id: String(p.id) }) }), `/api/despachos/lotes/${p.id}`)))).filter(l => l !== null) : null
   const inicial: DespachosInicial = { ov, lotes, espera: espera?.espera ?? null, primera }
+  // El remitente del manifiesto (y las cuentas que lee el mismo formulario): solo esas dos claves, no todo Ajustes.
+  const negocio = isAdmin ? Object.fromEntries((await dbDeSesion(session!).query(
+    `SELECT key, value FROM app_settings WHERE key IN ('ml_cuentas', 'despacho_remitente')`)).rows.map(r => [r.key, r.value])) as Record<string, string> : null
   return (
     <div className="space-y-6">
       <DespachosClient inicial={inicial} isAdmin={isAdmin} reportador={tieneModulo(session!.user, 'reportador')} desdeML={desdeML} />
       {/* El remitente del manifiesto se cambia aquí, para todas las empresas (ya no está en Ajustes). */}
-      {isAdmin && <NegocioSettings conDespachos soloRemitente />}
+      {isAdmin && <NegocioSettings conDespachos soloRemitente inicial={negocio} />}
     </div>
   )
 }

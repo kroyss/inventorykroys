@@ -46,7 +46,9 @@ export async function GET() {
   if (!acceso) return forbidden()
 
   try {
-    const { rows } = await db.query(`SELECT key, value FROM app_settings`)
+    // 12-11 (rapidez): sin la imagen del membrete (283 KB en SolucionesMC; la sirve /api/invoices/membrete) ni las
+    // pausas de promociones (las lee su página): iban en cada pedido y dentro del HTML de Productos/Promociones/MercadoEnvíos.
+    const { rows } = await db.query(`SELECT key, value FROM app_settings WHERE key <> 'membrete_factura_img' AND key NOT LIKE 'promo_pausa:%'`)
     const out: Record<string, string> = {}
     for (const r of rows) if (acceso === 'todo' || DE_AUTOMATIZACIONES.has(r.key)) out[r.key] = r.value
     // Sin el módulo Descuento ML, el descuento global es 0: publicado = final en todas las pantallas.

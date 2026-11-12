@@ -10,11 +10,12 @@ const ESCAPE_FABRICA = '¡Hola! Lo verificamos y te confirmamos en breve por aqu
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 // 10-11: se edita solo en Mi IA, con la frase de cada lado que esté disponible.
-export function FrenosIA({ preguntas = false, mensajes = false, total = false }: { preguntas?: boolean; mensajes?: boolean; total?: boolean }) {
-  const [f, setF] = useState<Frenos | null>(null)
+export function FrenosIA({ preguntas = false, mensajes = false, total = false, inicial = null }: { preguntas?: boolean; mensajes?: boolean; total?: boolean; inicial?: unknown }) {
+  const [f, setF] = useState<Frenos | null>((inicial as Frenos | null) ?? null)
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
   const [guardando, setGuardando] = useState(false)
-  useEffect(() => { fetch('/api/ia-frenos').then(r => r.ok ? r.json() : null).then(d => d && setF(d)).catch(() => {}) }, [])
+  // 12-11 (rapidez): en Mi IA vienen en el HTML; si no, se piden.
+  useEffect(() => { if (inicial) return; fetch('/api/ia-frenos').then(r => r.ok ? r.json() : null).then(d => d && setF(d)).catch(() => {}) }, [inicial])
   if (!f) return null
 
   const guardar = async (n: Frenos) => {
