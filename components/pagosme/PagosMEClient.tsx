@@ -433,10 +433,7 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
               <dt className="text-neutral-500">Estado</dt><dd><span className={`inline-block px-2 py-0.5 rounded-full ${VERIF[ver.verificacion].c}`}>{VERIF[ver.verificacion].t}</span>
                 {ver.verificado_por && <span className="ml-1.5 text-neutral-500">por {ver.verificado_por}{ver.verificado_at ? ` · ${hora(ver.verificado_at)}` : ''}</span>}</dd>
             </dl>
-            {ver.tiene_comprobante && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/api/pagos-me/${ver.id}/archivo?tipo=comprobante`} alt="Comprobante de pago" className="w-full rounded-lg border" />
-            )}
+            {ver.tiene_comprobante && <ComprobanteImgOPdf key={ver.id} url={`/api/pagos-me/${ver.id}/archivo?tipo=comprobante`} />}
             <div className="flex flex-wrap gap-2">
               {ver.verificacion !== 'valido' && <button onClick={() => { marcar('valido', [ver.id]); setVer(null) }} className="btn-primary text-sm flex-1">✓ Verificar</button>}
               {ver.verificacion !== 'invalido' && <button onClick={() => { marcar('invalido', [ver.id]); setVer(null) }} className="btn-secondary text-sm text-red-700">✗ Inválido</button>}
@@ -628,4 +625,12 @@ function CodigoConexion({ codigo, vence, onCerrar }: { codigo: string; vence: st
       <button onClick={onCerrar} className="text-emerald-700 text-xs">Cerrar ✕</button>
     </div>
   )
+}
+
+/** 12-11: el comprobante puede venir en PDF (el comprador lo subió así): si no carga como imagen, se muestra como PDF. */
+function ComprobanteImgOPdf({ url }: { url: string }) {
+  const [esPdf, setEsPdf] = useState(false)
+  if (esPdf) return <iframe src={url} title="Comprobante" className="w-full h-[60vh] rounded-lg border bg-white" />
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="Comprobante de pago" onError={() => setEsPdf(true)} className="w-full rounded-lg border" />
 }

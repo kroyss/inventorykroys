@@ -32,6 +32,8 @@ export default function VerComprobante({ pagoId, venta, datos, onCerrar }: {
   pagoId: number; venta: string; datos: DatosComprobante; onCerrar: () => void
 }) {
   const [copiado, setCopiado] = useState<string | null>(null)
+  // 12-11: el comprador también puede subir el pago en PDF: si no se puede ver como imagen, va como PDF.
+  const [esPdf, setEsPdf] = useState(false)
   const url = `/api/pagos-me/${pagoId}/archivo?tipo=comprobante`
 
   // Esc cierra solo esta ventana (en captura en window: antes que la de atrás).
@@ -70,8 +72,10 @@ export default function VerComprobante({ pagoId, venta, datos, onCerrar }: {
         </div>
         <div className="grid min-h-0 flex-1 overflow-auto md:grid-cols-[1fr_17rem]">
           <div className="order-2 flex items-start justify-center bg-neutral-100 p-3 md:order-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="Comprobante de pago" className="max-h-[75vh] w-auto max-w-full rounded-lg border bg-white" />
+            {esPdf
+              ? <iframe src={url} title="Comprobante" className="h-[55vh] w-full rounded-lg border bg-white md:h-[75vh]" />
+              // eslint-disable-next-line @next/next/no-img-element
+              : <img src={url} alt="Comprobante de pago" onError={() => setEsPdf(true)} className="max-h-[75vh] w-auto max-w-full rounded-lg border bg-white" />}
           </div>
           <div className="order-1 space-y-2 border-b border-neutral-100 p-4 md:order-2 md:border-b-0 md:border-l">
             <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Para buscar en el banco</p>
