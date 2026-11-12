@@ -110,7 +110,7 @@ export async function verificarBorrador(datos: string, pregunta: string, borrado
   const { resultado: r, uso, modelo } = await llamarClaude<{
     afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean }[]; partes_sin_contestar?: string[]; mal_entendida?: boolean
   }>({
-    sistema: SISTEMA + (v2 ? SISTEMA_V2_EXTRA : ''), herramienta: HERRAMIENTA, modelo: modeloV, maxTokens: 700,
+    para: 'Preguntas: verificador', sistema: SISTEMA + (v2 ? SISTEMA_V2_EXTRA : ''), herramienta: HERRAMIENTA, modelo: modeloV, maxTokens: 700,
     contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
   })
   // v2: Haiku a veces igual marca la cortesía o "el precio es el publicado" (07-11, 3 de 30): se descartan aquí.
@@ -132,7 +132,7 @@ async function verificarV3(datos: string, pregunta: string, borrador: string, mo
   const { resultado: r, uso, modelo } = await llamarClaude<{
     afirmaciones?: { afirmacion: string; donde: string; respaldada: boolean; tipo?: string }[]; principal_sin_contestar?: boolean; que_falta?: string
   }>({
-    sistema: SISTEMA + SISTEMA_V2_EXTRA + SISTEMA_V3_EXTRA, herramienta: HERRAMIENTA_V3, modelo: modeloV, maxTokens: 900,
+    para: 'Preguntas: verificador', sistema: SISTEMA + SISTEMA_V2_EXTRA + SISTEMA_V3_EXTRA, herramienta: HERRAMIENTA_V3, modelo: modeloV, maxTokens: 900,
     contenido: `DATOS:\n${datos}\n\n────────\nPREGUNTA: ${pregunta}\n\nBORRADOR A VERIFICAR:\n${borrador}`,
   })
   if (!esLista(r.afirmaciones)) return { ok: false, motivo: 'El verificador no respondió bien: lo revisa una persona', llamada: { modelo, uso } }

@@ -10,7 +10,7 @@ import type { Country } from '@/lib/types'
 // Solo con CRON_SECRET, desde el servidor:
 //   curl "http://127.0.0.1:8504/api/cron/ia-comparar?key=…&empresa=1&n=10&offset=0"
 // 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
-export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req), 'Comparador de contexto')
 
 async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams

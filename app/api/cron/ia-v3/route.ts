@@ -11,7 +11,7 @@ import type { Country } from '@/lib/types'
 // recalculan los frenos: así se compara solo el verificador. No publica, no guarda, no descuenta créditos.
 //   curl "http://127.0.0.1:8504/api/cron/ia-v3?key=…&empresa=1&n=10&offset=0&desde=2026-11-07"
 // 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
-export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req), 'Comparador v3')
 
 async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams

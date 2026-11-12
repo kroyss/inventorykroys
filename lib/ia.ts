@@ -50,8 +50,9 @@ export function costoDe(modelo: string, u: UsoIA, lote = false) {
 // 12-11 (el dueño): lo que gastan las pruebas internas del dueño sobre la cuenta de un cliente (Competencia: nuestra
 // respuesta para preguntas que ellos respondieron fuera) se guarda como módulo 'interna': no es consumo del cliente ni
 // le cuenta créditos, y Plataforma → Interno lo muestra aparte.
-const pruebaInterna = new AsyncLocalStorage<true>()
-export const comoPruebaInterna = <T>(fn: () => Promise<T>) => pruebaInterna.run(true, fn)
+// El valor guardado es el NOMBRE de la prueba (Competencia, Comparador v3…): así el registro dice cuál fue.
+const pruebaInterna = new AsyncLocalStorage<string>()
+export const comoPruebaInterna = <T>(fn: () => Promise<T>, nombre = 'Prueba interna') => pruebaInterna.run(nombre, fn)
 
 /** Guarda UN borrador (o una ficha) con todas sus llamadas sumadas: una fila = un borrador, que
  *  es lo que cuenta el límite del mes. No hace fallar nada si no se puede guardar. */
@@ -76,7 +77,8 @@ export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 
 }
 
 type Herramienta = { name: string; description: string; input_schema: object }
-interface Pedido { sistema: string; contenido: string | unknown[]; herramienta: Herramienta; web?: boolean; maxTokens?: number; modelo?: string }
+// para: en qué se gasta (12-11, el dueño: "ver en qué se gasta cada centavo"). Va al registro ia_gasto_para (mig. 170).
+interface Pedido { para: string; sistema: string; contenido: string | unknown[]; herramienta: Herramienta; web?: boolean; maxTokens?: number; modelo?: string }
 
 const CABECERAS = () => ({
   'x-api-key': process.env.ANTHROPIC_API_KEY!,
@@ -85,7 +87,7 @@ const CABECERAS = () => ({
 })
 
 /** El cuerpo de un pedido a Claude (lo usan la llamada directa y los lotes). */
-export function cuerpoClaude(o: Pedido) {
+export function cuerpoClaude(o: Omit<Pedido, 'para'>) {
   const modelo = o.modelo ?? MODELO_IA
   const tools: unknown[] = [o.herramienta]
   if (o.web) tools.unshift({ type: 'web_search_20250305', name: 'web_search', max_uses: CREDITOS_WEB_MAX - 1 })
@@ -118,22 +120,26 @@ export async function llamarClaude<T>(o: Pedido): Promise<{ resultado: T; uso: U
   const d = await r.json().catch(() => null)
   if (!r.ok) throw new Error(`IA ${r.status}: ${d?.error?.message ?? 'sin detalle'}`)
   let resultado: T
-  try { resultado = inputDeHerramienta<T>(d.content, o.herramienta.name) } catch (e) { anotarGasto(cuerpo.model, d.usage ?? {}, true); throw e }
-  anotarGasto(cuerpo.model, d.usage ?? {}, false)
+  const para = o.para + (o.web ? ' (con internet)' : '')
+  try { resultado = inputDeHerramienta<T>(d.content, o.herramienta.name) } catch (e) { anotarGasto(cuerpo.model, d.usage ?? {}, true, para); throw e }
+  anotarGasto(cuerpo.model, d.usage ?? {}, false, para)
   return { resultado, uso: d.usage ?? {}, modelo: cuerpo.model }
 }
 
 /** 12-11 (mig. 169): cada llamada pagada suma en ia_gasto, sea de quien sea. Es el total real contra el que se
  *  cuadra lo asignado a las cuentas. No espera ni hace fallar nada. */
-function anotarGasto(modelo: string, u: UsoIA, fallida: boolean) {
-  const tipo = pruebaInterna.getStore() ? 'interna' : 'cuenta'
+// 12-11 (mig. 170): con su motivo (`para`) y, si es una prueba tuya, el nombre de la prueba. ia_gasto (mig. 169) queda
+// solo con lo de las primeras horas.
+function anotarGasto(modelo: string, u: UsoIA, fallida: boolean, para: string) {
+  const prueba = pruebaInterna.getStore()
   dbGlobal().query(
-    `INSERT INTO ia_gasto (dia, modelo, tipo, llamadas, entrada, salida, busquedas, fallidas, costo)
-     VALUES (CURRENT_DATE, $1, $2, 1, $3, $4, $5, $6, $7)
-     ON CONFLICT (dia, modelo, tipo) DO UPDATE SET llamadas = ia_gasto.llamadas + 1, entrada = ia_gasto.entrada + EXCLUDED.entrada,
-       salida = ia_gasto.salida + EXCLUDED.salida, busquedas = ia_gasto.busquedas + EXCLUDED.busquedas,
-       fallidas = ia_gasto.fallidas + EXCLUDED.fallidas, costo = ia_gasto.costo + EXCLUDED.costo`,
-    [modelo, tipo, (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+    `INSERT INTO ia_gasto_para (dia, modelo, tipo, para, llamadas, entrada, salida, busquedas, fallidas, costo)
+     VALUES (CURRENT_DATE, $1, $2, $3, 1, $4, $5, $6, $7, $8)
+     ON CONFLICT (dia, modelo, tipo, para) DO UPDATE SET llamadas = ia_gasto_para.llamadas + 1, entrada = ia_gasto_para.entrada + EXCLUDED.entrada,
+       salida = ia_gasto_para.salida + EXCLUDED.salida, busquedas = ia_gasto_para.busquedas + EXCLUDED.busquedas,
+       fallidas = ia_gasto_para.fallidas + EXCLUDED.fallidas, costo = ia_gasto_para.costo + EXCLUDED.costo`,
+    [modelo, prueba ? 'interna' : 'cuenta', prueba ? `${prueba} · ${para}` : para,
+     (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
      u.output_tokens ?? 0, u.server_tool_use?.web_search_requests ?? 0, fallida ? 1 : 0, costoDe(modelo, u)],
   ).catch(e => console.error('[ia_gasto]', e))
 }
@@ -143,7 +149,7 @@ function anotarGasto(modelo: string, u: UsoIA, fallida: boolean) {
 export interface ResultadoLote { custom_id: string; result: { type: string; message?: { content: { type: string; name?: string; input?: unknown }[]; usage: UsoIA; model: string } } }
 
 /** Manda un lote de pedidos ({custom_id → pedido}). Devuelve el id del lote. */
-export async function enviarLote(pedidos: { id: string; pedido: Pedido }[]) {
+export async function enviarLote(pedidos: { id: string; pedido: Omit<Pedido, 'para'> }[]) {
   const r = await fetch('https://api.anthropic.com/v1/messages/batches', {
     method: 'POST', headers: CABECERAS(), cache: 'no-store',
     body: JSON.stringify({ requests: pedidos.map(p => ({ custom_id: p.id, params: cuerpoClaude(p.pedido) })) }),

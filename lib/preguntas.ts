@@ -597,7 +597,7 @@ export async function pedirBorrador(c: Contexto, web: boolean, recorte: Recorte 
   const contenido = bloqueContexto(c, recorte)
   const llamadas: LlamadaIA[] = []
   const pedir = async (modelo?: string) => {
-    const { resultado: b, uso, modelo: m } = await llamarClaude<Borrador>({ sistema, contenido, herramienta: HERRAMIENTA, web, modelo })
+    const { resultado: b, uso, modelo: m } = await llamarClaude<Borrador>({ para: 'Preguntas: respuesta', sistema, contenido, herramienta: HERRAMIENTA, web, modelo })
     llamadas.push({ modelo: m, uso })
     return {
       respuesta: String(b.respuesta ?? '').trim(),
@@ -677,7 +677,7 @@ export async function pedirBorradorEconomico(c: Contexto, modeloSimple = MODELO_
     'que aplica pide un mínimo para el envío gratis, inclúyelo tal cual al confirmar disponibilidad.'
   const llamadas: LlamadaIA[] = []
   // Un reintento si falla (04-11: 7 de 177 sin respuesta: corte de la IA o "no devolvió un borrador").
-  const llamar = (modelo?: string) => llamarClaude<Borrador>({ sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo, maxTokens: 800 })
+  const llamar = (modelo?: string) => llamarClaude<Borrador>({ para: 'Preguntas: respuesta (económica)', sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo, maxTokens: 800 })
   const pedir = async (modelo?: string) => {
     const { resultado: b, uso, modelo: m } = await llamar(modelo).catch(() => llamar(modelo))
     llamadas.push({ modelo: m, uso })
@@ -768,7 +768,7 @@ CORRECCIÓN: te paso TU BORRADOR ANTERIOR y LO QUE EL REVISOR ENCONTRÓ. Escribe
 export async function corregirBorrador(c: Contexto, anterior: string, problemas: string[], recorte: Recorte = CONTEXTO_RECORTADO) {
   const contenido = `${bloqueContexto(c, recorte)}\n\n────────\nTU BORRADOR ANTERIOR:\n${anterior || '(vacío)'}\n\nLO QUE EL REVISOR ENCONTRÓ:\n- ${problemas.join('\n- ')}`
   const { resultado: b, uso, modelo } = await llamarClaude<Borrador>({
-    sistema: SISTEMA + SISTEMA_V2_EXTRA + CORRECTOR_EXTRA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 800 })
+    para: 'Preguntas: corrector', sistema: SISTEMA + SISTEMA_V2_EXTRA + CORRECTOR_EXTRA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 800 })
   const respuesta = sinTercero(sinCodigo(String(b.respuesta ?? '').trim()))
   return {
     respuesta: CODIGO_INTERNO.test(respuesta) ? '' : respuesta,

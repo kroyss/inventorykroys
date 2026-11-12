@@ -89,7 +89,7 @@ async function revisarUna(db: Pool, q: { id: string; texto: string; conexion_id:
     descripcion ? `Descripción:\n${descripcion.slice(0, 1500)}` : 'Descripción: —',
   ].filter(Boolean).join('\n')
   const { resultado: r, uso, modelo } = await llamarClaude<{ partes?: Revision['partes']; cubre_todo?: boolean; texto_final?: string; motivo?: string }>(
-    { sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 600 })
+    { para: 'Revisor de respuestas sugeridas', sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 600 })
   await registrarUso(db, 'revisor', [{ modelo, uso }])
   const ok = r.cubre_todo === true && (r.partes ?? []).every(p => p.contestada)
   let texto = ok ? null : String(r.texto_final ?? '').trim() || null

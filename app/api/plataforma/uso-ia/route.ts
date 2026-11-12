@@ -39,8 +39,13 @@ export async function GET(req: NextRequest) {
          WHERE a.created_at >= ($1::date::timestamp AT TIME ZONE 'America/Caracas')
          GROUP BY 1, 2, 3, 4, 5`, [desde]),
       dbGlobal().query(
-        `SELECT to_char(dia, 'YYYY-MM-DD') AS dia, modelo, tipo, llamadas, fallidas, costo::float AS costo, primera
-         FROM ia_gasto WHERE dia >= $1::date ORDER BY dia`, [desde]).catch(() => ({ rows: [] })),
+        // ia_gasto_para (mig. 170) trae el motivo; ia_gasto (mig. 169) son las primeras horas, sin motivo.
+        `SELECT to_char(dia, 'YYYY-MM-DD') AS dia, modelo, tipo, para, llamadas, fallidas, costo::float AS costo, primera
+         FROM ia_gasto_para WHERE dia >= $1::date
+         UNION ALL
+         SELECT to_char(dia, 'YYYY-MM-DD'), modelo, tipo, 'Sin detalle (primeras horas del registro)', llamadas, fallidas, costo::float, primera
+         FROM ia_gasto WHERE dia >= $1::date
+         ORDER BY 1`, [desde]).catch(() => ({ rows: [] })),
     ])
     detalle.push(...ayuda)
     // Cuadre: desde la PRIMERA llamada anotada en ia_gasto (el registro empezó el 12-11 a media jornada).
@@ -72,7 +77,7 @@ export async function GET(req: NextRequest) {
     }
     const hoy = currentDate()
     const dias = Math.round((Date.parse(hoy) - Date.parse(desde)) / 864e5) + 1
-    return NextResponse.json({ desde, dias, detalle, empresas, cuadre, gasto: gasto.map(g => ({ dia: g.dia, modelo: g.modelo, tipo: g.tipo, llamadas: g.llamadas, fallidas: g.fallidas, costo: g.costo })) })
+    return NextResponse.json({ desde, dias, detalle, empresas, cuadre, gasto: gasto.map(g => ({ dia: g.dia, modelo: g.modelo, tipo: g.tipo, para: g.para, llamadas: g.llamadas, fallidas: g.fallidas, costo: g.costo })) })
   } catch (err) {
     return apiError(err)
   }

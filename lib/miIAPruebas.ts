@@ -94,7 +94,7 @@ export async function aprenderCorreccion(db: Db, o: {
   const { rows: [c] } = await db.query(`SELECT value FROM app_settings WHERE key = $1`, [MI_IA_KEY])
   const reglas = leerMiIA(c?.value)?.extras?.find(x => x.titulo === TITULO_CORRECCIONES)?.texto ?? ''
   const r = await llamarClaude<{ producto: string; regla: string }>({
-    sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 300,
+    para: 'Mi IA: aprender de una corrección', sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 300,
     contenido: `${o.itemId ? `PRODUCTO: ${o.producto ?? '—'}` : 'PRODUCTO: (no hay: es un mensaje, guarda solo "regla")'}\n` +
       `${o.tipo === 'preguntas' ? 'PREGUNTA' : 'MENSAJE'} DEL COMPRADOR: ${o.texto}\nLO QUE RESPONDIÓ LA IA: ${o.ia || '—'}\n` +
       `QUÉ ESTUVO MAL: ${ERRORES_TXT[o.error ?? ''] ?? '—'}\nCORRECCIÓN DEL VENDEDOR: ${o.correccion}\n` +

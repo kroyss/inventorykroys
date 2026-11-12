@@ -38,7 +38,7 @@ const HERRAMIENTA = {
 }
 
 // 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
-export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req), 'Evaluación con juez')
 
 async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams
@@ -65,7 +65,7 @@ async function correr(req: NextRequest) {
         const b = await pedirBorrador(c, false)
         const costo = b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0)
         const { resultado: j, uso, modelo } = await llamarClaude<{ veredicto: string; grave: boolean; por_cambio: boolean; comentario: string }>({
-          sistema: JUEZ, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 300,
+          para: 'Juez de evaluación', sistema: JUEZ, herramienta: HERRAMIENTA, modelo: MODELO_IA, maxTokens: 300,
           contenido: `PREGUNTA:\n${r.texto}\n\nRESPUESTA REAL DEL VENDEDOR:\n${r.respuesta}\n\nRESPUESTA DE LA IA (confianza ${b.confianza}):\n${b.respuesta || '(vacía)'}`,
         })
         out.push({ id: r.id, fuente: r.fuente ?? 'sin registro', pregunta: r.texto, real: r.respuesta, ia: b.respuesta, confianza: b.confianza, verificacion: b.verificacion,

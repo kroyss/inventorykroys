@@ -61,7 +61,7 @@ export async function aprenderDatoDeRespuesta(db: Pool, preguntaId: string, resp
     const { rows: anotadas } = await db.query(`SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 15`, [q.item_id])
 
     const r = await llamarClaude<{ dato: string }>({
-      sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 200,
+      para: 'Aprender un dato de tu respuesta', sistema: SISTEMA, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 200,
       contenido: `PRODUCTO: ${q.item_titulo ?? '—'}\nPREGUNTA: ${q.texto}\n` +
         (falta ? `LO QUE FALTABA: ${falta}\n` : '') + (propuesta ? `LO QUE PROPUSO LA IA: ${propuesta}\n` : '') +
         `RESPUESTA DEL VENDEDOR: ${respuesta}\nYA ANOTADO: ${anotadas.map(n => n.texto).join(' · ') || '—'}`,

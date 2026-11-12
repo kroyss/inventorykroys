@@ -88,7 +88,7 @@ export async function contextoFotos(db: Pool, conexionId: number, itemId: string
       ].join('\n') },
     ]
     const { resultado: r, uso, modelo } = await llamarClaude<{ texto: string; contradicciones: string | null }>(
-      { sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 900 })
+      { para: 'Lectura de fotos y publicación', sistema: SISTEMA, contenido, herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE, maxTokens: 900 })
     await registrarUso(db, 'fichas', [{ modelo, uso }])
     const texto = String(r.texto ?? '').trim().slice(0, 1200) || null
     const contra = typeof r.contradicciones === 'string' && r.contradicciones.trim() && !/^null$/i.test(r.contradicciones.trim())

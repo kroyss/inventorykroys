@@ -217,7 +217,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
 
   // 08-11 (el dueño): Haiku 5.5 escribe los mensajes (antes Sonnet, ~20× más caro). Un reintento si falla.
   if (correccion) L.push(`\n────────\nTU BORRADOR ANTERIOR:\n${correccion.anterior || '(vacío)'}\n\nPOR QUÉ NO SE ENVIÓ:\n- ${correccion.problemas.join('\n- ')}`)
-  const llamar = () => llamarClaude<BorradorMensaje>({ sistema: SISTEMA + (correccion ? CORRECCION_MENSAJE : ''), contenido: L.join('\n'), herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE })
+  const llamar = () => llamarClaude<BorradorMensaje>({ para: correccion ? 'Mensajes: corrector' : 'Mensajes: respuesta', sistema: SISTEMA + (correccion ? CORRECCION_MENSAJE : ''), contenido: L.join('\n'), herramienta: HERRAMIENTA, modelo: MODELO_SIMPLE })
   const { resultado: b, uso, modelo } = await llamar().catch(() => llamar())
   return {
     respuesta: String(b.respuesta ?? '').trim().slice(0, 350),

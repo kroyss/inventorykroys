@@ -9,7 +9,7 @@ interface Detalle {
 }
 interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null; creditos?: number | null }
 interface Cuadre { desde: string; pagado: number; internas: number; asignado: number; asignadoInternas: number; fallidas: number }
-interface Gasto { dia: string; modelo: string; tipo: string; llamadas: number; fallidas: number; costo: number }
+interface Gasto { dia: string; modelo: string; tipo: string; para: string; llamadas: number; fallidas: number; costo: number }
 interface Datos { desde: string; dias: number; detalle: Detalle[]; empresas: EmpresaMeta[]; cuadre: Cuadre | null; gasto: Gasto[] }
 
 // Fechas en hora de Caracas (las del negocio).
@@ -382,7 +382,74 @@ function CuadreGasto({ c, gasto }: { c: Cuadre; gasto: Gasto[] }) {
         <Numero titulo="Sin asignar a una cuenta" valor={usd(Math.max(0, sinAsignar))}
           detalle={c.fallidas ? `${c.fallidas} respuestas fallidas (se pagan igual)` : sinAsignar > 0.01 ? 'revisar: algo gasta sin anotarse' : 'cuadra'} />
       </div>
+      <EnQueSeGasta gasto={gasto} />
     </section>
+  )
+}
+
+/** 12-11 (el dueño): "ver en qué se gasta cada centavo". Cada motivo (respuesta, verificador, corrector, fotos, Mi IA,
+ *  Ayuda…) con sus llamadas, su costo y cuánto pesa; las pruebas tuyas aparte, con el nombre de la prueba. */
+function EnQueSeGasta({ gasto }: { gasto: Gasto[] }) {
+  const [verInternas, setVerInternas] = useState(false)
+  const agrupar = (tipo: 'cuenta' | 'interna') => {
+    const m = new Map<string, { llamadas: number; costo: number; fallidas: number }>()
+    for (const g of gasto.filter(x => (x.tipo === 'interna') === (tipo === 'interna'))) {
+      const a = m.get(g.para) ?? { llamadas: 0, costo: 0, fallidas: 0 }
+      a.llamadas += g.llamadas; a.costo += g.costo; a.fallidas += g.fallidas
+      m.set(g.para, a)
+    }
+    return [...m].sort((a, b) => b[1].costo - a[1].costo)
+  }
+  const cuentas = agrupar('cuenta'), internas = agrupar('interna')
+  const totalC = cuentas.reduce((a, [, g]) => a + g.costo, 0), totalI = internas.reduce((a, [, g]) => a + g.costo, 0)
+  const tabla = (filas: typeof cuentas, total: number) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-neutral-500 border-b border-neutral-200">
+            <th className="py-2 pr-3 font-medium">En qué</th>
+            <th className="py-2 px-3 font-medium text-right">Llamadas</th>
+            <th className="py-2 px-3 font-medium text-right">Costo</th>
+            <th className="py-2 px-3 font-medium text-right whitespace-nowrap">Por llamada</th>
+            <th className="py-2 pl-3 font-medium w-40">Del total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map(([para, g]) => {
+            const pct = total ? (g.costo / total) * 100 : 0
+            return (
+              <tr key={para} className="border-b border-neutral-100 last:border-0">
+                <td className="py-2 pr-3 text-neutral-800">{para}{g.fallidas > 0 && <span className="ml-1 text-xs text-amber-700">· {g.fallidas} fallidas</span>}</td>
+                <td className="py-2 px-3 text-right num">{g.llamadas}</td>
+                <td className="py-2 px-3 text-right num">{usd(g.costo)}</td>
+                <td className="py-2 px-3 text-right num text-neutral-600">{usd4(g.costo / Math.max(1, g.llamadas))}</td>
+                <td className="py-2 pl-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden"><span className="block h-full bg-lime-500" style={{ width: `${Math.max(2, pct)}%` }} /></span>
+                    <span className="w-9 text-right text-xs num text-neutral-500">{Math.round(pct)}%</span>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+  if (!cuentas.length && !internas.length) return null
+  return (
+    <div className="space-y-3 pt-1">
+      <h3 className="text-sm font-semibold text-neutral-800">En qué se gasta <span className="font-normal text-neutral-400">(uso de las cuentas · {usd(totalC)})</span></h3>
+      {cuentas.length ? tabla(cuentas, totalC) : <p className="text-sm text-neutral-400">Sin llamadas de las cuentas en este período.</p>}
+      {internas.length > 0 && (
+        <div>
+          <button onClick={() => setVerInternas(v => !v)} className="text-sm text-neutral-600 hover:text-neutral-900">
+            {verInternas ? '▾' : '▸'} Tus pruebas internas, por prueba ({usd(totalI)})
+          </button>
+          {verInternas && <div className="mt-2">{tabla(internas, totalI)}</div>}
+        </div>
+      )}
+    </div>
   )
 }
 

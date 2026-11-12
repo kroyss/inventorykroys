@@ -12,7 +12,7 @@ import type { Country } from '@/lib/types'
 // función que usa la respuesta automática (corregirPregunta / borradorMensaje con corrección). No publica, no guarda.
 //   curl "http://127.0.0.1:8504/api/cron/ia-corregir?key=…&empresa=1&n=10&offset=0[&tipo=mensajes]"
 // 12-11: prueba interna del dueño → su gasto va como 'interna' (ia_uso e ia_gasto), no como consumo de la cuenta.
-export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req))
+export const GET = (req: NextRequest) => comoPruebaInterna(() => correr(req), 'Comparador del corrector')
 
 async function correr(req: NextRequest) {
   const q = new URL(req.url).searchParams

@@ -217,7 +217,7 @@ export async function preguntarAyuda(o: {
   const contenido = `${previo ? previo + '\n\n' : ''}Pantalla donde está el usuario: ${o.pantalla.slice(0, 80) || '(desconocida)'}\n\nPregunta: ${pregunta}`
 
   const { resultado, uso, modelo } = await llamarClaude<{ respuesta: string; sabe: boolean; video_id: number | null }>({
-    sistema, contenido, herramienta: HERRAMIENTA, modelo: MODELO_AYUDA, maxTokens: 700,
+    para: 'Ayuda (preguntas al manual)', sistema, contenido, herramienta: HERRAMIENTA, modelo: MODELO_AYUDA, maxTokens: 700,
   })
   const video = videos.find(v => v.id === resultado.video_id) ?? null
   const entrada = (uso.input_tokens ?? 0) + (uso.cache_creation_input_tokens ?? 0) + (uso.cache_read_input_tokens ?? 0)
