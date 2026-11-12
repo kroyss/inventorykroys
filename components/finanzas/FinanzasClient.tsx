@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { usePrimera } from '@/lib/primera'
 import type { FinanceAccount, FinanceCategory, FinanceLedgerRow, FinanceKind } from '@/lib/types'
 import { money, PageHeader, Tabs, KPICard } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -54,7 +55,11 @@ const TAB_LABELS: Record<Tab, string> = {
   costos_ml:   'Costos ML',
 }
 
-export default function FinanzasClient() {
+/** 12-11 (rapidez): la primera carga viene en el HTML (los mismos GET de la API). Movimientos y cierre solo
+ *  sirven si son del mes que abre la pantalla. */
+export type FinanzasInicial = { month: string; accounts: unknown; categories: unknown; movements: unknown; summary: unknown; capital: unknown }
+
+export default function FinanzasClient({ inicial = null }: { inicial?: FinanzasInicial | null }) {
   const confirm = useConfirm()
   const [tab, setTab] = usePersistedTab<Tab>('tab:finanzas', 'movimientos')
 
@@ -74,29 +79,39 @@ export default function FinanzasClient() {
   const [showAcc,  setShowAcc]  = useState(false)
   const [showMov,  setShowMov]  = useState(false)
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const mesIni = inicial?.month
+  const iniStatic = usePrimera<any>(inicial?.accounts && inicial?.categories ? [inicial.accounts, inicial.categories] : null)
+  const iniMov    = usePrimera<any>(inicial?.movements)
+  const iniSum    = usePrimera<any>(inicial?.summary)
+  const iniCap    = usePrimera<any>(inicial?.capital)
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
   const loadStatic = useCallback(async () => {
-    const [a, c] = await Promise.all([
+    const [a, c] = iniStatic() ?? await Promise.all([
       fetch('/api/finance/accounts').then(r => r.json()),
       fetch('/api/finance/categories').then(r => r.json()),
     ])
     setAccounts(Array.isArray(a) ? a : [])
     setCategories(Array.isArray(c) ? c : [])
-  }, [])
+  }, [iniStatic])
 
   const loadMovements = useCallback(async () => {
-    const r = await fetch(`/api/finance/movements?month=${month}`).then(r => r.json())
+    const pre = iniMov()
+    const r = pre && month === mesIni ? pre : await fetch(`/api/finance/movements?month=${month}`).then(r => r.json())
     setMovements(r.rows ?? [])
-  }, [month])
+  }, [month, mesIni, iniMov])
 
   const loadSummary = useCallback(async () => {
-    const r = await fetch(`/api/finance/summary?month=${month}`).then(r => r.json())
+    const pre = iniSum()
+    const r = pre && month === mesIni ? pre : await fetch(`/api/finance/summary?month=${month}`).then(r => r.json())
     setSummary(r)
-  }, [month])
+  }, [month, mesIni, iniSum])
 
   const loadCapital = useCallback(async () => {
-    const r = await fetch('/api/finance/capital').then(r => r.json())
+    const r = iniCap() ?? await fetch('/api/finance/capital').then(r => r.json())
     setCapital(r)
-  }, [])
+  }, [iniCap])
 
   useEffect(() => { loadStatic() }, [loadStatic])
   useEffect(() => { loadMovements() }, [loadMovements])

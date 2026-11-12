@@ -10,6 +10,7 @@ import SalioMal from './SalioMal'
 import MoverFactura from './MoverFactura'
 import { PageHeader, chipCls } from '@/components/ui'
 import { DateField } from '@/components/ui/DateField'
+import { usePrimera } from '@/lib/primera'
 
 type Filter = 'all' | 'EMITIDA' | 'ANULADA' | 'RET_PENDIENTE'
 const FILTERS: { key: Filter; label: string }[] = [
@@ -21,7 +22,10 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 const RET_LABEL: Record<string, string> = { PENDIENTE: 'Retención pendiente', RECIBIDA: 'Retención recibida' }
 
-export default function FacturasClient(_: { userRole: UserRole }) {
+export default function FacturasClient({ inicial = null }: { userRole: UserRole
+  /** 12-11 (rapidez): facturas y borradores de la primera carga (filtro Todas, sin búsqueda), ya en el HTML. */
+  inicial?: { facturas: unknown; borradores: unknown } | null }) {
+  const primera = usePrimera(inicial?.facturas && inicial?.borradores ? inicial : null)
   const [rows, setRows]         = useState<Invoice[]>([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState<Filter>('all')
@@ -54,7 +58,8 @@ export default function FacturasClient(_: { userRole: UserRole }) {
     if (filter === 'EMITIDA' || filter === 'ANULADA') qs.set('status', filter)
     if (filter === 'RET_PENDIENTE') qs.set('retention', 'PENDIENTE')
     if (search) qs.set('search', search)
-    const [data, drafts] = await Promise.all([
+    const pre = primera()
+    const [data, drafts] = pre && filter === 'all' && !search ? [pre.facturas, pre.borradores] : await Promise.all([
       fetch(`/api/invoices?${qs}`).then(r => r.json()).catch(() => []),
       fetch('/api/invoices/drafts').then(r => r.json()).catch(() => []),
     ])
@@ -62,7 +67,7 @@ export default function FacturasClient(_: { userRole: UserRole }) {
     setRows(Array.isArray(data) ? data : [])
     setBorradores(Array.isArray(drafts) ? drafts : [])
     setLoading(false)
-  }, [filter, search])
+  }, [filter, search, primera])
   useEffect(() => { load() }, [load])
 
   const openDetail = useCallback(async (id: number) => {

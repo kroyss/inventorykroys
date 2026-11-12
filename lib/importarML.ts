@@ -38,7 +38,7 @@ export interface FilaImportar {
 }
 
 /** Trigramas como pg_trgm: por palabra (letras y números), en minúscula, con "  " delante y " " detrás. */
-function trigramas(texto: string) {
+export function trigramas(texto: string) {
   const set = new Set<string>()
   for (const w of texto.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []) {
     const p = `  ${w} `
@@ -46,11 +46,34 @@ function trigramas(texto: string) {
   }
   return set
 }
-function similitud(a: Set<string>, b: Set<string>) {
+export function similitud(a: Set<string>, b: Set<string>) {
   if (!a.size || !b.size) return 0
   let comunes = 0
   for (const t of a) if (b.has(t)) comunes++
   return comunes / (a.size + b.size - comunes)
+}
+
+/** El más parecido (índice en `productos`, o -1) con similitud ≥ SIMILITUD_MIN: el mismo resultado que comparar contra
+ *  todos con `similitud` (empate → el último, como `>=` en orden), pero solo cuenta los productos que comparten algún
+ *  trigrama (índice invertido). 12-11 (rapidez): Importar desde ML tardaba 1,9 s y trababa el servidor. */
+export function indiceParecidos(productos: Set<string>[]) {
+  const porTri = new Map<string, number[]>()
+  productos.forEach((tri, i) => { for (const t of tri) { const l = porTri.get(t); if (l) l.push(i); else porTri.set(t, [i]) } })
+  const comunes = new Int32Array(productos.length)
+  return (t: Set<string>) => {
+    if (!t.size) return -1
+    const tocados: number[] = []
+    for (const x of t) for (const i of porTri.get(x) ?? []) { if (comunes[i] === 0) tocados.push(i); comunes[i]++ }
+    tocados.sort((a, b) => a - b)
+    let max = SIMILITUD_MIN, mejor = -1
+    for (const i of tocados) {
+      const c = comunes[i], b = productos[i].size
+      const sim = c / (t.size + b - c)
+      if (sim >= max) { max = sim; mejor = i }
+      comunes[i] = 0
+    }
+    return mejor
+  }
 }
 
 /** `parecidas: false` (12-11): sin buscar parecidas por nombre (trigramas contra todos los productos, pesado de
@@ -106,15 +129,12 @@ export async function filasImportar(db: Pool, { parecidas = true } = {}): Promis
     const { rows: prods } = await db.query(`SELECT id, code, name FROM products WHERE is_active`)
     const conTri = prods.map(p => ({ id: p.id as number, code: p.code as string, name: p.name as string, tri: trigramas(p.name) }))
     const porSku = new Map(conTri.map(p => [p.code.toLowerCase(), p]))
+    const parecido = indiceParecidos(conTri.map(p => p.tri))
     for (const f of libres) {
       let mejor = f.sku ? porSku.get(f.sku.toLowerCase()) : undefined
       if (!mejor) {
-        const t = trigramas(f.variante ? `${f.titulo} ${f.variante}` : f.titulo)
-        let max = SIMILITUD_MIN
-        for (const p of conTri) {
-          const sim = similitud(t, p.tri)
-          if (sim >= max) { max = sim; mejor = p }
-        }
+        const i = parecido(trigramas(f.variante ? `${f.titulo} ${f.variante}` : f.titulo))
+        if (i >= 0) mejor = conTri[i]
       }
       if (mejor) { f.estado = 'parecida'; f.producto = { id: mejor.id, code: mejor.code, name: mejor.name, toda: false } }
     }

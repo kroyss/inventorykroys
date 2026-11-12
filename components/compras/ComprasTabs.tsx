@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { useRefetchOnFocus } from '@/lib/useRefetchOnFocus'
@@ -57,8 +57,9 @@ export default function ComprasTabs({
     } catch { /* sin red: conserva lo que hay */ }
   }, [])
 
-  // Re-consultar al cambiar de pestaña (y al montar).
-  useEffect(() => { refresh() }, [tabPedida, refresh])
+  // Re-consultar al cambiar de pestaña. Al montar no (12-11, rapidez): la lista recién vino con la página.
+  const montada = useRef(false)
+  useEffect(() => { if (!montada.current) { montada.current = true; return } refresh() }, [tabPedida, refresh])
   // Y también al volver a la pestaña del navegador o cada minuto: la pantalla
   // suele quedar abierta y, si no, muestra el estado del momento en que se abrió.
   useRefetchOnFocus(refresh, true, 60_000)

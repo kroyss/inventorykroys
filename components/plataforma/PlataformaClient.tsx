@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { usePrimera } from '@/lib/primera'
 import { useSession } from 'next-auth/react'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
@@ -142,7 +143,9 @@ function claveInicial() {
   return Array.from(r, n => abc[n % abc.length]).join('')
 }
 
-export default function PlataformaClient({ empresaActual }: { empresaActual: number }) {
+export default function PlataformaClient({ empresaActual, inicial = null }: { empresaActual: number
+  /** 12-11 (rapidez): empresas y el resumen de Hoy, ya en el HTML. */
+  inicial?: { empresas: unknown; resumen: import('./ResumenPanel').ResumenInicial } | null }) {
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [modulos, setModulos]   = useState<Record<string, string>>({})
   const [nueva, setNueva]       = useState(false)
@@ -170,12 +173,17 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
   const [buscar, setBuscar]     = useState('')
   const confirm = useConfirm()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const primera = usePrimera(inicial?.empresas as any)
   const cargar = useCallback(async () => {
-    const r = await fetch('/api/plataforma/empresas')
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    let d = primera() as any // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!d) {
+      const r = await fetch('/api/plataforma/empresas')
+      d = await r.json().catch(() => ({}))
+      if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    }
     setEmpresas(d.empresas); setModulos(d.modulos); setHoy(d.hoy)
-  }, [])
+  }, [primera])
   useEffect(() => { cargar() }, [cargar])
 
   const actualizar = async (e: Empresa, cambios: Partial<Pick<Empresa, 'nombre' | 'modulos' | 'is_active' | 'ia_limite_mes'>>) => {
@@ -263,7 +271,7 @@ export default function PlataformaClient({ empresaActual }: { empresaActual: num
         ))}
       </div>
 
-      {vista === 'hoy' ? <ResumenPanel onIr={setVista} /> : vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'cobros' ? <CobrosPanel /> : vista === 'fundadores' ? <FundadoresPanel />
+      {vista === 'hoy' ? <ResumenPanel inicial={inicial?.resumen ?? null} onIr={setVista} /> : vista === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : vista === 'cobros' ? <CobrosPanel /> : vista === 'fundadores' ? <FundadoresPanel />
         : vista === 'contenido' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
         : vista === 'interno' ? <>
           <div className="flex gap-1.5">

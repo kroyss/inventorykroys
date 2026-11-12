@@ -32,18 +32,23 @@ const usos7 = (u: Uso) => u.preguntas_7d + u.mensajes_7d + u.etiquetas_7d + u.re
 
 interface Aviso { nivel: 0 | 1 | 2; texto: string; ir: Vista; boton: string }
 
-export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
+/** 12-11 (rapidez): lo de la primera carga, ya en el HTML (cada parte null = se pide). */
+export type ResumenInicial = { aprendizaje: unknown; fundadores: unknown; cobros: unknown; visitas: unknown } | null
+
+export default function ResumenPanel({ onIr, inicial = null }: { onIr: (v: Vista) => void; inicial?: ResumenInicial }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [porRevisar, setPorRevisar] = useState(0)
   const [pagos, setPagos] = useState(0)   // pagos reportados en Mi plan por revisar (mig. 141)
 
   useEffect(() => {
     let vivo = true
-    const cargar = () => Promise.all([
+    let pre = inicial && inicial.aprendizaje && inicial.fundadores && inicial.cobros ? inicial : null
+    const cargar = () => (pre ? Promise.resolve([pre.aprendizaje, pre.fundadores, pre.cobros] as Record<string, never>[]) : Promise.all([
       fetch('/api/plataforma/aprendizaje').then(r => (r.ok ? r.json() : null)),
       fetch('/api/plataforma/fundadores').then(r => (r.ok ? r.json() : null)),
       fetch('/api/plataforma/cobros').then(r => (r.ok ? r.json() : null)),
-    ]).then(([a, f, c]) => {
+    ])).then(([a, f, c]) => {
+      pre = null
       if (!vivo) return
       if (a) setDatos(a)
       if (c?.pendientes) setPagos(c.pendientes.length)
@@ -52,7 +57,7 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
     cargar()
     const t = setInterval(cargar, 60_000)   // "en línea ahora" al día sin recargar
     return () => { vivo = false; clearInterval(t) }
-  }, [])
+  }, [inicial])
 
   if (!datos) return <p className="text-sm text-neutral-400 py-8 text-center">Cargando…</p>
 
@@ -101,7 +106,7 @@ export default function ResumenPanel({ onIr }: { onIr: (v: Vista) => void }) {
         })()}
       </div>
 
-      <VisitasRegistro />
+      <VisitasRegistro inicial={inicial?.visitas ?? null} />
 
       {/* Requiere atención */}
       <section className="bg-white rounded-xl border border-neutral-200 shadow-sm">
@@ -179,11 +184,12 @@ interface Visitas {
 }
 
 /** Visitas a /registro (27-10, migración 128): para medir la publicidad del link. Personas = navegadores distintos. */
-function VisitasRegistro() {
-  const [v, setV] = useState<Visitas | null>(null)
+function VisitasRegistro({ inicial = null }: { inicial?: unknown }) {
+  const [v, setV] = useState<Visitas | null>((inicial as Visitas | null) ?? null)
   useEffect(() => {
     let vivo = true
-    const cargar = () => fetch('/api/plataforma/visitas').then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setV(d) }).catch(() => {})
+    let ya = !!inicial
+    const cargar = () => ya ? Promise.resolve(void (ya = false)) : fetch('/api/plataforma/visitas').then(r => (r.ok ? r.json() : null)).then(d => { if (vivo && d) setV(d) }).catch(() => {})
     cargar()
     const t = setInterval(cargar, 60_000)
     return () => { vivo = false; clearInterval(t) }
