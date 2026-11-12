@@ -9,6 +9,7 @@
 // ninguna). Haiku solo para las preguntas SIMPLES (disponible, precio, envío, ubicación, pago), y si
 // no queda seguro ("alta") se vuelve a pedir a Sonnet. Se pueden cambiar por env (PREGUNTAS_MODELO,
 // PREGUNTAS_MODELO_SIMPLE); un modelo que no está en la tabla se calcula como Sonnet.
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Pool } from 'pg'
 import { dbGlobal } from '@/lib/db'
 
@@ -46,10 +47,17 @@ export function costoDe(modelo: string, u: UsoIA, lote = false) {
     + 0.01 * (u.server_tool_use?.web_search_requests ?? 0)
 }
 
+// 12-11 (el dueño): lo que gastan las pruebas internas del dueño sobre la cuenta de un cliente (Competencia: nuestra
+// respuesta para preguntas que ellos respondieron fuera) se guarda como módulo 'interna': no es consumo del cliente ni
+// le cuenta créditos, y Plataforma → Interno lo muestra aparte.
+const pruebaInterna = new AsyncLocalStorage<true>()
+export const comoPruebaInterna = <T>(fn: () => Promise<T>) => pruebaInterna.run(true, fn)
+
 /** Guarda UN borrador (o una ficha) con todas sus llamadas sumadas: una fila = un borrador, que
  *  es lo que cuenta el límite del mes. No hace fallar nada si no se puede guardar. */
 export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 'fichas' | 'revisor' | 'simulacion', llamadas: LlamadaIA[], usuarioId?: number | string | null) {
   if (!llamadas.length) return
+  const mod: string = pruebaInterna.getStore() ? 'interna' : modulo
   const suma = (f: (u: UsoIA) => number) => llamadas.reduce((a, l) => a + f(l.uso), 0)
   try {
     // 09-11 (mig. 156): un solo saldo; creditos_recarga queda en 0 (era el reparto incluidos/recargas de la mig. 140).
@@ -57,7 +65,7 @@ export async function registrarUso(db: Pool, modulo: 'preguntas' | 'mensajes' | 
     await db.query(
       `INSERT INTO ia_uso (modulo, modelo, entrada, salida, busquedas, costo, usuario_id, cache_lectura, cache_escritura, creditos_recarga)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [modulo, [...new Set(llamadas.map(l => l.modelo + (l.lote ? ' (lote)' : '')))].join(' → '),
+      [mod, [...new Set(llamadas.map(l => l.modelo + (l.lote ? ' (lote)' : '')))].join(' → '),
        suma(u => (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)),
        suma(u => u.output_tokens ?? 0), suma(u => u.server_tool_use?.web_search_requests ?? 0),
        llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0),

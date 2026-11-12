@@ -11,7 +11,7 @@ interface Detalle {
 interface EmpresaMeta { id: number; nombre: string; propietario: boolean; limite: number | null; creditos?: number | null }
 interface Datos { desde: string; dias: number; detalle: Detalle[]; empresas: EmpresaMeta[] }
 
-const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Lectura de publicaciones y fotos', revisor: 'Revisor de sugeridas', simulacion: 'Configuración y pruebas (Mi IA)' }
+const MODULO_TXT: Record<string, string> = { preguntas: 'Preguntas', mensajes: 'Mensajes', fichas: 'Lectura de publicaciones y fotos', revisor: 'Revisor de sugeridas', simulacion: 'Configuración y pruebas (Mi IA)', interna: 'Prueba interna tuya (Competencia)' }
 const modeloTxt = (m: string) => m
   .replace(/claude-haiku-[\w.-]+/g, 'Haiku').replace(/claude-sonnet-[\w.-]+/g, 'Sonnet').replace(/claude-opus-[\w.-]+/g, 'Opus')
 const tok = (n: number) => n >= 1e6 ? `${(n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M` : n >= 1e3 ? `${Math.round(n / 1e3).toLocaleString('de-DE')} mil` : String(n)
@@ -30,7 +30,7 @@ function cuentaDe(filas: Detalle[]): Cuenta {
     c.total += d.costo
     if (ES_RESPUESTA(d.modulo)) { c.respuestas += d.usos; c.creditos += d.usos + d.busquedas; c.costoResp += d.costo }
     else if (d.modulo === 'fichas') c.lectura += d.costo
-    else if (d.modulo === 'simulacion') c.config += d.costo
+    else if (d.modulo === 'simulacion' || d.modulo === 'interna') c.config += d.costo
     else c.revisor += d.costo
   }
   return c
@@ -51,12 +51,18 @@ export default function InternoPanel() {
 
   // 12-11 (el dueño): se mide desde que salió Mi IA (lo de antes eran otros modelos y otro diseño). Todo lo que gasta
   // cada cuenta cuenta: respuestas, lectura de publicaciones y fotos, configuración/pruebas de Mi IA y revisor.
+  // Las pruebas internas (módulo 'interna': Competencia sobre cuentas de clientes) van en su propia fila, no en el cliente.
   const detalle = datos?.detalle ?? []
-  const filas = [...new Set(detalle.map(d => d.empresa_id))].map(id => {
+  const deCuentas = detalle.filter(d => d.modulo !== 'interna')
+  const internas = detalle.filter(d => d.modulo === 'interna')
+  const filas = [...new Set(deCuentas.map(d => d.empresa_id))].map(id => {
     const meta = datos!.empresas.find(e => e.id === id)
-    return { id, nombre: meta?.nombre ?? `Empresa ${id}`, propietario: !!meta?.propietario, c: cuentaDe(detalle.filter(d => d.empresa_id === id)) }
-  }).sort((a, b) => b.c.total - a.c.total)
-  const clientes = cuentaDe(detalle.filter(d => !datos?.empresas.find(e => e.id === d.empresa_id)?.propietario))
+    return { id, nombre: meta?.nombre ?? `Empresa ${id}`, nota: meta?.propietario ? 'tu empresa · incluye pruebas internas' : null,
+      propietario: !!meta?.propietario, c: cuentaDe(deCuentas.filter(d => d.empresa_id === id)) }
+  })
+  if (internas.length) filas.push({ id: -1, nombre: 'Pruebas internas', nota: 'Competencia, sobre cuentas de clientes (no les cuenta)', propietario: true, c: cuentaDe(internas) })
+  filas.sort((a, b) => b.c.total - a.c.total)
+  const clientes = cuentaDe(deCuentas.filter(d => !datos?.empresas.find(e => e.id === d.empresa_id)?.propietario))
   const total = cuentaDe(detalle)
   const alMes = (n: number) => (datos?.dias ? (n / datos.dias) * 30 : n)
 
@@ -104,10 +110,10 @@ export default function InternoPanel() {
                 </tr>
               </thead>
               <tbody>
-                {filas.map(({ id, nombre, propietario, c }) => (
+                {filas.map(({ id, nombre, nota, c }) => (
                   <tr key={id} className="border-b border-neutral-100 last:border-0">
                     <td className="px-4 py-2.5 font-medium text-neutral-900 whitespace-nowrap">
-                      {nombre}{propietario && <span className="block text-[11px] font-normal text-neutral-400">tu empresa · incluye pruebas internas</span>}
+                      {nombre}{nota && <span className="block text-[11px] font-normal text-neutral-400">{nota}</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right num">{c.respuestas}</td>
                     <td className="px-3 py-2.5 text-right num">{c.creditos}</td>
@@ -221,7 +227,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
       ) : metas.map(e => {
         const filas = datos.detalle.filter(d => d.empresa_id === e.id)
         const costo = filas.reduce((a, d) => a + d.costo, 0)
-        const deBoton = filas.filter(d => d.modulo !== 'fichas' && d.modulo !== 'revisor' && d.modulo !== 'simulacion')
+        const deBoton = filas.filter(d => d.modulo === 'preguntas' || d.modulo === 'mensajes')
         const borradores = deBoton.reduce((a, d) => a + d.usos, 0)
         // Los que ve el cliente (cupoIA en la API); si no llegaron, desde el detalle del mes.
         const creditos = e.creditos ?? deBoton.reduce((a, d) => a + d.usos + d.busquedas, 0)
@@ -237,7 +243,7 @@ function DetalleMes({ datos }: { datos: Datos }) {
           return [...m.entries()].sort((a, b) => b[1].costo - a[1].costo)
         }
         const porModelo = agrupar(d => `${MODULO_TXT[d.modulo] ?? d.modulo}|${modeloTxt(d.modelo)}`)
-        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.modulo === 'simulacion' ? 'Sistema (configuración y pruebas)' : d.usuario))
+        const porUsuario = agrupar(d => (d.modulo === 'fichas' ? 'Sistema (fichas)' : d.modulo === 'revisor' ? 'Sistema (revisor)' : d.modulo === 'simulacion' ? 'Sistema (configuración y pruebas)' : d.modulo === 'interna' ? 'Tu prueba interna (Competencia)' : d.usuario))
         const porDia = agrupar(d => d.dia).sort((a, b) => a[0].localeCompare(b[0]))
         const maxDia = Math.max(...porDia.map(([, g]) => g.costo), 0.0001)
         const cupo = e.limite

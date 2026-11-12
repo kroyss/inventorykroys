@@ -6,7 +6,7 @@
 import { conEmpresa, dbGlobal } from '@/lib/db'
 import type { Country } from '@/lib/types'
 import { armarContexto, datosCompatibilidad, datosPublicacion, pedirBorrador, textoVendedor } from '@/lib/preguntas'
-import { costoDe } from '@/lib/ia'
+import { comoPruebaInterna, costoDe } from '@/lib/ia'
 import { motivosRevisar } from '@/lib/iaAutomatica'
 
 /** Las empresas con Mercasist que se comparan (Gerardo = SHOPIT_VE, Gonzalez Urdaneta). */
@@ -74,12 +74,12 @@ export async function generarCompetencia(n = 8): Promise<number> {
      WHERE c.generada_at IS NULL ORDER BY c.fecha DESC LIMIT $1`, [n])
   const uno = async (r: { id: number; empresa_id: number; pregunta_id: string; country: string }) => {
     try {
-      const out = await conEmpresa(r.empresa_id, r.country as Country, async db => {
+      const out = await comoPruebaInterna(() => conEmpresa(r.empresa_id, r.country as Country, async db => {
         const c = await armarContexto(db, Number(r.pregunta_id), r.country)
         const b = await pedirBorrador(c, false, undefined, true, true)
         const motivos = motivosRevisar(b, c.item?.status ?? null, c.pregunta.texto, datosPublicacion(c), true, textoVendedor(c), datosCompatibilidad(c))
         return { respuesta: b.respuesta, motivos, costo: b.llamadas.reduce((a, l) => a + costoDe(l.modelo, l.uso, l.lote), 0) }
-      })
+      }))
       await dbGlobal().query(
         `UPDATE ia_competencia SET respuesta_nuestra = $2, decision = $3, motivos = $4, costo = $5, error = NULL, generada_at = NOW(),
                 marca = CASE WHEN marca IS NULL AND respuesta_antes IS NOT NULL AND lower(btrim(respuesta_antes)) = lower(btrim($2)) THEN marca_antes ELSE marca END
