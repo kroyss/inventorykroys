@@ -55,6 +55,7 @@ export function CorregirIA({ tipo, itemId, producto, texto, ia, onGuardado }: {
   const [error, setError] = useState<string | null>(null)
   const [aprendido, setAprendido] = useState<Aprendido | null>(null)
   const [verDatos, setVerDatos] = useState(false)
+  const [soloEquipo, setSoloEquipo] = useState(false)   // marcada: no hace falta enseñarle nada
 
   const cerrar = () => { setAbierta(false); if (estado === 'listo') { setEstado(''); setCorreccion(''); setAprendido(null) } }
   const guardar = async () => {
@@ -107,7 +108,11 @@ export function CorregirIA({ tipo, itemId, producto, texto, ia, onGuardado }: {
         ) : (
           <div className="space-y-2">
             {/* 12-11: si la publicación no la debe responder la IA (p. ej. el precio publicado no es el real), un clic. */}
-            {itemId && <SoloEquipo itemId={itemId} />}
+            {itemId && <SoloEquipo itemId={itemId} onEstado={setSoloEquipo} />}
+            {soloEquipo ? <>
+              <p className="text-sm text-amber-900">✓ Listo: esta publicación la responde tu equipo. La IA no la contestará sola.</p>
+              <div className="flex justify-end"><button type="button" onClick={cerrar} className="btn-primary text-sm">Cerrar</button></div>
+            </> : <>
             <label className="block text-sm font-medium text-neutral-900" htmlFor="corregir-ia">¿Cómo la hubieras respondido tú?</label>
             <textarea id="corregir-ia" value={correccion} onChange={e => setCorreccion(e.target.value)} rows={4} maxLength={800} autoFocus
               placeholder="Responde como tú hubieses respondido esta pregunta, para que la IA aprenda cómo lo haces…"
@@ -119,6 +124,7 @@ export function CorregirIA({ tipo, itemId, producto, texto, ia, onGuardado }: {
               <button type="button" onClick={guardar} disabled={correccion.trim().length < 3 || estado === 'aprendiendo'} className="btn-primary text-sm">
                 {estado === 'aprendiendo' ? 'Aprendiendo…' : 'Guardar'}</button>
             </div>
+            </>}
           </div>
         )}
       </Ventana>

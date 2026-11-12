@@ -59,20 +59,21 @@ export function FilaDato({ d, onCambio }: { d: Dato; onCambio: () => void }) {
 }
 
 /** 12-11 (mig 171): casilla «Esta publicación solo la responde mi equipo». `onCambio` avisa a la lista. */
-export function SoloEquipo({ itemId, onCambio }: { itemId: string; onCambio?: (solo: boolean) => void }) {
+/** `onEstado` = cómo está (al leerla y al cambiarla). */
+export function SoloEquipo({ itemId, onCambio, onEstado }: { itemId: string; onCambio?: (solo: boolean) => void; onEstado?: (solo: boolean) => void }) {
   const [solo, setSolo] = useState<boolean | null>(null)
   const [error, setError] = useState(false)
   useEffect(() => {
     let vivo = true
-    fetch('/api/preguntas/solo-equipo').then(r => (r.ok ? r.json() : [])).then((l: { item_id: string }[]) => { if (vivo) setSolo(l.some(x => x.item_id === itemId)) }).catch(() => {})
+    fetch('/api/preguntas/solo-equipo').then(r => (r.ok ? r.json() : [])).then((l: { item_id: string }[]) => { if (!vivo) return; const v = l.some(x => x.item_id === itemId); setSolo(v); onEstado?.(v) }).catch(() => {})
     return () => { vivo = false }
-  }, [itemId])
+  }, [itemId]) // eslint-disable-line react-hooks/exhaustive-deps
   const cambiar = async (v: boolean) => {
     setSolo(v); setError(false)
     const r = await fetch('/api/preguntas/solo-equipo', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ item_id: itemId, solo: v }) }).catch(() => null)
     if (!r?.ok) { setSolo(!v); setError(true); return }
-    onCambio?.(v)
+    onCambio?.(v); onEstado?.(v)
   }
   return (
     <label className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${solo ? 'border-amber-300 bg-amber-50' : 'border-neutral-200 bg-neutral-50'}`}>
