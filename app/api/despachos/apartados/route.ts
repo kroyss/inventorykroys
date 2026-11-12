@@ -6,6 +6,7 @@ import { requestConnection } from '@/lib/requestConnection'
 import { despachosForbidden } from '@/lib/despachos'
 import { RESERVA_HORAS } from '@/lib/reportador'
 import { SIGUE_EN_ESPERA } from '@/lib/despachosApartados'
+import { sqlFacturaIncluye } from '@/lib/invoicesServer'
 
 // Envíos apartados (20-10, migración 107): sacar un envío puntual de Despachos / Reportador sin perderlo.
 //   GET  ?buscar=venta|guía → los que están "En espera" y, si se busca, los envíos que se pueden apartar.
@@ -25,7 +26,11 @@ const COLUMNAS = `e.id, e.venta, e.guia, COALESCE(e.guia_final, e.guia) AS guia_
             FROM sales s JOIN sale_items si ON si.sale_id = s.id JOIN products p ON p.id = si.product_id
             WHERE s.ml_order_number = e.venta),
            (SELECT o.productos FROM ml_ordenes o WHERE e.venta ~ '^[0-9]{1,18}$' AND (o.id = e.venta::bigint OR o.pack_id = e.venta::bigint)
-            ORDER BY (o.id = e.venta::bigint) DESC LIMIT 1)) AS productos`
+            ORDER BY (o.id = e.venta::bigint) DESC LIMIT 1)) AS productos,
+  -- 12-11 (el dueño): la venta cargada en Ventas, para que «Ya no se envía» ofrezca anularla y devolver el stock.
+  (SELECT json_build_object('id', s.id, 'status', s.status,
+            'factura', (SELECT i.invoice_number FROM invoices i WHERE ${sqlFacturaIncluye('i', 's.id')} LIMIT 1))
+   FROM sales s WHERE s.ml_order_number = e.venta LIMIT 1) AS venta_sistema`
 const DESDE = `FROM despacho_etiquetas e
   JOIN despacho_lotes l ON l.id = e.lote_id
   LEFT JOIN despacho_jornadas j ON j.id = l.jornada_id
@@ -69,12 +74,14 @@ export async function GET(req: NextRequest) {
 
 const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('apartar'), id: z.number().int(), tipo: z.enum(['espera', 'cancelado', 'enviada']),
+    concretada: z.boolean().optional(), anular_venta: z.boolean().optional(),
              nota: z.string().trim().max(200) })
     // 12-11 (el dueño): el motivo solo es obligatorio para «No se enviará» (no tiene vuelta atrás); «Todavía no sale», opcional.
     .refine(x => x.tipo !== 'cancelado' || x.nota.length >= 2, { message: 'Elige o escribe el motivo' }),
   z.object({ accion: z.literal('ya_enviadas'), ids: z.array(z.number().int()).min(1).max(300) }),
   z.object({ accion: z.literal('liberar'), id: z.number().int() }),
-  z.object({ accion: z.literal('cancelar'), id: z.number().int(), nota: z.string().trim().max(200).optional() }),
+  z.object({ accion: z.literal('cancelar'), id: z.number().int(), nota: z.string().trim().max(200).optional(),
+    concretada: z.boolean().optional(), anular_venta: z.boolean().optional() }),
 ])
 
 // 04-11 (BUYBOOK: una venta cancelada en Despachos, con pago y reintegro, no se calificó sola y ML la iba a concretar):
@@ -88,6 +95,48 @@ async function marcarCanceladaEnML(db: { query: (q: string, v?: unknown[]) => Pr
      WHERE (id::text = $1 OR pack_id::text = $1) AND no_concretada_at IS NULL AND cal_vendedor IS NULL
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = $1)`,
     [venta, userId, `Cancelada en Despachos${nota ? `: ${nota}` : ''}`.slice(0, 200)])
+}
+
+type Q = { query: (q: string, v?: unknown[]) => Promise<{ rows: any[]; rowCount: number | null }> }   // eslint-disable-line @typescript-eslint/no-explicit-any
+
+// 12-11 (el dueño): al cancelar el envío la persona dice si la venta se concretó (retiro, otro envío) o no (reembolso,
+// anulada). Eso decide Calificaciones aunque la venta esté cargada en Ventas (antes, cargada y DESCARGADA, quedaba
+// "concretada" y la automática la calificaba bien). Sin respuesta (versión anterior de la pantalla): lo de siempre.
+async function marcarResultadoEnML(db: Q, venta: string | null, userId: number, concretada: boolean, nota: string | null, anulada: boolean) {
+  if (!venta) return
+  if (concretada) {
+    await db.query(
+      `UPDATE ml_ordenes SET fuera_at = COALESCE(fuera_at, NOW()), fuera_por = COALESCE(fuera_por, $2)
+       WHERE (id::text = $1 OR pack_id::text = $1) AND no_concretada_at IS NULL AND cal_vendedor IS NULL`, [venta, userId])
+    return
+  }
+  await db.query(
+    `UPDATE ml_ordenes SET no_concretada_at = NOW(), no_concretada_motivo = 'otro', no_concretada_por = $2,
+            no_concretada_nota = $3, fuera_at = NULL, fuera_por = NULL
+     WHERE (id::text = $1 OR pack_id::text = $1) AND no_concretada_at IS NULL AND cal_vendedor IS NULL`,
+    [venta, userId, `Cancelada en Despachos${anulada ? ' (venta anulada)' : ''}${nota ? `: ${nota}` : ''}`.slice(0, 200)])
+}
+
+/** Anula la venta cargada en Ventas: devuelve al inventario lo que había descontado y la borra. Con factura no se puede. */
+async function anularVenta(db: Q, venta: string, userId: number): Promise<string | null> {
+  const { rows: [s] } = await db.query(`SELECT id, status FROM sales WHERE ml_order_number = $1 FOR UPDATE`, [venta])
+  if (!s) return null
+  const { rows: [inv] } = await db.query(`SELECT invoice_number FROM invoices i WHERE ${sqlFacturaIncluye('i', '$1')} LIMIT 1`, [s.id])
+  if (inv) return `La venta tiene la factura #${inv.invoice_number}: no se puede anular desde aquí. Elige «Mantener la venta registrada» y resuélvelo en Facturas.`
+  if (['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL'].includes(s.status)) {
+    const { rows: items } = await db.query(`SELECT product_id, quantity FROM sale_items WHERE sale_id = $1`, [s.id])
+    for (const it of items) {
+      await db.query(`UPDATE inventory SET quantity = quantity + $1, last_updated = NOW() WHERE product_id = $2`, [it.quantity, it.product_id])
+      await db.query(
+        `INSERT INTO inventory_movements (product_id, movement_type, quantity, reference, notes, created_by)
+         VALUES ($1, 'IN', $2, $3, 'Anulada desde Despachos: ya no se envía', $4)`,
+        [it.product_id, it.quantity, `Venta anulada #${s.id} (${venta})`, userId])
+    }
+  }
+  await db.query(`UPDATE despacho_etiquetas SET sale_id = NULL WHERE sale_id = $1`, [s.id])
+  await db.query(`DELETE FROM sale_items WHERE sale_id = $1`, [s.id])
+  await db.query(`DELETE FROM sales WHERE id = $1`, [s.id])
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -120,6 +169,16 @@ export async function POST(req: NextRequest) {
     if (!e) { await db.query('ROLLBACK'); return NextResponse.json({ error: 'Envío no encontrado' }, { status: 404 }) }
     // Liberar / cancelar: la etiqueta y las demás de la misma venta en su lote que siguen en espera (varias guías).
     const MISMAS = `(id = $1 OR (lote_id = ${Number(e.lote_id)} AND venta IS NOT DISTINCT FROM $9 AND apartado = 'espera'))`
+    // «No se enviará» / «Ya no se envía»: anular la venta cargada (si lo pidió) y marcar en ML si se concretó o no.
+    const cerrarCancelado = async (concretada: boolean | undefined, anular: boolean | undefined, nota: string | null) => {
+      if (anular && e.venta) {
+        const error = await anularVenta(db, e.venta, userId)
+        if (error) { await db.query('ROLLBACK'); return NextResponse.json({ error }, { status: 409 }) }
+      }
+      if (concretada === undefined) await marcarCanceladaEnML(db, e.venta, userId, nota)
+      else await marcarResultadoEnML(db, e.venta, userId, concretada, nota, !!anular)
+      return null
+    }
 
     if (b.accion === 'apartar') {
       const { rows: [ok] } = await db.query(`SELECT 1 FROM despacho_etiquetas e JOIN despacho_lotes l ON l.id = e.lote_id
@@ -141,14 +200,18 @@ export async function POST(req: NextRequest) {
          FROM despacho_etiquetas e
          WHERE e.id = $1 AND x.lote_id = e.lote_id AND x.venta = e.venta AND x.id <> e.id AND x.apartado IS NULL`,
         [b.id, b.tipo, b.nota || (b.tipo === 'enviada' ? 'Ya enviada por fuera de Despachos' : null), userId])
-      if (b.tipo === 'cancelado') await marcarCanceladaEnML(db, e.venta, userId, b.nota)
+      if (b.tipo === 'cancelado') {
+        const r = await cerrarCancelado(b.concretada, b.anular_venta, b.nota)
+        if (r) return r
+      }
     } else if (b.accion === 'cancelar') {
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }
       await db.query(
         `UPDATE despacho_etiquetas SET apartado = 'cancelado', apartado_por = $2, apartado_at = NOW(),
                 apartado_nota = COALESCE(NULLIF($3, ''), apartado_nota)
          WHERE ${MISMAS.replace('$9', '$4')}`, [b.id, userId, b.nota ?? null, e.venta])
-      await marcarCanceladaEnML(db, e.venta, userId, b.nota ?? null)
+      const r = await cerrarCancelado(b.concretada, b.anular_venta, b.nota ?? null)
+      if (r) return r
     } else {
       // Liberar ("Sale en el próximo manifiesto")
       if (e.apartado !== 'espera') { await db.query('ROLLBACK'); return NextResponse.json({ error: 'No está en espera' }, { status: 409 }) }

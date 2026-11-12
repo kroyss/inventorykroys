@@ -10,6 +10,56 @@ export interface Apartado {
   impresa: boolean; apartado: 'espera' | 'cancelado' | 'enviada' | null; apartado_nota: string | null; apartado_at: string | null
   productos?: string | null   // qué lleva (23-10)
   apartado_por: string | null; etapa: 'sin_imprimir' | 'impresa' | 'por_reportar'
+  venta_sistema?: { id: number; status: string; factura: string | null } | null   // cargada en Ventas (12-11)
+}
+
+/** 12-11 (el dueño): al cancelar un envío, ¿la venta se concretó? y, si está cargada en Ventas, ¿se anula y vuelve el stock? */
+export interface DecisionCancelar { concretada: boolean | null; anular: boolean | null }
+const DESCONTO = ['PROCESADA', 'DESCARGADA', 'DESCARGADA_LOCAL']
+export const decisionCompleta = (d: DecisionCancelar, e: Apartado, conInventario: boolean) =>
+  d.concretada !== null && (!(conInventario && e.venta_sistema) || d.anular !== null)
+
+function Opcion({ activa, onClick, titulo, detalle, peligro = false, deshabilitada = false }: {
+  activa: boolean; onClick: () => void; titulo: string; detalle: string; peligro?: boolean; deshabilitada?: boolean
+}) {
+  return (
+    <button type="button" aria-pressed={activa} onClick={onClick} disabled={deshabilitada}
+      className={`w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${activa ? (peligro ? 'border-red-500 bg-red-50' : 'border-neutral-900 bg-neutral-50') : 'border-neutral-200 bg-white hover:bg-neutral-50'}`}>
+      <b className="block text-xs">{titulo}</b><span className="block text-[11px] text-neutral-500">{detalle}</span>
+    </button>
+  )
+}
+
+export function ElegirCancelar({ e, conInventario, valor, onCambio }: {
+  e: Apartado; conInventario: boolean; valor: DecisionCancelar; onCambio: (d: DecisionCancelar) => void
+}) {
+  const vs = conInventario ? e.venta_sistema : null
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold text-neutral-700">¿La venta se concretó?</p>
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          <Opcion activa={valor.concretada === false} onClick={() => onCambio({ ...valor, concretada: false })} peligro
+            titulo="No se concretó" detalle="Reembolso, anulada o el comprador desistió. En Calificaciones: no concretada." />
+          <Opcion activa={valor.concretada === true} onClick={() => onCambio({ ...valor, concretada: true })}
+            titulo="Sí se concretó" detalle="La retiró alguien, cambió el método de envío u otra vía. En Calificaciones: concretada." />
+        </div>
+      </div>
+      {vs && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-neutral-700">
+            Esta venta está registrada en Ventas ({vs.status.replace(/_/g, ' ').toLowerCase()}{DESCONTO.includes(vs.status) ? ', ya descontó el stock' : ''}).
+          </p>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            <Opcion activa={valor.anular === true} onClick={() => onCambio({ ...valor, anular: true })} peligro deshabilitada={!!vs.factura}
+              titulo="Anular la venta" detalle={vs.factura ? `No se puede: tiene la factura #${vs.factura}.` : DESCONTO.includes(vs.status) ? 'Se borra de Ventas y los productos vuelven al inventario.' : 'Se borra de Ventas (no había descontado stock).'} />
+            <Opcion activa={valor.anular === false} onClick={() => onCambio({ ...valor, anular: false })}
+              titulo="Mantener la venta registrada" detalle="Queda en Ventas tal cual; el stock no cambia." />
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 const ETAPA: Record<Apartado['etapa'], string> = {
@@ -96,6 +146,8 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
   const [error, setError] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [hecho, setHecho] = useState<string | null>(null)   // confirmación de lo último que se hizo (sin dudas de "¿falta algo?")
+  // «Ya no se envía» abierto en una tarjeta (12-11): las preguntas van ahí mismo, antes de confirmar.
+  const [cancelando, setCancelando] = useState<{ id: number; dec: DecisionCancelar } | null>(null)
   const confirm = useConfirm()
   // 12-11 (el dueño): la lista de lo que se puede apartar, para elegir a dedo sin tener que buscar.
   const [disponibles, setDisponibles] = useState<Apartado[] | null>(null)
@@ -152,9 +204,10 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
           )}
 
           {apartando ? (
-            <FormApartar e={apartando} ocupado={ocupado} onCancelar={() => setApartando(null)}
-              onApartar={async (tipo, nota) => {
-                const ok = await accion({ accion: 'apartar', id: apartando.id, tipo, nota },
+            <FormApartar e={apartando} ocupado={ocupado} conInventario={conInventario} onCancelar={() => setApartando(null)}
+              onApartar={async (tipo, nota, dec) => {
+                const ok = await accion({ accion: 'apartar', id: apartando.id, tipo, nota,
+                  ...(tipo === 'cancelado' && dec ? { concretada: dec.concretada, anular_venta: dec.anular === true } : {}) },
                   `${apartando.venta ?? 'Envío'}: ${tipo === 'espera' ? 'quedó en espera (cuando vaya a salir, toca «Sale en el próximo manifiesto»).' : tipo === 'enviada' ? 'marcado «Ya la envié»: sale de la jornada y del manifiesto, la venta no se cancela.' : 'cancelado, no se enviará.'}`)
                 if (ok) { setApartando(null); setBuscar(''); setCandidatos(null) }
               }} />
@@ -218,14 +271,31 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
                           accion({ accion: 'liberar', id: a.id }, `${a.venta ?? 'Envío'}: va en el próximo manifiesto (entra en la jornada abierta y se reporta al cerrarla).`)
                         }}
                           className="btn-secondary text-xs disabled:opacity-50">Sale en el próximo manifiesto</button>
-                        <button disabled={ocupado} onClick={async () => {
-                          // No tiene vuelta atrás: nunca se despacha ni se reporta (queda en el historial como cancelado).
-                          if (!await confirm({ title: `Cancelar el envío ${a.venta ?? ''}`, confirmText: 'Sí, no se envía', danger: true,
-                            message: 'No va a salir nunca ni se le mandará la guía al comprador. Queda en el historial como "envío cancelado". Esto no se puede deshacer.' })) return
-                          accion({ accion: 'cancelar', id: a.id }, `${a.venta ?? 'Envío'}: cancelado, queda en el historial.`)
-                        }}
-                          className="btn-secondary text-xs disabled:opacity-50">Ya no se envía</button>
+                        <button disabled={ocupado} onClick={() => setCancelando(cancelando?.id === a.id ? null : { id: a.id, dec: { concretada: null, anular: null } })}
+                          aria-expanded={cancelando?.id === a.id}
+                          className={`btn-secondary text-xs disabled:opacity-50 ${cancelando?.id === a.id ? '!border-red-300 !bg-red-50 !text-red-800' : ''}`}>Ya no se envía</button>
                       </div>
+                      {cancelando?.id === a.id && (() => {
+                        const dec = cancelando.dec
+                        const listo = decisionCompleta(dec, a, conInventario)
+                        return (
+                          <div className="mt-3 space-y-3 rounded-lg border border-red-200 bg-white p-3">
+                            <p className="text-xs text-neutral-600">No va a salir nunca ni se le manda la guía al comprador. Queda en el historial como «envío cancelado». No se puede deshacer.</p>
+                            <ElegirCancelar e={a} conInventario={conInventario} valor={dec} onCambio={d => setCancelando({ id: a.id, dec: d })} />
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => setCancelando(null)} className="btn-secondary text-xs">Volver</button>
+                              <button disabled={ocupado || !listo} onClick={async () => {
+                                const anular = dec.anular === true
+                                const ok = await accion({ accion: 'cancelar', id: a.id, concretada: dec.concretada, anular_venta: anular },
+                                  `${a.venta ?? 'Envío'}: cancelado${anular ? ', venta anulada y stock devuelto' : ''}; en Calificaciones queda como ${dec.concretada ? 'concretada' : 'no concretada'}.`)
+                                if (ok) setCancelando(null)
+                              }} className="btn-primary !bg-red-600 text-xs hover:!bg-red-700 disabled:opacity-50">
+                                {ocupado ? 'Guardando…' : listo ? 'Cancelar el envío' : 'Responde arriba'}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </li>
                   )
                 })}
@@ -244,11 +314,13 @@ export function PanelEnEspera({ lista, preseleccion, onCerrar, onCambio, conInve
 const MOTIVOS_ESPERA = ['Pidió para otro día', 'Falta el pago', 'Cambio de producto']
 const MOTIVOS_CANCELA = ['Desistió', 'Pagó mal', 'Error en la venta']
 
-function FormApartar({ e, ocupado, onCancelar, onApartar }: {
-  e: Apartado; ocupado: boolean; onCancelar: () => void; onApartar: (tipo: 'espera' | 'cancelado' | 'enviada', nota: string) => void
+function FormApartar({ e, ocupado, conInventario, onCancelar, onApartar }: {
+  e: Apartado; ocupado: boolean; conInventario: boolean; onCancelar: () => void
+  onApartar: (tipo: 'espera' | 'cancelado' | 'enviada', nota: string, dec?: DecisionCancelar) => void
 }) {
   const [tipo, setTipo] = useState<'espera' | 'cancelado' | 'enviada'>('espera')
   const [nota, setNota] = useState('')
+  const [dec, setDec] = useState<DecisionCancelar>({ concretada: null, anular: null })
   return (
     <section className="space-y-3 rounded-lg border border-neutral-200 p-3">
       <h3 className="font-semibold">Apartar {e.venta ?? 'envío'}</h3>
@@ -279,6 +351,7 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
             className={`w-full rounded-lg border px-3 py-2 text-sm ${tipo === 'cancelado' && nota.trim().length < 2 ? 'border-amber-300' : 'border-neutral-300'}`} />
         </div>
       )}
+      {tipo === 'cancelado' && <ElegirCancelar e={e} conInventario={conInventario} valor={dec} onCambio={setDec} />}
       {e.impresa && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
           ⚠️ La etiqueta ya está impresa: <b>separa el paquete físico</b> para que no salga con el resto.
@@ -288,11 +361,13 @@ function FormApartar({ e, ocupado, onCancelar, onApartar }: {
       <div className="flex justify-end gap-2">
         <button onClick={onCancelar} className="btn-secondary text-xs">Cancelar</button>
         {(() => {
-          const falta = tipo === 'cancelado' && nota.trim().length < 2
+          const sinMotivo = tipo === 'cancelado' && nota.trim().length < 2
+          const sinElegir = tipo === 'cancelado' && !decisionCompleta(dec, e, conInventario)
+          const falta = sinMotivo || sinElegir
           return (
-            <button disabled={ocupado || falta} onClick={() => onApartar(tipo, nota.trim())}
+            <button disabled={ocupado || falta} onClick={() => onApartar(tipo, nota.trim(), dec)}
               className={`text-xs disabled:opacity-50 ${tipo === 'cancelado' ? 'btn-primary !bg-red-600 hover:!bg-red-700' : 'btn-primary'}`}>
-              {ocupado ? 'Guardando…' : falta ? 'Elige un motivo' : tipo === 'espera' ? 'Apartar: todavía no sale' : tipo === 'enviada' ? 'Ya la envié' : 'Cancelar el envío'}
+              {ocupado ? 'Guardando…' : sinMotivo ? 'Elige un motivo' : sinElegir ? 'Responde arriba' : tipo === 'espera' ? 'Apartar: todavía no sale' : tipo === 'enviada' ? 'Ya la envié' : 'Cancelar el envío'}
             </button>
           )
         })()}

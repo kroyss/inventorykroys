@@ -8,7 +8,7 @@
 import type { Pool } from 'pg'
 import { mlFetch, ErrorML } from '@/lib/ml'
 import { esDemo } from '@/lib/demo'
-import { leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion } from '@/lib/calificacionesML'
+import { CANCELADA_DESP, leerPlantillasCal, sqlBandeja, sqlLista, type PlantillasCalificacion } from '@/lib/calificacionesML'
 import { registrarUso } from '@/lib/usoAcciones'
 import { DIA_AUTO_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS } from '@/lib/noConcretada'
 
@@ -163,7 +163,9 @@ export async function noConcretadasAutomaticas(db: Pool, conInventario: boolean)
        AND (o.no_concretada_at IS NOT NULL OR (
          NOT EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')
          AND NOT EXISTS (SELECT 1 FROM despacho_etiquetas e WHERE e.venta IN (o.id::text, o.pack_id::text))))
-       AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
+       -- 12-11: cancelada en Despachos y marcada "no se concretó" vale aunque la venta siga cargada en Ventas.
+       AND (NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number IN (o.id::text, o.pack_id::text))
+            OR (o.no_concretada_at IS NOT NULL AND ${CANCELADA_DESP}))
      ORDER BY b.fecha LIMIT ${MAX_POR_DIA}`, [p.noConcretada.dias])
   const demo = await esDemo(db)
   let calificadas = 0, errores = 0, quitadas = 0

@@ -191,6 +191,8 @@ const GUIA_OK = `(g.impresa AND (NOT m.con_reportador OR g.reportada_at IS NOT N
 const BASE = `CASE WHEN o.fuera_at IS NOT NULL THEN o.fuera_at
               WHEN m.con_reportador AND g.reportada_at IS NOT NULL THEN g.reportada_at ELSE o.fecha END AS base,
          COALESCE(g.impresa, FALSE) AS guia_impresa, g.reportada_at, m.usa_despachos`
+/** El envío se canceló en Despachos («Ya no se envía» / «No se enviará»). */
+export const CANCELADA_DESP = `EXISTS (SELECT 1 FROM despacho_etiquetas ec WHERE ec.venta IN (o.id::text, o.pack_id::text) AND ec.apartado = 'cancelado')`
 const PAGO_ME = `EXISTS (SELECT 1 FROM me_pagos mp WHERE mp.venta IN (o.id::text, o.pack_id::text) AND mp.verificacion <> 'invalido')`
 /** 10-11 (caso Ainy): la empresa usa Pagos ME pero NO buscó los pagos después de que venció el plazo de esta venta: "sin
  *  pago" no es seguro (pudo pagar y el sistema no lo sabe). En vez de "no concretada" va a 'revisar' (decide una persona,
@@ -205,6 +207,9 @@ export const SQL_BANDEJA = `
          x.nickname AS cuenta, s.status AS sistema_estado, (f.id IS NOT NULL) AS facturada, ${BASE}, ${EXTRA},
          (o.venta_local_id IS NOT NULL) AS enlazada_local, COALESCE(o.pack_id, o.id)::text AS numero_venta,
          CASE
+           -- 12-11: «Ya no se envía» en Despachos con la respuesta de la persona: manda aunque la venta siga cargada.
+           WHEN ${CANCELADA_DESP} AND o.no_concretada_at IS NOT NULL THEN 'no_concretada'
+           WHEN ${CANCELADA_DESP} AND o.fuera_at IS NOT NULL AND COALESCE(o.estado, '') <> 'cancelled' THEN 'concretada'
            -- Descargada (o local) y, si lleva guía en Despachos, despachada. 28-10: procesada o facturada NO alcanza
            -- (una venta facturada antes de pagar, sin guía, se calificó sola y el envío nunca se pudo agendar).
            WHEN s.status IN ('DESCARGADA', 'DESCARGADA_LOCAL') AND (g.impresa IS NOT TRUE OR ${GUIA_OK}) THEN 'concretada'

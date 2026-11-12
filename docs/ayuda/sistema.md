@@ -615,8 +615,14 @@ cualquier orden). Al elegir uno hay motivos de un toque («Pidió para otro día
 sale» el motivo es opcional y para «No se enviará» es obligatorio:
 - **En espera:** no sale en ningún manifiesto ni se le reporta la guía hasta que toques «Sale en el próximo
   manifiesto».
-- **Cancelar envío:** nunca sale ni se le manda la guía. No se puede deshacer. La venta queda marcada «No se concretó»
-  (aunque tenga pago registrado): en Calificaciones sale como no concretada y la automática la califica.
+- **Cancelar envío** («No se enviará» al apartar, o «Ya no se envía» en un envío en espera): nunca sale ni se le manda
+  la guía. No se puede deshacer. Antes de confirmar el sistema pregunta **¿La venta se concretó?**:
+  - **No se concretó** (reembolso, anulada, desistió): en Calificaciones sale como no concretada (aunque tenga pago
+    registrado) y la automática la califica así.
+  - **Sí se concretó** (la retiró alguien, cambió el método de envío…): en Calificaciones sale como concretada.
+  - Si usas Inventario y la venta **ya está registrada en Ventas**, pregunta además: **Anular la venta** (se borra de
+    Ventas y los productos vuelven al inventario) o **Mantener la venta registrada** (queda igual, el stock no cambia).
+    Con factura no se puede anular desde ahí.
 - **Ya la envié:** el paquete ya salió por fuera de Despachos. Sale de la jornada y del manifiesto, y la venta **no**
   se cancela. No uses «Cancelar envío» para esto.
 - Si la etiqueta ya estaba impresa, separa el paquete físico.
