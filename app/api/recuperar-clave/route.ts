@@ -5,7 +5,7 @@ import { apiError } from '@/lib/apiError'
 import { cambiarConCodigo, pedirCodigo } from '@/lib/recuperarClave'
 
 // POST /api/recuperar-clave (13-11-2026, mig. 175) — público, sin sesión (pantalla /login/recuperar).
-//   { paso: 'pedir', usuario }                    → manda el código (siempre responde ok: no dice si existe)
+//   { paso: 'pedir', usuario }                    → manda el código y dice por dónde (tapado) o por qué no (ResultadoPedido)
 //   { paso: 'cambiar', usuario, codigo, clave }   → cambia la clave y cierra sus sesiones
 const Cuerpo = z.discriminatedUnion('paso', [
   z.object({ paso: z.literal('pedir'), usuario: z.string().trim().min(1, 'Escribe tu usuario o tu correo').max(120) }),
@@ -23,8 +23,7 @@ export async function POST(req: NextRequest) {
   try {
     const b = r.data
     if (b.paso === 'pedir') {
-      await pedirCodigo(b.usuario, ipHashDe(req))
-      return NextResponse.json({ ok: true })
+      return NextResponse.json(await pedirCodigo(b.usuario, ipHashDe(req)))
     }
     const error = await cambiarConCodigo(b.usuario, b.codigo, b.clave)
     return error ? NextResponse.json({ error }, { status: 400 }) : NextResponse.json({ ok: true })

@@ -1,10 +1,17 @@
 'use client'
 // «¿Olvidaste tu contraseña?» (13-11-2026, el dueño, mig. 175). Paso 1: usuario o correo → código de 6 números al correo
-// y al Telegram vinculado. Paso 2: código + clave nueva. Paso 3: listo → Entrar. API: /api/recuperar-clave.
+// y al Telegram vinculado; la pantalla dice por dónde salió (tapado) o, si no tiene ninguno, a quién pedirle ayuda.
+// Paso 2: código + clave nueva. Paso 3: listo → Entrar. API: /api/recuperar-clave (ResultadoPedido en lib/recuperarClave).
 import { useEffect, useState, type FormEvent } from 'react'
 import { TELEGRAM_SOPORTE } from '@/lib/cuenta'
+import type { ResultadoPedido } from '@/lib/recuperarClave'
 
-type Paso = 'pedir' | 'codigo' | 'listo'
+type Paso = 'pedir' | 'codigo' | 'sin_canal' | 'listo'
+const ERROR_PEDIDO: Record<'no_existe' | 'frenado' | 'fallo', string> = {
+  no_existe: 'No encontramos ese usuario o correo. Revisa cómo lo escribiste.',
+  frenado: 'Pediste varios códigos seguidos. Espera una hora o escríbenos.',
+  fallo: 'No pudimos enviar el código ahora. Prueba en unos minutos o escríbenos.',
+}
 const ESPERA_REENVIO = 60
 const campo = `w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-sm text-neutral-900 bg-white
   focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-lime-400`
@@ -19,6 +26,8 @@ export default function RecuperarClave() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const [espera, setEspera] = useState(0)
+  const [destino, setDestino] = useState<{ correo: string | null; telegram: string | null }>({ correo: null, telegram: null })
+  const [esAdmin, setEsAdmin] = useState(false)
 
   useEffect(() => {
     if (espera <= 0) return
@@ -26,20 +35,29 @@ export default function RecuperarClave() {
     return () => clearTimeout(t)
   }, [espera])
 
-  async function enviar(cuerpo: object) {
+  async function llamar(cuerpo: object): Promise<{ error: string | null; datos: Record<string, unknown> }> {
     const r = await fetch('/api/recuperar-clave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) }).catch(() => null)
-    const d = await r?.json().catch(() => ({}))
-    return r?.ok ? null : (d?.error ?? 'No se pudo conectar. Prueba de nuevo.')
+    const d = await r?.json().catch(() => ({})) ?? {}
+    return { error: r?.ok ? null : (d?.error ?? 'No se pudo conectar. Prueba de nuevo.'), datos: d }
   }
+  const enviar = async (cuerpo: object) => (await llamar(cuerpo)).error
 
   async function pedir(e?: FormEvent) {
     e?.preventDefault()
     if (!usuario.trim()) { setError('Escribe tu usuario o tu correo'); return }
     setCargando(true); setError('')
-    const err = await enviar({ paso: 'pedir', usuario })
+    const { error: err, datos } = await llamar({ paso: 'pedir', usuario })
     setCargando(false)
     if (err) { setError(err); return }
-    setPaso('codigo'); setEspera(ESPERA_REENVIO); setCodigo('')
+    const res = datos as ResultadoPedido
+    if (res.estado === 'enviado') {
+      setDestino({ correo: res.correo, telegram: res.telegram })
+      setPaso('codigo'); setEspera(ESPERA_REENVIO); setCodigo('')
+    } else if (res.estado === 'sin_canal') {
+      setEsAdmin(res.admin); setPaso('sin_canal')
+    } else {
+      setError(ERROR_PEDIDO[res.estado] ?? ERROR_PEDIDO.fallo)
+    }
   }
 
   async function cambiar(e: FormEvent) {
@@ -82,11 +100,23 @@ export default function RecuperarClave() {
           {paso === 'codigo' && (
             <form onSubmit={cambiar} className="space-y-4">
               <div>
-                <h1 className="text-xl font-semibold text-neutral-900">Revisa tu correo o Telegram</h1>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Si <b className="text-neutral-700">{usuario}</b> tiene correo o Telegram vinculado, te llegó un código de 6 números.
-                  Mira también en spam o promociones.
-                </p>
+                <h1 className="text-xl font-semibold text-neutral-900">
+                  {destino.correo && destino.telegram !== null ? 'Revisa tu correo o Telegram' : destino.correo ? 'Revisa tu correo' : 'Revisa tu Telegram'}
+                </h1>
+                <p className="mt-1 text-sm text-neutral-500">Te mandamos un código de 6 números:</p>
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {destino.correo && (
+                    <li className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700">
+                      <span aria-hidden>✉️</span><span>a tu correo <b className="font-mono">{destino.correo}</b></span>
+                    </li>
+                  )}
+                  {destino.telegram !== null && (
+                    <li className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700">
+                      <span aria-hidden>💬</span><span>a tu Telegram{destino.telegram && <> <b className="font-mono">{destino.telegram}</b></>}</span>
+                    </li>
+                  )}
+                </ul>
+                {destino.correo && <p className="mt-2 text-xs text-neutral-400">Si no ves el correo, mira en spam o promociones.</p>}
               </div>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-neutral-600">Código</span>
@@ -124,6 +154,25 @@ export default function RecuperarClave() {
             </form>
           )}
 
+          {paso === 'sin_canal' && (
+            <div className="space-y-4">
+              <div>
+                <h1 className="text-xl font-semibold text-neutral-900">Tu cuenta no tiene correo ni Telegram</h1>
+                <p className="mt-1 text-sm text-neutral-500">
+                  {esAdmin
+                    ? 'No tenemos a dónde mandarte el código. Escríbenos por Telegram y te ayudamos a recuperar tu clave.'
+                    : 'No tenemos a dónde mandarte el código. Pídele al administrador de tu empresa que te ponga una clave nueva (en Usuarios → Cambiar contraseña).'}
+                </p>
+              </div>
+              {esAdmin
+                ? <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer"
+                    className="block w-full rounded-lg bg-sky-600 py-2.5 text-center text-sm font-semibold text-white hover:bg-sky-500">Escribir a soporte por Telegram</a>
+                : <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-500">Pídele también que agregue tu correo (o vincula tu Telegram en Mis avisos cuando entres) para recuperarla solo la próxima vez.</p>}
+              <button type="button" onClick={() => { setPaso('pedir'); setError('') }}
+                className="w-full rounded-lg border border-neutral-300 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50">← Probar con otro usuario</button>
+            </div>
+          )}
+
           {paso === 'listo' && (
             <div className="space-y-4">
               <div>
@@ -135,7 +184,7 @@ export default function RecuperarClave() {
           )}
         </div>
 
-        {paso !== 'listo' && <>
+        {(paso === 'pedir' || paso === 'codigo') && <>
           <p className="mt-5 text-center text-xs text-neutral-500">
             ¿No te llega el código o tu cuenta no tiene correo?{' '}
             <a href={TELEGRAM_SOPORTE} target="_blank" rel="noopener noreferrer" className="font-medium text-sky-700 hover:underline">Escríbenos</a>

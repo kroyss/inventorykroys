@@ -1,13 +1,14 @@
 // Recuperar la clave sin ayuda (13-11-2026, el dueño, mig. 175). Pantalla: /login/recuperar.
 //   1. pedirCodigo(usuario o correo): código de 6 dígitos al correo (Resend, lib/correo.ts) y al Telegram vinculado.
 //   2. cambiarConCodigo(usuario o correo, código, clave nueva): cambia la clave y cierra sus sesiones (session_version).
-// Seguridad: la respuesta es la MISMA exista o no el usuario (no se puede averiguar quién tiene cuenta); el código vence
-// a los 15 min y acepta 5 intentos; máx. 3 pedidos por hora por persona y 10 por conexión; solo se guarda su hash.
+// Seguridad: la pantalla dice por dónde salió el código con los datos TAPADOS (c•••••@g•••.com, @c•••••) — decisión del
+// dueño 13-11 (confirma que el usuario existe, a cambio de no dejar a nadie esperando); el código vence a los 15 min y
+// acepta 5 intentos; máx. 3 pedidos por hora por persona y 10 por conexión; solo se guarda su hash.
 // Si alguien insiste (llega al tope), el dueño de la plataforma recibe un aviso por Telegram (una vez por hora).
 import { createHash, randomInt, timingSafeEqual } from 'crypto'
 import { hash } from 'bcryptjs'
 import { dbGlobal } from '@/lib/db'
-import { correoConfigurado, enviarCorreo } from '@/lib/correo'
+import { correoConfigurado, correoOculto, enviarCorreo } from '@/lib/correo'
 import { ENTORNO, enviarTelegram, esc, telegramConfigurado } from '@/lib/telegram'
 import { avisarDuenoPlataforma } from '@/lib/registro'
 import { PASSWORD_MAX, PASSWORD_MIN } from '@/lib/usuarios'
@@ -17,14 +18,31 @@ const VENCE_MIN = 15, MAX_INTENTOS = 5, MAX_POR_PERSONA_HORA = 3, MAX_POR_IP_HOR
 const hashCodigo = (codigo: string, userId: number) =>
   createHash('sha256').update(`${codigo}|${userId}|${process.env.NEXTAUTH_SECRET ?? ''}`).digest('hex')
 
-interface Persona { id: number; username: string; email: string | null; full_name: string | null; chat_id: string | null }
+interface Persona {
+  id: number; username: string; email: string | null; full_name: string | null
+  chat_id: string | null; tg_usuario: string | null; es_admin: boolean
+}
+
+/** Lo que ve la pantalla después de «Enviarme el código». */
+export type ResultadoPedido =
+  | { estado: 'enviado'; correo: string | null; telegram: string | null }   // telegram: '@c•••••' o '' (sin @usuario)
+  | { estado: 'sin_canal'; admin: boolean }   // ni correo ni Telegram: empleado → su administrador; admin → soporte
+  | { estado: 'no_existe' }
+  | { estado: 'frenado' }                     // pidió demasiados códigos en una hora
+  | { estado: 'fallo' }                       // tenía canal pero no salió (Resend/Telegram caído)
+
+const telegramOculto = (u: string | null) => {
+  const x = (u ?? '').replace(/^@/, '').trim()
+  return x ? `@${x.slice(0, 1)}•••••` : ''
+}
 
 /** Por usuario o por correo (si coinciden los dos con personas distintas, gana el usuario). Solo cuentas activas. */
 async function buscar(identificador: string): Promise<Persona | null> {
   const q = identificador.trim().toLowerCase()
   if (!q) return null
   const { rows: [p] } = await dbGlobal().query(
-    `SELECT u.id, u.username, NULLIF(u.email, '') AS email, u.full_name, t.chat_id::text AS chat_id
+    `SELECT u.id, u.username, NULLIF(u.email, '') AS email, u.full_name, t.chat_id::text AS chat_id, t.tg_usuario,
+            EXISTS (SELECT 1 FROM usuario_empresas ue WHERE ue.user_id = u.id AND ue.role = 'admin') AS es_admin
      FROM users u
      LEFT JOIN telegram_usuarios t ON t.user_id = u.id AND t.chat_id IS NOT NULL AND t.entorno = $2
      WHERE u.is_active AND (lower(u.username) = $1 OR lower(u.email) = $1)
@@ -41,8 +59,8 @@ const correoHtml = (nombre: string, codigo: string) => `
   <p style="margin:0;font-size:13px;color:#525252">Si no fuiste tú, ignora este correo: tu clave sigue igual.</p>
 </div>`
 
-/** Paso 1. Siempre responde lo mismo (no dice si el usuario existe). */
-export async function pedirCodigo(identificador: string, ipHash: string | null): Promise<void> {
+/** Paso 1. Dice por dónde salió el código (tapado) o por qué no salió. */
+export async function pedirCodigo(identificador: string, ipHash: string | null): Promise<ResultadoPedido> {
   const db = dbGlobal()
   if (ipHash) {
     const { rows: [{ n }] } = await db.query(
@@ -50,13 +68,20 @@ export async function pedirCodigo(identificador: string, ipHash: string | null):
     if (n >= MAX_POR_IP_HORA) {
       if (n === MAX_POR_IP_HORA) await avisarDuenoPlataforma(`🔐 <b>Recuperar clave</b>: una misma conexión pidió ${n} códigos en una hora (último con «${esc(identificador.slice(0, 60))}»). Quedó frenada por una hora.`)
       await db.query(`INSERT INTO clave_codigos (user_id, ip_hash, expira_at) VALUES (NULL, $1, NOW())`, [ipHash])
-      return
+      return { estado: 'frenado' }
     }
   }
   const p = await buscar(identificador)
   if (!p) {
     await db.query(`INSERT INTO clave_codigos (user_id, ip_hash, expira_at) VALUES (NULL, $1, NOW())`, [ipHash])
-    return
+    return { estado: 'no_existe' }
+  }
+  const usaCorreo = !!p.email && correoConfigurado()
+  const usaTelegram = !!p.chat_id && telegramConfigurado()
+  if (!usaCorreo && !usaTelegram) {
+    await db.query(`INSERT INTO clave_codigos (user_id, ip_hash, expira_at) VALUES ($1, $2, NOW())`, [p.id, ipHash])
+    // Tiene correo pero el envío de correos no está configurado: es falla nuestra, no de su cuenta.
+    return p.email ? { estado: 'fallo' } : { estado: 'sin_canal', admin: p.es_admin }
   }
   const { rows: [{ n }] } = await db.query(
     `SELECT count(*)::int AS n FROM clave_codigos WHERE user_id = $1 AND creado_at > NOW() - interval '1 hour'`, [p.id])
@@ -65,19 +90,19 @@ export async function pedirCodigo(identificador: string, ipHash: string | null):
       await avisarDuenoPlataforma(`🔐 <b>Recuperar clave</b>: piden muchos códigos para <b>${esc(p.username)}</b> (${n + 1} en una hora). Quedó frenado por una hora; si es la persona, puedes darle clave nueva en Plataforma.`)
       await db.query(`INSERT INTO clave_codigos (user_id, ip_hash, expira_at) VALUES ($1, $2, NOW())`, [p.id, ipHash])
     }
-    return
+    return { estado: 'frenado' }
   }
 
   const codigo = String(randomInt(0, 1_000_000)).padStart(6, '0')
   const nombre = (p.full_name ?? p.username).split(' ')[0]
   const canales: string[] = []
-  if (p.email && correoConfigurado()) {
+  if (usaCorreo && p.email) {
     await enviarCorreo({
       para: p.email, asunto: `Tu código: ${codigo} · El Comerciante Digital`, html: correoHtml(nombre, codigo),
       texto: `Hola ${nombre}, tu código para recuperar la clave de El Comerciante Digital es ${codigo}. Vence en ${VENCE_MIN} minutos. Si no fuiste tú, ignora este correo.`,
     }).then(() => canales.push('correo')).catch(err => console.error('[RECUPERAR CLAVE] correo', p.id, (err as Error).message))
   }
-  if (p.chat_id && telegramConfigurado()) {
+  if (usaTelegram && p.chat_id) {
     await enviarTelegram(p.chat_id,
       `🔐 Tu código para recuperar la clave: <b>${codigo}</b>\n\nVence en ${VENCE_MIN} minutos. Si no fuiste tú, ignóralo: tu clave sigue igual.`)
       .then(() => canales.push('telegram')).catch(err => console.error('[RECUPERAR CLAVE] telegram', p.id, (err as Error).message))
@@ -88,6 +113,12 @@ export async function pedirCodigo(identificador: string, ipHash: string | null):
     `INSERT INTO clave_codigos (user_id, codigo_hash, canales, ip_hash, expira_at)
      VALUES ($1, $2, $3, $4, NOW() + make_interval(mins => $5))`,
     [p.id, canales.length ? hashCodigo(codigo, p.id) : null, canales, ipHash, VENCE_MIN])
+  if (!canales.length) return { estado: 'fallo' }
+  return {
+    estado: 'enviado',
+    correo: canales.includes('correo') && p.email ? correoOculto(p.email) : null,
+    telegram: canales.includes('telegram') ? telegramOculto(p.tg_usuario) : null,
+  }
 }
 
 /** Paso 2. Devuelve null si salió bien, o el error para mostrar. */
