@@ -481,7 +481,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                 )}
                 {/* 13-11 (el dueño): prueba de 15 días para quien entró por otro lado (Radar) o ya la venció. */}
                 {sel.estado !== 'propietario' && sel.estado !== 'activo' && !sel.interna && sel.is_active && (
-                  <DarPrueba key={sel.organizacion_id} e={sel} onListo={msg => { setError(null); setAviso(msg); cargar() }} onError={setError} />
+                  <DarPrueba key={sel.organizacion_id} e={sel} hoy={hoy} onListo={msg => { setError(null); setAviso(msg); cargar() }} onError={setError} />
                 )}
                 {sel.estado !== 'propietario' && (
                   <details className="text-xs text-neutral-500">
@@ -966,7 +966,9 @@ function VerComoCliente({ empresaId }: { empresaId: number }) {
 
 /** 13-11 (el dueño): «Dar prueba de 15 días» a una cuenta del Radar (u otra sin plan): los módulos de la prueba gratis,
  *  con o sin Inventario, sin quitarle el Radar; 500 créditos de IA si nunca los recibió. */
-function DarPrueba({ e, onListo, onError }: { e: Empresa; onListo: (m: string) => void; onError: (m: string) => void }) {
+function DarPrueba({ e, hoy, onListo, onError }: { e: Empresa; hoy: string; onListo: (m: string) => void; onError: (m: string) => void }) {
+  // Prueba vigente (no Solo Radar): el botón la REINICIA (15 días desde hoy); los créditos no se repiten.
+  const vigente = e.estado === 'prueba' && !!e.prueba_hasta && e.prueba_hasta >= hoy && !soloRadarModulos(e.modulos)
   const [abierto, setAbierto] = useState(false)
   const [inventario, setInventario] = useState(false)
   const [ocupado, setOcupado] = useState(false)
@@ -981,13 +983,21 @@ function DarPrueba({ e, onListo, onError }: { e: Empresa; onListo: (m: string) =
     setAbierto(false)
     onListo(`${e.organizacion}: prueba de ${DIAS_PRUEBA.normal} días hasta el ${String(d.hasta).split('-').reverse().slice(0, 2).join('/')}${inventario ? ', con Inventario' : ''}. Ya puede entrar al Sistema.`)
   }
-  if (!abierto) return (
+  if (!abierto) return vigente ? (
+    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+      <span>Vence el {ddmm(e.prueba_hasta!)}</span>
+      <button onClick={() => setAbierto(true)} className="btn-secondary text-xs"
+        title="Vuelve a empezar la prueba: 15 días desde hoy. Los créditos de IA no se repiten.">
+        🔄 Reiniciar prueba ({DIAS_PRUEBA.normal} días desde hoy)</button>
+    </div>
+  ) : (
     <button onClick={() => setAbierto(true)} className="btn-secondary mb-2 text-xs"
       title="Prueba gratis de 15 días con los módulos de Automatizaciones (y si quieres Inventario). Lo que ya tiene (Radar) sigue.">
       🎁 Dar prueba de {DIAS_PRUEBA.normal} días</button>
   )
   return (
     <div className="mb-2 space-y-2 rounded-lg border border-lime-300 bg-lime-50/50 p-3 text-xs text-neutral-700">
+      {vigente && <p className="text-neutral-500">Ya tiene prueba hasta el {ddmm(e.prueba_hasta!)}: se reinicia y vence {DIAS_PRUEBA.normal} días desde hoy.</p>}
       <p><b>Prueba de {DIAS_PRUEBA.normal} días desde hoy</b>: Preguntas, Mensajes, Despachos, Reportador, Stock, Pagos ME y la IA
         (500 créditos si nunca los tuvo). Lo que ya tiene, como el Radar, sigue igual.</p>
       <label className="flex items-center gap-2">
@@ -996,7 +1006,7 @@ function DarPrueba({ e, onListo, onError }: { e: Empresa; onListo: (m: string) =
       </label>
       {inventario && <p className="text-amber-700">{AVISO_INVENTARIO}</p>}
       <div className="flex gap-2">
-        <button onClick={dar} disabled={ocupado} className="btn-primary text-xs disabled:opacity-50">{ocupado ? 'Dando…' : 'Dar prueba'}</button>
+        <button onClick={dar} disabled={ocupado} className="btn-primary text-xs disabled:opacity-50">{ocupado ? 'Guardando…' : vigente ? 'Reiniciar prueba' : 'Dar prueba'}</button>
         <button onClick={() => setAbierto(false)} disabled={ocupado} className="btn-secondary text-xs">Cancelar</button>
       </div>
     </div>
