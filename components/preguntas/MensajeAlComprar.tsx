@@ -61,11 +61,11 @@ export default function MensajeAlComprar() {
           <span>
             <span className="font-semibold text-neutral-900">Mandar un mensaje a cada comprador nuevo</span>
             <span className="block text-sm text-neutral-600">
-              A <b>1 o 2 minutos</b> de la compra, después de los dos mensajes automáticos de MercadoLibre, le llega
+              A <b>los pocos segundos</b> de la compra (unos 10), después de los dos mensajes automáticos de MercadoLibre, le llega
               {' '}este mensaje tuyo. <b>Una sola vez por venta.</b> Solo a las ventas que entren desde que lo prendes.
             </span>
             <span className="block text-xs text-neutral-500 mt-1">
-              No se manda si la venta se canceló o si el comprador ya te escribió (para no pisar la conversación).
+              No se manda si la venta se canceló o si el comprador escribió primero: así su mensaje queda en «Por atender» y no se pierde.
             </span>
           </span>
         </label>

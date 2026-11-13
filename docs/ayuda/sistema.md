@@ -410,9 +410,9 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 - **Buscar:** por comprador, nº de venta, producto o algo que se habló.
 
 **Pestañas extra:**
-- **Mensaje al comprador nuevo:** manda un mensaje de bienvenida a cada venta nueva (1 o 2 minutos después),
+- **Mensaje al comprador nuevo:** manda un mensaje de bienvenida a cada venta nueva (a los pocos segundos, unos 10, después de los dos de ML),
   una sola vez por venta, solo a ventas que entren desde que lo prendes. No se manda si la venta se canceló o si el
-  comprador ya te escribió. `{nombre}` = primer nombre del comprador. MercadoLibre corta los mensajes de más de
+  comprador escribió primero (su mensaje queda en «Por atender»; en «Últimos 7 días» sale «No se mandó» con el motivo). `{nombre}` = primer nombre del comprador. MercadoLibre corta los mensajes de más de
   **350 caracteres** sin avisar. Lo configura un administrador.
 - **Recordatorios de pago:** le recuerda el pago a quien compró y no ha concretado (1 vez al día a las 10:00, o 2
   veces: 10:00 y 17:00). Puedes poner otro texto para el último aviso. Si ya pagó, toca **Ya pagó, no recordar**.

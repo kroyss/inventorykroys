@@ -52,6 +52,8 @@ export async function procesarVentaNotificada(id: number, mlUserId: string | nul
   leidas.set(orden, ahora)
   if (leidas.size > 2000) for (const [k, t] of leidas) if (t < ahora - RELEER_SEG * 1000) leidas.delete(k)
   let detalle: Record<string, unknown>
+  type Bienvenida = { empresaId: number; country: string; pack: string; ms: number }
+  let bienvenida = null as Bienvenida | null
   try {
     const c = await cuentaDe(mlUserId)
     if (!c) detalle = { error: 'cuenta no conectada' }
@@ -60,6 +62,12 @@ export async function procesarVentaNotificada(id: number, mlUserId: string | nul
       detalle = await conEmpresa(c.empresaId, c.country, async db => {
         const { rowCount: estaba } = await db.query(`SELECT 1 FROM ml_ordenes WHERE id = $1`, [orden])
         const o = await traerOrden(db, c.conexionId, orden)
+        // 13-11: venta recién hecha → «Al comprar» a los pocos segundos (abajo, sin tener la conexión ocupada mientras espera).
+        if (o && !estaba) {
+          const { rows: [v] } = await db.query(
+            `SELECT COALESCE(pack_id, id)::text AS pack, (EXTRACT(EPOCH FROM fecha) * 1000)::float8 AS ms FROM ml_ordenes WHERE id = $1`, [orden])
+          if (v && v.ms > Date.now() - 2 * 60_000) bienvenida = { empresaId: c.empresaId, country: c.country, pack: v.pack, ms: v.ms }
+        }
         return { empresa: c.empresaId, nueva: !estaba, estado: o?.status ?? null, ...(o ? {} : { error: 'no es de esta cuenta' }) }
       })
     }
@@ -68,6 +76,15 @@ export async function procesarVentaNotificada(id: number, mlUserId: string | nul
   }
   await dbGlobal().query(`UPDATE ml_notificaciones SET detalle = $2, leido_at = NOW() WHERE id = $1`, [id, JSON.stringify(detalle)])
     .catch(e => console.error('[ml notificaciones] venta', e instanceof Error ? e.message : e))
+  const b = bienvenida as Bienvenida | null
+  if (b) {
+    try {
+      const { mensajeAlComprarAhora, ESPERA_SEG } = await import('@/lib/mensajeAlComprar')
+      const falta = b.ms + ESPERA_SEG * 1000 - Date.now()
+      if (falta > 0) await new Promise(r => setTimeout(r, falta))
+      await conEmpresa(b.empresaId, b.country as Parameters<typeof conEmpresa>[1], db => mensajeAlComprarAhora(db, b.pack))
+    } catch (e) { console.error('[mensaje al comprar] aviso', b.pack, e instanceof Error ? e.message : e) }
+  }
 }
 
 // ── Paso 2b: preguntas y mensajes (28-10) ──

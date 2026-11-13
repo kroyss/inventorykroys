@@ -22,6 +22,9 @@ export const CLAVE_CONFIG = 'mensaje_al_comprar'
 const CLAVE_SYNC = 'mensaje_al_comprar_sync'
 /** Minutos que se espera después de la compra (que primero lleguen los dos mensajes de ML; 25-10: 3 → 1). */
 export const ESPERA_MIN = 1
+/** 13-11 (el dueño): desde el aviso de la venta se manda a los ESPERA_SEG de la compra (ya pasaron los 2 de ML, que llegan
+ *  a los 2–6 s) y antes de que el comprador escriba (suele hacerlo a los 20–30 s). El cron (ESPERA_MIN) queda de respaldo. */
+export const ESPERA_SEG = 10
 const SYNC_MIN = 5
 const MAX_POR_PASADA = 30
 export { MAX_TEXTO }
@@ -53,14 +56,14 @@ const SQL_CANDIDATOS = `
            o.comprador, o.comprador_nombre, COALESCE(o.detalle->0->>'titulo', o.productos) AS producto, o.productos
     FROM ml_ordenes o JOIN ml_conexiones x ON x.id = o.conexion_id AND x.estado = 'activa'
     WHERE o.fecha >= $1::timestamptz AND o.fecha > NOW() - INTERVAL '24 hours'
-      AND o.fecha < NOW() - make_interval(mins => ${ESPERA_MIN})
+      AND o.fecha < NOW() - make_interval(secs => $2)
+      AND ($3::bigint IS NULL OR COALESCE(o.pack_id, o.id) = $3::bigint)
     ORDER BY COALESCE(o.pack_id, o.id), o.fecha
   )
   SELECT o.pack::text, o.id::text, o.conexion_id, o.fecha, o.comprador, o.comprador_nombre, o.producto, o.productos
   FROM o
   WHERE NOT EXISTS (SELECT 1 FROM ml_bienvenidas b WHERE b.pack_id = o.pack)
     AND NOT EXISTS (SELECT 1 FROM ml_ordenes o2 WHERE COALESCE(o2.pack_id, o2.id) = o.pack AND o2.estado = 'cancelled')
-    AND NOT EXISTS (SELECT 1 FROM ml_mensajes m WHERE m.pack_id = o.pack AND NOT m.propio AND m.fecha > o.fecha)
   ORDER BY o.fecha LIMIT ${MAX_POR_PASADA}`
 
 interface Candidato {
@@ -84,7 +87,7 @@ export async function mensajeAlComprar(db: Pool) {
       try { await sincronizarOrdenes(db, c.id, true, 1) } catch (e) { console.error('[mensaje al comprar] ventas', c.nickname, e instanceof Error ? e.message : e) }
     }
   }
-  const { rows } = await db.query<Candidato>(SQL_CANDIDATOS, [cfg.desde])
+  const { rows } = await db.query<Candidato>(SQL_CANDIDATOS, [cfg.desde, ESPERA_MIN * 60, null])
   let enviados = 0, saltados = 0, errores = 0
   for (const c of rows) {
     const r = await mandarUno(db, c, cfg)
@@ -95,12 +98,23 @@ export async function mensajeAlComprar(db: Pool) {
   return rows.length ? { enviados, saltados, errores } : null
 }
 
+/** 13-11: desde el aviso de la venta (lib/notificacionesML.ts), ya pasados ESPERA_SEG de la compra. Misma regla y mismo
+ *  candado que el cron (una vez por venta). */
+export async function mensajeAlComprarAhora(db: Pool, pack: string) {
+  const cfg = await leerConfigDb(db)
+  if (!cfg.activo || !cfg.desde) return null
+  const { rows: [c] } = await db.query<Candidato>(SQL_CANDIDATOS, [cfg.desde, ESPERA_SEG - 1, pack])
+  return c ? mandarUno(db, c, cfg) : null
+}
+
 async function anotar(db: Pool, pack: string, estado: 'enviado' | 'saltado' | 'error', motivo: string | null, texto: string | null) {
   await db.query(
     `UPDATE ml_bienvenidas SET estado = $2, motivo = $3, texto = COALESCE($4, texto),
             enviado_at = CASE WHEN $2 = 'enviado' THEN NOW() ELSE enviado_at END
      WHERE pack_id = $1::bigint`, [pack, estado, motivo, texto])
 }
+
+const ESCRIBIO = 'El comprador escribió primero: quedó en Por atender'
 
 async function mandarUno(db: Pool, c: Candidato, cfg: ConfigAlComprar): Promise<'enviado' | 'saltado' | 'error'> {
   // UNA vez: se anota antes de mandar. Si otra pasada ya la tomó, no se hace nada.
@@ -110,6 +124,10 @@ async function mandarUno(db: Pool, c: Candidato, cfg: ConfigAlComprar): Promise<
   if (!rowCount) return 'saltado'
   // Staging tiene copias de los tokens de producción: NUNCA manda mensajes reales desde ahí.
   if (process.env.APP_ENV === 'staging') { await anotar(db, c.pack, 'saltado', 'staging: no se manda', null); return 'saltado' }
+  // El comprador ya escribió (lo que ya está guardado): no se manda, así su mensaje queda en «Por atender».
+  const { rowCount: escribio } = await db.query(
+    `SELECT 1 FROM ml_mensajes WHERE pack_id = $1::bigint AND NOT propio AND fecha > $2::timestamptz LIMIT 1`, [c.pack, c.fecha])
+  if (escribio) { await anotar(db, c.pack, 'saltado', ESCRIBIO, null); return 'saltado' }
   try {
     const orden = await mlFetch<{ status?: string; buyer?: { id: number; first_name?: string } }>(db, c.conexion_id, `/orders/${c.id}`)
     if (orden.status === 'cancelled') { await anotar(db, c.pack, 'saltado', 'cancelada', null); return 'saltado' }
@@ -118,7 +136,7 @@ async function mandarUno(db: Pool, c: Candidato, cfg: ConfigAlComprar): Promise<
     const seller = Number(cx.ml_user_id)
     const hilo = await leerHilo(db, c.conexion_id, c.pack, seller, false)
     if (hilo.mensajes.some(m => !m.propio && new Date(m.fecha) > new Date(c.fecha))) {
-      await anotar(db, c.pack, 'saltado', 'el comprador escribió primero', null); return 'saltado'
+      await anotar(db, c.pack, 'saltado', ESCRIBIO, null); return 'saltado'
     }
     const texto = armarTexto(cfg.texto, orden.buyer.first_name || c.comprador_nombre, c.producto)
     await mlFetch(db, c.conexion_id, `/messages/packs/${c.pack}/sellers/${seller}?tag=post_sale`, {
