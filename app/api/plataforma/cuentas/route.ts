@@ -10,18 +10,20 @@ import { PASSWORD_MAX, PASSWORD_MIN, USERNAME_RE } from '@/lib/usuarios'
 // Plataforma → Cuentas: las personas (cuenta única para todos los productos). Solo el
 // dueño de la plataforma. Qué empresas de inventario tiene cada una se ve aquí y se
 // administra en Usuarios de cada empresa.
-/** GET /api/plataforma/cuentas */
-export async function GET() {
+/** GET /api/plataforma/cuentas[?empresa=ID] — ?empresa: solo las personas de esa empresa (ficha de la empresa, 13-11). */
+export async function GET(req: NextRequest) {
   const { error } = await soloDueno()
   if (error) return error
   try {
+    const empresa = Number(req.nextUrl.searchParams.get('empresa')) || null
     const { rows } = await dbGlobal().query(
       `SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.productos, u.last_login,
-              COALESCE((SELECT json_agg(json_build_object('nombre', e.nombre, 'role', ue.role) ORDER BY e.id)
+              COALESCE((SELECT json_agg(json_build_object('id', e.id, 'nombre', e.nombre, 'role', ue.role) ORDER BY e.id)
                           FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
                          WHERE ue.user_id = u.id), '[]'::json) AS empresas
        FROM users u
-       ORDER BY u.is_active DESC, u.username`)
+       WHERE $1::int IS NULL OR EXISTS (SELECT 1 FROM usuario_empresas ue WHERE ue.user_id = u.id AND ue.empresa_id = $1)
+       ORDER BY u.is_active DESC, u.username`, [empresa])
     return NextResponse.json({ cuentas: rows, productos: PRODUCTOS })
   } catch (err) {
     return apiError(err)

@@ -60,7 +60,11 @@ function Desglose({ k }: { k: Pendiente }) {
 const bs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /** Plataforma → Cuentas y cobros (12-11, el dueño): cuánto entra, quién paga, quién vence (y si usa el sistema) y los pagos. */
-export default function CobrosPanel({ inicial = null, onCambio }: { inicial?: unknown; onCambio?: () => void }) {
+export default function CobrosPanel({ inicial = null, onCambio, onAbrir }: { inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void }) {
+  // 13-11 (el dueño): el nombre del cliente abre su ficha (cuenta, plan, usuarios y pagos en un solo panel).
+  const nombre = (id: number, n: string) => onAbrir
+    ? <button onClick={e => { e.preventDefault(); e.stopPropagation(); onAbrir(id) }} className="font-bold hover:underline" title="Abrir la ficha del cliente">{n}</button>
+    : <b>{n}</b>
   const [d, setD] = useState<Datos | null>((inicial as Datos | null) ?? null)
   const [busy, setBusy] = useState<number | null>(null)
   const [rechazo, setRechazo] = useState<{ id: number; motivo: string } | null>(null)
@@ -123,7 +127,7 @@ export default function CobrosPanel({ inicial = null, onCambio }: { inicial?: un
               </a>
             )}
             <div className="flex-1 min-w-0 text-sm space-y-1">
-              <p><b>{k.organizacion}</b> <span className="text-neutral-500">· {k.persona ?? '—'} · {hora(k.creado_at)}</span></p>
+              <p>{nombre(k.organizacion_id, k.organizacion)} <span className="text-neutral-500">· {k.persona ?? '—'} · {hora(k.creado_at)}</span></p>
               <p className="text-xs text-neutral-600">Escalón {ESCALON[k.escalon]}{k.ventas_30d != null ? ` (${k.ventas_30d} ventas el mes pasado)` : ''}</p>
               <Desglose k={k} />
               <p className="text-base font-semibold">{usd(k.monto_usd)}{k.monto_bs ? <span className="font-normal text-neutral-600"> = {bs(k.monto_bs)} (BCV {k.tasa_bcv?.toLocaleString('de-DE', { maximumFractionDigits: 2 })})</span> : null}</p>
@@ -161,7 +165,7 @@ export default function CobrosPanel({ inicial = null, onCambio }: { inicial?: un
               return (
                 <li key={v.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
                   <span className="min-w-0 flex-1">
-                    <b>{v.nombre}</b>{v.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
+                    {nombre(v.id, v.nombre)}{v.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
                     <span className="text-neutral-500"> · {v.estado === 'prueba' ? 'prueba' : PLAN[v.plan ?? ''] ?? v.plan}</span>
                     <span className="block text-[11px] text-neutral-500">
                       <span className={e.mal ? 'text-red-600' : 'text-emerald-700'}>{e.t}</span>{!v.con_ml && ' · sin ML'}
@@ -190,7 +194,7 @@ export default function CobrosPanel({ inicial = null, onCambio }: { inicial?: un
               return (
                 <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
                   <span className="min-w-0 flex-1">
-                    <b>{p.nombre}</b>{p.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
+                    {nombre(p.id, p.nombre)}{p.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
                     <span className="text-neutral-500"> · {PLAN[p.plan ?? ''] ?? p.plan ?? '—'}{p.escalon != null ? ` · ${ESCALON[p.escalon]}` : ''}{p.ciclo ? ` · ${p.ciclo}` : ''}</span>
                     <span className={`block text-[11px] ${e.mal ? 'text-red-600' : 'text-neutral-500'}`}>{e.t}</span>
                   </span>
@@ -213,7 +217,7 @@ export default function CobrosPanel({ inicial = null, onCambio }: { inicial?: un
               <li key={k.id} className="px-3 py-1.5">
                 <details>
                   <summary className="flex flex-wrap justify-between gap-2 cursor-pointer list-none">
-                    <span><b>{k.organizacion}</b> · {k.tipo === 'plan' ? (PLAN[k.plan] ?? k.plan) : TIPO[k.tipo]} · {usd(k.monto_usd)}
+                    <span>{nombre(k.organizacion_id, k.organizacion)} · {k.tipo === 'plan' ? (PLAN[k.plan] ?? k.plan) : TIPO[k.tipo]} · {usd(k.monto_usd)}
                       {k.desde && k.hasta ? <span className="text-neutral-500"> · {ddmm(k.desde)} → {ddmm(k.hasta)}</span> : null}
                       <span className="text-neutral-400"> · ver detalle</span></span>
                     <span className={k.estado === 'aprobado' ? 'text-lime-700' : 'text-red-700'} title={k.motivo ?? undefined}>

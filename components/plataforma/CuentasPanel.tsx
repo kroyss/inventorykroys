@@ -9,7 +9,7 @@ interface Cuenta {
   is_active: boolean
   productos: string[]
   last_login: string | null
-  empresas: { nombre: string; role: string }[]
+  empresas: { id: number; nombre: string; role: string }[]
 }
 
 const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
@@ -21,8 +21,10 @@ function claveInicial() {
 }
 
 /** Plataforma → Cuentas: una cuenta por persona para todos los productos (entra con su
- *  usuario; el correo es para recuperar la clave). Aquí se marca a qué productos entra. */
-export default function CuentasPanel() {
+ *  usuario; el correo es para recuperar la clave). Aquí se marca a qué productos entra.
+ *  13-11 (el dueño, un solo panel por cliente): con `empresaId` se muestra compacto dentro de la ficha de la empresa
+ *  (solo sus personas); sin él es «Cuentas y cobros → Personas», con buscador, y la empresa abre su ficha. */
+export default function CuentasPanel({ empresaId, onAbrirEmpresa }: { empresaId?: number; onAbrirEmpresa?: (id: number) => void } = {}) {
   const [cuentas, setCuentas]     = useState<Cuenta[]>([])
   const [productos, setProductos] = useState<Record<string, string>>({})
   const [nueva, setNueva]         = useState(false)
@@ -31,11 +33,11 @@ export default function CuentasPanel() {
   const [buscar, setBuscar]       = useState('')
 
   const cargar = useCallback(async () => {
-    const r = await fetch('/api/plataforma/cuentas')
+    const r = await fetch(`/api/plataforma/cuentas${empresaId ? `?empresa=${empresaId}` : ''}`)
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setCuentas(d.cuentas); setProductos(d.productos)
-  }, [])
+  }, [empresaId])
   useEffect(() => { cargar() }, [cargar])
 
   const actualizar = async (c: Cuenta, cambios: { email?: string; productos?: string[]; full_name?: string; is_active?: boolean; password?: string }, msg?: string) => {
@@ -84,6 +86,49 @@ También sale de: ${c.empresas.map(e => e.nombre).join(', ')}.` : ''))) return
 
   const q = buscar.trim().toLowerCase()
   const visibles = q ? cuentas.filter(c => `${c.username} ${c.email ?? ''} ${c.full_name ?? ''}`.toLowerCase().includes(q)) : cuentas
+
+  // Dentro de la ficha de la empresa: tarjetas compactas (el panel lateral es angosto).
+  if (empresaId) return (
+    <div className="space-y-2">
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">{error}</div>}
+      {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-3 py-2 rounded text-xs break-words">{aviso}</div>}
+      {!cuentas.length && !error && <p className="text-xs text-neutral-400">Cargando…</p>}
+      {cuentas.map(c => {
+        const rol = c.empresas.find(e => e.id === empresaId)?.role
+        return (
+          <div key={c.id} className={`rounded-lg border border-neutral-200 p-2.5 space-y-1.5 ${!c.is_active ? 'opacity-60' : ''}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate"><span className="font-mono font-medium">{c.username}</span>{rol && <span className="ml-1.5 text-[11px] text-neutral-500">{rol}</span>}</p>
+                <p className="text-[11px] text-neutral-500">
+                  <button onClick={() => cambiarNombre(c)} className="hover:underline" title="Cambiar el nombre">{c.full_name ?? 'agregar nombre…'}</button>
+                  {' · '}
+                  <button onClick={() => cambiarCorreo(c)} className="hover:underline break-all" title="Correo para recuperar la clave">{c.email ?? 'agregar correo…'}</button>
+                </p>
+                <p className="text-[11px] text-neutral-400">{c.last_login ? `Último ingreso: ${new Date(c.last_login).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', timeZone: 'America/Caracas' })}` : 'Nunca entró'}
+                  {c.empresas.length > 1 && ` · también en ${c.empresas.filter(e => e.id !== empresaId).map(e => e.nombre).join(', ')}`}</p>
+              </div>
+              <button onClick={() => actualizar(c, { is_active: !c.is_active })}
+                title={c.is_active ? 'Desactivar: ya no puede entrar (sus datos quedan)' : 'Activar'}
+                className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-600'}`}>
+                {c.is_active ? 'Activa' : 'Desactivada'}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Object.entries(productos).map(([p, desc]) => (
+                <button key={p} onClick={() => alternar(c, p)} title={desc}
+                  className={`px-2 py-0.5 rounded-full text-[11px] border ${c.productos.includes(p) ? 'bg-green-100 border-green-200 text-green-800' : 'bg-white border-neutral-200 text-neutral-400'}`}>
+                  {c.productos.includes(p) ? '✓ ' : ''}{p}
+                </button>
+              ))}
+              <button onClick={() => nuevaClave(c)} className="ml-auto text-xs text-neutral-600 hover:underline">Clave nueva</button>
+            </div>
+          </div>
+        )
+      })}
+      <p className="text-[11px] text-neutral-400">Tocar un producto lo da o lo quita. Agregar personas o cambiar su rol lo hace el admin del cliente en su pantalla Usuarios.</p>
+    </div>
+  )
 
   return (
     <div className="space-y-3">
@@ -137,7 +182,12 @@ También sale de: ${c.empresas.map(e => e.nombre).join(', ')}.` : ''))) return
                   </div>
                 </td>
                 <td className="px-4 py-2 text-xs text-neutral-600">
-                  {c.empresas.length ? c.empresas.map(e => `${e.nombre} (${e.role})`).join(', ') : '—'}
+                  {c.empresas.length ? c.empresas.map((e, i) => (
+                    <span key={e.id}>{i > 0 && ', '}
+                      {onAbrirEmpresa
+                        ? <button onClick={() => onAbrirEmpresa(e.id)} className="text-sky-700 hover:underline" title="Abrir la ficha de la empresa">{e.nombre}</button>
+                        : e.nombre} ({e.role})</span>
+                  )) : '—'}
                 </td>
                 <td className="px-4 py-2">
                   <button onClick={() => actualizar(c, { is_active: !c.is_active })}

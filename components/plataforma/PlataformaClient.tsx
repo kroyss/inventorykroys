@@ -163,7 +163,10 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   // 12-11 (fase 2): Novedades y cursos (antes Contenido), Programas y promos (precios vigentes + historial de Fundadores
   // y Despegue) e Interno con todo lo técnico adentro (IA, Soporte, Telegram, cuentas de personas).
   const [vista, setVista]       = useState<'uso' | 'cuentas' | 'novedades' | 'programas' | 'interno'>('uso')
-  const [interno, setInterno]   = useState<'ia' | 'auto' | 'soporte' | 'telegram' | 'personas'>('ia')
+  const [interno, setInterno]   = useState<'ia' | 'auto' | 'soporte' | 'telegram'>('ia')
+  // 13-11 (el dueño, un solo panel por cliente): Cuentas y cobros tiene Cobros y Personas (antes Interno → Cuentas de
+  // personas); el nombre de un cliente en cualquiera de las dos abre su ficha, que ahora trae también sus usuarios.
+  const [cuentasVer, setCuentasVer] = useState<'cobros' | 'personas'>('cobros')
   const verSoporte = () => { setVista('interno'); setInterno('soporte') }
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('soporte'))
@@ -273,6 +276,12 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   }
 
   const sel = empresas.find(e => e.id === abierta) ?? null
+  // Cobros trae la organización: se abre su primera empresa (la ficha muestra plan, usuarios y pagos de la cuenta).
+  const abrirEmpresa = (id: number) => { setError(null); setAviso(null); setAbierta(id) }
+  const abrirOrganizacion = (orgId: number) => {
+    const e = empresas.filter(x => x.organizacion_id === orgId).sort((a, b) => a.id - b.id)[0]
+    if (e) abrirEmpresa(e.id)
+  }
   // Escape cierra el panel
   useEffect(() => {
     if (abierta == null) return
@@ -315,19 +324,29 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         ))}
       </div>
 
-      {vista === 'cuentas' ? <CobrosPanel inicial={inicial?.cobros ?? null} onCambio={leerPendientes} />
+      {vista === 'cuentas' ? <>
+          <div className="flex flex-wrap gap-1.5">
+            {([['cobros', `Cobros y vencimientos${pendientes.pagos ? ` (${pendientes.pagos})` : ''}`], ['personas', 'Personas (usuarios)']] as const).map(([k, t]) => (
+              <button key={k} onClick={() => setCuentasVer(k)}
+                className={`px-3 py-1 rounded-full text-sm border ${cuentasVer === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
+            ))}
+          </div>
+          {cuentasVer === 'cobros'
+            ? <CobrosPanel inicial={inicial?.cobros ?? null} onCambio={leerPendientes} onAbrir={abrirOrganizacion} />
+            : <CuentasPanel onAbrirEmpresa={abrirEmpresa} />}
+        </>
         : vista === 'novedades' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
         : vista === 'programas' ? <ProgramasPanel hoy={hoy} visitas={inicial?.visitas ?? null} />
         : vista === 'interno' ? <>
           <div className="flex flex-wrap gap-1.5">
             {([['ia', 'Gasto de IA'], ['auto', 'IA automática por cliente'],
-               ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['telegram', 'Telegram'], ['personas', 'Cuentas de personas']] as const).map(([k, t]) => (
+               ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['telegram', 'Telegram']] as const).map(([k, t]) => (
               <button key={k} onClick={() => setInterno(k)}
                 className={`px-3 py-1 rounded-full text-sm border ${interno === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
             ))}
           </div>
           {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel />
-            : interno === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : interno === 'telegram' ? <AvisosTelegramCard /> : <CuentasPanel />}
+            : interno === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : <AvisosTelegramCard />}
         </> : <>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
@@ -439,6 +458,10 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         </div>
       )}
 
+
+      </>}
+
+      {/* 13-11: la ficha se abre desde Uso y desde Cuentas y cobros (Cobros y Personas). */}
       {reactivar && (
         <Reactivar e={reactivar} hoy={hoy} onCancelar={() => setReactivar(null)} onError={msg => { setReactivar(null); setError(msg) }}
           onListo={msg => { setReactivar(null); setAviso(msg); cargar() }} />
@@ -498,6 +521,11 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                     ciclo: sel.ciclo, plan_hasta: sel.plan_hasta, radar_pro_hasta: sel.radar_pro_hasta, radar_mes_hasta: sel.radar_mes_hasta ?? null,
                     empresas: empresas.filter(x => x.organizacion_id === sel.organizacion_id).map(x => ({ id: x.id, nombre: x.nombre })) }}
                   onCambio={msg => { setError(null); setAviso(msg); cargar() }} onError={msg => { setAviso(null); setError(msg) }} />
+              </section>
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Usuarios ({sel.usuarios})</h3>
+                <CuentasPanel key={sel.id} empresaId={sel.id} />
               </section>
 
               {sel.id !== empresaActual && sel.is_active && (
@@ -577,7 +605,6 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
           </aside>
         </div>
       )}
-      </>}
     </div>
   )
 }
