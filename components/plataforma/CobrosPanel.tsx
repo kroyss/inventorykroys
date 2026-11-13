@@ -24,16 +24,6 @@ interface DatosCobro { pago_movil: { banco: string; cedula: string; telefono: st
 interface Datos { pendientes: Pendiente[]; vencen: Vence[]; recientes: Reciente[]; datos: DatosCobro
   pagando?: Pagando[]; ingresos?: { mes: number; pagos_mes: number; anterior: number } }
 
-const DIA = 864e5
-const hoyVE = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' })
-const diasA = (f: string) => Math.round((Date.parse(`${f}T12:00:00Z`) - Date.parse(`${hoyVE()}T12:00:00Z`)) / DIA)
-const entro = (f: string | null) => {
-  if (!f) return { t: 'nunca entró', mal: true }
-  const d = (Date.now() - new Date(f).getTime()) / DIA
-  return { t: d < 1 ? 'entró hoy' : d < 2 ? 'entró ayer' : `entró hace ${Math.round(d)} días`, mal: d > 7 }
-}
-const wa = (n: string) => `https://wa.me/${n.replace(/\D/g, '').replace(/^0/, '58')}`
-const cuando = (d: number) => (d < 0 ? 'venció' : d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`)
 
 const PLAN: Record<string, string> = { esencial: 'Esencial', automatizaciones: 'Automatizaciones', completo: 'Completo' }
 const METODO: Record<string, string> = { pago_movil: 'Pago Móvil', binance: 'Binance' }
@@ -60,7 +50,11 @@ function Desglose({ k }: { k: Pendiente }) {
 const bs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /** Plataforma → Cuentas y cobros (12-11, el dueño): cuánto entra, quién paga, quién vence (y si usa el sistema) y los pagos. */
-export default function CobrosPanel({ inicial = null, onCambio, onAbrir }: { inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void }) {
+// 13-11 (el dueño, Plataforma → Clientes): ya no es pestaña. modo 'pendientes' = los pagos por revisar (se abren desde
+// «Por atender»); modo 'extras' = lo que se mira poco (últimos revisados y datos de cobro), plegado al final de Clientes.
+// Vencen y Pagando como listas aparte se quitaron: son los filtros «Por vencer» y «Pagando» de la lista de clientes.
+export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }: {
+  inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void; modo: 'pendientes' | 'extras' }) {
   // 13-11 (el dueño): el nombre del cliente abre su ficha (cuenta, plan, usuarios y pagos en un solo panel).
   const nombre = (id: number, n: string) => onAbrir
     ? <button onClick={e => { e.preventDefault(); e.stopPropagation(); onAbrir(id) }} className="font-bold hover:underline" title="Abrir la ficha del cliente">{n}</button>
@@ -95,27 +89,16 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir }: { ini
     setEditarDatos(null); setAviso('Datos de cobro guardados: los clientes ya los ven así.'); cargar()
   }
 
-  if (!d) return <p className="text-sm text-neutral-500">Cargando…</p>
+  if (!d) return modo === 'extras' ? null : <p className="text-sm text-neutral-500">Cargando…</p>
   const campo = 'w-full border border-neutral-300 rounded px-2 py-1 text-sm'
-  const pagando = d.pagando ?? []
-  // Lo que entra por mes con lo que paga cada uno hoy (trimestral = su pago ÷ 3).
-  const recurrente = pagando.reduce((a, p) => a + (p.monto ?? 0) / (p.ciclo === 'trimestral' ? 3 : 1), 0)
-  const ing = d.ingresos
 
   return (
-    <div className="space-y-6">
+    <div className={modo === 'pendientes' ? 'space-y-3' : 'space-y-4'}>
       {aviso && <p className="text-sm bg-lime-50 border border-lime-200 text-lime-900 rounded px-3 py-2">{aviso}</p>}
       {error && <p className="text-sm bg-red-50 border border-red-200 text-red-800 rounded px-3 py-2">{error}</p>}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Cifra titulo="Cobrado este mes" valor={ing ? usd(ing.mes) : '—'} detalle={ing ? `${ing.pagos_mes} pago${ing.pagos_mes === 1 ? '' : 's'} · mes anterior ${usd(ing.anterior)}` : ''} />
-        <Cifra titulo="Pagando" valor={String(pagando.length)} detalle={`≈ ${usd(recurrente)} al mes con sus planes`} />
-        <Cifra titulo="Vencen en 7 días" valor={String(d.vencen.length)} detalle={`${d.vencen.filter(v => v.estado === 'activo').length} planes · ${d.vencen.filter(v => v.estado !== 'activo').length} pruebas`} alerta={d.vencen.some(v => diasA(v.vence) <= 1)} />
-        <Cifra titulo="Pagos por revisar" valor={String(d.pendientes.length)} detalle={d.pendientes.length ? 'revísalos abajo' : 'nada pendiente'} alerta={d.pendientes.length > 0} />
-      </div>
-
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-neutral-800">Por revisar ({d.pendientes.length})</h2>
+      {modo === 'pendientes' && <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-neutral-800">Pagos por revisar ({d.pendientes.length})</h2>
         {!d.pendientes.length && <p className="text-sm text-neutral-500">No hay pagos por revisar.</p>}
         {d.pendientes.map(k => (
           <div key={k.id} className="rounded-xl border border-amber-200 bg-white p-3 flex flex-col sm:flex-row gap-3">
@@ -153,62 +136,9 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir }: { ini
             </div>
           </div>
         ))}
-      </section>
+      </section>}
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-neutral-800">Vencen en los próximos 7 días ({d.vencen.length})</h2>
-        <p className="text-xs text-neutral-500">Primero los que usan el sistema: a esos vale la pena escribirles.</p>
-        {!d.vencen.length ? <p className="text-sm text-neutral-500">Ninguna.</p> : (
-          <ul className="text-sm divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
-            {[...d.vencen].sort((a, b) => Number(entro(a.ultima).mal) - Number(entro(b.ultima).mal) || a.vence.localeCompare(b.vence)).map(v => {
-              const e = entro(v.ultima), dd = diasA(v.vence)
-              return (
-                <li key={v.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
-                  <span className="min-w-0 flex-1">
-                    {nombre(v.id, v.nombre)}{v.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
-                    <span className="text-neutral-500"> · {v.estado === 'prueba' ? 'prueba' : PLAN[v.plan ?? ''] ?? v.plan}</span>
-                    <span className="block text-[11px] text-neutral-500">
-                      <span className={e.mal ? 'text-red-600' : 'text-emerald-700'}>{e.t}</span>{!v.con_ml && ' · sin ML'}
-                    </span>
-                  </span>
-                  <span className={`text-xs ${dd <= 1 ? 'font-semibold text-red-700' : 'text-neutral-700'}`}>vence {cuando(dd)} ({ddmm(v.vence)})</span>
-                  <span className="text-xs">{v.ultimo_cobro === 'revision' ? <span className="text-amber-700">reportó pago (por revisar)</span>
-                    : v.ultimo_cobro === 'aprobado' && v.estado === 'activo' ? <span className="text-neutral-500">pagó antes</span>
-                    : <span className="text-neutral-500">no ha reportado</span>}</span>
-                  {v.registro?.whatsapp
-                    ? <a href={wa(v.registro.whatsapp)} target="_blank" rel="noreferrer" className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100">WhatsApp</a>
-                    : v.registro?.telegram ? <a href={`https://t.me/${v.registro.telegram}`} target="_blank" rel="noreferrer" className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-inset ring-sky-200">Telegram</a> : null}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-neutral-800">Pagando ({pagando.length})</h2>
-        {!pagando.length ? <p className="text-sm text-neutral-500">Nadie todavía.</p> : (
-          <ul className="text-sm divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
-            {pagando.map(p => {
-              const e = entro(p.ultima), dd = p.hasta ? diasA(p.hasta) : null
-              return (
-                <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
-                  <span className="min-w-0 flex-1">
-                    {nombre(p.id, p.nombre)}{p.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
-                    <span className="text-neutral-500"> · {PLAN[p.plan ?? ''] ?? p.plan ?? '—'}{p.escalon != null ? ` · ${ESCALON[p.escalon]}` : ''}{p.ciclo ? ` · ${p.ciclo}` : ''}</span>
-                    <span className={`block text-[11px] ${e.mal ? 'text-red-600' : 'text-neutral-500'}`}>{e.t}</span>
-                  </span>
-                  <span className="num text-xs text-neutral-700">{p.monto != null ? usd(p.monto) : '—'}</span>
-                  <span className={`text-xs ${dd != null && dd <= 3 ? 'font-semibold text-amber-700' : 'text-neutral-500'}`}>
-                    {p.hasta ? `hasta ${ddmm(p.hasta)}${dd != null && dd <= 7 ? ` (${cuando(dd)})` : ''}` : 'sin fecha'}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
+      {modo === 'extras' && <>
       <details className="group space-y-2">
         <summary className="cursor-pointer select-none text-sm font-semibold text-neutral-800">Últimos pagos revisados ({d.recientes.length})</summary>
         {!d.recientes.length ? <p className="text-sm text-neutral-500">Todavía ninguno.</p> : (
@@ -269,16 +199,8 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir }: { ini
           </div>
         )}
       </details>
+      </>}
     </div>
   )
 }
 
-function Cifra({ titulo, valor, detalle, alerta = false }: { titulo: string; valor: string; detalle: string; alerta?: boolean }) {
-  return (
-    <div className={`min-w-0 rounded-xl border bg-white px-4 py-3 shadow-sm ${alerta ? 'border-amber-300' : 'border-neutral-200'}`}>
-      <div className="text-xs text-neutral-500">{titulo}</div>
-      <div className="num text-2xl font-semibold text-neutral-900">{valor}</div>
-      <div className="truncate text-xs text-neutral-400" title={detalle}>{detalle}</div>
-    </div>
-  )
-}

@@ -16,7 +16,7 @@ export interface Empresa {
   pagos_me_estado?: 'vinculado' | 'intento' | 'sin_intentar' | null   // en qué quedó la conexión (23-10)
 }
 type Nivel = 'integrado' | 'parcial' | 'sin_uso' | 'no_entra' | 'sin_ventas' | 'sin_conectar'
-type FiltroUso = 'todos' | 'pagando' | 'sin_conectar' | 'por_vencer' | 'dormidos'
+export type FiltroUso = 'todos' | 'pagando' | 'prueba' | 'sin_conectar' | 'por_vencer' | 'dormidos'
 type Orden = 'actividad' | 'ultimo' | 'ventas' | 'nombre'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : null)
@@ -119,16 +119,22 @@ export const CEROS = {
 }
 
 const FILTROS_USO: { k: FiltroUso; t: string }[] = [
-  { k: 'todos', t: 'Todos' }, { k: 'pagando', t: 'Pagando' }, { k: 'sin_conectar', t: 'Sin conectar ML' },
-  { k: 'por_vencer', t: 'Por vencer' }, { k: 'dormidos', t: 'Dormidos (7+ días sin entrar)' },
+  { k: 'todos', t: 'Todos' }, { k: 'pagando', t: 'Pagando' }, { k: 'prueba', t: 'En prueba' }, { k: 'por_vencer', t: 'Por vencer' },
+  { k: 'sin_conectar', t: 'Sin ML' }, { k: 'dormidos', t: 'Dormidos' },
 ]
 
 /** Plataforma → Clientes: la lista de empresas con su uso. Tocar una fila abre su ficha (onAbrir). */
-export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCliente[]; onAbrir: (id: number) => void; abierta: number | null }) {
+/** Lo cobrado (Plataforma → Clientes, 13-11): sale de /api/plataforma/cobros. */
+export interface ResumenCobro { mes: number; pagos_mes: number; anterior: number; recurrente: number }
+const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`
+
+export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro, cobro = null }: {
+  base: BaseCliente[]; onAbrir: (id: number) => void; abierta: number | null
+  filtro: FiltroUso; onFiltro: (f: FiltroUso) => void; cobro?: ResumenCobro | null }) {
   const [dias, setDias] = useState(7)
   const [lista, setLista] = useState<Empresa[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [filtroUso, setFiltroUso] = useState<FiltroUso>('todos')
+  const filtroUso = filtro, setFiltroUso = onFiltro
   const [orden, setOrden] = useState<Orden>('actividad')
 
   useEffect(() => {
@@ -154,7 +160,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
   const esActivo = (x: typeof filas[number]) => x.act > 0
   const esDormido = (x: typeof filas[number]) => !!x.e.cuentas && diasSin(x.e.ultimo_uso ?? x.e.abierta_at) > 7
   const pasa: Record<FiltroUso, (x: typeof filas[number]) => boolean> = {
-    todos: () => true, pagando: x => !!x.b.pagando, dormidos: esDormido, sin_conectar: x => !x.e.cuentas, por_vencer: x => x.b.porVencer,
+    todos: () => true, pagando: x => !!x.b.pagando, prueba: x => !!x.b.prueba, dormidos: esDormido, sin_conectar: x => !x.e.cuentas, por_vencer: x => x.b.porVencer,
   }
   const maxAct = Math.max(1, ...clientes.map(x => x.act))
   const ordenar = (x: typeof filas[number], y: typeof filas[number]) =>
@@ -172,8 +178,8 @@ export default function AdopcionPanel({ base, onAbrir, abierta }: { base: BaseCl
   const TARJETAS: [string, ReactNode, string, boolean?][] = [
     ['En línea ahora', enLinea.length, enLinea.length ? enLinea.map(x => x.b.nombre).join(', ') : 'ningún cliente usando ahora', enLinea.length > 0],
     [`Lo usaron (${dias} días)`, <>{clientes.filter(esActivo).length}<span className="text-sm font-normal text-neutral-400"> / {conectados.length}</span></>, 'de los que tienen ML conectado'],
-    ['Pagando', clientes.filter(x => x.b.pagando).length, `${clientes.filter(x => x.b.pagando && esActivo(x)).length} lo usaron en ${dias} días`],
-    ['En prueba con ML', clientes.filter(x => x.b.prueba && x.e.cuentas).length, `${clientes.filter(x => x.b.prueba && !x.e.cuentas).length} más sin conectar ML`],
+    ['Pagando', clientes.filter(x => x.b.pagando).length, cobro ? `≈ ${usd(cobro.recurrente)} al mes con sus planes` : `${clientes.filter(x => x.b.pagando && esActivo(x)).length} lo usaron en ${dias} días`],
+    ['Cobrado este mes', cobro ? usd(cobro.mes) : '—', cobro ? `${cobro.pagos_mes} pago${cobro.pagos_mes === 1 ? '' : 's'} · mes anterior ${usd(cobro.anterior)}` : ''],
   ]
 
   return (

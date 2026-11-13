@@ -1,18 +1,22 @@
 'use client'
+// Plataforma → ficha del cliente → Personas (13-11-2026, el dueño: un solo panel por cliente). Las personas de ESA empresa,
+// una tarjeta cada una: usuario, rol, nombre, correo y cuándo entró; las acciones en el ⋯ (clave nueva, editar, desactivar,
+// eliminar). Ya no hay tabla aparte de personas: el buscador de Clientes las encuentra por usuario, nombre o correo.
+// Los «productos» por persona no se muestran: a qué entra cada cliente lo deciden los módulos de su empresa.
 import { useCallback, useEffect, useState } from 'react'
+import { RowMenu } from '@/components/ui'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
+import { hace } from './AdopcionPanel'
 
-interface Cuenta {
+interface Persona {
   id: number
   username: string
   email: string | null
   full_name: string | null
   is_active: boolean
-  productos: string[]
-  last_login: string | null
+  entro: string | null
   empresas: { id: number; nombre: string; role: string }[]
 }
-
-const input = 'mt-1 w-full border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white'
 
 function claveInicial() {
   const abc = 'abcdefghjkmnpqrstuvwxyz23456789'
@@ -20,256 +24,143 @@ function claveInicial() {
   return Array.from(r, n => abc[n % abc.length]).join('')
 }
 
-/** Plataforma → Cuentas: una cuenta por persona para todos los productos (entra con su
- *  usuario; el correo es para recuperar la clave). Aquí se marca a qué productos entra.
- *  13-11 (el dueño, un solo panel por cliente): con `empresaId` se muestra compacto dentro de la ficha de la empresa
- *  (solo sus personas); sin él es «Cuentas y cobros → Personas», con buscador, y la empresa abre su ficha. */
-export default function CuentasPanel({ empresaId, onAbrirEmpresa }: { empresaId?: number; onAbrirEmpresa?: (id: number) => void } = {}) {
-  const [cuentas, setCuentas]     = useState<Cuenta[]>([])
-  const [productos, setProductos] = useState<Record<string, string>>({})
-  const [nueva, setNueva]         = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const [aviso, setAviso]         = useState<string | null>(null)
-  const [buscar, setBuscar]       = useState('')
+const ROL: Record<string, string> = { admin: 'Administrador', user: 'Empleado' }
+
+export default function PersonasEmpresa({ empresaId }: { empresaId: number }) {
+  const confirmar = useConfirm()
+  const [personas, setPersonas] = useState<Persona[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<{ id: number; texto: string; clave?: string } | null>(null)
+  const [editando, setEditando] = useState<{ id: number; full_name: string; email: string } | null>(null)
+  const [ocupado, setOcupado] = useState<number | null>(null)
 
   const cargar = useCallback(async () => {
-    const r = await fetch(`/api/plataforma/cuentas${empresaId ? `?empresa=${empresaId}` : ''}`)
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
-    setCuentas(d.cuentas); setProductos(d.productos)
+    const r = await fetch(`/api/plataforma/cuentas?empresa=${empresaId}`).catch(() => null)
+    const d = await r?.json().catch(() => ({}))
+    if (!r?.ok) { setError(d?.error ?? 'No se pudieron cargar las personas'); setPersonas([]); return }
+    setPersonas(d.cuentas)
   }, [empresaId])
   useEffect(() => { cargar() }, [cargar])
 
-  const actualizar = async (c: Cuenta, cambios: { email?: string; productos?: string[]; full_name?: string; is_active?: boolean; password?: string }, msg?: string) => {
-    setError(null); setAviso(null)
-    const r = await fetch(`/api/plataforma/cuentas/${c.id}`, {
+  const guardar = async (p: Persona, cambios: { email?: string; full_name?: string; is_active?: boolean; password?: string }) => {
+    setOcupado(p.id); setError(null)
+    const r = await fetch(`/api/plataforma/cuentas/${p.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'Error'); return }
-    setAviso(msg ?? `${c.username}: guardado`)
-    cargar()
+    }).catch(() => null)
+    const d = await r?.json().catch(() => ({}))
+    setOcupado(null)
+    if (!r?.ok) { setError(d?.error ?? 'No se pudo guardar'); return false }
+    await cargar()
+    return true
   }
 
-  const cambiarCorreo = (c: Cuenta) => {
-    const email = window.prompt(`Correo de ${c.username} (vacío = sin correo)`, c.email ?? '')
-    if (email === null) return
-    actualizar(c, { email: email.trim() })
-  }
-
-  const cambiarNombre = (c: Cuenta) => {
-    const full_name = window.prompt(`Nombre completo de ${c.username}`, c.full_name ?? '')?.trim()
-    if (full_name && full_name !== c.full_name) actualizar(c, { full_name })
-  }
-
-  const nuevaClave = (c: Cuenta) => {
+  const claveNueva = async (p: Persona) => {
+    const ok = await confirmar({ title: `Clave nueva para ${p.username}`, message: 'Se cierran sus sesiones abiertas y tendrá que entrar con la clave nueva. La verás aquí una sola vez.', confirmText: 'Dar clave nueva' })
+    if (!ok) return
     const password = claveInicial()
-    if (!window.confirm(`¿Darle a ${c.username} una clave nueva? Se cierran sus sesiones abiertas y tendrá que entrar con la nueva.`)) return
-    actualizar(c, { password }, `${c.username}: clave nueva ${password} (pásasela por Telegram privado; se muestra solo esta vez).`)
+    if (await guardar(p, { password })) setAviso({ id: p.id, texto: 'Clave nueva (pásasela por Telegram o WhatsApp privado; no se vuelve a mostrar):', clave: password })
   }
 
-  const eliminar = async (c: Cuenta) => {
-    if (!window.confirm(`¿Eliminar la cuenta ${c.username}? No se puede deshacer.` +
-      (c.empresas.length ? `
+  const activar = async (p: Persona) => {
+    if (p.is_active) {
+      const ok = await confirmar({ title: `Desactivar a ${p.username}`, message: 'Ya no podrá entrar. Sus datos quedan y la puedes activar cuando quieras.', confirmText: 'Desactivar', danger: true })
+      if (!ok) return
+    }
+    if (await guardar(p, { is_active: !p.is_active })) setAviso({ id: p.id, texto: p.is_active ? 'Desactivada: ya no puede entrar.' : 'Activada: ya puede entrar.' })
+  }
 
-También sale de: ${c.empresas.map(e => e.nombre).join(', ')}.` : ''))) return
-    setError(null); setAviso(null)
-    const r = await fetch(`/api/plataforma/cuentas/${c.id}`, { method: 'DELETE' })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'No se pudo eliminar'); return }
-    setAviso(`${c.username}: eliminada`)
+  const eliminar = async (p: Persona) => {
+    const otras = p.empresas.filter(e => e.id !== empresaId)
+    const ok = await confirmar({
+      title: `Eliminar a ${p.username}`, danger: true, confirmText: 'Eliminar',
+      message: `No se puede deshacer.${otras.length ? `\nTambién sale de: ${otras.map(e => e.nombre).join(', ')}.` : ''}\nSolo se puede si no registró movimientos; si no, desactívala.`,
+    })
+    if (!ok) return
+    setOcupado(p.id); setError(null)
+    const r = await fetch(`/api/plataforma/cuentas/${p.id}`, { method: 'DELETE' }).catch(() => null)
+    const d = await r?.json().catch(() => ({}))
+    setOcupado(null)
+    if (!r?.ok) { setError(d?.error ?? 'No se pudo eliminar'); return }
     cargar()
   }
 
-  const alternar = (c: Cuenta, p: string) =>
-    actualizar(c, { productos: c.productos.includes(p) ? c.productos.filter(x => x !== p) : [...c.productos, p] })
+  const guardarEdicion = async (p: Persona) => {
+    if (!editando) return
+    const cambios: { full_name?: string; email?: string } = {}
+    if (editando.full_name.trim() && editando.full_name.trim() !== (p.full_name ?? '')) cambios.full_name = editando.full_name.trim()
+    if (editando.email.trim() !== (p.email ?? '')) cambios.email = editando.email.trim()
+    if (!Object.keys(cambios).length) { setEditando(null); return }
+    if (await guardar(p, cambios)) { setEditando(null); setAviso({ id: p.id, texto: 'Guardado.' }) }
+  }
 
-  const q = buscar.trim().toLowerCase()
-  const visibles = q ? cuentas.filter(c => `${c.username} ${c.email ?? ''} ${c.full_name ?? ''}`.toLowerCase().includes(q)) : cuentas
+  if (!personas) return <div className="h-16 animate-pulse rounded-lg bg-neutral-100" />
 
-  // Dentro de la ficha de la empresa: tarjetas compactas (el panel lateral es angosto).
-  if (empresaId) return (
+  return (
     <div className="space-y-2">
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">{error}</div>}
-      {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-3 py-2 rounded text-xs break-words">{aviso}</div>}
-      {!cuentas.length && !error && <p className="text-xs text-neutral-400">Cargando…</p>}
-      {cuentas.map(c => {
-        const rol = c.empresas.find(e => e.id === empresaId)?.role
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+      {!personas.length && !error && <p className="text-xs text-neutral-400">Sin personas.</p>}
+      {personas.map(p => {
+        const rol = p.empresas.find(e => e.id === empresaId)?.role
+        const otras = p.empresas.filter(e => e.id !== empresaId)
+        const edita = editando?.id === p.id
         return (
-          <div key={c.id} className={`rounded-lg border border-neutral-200 p-2.5 space-y-1.5 ${!c.is_active ? 'opacity-60' : ''}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate"><span className="font-mono font-medium">{c.username}</span>{rol && <span className="ml-1.5 text-[11px] text-neutral-500">{rol}</span>}</p>
-                <p className="text-[11px] text-neutral-500">
-                  <button onClick={() => cambiarNombre(c)} className="hover:underline" title="Cambiar el nombre">{c.full_name ?? 'agregar nombre…'}</button>
-                  {' · '}
-                  <button onClick={() => cambiarCorreo(c)} className="hover:underline break-all" title="Correo para recuperar la clave">{c.email ?? 'agregar correo…'}</button>
-                </p>
-                <p className="text-[11px] text-neutral-400">{c.last_login ? `Último ingreso: ${new Date(c.last_login).toLocaleDateString('es-VE', { day: 'numeric', month: 'short', timeZone: 'America/Caracas' })}` : 'Nunca entró'}
-                  {c.empresas.length > 1 && ` · también en ${c.empresas.filter(e => e.id !== empresaId).map(e => e.nombre).join(', ')}`}</p>
+          <div key={p.id} className={`rounded-xl border bg-white p-3 ${p.is_active ? 'border-neutral-200' : 'border-dashed border-neutral-300 bg-neutral-50'} ${ocupado === p.id ? 'opacity-60' : ''}`}>
+            <div className="flex items-start gap-3">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase ${p.is_active ? 'bg-lime-100 text-lime-800' : 'bg-neutral-200 text-neutral-500'}`} aria-hidden>
+                {(p.full_name ?? p.username).slice(0, 1)}
               </div>
-              <button onClick={() => actualizar(c, { is_active: !c.is_active })}
-                title={c.is_active ? 'Desactivar: ya no puede entrar (sus datos quedan)' : 'Activar'}
-                className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-600'}`}>
-                {c.is_active ? 'Activa' : 'Desactivada'}
-              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="truncate font-medium text-neutral-900">{p.full_name ?? p.username}</span>
+                  {rol && <span className="rounded-full bg-neutral-100 px-2 py-px text-[10px] font-medium text-neutral-600">{ROL[rol] ?? rol}</span>}
+                  {!p.is_active && <span className="rounded-full bg-neutral-200 px-2 py-px text-[10px] font-medium text-neutral-600">Desactivada</span>}
+                </div>
+                <p className="truncate font-mono text-xs text-neutral-500">{p.username}</p>
+                <p className="truncate text-xs text-neutral-500">{p.email ?? <span className="text-amber-700">sin correo (no puede recuperar la clave)</span>}</p>
+                <p className="text-[11px] text-neutral-400">
+                  {p.entro ? `Entró ${hace(p.entro)}` : 'Nunca entró'}
+                  {otras.length > 0 && ` · también en ${otras.map(e => e.nombre).join(', ')}`}
+                </p>
+              </div>
+              <RowMenu items={[
+                { label: 'Clave nueva', onClick: () => claveNueva(p) },
+                { label: 'Editar nombre y correo', onClick: () => { setAviso(null); setEditando({ id: p.id, full_name: p.full_name ?? '', email: p.email ?? '' }) } },
+                { label: p.is_active ? 'Desactivar' : 'Activar', onClick: () => activar(p) },
+                { label: 'Eliminar…', onClick: () => eliminar(p), danger: true },
+              ]} />
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {Object.entries(productos).map(([p, desc]) => (
-                <button key={p} onClick={() => alternar(c, p)} title={desc}
-                  className={`px-2 py-0.5 rounded-full text-[11px] border ${c.productos.includes(p) ? 'bg-green-100 border-green-200 text-green-800' : 'bg-white border-neutral-200 text-neutral-400'}`}>
-                  {c.productos.includes(p) ? '✓ ' : ''}{p}
-                </button>
-              ))}
-              <button onClick={() => nuevaClave(c)} className="ml-auto text-xs text-neutral-600 hover:underline">Clave nueva</button>
-            </div>
+
+            {edita && editando && (
+              <form onSubmit={e => { e.preventDefault(); guardarEdicion(p) }} className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
+                <label className="block text-[11px] text-neutral-500">Nombre
+                  <input autoFocus value={editando.full_name} onChange={e => setEditando({ ...editando, full_name: e.target.value })}
+                    className="mt-0.5 w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+                </label>
+                <label className="block text-[11px] text-neutral-500">Correo (para recuperar la clave)
+                  <input type="email" value={editando.email} onChange={e => setEditando({ ...editando, email: e.target.value })} placeholder="vacío = sin correo"
+                    className="mt-0.5 w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setEditando(null)} className="btn-secondary text-xs">Cancelar</button>
+                  <button type="submit" disabled={ocupado === p.id} className="btn-primary text-xs">{ocupado === p.id ? 'Guardando…' : 'Guardar'}</button>
+                </div>
+              </form>
+            )}
+
+            {aviso?.id === p.id && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-lime-200 bg-lime-50 px-3 py-2 text-xs text-lime-900">
+                <span className="min-w-0 flex-1">{aviso.texto}</span>
+                {aviso.clave && <>
+                  <code className="rounded bg-white px-2 py-0.5 font-mono text-sm text-neutral-900 ring-1 ring-lime-200">{aviso.clave}</code>
+                  <button type="button" onClick={() => navigator.clipboard?.writeText(aviso.clave!).catch(() => {})} className="font-medium underline">Copiar</button>
+                </>}
+                <button type="button" onClick={() => setAviso(null)} className="text-lime-700 hover:text-lime-900" aria-label="Cerrar">✕</button>
+              </div>
+            )}
           </div>
         )
       })}
-      <p className="text-[11px] text-neutral-400">Tocar un producto lo da o lo quita. Agregar personas o cambiar su rol lo hace el admin del cliente en su pantalla Usuarios.</p>
+      <p className="text-[11px] text-neutral-400">Agregar personas o cambiar su rol lo hace el administrador del cliente en su pantalla Usuarios.</p>
     </div>
-  )
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar usuario, nombre o correo…"
-          className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-72" />
-        <button onClick={() => { setNueva(true); setError(null) }} className="btn-primary text-sm ml-auto">+ Nueva cuenta</button>
-      </div>
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
-      {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}
-      {nueva && <NuevaCuenta productos={productos} onCancelar={() => setNueva(false)}
-        onCreada={msg => { setNueva(false); setAviso(msg); cargar() }} />}
-
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-xs text-neutral-500">
-            <tr>
-              <th className="px-4 py-2 text-left">Usuario</th>
-              <th className="px-4 py-2 text-left">Nombre</th>
-              <th className="px-4 py-2 text-left">Correo (recuperar clave)</th>
-              <th className="px-4 py-2 text-left">Productos</th>
-              <th className="px-4 py-2 text-left">Empresas de inventario</th>
-              <th className="px-4 py-2 text-left">Estado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.map(c => (
-              <tr key={c.id} className={`border-t border-neutral-100 align-top ${!c.is_active ? 'opacity-50' : ''}`}>
-                <td className="px-4 py-2 font-mono">{c.username}</td>
-                <td className="px-4 py-2">
-                  <button onClick={() => cambiarNombre(c)} className="hover:underline text-left" title="Cambiar el nombre">
-                    {c.full_name ?? <span className="text-neutral-400">agregar…</span>} <span className="text-neutral-400 text-xs">✏️</span>
-                  </button>
-                </td>
-                <td className="px-4 py-2">
-                  <button onClick={() => cambiarCorreo(c)} className="hover:underline text-left" title="Cambiar correo">
-                    {c.email ?? <span className="text-neutral-400">agregar…</span>}
-                  </button>
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(productos).map(([p, desc]) => (
-                      <button key={p} onClick={() => alternar(c, p)} title={desc}
-                        className={`px-2 py-0.5 rounded-full text-xs border ${
-                          c.productos.includes(p) ? 'bg-green-100 border-green-200 text-green-800' : 'bg-white border-neutral-200 text-neutral-400'
-                        }`}>
-                        {c.productos.includes(p) ? '✓ ' : ''}{p}
-                      </button>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-2 text-xs text-neutral-600">
-                  {c.empresas.length ? c.empresas.map((e, i) => (
-                    <span key={e.id}>{i > 0 && ', '}
-                      {onAbrirEmpresa
-                        ? <button onClick={() => onAbrirEmpresa(e.id)} className="text-sky-700 hover:underline" title="Abrir la ficha de la empresa">{e.nombre}</button>
-                        : e.nombre} ({e.role})</span>
-                  )) : '—'}
-                </td>
-                <td className="px-4 py-2">
-                  <button onClick={() => actualizar(c, { is_active: !c.is_active })}
-                    title={c.is_active ? 'Desactivar: ya no puede entrar (sus datos quedan)' : 'Activar'}
-                    className={`px-2 py-0.5 rounded-full text-xs ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-600'}`}>
-                    {c.is_active ? 'Activa' : 'Desactivada'}
-                  </button>
-                </td>
-                <td className="px-4 py-2 text-right whitespace-nowrap">
-                  <button onClick={() => nuevaClave(c)} className="text-xs text-neutral-600 hover:underline mr-3">Clave nueva</button>
-                  <button onClick={() => eliminar(c)} className="text-xs text-red-600 hover:underline">Eliminar</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-neutral-500">
-        Cada persona entra con su <b>usuario</b> a todos los productos que tenga marcados. El correo solo sirve para recuperar la clave.
-        Desactivar la saca de todo (sus datos quedan). Eliminar solo se puede si no registró movimientos; si no, desactívala.
-        El acceso a empresas de inventario (y su rol) se maneja en Usuarios de cada empresa.
-      </p>
-    </div>
-  )
-}
-
-function NuevaCuenta({ productos, onCancelar, onCreada }: {
-  productos: Record<string, string>; onCancelar: () => void; onCreada: (msg: string) => void
-}) {
-  const [f, setF] = useState({ username: '', email: '', full_name: '', password: claveInicial(), productos: ['radar'] })
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const crear = async () => {
-    setGuardando(true); setError(null)
-    const r = await fetch('/api/plataforma/cuentas', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f),
-    })
-    const d = await r.json().catch(() => ({}))
-    setGuardando(false)
-    if (!r.ok) { setError(d.error ?? 'Error'); return }
-    onCreada(`Cuenta "${f.username}" creada. Entra con ese usuario y la contraseña ${f.password}.`)
-  }
-
-  return (
-    <section className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
-      <h2 className="text-sm font-semibold text-neutral-800">Nueva cuenta</h2>
-      <p className="text-xs text-neutral-500">Para alguien que entra solo al Radar (u otro producto sin empresa de inventario). Para inventario, crea la empresa o el usuario desde la empresa.</p>
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">{error}</div>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="text-xs text-neutral-600">Nombre completo
-          <input className={input} value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} />
-        </label>
-        <label className="text-xs text-neutral-600">Usuario (para entrar)
-          <input className={`${input} font-mono`} value={f.username} autoComplete="off"
-            onChange={e => setF({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') })} />
-        </label>
-        <label className="text-xs text-neutral-600">Correo (para recuperar la clave)
-          <input className={input} value={f.email} type="email" onChange={e => setF({ ...f, email: e.target.value })} />
-        </label>
-        <label className="text-xs text-neutral-600">Contraseña inicial
-          <div className="flex gap-2">
-            <input className={`${input} font-mono`} value={f.password} autoComplete="new-password" onChange={e => setF({ ...f, password: e.target.value })} />
-            <button type="button" onClick={() => setF({ ...f, password: claveInicial() })} className="btn-secondary text-xs mt-1">Otra</button>
-          </div>
-        </label>
-        <div className="text-xs text-neutral-600">Productos
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {Object.entries(productos).map(([p, desc]) => (
-              <label key={p} className="flex items-center gap-1 border border-neutral-200 rounded px-2 py-1" title={desc}>
-                <input type="checkbox" checked={f.productos.includes(p)}
-                  onChange={() => setF({ ...f, productos: f.productos.includes(p) ? f.productos.filter(x => x !== p) : [...f.productos, p] })} />
-                {p}
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancelar} className="btn-secondary text-sm">Cancelar</button>
-        <button onClick={crear} disabled={guardando} className="btn-primary text-sm">{guardando ? 'Creando…' : 'Crear cuenta'}</button>
-      </div>
-    </section>
   )
 }

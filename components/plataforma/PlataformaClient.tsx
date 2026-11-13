@@ -4,14 +4,14 @@ import { usePrimera } from '@/lib/primera'
 import { useSession } from 'next-auth/react'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import CuentasPanel from './CuentasPanel'
+import PersonasEmpresa from './CuentasPanel'
 import ProgramasPanel from './ProgramasPanel'
 import AvisosTelegramCard from './AvisosTelegramCard'
 import InternoPanel from './InternoPanel'
 import IaClientesPanel from './IaClientesPanel'
 import NovedadesCard from './NovedadesCard'
 import AprendizajePanel from './AprendizajePanel'
-import AdopcionPanel from './AdopcionPanel'
+import AdopcionPanel, { type FiltroUso, type ResumenCobro } from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
 import CobrosPanel from './CobrosPanel'
@@ -30,6 +30,7 @@ interface Empresa {
   organizacion: string
   usuarios: number
   admins: string | null
+  personas?: string | null   // usuario, nombre y correo de su gente (para el buscador)
   estado: EstadoCuenta
   prueba_hasta: string | null
   prueba_dias: number | null
@@ -162,17 +163,18 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   // y los pagos: antes repartido en Hoy, Clientes y Cobros).
   // 12-11 (fase 2): Novedades y cursos (antes Contenido), Programas y promos (precios vigentes + historial de Fundadores
   // y Despegue) e Interno con todo lo técnico adentro (IA, Soporte, Telegram, cuentas de personas).
-  const [vista, setVista]       = useState<'uso' | 'cuentas' | 'novedades' | 'programas' | 'interno'>('uso')
+  const [vista, setVista]       = useState<'uso' | 'novedades' | 'programas' | 'interno'>('uso')
   const [interno, setInterno]   = useState<'ia' | 'auto' | 'soporte' | 'telegram'>('ia')
-  // 13-11 (el dueño, un solo panel por cliente): Cuentas y cobros tiene Cobros y Personas (antes Interno → Cuentas de
-  // personas); el nombre de un cliente en cualquiera de las dos abre su ficha, que ahora trae también sus usuarios.
-  const [cuentasVer, setCuentasVer] = useState<'cobros' | 'personas'>('cobros')
+  // 13-11 (el dueño, un solo panel por cliente): «Clientes» junta Uso y Cuentas y cobros. Los pagos por revisar se abren
+  // desde «Por atender»; Vencen/Pagando son filtros de la lista; las personas viven en la ficha y el buscador las encuentra.
+  const [filtroUso, setFiltroUso] = useState<FiltroUso>('todos')
+  const [verPagos, setVerPagos] = useState(false)
   const verSoporte = () => { setVista('interno'); setInterno('soporte') }
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('soporte'))
     if (id) { setCasoSoporte(id); setVista('interno'); setInterno('soporte') }
     // ?vista=cobros: el botón del aviso de Telegram de un pago reportado (mig. 141).
-    if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVista('cuentas')
+    if (new URLSearchParams(window.location.search).get('vista') === 'cobros') setVerPagos(true)
   }, [])
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
@@ -187,14 +189,19 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   // Lo que espera por ti (franja de Uso y número en las pestañas): pagos reportados y casos de soporte abiertos.
   const [pendientes, setPendientes] = useState<{ pagos: number; casos: number }>(() => ({
     pagos: ((inicial?.cobros as { pendientes?: unknown[] } | null)?.pendientes ?? []).length, casos: 0 }))
+  const [cobro, setCobro] = useState<ResumenCobro | null>(() => resumenCobro(inicial?.cobros))
   const leerPendientes = useCallback(() => {
     Promise.all([
       fetch('/api/plataforma/cobros').then(r => (r.ok ? r.json() : null)).catch(() => null),
       fetch('/api/plataforma/casos-soporte').then(r => (r.ok ? r.json() : null)).catch(() => null),
-    ]).then(([c, s]) => setPendientes(p => ({
-      pagos: c?.pendientes ? c.pendientes.length : p.pagos,
-      casos: s?.casos ? s.casos.filter((x: { estado: string }) => x.estado === 'abierto').length : p.casos,
-    })))
+    ]).then(([c, s]) => {
+      setPendientes(p => ({
+        pagos: c?.pendientes ? c.pendientes.length : p.pagos,
+        casos: s?.casos ? s.casos.filter((x: { estado: string }) => x.estado === 'abierto').length : p.casos,
+      }))
+      const r = resumenCobro(c)
+      if (r) setCobro(r)
+    })
   }, [])
   useEffect(() => { leerPendientes(); const t = setInterval(leerPendientes, 120_000); return () => clearInterval(t) }, [leerPendientes])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -291,6 +298,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   }, [abierta])
   const q = buscar.trim().toLowerCase()
   const coincide = (e: Empresa) => !q || e.nombre.toLowerCase().includes(q) || (e.admins ?? '').toLowerCase().includes(q) || e.organizacion.toLowerCase().includes(q)
+    || (e.personas ?? '').toLowerCase().includes(q)
   // 12-11 (el dueño): los de solo Radar no piden seguimiento: van plegados aparte, como los inactivos.
   // 13-11: con la prueba de 15 días (más módulos que el Radar) ya no cuenta como «Solo Radar».
   const soloRadar = (e: Empresa) => e.origen === 'radar' && e.estado === 'prueba' && soloRadarModulos(e.modulos)
@@ -315,7 +323,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {([['uso', `Uso${empresas.length ? ` (${clientesActivos})` : ''}`], ['cuentas', `Cuentas y cobros${pendientes.pagos ? ` (${pendientes.pagos})` : ''}`],
+        {([['uso', `Clientes${empresas.length ? ` (${clientesActivos})` : ''}${pendientes.pagos ? ` · 💳 ${pendientes.pagos}` : ''}`],
            ['novedades', 'Novedades y cursos'], ['programas', 'Programas y promos'], ['interno', `Interno${pendientes.casos ? ` (${pendientes.casos})` : ''}`]] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)}
             className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
@@ -324,18 +332,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         ))}
       </div>
 
-      {vista === 'cuentas' ? <>
-          <div className="flex flex-wrap gap-1.5">
-            {([['cobros', `Cobros y vencimientos${pendientes.pagos ? ` (${pendientes.pagos})` : ''}`], ['personas', 'Personas (usuarios)']] as const).map(([k, t]) => (
-              <button key={k} onClick={() => setCuentasVer(k)}
-                className={`px-3 py-1 rounded-full text-sm border ${cuentasVer === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
-            ))}
-          </div>
-          {cuentasVer === 'cobros'
-            ? <CobrosPanel inicial={inicial?.cobros ?? null} onCambio={leerPendientes} onAbrir={abrirOrganizacion} />
-            : <CuentasPanel onAbrirEmpresa={abrirEmpresa} />}
-        </>
-        : vista === 'novedades' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
+      {vista === 'novedades' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
         : vista === 'programas' ? <ProgramasPanel hoy={hoy} visitas={inicial?.visitas ?? null} />
         : vista === 'interno' ? <>
           <div className="flex flex-wrap gap-1.5">
@@ -365,8 +362,8 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
           {totalRadar.length > 0 && <span className="text-neutral-400"> · {totalRadar.length} solo Radar</span>}
           {totalInactivas.length > 0 && <span className="text-neutral-400"> · {totalInactivas.length} inactivos guardados abajo</span>}
         </p>
-        <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Buscar empresa o admin…"
-          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-64" />
+        <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Buscar empresa, usuario, nombre o correo…"
+          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-80" />
       </div>
 
       {/* Lo que espera por ti: solo aparece si hay algo. */}
@@ -376,9 +373,9 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
           return !!f && diasHasta(f, hoy) <= 1
         })())
         const items: [string, () => void][] = []
-        if (pendientes.pagos) items.push([`💳 ${pendientes.pagos} pago${pendientes.pagos === 1 ? '' : 's'} por revisar`, () => setVista('cuentas')])
+        if (pendientes.pagos) items.push([`💳 ${pendientes.pagos} pago${pendientes.pagos === 1 ? '' : 's'} por revisar`, () => setVerPagos(v => !v)])
         if (pendientes.casos) items.push([`🆘 ${pendientes.casos} caso${pendientes.casos === 1 ? '' : 's'} de soporte abierto${pendientes.casos === 1 ? '' : 's'}`, verSoporte])
-        if (vencenYa.length) items.push([`⏳ ${vencenYa.length} vence${vencenYa.length === 1 ? '' : 'n'} hoy o mañana`, () => setVista('cuentas')])
+        if (vencenYa.length) items.push([`⏳ ${vencenYa.length} vence${vencenYa.length === 1 ? '' : 'n'} hoy o mañana`, () => setFiltroUso('por_vencer')])
         if (!items.length) return null
         return (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
@@ -392,7 +389,14 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
 
       {/* Una sola lista (2026-10-15): cada empresa con su estado de cuenta y su uso del sistema; la ficha
           (módulos, IA, acciones) se abre al tocarla, como antes. */}
-      <AdopcionPanel abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
+      {verPagos && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+          <div className="mb-2 flex justify-end"><button onClick={() => setVerPagos(false)} className="text-xs text-neutral-500 hover:text-neutral-800">Ocultar ✕</button></div>
+          <CobrosPanel modo="pendientes" inicial={inicial?.cobros ?? null} onCambio={() => { leerPendientes(); cargar() }} onAbrir={abrirOrganizacion} />
+        </div>
+      )}
+
+      <AdopcionPanel filtro={filtroUso} onFiltro={setFiltroUso} cobro={cobro} abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
         base={activas.map(e => ({
           id: e.id, nombre: e.nombre, activa: true, pagando: e.estado === 'activo', prueba: e.estado === 'prueba',
           porVencer: (e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5)
@@ -458,10 +462,11 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         </div>
       )}
 
-
+      {/* Lo de cobros que se mira poco: plegado al final. */}
+      <CobrosPanel modo="extras" inicial={inicial?.cobros ?? null} onCambio={leerPendientes} onAbrir={abrirOrganizacion} />
       </>}
 
-      {/* 13-11: la ficha se abre desde Uso y desde Cuentas y cobros (Cobros y Personas). */}
+      {/* 13-11: la ficha se abre desde la lista, los pagos por revisar y el buscador. */}
       {reactivar && (
         <Reactivar e={reactivar} hoy={hoy} onCancelar={() => setReactivar(null)} onError={msg => { setReactivar(null); setError(msg) }}
           onListo={msg => { setReactivar(null); setAviso(msg); cargar() }} />
@@ -480,7 +485,6 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                 <div className="text-xs text-neutral-500">
                   {sel.country} · {sel.organizacion} · {sel.usuarios} usuario{sel.usuarios === 1 ? '' : 's'}
                 </div>
-                {sel.admins && <div className="text-xs text-neutral-500 font-mono mt-0.5">Admin: {sel.admins}</div>}
               </div>
               <button onClick={() => setAbierta(null)} className="text-neutral-400 hover:text-neutral-700 text-xl leading-none">✕</button>
             </div>
@@ -515,6 +519,11 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
               </section>
 
               <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Personas ({sel.usuarios})</h3>
+                <PersonasEmpresa key={sel.id} empresaId={sel.id} />
+              </section>
+
+              <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Plan y pagos</h3>
                 <PlanCliente key={sel.organizacion_id} hoy={hoy}
                   d={{ organizacion_id: sel.organizacion_id, fundador: sel.fundador, estado: sel.estado, plan: sel.plan, escalon: sel.escalon,
@@ -523,24 +532,6 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                   onCambio={msg => { setError(null); setAviso(msg); cargar() }} onError={msg => { setAviso(null); setError(msg) }} />
               </section>
 
-              <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Usuarios ({sel.usuarios})</h3>
-                <CuentasPanel key={sel.id} empresaId={sel.id} />
-              </section>
-
-              {sel.id !== empresaActual && sel.is_active && (
-                <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Ver como cliente</h3>
-                  <VerComoCliente key={sel.id} empresaId={sel.id} />
-                </section>
-              )}
-
-              {sel.estado !== 'propietario' && (
-                <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Historia</h3>
-                  <Historia key={`${sel.organizacion_id}-${sel.estado}-${sel.prueba_hasta}-${sel.is_active}`} organizacionId={sel.organizacion_id} />
-                </section>
-              )}
 
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Módulos</h3>
@@ -576,6 +567,20 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                 <LimiteIA key={`${sel.id}-${sel.ia_limite_mes}`} valor={sel.ia_limite_mes} onGuardar={v => actualizar(sel, { ia_limite_mes: v })} />
               </section>
 
+              {/* Lo que se mira poco: plegado. */}
+              {sel.estado !== 'propietario' && (
+                <details className="group border-t border-neutral-100 pt-3">
+                  <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-neutral-500">Historia</summary>
+                  <div className="mt-2"><Historia key={`${sel.organizacion_id}-${sel.estado}-${sel.prueba_hasta}-${sel.is_active}`} organizacionId={sel.organizacion_id} /></div>
+                </details>
+              )}
+              {sel.id !== empresaActual && sel.is_active && (
+                <details className="group border-t border-neutral-100 pt-3">
+                  <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-neutral-500">Ver como cliente</summary>
+                  <div className="mt-2"><VerComoCliente key={sel.id} empresaId={sel.id} /></div>
+                </details>
+              )}
+
               {/* Acciones delicadas: al fondo y separadas */}
               <section className="border-t border-neutral-100 pt-4 space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Acciones</h3>
@@ -607,6 +612,14 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
       )}
     </div>
   )
+}
+
+/** Lo cobrado para las cifras de Clientes (de /api/plataforma/cobros): este mes y lo que entra al mes con los planes de hoy. */
+function resumenCobro(c: unknown): ResumenCobro | null {
+  const d = c as { ingresos?: { mes: number; pagos_mes: number; anterior: number }; pagando?: { monto: number | null; ciclo: string | null }[] } | null
+  if (!d?.ingresos) return null
+  const recurrente = (d.pagando ?? []).reduce((a, p) => a + (p.monto ?? 0) / (p.ciclo === 'trimestral' ? 3 : 1), 0)
+  return { ...d.ingresos, recurrente }
 }
 
 function NuevaEmpresa({ modulos, onCancelar, onCreada }: {

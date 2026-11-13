@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     const empresa = Number(req.nextUrl.searchParams.get('empresa')) || null
     const { rows } = await dbGlobal().query(
-      `SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.productos, u.last_login,
+      `SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.productos, u.last_login, COALESCE(u.ultima_actividad, u.last_login) AS entro,
               COALESCE((SELECT json_agg(json_build_object('id', e.id, 'nombre', e.nombre, 'role', ue.role) ORDER BY e.id)
                           FROM usuario_empresas ue JOIN empresas e ON e.id = ue.empresa_id
                          WHERE ue.user_id = u.id), '[]'::json) AS empresas

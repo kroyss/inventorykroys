@@ -49,7 +49,10 @@ export async function GET() {
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
               (SELECT string_agg(u.username, ', ' ORDER BY u.username)
                  FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
-                 WHERE ue.empresa_id = e.id AND ue.role = 'admin') AS admins
+                 WHERE ue.empresa_id = e.id AND ue.role = 'admin') AS admins,
+              -- 13-11: para el buscador de Clientes (encuentra la empresa por usuario, nombre o correo de su gente).
+              (SELECT string_agg(concat_ws(' ', u.username, u.full_name, u.email), ' ')
+                 FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id WHERE ue.empresa_id = e.id) AS personas
        FROM empresas e JOIN organizaciones o ON o.id = e.organizacion_id
        LEFT JOIN plataforma_uso_clientes() u ON u.empresa_id = e.id
        ORDER BY o.nombre, e.id`)
