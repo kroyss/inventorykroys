@@ -8,12 +8,13 @@ const Schema = z.object({
   full_name: z.string().trim().min(2).max(100).optional(),
   role:      z.enum(['admin', 'user']).optional(),
   is_active: z.boolean().optional(),
+  email:     z.string().trim().toLowerCase().email('Revisa el correo').max(120).or(z.literal('')).optional(),   // '' = quitarlo
   // Permisos del usuario en ESTA empresa (lib/permisos.ts). null = volver a los de su rol.
   permisos:  z.array(z.enum(TODOS as [string, ...string[]])).max(TODOS.length).nullable().optional(),
 })
 
 /**
- * PUT /api/users/[id] — nombre, rol, activo y permisos (admin).
+ * PUT /api/users/[id] — nombre, correo, rol, activo y permisos (admin).
  * El rol es el de ESTA empresa (usuario_empresas) y se aplica en el siguiente request.
  * Desactivar es global (la persona no entra a ninguna empresa) y cierra sus sesiones.
  * Protecciones: no te puedes desactivar ni quitar el admin a ti mismo, y siempre queda
@@ -48,15 +49,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       if (n === 0) return NextResponse.json({ error: 'Tiene que quedar al menos un admin activo' }, { status: 400 })
     }
 
+    if (body.email) {
+      const { rows: [dup] } = await db.query(`SELECT 1 FROM users WHERE lower(email) = $1 AND id <> $2`, [body.email, u.id])
+      if (dup) return NextResponse.json({ error: 'Ese correo ya está en otra cuenta' }, { status: 400 })
+    }
+
     const desactiva = body.is_active !== undefined && body.is_active !== u.is_active
     await db.query('BEGIN')
     await db.query(
       `UPDATE users SET
          full_name = COALESCE($2, full_name),
          is_active = COALESCE($3, is_active)
+         ${body.email !== undefined ? ", email = NULLIF($4, '')" : ''}
          ${desactiva ? ', session_version = session_version + 1' : ''}
        WHERE id = $1`,
-      [u.id, body.full_name ?? null, body.is_active ?? null])
+      [u.id, body.full_name ?? null, body.is_active ?? null, ...(body.email !== undefined ? [body.email] : [])])
     if (body.permisos !== undefined) {
       // Se guarda la lista completa (o NULL); se aplica en el siguiente request, sin volver a entrar.
       await db.query(`UPDATE usuario_empresas SET permisos = $3 WHERE user_id = $1 AND empresa_id = $2`,

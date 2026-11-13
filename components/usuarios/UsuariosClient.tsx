@@ -6,7 +6,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { Country } from '@/lib/types'
 
 interface Usuario {
-  id: number; username: string; full_name: string | null; role: 'admin' | 'user'
+  id: number; username: string; full_name: string | null; email: string | null; role: 'admin' | 'user'
   permisos: string[] | null     // null = los de su rol (lib/permisos.ts)
   is_active: boolean; created_at: string | null; last_login: string | null
 }
@@ -49,7 +49,7 @@ export default function UsuariosClient({ country }: { country: Country }) {
   }), [])
   useEffect(() => { cargar() }, [cargar])
 
-  const actualizar = async (u: Usuario, cambios: Partial<Pick<Usuario, 'role' | 'is_active' | 'full_name'>>, msg: string) => {
+  const actualizar = async (u: Usuario, cambios: Partial<Pick<Usuario, 'role' | 'is_active' | 'full_name' | 'email'>>, msg: string) => {
     setError(null); setAviso(null)
     const r = await fetch(`/api/users/${u.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios),
@@ -90,6 +90,15 @@ export default function UsuariosClient({ country }: { country: Country }) {
     const nombre = window.prompt('Nombre completo', u.full_name ?? '')?.trim()
     if (!nombre || nombre === u.full_name) return
     actualizar(u, { full_name: nombre }, 'Nombre actualizado.')
+  }
+
+  // Correo: con él la persona recupera su clave sola («¿Olvidaste tu contraseña?»).
+  const cambiarCorreo = async (u: Usuario) => {
+    const r = window.prompt('Correo (con él recupera su clave sola). Vacío = quitarlo.', u.email ?? '')
+    if (r === null) return
+    const correo = r.trim().toLowerCase()
+    if (correo === (u.email ?? '')) return
+    actualizar(u, { email: correo }, correo ? 'Correo guardado.' : 'Correo quitado.')
   }
 
   return (
@@ -140,6 +149,10 @@ export default function UsuariosClient({ country }: { country: Country }) {
                   <td className="px-4 py-2 font-mono">{u.username}{yo && <span className="ml-1 text-xs text-neutral-400 font-sans">(tú)</span>}</td>
                   <td className="px-4 py-2">
                     <button onClick={() => renombrar(u)} className="hover:underline text-left" title="Cambiar nombre">{u.full_name ?? '—'}</button>
+                    <button onClick={() => cambiarCorreo(u)} title="Con el correo recupera su clave sola"
+                      className={`block text-left text-xs hover:underline ${u.email ? 'text-neutral-400' : 'text-amber-600'}`}>
+                      {u.email ?? '+ agregar correo'}
+                    </button>
                   </td>
                   <td className="px-4 py-2">
                     <select value={u.role} disabled={yo || !u.is_active} onChange={e => cambiarRol(u, e.target.value as Usuario['role'])}
@@ -204,7 +217,7 @@ function CampoClave({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 function NuevoUsuario({ onCancelar, onCreado }: { onCancelar: () => void; onCreado: (msg: string) => void }) {
-  const [f, setF] = useState({ username: '', full_name: '', role: 'user' as 'admin' | 'user', password: generarPassword() })
+  const [f, setF] = useState({ username: '', full_name: '', email: '', role: 'user' as 'admin' | 'user', password: generarPassword() })
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const input = 'border border-neutral-300 rounded px-2 py-1.5 text-sm w-full'
@@ -231,6 +244,10 @@ function NuevoUsuario({ onCancelar, onCreado }: { onCancelar: () => void; onCrea
         <label className="text-xs text-neutral-600">Usuario (para entrar)
           <input className={`${input} font-mono`} value={f.username} autoComplete="off"
             onChange={e => setF({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') })} placeholder="p.ej. maria" />
+        </label>
+        <label className="text-xs text-neutral-600">Correo (opcional)
+          <input className={input} type="email" value={f.email} autoComplete="off" onChange={e => setF({ ...f, email: e.target.value })} />
+          <span className="mt-0.5 block text-[11px] text-neutral-400">Sin correo no podrá recuperar su clave solo.</span>
         </label>
         <label className="text-xs text-neutral-600">Rol
           <select className={input} value={f.role} onChange={e => setF({ ...f, role: e.target.value as 'admin' | 'user' })}>

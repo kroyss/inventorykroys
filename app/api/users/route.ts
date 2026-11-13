@@ -14,6 +14,8 @@ const CreateSchema = z.object({
   full_name: z.string().trim().min(2, 'Falta el nombre').max(100),
   role:      z.enum(['admin', 'user']),
   password:  z.string().min(PASSWORD_MIN, `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres`).max(PASSWORD_MAX),
+  // Opcional (13-11): con él la persona recupera su clave sola (/login/recuperar).
+  email:     z.string().trim().toLowerCase().email('Revisa el correo').max(120).or(z.literal('')).default(''),
 })
 
 /** GET /api/users — lista de usuarios (admin) */
@@ -23,7 +25,7 @@ export async function GET() {
   if (session.user.role !== 'admin') return forbidden()
   try {
     const { rows } = await db.query(
-      `SELECT u.id, u.username, u.full_name, ue.role, ue.permisos, u.is_active, u.created_at, u.last_login
+      `SELECT u.id, u.username, u.full_name, u.email, ue.role, ue.permisos, u.is_active, u.created_at, u.last_login
        FROM users u JOIN usuario_empresas ue ON ue.user_id = u.id AND ue.empresa_id = $1
        ORDER BY u.is_active DESC, ue.role, u.username`, [session.user.empresaId])
     // Permisos que aplican a ESTA empresa (según sus módulos y país), para la ficha de cada usuario.
@@ -47,11 +49,16 @@ export async function POST(req: NextRequest) {
     const { rows: [dup] } = await db.query(`SELECT 1 FROM users WHERE username = $1`, [body.username])
     if (dup) return NextResponse.json({ error: `El usuario "${body.username}" ya existe. Elige otro nombre.` }, { status: 400 })
 
+    if (body.email) {
+      const { rows: [dupMail] } = await db.query(`SELECT 1 FROM users WHERE lower(email) = $1`, [body.email])
+      if (dupMail) return NextResponse.json({ error: 'Ese correo ya está en otra cuenta' }, { status: 400 })
+    }
+
     await db.query('BEGIN')
     const { rows: [u] } = await db.query(
-      `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active)
-       VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING id`,
-      [body.username, await hash(body.password, 10), body.full_name, body.role, session.user.country])
+      `INSERT INTO users (username, password_hash, full_name, role, country_access, is_active, email)
+       VALUES ($1, $2, $3, $4, $5, TRUE, $6) RETURNING id`,
+      [body.username, await hash(body.password, 10), body.full_name, body.role, session.user.country, body.email || null])
     await db.query(
       `INSERT INTO usuario_empresas (user_id, empresa_id, role) VALUES ($1, $2, $3)`,
       [u.id, session.user.empresaId, body.role])

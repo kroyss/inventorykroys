@@ -195,7 +195,9 @@ export default function LoginForm({ marca }: { marca: Marca }) {
             </button>
           </form>
 
-          <p className="text-xs text-neutral-400 mt-6">¿Olvidaste tu contraseña? Escríbele a tu administrador.</p>
+          <p className="text-xs text-neutral-500 mt-6">
+            <a href="/login/recuperar" className="font-medium text-neutral-700 underline-offset-2 hover:underline">¿Olvidaste tu contraseña?</a>
+          </p>
           <a href="/registro" className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-lime-300 bg-lime-50 px-4 py-3 text-sm transition hover:border-lime-400">
             <span><span className="block font-semibold text-neutral-900">¿No tienes cuenta?</span><span className="block text-xs text-neutral-600">Prueba 15 días gratis con tus propias ventas</span></span>
             <span aria-hidden="true" className="text-lime-700">→</span>

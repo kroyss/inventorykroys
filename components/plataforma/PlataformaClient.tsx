@@ -628,7 +628,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
   const [f, setF] = useState({
     nombre: '', country: 'VE' as 'VE' | 'CO', modulos: ['despachos', 'reportador', 'preguntas', 'alertas_stock'],   // un Fundador: Automatizaciones, sin Inventario
     alta: 'fundador' as 'fundador' | 'prueba' | 'activo' | 'demo',
-    username: '', full_name: '', password: claveInicial(),
+    username: '', full_name: '', email: '', password: claveInicial(),
   })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -639,7 +639,7 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: f.nombre, country: f.country, modulos: f.modulos, alta: f.alta,
-        admin: { username: f.username, full_name: f.full_name, password: f.password },
+        admin: { username: f.username, full_name: f.full_name, email: f.email, password: f.password },
       }),
     })
     const d = await r.json().catch(() => ({}))
@@ -677,6 +677,9 @@ function NuevaEmpresa({ modulos, onCancelar, onCreada }: {
         <label className="text-xs text-neutral-600">Administrador: usuario (para entrar)
           <input className={`${input} font-mono`} value={f.username} autoComplete="off"
             onChange={e => setF({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') })} placeholder="p.ej. perez" />
+        </label>
+        <label className="text-xs text-neutral-600">Administrador: correo{f.alta === 'demo' ? ' (opcional en la demo)' : ''}
+          <input className={input} type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="con él recupera su clave" />
         </label>
         <label className="text-xs text-neutral-600">Contraseña inicial (se la pasas; la puede cambiar)
           <div className="flex gap-2">

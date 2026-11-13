@@ -55,8 +55,12 @@ el portal de MercadoEnvíos de Venezuela.
 - **Dirección:** app.elcomerciantedigital.com. Se entra con **usuario y contraseña** (no con correo).
 - **Una cuenta por persona.** Si una persona trabaja en varias empresas, usa el mismo usuario y elige la empresa
   en el selector de arriba (navbar).
-- **Olvidé mi contraseña:** el administrador de tu empresa te pone una nueva en **Usuarios → Cambiar
-  contraseña**. Si el olvido es del administrador, escríbenos a Soporte.
+- **Olvidé mi contraseña:** en la pantalla de entrar toca **«¿Olvidaste tu contraseña?»**, escribe tu usuario o
+  tu correo y te llega un **código de 6 números** al correo de tu cuenta y a tu Telegram (si lo vinculaste en Mis
+  avisos). Escribe el código y tu clave nueva (mínimo 8 caracteres). El código vale 15 minutos y tiene 5 intentos;
+  al cambiarla se cierran tus sesiones abiertas en otros equipos. Si no te llega, mira en spam o promociones.
+  Si tu cuenta no tiene correo ni Telegram, el administrador de tu empresa te pone una nueva en **Usuarios →
+  Cambiar contraseña**, o escríbenos a Soporte.
 - **Crear cuenta:** app.elcomerciantedigital.com/registro (nombre del negocio, tu nombre, usuario, contraseña y un
   contacto: WhatsApp o Telegram).
 - **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **corren desde que te
@@ -783,7 +787,9 @@ Si no ves algunos avisos es porque tu usuario no tiene acceso a esa sección (Pr
 
 Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo lo maneja un **administrador**.
 
-- **Nuevo usuario:** nombre, usuario (para entrar) y contraseña inicial. Pásale su contraseña a la persona.
+- **Nuevo usuario:** nombre, usuario (para entrar), correo (opcional) y contraseña inicial. Pásale su contraseña a
+  la persona. **Con correo puede recuperar su clave sola**; sin correo, se la tienes que cambiar tú. El correo se
+  agrega o cambia tocando debajo del nombre en la lista («+ agregar correo»).
 - **Roles:** *Administrador* = todo, incluidos Usuarios y Ajustes. *Usuario* = lo que le marques en **Permisos**.
 - **Permisos:** secciones que ve (Preguntas, Mensajes, Despachos…) y acciones (ver costos, editar compras, configurar
   automatizaciones…). «Volver a lo predeterminado» lo deja como al inicio.

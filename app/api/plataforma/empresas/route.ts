@@ -78,6 +78,8 @@ const CreateSchema = z.object({
     username:  z.string().trim().toLowerCase().regex(USERNAME_RE, 'Usuario: 3 a 30 caracteres, solo letras, números, punto, guion o guion bajo'),
     full_name: z.string().trim().min(2, 'Falta el nombre del administrador').max(100),
     password:  z.string().min(PASSWORD_MIN, `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres`).max(PASSWORD_MAX),
+    // 13-11 (recuperar la clave por correo): obligatorio salvo en la demo.
+    email:     z.string().trim().toLowerCase().email('Revisa el correo del administrador').max(120).or(z.literal('')).default(''),
   }),
 })
 
@@ -97,10 +99,15 @@ export async function POST(req: NextRequest) {
     const choque = await choqueAlta(client, body.nombre, body.admin.username)
     if (choque) { await client.query('ROLLBACK'); return NextResponse.json({ error: choque }, { status: 400 }) }
     const demo = body.alta === 'demo'
+    if (!demo && !body.admin.email) { await client.query('ROLLBACK'); return NextResponse.json({ error: 'Falta el correo del administrador (con él recupera su clave)' }, { status: 400 }) }
+    if (body.admin.email) {
+      const { rows: [dup] } = await client.query(`SELECT 1 FROM users WHERE lower(email) = $1`, [body.admin.email])
+      if (dup) { await client.query('ROLLBACK'); return NextResponse.json({ error: 'Ese correo ya está en otra cuenta' }, { status: 400 }) }
+    }
     if (demo && body.country !== 'VE') { await client.query('ROLLBACK'); return NextResponse.json({ error: 'La demo es de Venezuela (Despachos y Reportador son solo VE)' }, { status: 400 }) }
     // Organización, empresa, admin y siembra: lib/altaCuenta.ts (lo mismo que usa /registro).
     const { empresaId, categorias, ajustes } = await crearCuenta(client, {
-      nombre: body.nombre, country: body.country, modulos: body.modulos, alta: body.alta, admin: body.admin,
+      nombre: body.nombre, country: body.country, modulos: body.modulos, alta: body.alta, admin: { ...body.admin, email: body.admin.email || undefined },
       origenOrgId: session!.user.organizacionId,
     })
     const emp = { id: empresaId }
