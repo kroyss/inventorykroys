@@ -12,6 +12,8 @@ import { shipInfo, parseShippingTable, type ShipInfo } from '@/lib/mlShipping'
 import { liveBaseVE, liveFinalVE, livePublishedVE, recDiscountVE, mlNetFor, storedPricesVE, type VeRate } from '@/lib/pricingVE'
 import Link from '@/components/ui/Link'
 import MlBreakdown from './MlBreakdown'
+import VinculosML from './VinculosML'
+import ElegirPesoML from './ElegirPesoML'
 import { etiquetaCategoria } from '@/lib/categoriasGanancia'
 
 // ─── helpers ────────────────────────────────────────────────────
@@ -77,10 +79,11 @@ interface FormState {
   sale_price: number
   weight_kg: string   // string para permitir vacío en el input
   peso_ml?: boolean   // mig. 174: el peso viene del portal de MercadoEnvíos (no se edita a mano)
-  ml_codes: MLCode[]
+  pesos_ml?: number[] | null   // sus publicaciones pesan distinto en ML: se elige uno con un clic
+  ml_codes: MLCode[]   // solo lectura (13-11): los vínculos se hacen en Publicaciones → Vincular
 }
 
-const emptyForm = (mlAccounts: string[]): FormState => ({
+const emptyForm = (): FormState => ({
   code: '',
   name: '',
   profit_category_id: null,
@@ -90,13 +93,14 @@ const emptyForm = (mlAccounts: string[]): FormState => ({
   discount_percent: 0,
   sale_price: 0,
   weight_kg: '',
-  ml_codes: mlAccounts.map(a => ({ account: a, code: '' })),
+  ml_codes: [],
 })
 
 // Detalle completo de un producto (respuesta de GET /api/products/[id])
 interface ProductDetail {
   id: number
   peso_origen?: string | null
+  pesos_ml?: number[] | null
   code: string
   name: string
   is_active: boolean
@@ -139,7 +143,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const [batchCat,  setBatchCat]  = useState<number | null>(null)
   const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
   const [editId,    setEditId]    = useState<number | null>(null)
-  const [form,      setForm]      = useState<FormState>(emptyForm(mlAccounts))
+  const [form,      setForm]      = useState<FormState>(emptyForm())
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [okMsg,     setOkMsg]     = useState('')
@@ -290,7 +294,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     setError('')
     const res  = await fetch('/api/products/next-code')
     const data = await res.json()
-    setForm({ ...emptyForm(mlAccounts), code: data.next_code ?? data.code })
+    setForm({ ...emptyForm(), code: data.next_code ?? data.code })
     setEditId(null)
     setSalePriceAutoFilled(false)
     setModal('create')
@@ -313,10 +317,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       sale_price:         data.sale_price,
       weight_kg:          data.weight_kg != null ? String(data.weight_kg) : '',
       peso_ml:            data.peso_origen === 'ml',
-      ml_codes:           mlAccounts.map(a => ({
-        account: a,
-        code: (data.ml_codes as MLCode[]).find(m => m.account === a)?.code ?? '',
-      })),
+      pesos_ml:           data.pesos_ml ?? null,
+      ml_codes:           data.ml_codes as MLCode[],
     })
     setEditId(id)
     setModal('edit')
@@ -343,8 +345,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         // VE: el precio de inventario sigue al Precio Base (USD). CO y simple: el del input.
         sale_price:          isCO || simpleVE ? form.sale_price : basePriceUsd,
       }
+      // Los códigos ML ya no se mandan (13-11): se vinculan en Publicaciones → Vincular.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { ml_codes: _codigos, peso_ml: _pm, pesos_ml: _pd, ...sinVinculos } = form
       const payload = {
-        ...form,
+        ...sinVinculos,
         ...(simple ? { profit_category_id: null } : {}),
         ...precios,
         weight_kg:           weightNum,
@@ -368,9 +373,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             shipping_cost:      form.shipping_cost,
             ...precios,
             weight_kg:          weightNum,
-            // Todas las cuentas, también las vaciadas: vacío = se quita ese código (21-10; antes se filtraban
-            // y borrar un código en el formulario no hacía nada).
-            ml_codes:           form.ml_codes,
           }),
         })
       }
@@ -390,7 +392,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         // reset form + fetch next code for the following product
         const codeRes = await fetch('/api/products/next-code')
         const codeData = await codeRes.json()
-        setForm({ ...emptyForm(mlAccounts), code: codeData.next_code ?? codeData.code })
+        setForm({ ...emptyForm(), code: codeData.next_code ?? codeData.code })
         setOkMsg(`Producto ${created} creado. Listo para el siguiente.`)
         setTimeout(() => setOkMsg(''), 3000)
       } else {
@@ -400,7 +402,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       setSaving(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, modal, editId, basePriceUsd, publishedPriceUsd, finalPriceUsd, mlAccounts])
+  }, [form, modal, editId, basePriceUsd, publishedPriceUsd, finalPriceUsd])
 
   // ── status toggle / delete ──
   async function handleStatus(id: number, action: 'activate' | 'deactivate' | 'delete'): Promise<boolean> {
@@ -950,6 +952,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                             className="w-28 border border-neutral-300 rounded px-2 py-1 text-sm text-right
                                        focus:outline-none focus:ring-2 focus:ring-neutral-800" />}
                         </div>
+                        {!form.peso_ml && form.pesos_ml && (
+                          <ElegirPesoML pesos={form.pesos_ml} actual={form.weight_kg}
+                            onElegir={kg => setForm(f => ({ ...f, weight_kg: String(kg) }))} />
+                        )}
                         {descuento && !simple ? <>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-neutral-700">Descuento ML (global): <b>{globalDiscount.toFixed(1)}%</b></span>
@@ -1044,34 +1050,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   : <>El precio de venta de inventario se guarda igual al <b>Precio Base</b> (${fmt(basePriceUsd)}).</>}
               </p>
 
-              {/* ML codes — en una sola línea */}
+              {/* Publicaciones de ML: solo lectura, se vinculan en Publicaciones → Vincular (13-11) */}
               <div className="border border-neutral-200 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-semibold text-neutral-800">
-                  Códigos ML ({country})
-                </p>
-                {form.ml_codes.length === 0 && (
-                  <p className="text-xs text-neutral-500">
-                    Aquí va el código de la publicación (MLV…) en cada una de tus cuentas. Aparecen al conectar tus cuentas
-                    de MercadoLibre (Automatiza → Cuentas de MercadoLibre) o al escribirlas en Ajustes → Tu negocio.
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  {form.ml_codes.map((ml, i) => (
-                    <div key={ml.account}>
-                      <label className="block text-[11px] font-mono text-neutral-500 mb-1">{ml.account}</label>
-                      <input
-                        value={ml.code}
-                        onChange={e => setForm(f => ({
-                          ...f,
-                          ml_codes: f.ml_codes.map((m, j) => j === i ? { ...m, code: e.target.value } : m),
-                        }))}
-                        placeholder="MLA-XXXXXXXXXX"
-                        className="w-full border border-neutral-300 rounded-lg px-3 py-1.5 text-sm
-                                   focus:outline-none focus:ring-2 focus:ring-neutral-800"
-                      />
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm font-semibold text-neutral-800">Publicaciones de MercadoLibre</p>
+                <VinculosML codes={form.ml_codes} productCode={form.code} creando={modal === 'create'} />
               </div>
 
               {error && (
@@ -1229,6 +1211,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                           </button>
                         </div>}
                       </div>
+                      {viewing.peso_origen !== 'ml' && viewing.pesos_ml && (
+                        <ElegirPesoML pesos={viewing.pesos_ml} actual={viewWeight} onElegir={kg => setViewWeight(String(kg))} />
+                      )}
                       <div className={`text-[11px] px-2 py-1.5 rounded border ${shipBadge(vShip).cls}`}>
                         {shipBadge(vShip).label}
                       </div>
@@ -1254,19 +1239,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Códigos ML ({country})</p>
-                  {v.ml_codes.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {v.ml_codes.map(ml => (
-                        <div key={ml.account} className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
-                          <p className="text-[11px] font-mono text-neutral-500">{ml.account}</p>
-                          <p className="text-sm font-mono text-neutral-800">{ml.code || '—'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-neutral-400 text-xs">Sin códigos ML registrados</p>
-                  )}
+                  <p className="text-sm font-semibold text-neutral-800 mb-2">Publicaciones de MercadoLibre</p>
+                  <VinculosML codes={v.ml_codes} productCode={v.code} />
                 </div>
               </div>
 

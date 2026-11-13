@@ -47,6 +47,7 @@ export interface Product {
 export interface MLCode {
   account: string
   code: string
+  unidades?: number   // publicación que trae N unidades (pack, «trae N u.» en Stock en ML)
 }
 
 // ─── Finance (módulo global VE+CO) ──────────────────

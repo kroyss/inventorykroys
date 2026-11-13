@@ -1,3 +1,4 @@
+import { PESOS_VINCULADOS, SQL_PESOS_DISTINTOS } from '@/lib/pesosML'
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
@@ -45,19 +46,21 @@ export async function GET(
        pp.profit_category_id,
        p.weight_kg::float                            AS weight_kg,
        p.peso_origen,
+       ${SQL_PESOS_DISTINTOS}                       AS pesos_ml,
        COALESCE(inv.sale_price,            0)::float AS sale_price,
        COALESCE(inv.quantity,              0)::int   AS quantity
      FROM products p
      LEFT JOIN product_pricing   pp  ON p.id = pp.product_id
      LEFT JOIN profit_categories pc  ON pp.profit_category_id = pc.id
      LEFT JOIN inventory         inv ON p.id = inv.product_id
+     LEFT JOIN (${PESOS_VINCULADOS}) pv ON pv.product_id = p.id
      WHERE p.id = $1`,
     [id]
   )
   if (!rows[0]) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
   const { rows: mlRows } = await db.query(
-    `SELECT ml_account AS account, ml_code AS code
+    `SELECT ml_account AS account, ml_code AS code, unidades
      FROM product_ml_codes WHERE product_id = $1 AND is_active = TRUE ORDER BY id`,
     [id]
   )

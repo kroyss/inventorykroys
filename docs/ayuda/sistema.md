@@ -811,7 +811,14 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   MercadoEnvíos (el que usa ML para el envío gratis), por medio de sus vínculos: Pagos ME lo trae en la primera traída
   del día. Se ve con la marca **ML** y no se edita a mano. A mano solo los productos que ML no da. **Pesos distintos
   en ML** = sus publicaciones pesan distinto en el portal: casi siempre un pack sin marcar «trae N u.» o un vínculo mal
-  hecho; se revisa en Vincular o Stock. Precios, margen, Promociones y Costos ML usan ese mismo peso.
+  hecho; se revisa en Vincular o Stock, o se **elige con un clic** uno de los pesos que trae ML (en MercadoEnvíos o en la
+  ficha del producto). Precios, margen, Promociones y Costos ML usan ese mismo peso.
+- **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
+  «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
+  (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
+- **Cómo cargar productos:** si ya vendes en ML → Publicaciones → **Importar desde ML** (crea el producto vinculado, con
+  peso y foto). Si no está en ML → Productos → **Nuevo** solo con lo tuyo (costo, categoría, stock); cuando lo publiques,
+  lo vinculas y el peso y la foto llegan solos.
 - **Actualizar desde ML** (Publicaciones, Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
 - **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (pestaña de Publicaciones; en Productos solo sale cuando todavía no hay productos) crea productos a partir de

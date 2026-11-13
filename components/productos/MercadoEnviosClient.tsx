@@ -1,4 +1,5 @@
 'use client'
+import ElegirPesoML from './ElegirPesoML'
 import { useEffect, useMemo, useState } from 'react'
 import type { Product } from '@/lib/types'
 import { shipInfo, parseShippingTable, type ShipInfo, type ShipStatus } from '@/lib/mlShipping'
@@ -79,8 +80,9 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
     return arr
   }, [rows, filter, search])
 
-  async function saveWeight(id: number) {
-    const raw = (weights[id] ?? '').trim()
+  async function saveWeight(id: number, valor?: string) {
+    if (valor !== undefined) setWeights(w => ({ ...w, [id]: valor }))
+    const raw = (valor ?? weights[id] ?? '').trim()
     const kg = raw === '' ? null : parseFloat(raw)
     if (kg !== null && (isNaN(kg) || kg <= 0)) { setError('Peso inválido'); return }
     const prev = products.find(p => p.id === id)?.weight_kg ?? null
@@ -177,7 +179,10 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
                       placeholder="—"
                       className={`w-20 border rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-neutral-800
                                   ${savingId === p.id ? 'border-amber-400 bg-amber-50' : 'border-neutral-300'}`} />
-                    {p.pesos_ml && <div className="mt-0.5 whitespace-nowrap text-[10px] text-amber-700" title="Sus publicaciones pesan distinto en MercadoEnvíos">ML: {p.pesos_ml.join(' / ')}</div>}
+                    {p.pesos_ml && <div className="mt-1 flex justify-end">
+                      <ElegirPesoML pesos={p.pesos_ml} actual={p.weight_kg} ocupado={savingId === p.id}
+                        onElegir={kg => saveWeight(p.id, String(kg))} />
+                    </div>}
                     </>}
                   </td>
                   <td className="px-2 py-2 text-right">${fmt(published)}</td>
