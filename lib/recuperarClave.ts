@@ -33,7 +33,7 @@ export type ResultadoPedido =
 
 const telegramOculto = (u: string | null) => {
   const x = (u ?? '').replace(/^@/, '').trim()
-  return x ? `@${x.slice(0, 1)}•••••` : ''
+  return x ? `@${x.slice(0, Math.min(3, Math.ceil(x.length / 2)))}•••` : ''
 }
 
 /** Por usuario o por correo (si coinciden los dos con personas distintas, gana el usuario). Solo cuentas activas. */
@@ -116,7 +116,8 @@ export async function pedirCodigo(identificador: string, ipHash: string | null):
   if (!canales.length) return { estado: 'fallo' }
   return {
     estado: 'enviado',
-    correo: canales.includes('correo') && p.email ? correoOculto(p.email) : null,
+    // Si escribió el correo, ya lo conoce: se muestra completo.
+    correo: canales.includes('correo') && p.email ? (p.email.toLowerCase() === identificador.trim().toLowerCase() ? p.email : correoOculto(p.email)) : null,
     telegram: canales.includes('telegram') ? telegramOculto(p.tg_usuario) : null,
   }
 }

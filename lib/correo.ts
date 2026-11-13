@@ -17,11 +17,9 @@ export async function enviarCorreo(d: { para: string; asunto: string; html: stri
   if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`)
 }
 
-/** Oculta un correo para mostrarlo: contrerasm@gmail.com → c•••••@g•••.com */
+/** Correo a medio tapar, reconocible para su dueño (13-11): contrerasm@gmail.com → con•••@gmail.com */
 export const correoOculto = (c: string) => {
   const [u, d] = c.split('@')
   if (!d) return '•••'
-  const punto = d.lastIndexOf('.')
-  const tld = punto > 0 ? d.slice(punto) : ''
-  return `${u.slice(0, 1)}•••••@${d.slice(0, 1)}•••${tld}`
+  return `${u.slice(0, Math.min(3, Math.ceil(u.length / 2)))}•••@${d}`
 }

@@ -59,7 +59,7 @@ el portal de MercadoEnvíos de Venezuela.
   tu correo y te llega un **código de 6 números** al correo de tu cuenta y a tu Telegram (si lo vinculaste en Mis
   avisos). Escribe el código y tu clave nueva (mínimo 8 caracteres). El código vale 15 minutos y tiene 5 intentos;
   al cambiarla se cierran tus sesiones abiertas en otros equipos. La pantalla te dice a dónde lo mandó (correo y
-  Telegram tapados, p. ej. c•••••@g•••.com y @c•••••). Si no te llega el correo, mira en spam o promociones.
+  Telegram a medio tapar, p. ej. con•••@gmail.com y @con•••; si escribiste el correo, se ve completo). Si no te llega el correo, mira en spam o promociones.
   Si tu cuenta no tiene correo ni Telegram, la pantalla te lo dice: si eres empleado, el administrador de tu empresa
   te pone una nueva en **Usuarios → Cambiar contraseña**; si eres el administrador, escríbenos a Soporte por Telegram.
 - **Crear cuenta:** app.elcomerciantedigital.com/registro (nombre del negocio, tu nombre, usuario, contraseña y un
