@@ -814,7 +814,7 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   hecho; se revisa en Vincular o Stock. Precios, margen, Promociones y Costos ML usan ese mismo peso.
 - **Actualizar desde ML** (Publicaciones, Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
-- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (pestaña de Publicaciones; en Productos queda un enlace chico) crea productos a partir de
+- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (pestaña de Publicaciones; en Productos solo sale cuando todavía no hay productos) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
 - **Catálogo PDF** (Productos → botón Catálogo PDF; en prueba, solo algunas empresas): elige productos (buscar,
   «Solo con stock», «Solo con foto»), sube tu **logo**, pon el nombre, una línea debajo y un texto al final
