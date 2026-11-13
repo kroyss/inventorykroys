@@ -55,7 +55,7 @@ export default function PersonasEmpresa({ empresaId }: { empresaId: number }) {
   }
 
   const claveNueva = async (p: Persona) => {
-    const ok = await confirmar({ title: `Clave nueva para ${p.username}`, message: 'Se cierran sus sesiones abiertas y tendrá que entrar con la clave nueva. La verás aquí una sola vez.', confirmText: 'Dar clave nueva' })
+    const ok = await confirmar({ title: `Restaurar la clave de ${p.username}`, message: 'Se le da una clave nueva: se cierran sus sesiones abiertas y tendrá que entrar con ella. La verás aquí una sola vez.', confirmText: 'Restaurar clave' })
     if (!ok) return
     const password = claveInicial()
     if (await guardar(p, { password })) setAviso({ id: p.id, texto: 'Clave nueva (pásasela por Telegram o WhatsApp privado; no se vuelve a mostrar):', clave: password })
@@ -122,13 +122,26 @@ export default function PersonasEmpresa({ empresaId }: { empresaId: number }) {
                   {otras.length > 0 && ` · también en ${otras.map(e => e.nombre).join(', ')}`}
                 </p>
               </div>
+              {/* Lo delicado o poco usado, en el ⋯; lo de todos los días va a la vista abajo. */}
               <RowMenu items={[
-                { label: 'Clave nueva', onClick: () => claveNueva(p) },
-                { label: 'Editar nombre y correo', onClick: () => { setAviso(null); setEditando({ id: p.id, full_name: p.full_name ?? '', email: p.email ?? '' }) } },
                 { label: p.is_active ? 'Desactivar' : 'Activar', onClick: () => activar(p) },
                 { label: 'Eliminar…', onClick: () => eliminar(p), danger: true },
               ]} />
             </div>
+            {!edita && (
+              <div className="mt-2.5 flex flex-wrap gap-2 pl-12">
+                <button type="button" onClick={() => claveNueva(p)} disabled={ocupado === p.id}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50 disabled:opacity-50">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 9.2-9.2M17 6l3 3M14 9l2 2" /></svg>
+                  Restaurar clave
+                </button>
+                <button type="button" onClick={() => { setAviso(null); setEditando({ id: p.id, full_name: p.full_name ?? '', email: p.email ?? '' }) }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  Editar nombre y correo
+                </button>
+              </div>
+            )}
 
             {edita && editando && (
               <form onSubmit={e => { e.preventDefault(); guardarEdicion(p) }} className="mt-3 space-y-2 border-t border-neutral-100 pt-3">
