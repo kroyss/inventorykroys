@@ -5,6 +5,9 @@
 //   · Al terminar: «✓ Tareas terminadas» (o «con errores»); abierta muestra cómo quedaron y «Ver cómo quedaron».
 //   · La ✕ quita el aviso de las terminadas (no vuelven a salir).
 // Pregunta una vez al abrir; si hay algo en curso, cada 5 s hasta que termine. Despierta con el evento 'cola-ml'.
+// 13-11 (el dueño: «demasiado invasivo»): al terminar NUNCA se abre solo (lo abierto se recuerda solo mientras procesa);
+// si todo salió bien la pastilla se va sola a los 8 s; con errores queda hasta la ✕. La traída AUTOMÁTICA de
+// MercadoEnvíos (la del día, sin pedirla nadie) no avisa, salvo que falle.
 import { comun } from '@/lib/comun'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/ui/Link'
@@ -25,6 +28,8 @@ export default function AvisoColaML() {
   const [vistos, setVistos] = useState<number[]>(() => (typeof window === 'undefined' ? [] : leer<number[]>(VISTOS, [])))
   const [abierto, setAbierto] = useState<boolean>(() => (typeof window === 'undefined' ? false : leer<boolean>(ABIERTO, false)))
   const [mirando, setMirando] = useState(0)
+  // Abierto a mano con las tareas ya terminadas (solo en esta pantalla, no se recuerda).
+  const [verTerminadas, setVerTerminadas] = useState(false)
 
   const primera = useRef(true)
   const cargar = useCallback(async () => {
@@ -55,21 +60,36 @@ export default function AvisoColaML() {
     return () => { vivo = false; if (t) clearTimeout(t) }
   }, [cargar, mirando])
 
+  // Terminadas sin errores y con el panel cerrado: la pastilla se quita sola a los 8 s.
+  const traidaSinVer = !!traida && !vistos.includes(-traida.id)
+  const idsTerminados = lotes.filter(l => l.estado !== 'en_curso' && !vistos.includes(l.id)).map(l => l.id).join(',')
+  const todoBien = !lotes.some(l => l.estado === 'en_curso') && !(traida && (traida.en_curso || traida.esperando_pc))
+    && !lotes.some(l => l.estado !== 'en_curso' && !vistos.includes(l.id) && l.errores > 0) && !(traida && !vistos.includes(-traida.id) && traida.con_error)
+  useEffect(() => {
+    if (!todoBien || verTerminadas || (!idsTerminados && !traidaSinVer)) return
+    const t = setTimeout(() => {
+      setVistos(v => { const n = [...v, ...idsTerminados.split(',').filter(Boolean).map(Number), ...(traida && traidaSinVer ? [-traida.id] : [])].slice(-50); guardar(VISTOS, n); return n })
+    }, 8000)
+    return () => clearTimeout(t)
+  }, [todoBien, verTerminadas, idsTerminados, traida, traidaSinVer])
+
   const enCurso = lotes.filter(l => l.estado === 'en_curso')
   const terminados = lotes.filter(l => l.estado !== 'en_curso' && !vistos.includes(l.id))
   const traidaCorre = !!traida && (traida.en_curso || traida.esperando_pc)
-  const traidaVer = !!traida && (traidaCorre || !vistos.includes(-traida.id))
+  const traidaVer = !!traida && (traidaCorre || !vistos.includes(-traida.id)) && (!traida.automatico || (!traidaCorre && traida.con_error))
   if (!enCurso.length && !terminados.length && !traidaVer) return null
   const procesando = enCurso.length > 0 || traidaCorre
   const conErrores = terminados.some(l => l.errores > 0) || (!traidaCorre && traidaVer && !!traida?.con_error)
   const visibles = procesando ? enCurso : terminados
   const verTraida = traidaVer && (procesando ? traidaCorre : true)
-  const alternar = () => { setAbierto(!abierto); guardar(ABIERTO, !abierto) }
+  // Mientras procesa se recuerda abierto/cerrado entre pantallas; con todo terminado se abre solo con el clic.
+  const panel = procesando ? abierto : verTerminadas
+  const alternar = () => procesando ? (setAbierto(!abierto), guardar(ABIERTO, !abierto)) : setVerTerminadas(!verTerminadas)
   const quitar = () => { const v = [...vistos, ...terminados.map(l => l.id), ...(traida ? [-traida.id] : [])].slice(-50); setVistos(v); guardar(VISTOS, v) }
 
   return (
     <div className="fixed z-40 right-14 bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-5 flex flex-col items-end gap-2">
-      {abierto && (
+      {panel && (
         <div className="w-[calc(100vw-4.25rem)] sm:w-80 rounded-xl border border-neutral-200 bg-white shadow-lg p-3 space-y-2.5 text-sm">
           {verTraida && traida && <TraidaME t={traida} />}
           {visibles.map(l => {
@@ -103,12 +123,12 @@ export default function AvisoColaML() {
       )}
       <div className={`flex items-center rounded-full border shadow-md text-xs font-medium ${procesando ? 'bg-white border-neutral-200 text-neutral-700'
         : conErrores ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
-        <button type="button" onClick={alternar} className="flex items-center gap-1.5 pl-3 pr-2 py-1.5" title={abierto ? 'Achicar' : 'Ver el avance'}>
+        <button type="button" onClick={alternar} className="flex items-center gap-1.5 pl-3 pr-2 py-1.5" title={panel ? 'Achicar' : procesando ? 'Ver el avance' : 'Ver cómo quedaron'}>
           {procesando
             ? <><svg viewBox="0 0 20 20" className="h-3.5 w-3.5 animate-spin text-lime-600" fill="none" stroke="currentColor" strokeWidth={2}><path d="M10 3a7 7 0 1 1-7 7" strokeLinecap="round" /></svg>
                 Procesando tareas ({enCurso.length + (traidaCorre ? 1 : 0)})</>
             : <>{conErrores ? '⚠' : '✓'} Tareas terminadas{conErrores ? ' con errores' : ''}</>}
-          <span className="text-neutral-400">{abierto ? '▾' : '▴'}</span>
+          <span className="text-neutral-400">{panel ? '▾' : '▴'}</span>
         </button>
         {!procesando && (
           <button type="button" onClick={quitar} className="pr-3 pl-1 py-1.5 opacity-60 hover:opacity-100" title="Quitar el aviso">✕</button>
