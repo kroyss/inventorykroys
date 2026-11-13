@@ -60,7 +60,7 @@ Cómo responder:
 - Si el comprador solo saluda o agradece, responde corto y amable.
 - Nada de correos, redes sociales ni links que no sean de MercadoLibre.
 - SOLO AGRADECE (08-11): si el comprador solo agradece o confirma ("gracias", "ok", "perfecto", "excelente") y no pregunta nada, responde corto y cordial (ej. "Con gusto, quedo a su orden"); puedes recordar cuándo sale el envío, pero NO vuelvas a ofrecer el embalaje ni otros cobros que ya se le dijeron.
-- PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró, preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
+- PEDIDO ESPECIAL (08-11): si en lo que escribió AHORA el comprador pide algo DISTINTO a lo que compró —otro color, talla, modelo o variante; mezclar variantes ("compré 2 rojos, quiero 1 rojo y 1 azul"); más o menos unidades; cambiar o agregar otro producto— pon en "pedido_especial" un resumen corto con lo que compró y lo que quiere (ej. "Compró 2 rojos, quiere 1 rojo y 1 azul"). En ese caso el borrador NO confirma el cambio: di que lo verifican y le confirman por aquí. NO es pedido especial (deja null): preguntar de qué color o modelo le llega, confirmar que es el que compró (13-11: si lo que pide o nombra COINCIDE con la VARIANTE QUE COMPRÓ —ej. escribe "solo color blanco" y compró "Color: Luz solo Blanco"— es la misma compra repetida: confírmale que eso es lo que compró y así le llega; las fotos o la ficha pueden mostrar OTRA variante de la publicación y eso NO cambia lo que compró), preguntar si hay otros colores ANTES de decidir algo, reclamos por algo que llegó mal, ni dudas de uso.
 - RECLAMO (08-11): si pide devolución, garantía, reemplazo o reembolso, o dice que le llegó dañado, defectuoso, que no funciona, incompleto o un producto/color/modelo distinto al que compró, pon en "reclamo" un resumen corto (ej. "Le llegó azul, compró rojo; pide cambio"). El borrador NO promete devolución, reemplazo ni reembolso: di que lo revisan con el equipo y le responden por aquí. Si no es eso, null.
 
 Siempre termina llamando a la herramienta proponer_respuesta.`
@@ -120,7 +120,8 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     for (const it of venta.items) {
       const s = stock.find(x => x.ml_code === it.id.replace(/^[A-Z]{3}/, ''))
       const precio = it.precio != null ? ` · ${it.precio} ${it.moneda ?? ''} c/u` : ''
-      L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — variante: ${it.variante}` : ''}${precio}${s ? ` (stock en el sistema: ${s.stock}; solo importa si pide más o cambiar)` : ''}`)
+      // 13-11: la variante elegida en ML es LO QUE COMPRÓ y manda sobre fotos/ficha (que pueden mostrar otra variante).
+      L.push(`- ${it.cantidad} × ${it.titulo}${it.variante ? ` — VARIANTE QUE COMPRÓ: ${it.variante} (la eligió en ML; manda sobre fotos, ficha y descripción)` : ''}${precio}${s ? ` (stock en el sistema: ${s.stock}; solo importa si pide más o cambiar)` : ''}`)
       // 08-11 (el dueño): el envío gratis de ESTA compra (lo que la pantalla muestra como "Gratis SOLO TEALCA").
       if (it.envio) L.push(`  ENVÍO GRATIS DE ESTA COMPRA (según peso y precio pagado): ${it.envio.estado === 'sin_peso' ? 'Sin peso: no se sabe' : it.envio.texto}${it.envio.conflicto ? ' (dudoso: vinculada a productos de distinto peso)' : ''}`)
     }
@@ -155,6 +156,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     const { rows: notasItem } = await db.query(`SELECT texto FROM ml_item_notas WHERE item_id = $1 ORDER BY created_at DESC LIMIT 20`, [it.id])
     if (!cat?.ficha && !fc?.texto && !desc && !lf.length && !notasItem.length) continue
     L.push(`\nPRODUCTO "${it.titulo}":`)
+    if (it.variante) L.push(`(Las fotos, la ficha y la descripción son de TODA la publicación y pueden mostrar otras variantes; este comprador compró: ${it.variante}.)`)
     if (cat?.ficha) L.push(`Ficha: ${cat.ficha}`)
     if (desc) L.push(`Descripción: ${desc.slice(0, 2500)}`)
     L.push(...lf)
