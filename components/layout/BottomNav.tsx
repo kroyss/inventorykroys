@@ -7,7 +7,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual } from '@/lib/espacios'
-import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
+import { pestanasML, enPublicaciones } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 // Barra inferior del celular. Íconos de línea (mismo trazo en todos, estilo Lucide) en lugar de
@@ -131,7 +131,7 @@ export default function BottomNav({ role, permisos, country, modulos }: { role: 
   const tieneAuto = modulos.includes('despachos') || modulos.includes('reportador') || modulos.includes('preguntas')
   const primary = visible(auto ? PRIMARY_AUTO : PRIMARY)
   const more    = visible(auto ? MORE_AUTO : MORE).filter(i => i.href !== '/automatizaciones' || tieneAuto)
-  const activo  = (href: string) => pathname === href ||
+  const activo  = (href: string) => enPublicaciones(pathname) ? href === '/publicaciones' : pathname === href ||
     (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href + '/'))
   const enMas   = more.some(i => activo(i.href))
   // Avisos de lo que quedó en "Más" (p. ej. calificaciones): un punto en el botón.

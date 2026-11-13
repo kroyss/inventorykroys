@@ -8,6 +8,11 @@ import { tiposPermitidos } from '@/lib/colaPermisos'
 // desde varios lados (mis publicaciones de ML). Cada pantalla sigue en su dirección de siempre (avisos de Telegram y
 // permisos no cambian); arriba comparten estas pestañas. Cada una se muestra con las mismas reglas que su página;
 // con una sola no se dibuja nada. El menú «Publicaciones» aparece si hay al menos una.
+/** 13-11 (el dueño): las direcciones de las pestañas de Publicaciones (algunas viven bajo /productos o /inventario): con
+ *  cualquiera abierta, el menú marca «Publicaciones» y no Productos ni Inventario. */
+export const RUTAS_PUBLICACIONES = ['/publicaciones', '/vincular-ml', '/inventario/stock-ml', '/productos/promociones', '/productos/importar-ml', '/productos/mercadoenvios']
+export const enPublicaciones = (pathname: string) => RUTAS_PUBLICACIONES.some(r => pathname === r || pathname.startsWith(r + '/'))
+
 export type PestanaML = 'editar' | 'vincular' | 'importar' | 'stock' | 'promociones' | 'envios' | 'tareas'
 type UsuarioML = { role?: UserRole; permisos?: string[]; modulos?: string[]; country?: string }
 

@@ -6,7 +6,7 @@ import type { UserRole, Country } from '@/lib/types'
 import { rutaHabilitada, ventasDesdeML } from '@/lib/modulos'
 import { puede, rutaPermitida } from '@/lib/permisos'
 import { espacioActual, type Espacio } from '@/lib/espacios'
-import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
+import { pestanasML, enPublicaciones } from '@/components/productos/PublicacionesMLTabs'
 import { useAvisos, AVISO_DE_RUTA, Numerito, NumerosCalificaciones, hayAlerta } from './Avisos'
 
 const allLinks: { href: string; label: string; countries: Country[]; espacio?: Espacio; soloDesdeML?: boolean }[] = [
@@ -65,7 +65,7 @@ export default function NavLinks({ role, permisos, country, modulos }: Props) {
       && (!l.soloDesdeML || ventasDesdeML({ modulos }))
       && (l.href !== '/publicaciones' || pestanasML({ ...u, modulos, country }).length > 0)
   )
-  const activo = (href: string) =>
+  const activo = (href: string) => enPublicaciones(pathname) ? href === '/publicaciones' :
     pathname === href || (href !== '/dashboard' && href !== '/automatizaciones' && pathname.startsWith(href))
   const etiqueta = (l: typeof links[number]) => (
     <>
