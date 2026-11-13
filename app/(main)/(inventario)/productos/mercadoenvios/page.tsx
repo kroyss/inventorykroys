@@ -8,6 +8,7 @@ import PublicacionesMLTabs from '@/components/productos/PublicacionesMLTabs'
 import type { Product } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tasaYAjustes } from '@/lib/inicial'
+import { PESOS_VINCULADOS, SQL_PESOS_DISTINTOS } from '@/lib/pesosML'
 
 export const metadata = { title: 'MercadoEnvíos' }
 
@@ -25,10 +26,13 @@ export default async function MercadoEnviosPage() {
       COALESCE(pp.total_cost,             0)::float AS total_cost,
       pc.name                                        AS category_name,
       COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
-      p.weight_kg::float                             AS weight_kg
+      p.weight_kg::float                             AS weight_kg,
+      p.peso_origen,
+      ${SQL_PESOS_DISTINTOS}                         AS pesos_ml
     FROM products p
     LEFT JOIN product_pricing   pp  ON p.id = pp.product_id
     LEFT JOIN profit_categories pc  ON pp.profit_category_id = pc.id
+    LEFT JOIN (${PESOS_VINCULADOS}) pv ON pv.product_id = p.id
     WHERE p.is_active = TRUE
     ORDER BY p.name
   `)

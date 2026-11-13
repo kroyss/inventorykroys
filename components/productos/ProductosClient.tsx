@@ -76,6 +76,7 @@ interface FormState {
   discount_percent: number
   sale_price: number
   weight_kg: string   // string para permitir vacío en el input
+  peso_ml?: boolean   // mig. 174: el peso viene del portal de MercadoEnvíos (no se edita a mano)
   ml_codes: MLCode[]
 }
 
@@ -95,6 +96,7 @@ const emptyForm = (mlAccounts: string[]): FormState => ({
 // Detalle completo de un producto (respuesta de GET /api/products/[id])
 interface ProductDetail {
   id: number
+  peso_origen?: string | null
   code: string
   name: string
   is_active: boolean
@@ -310,6 +312,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       discount_percent:   data.discount_percent,
       sale_price:         data.sale_price,
       weight_kg:          data.weight_kg != null ? String(data.weight_kg) : '',
+      peso_ml:            data.peso_origen === 'ml',
       ml_codes:           mlAccounts.map(a => ({
         account: a,
         code: (data.ml_codes as MLCode[]).find(m => m.account === a)?.code ?? '',
@@ -947,11 +950,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <label className="text-xs font-medium text-neutral-700">Peso (kg) <span className="text-neutral-400">· MercadoEnvíos</span></label>
-                          <input type="number" step="0.001" min="0" value={form.weight_kg}
+                          {form.peso_ml ? (
+                            <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{form.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span></span>
+                          ) : <input type="number" step="0.001" min="0" value={form.weight_kg}
                             onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))}
                             placeholder="ej. 0.350"
                             className="w-28 border border-neutral-300 rounded px-2 py-1 text-sm text-right
-                                       focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+                                       focus:outline-none focus:ring-2 focus:ring-neutral-800" />}
                         </div>
                         {descuento && !simple ? <>
                           <div className="flex items-center justify-between text-xs">
@@ -1218,7 +1223,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <label className="text-xs text-neutral-600">Peso (kg)</label>
-                        <div className="flex items-center gap-1">
+                        {viewing.peso_origen === 'ml' ? (
+                          <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{viewing.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span></span>
+                        ) : <div className="flex items-center gap-1">
                           <input type="number" step="0.001" min="0" value={viewWeight}
                             onChange={e => setViewWeight(e.target.value)}
                             placeholder="ej. 0.350"
@@ -1228,7 +1235,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                             className="text-xs px-2 py-1 rounded bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-50">
                             {savingWeight ? '…' : '✓'}
                           </button>
-                        </div>
+                        </div>}
                       </div>
                       <div className={`text-[11px] px-2 py-1.5 rounded border ${shipBadge(vShip).cls}`}>
                         {shipBadge(vShip).label}

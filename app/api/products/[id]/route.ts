@@ -44,6 +44,7 @@ export async function GET(
        COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
        pp.profit_category_id,
        p.weight_kg::float                            AS weight_kg,
+       p.peso_origen,
        COALESCE(inv.sale_price,            0)::float AS sale_price,
        COALESCE(inv.quantity,              0)::int   AS quantity
      FROM products p
@@ -84,7 +85,8 @@ export async function PUT(
         await db.query(`UPDATE products SET name = $1 WHERE id = $2`, [body.name, id])
       }
       if (body.weight_kg !== undefined) {
-        await db.query(`UPDATE products SET weight_kg = $1 WHERE id = $2`, [body.weight_kg, id])
+        // Cambio a mano → origen 'manual' (mig. 174). Si el portal lo da igual en todas sus publicaciones, la próxima traída lo vuelve a poner.
+        await db.query(`UPDATE products SET weight_kg = $1, peso_origen = CASE WHEN weight_kg IS DISTINCT FROM $1 THEN 'manual' ELSE peso_origen END WHERE id = $2`, [body.weight_kg, id])
       }
 
       const pricingFields: [string, unknown][] = []

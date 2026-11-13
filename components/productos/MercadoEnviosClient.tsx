@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import Link from '@/components/ui/Link'
 import type { Product } from '@/lib/types'
 import { shipInfo, parseShippingTable, type ShipInfo, type ShipStatus } from '@/lib/mlShipping'
 import { matchTokens } from '@/lib/search'
@@ -18,7 +17,7 @@ const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
   unregistered: { label: '⚪ Sin peso',        chip: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
 }
 
-type Filter = 'all' | 'unregistered' | 'capped' | 'aggregate' | 'impossible'
+type Filter = 'all' | 'unregistered' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
 
 export default function MercadoEnviosClient({ initialProducts, inicialTasa = null }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
@@ -71,7 +70,8 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
 
   const filtered = useMemo(() => {
     let arr = rows
-    if (filter === 'unregistered') arr = arr.filter(r => r.info.status === 'unregistered')
+    if (filter === 'distintos') arr = arr.filter(r => !!r.p.pesos_ml)
+    else if (filter === 'unregistered') arr = arr.filter(r => r.info.status === 'unregistered')
     else if (filter === 'capped')     arr = arr.filter(r => r.info.status === 'capped')
     else if (filter === 'aggregate')  arr = arr.filter(r => r.info.status === 'aggregate')
     else if (filter === 'impossible') arr = arr.filter(r => r.info.status === 'impossible' || r.info.status === 'overweight')
@@ -108,7 +108,6 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold text-neutral-900">📦 MercadoEnvíos</h1>
-        <Link href="/productos" className="text-sm text-neutral-500 hover:text-neutral-800">← Volver a Productos</Link>
         <div className="ml-auto text-sm text-neutral-500">
           Descuento global: <b className="text-neutral-800">{globalDiscount.toFixed(1)}%</b>
           {rate && <span className="text-neutral-400"> · exceso {rate.excess}%</span>}
@@ -116,7 +115,10 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
       </div>
 
       <p className="text-xs text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg p-3 leading-relaxed">
-        Registrá el <b>peso</b> de cada producto. El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
+        El <b>peso</b> sale solo del portal de MercadoEnvíos (<b className="text-sky-700">ML</b>: el que usa ML para el envío gratis; lo
+        trae Pagos ME una vez al día por medio de los vínculos). A mano solo los que ML no da.
+        <b className="text-amber-700"> Pesos distintos</b> = sus publicaciones pesan distinto en ML: suele ser un pack sin marcar «trae N u.» o un
+        vínculo mal hecho (revísalo en Publicaciones → Vincular o Stock). El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
         envío gratis (según la tabla de ML) y <b>limita solo</b> el descuento global a ese tope.
         <span className="text-amber-700"> ⚠️ Tope</span> = se le baja el descuento para conservar el envío gratis;
         <span className="text-sky-700"> 🛒 Por volumen</span> = a 1 unidad no llega, pero sí juntando unidades (normal en productos baratos);
@@ -127,6 +129,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
       <div className="flex flex-wrap items-center gap-2">
         {chip('all', 'Todos', rows.length, 'bg-neutral-900 text-white border-neutral-900')}
         {chip('unregistered', '⚪ Sin peso', counts.unregistered, 'bg-neutral-700 text-white border-neutral-700')}
+        {rows.some(r => r.p.pesos_ml) && chip('distintos', 'Pesos distintos en ML', rows.filter(r => r.p.pesos_ml).length, 'bg-amber-600 text-white border-amber-600')}
         {chip('capped', '⚠️ Con tope', counts.capped, 'bg-amber-500 text-white border-amber-500')}
         {chip('aggregate', '🛒 Por volumen', counts.aggregate, 'bg-sky-600 text-white border-sky-600')}
         {chip('impossible', '🚫 Revisar precio', counts.impossible + counts.overweight, 'bg-red-600 text-white border-red-600')}
@@ -161,6 +164,11 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500">{p.code}</td>
                   <td className="px-3 py-2 max-w-[16rem] truncate" title={p.name}>{p.name}</td>
                   <td className="px-2 py-2 text-right">
+                    {p.peso_origen === 'ml' ? (
+                      <span className="whitespace-nowrap" title="Peso del portal de MercadoEnvíos: se actualiza solo">
+                        {p.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span>
+                      </span>
+                    ) : <>
                     <input type="number" step="0.001" min="0"
                       value={weights[p.id] ?? ''}
                       onChange={e => setWeights(w => ({ ...w, [p.id]: e.target.value }))}
@@ -169,6 +177,8 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
                       placeholder="—"
                       className={`w-20 border rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-neutral-800
                                   ${savingId === p.id ? 'border-amber-400 bg-amber-50' : 'border-neutral-300'}`} />
+                    {p.pesos_ml && <div className="mt-0.5 whitespace-nowrap text-[10px] text-amber-700" title="Sus publicaciones pesan distinto en MercadoEnvíos">ML: {p.pesos_ml.join(' / ')}</div>}
+                    </>}
                   </td>
                   <td className="px-2 py-2 text-right">${fmt(published)}</td>
                   <td className="px-2 py-2 text-right text-neutral-500">{info.tier ? `$${fmt(info.tier.minPrice)}` : '—'}</td>

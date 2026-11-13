@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     // Pesos del portal (Promociones, migración 094): la primera traída del día de cada cuenta, o la
     // pedida con "Actualizar pesos". La extensión 1.3.2+ los lee; las anteriores ignoran el dato.
     let pesos = false
-    if (p && a.modulos.includes('promociones')) {
+    // 13-11 (mig. 174): también con Inventario (los pesos pasan a los productos: precios, margen, Costos ML).
+    if (p && (a.modulos.includes('promociones') || a.modulos.includes('inventario'))) {
       if (p.pesos) pesos = true
       else {
         const { rows: [f] } = await a.db.query(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { autenticarVigilante } from '@/lib/pagosME'
+import { sincronizarPesos } from '@/lib/pesosML'
 
 const Body = z.object({
   cuenta: z.string().trim().min(1).max(80),
@@ -23,7 +24,7 @@ const Body = z.object({
 export async function POST(req: NextRequest) {
   const a = await autenticarVigilante(req)
   if ('error' in a) return a.error
-  if (!a.modulos.includes('promociones')) return NextResponse.json({ ok: true, ignorado: true })
+  if (!a.modulos.includes('promociones') && !a.modulos.includes('inventario')) return NextResponse.json({ ok: true, ignorado: true })
   try {
     const b = Body.parse(await req.json())
     const filas = b.items
@@ -41,7 +42,9 @@ export async function POST(req: NextRequest) {
       await a.db.query(`DELETE FROM me_productos WHERE cuenta = $1 AND NOT (publicacion = ANY($2::text[]))`,
         [b.cuenta, filas.map(f => f.publicacion)])
     }
-    return NextResponse.json({ ok: true, guardadas: filas.length })
+    // 13-11 (mig. 174): el peso del portal pasa a los productos vinculados (un solo peso en todo el sistema).
+    const productos = a.modulos.includes('inventario') ? await sincronizarPesos(a.db).catch(e => { console.error('[pesos ML]', e); return 0 }) : 0
+    return NextResponse.json({ ok: true, guardadas: filas.length, productos })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })
     return apiError(err)

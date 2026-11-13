@@ -101,12 +101,17 @@ export async function buscarNuevas(db: Pool, conexionId: number): Promise<number
 }
 
 /** Refresca el catálogo de una cuenta si pasaron HORAS_CATALOGO (la reserva es atómica).
- *  `forzar`: ya (Importar desde ML → "Actualizar desde ML"), aunque no hayan pasado las horas. */
+ *  `forzar`: ya (botones «Actualizar desde ML» de Publicaciones, Importar desde ML y Stock), aunque no hayan pasado las
+ *  horas, PERO no si se leyó hace menos de MIN_FORZADO (13-11, el dueño): cada clic releía el catálogo entero (cientos de
+ *  publicaciones) y dos personas en dos pantallas lo leían dos veces. Devuelve null si no hizo falta leer. */
+const MIN_FORZADO = 5
+
 export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = false) {
   const { rows: [c] } = await db.query(
     `UPDATE ml_conexiones SET catalogo_at = NOW()
-     WHERE id = $1 AND estado = 'activa' AND ($3 OR catalogo_at IS NULL OR catalogo_at < NOW() - make_interval(hours => $2))
-     RETURNING ml_user_id`, [conexionId, HORAS_CATALOGO, forzar])
+     WHERE id = $1 AND estado = 'activa' AND (catalogo_at IS NULL
+       OR catalogo_at < NOW() - CASE WHEN $3 THEN make_interval(mins => $4) ELSE make_interval(hours => $2) END)
+     RETURNING ml_user_id`, [conexionId, HORAS_CATALOGO, forzar, MIN_FORZADO])
   if (!c) return null
   const seller = Number(c.ml_user_id)
   const ids = [...new Set([...await idsDe(db, conexionId, seller, 'active'), ...await idsDe(db, conexionId, seller, 'paused')])]

@@ -40,6 +40,8 @@ export interface Product {
   sale_price: number
   quantity: number
   weight_kg: number | null
+  peso_origen?: string | null      // 'ml' = del portal de MercadoEnvíos (mig. 174), no se edita a mano
+  pesos_ml?: number[] | null       // pesos distintos en sus publicaciones (revisar vínculo o pack)
 }
 
 export interface MLCode {
