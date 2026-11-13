@@ -28,7 +28,7 @@ function generarPassword() {
 
 const ROL_TXT = { admin: 'Admin (todo)', user: 'Usuario (lo que marques en Permisos)' }
 
-export default function UsuariosClient({ country }: { country: Country }) {
+export default function UsuariosClient({ country, embebido = false }: { country: Country; embebido?: boolean }) {
   const confirm = useConfirm()
   const [users, setUsers] = useState<Usuario[]>([])
   const [me, setMe]       = useState<number | null>(null)
@@ -103,11 +103,19 @@ export default function UsuariosClient({ country }: { country: Country }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Usuarios"
-        subtitle={`Quién puede entrar a esta empresa (${country}). Cada empresa tiene sus propios usuarios.`}
-        actions={<button onClick={() => { setNuevo(true); setError(null) }} className="btn-primary text-sm">+ Nuevo usuario</button>}
-      />
+      {embebido ? (
+        // Mi cuenta → Mi equipo (13-11): sin título propio, la página ya lo tiene.
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-neutral-500">Quién puede entrar a tu negocio y qué ve cada uno.</p>
+          <button onClick={() => { setNuevo(true); setError(null) }} className="btn-primary text-sm">+ Nuevo usuario</button>
+        </div>
+      ) : (
+        <PageHeader
+          title="Usuarios"
+          subtitle={`Quién puede entrar a esta empresa (${country}). Cada empresa tiene sus propios usuarios.`}
+          actions={<button onClick={() => { setNuevo(true); setError(null) }} className="btn-primary text-sm">+ Nuevo usuario</button>}
+        />
+      )}
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-neutral-50 border border-neutral-200 text-neutral-700 px-4 py-2 rounded text-sm">{aviso}</div>}

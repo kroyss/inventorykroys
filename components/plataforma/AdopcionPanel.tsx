@@ -135,6 +135,7 @@ export interface BaseCliente {
   vence?: number | null        // días que le quedan (plan o prueba); null = no vence o no aplica
   whatsapp?: string | null     // contacto (ficha → Contacto): botón directo en la fila
   telegram?: string | null
+  verComo?: number | null      // 13-11: usuario (admin) con el que se entra en «Ver como» desde el ojo
 }
 
 export const CEROS = {
@@ -152,18 +153,20 @@ const FILTROS_USO: { k: FiltroUso; t: string }[] = [
 /** Lo cobrado (Plataforma → Clientes, 13-11): sale de /api/plataforma/cobros. */
 export interface ResumenCobro { mes: number; pagos_mes: number; anterior: number; recurrente: number }
 // Columnas de la fila en escritorio (en móvil la fila es una tarjeta apilada). Literales: Tailwind las lee del código.
-const COLS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_4.5rem]'
-const COLS_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_4.5rem]'
+const COLS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_6.5rem]'
+const COLS_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_6.5rem]'
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`
 
-export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro, cobro = null }: {
+export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro, cobro = null, onVerComo }: {
   base: BaseCliente[]; onAbrir: (id: number) => void; abierta: number | null
+  onVerComo?: (empresaId: number, usuarioId: number) => Promise<void>
   filtro: FiltroUso; onFiltro: (f: FiltroUso) => void; cobro?: ResumenCobro | null }) {
   const [dias, setDias] = useState(7)
   const [lista, setLista] = useState<Empresa[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const filtroUso = filtro, setFiltroUso = onFiltro
   const [orden, setOrden] = useState<Orden>('actividad')
+  const [entrando, setEntrando] = useState<number | null>(null)
 
   useEffect(() => {
     let vivo = true
@@ -293,6 +296,16 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
                     </div>
                     {/* Contacto directo (móvil: arriba a la derecha; escritorio: al final) */}
                     <div className="flex items-center justify-end gap-0.5 md:order-last">
+                      {b.verComo && onVerComo && (
+                        <button type="button" disabled={entrando !== null}
+                          onClick={ev => { ev.stopPropagation(); setEntrando(b.id); onVerComo(b.id, b.verComo!).catch(() => setEntrando(null)) }}
+                          title="Ver su cuenta tal como la ven (solo lectura, no se enteran)" aria-label={`Ver la cuenta de ${b.nombre}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50">
+                          {entrando === b.id
+                            ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700" aria-hidden />
+                            : <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>}
+                        </button>
+                      )}
                       {b.whatsapp && <a href={waLink(b.whatsapp)} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} title={`WhatsApp ${b.whatsapp}`} aria-label={`WhatsApp de ${b.nombre}`}
                         className="flex h-8 w-8 items-center justify-center rounded-full text-emerald-600 hover:bg-emerald-50">
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3a.4.4 0 0 0 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3Z" /></svg>

@@ -11,7 +11,7 @@ interface Props {
   rol: 'admin' | 'user'
   empresa: string | null
   ajustes: boolean
-  usuarios: boolean
+  usuarios?: boolean   // 13-11: ya no se usa (Usuarios vive en Mi cuenta → Mi equipo)
   plataforma: boolean
   demo?: boolean
   pagosME?: boolean
@@ -24,7 +24,7 @@ interface Props {
 
 // Menú de la cuenta (arriba a la derecha): lo que se toca poco (Ajustes, Usuarios,
 // Plataforma) y Cerrar sesión, para que la barra quede solo con el trabajo del día.
-export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plataforma, demo, pagosME = false, avisos = false, miPlan = false, miIA = false, radar = false }: Props) {
+export default function UserMenu({ nombre, rol, empresa, ajustes, plataforma, demo, pagosME = false, avisos = false, miPlan = false, miIA = false, radar = false }: Props) {
   const pathname = usePathname()
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
@@ -40,6 +40,8 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
 
   const iniciales = nombre.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?'
   const links = [
+    // Mi cuenta (13-11): todos (sus datos y su clave); el admin además su equipo (antes Usuarios) y su negocio.
+    { href: '/mi-cuenta', label: 'Mi cuenta' },
     // Mis avisos (2026-10-14): Telegram de cada persona; primero solo la organización de la plataforma.
     avisos && { href: '/mis-avisos', label: 'Mis avisos' },
     // Ajustes es del inventario (tasa, exceso, categorías): en Automatizaciones cada herramienta tiene los suyos adentro.
@@ -51,7 +53,6 @@ export default function UserMenu({ nombre, rol, empresa, ajustes, usuarios, plat
     // Mi IA (06-11): la misma página que en Preguntas y Mensajes.
     miIA       && { href: '/mi-ia',      label: 'Mi IA', nuevo: 'mi_ia' as const },
     miPlan     && { href: '/mi-plan',    label: 'Mi plan' },
-    usuarios   && { href: '/usuarios',   label: 'Usuarios' },
     plataforma && { href: '/plataforma', label: 'Plataforma' },
     demo       && { href: '/demo',       label: 'Demo · restaurar' },
   ].filter(Boolean) as { href: string; label: string; nuevo?: ClaveNuevo }[]

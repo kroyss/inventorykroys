@@ -61,7 +61,7 @@ el portal de MercadoEnvíos de Venezuela.
   al cambiarla se cierran tus sesiones abiertas en otros equipos. La pantalla te dice a dónde lo mandó (correo y
   Telegram a medio tapar, p. ej. con•••@gmail.com y @con•••; si escribiste el correo, se ve completo). Si no te llega el correo, mira en spam o promociones.
   Si tu cuenta no tiene correo ni Telegram, la pantalla te lo dice: si eres empleado, el administrador de tu empresa
-  te pone una nueva en **Usuarios → Cambiar contraseña**; si eres el administrador, escríbenos a Soporte por Telegram.
+  te pone una nueva en **Mi cuenta → Mi equipo → Cambiar contraseña**; si eres el administrador, escríbenos a Soporte por Telegram.
 - **Crear cuenta:** app.elcomerciantedigital.com/registro (nombre del negocio, tu nombre, usuario, contraseña y un
   contacto: WhatsApp o Telegram).
 - **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **corren desde que te
@@ -782,13 +782,21 @@ Si no ves algunos avisos es porque tu usuario no tiene acceso a esa sección (Pr
 
 ---
 
-## 14. Usuarios y permisos
+## 14. Mi cuenta: mis datos, mi equipo y permisos
 
-*Cómo lo pregunta la gente:* empleados, agregar usuario, mi equipo, permisos, no ve una sección, cambiar contraseña de un empleado, administrador.
+*Cómo lo pregunta la gente:* mi cuenta, mi perfil, mis datos, cambiar mi contraseña, nombre del negocio, empleados, agregar usuario, mi equipo, permisos, no ve una sección, cambiar contraseña de un empleado, administrador.
 
-Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo lo maneja un **administrador**.
+Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se llamaba «Usuarios».
 
-- **Nuevo usuario:** nombre, usuario (para entrar), correo (opcional) y contraseña inicial. Pásale su contraseña a
+- **Mis datos** (todos): tu nombre, tu **correo** (con él recuperas tu clave), tu **WhatsApp** y tu **Telegram**
+  (botón Vincular, que lleva a Mis avisos). Con esos datos soporte puede ayudarte. El usuario para entrar no se cambia.
+- **Mi contraseña** (todos): escribe la actual y la nueva dos veces. Al cambiarla se cierran tus sesiones en todos los
+  equipos y vuelves a entrar con la nueva. ¿No recuerdas la actual? «¿Olvidaste tu contraseña?» en la pantalla de entrar.
+- **Mi negocio** (solo administrador): el nombre de tu negocio, el que se ve arriba en el menú. No cambia tus
+  cuentas de MercadoLibre.
+- **Mi equipo** (solo administrador): quién puede entrar a tu empresa y qué ve cada uno:
+
+- **Nuevo usuario** (en Mi equipo): nombre, usuario (para entrar), correo (opcional) y contraseña inicial. Pásale su contraseña a
   la persona. **Con correo puede recuperar su clave sola**; sin correo, se la tienes que cambiar tú. El correo se
   agrega o cambia tocando debajo del nombre en la lista («+ agregar correo»).
 - **Roles:** *Administrador* = todo, incluidos Usuarios y Ajustes. *Usuario* = lo que le marques en **Permisos**.
@@ -981,7 +989,7 @@ Para ayudarte rápido: di qué pantalla, qué hiciste y qué esperabas; una capt
 mi información, es seguro, comparten mis datos, mi contraseña la ven.
 
 - **Tus datos son de tu empresa:** ninguna otra empresa puede verlos.
-- **Dentro de tu empresa**, el administrador decide qué ve y qué puede hacer cada persona (**Usuarios → Permisos**).
+- **Dentro de tu empresa**, el administrador decide qué ve y qué puede hacer cada persona (**Mi cuenta → Mi equipo → Permisos**).
 - **Tu contraseña no la puede ver nadie.** Solo se puede poner una nueva (ver «Olvidé mi contraseña» en la sección 2).
 - **MercadoLibre:** el sistema usa la conexión que tú autorizaste para leer y responder en tu cuenta. La puedes
   desconectar cuando quieras en **Cuentas de MercadoLibre**.

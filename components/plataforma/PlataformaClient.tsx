@@ -39,6 +39,8 @@ interface Empresa {
   interna?: boolean          // mig. 172: cuenta interna (EmpresaPruebas, DEMO): no paga ni vence
   origen?: string | null      // 'autoregistro' = se registró solo en /registro (26-10); 'radar' = desde el Radar (29-10)
   registro?: Registro | null
+  admin_id?: number | null         // 13-11: con quién se entra en «Ver como» desde la lista
+  admin_whatsapp?: string | null   // 13-11: el que puso el admin en Mi cuenta (respaldo del de registro)
   ia_limite_mes: number | null
   motivo_pausa: string | null
   pausa_fecha: string | null
@@ -173,6 +175,13 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
+  // 13-11 (el dueño): «Ver como» directo desde la fila (el ojo), como su administrador. Solo lectura y queda
+  // registrado en soporte_accesos (solo lo ve Plataforma; el cliente no se entera).
+  const { update: actualizarSesion } = useSession()
+  const verComo = async (empresaId: number, usuarioId: number) => {
+    await actualizarSesion({ soporte: { empresaId, usuarioId } })
+    window.location.assign('/')
+  }
   const [eligiendoRadar, setEligiendoRadar] = useState<number | null>(null)   // empresa a la que se le está prendiendo el Radar
   const [verInactivos, setVerInactivos] = useState(false)
   const [verRadar, setVerRadar] = useState(false)
@@ -362,14 +371,9 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
 
       {/* Lo que espera por ti: solo aparece si hay algo. */}
       {(() => {
-        const vencenYa = activas.filter(e => e.estado !== 'propietario' && !e.interna && (() => {
-          const f = e.estado === 'activo' ? e.plan_hasta : e.prueba_dias == null ? e.prueba_hasta : null
-          return !!f && diasHasta(f, hoy) <= 1
-        })())
         const items: [string, () => void][] = []
         if (pendientes.pagos) items.push([`💳 ${pendientes.pagos} pago${pendientes.pagos === 1 ? '' : 's'} por revisar`, () => setVerPagos(v => !v)])
         if (pendientes.casos) items.push([`🆘 ${pendientes.casos} caso${pendientes.casos === 1 ? '' : 's'} de soporte abierto${pendientes.casos === 1 ? '' : 's'}`, verSoporte])
-        if (vencenYa.length) items.push([`⏳ ${vencenYa.length} vence${vencenYa.length === 1 ? '' : 'n'} hoy o mañana`, () => setFiltroUso('por_vencer')])
         if (!items.length) return null
         return (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
@@ -391,9 +395,11 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
       )}
 
       <AdopcionPanel filtro={filtroUso} onFiltro={setFiltroUso} cobro={cobro} abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
+        onVerComo={verComo}
         base={activas.map(e => ({
           id: e.id, nombre: e.nombre, activa: true, pagando: e.estado === 'activo', prueba: e.estado === 'prueba',
-          interna: !!e.interna, whatsapp: e.registro?.whatsapp ?? null, telegram: e.registro?.telegram ?? null,
+          verComo: e.id !== empresaActual && e.is_active && e.admin_id ? e.admin_id : null,
+          interna: !!e.interna, whatsapp: e.registro?.whatsapp ?? e.admin_whatsapp ?? null, telegram: e.registro?.telegram ?? null,
           vence: e.interna || e.estado === 'propietario' ? null
             : e.estado === 'activo' ? (e.plan_hasta ? diasHasta(e.plan_hasta, hoy) : null)
             : e.estado === 'prueba' && e.prueba_dias == null && e.prueba_hasta ? diasHasta(e.prueba_hasta, hoy) : null,
@@ -579,10 +585,10 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                 </details>
               )}
               {sel.id !== empresaActual && sel.is_active && (
-                <details className="group border-t border-neutral-100 pt-3">
-                  <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-neutral-500">Ver como cliente</summary>
-                  <div className="mt-2"><VerComoCliente key={sel.id} empresaId={sel.id} /></div>
-                </details>
+                <section className="border-t border-neutral-100 pt-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Ver como cliente</h3>
+                  <VerComoCliente key={sel.id} empresaId={sel.id} />
+                </section>
               )}
 
               {/* Acciones delicadas: al fondo y separadas */}
@@ -945,6 +951,7 @@ function Historia({ organizacionId }: { organizacionId: number }) {
     : t === 'fecha' ? `📅 Vencimiento cambiado al ${det ? ddmm(det) : '—'}`
     : t === 'apagada' ? `⛔ Apagada a mano${det ? ` (${det})` : ''}`
     : t === 'encendida' ? `🔌 Encendida de nuevo${det ? ` (${det})` : ''}`
+    : t === 'renombrada' ? `✏️ Cambió el nombre${det ? `: ${det}` : ''}`
     : t
   const filas: { f: string; t: string; por?: string | null }[] = [
     { f: d.creada, t: '🆕 Creada' },

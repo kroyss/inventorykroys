@@ -1,12 +1,6 @@
-import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
-import UsuariosClient from '@/components/usuarios/UsuariosClient'
 
-export const metadata = { title: 'Usuarios' }
-
-export default async function UsuariosPage() {
-  const session = await getServerSession(authOptions)
-  if (session?.user.role !== 'admin') redirect('/dashboard')
-  return <UsuariosClient country={session.user.country} />
+// 13-11-2026: Usuarios vive ahora en Mi cuenta → Mi equipo (los enlaces viejos siguen sirviendo).
+export default function UsuariosPage() {
+  redirect('/mi-cuenta?ver=equipo')
 }

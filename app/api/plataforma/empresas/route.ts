@@ -47,6 +47,11 @@ export async function GET() {
               o.motivo_pausa, o.plan, o.escalon, o.ciclo, to_char(o.plan_hasta, 'YYYY-MM-DD') AS plan_hasta, to_char(o.radar_pro_hasta, 'YYYY-MM-DD') AS radar_pro_hasta, to_char(o.radar_mes_hasta, 'YYYY-MM-DD') AS radar_mes_hasta, to_char(o.pausa_fecha, 'YYYY-MM-DD') AS pausa_fecha,
               to_char(o.created_at AT TIME ZONE 'America/Caracas', 'YYYY-MM-DD') AS creada, u.cuentas,
               (SELECT COUNT(*)::int FROM usuario_empresas ue WHERE ue.empresa_id = e.id) AS usuarios,
+              (SELECT u.id FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
+                 WHERE ue.empresa_id = e.id AND ue.role = 'admin' AND u.is_active ORDER BY u.id LIMIT 1) AS admin_id,
+              (SELECT NULLIF(u.whatsapp, '') FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
+                 WHERE ue.empresa_id = e.id AND ue.role = 'admin' AND u.is_active AND NULLIF(u.whatsapp, '') IS NOT NULL
+                 ORDER BY u.id LIMIT 1) AS admin_whatsapp,
               (SELECT string_agg(u.username, ', ' ORDER BY u.username)
                  FROM usuario_empresas ue JOIN users u ON u.id = ue.user_id
                  WHERE ue.empresa_id = e.id AND ue.role = 'admin') AS admins,

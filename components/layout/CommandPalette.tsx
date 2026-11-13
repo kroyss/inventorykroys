@@ -46,7 +46,7 @@ export default function CommandPalette({ role, permisos, country, modulos }: { r
     { label: 'Ir a Productos',    hint: 'Navegar',   action: go('/productos'),  countries: ['VE','CO'] },
     { label: 'Ir a Reportes',     hint: 'Navegar',   action: go('/reportes'),   countries: ['VE','CO'] },
     { label: 'Ir a Ajustes',      hint: 'Navegar',   action: go('/tasas'),      countries: ['VE', 'CO'] },
-    { label: 'Ir a Usuarios',     hint: 'Navegar',   action: go('/usuarios'),   countries: ['VE', 'CO'] },
+    { label: 'Ir a Mi cuenta',    hint: 'Navegar',   action: go('/mi-cuenta'),  countries: ['VE', 'CO'] },
     { label: 'Nueva venta',       hint: 'Acción',    action: go('/ventas?new=1'),    countries: ['VE','CO'] },
     { label: 'Nueva compra',      hint: 'Acción',    action: go('/compras?new=1'),   permiso: 'compras_editar' as Permiso,        countries: ['VE','CO'] },
     { label: 'Nuevo producto',    hint: 'Acción',    action: go('/productos?new=1'), countries: ['VE','CO'] },

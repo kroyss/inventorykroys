@@ -63,7 +63,7 @@ const MORE: NavItem[] = [
   { href: '/publicaciones', label: 'Publicaciones', icon: 'productos', countries: ['VE', 'CO'] },
   { href: '/finanzas',   label: 'Finanzas',   icon: 'finanzas',   countries: ['VE', 'CO'] },
   { href: '/tasas',      label: 'Ajustes',    icon: 'ajustes',    countries: ['VE', 'CO'] },
-  { href: '/usuarios',   label: 'Usuarios',   icon: 'usuarios',   countries: ['VE', 'CO'] },
+  { href: '/mi-cuenta',  label: 'Mi cuenta',  icon: 'usuarios',   countries: ['VE', 'CO'] },
   { href: '/aprendizaje', label: 'Aprendizaje', icon: 'aprendizaje', countries: ['VE', 'CO'] },
   { href: '/novedades',   label: 'Novedades',   icon: 'novedades',   countries: ['VE', 'CO'] },
 ]

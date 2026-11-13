@@ -12,6 +12,7 @@ interface Persona {
   id: number
   username: string
   email: string | null
+  whatsapp?: string | null
   full_name: string | null
   is_active: boolean
   entro: string | null
@@ -117,6 +118,7 @@ export default function PersonasEmpresa({ empresaId }: { empresaId: number }) {
                 </div>
                 <p className="truncate font-mono text-xs text-neutral-500">{p.username}</p>
                 <p className="truncate text-xs text-neutral-500">{p.email ?? <span className="text-amber-700">sin correo (no puede recuperar la clave)</span>}</p>
+                {p.whatsapp && <a href={`https://wa.me/${p.whatsapp.replace(/\D/g, '').replace(/^0/, '58')}`} target="_blank" rel="noreferrer" className="block truncate text-xs font-medium text-emerald-700 hover:underline">WhatsApp {p.whatsapp}</a>}
                 <p className="text-[11px] text-neutral-400">
                   {p.entro ? `Entró ${hace(p.entro)}` : 'Nunca entró'}
                   {otras.length > 0 && ` · también en ${otras.map(e => e.nombre).join(', ')}`}
