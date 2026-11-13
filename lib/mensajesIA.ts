@@ -196,7 +196,13 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
     else L.push('ENVÍO: todavía no tiene guía (no se ha despachado).')
   }
   const textoNotas = [...notas.notas.map(n => n.texto), s?.notes].filter((x): x is string => !!x?.trim())
-  if (textoNotas.length) L.push(`NOTA DE LA VENTA: ${[...new Set(textoNotas)].join(' · ')}`)
+  // 13-11: las notas «PEDIDO ESPECIAL / RECLAMO - verificar» las escribió la IA misma (lib/mensajesIAPrueba.ts): se marcan
+  // como suposición para que no se repita un error suyo (dijo que compró otra variante y lo volvió a leer como dato).
+  const deLaIA = (t: string) => /^(PEDIDO ESPECIAL|RECLAMO) - verificar:/i.test(t.trim())
+  const unicas = [...new Set(textoNotas)]
+  const delEquipo = unicas.filter(t => !deLaIA(t)), propias = unicas.filter(deLaIA)
+  if (delEquipo.length) L.push(`NOTA DE LA VENTA: ${delEquipo.join(' · ')}`)
+  if (propias.length) L.push(`AVISO AUTOMÁTICO QUE DEJÓ LA IA ANTES (suposición, puede estar equivocado; compáralo con la VARIANTE QUE COMPRÓ y la conversación): ${propias.join(' · ')}`)
   // Mi IA (06-11, lib/miIA.ts, con la parte post-venta) + el texto libre de siempre.
   const pol = await politicasIA(db, 'mensajes', hilo.mensajes.slice(-6).filter(m => !m.propio).map(m => m.texto).join('\n'))
   if (pol.texto) L.push(`\nPOLÍTICAS DEL VENDEDOR:\n${pol.texto}`)
