@@ -4,6 +4,7 @@ import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { tieneModulo } from '@/lib/modulos'
 import MercadoEnviosClient from '@/components/productos/MercadoEnviosClient'
+import PublicacionesMLTabs from '@/components/productos/PublicacionesMLTabs'
 import type { Product } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tasaYAjustes } from '@/lib/inicial'
@@ -33,5 +34,8 @@ export default async function MercadoEnviosPage() {
   `)
 
   // 12-11 (rapidez): tasa y Ajustes en el HTML.
-  return <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} />
+  return <>
+    <PublicacionesMLTabs user={session.user} actual="envios" />
+    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} />
+  </>
 }

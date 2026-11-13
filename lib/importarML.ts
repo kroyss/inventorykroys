@@ -31,6 +31,7 @@ export interface FilaImportar {
   sin_movimiento?: boolean       // pausada sin ventas ni preguntas en 90 días (migración 127)
   reciente?: boolean             // apareció en el catálogo en los últimos 15 días (mig. 173): «publicación nueva»
   thumbnail: string | null
+  foto?: string | null   // 13-11: la de la variante (si ML la da) o la de la publicación
   permalink: string | null
   estado: EstadoImportar
   producto: { id: number; code: string; name: string; toda: boolean } | null   // vinculada (toda = por la publicación) o parecida
@@ -93,9 +94,9 @@ export async function filasImportar(db: Pool, { parecidas = true } = {}): Promis
       estado_ml: c.estado, sin_movimiento: !!c.sin_movimiento, reciente: !!c.reciente, thumbnail: c.thumbnail, permalink: c.permalink, estado: 'nueva' as EstadoImportar, producto: null }
     const vars = (c.variantes as VarianteCatalogo[] | null) ?? []
     if (vars.length) {
-      for (const v of vars) filas.push({ ...base, codigo: `${pub}:${v.id}`, variante: v.nombre, disponible: v.disponible, sku: v.sku ?? c.sku })
+      for (const v of vars) filas.push({ ...base, foto: v.foto ?? c.thumbnail, codigo: `${pub}:${v.id}`, variante: v.nombre, disponible: v.disponible, sku: v.sku ?? c.sku })
     } else {
-      filas.push({ ...base, codigo: pub, variante: null, disponible: c.disponible, sku: c.sku })
+      filas.push({ ...base, foto: c.thumbnail, codigo: pub, variante: null, disponible: c.disponible, sku: c.sku })
     }
   }
   if (!filas.length) return []

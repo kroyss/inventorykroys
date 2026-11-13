@@ -807,19 +807,22 @@ Quién puede entrar a tu empresa. Cada empresa tiene sus propios usuarios. Solo 
   modelo; si está en varias publicaciones, la activa con más stock). En la ficha del producto: **Cambiar foto** (o
   **Subir foto**) pone una tuya, y **Usar la de MercadoLibre** vuelve a la de ML. Sin foto: cuadro gris «Sin foto».
   Las hojas impresas (recepción y conteo) no llevan fotos.
-- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** crea productos a partir de
+- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (pestaña de Publicaciones; en Productos queda un enlace chico) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
 - **Catálogo PDF** (Productos → botón Catálogo PDF; en prueba, solo algunas empresas): elige productos (buscar,
   «Solo con stock», «Solo con foto»), sube tu **logo**, pon el nombre, una línea debajo y un texto al final
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
-- **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Publicaciones** (menú propio, con pestañas Editar · Vincular · Importar desde ML · Stock · Promociones · MercadoEnvíos (Venezuela) · Tareas; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
   cada 5 minutos por cuenta). Las de los últimos 15 días sin producto salen en un aviso azul **«N publicaciones nuevas
   sin producto»** (también en Productos) y en el filtro **Nuevas**: elige **Es este producto** o **Crear producto nuevo**.
+  **Revisar con fotos** (filtro de Vincular): cada producto con las fotos de todas sus publicaciones vinculadas; si una
+  no corresponde, **Corregir** abre esa publicación para cambiar el vínculo. La foto del producto en todo el sistema
+  sale de estos vínculos: al corregir aquí se arregla sola en todos lados (no hay que actualizar nada).
 - **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
   cuentas de una vez. Aquí se marca si una publicación es pack/combo («trae N u.»).
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.

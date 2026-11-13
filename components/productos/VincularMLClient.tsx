@@ -14,6 +14,7 @@ interface Fila {
   codigo: string; item_id: string; cuenta: string; titulo: string; variante: string | null; disponible: number
   estado_ml: string | null; thumbnail: string | null; permalink: string | null; sin_movimiento?: boolean
   reciente?: boolean   // apareció en los últimos 15 días (mig. 173)
+  foto?: string | null  // la de la variante (o la de la publicación)
   estado: 'vinculada' | 'parecida' | 'nueva'
   producto: { id: number; code: string; name: string; toda: boolean } | null
   ventas60: number; vinculado_por: string | null; vinculado_at: string | null; propio: boolean
@@ -23,7 +24,7 @@ interface Fila {
   no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
-type Filtro = 'nuevas' | 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas' | 'sin_pub'
+type Filtro = 'fotos' | 'nuevas' | 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas' | 'sin_pub'
 
 const POR_PAGINA = 25
 
@@ -117,6 +118,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
   const n = {
     todas: encontradas.length,
     vinculadas: encontradas.filter(f => f.estado === 'vinculada').length,
+    fotos: new Set(encontradas.filter(f => f.estado === 'vinculada').map(f => f.producto!.id)).size,
     dudas: encontradas.filter(f => f.duda).length,
     pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)).length,
     activas: encontradas.filter(activaSinVincular).length,
@@ -189,7 +191,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([...(n.nuevas ? [['nuevas', 'Nuevas', n.nuevas] as const] : []), ['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas], ['sin_pub', 'Productos sin publicación', sinPub.length]] as const).map(([k, t, n]) => (
+        {([...(n.nuevas ? [['nuevas', 'Nuevas', n.nuevas] as const] : []), ['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ['fotos', 'Revisar con fotos', n.fotos], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas], ['sin_pub', 'Productos sin publicación', sinPub.length]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
@@ -211,7 +213,10 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
         {datos.productos.map(p => <option key={p.id} value={`${p.code} · ${p.name}`}>{`stock ${p.stock}`}</option>)}
       </datalist>
 
-      {filtro === 'sin_pub' ? (
+      {filtro === 'fotos' ? (
+        <RevisarFotos filas={encontradas.filter(f => f.estado === 'vinculada' && (!cuenta || f.cuenta === cuenta))} ver={ver}
+          onMas={() => setVer(v => v + POR_PAGINA)} onCorregir={f => { setFiltro('todas'); setBuscar(f.item_id); setVer(POR_PAGINA); scrollTo({ top: 0 }) }} />
+      ) : filtro === 'sin_pub' ? (
         <ProductosSinPub lista={sinPub.slice(0, ver)} quedan={Math.max(0, sinPub.length - ver)} onMas={() => setVer(v => v + POR_PAGINA)}
           filas={datos.filas.filter(f => (f.estado !== 'vinculada' || f.producto?.toda) && (!cuenta || f.cuenta === cuenta))} pedir={pedir}
           onVinculado={(f, p) => { cambiarFila(f.codigo, { estado: 'vinculada', producto: { id: p.id, code: p.code, name: p.name, toda: false }, otros: undefined,
@@ -282,9 +287,11 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
   return (
     <li className={`scroll-mt-16 px-4 py-2.5 text-sm ${modo === 'elegir' && celular ? 'bg-lime-50/60' : ''}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <div className="min-w-[10rem] flex-1">
+        <div className="flex min-w-[10rem] flex-1 items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {f.variante && f.foto && f.foto !== f.thumbnail && <img src={f.foto} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded border bg-white object-contain" />}
           <span className="font-medium text-neutral-800">{f.variante ?? 'Publicación sin variantes'}</span>
-          <span className="ml-2 text-xs text-neutral-400">{f.ventas60} vendidas · disponible {f.disponible}</span>
+          <span className="text-xs text-neutral-400">{f.ventas60} vendidas · disponible {f.disponible}</span>
         </div>
 
         {f.estado === 'vinculada' && f.producto ? (
@@ -566,6 +573,48 @@ function ProductosSinPub({ lista, quedan, onMas, filas, pedir, onVinculado }: {
         ))}
       </ul>
       {quedan > 0 && <button onClick={onMas} className="btn-secondary w-full text-sm">Ver {Math.min(POR_PAGINA, quedan)} más ({quedan} quedan)</button>}
+    </div>
+  )
+}
+
+/** 13-11 (el dueño): revisión visual de los vínculos. Un producto por tarjeta con la foto de CADA publicación (o variante)
+ *  vinculada: si una no se parece al producto o a las demás, está mal vinculada → «Corregir» abre esa publicación.
+ *  Las fotos de todo el sistema salen de estos vínculos, así que al corregir aquí se corrige la foto en todos lados. */
+function RevisarFotos({ filas, ver, onMas, onCorregir }: { filas: Fila[]; ver: number; onMas: () => void; onCorregir: (f: Fila) => void }) {
+  const productos = useMemo(() => {
+    const m = new Map<number, { p: NonNullable<Fila['producto']>; filas: Fila[] }>()
+    for (const f of filas) {
+      const k = f.producto!.id
+      if (!m.has(k)) m.set(k, { p: f.producto!, filas: [] })
+      m.get(k)!.filas.push(f)
+    }
+    // Primero los que tienen más publicaciones vinculadas (donde más fácil se cuela un error).
+    return [...m.values()].sort((a, b) => b.filas.length - a.filas.length || a.p.name.localeCompare(b.p.name))
+  }, [filas])
+  if (!productos.length) return <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500">Nada vinculado en esta vista.</p>
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-neutral-500">Cada producto con las fotos de sus publicaciones. Si una no corresponde, toca <b>Corregir</b>: la foto del
+        producto en todo el sistema sale de estos vínculos y se arregla sola.</p>
+      {productos.slice(0, ver).map(({ p, filas }) => (
+        <section key={p.id} className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm">
+          <div className="mb-2 text-sm"><span className="mr-2 font-mono text-xs text-neutral-400">{p.code}</span><span className="font-medium text-neutral-900">{p.name}</span>
+            <span className="ml-2 text-xs text-neutral-400">{filas.length} {filas.length === 1 ? 'publicación' : 'publicaciones'}</span></div>
+          <div className="flex flex-wrap gap-3">
+            {filas.map(f => (
+              <div key={`${f.cuenta}|${f.codigo}`} className="w-28 text-center text-[11px] text-neutral-500">
+                {f.foto ?? f.thumbnail
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={(f.foto ?? f.thumbnail)!} alt="" loading="lazy" className="mx-auto h-24 w-24 rounded-md border bg-white object-contain" title={f.titulo} />
+                  : <div className="mx-auto h-24 w-24 rounded-md bg-neutral-100" />}
+                <div className="mt-1 truncate" title={f.titulo}>{f.cuenta}{f.variante ? ` · ${f.variante}` : ''}</div>
+                <button onClick={() => onCorregir(f)} className="text-neutral-600 underline hover:text-neutral-900">Corregir</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+      {productos.length > ver && <button onClick={onMas} className="btn-secondary w-full text-sm">Ver {Math.min(POR_PAGINA, productos.length - ver)} más ({productos.length - ver} quedan)</button>}
     </div>
   )
 }

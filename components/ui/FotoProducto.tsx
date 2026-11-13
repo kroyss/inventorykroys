@@ -11,8 +11,10 @@ let fotos: Record<number, string> | null = null
 const avisar = new Set<() => void>()
 
 function cargar() {
-  if (!pedido) pedido = fetch('/api/products/fotos').then(r => (r.ok ? r.json() : {})).catch(() => ({}))
+  // Si falla (sesión recién abierta, deploy a medias) NO se guarda el vacío: la próxima pantalla lo vuelve a pedir.
+  if (!pedido) pedido = fetch('/api/products/fotos').then(r => (r.ok ? r.json() : Promise.reject(r.status)))
     .then((d: Record<number, string>) => { fotos = d; avisar.forEach(f => f()) })
+    .catch(() => { pedido = null; if (!fotos) { fotos = {}; avisar.forEach(f => f()) } })
   return pedido
 }
 const suscribir = (f: () => void) => { avisar.add(f); cargar(); return () => { avisar.delete(f) } }
