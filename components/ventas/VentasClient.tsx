@@ -1,5 +1,6 @@
 'use client'
 import CorregirPedido, { NotaAjustes } from '@/components/ventas/CorregirPedido'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import AvisoReabrir from '@/components/ventas/AvisoReabrir'
 import { LineaBancoVenta } from '@/components/ventas/LineaBanco'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -583,8 +584,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
                     </td>
                     <td className="px-3 py-2 font-mono text-xs font-bold text-neutral-900 whitespace-nowrap">{s.ml_order_number}</td>
                     <td className="px-3 py-2 text-neutral-700 max-w-[12rem] truncate">{s.customer_name || '—'}</td>
-                    <td className="px-3 py-2 text-xs text-neutral-500 max-w-[18rem] truncate cursor-help"
+                    <td className="px-3 py-1.5 text-xs text-neutral-500 max-w-[18rem] truncate cursor-help"
                       title={itemsTooltip(s.items, s.notes)}>
+                      {s.items[0] && <FotoProducto id={s.items[0].product_id} nombre={s.items[0].product_name} tam="xs" className="mr-1.5 inline-block align-middle" />}
                       {s.items.map((i, k) => (
                         <span key={i.id}>
                           {k > 0 && <span className="text-neutral-300"> · </span>}
@@ -758,10 +760,10 @@ export default function VentasClient({ products: initialProducts, userRole, coun
               <div className="space-y-1">
                 {selected.items.map((i: SaleItem) => (
                   <div key={i.id} className="flex justify-between gap-2 text-sm">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2"><FotoProducto id={i.product_id} nombre={i.product_name} /><span className="min-w-0">
                       <span className="text-neutral-400 mr-2">{i.product_code}</span>
                       {i.product_name}
-                    </div>
+                    </span></div>
                     <div className="shrink-0 whitespace-nowrap">{i.quantity} × ${money(i.unit_price)}</div>
                   </div>
                 ))}

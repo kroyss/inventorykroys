@@ -24,13 +24,16 @@ interface ItemCatalogo {
   category_id: string | null; available_quantity: number; permalink?: string
   attributes?: { id?: string; name: string; value_name: string | null }[]
   thumbnail?: string; seller_custom_field?: string | null
-  variations?: { id: number; available_quantity?: number; seller_custom_field?: string | null
+  pictures?: { id: string; secure_url?: string; url?: string }[]
+  variations?: { id: number; available_quantity?: number; seller_custom_field?: string | null; picture_ids?: string[]
                  attribute_combinations?: { name: string; value_name: string | null }[]
                  attributes?: { id?: string; value_name: string | null }[] }[]
 }
 
 /** Variantes como las guarda ml_catalogo.variantes (migración 082): para importar un producto por variante. */
-export interface VarianteCatalogo { id: number; nombre: string | null; disponible: number; sku: string | null }
+export interface VarianteCatalogo { id: number; nombre: string | null; disponible: number; sku: string | null; foto?: string | null }
+/** 13-11 (mig. 173): foto chica (-I) de ML, como `thumbnail`: sirve para las miniaturas del inventario. */
+const fotoChica = (u: string | undefined) => u ? u.replace(/^http:/, 'https:').replace(/-[A-Z]\.(jpg|webp|png)$/i, '-I.$1') : null
 const skuDe = (campo: string | null | undefined, attrs: { id?: string; value_name: string | null }[] | undefined) =>
   campo?.trim() || attrs?.find(a => a.id === 'SELLER_SKU')?.value_name?.trim() || null
 const variantesDe = (it: ItemCatalogo): VarianteCatalogo[] | null => it.variations?.length
@@ -39,6 +42,8 @@ const variantesDe = (it: ItemCatalogo): VarianteCatalogo[] | null => it.variatio
       nombre: (v.attribute_combinations ?? []).map(a => `${a.name}: ${a.value_name ?? '—'}`).join(' · ') || null,
       disponible: v.available_quantity ?? 0,
       sku: skuDe(v.seller_custom_field, v.attributes),
+      // La primera foto de la variante (cada color/modelo es un producto aparte en el inventario).
+      foto: fotoChica((it.pictures ?? []).find(p => p.id === v.picture_ids?.[0])?.secure_url ?? (it.pictures ?? []).find(p => p.id === v.picture_ids?.[0])?.url),
     }))
   : null
 
@@ -48,6 +53,52 @@ const ATRIBUTO_INUTIL = /^(SKU|C[oó]digo universal|GTIN|Condici[oó]n del [ií]
 export const fichaDeAtributos = (attrs: ItemCatalogo['attributes']) =>
   (attrs ?? []).filter(a => a.value_name && !ATRIBUTO_INUTIL.test(a.name))
     .slice(0, 18).map(a => `${a.name}: ${a.value_name}`).join(' · ') || null
+
+const CAMPOS = 'id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations,pictures'
+
+async function guardarItem(db: Pool, conexionId: number, it: ItemCatalogo) {
+  const vars = variantesDe(it)
+  await db.query(
+    `INSERT INTO ml_catalogo (item_id, conexion_id, titulo, precio, moneda, category_id, disponible, estado, permalink, ficha,
+                              thumbnail, sku, variantes, actualizado_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+     ON CONFLICT (empresa_id, item_id) DO UPDATE SET conexion_id = EXCLUDED.conexion_id, titulo = EXCLUDED.titulo,
+       precio = EXCLUDED.precio, moneda = EXCLUDED.moneda, category_id = EXCLUDED.category_id,
+       disponible = EXCLUDED.disponible, estado = EXCLUDED.estado, permalink = EXCLUDED.permalink,
+       ficha = EXCLUDED.ficha, thumbnail = EXCLUDED.thumbnail, sku = EXCLUDED.sku, variantes = EXCLUDED.variantes,
+       actualizado_at = NOW()`,
+    [it.id, conexionId, it.title, it.price, it.currency_id, it.category_id, it.available_quantity ?? 0,
+     it.status, it.permalink ?? null, fichaDeAtributos(it.attributes),
+     it.thumbnail?.replace(/^http:/, 'https:') ?? null, skuDe(it.seller_custom_field, it.attributes),
+     vars ? JSON.stringify(vars) : null])
+}
+
+/** 13-11 (el dueño): al abrir Vincular con ML, las publicaciones NUEVAS de la cuenta sin esperar la pasada de 6 h.
+ *  Liviano: la primera página de las activas más recientes; solo se lee el detalle de las que no están en el catálogo.
+ *  A lo sumo cada 5 minutos por cuenta (aunque entren varias personas). Devuelve cuántas agregó (null = no tocaba). */
+export async function buscarNuevas(db: Pool, conexionId: number): Promise<number | null> {
+  const { rows: [c] } = await db.query(
+    `UPDATE ml_conexiones SET nuevas_at = NOW()
+     WHERE id = $1 AND estado = 'activa' AND (nuevas_at IS NULL OR nuevas_at < NOW() - INTERVAL '5 minutes')
+     RETURNING ml_user_id`, [conexionId])
+  if (!c) return null
+  const r: { results?: string[] } = await mlFetch(db, conexionId,
+    `/users/${Number(c.ml_user_id)}/items/search?status=active&orders=start_time_desc&limit=50`)
+  const ids = r.results ?? []
+  if (!ids.length) return 0
+  const { rows: ya } = await db.query(`SELECT item_id FROM ml_catalogo WHERE item_id = ANY($1::text[])`, [ids])
+  const faltan = ids.filter(id => !ya.some(y => y.item_id === id))
+  let n = 0
+  for (let i = 0; i < faltan.length; i += POR_MULTIGET) {
+    const items = await leerItems<ItemCatalogo>(db, conexionId, faltan.slice(i, i + POR_MULTIGET), CAMPOS)
+    for (const x of items) {
+      const it = x.code === 200 ? x.body : null
+      if (!it || (it.status !== 'active' && it.status !== 'paused')) continue
+      await guardarItem(db, conexionId, it); n++
+    }
+  }
+  return n
+}
 
 /** Refresca el catálogo de una cuenta si pasaron HORAS_CATALOGO (la reserva es atómica).
  *  `forzar`: ya (Importar desde ML → "Actualizar desde ML"), aunque no hayan pasado las horas. */
@@ -64,24 +115,12 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
   const sinLeer: string[] = []
   for (let i = 0; i < ids.length; i += POR_MULTIGET) {
     const r = await leerItems<ItemCatalogo>(db, conexionId, ids.slice(i, i + POR_MULTIGET),
-      'id,title,status,price,currency_id,category_id,available_quantity,permalink,attributes,thumbnail,seller_custom_field,variations')
+      CAMPOS)
     sinLeer.push(...r.filter(x => x.code === -1).map(x => x.id))
     for (const x of r) {
       const it = x.code === 200 ? x.body : null
       if (!it || (it.status !== 'active' && it.status !== 'paused')) continue
-      await db.query(
-        `INSERT INTO ml_catalogo (item_id, conexion_id, titulo, precio, moneda, category_id, disponible, estado, permalink, ficha,
-                                  thumbnail, sku, variantes, actualizado_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
-         ON CONFLICT (empresa_id, item_id) DO UPDATE SET conexion_id = EXCLUDED.conexion_id, titulo = EXCLUDED.titulo,
-           precio = EXCLUDED.precio, moneda = EXCLUDED.moneda, category_id = EXCLUDED.category_id,
-           disponible = EXCLUDED.disponible, estado = EXCLUDED.estado, permalink = EXCLUDED.permalink,
-           ficha = EXCLUDED.ficha, thumbnail = EXCLUDED.thumbnail, sku = EXCLUDED.sku, variantes = EXCLUDED.variantes,
-           actualizado_at = NOW()`,
-        [it.id, conexionId, it.title, it.price, it.currency_id, it.category_id, it.available_quantity ?? 0,
-         it.status, it.permalink ?? null, fichaDeAtributos(it.attributes),
-         it.thumbnail?.replace(/^http:/, 'https:') ?? null, skuDe(it.seller_custom_field, it.attributes),
-         variantesDe(it) ? JSON.stringify(variantesDe(it)) : null])
+      await guardarItem(db, conexionId, it)
       n++
     }
   }

@@ -21,6 +21,6 @@ export default async function VincularMLPage({ searchParams }: { searchParams: P
   return <>
     <PublicacionesMLTabs user={session.user} actual="vincular" />
     <VincularMLClient conCuentas={tieneModulo(session.user, 'preguntas')} paraQuien={paraQuien}
-      buscarInicial={buscar?.slice(0, 80) ?? ''} vistaInicial={vista === 'activas' ? 'activas' : undefined} conStock={pestanasML(session.user).some(x => x.k === 'stock')} />
+      buscarInicial={buscar?.slice(0, 80) ?? ''} vistaInicial={vista === 'activas' || vista === 'nuevas' ? vista : undefined} conStock={pestanasML(session.user).some(x => x.k === 'stock')} />
   </>
 }

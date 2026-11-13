@@ -6,6 +6,7 @@ import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { desvincular, eliminarVarianteML, filasVincular, marcarNoUsa, productosParaVincular, vincular } from '@/lib/vincularML'
 import { ErrorML } from '@/lib/ml'
+import { buscarNuevas } from '@/lib/catalogoML'
 
 // Vincular publicaciones de ML (20-10, migración 109; lib/vincularML.ts). Permiso "vincular_ml" (empleados, sin ver
 // Productos). Precios solo para quien tiene "costos". Resolver dudas como "ignorada": quien ve Productos (el dueño).
@@ -56,6 +57,7 @@ const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('no_usa'), codigo: Codigo, valor: z.boolean(), cuenta: z.string().max(50).optional(),
              titulo: z.string().max(300).optional(), variante: z.string().max(200).nullable().optional() }),
   z.object({ accion: z.literal('eliminar_variante'), codigo: Codigo, con_stock: z.boolean().optional() }),
+  z.object({ accion: z.literal('buscar_nuevas') }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -64,6 +66,13 @@ export async function POST(req: NextRequest) {
   try {
     const b = Body.parse(await req.json())
     const userId = Number(s.session.user.id)
+    // 13-11 (mig. 173): al abrir la pantalla, las publicaciones nuevas de cada cuenta (máx. cada 5 min por cuenta).
+    if (b.accion === 'buscar_nuevas') {
+      const { rows: cs } = await s.db.query(`SELECT id FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
+      let nuevas = 0
+      for (const c of cs) nuevas += (await buscarNuevas(s.db, c.id).catch(e => { console.error('[nuevas ML]', c.id, e instanceof Error ? e.message : e); return 0 })) ?? 0
+      return NextResponse.json({ ok: true, nuevas })
+    }
     if (b.accion === 'vincular') {
       const { rows: [p] } = await s.db.query(`SELECT id FROM products WHERE id = $1 AND is_active`, [b.product_id])
       if (!p) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })

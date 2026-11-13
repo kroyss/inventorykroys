@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import type { PurchaseOrder, PurchaseOrderItem, Supplier, UserRole } from '@/lib/types'
 import { Stepper, KPICard, int, Pagination, StatusBadge, chipCls } from '@/components/ui'
 import { Combobox } from '@/components/ui/Combobox'
@@ -942,8 +943,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                 {selected.items.map((item, idx) => (
                   <tr key={idx} className="border-t hover:bg-neutral-50">
                     <td className="px-4 py-2">
+                      <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.product_name} tam="xs" /><span>
                       <span className="text-neutral-500 font-mono text-xs mr-2">{item.product_code}</span>
                       {item.product_name}
+                      </span></div>
                     </td>
                     <td className="px-4 py-2 text-right">{item.quantity}</td>
                     {verCostos && <td className="px-4 py-2 text-right">${fmt(item.unit_cost_usd)}</td>}
@@ -1042,10 +1045,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                           onClick={() => addProductToForm(p)}
                           className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex justify-between gap-2"
                         >
-                          <span className="truncate">
+                          <span className="flex min-w-0 items-center gap-2"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span className="truncate">
                             <span className="font-mono text-neutral-500 mr-2">{p.code}</span>
                             {p.name}
-                          </span>
+                          </span></span>
                           {(p.total_cost ?? 0) > 0 && (
                             <span className="text-neutral-400 whitespace-nowrap">${fmt(p.total_cost!)}</span>
                           )}
@@ -1072,8 +1075,10 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                       {formItems.map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="px-3 py-1.5 text-xs">
+                            <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.product_name} tam="xs" /><span>
                             <span className="text-neutral-400 mr-1">{item.product_code}</span>
                             {item.product_name}
+                            </span></div>
                           </td>
                           <td className="px-3 py-1.5">
                             <NumberInput
@@ -1156,11 +1161,13 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
                   {recvItems.map((item, idx) => (
                     <tr key={idx} className="border-t">
                       <td className="px-3 py-2 text-xs">
+                        <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.product_name} /><span>
                         <span className="text-neutral-400 mr-1">{item.product_code}</span>
                         {item.product_name}
                         {item.already_received > 0 && (
                           <span className="ml-1 text-amber-500">(ya {item.already_received})</span>
                         )}
+                        </span></div>
                       </td>
                       <td className="px-3 py-2 text-right text-neutral-500">{item.expected - item.already_received}</td>
                       <td className="px-3 py-2">

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import type { ImportOrder, Supplier, UserRole } from '@/lib/types'
 import ImportsForm from './ImportsForm'
 import ImportFiles from './ImportFiles'
@@ -1105,8 +1106,10 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                     {selected.items.map(i => (
                       <tr key={i.id} className="border-t">
                         <td className="px-3 py-2">
+                          <div className="flex items-center gap-2"><FotoProducto id={i.product_id} nombre={i.product_name} tam="xs" /><span>
                           <span className="font-mono text-xs text-neutral-400 mr-2">{i.product_code}</span>
                           {i.product_name}
+                          </span></div>
                         </td>
                         <td className="px-3 py-2 text-right">{i.quantity}</td>
                         {verCostos && <td className="px-3 py-2 text-right">${fmt(i.unit_cost_usd)}</td>}
@@ -1147,8 +1150,10 @@ export default function ImportsClient({ initialOrders, suppliers, acceso, histor
                   {recvItems.map((it, idx) => (
                     <tr key={it.product_id} className="border-t">
                       <td className="px-3 py-2">
+                        <div className="flex items-center gap-2"><FotoProducto id={it.product_id} nombre={it.product_name} /><span>
                         <span className="font-mono text-xs text-neutral-400 mr-2">{it.product_code}</span>
                         {it.product_name}
+                        </span></div>
                       </td>
                       <td className="px-3 py-2 text-right">{it.expected}</td>
                       <td className="px-3 py-2 text-right text-neutral-500">{it.already_received}</td>

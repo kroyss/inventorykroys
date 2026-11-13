@@ -57,12 +57,12 @@ function Etiqueta({ f }: { f: FilaImportar }) {
   )
 }
 
-export default function ImportarMLClient({ conCuentas }: { conCuentas: boolean }) {
+export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { conCuentas: boolean; buscarInicial?: string }) {
   const [datos, setDatos] = useState<Datos | null>(null)
   const [productos, setProductos] = useState<ComboOption[]>([])
   const [filtro, setFiltro] = useState<Filtro>('revisar')
   const [cuenta, setCuenta] = useState('')
-  const [buscar, setBuscar] = useState('')
+  const [buscar, setBuscar] = useState(buscarInicial)
   const [pagina, setPagina] = useState(1)
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
   const [borrador, setBorrador] = useState<Record<string, Borrador>>({})

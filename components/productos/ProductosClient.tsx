@@ -1,5 +1,6 @@
 'use client'
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
+import { FotoProducto, FotoEditable } from '@/components/ui/FotoProducto'
 import type { Product, ProfitCategory, Country, MLCode } from '@/lib/types'
 import { int, PageHeader, KPICard, StatusBadge, RowMenu } from '@/components/ui'
 import { useEscape } from '@/components/ui/useEscape'
@@ -678,7 +679,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     />
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{p.code}</td>
-                  <td className="px-3 py-2 font-medium text-neutral-900">{p.name}</td>
+                  <td className="px-3 py-1.5 font-medium text-neutral-900"><div className="flex items-center gap-2"><FotoProducto id={p.id} nombre={p.name} />{p.name}</div></td>
                   {!simple && (
                     <td className="px-3 py-2">
                       {p.category_name ? (
@@ -736,7 +737,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             return (
               <div key={p.id} onClick={() => openView(p.id)} className="px-4 py-3 cursor-pointer active:bg-neutral-50">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <FotoProducto id={p.id} nombre={p.name} tam="md" />
+                  <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-neutral-400">{p.code}</div>
                     <div className="font-medium text-neutral-900 truncate">{p.name}</div>
                     {p.category_name && !simple && (
@@ -1143,6 +1145,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </div>
                 </div>
                 <button onClick={closeView} className="text-neutral-400 hover:text-neutral-700 text-lg">✕</button>
+              </div>
+              {/* 13-11 (mig. 173): la foto del producto (propia o de MercadoLibre) y cambiarla. */}
+              <div className="px-6 py-3 border-b border-neutral-100 shrink-0">
+                <FotoEditable id={v.id} nombre={v.name} puedeCambiar />
               </div>
 
               {/* body */}

@@ -13,6 +13,7 @@ interface Producto { id: number; code: string; name: string; stock: number; vent
 interface Fila {
   codigo: string; item_id: string; cuenta: string; titulo: string; variante: string | null; disponible: number
   estado_ml: string | null; thumbnail: string | null; permalink: string | null; sin_movimiento?: boolean
+  reciente?: boolean   // apareció en los últimos 15 días (mig. 173)
   estado: 'vinculada' | 'parecida' | 'nueva'
   producto: { id: number; code: string; name: string; toda: boolean } | null
   ventas60: number; vinculado_por: string | null; vinculado_at: string | null; propio: boolean
@@ -22,7 +23,7 @@ interface Fila {
   no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
 }
 interface Datos { filas: Fila[]; productos: Producto[]; hoy: { todos: number; mios: number }; esDueno: boolean }
-type Filtro = 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas' | 'sin_pub'
+type Filtro = 'nuevas' | 'activas' | 'pendientes' | 'dudas' | 'vinculadas' | 'toda' | 'no_usa' | 'todas' | 'sin_pub'
 
 const POR_PAGINA = 25
 
@@ -47,6 +48,8 @@ const activaSinVincular = (f: Fila) => f.estado !== 'vinculada' && f.estado_ml =
 const quieta = (f: Fila) => f.estado !== 'vinculada' && !!f.sin_movimiento
 /** Variante que hereda el vínculo viejo de la publicación entera (código cargado en la ficha, antes de vincular por variante). */
 const porToda = (f: Fila) => f.estado === 'vinculada' && !!f.producto?.toda
+/** 13-11 (mig. 173): publicada en los últimos 15 días y todavía sin producto. */
+const nuevaSinVincular = (f: Fila) => !!f.reciente && f.estado !== 'vinculada' && !f.no_usa
 const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
 const coincide = (f: Fila, palabras: string[]) => { if (!palabras.length) return true; const t = textoFila(f); return palabras.every(w => t.includes(w)) }
 /** ¿Ve la pestaña Stock? (para el atajo «ver stock» de cada vínculo) */
@@ -70,7 +73,16 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
     setDatos(d); setError(null)
   })
-  useEffect(() => { if (conCuentas) cargar() }, [conCuentas])
+  // 13-11 (el dueño): al abrir, se buscan las publicaciones nuevas de cada cuenta (sin esperar la pasada de 6 h ni
+  // tocar ningún botón). La pantalla abre con lo que ya hay; si aparece algo nuevo, se recarga y sale el aviso.
+  const [buscando, setBuscando] = useState(false)
+  useEffect(() => {
+    if (!conCuentas) return
+    cargar()
+    setBuscando(true)
+    fetch('/api/vincular-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'buscar_nuevas' }) })
+      .then(r => r.json()).then(d => { if (d?.nuevas > 0) return cargar() }).catch(() => {}).finally(() => setBuscando(false))
+  }, [conCuentas]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Agrupado por publicación, ordenado por ventas de 60 días.
   const grupos = useMemo(() => {
@@ -82,7 +94,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
       if (!m.has(k)) m.set(k, { item_id: f.item_id, cuenta: f.cuenta, titulo: f.titulo, thumbnail: f.thumbnail, permalink: f.permalink, estado_ml: f.estado_ml, quieta: !!f.sin_movimiento, filas: [] })
       m.get(k)!.filas.push(f)
     }
-    const pasa = (f: Fila) => filtro === 'sin_pub' ? false : filtro === 'todas' ? true : filtro === 'vinculadas' ? f.estado === 'vinculada'
+    const pasa = (f: Fila) => filtro === 'sin_pub' ? false : filtro === 'todas' ? true : filtro === 'nuevas' ? nuevaSinVincular(f) : filtro === 'vinculadas' ? f.estado === 'vinculada'
       : filtro === 'activas' ? activaSinVincular(f)
       : filtro === 'toda' ? porToda(f)
       : filtro === 'no_usa' ? f.estado !== 'vinculada' && !!f.no_usa
@@ -108,6 +120,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     dudas: encontradas.filter(f => f.duda).length,
     pendientes: encontradas.filter(f => f.estado !== 'vinculada' && !f.duda && !f.no_usa && (!quieta(f) || palabras.length > 0)).length,
     activas: encontradas.filter(activaSinVincular).length,
+    nuevas: encontradas.filter(nuevaSinVincular).length,
     toda: encontradas.filter(porToda).length,
     no_usa: encontradas.filter(f => f.estado !== 'vinculada' && f.no_usa).length,
   }
@@ -153,6 +166,15 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
         </div>
       )}
 
+      {/* 13-11: publicaciones nuevas (últimos 15 días) sin producto en el inventario. */}
+      {n.nuevas > 0 && filtro !== 'nuevas' && (
+        <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sky-900"><b>{n.nuevas} publicaci{n.nuevas === 1 ? 'ón nueva' : 'ones nuevas'}</b> sin producto en el inventario: dile al sistema a qué producto corresponde{datos.esDueno ? ' o crea el producto' : ''}.</span>
+          <button onClick={() => { setFiltro('nuevas'); setVer(POR_PAGINA) }} className="btn-primary shrink-0 text-xs">Ver nuevas</button>
+        </div>
+      )}
+      {buscando && <p className="text-xs text-neutral-400">Buscando publicaciones nuevas en MercadoLibre…</p>}
+
       {/* Avance */}
       <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
@@ -167,7 +189,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-        {([['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas], ['sin_pub', 'Productos sin publicación', sinPub.length]] as const).map(([k, t, n]) => (
+        {([...(n.nuevas ? [['nuevas', 'Nuevas', n.nuevas] as const] : []), ['activas', 'Activas sin vincular', n.activas], ['pendientes', 'Por vincular', n.pendientes], ['dudas', 'Dudas', n.dudas], ['vinculadas', 'Vinculadas', n.vinculadas], ...(n.toda ? [['toda', 'Por publicación entera', n.toda] as const] : []), ['no_usa', 'No se usan', n.no_usa], ['todas', 'Todas', n.todas], ['sin_pub', 'Productos sin publicación', sinPub.length]] as const).map(([k, t, n]) => (
           <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
             {t} <span className="opacity-60">{n}</span>
@@ -324,6 +346,9 @@ Si no es exactamente el mismo (modelo, medida, color), toca «No» y usa «Es ot
               </>
             )}
             {productos.length > 0 && <button onClick={() => setModo(modo === 'elegir' ? 'nada' : 'elegir')} className="btn-secondary w-full text-xs sm:w-auto">{f.estado === 'parecida' ? 'Es otro…' : 'Elegir producto…'}</button>}
+            {/* 13-11: producto que todavía no existe en el inventario → se crea desde la publicación (Crear productos desde ML). */}
+            {esDueno && f.reciente && <Link href={`/productos/importar-ml?buscar=${encodeURIComponent(f.item_id)}`} className="btn-secondary w-full text-center text-xs sm:w-auto"
+              title="Crea el producto a partir de esta publicación (queda vinculado)">Crear producto nuevo</Link>}
             {!f.duda && productos.length > 0 && <button onClick={() => setModo(modo === 'duda' ? 'nada' : 'duda')} className="py-1 text-xs text-neutral-500 underline sm:py-0">No sé, para {paraQuien}</button>}
             {/* Variantes viejas (26-10): lo decide una persona, nunca solo. */}
             {!f.no_usa && (

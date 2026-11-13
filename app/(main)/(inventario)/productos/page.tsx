@@ -8,6 +8,7 @@ import { tieneModulo } from '@/lib/modulos'
 import type { Product, ProfitCategory } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tasaYAjustes } from '@/lib/inicial'
+import { AvisoNuevasML } from '@/components/productos/AvisosML'
 
 export const metadata = { title: 'Productos' }
 
@@ -46,7 +47,10 @@ export default async function ProductosPage() {
     `),
   ])
 
+  const conML = puede(session.user, 'importar_ml') && tieneModulo(session.user, 'preguntas')
   return (
+    <div className="space-y-3">
+    {conML && <AvisoNuevasML />}
     <ProductosClient
       inicialTasa={await tasaYAjustes()}
       initialProducts={productsRes.rows as Product[]}
@@ -59,5 +63,6 @@ export default async function ProductosPage() {
       categorias={tieneModulo(session.user, 'precios_categorias')}
       promociones={tieneModulo(session.user, 'promociones') && puede(session.user, 'promociones')}
     />
+    </div>
   )
 }

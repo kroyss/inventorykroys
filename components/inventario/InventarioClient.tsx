@@ -1,5 +1,6 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import type { InventoryItem, InventoryMovement, StockStatus, UserRole, Country } from '@/lib/types'
 import { Pagination, PageHeader, KPICard, StatusBadge } from '@/components/ui'
 import Link from '@/components/ui/Link'
@@ -497,7 +498,8 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                   onClick={() => selectItem(item)}
                   className={`border-b border-neutral-50 hover:bg-neutral-50 cursor-pointer ${i % 2 ? 'bg-neutral-50/40' : ''}`}>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{item.code}</td>
-                  <td className="px-3 py-2 font-medium text-neutral-900">
+                  <td className="px-3 py-1.5 font-medium text-neutral-900">
+                    <div className="flex items-center gap-2"><FotoProducto id={item.product_id} nombre={item.name} /><span>
                     {item.name}
                     {item.stock_por_verificar && (
                       <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-px align-middle text-[10px] font-semibold text-amber-800"
@@ -505,6 +507,7 @@ export default function InventarioClient({ initialItems, acceso, country, etique
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />por verificar
                       </span>
                     )}
+                    </span></div>
                   </td>
                   <td className={`px-3 py-2 text-right font-semibold num ${item.quantity === 0 && item.status !== 'INACTIVO' ? 'text-red-600' : 'text-neutral-900'}`}>{item.quantity}</td>
                   {/* Sin configurar (0): se muestra el recomendado por ventas, en gris y cursiva */}
