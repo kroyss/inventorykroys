@@ -15,6 +15,11 @@ const Schema = z.object({
   is_active: z.boolean().optional(),
   // Borradores de IA por mes (null = sin límite).
   ia_limite_mes: z.number().int().min(0).max(100000).nullable().optional(),
+  // 13-11: WhatsApp / Telegram de contacto (organizaciones.registro; '' = quitarlo). Ficha → Contacto.
+  contacto: z.object({
+    whatsapp: z.string().trim().regex(/^([+\d\s()-]{7,20})?$/, 'Revisa el número de WhatsApp'),
+    telegram: z.string().trim().transform(t => t.replace(/^@/, '')).pipe(z.string().regex(/^[A-Za-z0-9_]{0,32}$/, 'Revisa el usuario de Telegram')),
+  }).optional(),
 })
 
 /**
@@ -34,6 +39,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // No te puedes desactivar la empresa desde la que administras la plataforma.
     if (body.is_active === false && Number(id) === session.user.empresaId) {
       return NextResponse.json({ error: 'No puedes desactivar la empresa en la que estás' }, { status: 400 })
+    }
+    if (body.contacto) {
+      await dbGlobal().query(
+        `UPDATE organizaciones o SET registro = COALESCE(o.registro, '{}'::jsonb)
+           || jsonb_build_object('whatsapp', NULLIF($2, ''), 'telegram', NULLIF($3, ''))
+         FROM empresas e WHERE e.id = $1 AND o.id = e.organizacion_id`, [id, body.contacto.whatsapp, body.contacto.telegram])
+      if (body.nombre === undefined && body.modulos === undefined && body.is_active === undefined && body.ia_limite_mes === undefined) {
+        return NextResponse.json({ ok: true })
+      }
     }
     // Renombrar: la organización con una sola empresa y el mismo nombre se renombra también.
     if (body.nombre) {

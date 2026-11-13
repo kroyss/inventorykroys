@@ -45,6 +45,24 @@ export const queUsa = (e: Empresa) => ([
   ['calificaciones', e.calificadas_sistema], ['stock', e.stock], ['IA', e.ia], ['pagos ME', e.pagos_me ?? 0],
 ] as [string, number][]).filter(([, n]) => n > 0).map(([t, n]) => `${n} ${t}`).join(' · ')
 
+/** Lo 3 que más usó, para la fila (todo en el title). */
+const usoCorto = (e: Empresa) => ([
+  ['preguntas', e.preguntas_sistema], ['mensajes', e.mensajes_sistema], ['guías', e.guias], ['reportes', e.reportadas],
+  ['calificaciones', e.calificadas_sistema], ['stock', e.stock], ['IA', e.ia], ['pagos ME', e.pagos_me ?? 0],
+] as [string, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${n} ${t}`).join(' · ')
+
+/** Por qué un cliente pide atención hoy (lo más urgente primero); null = va bien. 13-11 (el dueño). */
+type Motivo = { t: string; grave: boolean }
+function motivo(b: BaseCliente, e: Empresa, n: Nivel): Motivo | null {
+  if (b.vence != null && b.vence <= 5) return { t: b.vence < 0 ? 'Venció' : b.vence === 0 ? 'Vence hoy' : `Vence en ${b.vence} día${b.vence === 1 ? '' : 's'}`, grave: b.vence <= 1 }
+  if (n === 'sin_conectar') return { t: 'No conectó MercadoLibre', grave: false }
+  if (n === 'no_entra') return { t: `No entra (${hace(e.ultimo_uso ?? e.abierta_at)})`, grave: true }
+  if (n === 'sin_uso') return { t: 'Entra pero no usa nada', grave: true }
+  return null
+}
+
+const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, '').replace(/^0/, '58')}`
+
 /** Qué usa, con cuántas veces (solo lo que usó). */
 export function UsoChips({ e }: { e: Empresa }) {
   const usos: [string, number, string][] = [
@@ -110,7 +128,14 @@ function siguiente(e: Empresa, n: Nivel) {
 
 /** Una empresa de la lista de Plataforma (búsqueda y estado de la cuenta los pone PlataformaClient; 20-10 aquí
  *  solo llegan las que pueden entrar: las inactivas van plegadas aparte). porVencer = le quedan ≤ 5 días. */
-export interface BaseCliente { id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean; extra?: ReactNode; pagando?: boolean; prueba?: boolean }
+export interface BaseCliente {
+  id: number; nombre: string; detalle: string; cuenta: ReactNode; activa: boolean; porVencer: boolean; extra?: ReactNode
+  pagando?: boolean; prueba?: boolean
+  interna?: boolean            // 13-11: va con «Tuyas e internas», nunca en «Para atender»
+  vence?: number | null        // días que le quedan (plan o prueba); null = no vence o no aplica
+  whatsapp?: string | null     // contacto (ficha → Contacto): botón directo en la fila
+  telegram?: string | null
+}
 
 export const CEROS = {
   propia: false, cuentas: null, ventas: 0, preguntas: 0, preguntas_sistema: 0, guias: 0, reportadas: 0, calificadas: 0,
@@ -126,6 +151,9 @@ const FILTROS_USO: { k: FiltroUso; t: string }[] = [
 /** Plataforma → Clientes: la lista de empresas con su uso. Tocar una fila abre su ficha (onAbrir). */
 /** Lo cobrado (Plataforma → Clientes, 13-11): sale de /api/plataforma/cobros. */
 export interface ResumenCobro { mes: number; pagos_mes: number; anterior: number; recurrente: number }
+// Columnas de la fila en escritorio (en móvil la fila es una tarjeta apilada). Literales: Tailwind las lee del código.
+const COLS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_4.5rem]'
+const COLS_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_4.5rem]'
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`
 
 export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro, cobro = null }: {
@@ -168,9 +196,16 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
       : orden === 'ventas' ? y.e.ventas - x.e.ventas
       : orden === 'ultimo' ? diasSin(x.e.ultimo_uso ?? x.e.abierta_at) - diasSin(y.e.ultimo_uso ?? y.e.abierta_at)
       : y.act - x.act || diasSin(x.e.ultimo_uso) - diasSin(y.e.ultimo_uso)
-  // Tu empresa arriba como referencia; las desactivadas al final; el resto según el orden elegido.
+  // 13-11 (el dueño): agrupada por lo que pide de ti. Para atender (vence, sin ML, no entra, no usa nada) primero y con
+  // el motivo a la vista; después los que van bien; tus empresas e internas al final, como referencia.
   const vistas = filas.filter(x => x.e.propia || pasa[filtroUso](x))
-    .sort((x, y) => Number(y.e.propia) - Number(x.e.propia) || Number(y.b.activa) - Number(x.b.activa) || ordenar(x, y))
+    .map(x => ({ ...x, m: x.e.propia || x.b.interna ? null : motivo(x.b, x.e, x.n) }))
+  const grupos: { k: string; t: string; ayuda: string; filas: typeof vistas }[] = [
+    { k: 'atender', t: 'Para atender', ayuda: 'vence pronto, sin MercadoLibre, no entra o no usa nada',
+      filas: vistas.filter(x => x.m).sort((x, y) => Number(y.m!.grave) - Number(x.m!.grave) || ordenar(x, y)) },
+    { k: 'bien', t: 'Van bien', ayuda: 'entran y usan el sistema', filas: vistas.filter(x => !x.m && !x.e.propia && !x.b.interna).sort(ordenar) },
+    { k: 'tuyas', t: 'Tuyas e internas', ayuda: 'referencia: no pagan ni vencen', filas: vistas.filter(x => x.e.propia || x.b.interna).sort(ordenar) },
+  ]
 
   // 12-11 (el dueño): lo que mira seguido, en 4 números.
   const enLinea = clientes.filter(x => x.e.en_linea)
@@ -223,55 +258,85 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-xs text-neutral-500">
-            <tr className="[&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-medium">
-              <th>Empresa</th><th>Cuenta</th><th>Último uso</th><th>Actividad ({dias} días)</th><th>Uso</th><th className="w-6" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {vistas.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-400">Ninguna empresa con ese filtro.</td></tr>
-            )}
-            {vistas.map(({ b, e, n, act }) => {
-              const paso = b.activa ? siguiente(e, n) : null
-              return (
-                <tr key={b.id} onClick={() => onAbrir(b.id)}
-                  className={`cursor-pointer align-top hover:bg-neutral-50 ${abierta === b.id ? 'bg-lime-50/60' : e.propia ? 'bg-lime-50/30' : ''} ${b.activa ? '' : 'opacity-50'}`}>
-                  <td className="px-3 py-2.5">
-                    <div className="font-medium text-neutral-900">{b.nombre}{e.propia && <span className="ml-1.5 rounded bg-neutral-900 px-1.5 py-px text-[10px] font-semibold text-white">TÚ</span>}</div>
-                    <div className="text-[11px] text-neutral-400">{b.detalle}</div>
-                    <div className="max-w-[14rem] truncate text-[11px] text-neutral-400" title={e.cuentas ?? ''}>{e.cuentas ?? 'sin cuenta de ML'}</div>
-                    {b.extra}
-                  </td>
-                  <td className="px-3 py-2.5">{b.cuenta}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-xs">
-                    {e.en_linea ? <span className="font-medium text-emerald-700"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />usando ahora</span>
-                      : <span className={diasSin(e.ultimo_uso ?? e.abierta_at) > 7 ? 'text-red-600' : 'text-neutral-600'}>{e.ultimo_uso ? hace(e.ultimo_uso) : e.abierta_at ? `entró ${hace(e.abierta_at)}` : 'nunca'}</span>}
-                    {!e.en_linea && e.abierta && <div className="text-[11px] text-neutral-400"><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-neutral-300" />pestaña abierta</div>}
-                    <div className="text-[11px] text-neutral-400">{e.usuarios_7d} persona{e.usuarios_7d === 1 ? '' : 's'} en 7 d</div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex min-w-[7rem] items-center gap-2" title={`${act} cosas hechas en el sistema en ${dias} días${queUsa(e) ? `: ${queUsa(e)}` : ''}`}>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
-                        <div className="h-full rounded-full bg-lime-500" style={{ width: `${e.propia ? 100 : Math.round((act / maxAct) * 100)}%` }} />
+      {vistas.length === 0 && <p className="rounded-xl border border-dashed border-neutral-200 py-10 text-center text-sm text-neutral-400">Ninguna empresa con ese filtro.</p>}
+
+      {grupos.filter(g => g.filas.length).map(g => (
+        <section key={g.k} className="space-y-1.5">
+          <h3 className="flex items-baseline gap-2 px-1">
+            <span className={`text-xs font-semibold uppercase tracking-wide ${g.k === 'atender' ? 'text-amber-700' : 'text-neutral-500'}`}>{g.t}</span>
+            <span className="text-xs font-semibold tabular-nums text-neutral-400">{g.filas.length}</span>
+            <span className="hidden text-[11px] text-neutral-400 sm:inline">· {g.ayuda}</span>
+          </h3>
+          <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <div className={`hidden ${COLS} gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-1.5 text-[11px] font-medium text-neutral-500 md:grid`}>
+              <span>Cliente</span><span>Cuenta</span><span>Último uso</span><span>Actividad ({dias} días)</span><span>{g.k === 'atender' ? 'Qué pasa' : 'Uso'}</span><span />
+            </div>
+            <ul className="divide-y divide-neutral-100">
+              {g.filas.map(({ b, e, n, act, m }) => {
+                const paso = b.activa && !e.propia ? siguiente(e, n) : null
+                const color = m ? (m.grave ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800')
+                  : e.propia || b.interna ? 'bg-neutral-900 text-white'
+                  : n === 'integrado' ? 'bg-emerald-100 text-emerald-800' : n === 'parcial' ? 'bg-lime-100 text-lime-800' : 'bg-neutral-100 text-neutral-500'
+                const dormido = !!e.cuentas && diasSin(e.ultimo_uso ?? e.abierta_at) > 7
+                return (
+                  <li key={b.id} role="button" tabIndex={0} onClick={() => onAbrir(b.id)}
+                    onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(b.id) } }}
+                    className={`group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-4 py-3 outline-none transition-colors hover:bg-neutral-50 focus-visible:bg-lime-50 md:gap-4 ${COLS_MD} ${abierta === b.id ? 'bg-lime-50/70' : ''}`}>
+                    {/* Cliente */}
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span aria-hidden className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${color}`}>{b.nombre.trim().charAt(0).toUpperCase()}</span>
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-neutral-900">{b.nombre}{e.propia && <span className="ml-1.5 rounded bg-neutral-900 px-1.5 py-px align-middle text-[10px] font-semibold text-white">TÚ</span>}</div>
+                        <div className="truncate text-[11px] text-neutral-400" title={[b.detalle, e.cuentas].filter(Boolean).join(' · ')}>{b.detalle}{e.cuentas ? ` · ${e.cuentas}` : ''}</div>
+                        {b.extra}
                       </div>
-                      <b className="tabular-nums text-xs text-neutral-800">{act}</b>
                     </div>
-                    <div className="mt-0.5 max-w-[16rem] truncate text-[11px] text-neutral-400" title={queUsa(e) || undefined}>{e.ventas} ventas en ML{queUsa(e) ? ` · ${queUsa(e)}` : ''}</div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${NIVEL[n].c}`}>{NIVEL[n].t}</span>
-                    {paso && !e.propia && <div className="mt-1 max-w-[12rem] text-[11px] text-neutral-500">→ {paso}</div>}
-                  </td>
-                  <td className="px-2 py-2.5 text-neutral-300">›</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                    {/* Contacto directo (móvil: arriba a la derecha; escritorio: al final) */}
+                    <div className="flex items-center justify-end gap-0.5 md:order-last">
+                      {b.whatsapp && <a href={waLink(b.whatsapp)} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} title={`WhatsApp ${b.whatsapp}`} aria-label={`WhatsApp de ${b.nombre}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-emerald-600 hover:bg-emerald-50">
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3a.4.4 0 0 0 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3Z" /></svg>
+                      </a>}
+                      {b.telegram && <a href={`https://t.me/${b.telegram}`} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} title={`Telegram @${b.telegram}`} aria-label={`Telegram de ${b.nombre}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-sky-600 hover:bg-sky-50">
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden><path d="M21.4 4.3 2.9 11.4c-1.3.5-1.3 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.7c.3-1.3-.5-1.9-1.5-1.4ZM8.8 14l9.6-6.1c.5-.3.9-.1.5.2l-8.2 7.4-.3 3.5L8.8 14Z" /></svg>
+                      </a>}
+                      <span aria-hidden className="hidden w-4 text-center text-neutral-300 group-hover:text-neutral-500 md:inline">›</span>
+                    </div>
+                    {/* Cuenta */}
+                    <div className="col-span-2 min-w-0 pl-11 md:col-span-1 md:pl-0">{b.cuenta}</div>
+                    {/* Último uso */}
+                    <div className="col-span-2 flex items-baseline gap-2 pl-11 text-xs md:col-span-1 md:block md:pl-0">
+                      {e.en_linea
+                        ? <span className="font-medium text-emerald-700"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />ahora</span>
+                        : <span className={dormido ? 'font-medium text-red-600' : 'text-neutral-700'}>{e.ultimo_uso ? hace(e.ultimo_uso) : e.abierta_at ? `entró ${hace(e.abierta_at)}` : 'nunca'}</span>}
+                      {e.usuarios_7d > 1 && <div className="text-[11px] text-neutral-400">{e.usuarios_7d} personas</div>}
+                    </div>
+                    {/* Actividad */}
+                    <div className="col-span-2 min-w-0 pl-11 md:col-span-1 md:pl-0" title={`${act} cosas hechas en el sistema en ${dias} días${queUsa(e) ? `: ${queUsa(e)}` : ''}`}>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
+                          <div className="h-full rounded-full bg-lime-500" style={{ width: `${e.propia ? 100 : Math.round((act / maxAct) * 100)}%` }} />
+                        </div>
+                        <b className="w-12 text-right text-xs tabular-nums text-neutral-800">{act.toLocaleString('de-DE')}</b>
+                      </div>
+                      <div className="mt-0.5 truncate text-[11px] text-neutral-400">{e.ventas} ventas{usoCorto(e) ? ` · ${usoCorto(e)}` : ''}</div>
+                    </div>
+                    {/* Qué pasa / Uso */}
+                    <div className="col-span-2 min-w-0 pl-11 md:col-span-1 md:pl-0">
+                      {m
+                        ? <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${m.grave ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-amber-50 text-amber-800 ring-amber-200'}`}>{m.t}</span>
+                        : !e.propia && <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${NIVEL[n].c}`}>{NIVEL[n].t}</span>}
+                      {paso && <div className="mt-1 text-[11px] leading-snug text-neutral-500">→ {paso}</div>}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </section>
+      ))}
+
       <p className="text-[11px] text-neutral-400">
         Actividad: todo lo hecho en el sistema en {dias} días (preguntas y mensajes respondidos, guías impresas y reportadas,
         calificaciones, stock e IA). Integrado: responde la mitad o más de las preguntas aquí y pasa la mitad o más de las ventas por

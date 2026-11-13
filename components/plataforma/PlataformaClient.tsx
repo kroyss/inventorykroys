@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { PageHeader } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import PersonasEmpresa from './CuentasPanel'
+import ContactoEmpresa, { type Registro } from './ContactoEmpresa'
 import ProgramasPanel from './ProgramasPanel'
 import AvisosTelegramCard from './AvisosTelegramCard'
 import InternoPanel from './InternoPanel'
@@ -37,7 +38,7 @@ interface Empresa {
   fundador: boolean
   interna?: boolean          // mig. 172: cuenta interna (EmpresaPruebas, DEMO): no paga ni vence
   origen?: string | null      // 'autoregistro' = se registró solo en /registro (26-10); 'radar' = desde el Radar (29-10)
-  registro?: { correo?: string; whatsapp?: string; telegram?: string | null } | null
+  registro?: Registro | null
   ia_limite_mes: number | null
   motivo_pausa: string | null
   pausa_fecha: string | null
@@ -84,7 +85,7 @@ function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; e
     // Con plan registrado (mig 138): hasta cuándo pagó; al día siguiente del vencimiento el cron la pausa.
     const d = e.plan_hasta ? diasHasta(e.plan_hasta, hoy) : null
     const pago = e.plan_hasta ? `pagado hasta ${ddmm(e.plan_hasta)}${d! <= 3 ? ` · ${d! < 0 ? 'vencido' : d === 0 ? 'vence hoy' : `quedan ${d} día${d === 1 ? '' : 's'}`}` : ''}` : null
-    return { icono: d != null && d <= 3 ? '⚠️' : '✅', texto: 'Pagando', extra: [pago, e.cuentas ? 'ML conectado' : 'sin ML'].filter(Boolean).join(' · '), alerta: d != null && d <= 3 }
+    return { icono: d != null && d <= 3 ? '⚠️' : '✅', texto: 'Pagando', extra: [pago, e.cuentas ? null : 'sin ML'].filter(Boolean).join(' · '), alerta: d != null && d <= 3 }
   }
   // Se registró desde el Radar (29-10): solo el módulo Radar; qué días entra lo decide su grupo en el Radar.
   if (e.origen === 'radar' && est === 'prueba' && soloRadarModulos(e.modulos)) return { icono: '📡', texto: 'Solo Radar', extra: 'se registró desde el Radar' }
@@ -108,7 +109,7 @@ function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; e
     const pendiente = !!c && Date.parse(corteISO(c)) > Date.now()
     partes.push(pendiente ? `sin ML · corte ${ddmm(c!.fecha)} ${c!.hora > 12 ? `${c!.hora - 12} pm` : `${c!.hora} am`}` : 'sin ML')
     alerta = alerta || pendiente
-  } else partes.push('ML conectado')
+  }
   return { icono: alerta ? '⚠️' : '🟢', texto: 'En prueba', extra: partes.join(' · '), alerta }
 }
 
@@ -119,13 +120,6 @@ function FraseCuenta({ e, hoy }: { e: Empresa; hoy: string }) {
       <div className="whitespace-nowrap text-xs font-medium text-neutral-800">{f.icono} {f.texto}{e.fundador && <span className="ml-1 text-amber-700" title="Fundador">⭐</span>}
         {e.origen === 'autoregistro' && <span className="ml-1.5 rounded-full bg-sky-50 px-1.5 py-px text-[10px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-200" title="Se registró solo en /registro (prueba de 15 días)">Autoregistro</span>}</div>
       {f.extra && <div className={`text-[11px] ${f.alerta ? 'text-amber-700' : 'text-neutral-500'}`}>{f.extra}</div>}
-      {(e.origen === 'autoregistro' || e.origen === 'radar') && e.registro && (
-        <div className="text-[11px] text-neutral-500">
-          {e.registro.whatsapp && <a href={`https://wa.me/${e.registro.whatsapp.replace(/\D/g, '').replace(/^0/, '58')}`} target="_blank" rel="noreferrer" className="underline" onClick={ev => ev.stopPropagation()}>WhatsApp {e.registro.whatsapp}</a>}
-          {e.registro.telegram && <> · <a href={`https://t.me/${e.registro.telegram}`} target="_blank" rel="noreferrer" className="underline" onClick={ev => ev.stopPropagation()}>@{e.registro.telegram}</a></>}
-          {e.registro.correo && <> · {e.registro.correo}</>}
-        </div>
-      )}
     </div>
   )
 }
@@ -399,6 +393,10 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
       <AdopcionPanel filtro={filtroUso} onFiltro={setFiltroUso} cobro={cobro} abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
         base={activas.map(e => ({
           id: e.id, nombre: e.nombre, activa: true, pagando: e.estado === 'activo', prueba: e.estado === 'prueba',
+          interna: !!e.interna, whatsapp: e.registro?.whatsapp ?? null, telegram: e.registro?.telegram ?? null,
+          vence: e.interna || e.estado === 'propietario' ? null
+            : e.estado === 'activo' ? (e.plan_hasta ? diasHasta(e.plan_hasta, hoy) : null)
+            : e.estado === 'prueba' && e.prueba_dias == null && e.prueba_hasta ? diasHasta(e.prueba_hasta, hoy) : null,
           porVencer: (e.estado === 'prueba' && e.prueba_dias == null && !!e.prueba_hasta && diasHasta(e.prueba_hasta, hoy) <= 5)
             || (e.estado === 'activo' && !!e.plan_hasta && diasHasta(e.plan_hasta, hoy) <= 3),
           detalle: `${e.country}${e.organizacion !== e.nombre ? ` · ${e.organizacion}` : ''}${e.admins ? ` · ${e.admins}` : ''}`,
@@ -516,6 +514,12 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                     <div className="mt-2"><Cuenta e={sel} hoy={hoy} onGuardada={msg => { setAviso(msg); cargar() }} onError={setError} /></div>
                   </details>
                 )}
+              </section>
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-1.5">Contacto</h3>
+                <ContactoEmpresa key={sel.id} empresaId={sel.id} registro={sel.registro} origen={sel.origen} creada={sel.creada}
+                  onGuardado={msg => { setError(null); setAviso(msg); cargar() }} onError={setError} />
               </section>
 
               <section>
