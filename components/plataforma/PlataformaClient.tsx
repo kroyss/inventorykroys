@@ -15,6 +15,7 @@ import AdopcionPanel from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
 import CobrosPanel from './CobrosPanel'
+import { soloRadar as soloRadarModulos } from '@/lib/modulos'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 import { corteDeAlta, corteISO } from '@/lib/fundadoresCortes'
 
@@ -85,7 +86,7 @@ function fraseCuenta(e: Empresa, hoy: string): { icono: string; texto: string; e
     return { icono: d != null && d <= 3 ? '⚠️' : '✅', texto: 'Pagando', extra: [pago, e.cuentas ? 'ML conectado' : 'sin ML'].filter(Boolean).join(' · '), alerta: d != null && d <= 3 }
   }
   // Se registró desde el Radar (29-10): solo el módulo Radar; qué días entra lo decide su grupo en el Radar.
-  if (e.origen === 'radar' && est === 'prueba') return { icono: '📡', texto: 'Solo Radar', extra: 'se registró desde el Radar' }
+  if (e.origen === 'radar' && est === 'prueba' && soloRadarModulos(e.modulos)) return { icono: '📡', texto: 'Solo Radar', extra: 'se registró desde el Radar' }
   if (est === 'vencido') {
     if (e.motivo_pausa === 'corte_fundadores') return { icono: '⏸', texto: 'Pausada', extra: `no conectó ML (corte ${e.pausa_fecha ? ddmm(e.pausa_fecha) : ''})` }
     if (e.motivo_pausa === 'plan') return { icono: '⏸', texto: 'Pausada', extra: 'venció su plan' }
@@ -282,7 +283,8 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const q = buscar.trim().toLowerCase()
   const coincide = (e: Empresa) => !q || e.nombre.toLowerCase().includes(q) || (e.admins ?? '').toLowerCase().includes(q) || e.organizacion.toLowerCase().includes(q)
   // 12-11 (el dueño): los de solo Radar no piden seguimiento: van plegados aparte, como los inactivos.
-  const soloRadar = (e: Empresa) => e.origen === 'radar' && e.estado === 'prueba'
+  // 13-11: con la prueba de 15 días (más módulos que el Radar) ya no cuenta como «Solo Radar».
+  const soloRadar = (e: Empresa) => e.origen === 'radar' && e.estado === 'prueba' && soloRadarModulos(e.modulos)
   const activas = empresas.filter(e => puedeEntrar(e, hoy) && !soloRadar(e) && coincide(e))
   const radares = empresas.filter(e => puedeEntrar(e, hoy) && soloRadar(e) && coincide(e))
   const totalRadar = empresas.filter(e => puedeEntrar(e, hoy) && soloRadar(e))
@@ -476,6 +478,10 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
                       ? <button onClick={() => pausar(sel)} className="btn-secondary text-xs">Pausar (no podrá entrar)</button>
                       : <button onClick={() => setReactivar(sel)} className="btn-primary text-xs">Reactivar…</button>}
                   </div>
+                )}
+                {/* 13-11 (el dueño): prueba de 15 días para quien entró por otro lado (Radar) o ya la venció. */}
+                {sel.estado !== 'propietario' && sel.estado !== 'activo' && !sel.interna && sel.is_active && (
+                  <DarPrueba key={sel.organizacion_id} e={sel} onListo={msg => { setError(null); setAviso(msg); cargar() }} onError={setError} />
                 )}
                 {sel.estado !== 'propietario' && (
                   <details className="text-xs text-neutral-500">
@@ -954,6 +960,45 @@ function VerComoCliente({ empresaId }: { empresaId: number }) {
           </ul>
         </details>
       )}
+    </div>
+  )
+}
+
+/** 13-11 (el dueño): «Dar prueba de 15 días» a una cuenta del Radar (u otra sin plan): los módulos de la prueba gratis,
+ *  con o sin Inventario, sin quitarle el Radar; 500 créditos de IA si nunca los recibió. */
+function DarPrueba({ e, onListo, onError }: { e: Empresa; onListo: (m: string) => void; onError: (m: string) => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const [inventario, setInventario] = useState(false)
+  const [ocupado, setOcupado] = useState(false)
+  const dar = async () => {
+    setOcupado(true)
+    const r = await fetch(`/api/plataforma/organizaciones/${e.organizacion_id}/prueba`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inventario }),
+    })
+    const d = await r.json().catch(() => ({}))
+    setOcupado(false)
+    if (!r.ok) { onError(d.error ?? 'No se pudo dar la prueba'); return }
+    setAbierto(false)
+    onListo(`${e.organizacion}: prueba de ${DIAS_PRUEBA.normal} días hasta el ${String(d.hasta).split('-').reverse().slice(0, 2).join('/')}${inventario ? ', con Inventario' : ''}. Ya puede entrar al Sistema.`)
+  }
+  if (!abierto) return (
+    <button onClick={() => setAbierto(true)} className="btn-secondary mb-2 text-xs"
+      title="Prueba gratis de 15 días con los módulos de Automatizaciones (y si quieres Inventario). Lo que ya tiene (Radar) sigue.">
+      🎁 Dar prueba de {DIAS_PRUEBA.normal} días</button>
+  )
+  return (
+    <div className="mb-2 space-y-2 rounded-lg border border-lime-300 bg-lime-50/50 p-3 text-xs text-neutral-700">
+      <p><b>Prueba de {DIAS_PRUEBA.normal} días desde hoy</b>: Preguntas, Mensajes, Despachos, Reportador, Stock, Pagos ME y la IA
+        (500 créditos si nunca los tuvo). Lo que ya tiene, como el Radar, sigue igual.</p>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={inventario} onChange={ev => setInventario(ev.target.checked)} />
+        Con Inventario <span className="text-neutral-400">(productos, ventas, compras)</span>
+      </label>
+      {inventario && <p className="text-amber-700">{AVISO_INVENTARIO}</p>}
+      <div className="flex gap-2">
+        <button onClick={dar} disabled={ocupado} className="btn-primary text-xs disabled:opacity-50">{ocupado ? 'Dando…' : 'Dar prueba'}</button>
+        <button onClick={() => setAbierto(false)} disabled={ocupado} className="btn-secondary text-xs">Cancelar</button>
+      </div>
     </div>
   )
 }
