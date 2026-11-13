@@ -351,7 +351,7 @@ envía sola**: siempre la envía una persona (lo que sale solo es la respuesta a
 - La IA también tiene en cuenta lo que ese mismo comprador preguntó antes (si te pregunta «¿cuánto tarda?» y después
   «sería a Valencia», entiende que es lo mismo).
 - **ZOOM o TEALCA:** en Preguntas y en Mensajes la IA responde según el envío gratis de ESE producto (lo que ves al
-  lado: «Gratis ZOOM y TEALCA», «Gratis SOLO TEALCA» o sin envío gratis), no según tus políticas generales. Si es solo
+  lado: «Gratis ZOOM y TEALCA», «⚠ SOLO TEALCA» = gratis solo por Tealca, o sin envío gratis), no según tus políticas generales. Si es solo
   TEALCA y preguntan por ZOOM, dice que el envío gratis es por TEALCA y por ZOOM sería cobro a destino. Sin peso
   cargado, no lo afirma y queda para que respondas tú.
 

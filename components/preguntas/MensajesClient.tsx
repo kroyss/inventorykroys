@@ -456,7 +456,7 @@ export function Hilo({ c, rapidas, onCambio, soloLectura = false, sinNotas = fal
                       it.envio.estado === 'ambas' ? 'text-emerald-800 bg-emerald-50 ring-emerald-200'
                         : it.envio.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold'
                         : it.envio.estado === 'sin_peso' ? 'text-neutral-400 ring-neutral-200' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'}`}>
-                      {it.envio.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : it.envio.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA'
+                      {it.envio.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : it.envio.estado === 'tealca' ? '⚠ SOLO TEALCA'
                         : it.envio.estado === 'sin_peso' ? 'Envío: sin peso' : '⚠ Sin envío gratis'}
                     </span>
                   )}

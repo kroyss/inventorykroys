@@ -193,12 +193,13 @@ function EnvioGratis({ p }: { p: Pregunta }) {
     </span>) : null
   const estilo = e.estado === 'ambas' ? 'text-emerald-800 bg-emerald-50 ring-emerald-200'
     : e.estado === 'tealca' ? 'text-amber-900 bg-amber-100 ring-amber-300 font-semibold' : 'text-red-700 bg-red-50 ring-red-200 font-semibold'
-  const txt = e.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : e.estado === 'tealca' ? '⚠ Gratis SOLO TEALCA' : '⚠ Sin envío gratis'
+  const txt = e.estado === 'ambas' ? 'Gratis ZOOM y TEALCA' : e.estado === 'tealca' ? '⚠ SOLO TEALCA' : '⚠ Sin envío gratis'
   return (
     <>
       <span className={`text-[11px] rounded-full px-2 py-0.5 ring-1 ring-inset whitespace-nowrap ${estilo}`}
         title={`${e.texto}${e.porPromo ? ' — por la promoción: al terminar vuelve a su envío normal' : ''} · mínimos para su peso: ZOOM $${e.minZoom} · TEALCA $${e.minTealca}`}>
-        {txt}{e.porPromo ? ' · por la promo' : ''}
+        {/* 13-11 (el dueño): corto; «por la promo» queda en el texto al pasar el mouse. */}
+        {txt}
       </span>
       <AvisoPesos c={conflictoPesos(p.item_pesos, precioUSD(p), tablas)} />
       {hueco && (

@@ -10,18 +10,22 @@ import { randomBytes } from 'crypto'
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? './uploads'
 const DIR = path.join(UPLOAD_DIR, 'productos')
 
-/** { product_id: url } de todos los productos de la empresa (los sin foto no vienen). ~20 ms con 500 productos. */
+/** { product_id: url } de todos los productos de la empresa (los sin foto no vienen). ~13 ms con 500 productos. */
 export async function fotosProductos(db: Pick<Pool, 'query'>): Promise<Record<number, string>> {
+  // 13-11 (rapidez): UNA pasada (DISTINCT ON por producto) en vez de un LATERAL por producto: con RLS el LATERAL recorría
+  // todo el catálogo para cada producto (2–3,7 s con 500 productos); así ~13 ms. SUBSTRING(item_id FROM 4) = el número
+  // sin MLV/MCO (índice idx_ml_catalogo_num).
   const { rows } = await db.query(`
+    WITH ml AS (
+      SELECT DISTINCT ON (m.product_id) m.product_id,
+             COALESCE((SELECT v->>'foto' FROM jsonb_array_elements(c.variantes) v WHERE v->>'id' = split_part(m.ml_code, ':', 2)), c.thumbnail) AS url
+      FROM product_ml_codes m
+      JOIN ml_catalogo c ON SUBSTRING(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
+      WHERE m.is_active
+      ORDER BY m.product_id, c.estado = 'active' DESC, c.disponible DESC, c.item_id)
     SELECT p.id, CASE WHEN p.foto_path IS NOT NULL THEN '/api/products/' || p.id || '/foto?v=' || floor(extract(epoch FROM p.foto_at))::bigint
                       ELSE ml.url END AS url
-    FROM products p
-    LEFT JOIN LATERAL (
-      SELECT COALESCE((SELECT v->>'foto' FROM jsonb_array_elements(c.variantes) v WHERE v->>'id' = split_part(m.ml_code, ':', 2)), c.thumbnail) AS url
-      FROM product_ml_codes m
-      JOIN ml_catalogo c ON c.item_id IN ('MLV' || split_part(m.ml_code, ':', 1), 'MCO' || split_part(m.ml_code, ':', 1))
-      WHERE m.product_id = p.id AND m.is_active
-      ORDER BY c.estado = 'active' DESC, c.disponible DESC, c.item_id LIMIT 1) ml ON TRUE`)
+    FROM products p LEFT JOIN ml ON ml.product_id = p.id`)
   const out: Record<number, string> = {}
   for (const r of rows) if (r.url) out[r.id] = r.url
   return out
