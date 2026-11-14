@@ -876,13 +876,13 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
-- **Cómo cargar productos:** si ya vendes en ML → Publicaciones → **Importar desde ML** (crea el producto vinculado, con
+- **Cómo cargar productos:** si ya vendes en ML → Productos → **Importar desde ML** (crea el producto vinculado, con
   peso y foto). **El costo (en USD, mayor que 0) es obligatorio** para crear cada producto: sin costo la ganancia de
   sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, % de ganancia, stock); cuando lo publiques,
   lo vinculas y el peso y la foto llegan solos.
-- **Actualizar desde ML** (Publicaciones, Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
+- **Actualizar desde ML** (Publicaciones, Productos → Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
-- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (pestaña de Publicaciones; en Productos solo sale cuando todavía no hay productos) crea productos a partir de
+- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
 - **% de ganancia** (desde el 14-11 reemplaza a las «categorías de ganancia»): en la ficha (Editar o + Producto) hay
   un **medidor** de 0 a 200 %: se mueve con la barra o se escribe el número, y los dos van juntos. Es la ganancia
@@ -912,7 +912,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
-- **Publicaciones** (menú propio, con pestañas Editar · Vincular · Importar desde ML · Stock · Promociones · MercadoEnvíos (Venezuela) · Tareas; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones · MercadoEnvíos (Venezuela) · Tareas; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho

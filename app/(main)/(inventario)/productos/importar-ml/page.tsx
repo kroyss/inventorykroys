@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import ImportarMLClient from '@/components/productos/ImportarMLClient'
-import PublicacionesMLTabs from '@/components/productos/PublicacionesMLTabs'
 
 export const metadata = { title: 'Importar desde MercadoLibre' }
 
@@ -13,8 +12,6 @@ export default async function ImportarMLPage({ searchParams }: { searchParams: P
   if (!session || !puede(session.user, 'ver_productos') || !puede(session.user, 'importar_ml')) redirect('/dashboard')
   const { buscar } = await searchParams
   // 13-11: desde Vincular («Crear producto nuevo») llega ?buscar=MLV…: se abre con esa publicación.
-  return <>
-    <PublicacionesMLTabs user={session.user} actual="importar" />
-    <ImportarMLClient conCuentas={tieneModulo(session.user, 'preguntas')} buscarInicial={buscar?.slice(0, 80) ?? ''} />
-  </>
+  // 14-11 (el dueño): es parte de Productos (no una pestaña de Publicaciones); se entra con el botón de Productos.
+  return <ImportarMLClient conCuentas={tieneModulo(session.user, 'preguntas')} buscarInicial={buscar?.slice(0, 80) ?? ''} />
 }

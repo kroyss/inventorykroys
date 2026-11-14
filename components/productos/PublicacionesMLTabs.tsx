@@ -10,18 +10,18 @@ import { tiposPermitidos } from '@/lib/colaPermisos'
 // con una sola no se dibuja nada. El menú «Publicaciones» aparece si hay al menos una.
 /** 13-11 (el dueño): las direcciones de las pestañas de Publicaciones (algunas viven bajo /productos o /inventario): con
  *  cualquiera abierta, el menú marca «Publicaciones» y no Productos ni Inventario. */
-export const RUTAS_PUBLICACIONES = ['/publicaciones', '/vincular-ml', '/inventario/stock-ml', '/productos/promociones', '/productos/importar-ml', '/productos/mercadoenvios']
+export const RUTAS_PUBLICACIONES = ['/publicaciones', '/vincular-ml', '/inventario/stock-ml', '/productos/promociones', '/productos/mercadoenvios']
 export const enPublicaciones = (pathname: string) => RUTAS_PUBLICACIONES.some(r => pathname === r || pathname.startsWith(r + '/'))
 
-export type PestanaML = 'editar' | 'vincular' | 'importar' | 'stock' | 'promociones' | 'envios' | 'tareas'
+export type PestanaML = 'editar' | 'vincular' | 'stock' | 'promociones' | 'envios' | 'tareas'
 type UsuarioML = { role?: UserRole; permisos?: string[]; modulos?: string[]; country?: string }
 
 export function pestanasML(user: UsuarioML) {
   const p: { k: PestanaML; t: string; href: string }[] = []
   if (tieneModulo(user, 'publicaciones') && tieneModulo(user, 'preguntas') && puede(user, 'editar_publicaciones')) p.push({ k: 'editar', t: 'Editar', href: '/publicaciones' })
   if (puede(user, 'vincular_ml') || (puede(user, 'ver_productos') && puede(user, 'importar_ml'))) p.push({ k: 'vincular', t: 'Vincular', href: '/vincular-ml' })
-  // 13-11 (el dueño): Importar desde ML y MercadoEnvíos vienen de Productos (son de MercadoLibre); la dirección no cambia.
-  if (tieneModulo(user, 'preguntas') && puede(user, 'ver_productos') && puede(user, 'importar_ml')) p.push({ k: 'importar', t: 'Importar desde ML', href: '/productos/importar-ml' })
+  // 13-11 (el dueño): MercadoEnvíos viene de Productos (es de MercadoLibre); la dirección no cambia. 14-11: Importar desde ML
+  // vuelve a Productos (ahí es donde se crean los productos): ya no es pestaña de Publicaciones.
   if (tieneModulo(user, 'inventario') && tieneModulo(user, 'preguntas') && puede(user, 'ver_inventario')) p.push({ k: 'stock', t: 'Stock', href: '/inventario/stock-ml' })
   if (user.country === 'VE' && tieneModulo(user, 'promociones') && puede(user, 'promociones') && puede(user, 'ver_productos')) p.push({ k: 'promociones', t: 'Promociones', href: '/productos/promociones' })
   // 14-11: MercadoEnvíos (pesos) para toda empresa de Venezuela con Inventario; el descuento solo se ve con Descuento ML.
