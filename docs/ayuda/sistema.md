@@ -838,6 +838,9 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   2. **Crea tus productos:** en Productos → «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones
      su costo; cada una queda como producto ya vinculado. También se crean a mano con **+ Producto** (nombre, costo y
      % de ganancia con el medidor; el precio se calcula solo).
+  - **Pon el peso de tus productos** (Venezuela, con la tabla de MercadoEnvíos; dice cuántos faltan): en Productos →
+     MercadoEnvíos, **Traer pesos de ML** llena los que no tienen con el de su publicación (revísalos en «Por revisar»);
+     los que falten se escriben a mano. Se marca hecho cuando todos los productos tienen peso.
   3. **Pon el stock que tienes hoy:** en Inventario, en cada producto **Ajustar** y escribes cuántas unidades tienes.
      Después el stock baja con las ventas y sube con las compras.
   4. **Registra tu primera venta:** en Ventas → **Por confirmar** confirmas las ventas de MercadoLibre (quedan
@@ -860,7 +863,13 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   Las hojas impresas (recepción y conteo) no llevan fotos.
 - **Pesos (Publicaciones → MercadoEnvíos, Venezuela):** el peso de cada producto sale **solo** del portal de
   MercadoEnvíos (el que usa ML para el envío gratis), por medio de sus vínculos: Pagos ME lo trae en la primera traída
-  del día. Se ve con la marca **ML** y no se edita a mano. A mano solo los productos que ML no da. **Pesos distintos
+  del día. Se ve con la marca **ML** y no se edita a mano. **Sin Pagos ME** (o mientras no llega), el producto **sin
+  peso** toma el «Peso del paquete» que declara su publicación de ML: queda **por revisar** (borde ámbar, «de la
+  publicación», filtro **📝 Por revisar**), porque es lo que se cargó en ML y a veces no es el real; se corrige
+  escribiendo el peso o se confirma con **✓**. El del portal lo reemplaza cuando llega. Esto pasa solo al importar
+  productos y al leer el catálogo, y de una vez con el botón **⬇ Traer pesos de ML** (en MercadoEnvíos): llena los que
+  no tienen peso y, si tienes Pagos ME, pide además los pesos reales del portal (llegan en 1 a 3 minutos con la PC
+  prendida). Nunca pisa un peso que ya tenías. A mano solo los productos que ML no da. **Pesos distintos
   en ML** = sus publicaciones pesan distinto en el portal: casi siempre un pack sin marcar «trae N u.» o un vínculo mal
   hecho; se revisa en Vincular o Stock, o se **elige con un clic** uno de los pesos que trae ML (en MercadoEnvíos o en la
   ficha del producto). Precios, margen, Promociones y Costos ML usan ese mismo peso.
@@ -892,7 +901,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   - Reportes (Más vendidos, Stock) muestran «Ganancia 60%» en vez del nombre de la categoría.
 - **Costos ML** (botón en Productos; admin o quien tenga el permiso **Configurar costos ML**): la **comisión de
   MercadoLibre** (12 % en Venezuela), el envío de los productos **sin peso** y desde qué precio es gratis, la **tabla
-  de MercadoEnvíos** (envío gratis por peso, solo lectura) y los **colores de la ganancia neta**: «Sana desde» (20 %
+  de MercadoEnvíos** (envío gratis por peso, solo lectura: es la misma para todos los vendedores de ML Venezuela y la
+  mantiene al día El Comerciante Digital cuando ML la cambia) y los **colores de la ganancia neta**: «Sana desde» (20 %
   por defecto) y «Ajustada desde» (0 %); por debajo es pérdida. Se miden sobre lo que queda después de MercadoLibre
   (% sobre la venta). Se usan en la ficha, la columna Margen neto, los simuladores y Promociones.
   - El **«Envío»** del costo de la ficha es lo que te costó traer el producto (flete o importación) y se suma al costo;
@@ -990,7 +1000,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   es urgente, para cuántos meses comprar, cuántos meses de ventas mirar, venta mínima al mes para reponer, qué es
   «parado» (unidades y meses), cuánto dura «recién llegado» y cuántos meses comparar para «se está cayendo». Botones
   para partir de **Compras locales** (llega en ~1 mes) o **Importación** (~4 meses). Cada empresa tiene las suyas.
-- **Ajustes:** tasa del dólar, costos de MercadoLibre (comisión, envío) y otras configuraciones del administrador.
+- **Ajustes:** tasa del dólar, costos de MercadoLibre (comisión, envío) y otras configuraciones del administrador. La
+  **Tabla MercadoEnvíos** se ve ahí pero no se edita: es global y la mantiene El Comerciante Digital.
 
 <!-- VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos -->
 

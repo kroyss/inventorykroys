@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { tablasEnvioGlobales } from '@/lib/tablasEnvioGlobal'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       let tabla: string | null = null
       const { rows: aj } = await db.query(`SELECT key, value FROM app_settings`)
       for (const r of aj) { if (r.key === 'ml_shipping_table') tabla = r.value; const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v }
+      tabla = (await tablasEnvioGlobales()).ml_shipping_table ?? tabla   // 14-11: tabla global
       comision = session.user.country === 'CO'
         ? precio => Math.round((precio * ((mlp.ml_comision ?? 15.5) + (mlp.ml_reten ?? 1.91)) / 100
             + (precio >= (mlp.ml_umbral_envio ?? 60000) ? (mlp.ml_envio_alto ?? 8000) : (mlp.ml_envio_bajo ?? 2600))) * 100) / 100

@@ -1,6 +1,7 @@
 'use client'
 import ElegirPesoML from './ElegirPesoML'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Product } from '@/lib/types'
 import { shipInfo, parseShippingTable, type ShipInfo, type ShipStatus } from '@/lib/mlShipping'
 import { matchTokens } from '@/lib/search'
@@ -18,16 +19,27 @@ const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
   unregistered: { label: '⚪ Sin peso',        chip: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
 }
 
-type Filter = 'all' | 'unregistered' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
+type Filter = 'all' | 'unregistered' | 'borrador' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
 
-export default function MercadoEnviosClient({ initialProducts, inicialTasa = null }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
+export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean }) {
+  const router = useRouter()
   const [products, setProducts] = useState<Product[]>(initialProducts)
+  // 14-11: «Traer pesos de ML» (borrador de la publicación + pedido al portal si hay Pagos ME).
+  const [trayendo, setTrayendo] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState<Filter>('all')
   const [weights, setWeights]   = useState<Record<number, string>>(
     () => Object.fromEntries(initialProducts.map(p => [p.id, p.weight_kg != null ? String(p.weight_kg) : '']))
   )
   const [savingId, setSavingId] = useState<number | null>(null)
+  // Tras «Traer pesos de ML» (router.refresh) llegan los productos con su peso nuevo (ajuste durante el render).
+  const [iniVisto, setIniVisto] = useState(initialProducts)
+  if (iniVisto !== initialProducts) {
+    setIniVisto(initialProducts)
+    setProducts(initialProducts)
+    setWeights(Object.fromEntries(initialProducts.map(p => [p.id, p.weight_kg != null ? String(p.weight_kg) : ''])))
+  }
   const [error, setError]       = useState('')
 
   // Tasa VE + settings (exceso, descuento global, tabla de envíos)
@@ -72,6 +84,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
   const filtered = useMemo(() => {
     let arr = rows
     if (filter === 'distintos') arr = arr.filter(r => !!r.p.pesos_ml)
+    else if (filter === 'borrador') arr = arr.filter(r => r.p.peso_origen === 'publicacion')
     else if (filter === 'unregistered') arr = arr.filter(r => r.info.status === 'unregistered')
     else if (filter === 'capped')     arr = arr.filter(r => r.info.status === 'capped')
     else if (filter === 'aggregate')  arr = arr.filter(r => r.info.status === 'aggregate')
@@ -80,21 +93,36 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
     return arr
   }, [rows, filter, search])
 
-  async function saveWeight(id: number, valor?: string) {
+  async function saveWeight(id: number, valor?: string, confirmar = false) {
     if (valor !== undefined) setWeights(w => ({ ...w, [id]: valor }))
     const raw = (valor ?? weights[id] ?? '').trim()
     const kg = raw === '' ? null : parseFloat(raw)
     if (kg !== null && (isNaN(kg) || kg <= 0)) { setError('Peso inválido'); return }
     const prev = products.find(p => p.id === id)?.weight_kg ?? null
-    if (kg === prev) return                       // sin cambios
+    if (kg === prev && !confirmar) return         // sin cambios (confirmar el borrador sí guarda)
     setSavingId(id); setError('')
     const res = await fetch(`/api/products/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weight_kg: kg }),
+      body: JSON.stringify({ weight_kg: kg, confirmar_peso: true }),
     })
     setSavingId(null)
     if (!res.ok) { setError((await res.json()).error ?? 'Error al guardar'); return }
-    setProducts(ps => ps.map(p => p.id === id ? { ...p, weight_kg: kg } : p))
+    setProducts(ps => ps.map(p => p.id === id ? { ...p, weight_kg: kg, peso_origen: 'manual' } : p))
+  }
+
+  async function traerPesos() {
+    setTrayendo(true); setError(''); setAviso(null)
+    const r = await fetch('/api/products/pesos-ml', { method: 'POST' }).catch(() => null)
+    const d = await r?.json().catch(() => null)
+    setTrayendo(false)
+    if (!r?.ok) { setError(d?.error ?? 'No se pudieron traer los pesos. Prueba de nuevo.'); return }
+    const partes = [d.llenados ? `${d.llenados} producto${d.llenados === 1 ? '' : 's'} sin peso tomaron el de su publicación (revísalos en «Por revisar»).`
+                               : 'No había productos sin peso con un peso en su publicación.']
+    if (d.portal === 'pedido') partes.push('Pedí al programa de Pagos ME los pesos reales del portal: llegan en 1 a 3 minutos (con la PC prendida) y reemplazan a los de la publicación.')
+    else if (d.portal === 'en_curso') partes.push('Ya hay una traída de MercadoEnvíos en curso: los pesos del portal llegan cuando termine.')
+    if (d.sin_peso) partes.push(`Quedan ${d.sin_peso} sin peso: cárgalos a mano.`)
+    setAviso(partes.join(' '))
+    router.refresh()
   }
 
   const chip = (f: Filter, label: string, n: number, active: string) => (
@@ -107,9 +135,19 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
   return (
     <div className="space-y-4">
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded">{error}</div>}
+      {aviso && <div className="flex items-start gap-2 bg-sky-50 border border-sky-200 text-sky-800 px-4 py-2 rounded text-sm">
+        <span className="flex-1">{aviso}</span>
+        <button type="button" onClick={() => setAviso(null)} aria-label="Cerrar" className="text-sky-500 hover:text-sky-800">✕</button>
+      </div>}
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold text-neutral-900">📦 MercadoEnvíos</h1>
+        <button type="button" onClick={traerPesos} disabled={trayendo}
+          title={pagosME ? 'Llena los productos sin peso con el de su publicación y pide los pesos reales del portal de MercadoEnvíos'
+                         : 'Llena los productos sin peso con el «Peso del paquete» que declara su publicación de MercadoLibre'}
+          className="btn-secondary text-sm disabled:opacity-50">
+          {trayendo ? 'Trayendo…' : '⬇ Traer pesos de ML'}
+        </button>
         <div className="ml-auto text-sm text-neutral-500">
           Descuento global: <b className="text-neutral-800">{globalDiscount.toFixed(1)}%</b>
           {rate && <span className="text-neutral-400"> · exceso {rate.excess}%</span>}
@@ -118,7 +156,8 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
 
       <p className="text-xs text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg p-3 leading-relaxed">
         El <b>peso</b> sale solo del portal de MercadoEnvíos (<b className="text-sky-700">ML</b>: el que usa ML para el envío gratis; lo
-        trae Pagos ME una vez al día por medio de los vínculos). A mano solo los que ML no da.
+        trae Pagos ME una vez al día por medio de los vínculos). Sin eso, el producto sin peso toma el que declara su publicación
+        (<b className="text-amber-700">Por revisar</b>: es lo que se cargó en ML y a veces no es el real; corrígelo o confírmalo con ✓). A mano solo los que ML no da.
         <b className="text-amber-700"> Pesos distintos</b> = sus publicaciones pesan distinto en ML: suele ser un pack sin marcar «trae N u.» o un
         vínculo mal hecho (revísalo en Publicaciones → Vincular o Stock). El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
         envío gratis (según la tabla de ML) y <b>limita solo</b> el descuento global a ese tope.
@@ -131,6 +170,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
       <div className="flex flex-wrap items-center gap-2">
         {chip('all', 'Todos', rows.length, 'bg-neutral-900 text-white border-neutral-900')}
         {chip('unregistered', '⚪ Sin peso', counts.unregistered, 'bg-neutral-700 text-white border-neutral-700')}
+        {rows.some(r => r.p.peso_origen === 'publicacion') && chip('borrador', '📝 Por revisar', rows.filter(r => r.p.peso_origen === 'publicacion').length, 'bg-amber-500 text-white border-amber-500')}
         {rows.some(r => r.p.pesos_ml) && chip('distintos', 'Pesos distintos en ML', rows.filter(r => r.p.pesos_ml).length, 'bg-amber-600 text-white border-amber-600')}
         {chip('capped', '⚠️ Con tope', counts.capped, 'bg-amber-500 text-white border-amber-500')}
         {chip('aggregate', '🛒 Por volumen', counts.aggregate, 'bg-sky-600 text-white border-sky-600')}
@@ -177,8 +217,14 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
                       onBlur={() => saveWeight(p.id)}
                       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                       placeholder="—"
+                      title={p.peso_origen === 'publicacion' ? 'Peso que declara la publicación de ML: revísalo' : undefined}
                       className={`w-20 border rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-neutral-800
-                                  ${savingId === p.id ? 'border-amber-400 bg-amber-50' : 'border-neutral-300'}`} />
+                                  ${savingId === p.id ? 'border-amber-400 bg-amber-50' : p.peso_origen === 'publicacion' ? 'border-amber-400 bg-amber-50/60' : 'border-neutral-300'}`} />
+                    {p.peso_origen === 'publicacion' && <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-amber-700 whitespace-nowrap">
+                      de la publicación
+                      <button type="button" disabled={savingId === p.id} onClick={() => saveWeight(p.id, undefined, true)}
+                        title="Confirmar este peso" className="rounded border border-amber-300 bg-white px-1 font-semibold hover:bg-amber-100 disabled:opacity-50">✓</button>
+                    </div>}
                     {p.pesos_ml && <div className="mt-1 flex justify-end">
                       <ElegirPesoML pesos={p.pesos_ml} actual={p.weight_kg} ocupado={savingId === p.id}
                         onElegir={kg => saveWeight(p.id, String(kg))} />

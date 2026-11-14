@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { tieneModulo, type Modulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
+import { esDuenoPlataforma } from '@/lib/empresa'
+import { conTablasGlobales, guardarTablasEnvio, CLAVES_TABLA_ENVIO } from '@/lib/tablasEnvioGlobal'
 
 // Claves que solo existen con su módulo: sin él no se guardan (y ml_descuento se lee como 0).
 const DE_MODULO: Record<string, Modulo> = {
@@ -57,7 +59,8 @@ export async function GET() {
     for (const r of rows) if (acceso === 'todo' || DE_AUTOMATIZACIONES.has(r.key)) out[r.key] = r.value
     // Sin el módulo Descuento ML, el descuento global es 0: publicado = final en todas las pantallas.
     if (!tieneModulo(session.user, 'descuento_ml')) out.ml_descuento = '0'
-    return NextResponse.json(out)
+    // 14-11: la tabla de MercadoEnvíos es GLOBAL (la mantiene el dueño de la plataforma), igual para todas las empresas.
+    return NextResponse.json(acceso === 'todo' ? await conTablasGlobales(out, session.user.country) : out)
   } catch (err) {
     return apiError(err)
   }
@@ -73,6 +76,17 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = z.record(z.string(), z.union([z.string(), z.number()])).parse(await req.json())
+    // 14-11: la tabla de MercadoEnvíos es global → solo el dueño de la plataforma, y va a plataforma_config.
+    const tabla = Object.fromEntries(CLAVES_TABLA_ENVIO.filter(k => body[k] != null).map(k => [k, String(body[k])]))
+    for (const k of CLAVES_TABLA_ENVIO) delete body[k]
+    if (Object.keys(tabla).length) {
+      if (!esDuenoPlataforma(session.user) || session.user.country !== 'VE') {
+        return NextResponse.json({ error: 'La tabla de MercadoEnvíos es la misma para todos y la mantiene El Comerciante Digital' }, { status: 403 })
+      }
+      for (const v of Object.values(tabla)) z.array(z.object({ maxKg: z.number().positive(), minPrice: z.number().nonnegative() })).min(1).parse(JSON.parse(v))
+      await guardarTablasEnvio(tabla)
+      if (!Object.keys(body).length) return NextResponse.json({ ok: true })
+    }
     const entries = Object.entries(body)
       .filter(([k]) => ALLOWED.has(k) && (acceso === 'todo' || (acceso === 'automatizaciones' && DE_AUTOMATIZACIONES.has(k)) || (costosML && DE_COSTOS_ML.has(k)))
         && (!DE_MODULO[k] || tieneModulo(session.user, DE_MODULO[k])))
@@ -88,7 +102,7 @@ export async function PUT(req: NextRequest) {
     }
     return NextResponse.json({ ok: true })
   } catch (err) {
-    if (err instanceof z.ZodError) return NextResponse.json({ error: err.message }, { status: 400 })
+    if (err instanceof z.ZodError || err instanceof SyntaxError) return NextResponse.json({ error: err.message }, { status: 400 })
     return apiError(err)
   }
 }

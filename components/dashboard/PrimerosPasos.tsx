@@ -9,7 +9,8 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 // «Ver todos» despliega la lista. Al terminar, felicita y recomienda leer Publicaciones y Reportes en Aprendizaje
 // (recomendación: no cuenta para terminar). «Ocultar» pide confirmar y se vuelve a abrir desde Aprendizaje.
 // Textos = docs/ayuda/sistema.md (mantener iguales).
-interface Estado { ml: boolean; productos: boolean; stock: boolean; venta: boolean; procesada: boolean; compra: boolean; oculta: boolean; conML: boolean }
+interface Estado { ml: boolean; productos: boolean; stock: boolean; venta: boolean; procesada: boolean; compra: boolean; oculta: boolean; conML: boolean
+  conPeso?: boolean; sin_peso?: number; peso_por_revisar?: number }
 interface Paso { k: string; titulo: string; como: string; href: string; ir: string; hecho: boolean }
 const VISTA = 'guia-inventario-vista'
 export const MANUAL_INVENTARIO = '/aprendizaje/manual/inventario'
@@ -27,6 +28,12 @@ function pasos(e: Estado): Paso[] {
         ? 'En «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones su costo: cada una queda como un producto ya vinculado. También puedes crearlos a mano con + Producto.'
         : 'En Productos toca + Producto: nombre, costo y % de ganancia con el medidor (el precio se calcula solo).',
     },
+    // 14-11: el peso decide el envío gratis y lo que ML te cobra de envío (tabla de MercadoEnvíos).
+    ...(e.conPeso ? [{
+      k: 'peso', titulo: e.sin_peso ? `Pon el peso de tus productos (faltan ${e.sin_peso})` : 'Pon el peso de tus productos',
+      hecho: e.productos && !e.sin_peso, href: '/productos/mercadoenvios', ir: 'Ir a MercadoEnvíos',
+      como: 'El peso decide si el producto tiene envío gratis y cuánto te cobra ML de envío. En Productos → MercadoEnvíos toca «Traer pesos de ML»: los que no tienen peso toman el de su publicación (revísalos en «Por revisar»); los que falten, escríbelos a mano.',
+    }] : []),
     {
       k: 'stock', titulo: 'Pon el stock que tienes hoy', hecho: e.stock, href: '/inventario', ir: 'Ir a Inventario',
       como: 'En Inventario, en cada producto toca Ajustar y escribe cuántas unidades tienes. De ahí en adelante el stock baja con las ventas y sube con las compras.',

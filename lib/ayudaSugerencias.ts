@@ -66,6 +66,10 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo agrego a alguien de mi equipo?', respuesta: 'Toca **+ Nuevo usuario**, pon nombre, usuario y contraseña inicial, y pásale su contraseña. Con **Permisos** eliges qué ve y qué puede hacer.' },
     { pregunta: 'Un empleado olvidó su contraseña', respuesta: 'En su fila toca **Cambiar contraseña** y pásale la nueva. Sus sesiones abiertas se cierran.' },
   ],
+  '/productos/mercadoenvios': [
+    { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'Toca **⬇ Traer pesos de ML**: los productos sin peso toman el que declara su publicación y quedan en **📝 Por revisar** (corrígelo o confírmalo con ✓). Si tienes Pagos ME, además llegan los pesos reales del portal en 1 a 3 minutos.' },
+    { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
+  ],
   '/aprendizaje': [
     { pregunta: '¿En qué orden veo los videos?', respuesta: 'En el orden de la lista: primero la serie de Automatizaciones (del 1 al 7) y, si usas Pagos ME, la de MercadoEnvíos.' },
   ],

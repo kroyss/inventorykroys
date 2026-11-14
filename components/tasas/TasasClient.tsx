@@ -23,24 +23,25 @@ interface Rate {
 // Fila editable de la tabla de MercadoEnvíos: peso máx → precio mínimo de ZOOM y de TEALCA (19-10: cada
 // transportista tiene el suyo; antes era una sola columna = TEALCA).
 interface FilaEnvio { maxKg: number; zoom: number; tealca: number }
-function ShipRowInputs({ row, onChange, onRemove }: {
+function ShipRowInputs({ row, onChange, onRemove, soloLectura }: {
   row: FilaEnvio
+  soloLectura?: boolean
   onChange: (field: keyof FilaEnvio, val: number) => void
   onRemove: () => void
 }) {
   return (
     <>
       <input type="number" step="0.001" min="0" value={row.maxKg === 0 ? '' : row.maxKg}
-        onChange={e => onChange('maxKg', Number(e.target.value))} placeholder="0.5"
-        className="border rounded px-2 py-1 text-sm" />
+        onChange={e => onChange('maxKg', Number(e.target.value))} placeholder="0.5" disabled={soloLectura}
+        className="border rounded px-2 py-1 text-sm disabled:bg-neutral-50 disabled:text-neutral-700" />
       <input type="number" step="0.01" min="0" value={row.zoom === 0 ? '' : row.zoom}
-        onChange={e => onChange('zoom', Number(e.target.value))} placeholder="3"
-        className="border rounded px-2 py-1 text-sm" />
+        onChange={e => onChange('zoom', Number(e.target.value))} placeholder="3" disabled={soloLectura}
+        className="border rounded px-2 py-1 text-sm disabled:bg-neutral-50 disabled:text-neutral-700" />
       <input type="number" step="0.01" min="0" value={row.tealca === 0 ? '' : row.tealca}
-        onChange={e => onChange('tealca', Number(e.target.value))} placeholder="3"
-        className="border rounded px-2 py-1 text-sm" />
-      <button onClick={onRemove} title="Quitar rango"
-        className="text-neutral-300 hover:text-red-600 px-1 text-sm">✕</button>
+        onChange={e => onChange('tealca', Number(e.target.value))} placeholder="3" disabled={soloLectura}
+        className="border rounded px-2 py-1 text-sm disabled:bg-neutral-50 disabled:text-neutral-700" />
+      {soloLectura ? <span /> : <button onClick={onRemove} title="Quitar rango"
+        className="text-neutral-300 hover:text-red-600 px-1 text-sm">✕</button>}
     </>
   )
 }
@@ -269,7 +270,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
         {/* Tabla MercadoEnvíos (abre modal de edición) */}
         {descuento && <div className="border-l border-neutral-200 pl-3 self-center shrink-0">
           <button type="button" onClick={() => setShipOpen(true)}
-            title="Editar la tabla de envío gratis por peso de MercadoLibre (se abre solo al hacer clic)"
+            title={puedeTasas ? 'Editar la tabla de envío gratis por peso de MercadoLibre (global, para todas las empresas)' : 'Ver la tabla de envío gratis por peso de MercadoLibre'}
             className="text-sm px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100 whitespace-nowrap">
             📦 Tabla MercadoEnvíos
           </button>
@@ -323,9 +324,15 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
               <button onClick={() => setShipOpen(false)} className="text-neutral-400 hover:text-neutral-700 text-lg">✕</button>
             </div>
             <p className="text-xs text-neutral-500 mb-3">
-              Peso máximo del rango → precio mínimo (USD) para tener envío gratis con cada transportista. Edítala cuando ML
-              cambie la tabla: se aplica en todo el sistema (Productos, Promociones, Preguntas, Mensajes, la IA y la ficha).
-              TEALCA también es la que usa Productos para el tope de descuento y el costo de envío.
+              Peso máximo del rango → precio mínimo (USD) para tener envío gratis con cada transportista. Se usa en todo el
+              sistema (Productos, Promociones, Preguntas, Mensajes, la IA y la ficha). TEALCA también es la que usa Productos
+              para el tope de descuento y el costo de envío.
+            </p>
+            {/* 14-11: la tabla es GLOBAL (lib/tablasEnvioGlobal.ts): la política de ML es la misma para todos los vendedores. */}
+            <p className={`text-xs rounded-lg px-3 py-2 mb-3 ${puedeTasas ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-neutral-50 text-neutral-600 border border-neutral-200'}`}>
+              {puedeTasas
+                ? 'Es la misma para todas las empresas de Venezuela: lo que guardes aquí cambia para todos tus clientes.'
+                : 'Es la misma para todos los vendedores de MercadoLibre Venezuela. La mantiene al día El Comerciante Digital cuando ML la cambia.'}
             </p>
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
               <div className="text-[11px] text-neutral-500">Hasta (kg)</div>
@@ -333,12 +340,12 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
               <div className="text-[11px] text-neutral-500">TEALCA (USD)</div>
               <div></div>
               {shipRows.map((r, i) => (
-                <ShipRowInputs key={i} row={r}
+                <ShipRowInputs key={i} row={r} soloLectura={!puedeTasas}
                   onChange={(field, val) => setShipRows(rows => rows.map((x, j) => j === i ? { ...x, [field]: val } : x))}
                   onRemove={() => setShipRows(rows => rows.filter((_, j) => j !== i))} />
               ))}
             </div>
-            <div className="flex items-center justify-between gap-2 mt-4">
+            {puedeTasas && <div className="flex items-center justify-between gap-2 mt-4">
               <button onClick={() => setShipRows(rows => [...rows, { maxKg: 0, zoom: 0, tealca: 0 }])}
                 className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 text-neutral-700 font-medium hover:bg-neutral-100">
                 + Agregar rango
@@ -347,7 +354,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
                 className="text-xs px-3 py-1.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 disabled:opacity-50">
                 {busy ? 'Guardando…' : '💾 Guardar tabla'}
               </button>
-            </div>
+            </div>}
             <a href="/productos/mercadoenvios" className="block mt-3 text-xs text-neutral-700 underline underline-offset-2 hover:text-neutral-900">Ir a gestión de pesos →</a>
           </div>
         </div>

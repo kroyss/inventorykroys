@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { tablasEnvioGlobales } from '@/lib/tablasEnvioGlobal'
 import { SQL_RETIRO_EN_TIENDA } from '@/lib/pagosMEComun'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
@@ -52,6 +53,7 @@ export async function PUT(
         if (r.key === 'ml_shipping_table') shipTableRaw = r.value   // JSON, no numérico
         const v = parseFloat(r.value); if (!isNaN(v)) mlp[r.key] = v
       }
+      shipTableRaw = (await tablasEnvioGlobales()).ml_shipping_table ?? shipTableRaw   // 14-11: tabla global
     } catch { /* app_settings ausente → defaults */ }
     const saleIsCO = session.user.country === 'CO'
     const snapshotCommission = async () => {

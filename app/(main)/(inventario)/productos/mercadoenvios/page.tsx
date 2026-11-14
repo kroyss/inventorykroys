@@ -40,6 +40,6 @@ export default async function MercadoEnviosPage() {
   // 12-11 (rapidez): tasa y Ajustes en el HTML.
   return <>
     <PublicacionesMLTabs user={session.user} actual="envios" />
-    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} />
+    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} pagosME={tieneModulo(session.user, 'pagos_me')} />
   </>
 }

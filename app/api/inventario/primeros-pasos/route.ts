@@ -29,8 +29,12 @@ export async function GET() {
              EXISTS (SELECT 1 FROM sales) AS venta,
              EXISTS (SELECT 1 FROM sales WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')) AS procesada,
              EXISTS (SELECT 1 FROM purchase_orders) OR EXISTS (SELECT 1 FROM import_orders) AS compra,
-             COALESCE((SELECT value FROM app_settings WHERE key = '${CLAVE}'), '') = '1' AS oculta`)
-    return NextResponse.json({ ...r, conML: tieneModulo(a.u, 'preguntas') })
+             COALESCE((SELECT value FROM app_settings WHERE key = '${CLAVE}'), '') = '1' AS oculta,
+             (SELECT COUNT(*)::int FROM products WHERE is_active AND (weight_kg IS NULL OR weight_kg <= 0)) AS sin_peso,
+             (SELECT COUNT(*)::int FROM products WHERE is_active AND peso_origen = 'publicacion') AS peso_por_revisar`)
+    // 14-11: paso «Pon el peso» solo donde se usa (VE con la tabla de MercadoEnvíos = módulo Descuento ML).
+    const conPeso = a.u.country === 'VE' && tieneModulo(a.u, 'descuento_ml')
+    return NextResponse.json({ ...r, conML: tieneModulo(a.u, 'preguntas'), conPeso })
   } catch (err) { return apiError(err) }
 }
 

@@ -89,7 +89,7 @@ export default function CostosMLModal({ country, ml, onCerrar, onGuardado }: {
       {tabla.length > 0 && (
         <details className="rounded-lg border border-neutral-200 px-3 py-2">
           <summary className="cursor-pointer text-sm font-semibold text-neutral-800">Tabla de MercadoEnvíos (envío gratis por peso)</summary>
-          <p className="mt-1 text-[11px] text-neutral-500">Con peso, el envío que cobra ML sale de aquí: hasta ese peso, envío gratis desde ese precio.</p>
+          <p className="mt-1 text-[11px] text-neutral-500">Con peso, el envío que cobra ML sale de aquí: hasta ese peso, envío gratis desde ese precio. Es la misma para todos los vendedores y la mantiene al día El Comerciante Digital.</p>
           <table className="mt-1 w-full text-xs">
             <tbody>{tabla.map((t, i) => (
               <tr key={i} className="border-t border-neutral-100"><td className="py-1 text-neutral-600">{t.maxKg >= 999 ? `más de ${tabla[i - 1]?.maxKg ?? 80} kg` : `hasta ${t.maxKg.toLocaleString('de-DE')} kg`}</td>

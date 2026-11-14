@@ -20,6 +20,7 @@ const UpdateSchema = z.object({
   discount_percent:   z.number().min(0).max(100).optional(),
   sale_price:         z.number().nonnegative().optional(),
   weight_kg:          z.number().positive().nullable().optional(),
+  confirmar_peso: z.boolean().optional(),   // 14-11: el ✓ del peso confirma el borrador de la publicación
   ml_codes:           z.array(z.object({ account: z.string(), code: z.string() })).optional(),
 })
 
@@ -92,7 +93,9 @@ export async function PUT(
       }
       if (body.weight_kg !== undefined) {
         // Cambio a mano → origen 'manual' (mig. 174). Si el portal lo da igual en todas sus publicaciones, la próxima traída lo vuelve a poner.
-        await db.query(`UPDATE products SET weight_kg = $1, peso_origen = CASE WHEN weight_kg IS DISTINCT FROM $1 THEN 'manual' ELSE peso_origen END WHERE id = $2`, [body.weight_kg, id])
+        // 14-11: `confirmar_peso` (el ✓ del peso) confirma el borrador de la publicación aunque sea el mismo número → 'manual'.
+        // Guardar la ficha entera manda el peso siempre: eso solo NO lo confirma.
+        await db.query(`UPDATE products SET weight_kg = $1, peso_origen = CASE WHEN weight_kg IS DISTINCT FROM $1 OR ($3 AND peso_origen = 'publicacion') THEN 'manual' ELSE peso_origen END WHERE id = $2`, [body.weight_kg, id, body.confirmar_peso === true])
       }
 
       const pricingFields: [string, unknown][] = []
