@@ -50,11 +50,12 @@ function Desglose({ k }: { k: Pendiente }) {
 const bs = (n: number) => `Bs ${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /** Plataforma → Cuentas y cobros (12-11, el dueño): cuánto entra, quién paga, quién vence (y si usa el sistema) y los pagos. */
-// 13-11 (el dueño, Plataforma → Clientes): ya no es pestaña. modo 'pendientes' = los pagos por revisar (se abren desde
-// «Por atender»); modo 'extras' = lo que se mira poco (últimos revisados y datos de cobro), plegado al final de Clientes.
+// 14-11 (el dueño): todo vive en el panel lateral «Pagos» (PanelPagos, abajo), que se abre desde «cobrado este mes» en
+// Clientes y desde el botón del aviso de Telegram. modo 'pendientes' = por revisar · 'pagados' = los ya revisados
+// (quién pagó, qué y hasta cuándo) · 'datos' = Pago Móvil y Binance que ve el cliente.
 // Vencen y Pagando como listas aparte se quitaron: son los filtros «Por vencer» y «Pagando» de la lista de clientes.
 export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }: {
-  inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void; modo: 'pendientes' | 'extras' }) {
+  inicial?: unknown; onCambio?: () => void; onAbrir?: (organizacionId: number) => void; modo: 'pendientes' | 'pagados' | 'datos' }) {
   // 13-11 (el dueño): el nombre del cliente abre su ficha (cuenta, plan, usuarios y pagos en un solo panel).
   const nombre = (id: number, n: string) => onAbrir
     ? <button onClick={e => { e.preventDefault(); e.stopPropagation(); onAbrir(id) }} className="font-bold hover:underline" title="Abrir la ficha del cliente">{n}</button>
@@ -89,7 +90,7 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
     setEditarDatos(null); setAviso('Datos de cobro guardados: los clientes ya los ven así.'); cargar()
   }
 
-  if (!d) return modo === 'extras' ? null : <p className="text-sm text-neutral-500">Cargando…</p>
+  if (!d) return <p className="text-sm text-neutral-500">Cargando…</p>
   const campo = 'w-full border border-neutral-300 rounded px-2 py-1 text-sm'
 
   return (
@@ -98,8 +99,7 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
       {error && <p className="text-sm bg-red-50 border border-red-200 text-red-800 rounded px-3 py-2">{error}</p>}
 
       {modo === 'pendientes' && <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-neutral-800">Pagos por revisar ({d.pendientes.length})</h2>
-        {!d.pendientes.length && <p className="text-sm text-neutral-500">No hay pagos por revisar.</p>}
+        {!d.pendientes.length && <p className="rounded-xl border border-dashed border-neutral-200 py-10 text-center text-sm text-neutral-400">No hay pagos por revisar. Cuando un cliente reporte uno te llega un Telegram.</p>}
         {d.pendientes.map(k => (
           <div key={k.id} className="rounded-xl border border-amber-200 bg-white p-3 flex flex-col sm:flex-row gap-3">
             {k.tiene_comprobante && (
@@ -138,9 +138,18 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
         ))}
       </section>}
 
-      {modo === 'extras' && <>
-      <details className="group space-y-2">
-        <summary className="cursor-pointer select-none text-sm font-semibold text-neutral-800">Últimos pagos revisados ({d.recientes.length})</summary>
+      {modo === 'pagados' && <section className="space-y-3">
+        {d.ingresos && (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {([['Cobrado este mes', usd(d.ingresos.mes)], ['Pagos este mes', String(d.ingresos.pagos_mes)], ['Mes anterior', usd(d.ingresos.anterior)]] as const).map(([t, v]) => (
+              <div key={t} className="rounded-lg bg-neutral-50 px-2 py-2">
+                <p className="text-lg font-semibold tabular-nums text-neutral-900">{v}</p>
+                <p className="text-[11px] text-neutral-500">{t}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-neutral-500">Los últimos {d.recientes.length} pagos revisados. Toca uno para ver el detalle; el nombre abre su ficha.</p>
         {!d.recientes.length ? <p className="text-sm text-neutral-500">Todavía ninguno.</p> : (
           <ul className="text-sm divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white">
             {d.recientes.map(k => (
@@ -164,11 +173,11 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
             ))}
           </ul>
         )}
-      </details>
+      </section>}
 
-      <details className="space-y-2" open={!!editarDatos}>
-        <summary className="cursor-pointer select-none text-sm font-semibold text-neutral-800">Datos de cobro (los ve el cliente en Mi plan)</summary>
-        <div className="flex items-baseline justify-end">
+      {modo === 'datos' && <section className="space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-xs text-neutral-500">Los ve el cliente en Mi plan al pagar.</p>
           {!editarDatos && <button onClick={() => setEditarDatos(d.datos)} className="text-sm text-sky-700 hover:underline">Editar</button>}
         </div>
         {editarDatos ? (
@@ -198,9 +207,47 @@ export default function CobrosPanel({ inicial = null, onCambio, onAbrir, modo }:
             <p><b>Binance:</b> ID {d.datos.binance.id} ({d.datos.binance.nombre}) · {d.datos.binance.correo} · {d.datos.binance.moneda}</p>
           </div>
         )}
-      </details>
-      </>}
+      </section>}
     </div>
   )
 }
 
+
+/** Panel lateral «Pagos» (14-11, el dueño): por revisar · pagados · datos de cobro. */
+export type PestanaPagos = 'pendientes' | 'pagados' | 'datos'
+export function PanelPagos({ inicial = null, pendientes, pestana: inicialPestana = 'pendientes', onCerrar, onCambio, onAbrir }: {
+  inicial?: unknown; pendientes: number; pestana?: PestanaPagos
+  onCerrar: () => void; onCambio?: () => void; onAbrir?: (organizacionId: number) => void
+}) {
+  const [pestana, setPestana] = useState<PestanaPagos>(inicialPestana)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [onCerrar])
+  const PESTANAS: [PestanaPagos, string][] = [['pendientes', `Por revisar${pendientes ? ` (${pendientes})` : ''}`], ['pagados', 'Pagados'], ['datos', 'Datos de cobro']]
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Pagos">
+      <div className="absolute inset-0 bg-black/20" onClick={onCerrar} />
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b px-5 pt-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-neutral-900">Pagos</h2>
+            <div role="tablist" className="mt-2 flex gap-1">
+              {PESTANAS.map(([k, t]) => (
+                <button key={k} role="tab" aria-selected={pestana === k} onClick={() => setPestana(k)}
+                  className={`-mb-px whitespace-nowrap border-b-2 px-2.5 py-2 text-sm font-medium ${pestana === k ? 'border-lime-500 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={onCerrar} aria-label="Cerrar" className="text-xl leading-none text-neutral-400 hover:text-neutral-700">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <CobrosPanel key={pestana} modo={pestana} inicial={inicial} onCambio={onCambio} onAbrir={onAbrir} />
+        </div>
+      </aside>
+    </div>
+  )
+}

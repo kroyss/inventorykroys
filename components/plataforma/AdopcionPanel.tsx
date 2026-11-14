@@ -16,7 +16,8 @@ export interface Empresa {
   pagos_me_estado?: 'vinculado' | 'intento' | 'sin_intentar' | null   // en qué quedó la conexión (23-10)
 }
 type Nivel = 'integrado' | 'parcial' | 'sin_uso' | 'no_entra' | 'sin_ventas' | 'sin_conectar'
-export type FiltroUso = 'todos' | 'pagando' | 'prueba' | 'sin_conectar' | 'por_vencer' | 'dormidos'
+// 14-11: todos/pagando/prueba = la barra de trabajo; en_linea/activos = los números de arriba; m_* = el motivo de «Para atender».
+export type FiltroUso = 'todos' | 'pagando' | 'prueba' | 'en_linea' | 'activos' | 'm_vence' | 'm_sinml' | 'm_noentra' | 'm_sinuso'
 type Orden = 'actividad' | 'ultimo' | 'ventas' | 'nombre'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : null)
@@ -52,14 +53,19 @@ const usoCorto = (e: Empresa) => ([
 ] as [string, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${n} ${t}`).join(' · ')
 
 /** Por qué un cliente pide atención hoy (lo más urgente primero); null = va bien. 13-11 (el dueño). */
-type Motivo = { t: string; grave: boolean }
+type ClaveMotivo = 'vence' | 'sinml' | 'noentra' | 'sinuso'
+type Motivo = { k: ClaveMotivo; t: string; grave: boolean }
 function motivo(b: BaseCliente, e: Empresa, n: Nivel): Motivo | null {
-  if (b.vence != null && b.vence <= 5) return { t: b.vence < 0 ? 'Venció' : b.vence === 0 ? 'Vence hoy' : `Vence en ${b.vence} día${b.vence === 1 ? '' : 's'}`, grave: b.vence <= 1 }
-  if (n === 'sin_conectar') return { t: 'No conectó MercadoLibre', grave: false }
-  if (n === 'no_entra') return { t: `No entra (${hace(e.ultimo_uso ?? e.abierta_at)})`, grave: true }
-  if (n === 'sin_uso') return { t: 'Entra pero no usa nada', grave: true }
+  if (b.vence != null && b.vence <= 5) return { k: 'vence', t: b.vence < 0 ? 'Venció' : b.vence === 0 ? 'Vence hoy' : `Vence en ${b.vence} día${b.vence === 1 ? '' : 's'}`, grave: b.vence <= 1 }
+  if (n === 'sin_conectar') return { k: 'sinml', t: 'No conectó MercadoLibre', grave: false }
+  if (n === 'no_entra') return { k: 'noentra', t: `No entra (${hace(e.ultimo_uso ?? e.abierta_at)})`, grave: true }
+  if (n === 'sin_uso') return { k: 'sinuso', t: 'Entra pero no usa nada', grave: true }
   return null
 }
+const MOTIVOS: { k: ClaveMotivo; t: (n: number) => string }[] = [
+  { k: 'vence', t: n => `${n} vence${n === 1 ? '' : 'n'}` }, { k: 'sinml', t: n => `${n} sin ML` },
+  { k: 'noentra', t: n => `${n} no entra${n === 1 ? '' : 'n'}` }, { k: 'sinuso', t: n => `${n} no usa${n === 1 ? '' : 'n'} nada` },
+]
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, '').replace(/^0/, '58')}`
 
@@ -144,10 +150,10 @@ export const CEROS = {
   en_linea: false, abierta: false, telegram: false, pagos_me: null,
 }
 
-const FILTROS_USO: { k: FiltroUso; t: string }[] = [
-  { k: 'todos', t: 'Todos' }, { k: 'pagando', t: 'Pagando' }, { k: 'prueba', t: 'En prueba' }, { k: 'por_vencer', t: 'Por vencer' },
-  { k: 'sin_conectar', t: 'Sin ML' }, { k: 'dormidos', t: 'Dormidos' },
-]
+const SEGMENTOS: { k: FiltroUso; t: string }[] = [{ k: 'todos', t: 'Todos' }, { k: 'pagando', t: 'Pagando' }, { k: 'prueba', t: 'En prueba' }]
+const NOMBRE_FILTRO: Partial<Record<FiltroUso, string>> = {
+  en_linea: 'En línea ahora', activos: 'Lo usaron', m_vence: 'Vencen pronto', m_sinml: 'Sin MercadoLibre', m_noentra: 'No entran', m_sinuso: 'No usan nada',
+}
 
 /** Plataforma → Clientes: la lista de empresas con su uso. Tocar una fila abre su ficha (onAbrir). */
 /** Lo cobrado (Plataforma → Clientes, 13-11): sale de /api/plataforma/cobros. */
@@ -157,8 +163,11 @@ const COLS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_
 const COLS_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1.1fr)_6.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_6.5rem]'
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`
 
-export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro, cobro = null, onVerComo }: {
+export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro, cobro = null, onVerComo,
+  buscar, onBuscar, pagosPendientes = 0, casos = 0, onPagos, onSoporte }: {
   base: BaseCliente[]; onAbrir: (id: number) => void; abierta: number | null
+  buscar: string; onBuscar: (q: string) => void
+  pagosPendientes?: number; casos?: number; onPagos: () => void; onSoporte: () => void
   onVerComo?: (empresaId: number, usuarioId: number) => Promise<void>
   filtro: FiltroUso; onFiltro: (f: FiltroUso) => void; cobro?: ResumenCobro | null }) {
   const [dias, setDias] = useState(7)
@@ -185,14 +194,17 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
   const uso = new Map(lista.map(e => [e.id, e]))
   const filas = base.map(b => {
     const e = { ...CEROS, ...uso.get(b.id), id: b.id, nombre: b.nombre } as Empresa
-    return { b, e, n: nivel(e), act: actividad(e) }
+    const n = nivel(e)
+    return { b, e, n, act: actividad(e), m: e.propia || b.interna ? null : motivo(b, e, n) }
   })
   const clientes = filas.filter(x => !x.e.propia && x.b.activa)
   const esActivo = (x: typeof filas[number]) => x.act > 0
-  const esDormido = (x: typeof filas[number]) => !!x.e.cuentas && diasSin(x.e.ultimo_uso ?? x.e.abierta_at) > 7
   const pasa: Record<FiltroUso, (x: typeof filas[number]) => boolean> = {
-    todos: () => true, pagando: x => !!x.b.pagando, prueba: x => !!x.b.prueba, dormidos: esDormido, sin_conectar: x => !x.e.cuentas, por_vencer: x => x.b.porVencer,
+    todos: () => true, pagando: x => !!x.b.pagando, prueba: x => !!x.b.prueba,
+    en_linea: x => x.e.en_linea, activos: esActivo,
+    m_vence: x => x.m?.k === 'vence', m_sinml: x => x.m?.k === 'sinml', m_noentra: x => x.m?.k === 'noentra', m_sinuso: x => x.m?.k === 'sinuso',
   }
+  const alternar = (f: FiltroUso) => setFiltroUso(filtroUso === f ? 'todos' : f)
   const maxAct = Math.max(1, ...clientes.map(x => x.act))
   const ordenar = (x: typeof filas[number], y: typeof filas[number]) =>
     orden === 'nombre' ? x.b.nombre.localeCompare(y.b.nombre)
@@ -201,8 +213,8 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
       : y.act - x.act || diasSin(x.e.ultimo_uso) - diasSin(y.e.ultimo_uso)
   // 13-11 (el dueño): agrupada por lo que pide de ti. Para atender (vence, sin ML, no entra, no usa nada) primero y con
   // el motivo a la vista; después los que van bien; tus empresas e internas al final, como referencia.
-  const vistas = filas.filter(x => x.e.propia || pasa[filtroUso](x))
-    .map(x => ({ ...x, m: x.e.propia || x.b.interna ? null : motivo(x.b, x.e, x.n) }))
+  // Tus empresas quedan siempre como referencia, salvo con un filtro de «Para atender» (ahí solo importan los clientes).
+  const vistas = filas.filter(x => (x.e.propia && !filtroUso.startsWith('m_')) || (!x.e.propia && pasa[filtroUso](x)))
   const grupos: { k: string; t: string; ayuda: string; filas: typeof vistas }[] = [
     { k: 'atender', t: 'Para atender', ayuda: 'vence pronto, sin MercadoLibre, no entra o no usa nada',
       filas: vistas.filter(x => x.m).sort((x, y) => Number(y.m!.grave) - Number(x.m!.grave) || ordenar(x, y)) },
@@ -210,54 +222,89 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
     { k: 'tuyas', t: 'Tuyas e internas', ayuda: 'referencia: no pagan ni vencen', filas: vistas.filter(x => x.e.propia || x.b.interna).sort(ordenar) },
   ]
 
-  // 12-11 (el dueño): lo que mira seguido, en 4 números.
+  // 14-11 (el dueño): dos franjas finas en vez de tarjetas + chips + avisos. Franja 1 = los números del negocio
+  // (cada uno clickeable); franja 2 = la barra de trabajo (segmento, buscador, período, orden).
   const enLinea = clientes.filter(x => x.e.en_linea)
   const conectados = clientes.filter(x => x.e.cuentas)
-  const TARJETAS: [string, ReactNode, string, boolean?][] = [
-    ['En línea ahora', enLinea.length, enLinea.length ? enLinea.map(x => x.b.nombre).join(', ') : 'ningún cliente usando ahora', enLinea.length > 0],
-    [`Lo usaron (${dias} días)`, <>{clientes.filter(esActivo).length}<span className="text-sm font-normal text-neutral-400"> / {conectados.length}</span></>, 'de los que tienen ML conectado'],
-    ['Pagando', clientes.filter(x => x.b.pagando).length, cobro ? `≈ ${usd(cobro.recurrente)} al mes con sus planes` : `${clientes.filter(x => x.b.pagando && esActivo(x)).length} lo usaron en ${dias} días`],
-    ['Cobrado este mes', cobro ? usd(cobro.mes) : '—', cobro ? `${cobro.pagos_mes} pago${cobro.pagos_mes === 1 ? '' : 's'} · mes anterior ${usd(cobro.anterior)}` : ''],
-  ]
+  const pagando = clientes.filter(x => x.b.pagando)
+  const atender = clientes.filter(x => x.m)
+  const filtroEspecial = NOMBRE_FILTRO[filtroUso]
+  const stat = 'group flex shrink-0 items-baseline gap-1.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white hover:shadow-sm'
+  const statOn = 'bg-white shadow-sm ring-1 ring-neutral-200'
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {TARJETAS.map(([t, n, d, vivo]) => (
-          <div key={t} className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
-            <p className="flex items-center gap-1.5 text-xs text-neutral-500">{vivo && <span className="h-2 w-2 rounded-full bg-emerald-500" />}{t}</p>
-            <p className="text-2xl font-semibold tabular-nums text-neutral-900">{n}</p>
-            <p className="truncate text-[11px] text-neutral-400" title={d}>{d}</p>
-          </div>
-        ))}
+      {/* Franja 1 · los números del negocio */}
+      <div className="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
+        <button onClick={() => alternar('en_linea')} className={`${stat} ${filtroUso === 'en_linea' ? statOn : ''}`}
+          title={enLinea.length ? enLinea.map(x => x.b.nombre).join(', ') : 'Ningún cliente usando ahora'}>
+          <span className={`h-2 w-2 shrink-0 self-center rounded-full ${enLinea.length ? 'bg-emerald-500' : 'bg-neutral-300'}`} />
+          <b className="text-xl font-semibold tabular-nums text-neutral-900">{enLinea.length}</b>
+          <span className="whitespace-nowrap text-xs text-neutral-500">en línea</span>
+        </button>
+        <span className="text-neutral-200" aria-hidden>·</span>
+        <button onClick={() => alternar('activos')} className={`${stat} ${filtroUso === 'activos' ? statOn : ''}`} title={`Usaron el sistema en ${dias} días, de los que tienen MercadoLibre conectado`}>
+          <b className="text-xl font-semibold tabular-nums text-neutral-900">{clientes.filter(esActivo).length}<span className="text-sm font-normal text-neutral-400">/{conectados.length}</span></b>
+          <span className="whitespace-nowrap text-xs text-neutral-500">lo usaron ({dias} d)</span>
+        </button>
+        <span className="text-neutral-200" aria-hidden>·</span>
+        <button onClick={() => alternar('pagando')} className={`${stat} ${filtroUso === 'pagando' ? statOn : ''}`}>
+          <b className="text-xl font-semibold tabular-nums text-neutral-900">{pagando.length}</b>
+          <span className="whitespace-nowrap text-xs text-neutral-500">pagando{cobro ? ` ≈ ${usd(cobro.recurrente)}/mes` : ''}</span>
+        </button>
+        <span className="text-neutral-200" aria-hidden>·</span>
+        <button onClick={onPagos} className={`${stat} relative`} title={cobro ? `${cobro.pagos_mes} pago${cobro.pagos_mes === 1 ? '' : 's'} este mes · mes anterior ${usd(cobro.anterior)}. Toca para ver los pagos.` : 'Ver los pagos'}>
+          <b className="text-xl font-semibold tabular-nums text-neutral-900">{cobro ? usd(cobro.mes) : '—'}</b>
+          <span className="whitespace-nowrap text-xs text-neutral-500 group-hover:text-neutral-800">cobrado este mes ›</span>
+          {pagosPendientes > 0 && (
+            <span className="ml-1 self-center whitespace-nowrap rounded-full bg-red-500 px-1.5 py-px text-[10px] font-bold text-white" title="Pagos por revisar">
+              {pagosPendientes} por revisar
+            </span>
+          )}
+        </button>
+        {casos > 0 && <>
+          <span className="text-neutral-200" aria-hidden>·</span>
+          <button onClick={onSoporte} className="shrink-0 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 hover:bg-amber-100">
+            🆘 {casos} caso{casos === 1 ? '' : 's'} de soporte
+          </button>
+        </>}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1.5">
-          {FILTROS_USO.map(f => (
-            <button key={f.k} onClick={() => setFiltroUso(f.k)}
-              className={`rounded-full border px-3 py-1 text-xs ${filtroUso === f.k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
-              {f.t} <span className="opacity-60">{clientes.filter(pasa[f.k]).length}</span>
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
-          <label className="flex items-center gap-1 text-neutral-500">Ordenar
-            <select value={orden} onChange={e => setOrden(e.target.value as Orden)} className="rounded-lg border border-neutral-300 px-2 py-1 text-xs text-neutral-800">
-              <option value="actividad">Más activos</option>
-              <option value="ultimo">Último uso</option>
-              <option value="ventas">Ventas</option>
-              <option value="nombre">Nombre</option>
-            </select>
-          </label>
-          <div className="flex gap-1">
-            {[7, 14, 30].map(d => (
-              <button key={d} onClick={() => setDias(d)}
-                className={`rounded-full border px-2.5 py-1 font-medium ${dias === d ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
-                {d} días
+      {/* Franja 2 · la barra de trabajo */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="flex items-center gap-2">
+          <div role="tablist" className="inline-flex shrink-0 rounded-lg bg-neutral-100 p-0.5">
+            {SEGMENTOS.map(f => (
+              <button key={f.k} role="tab" aria-selected={filtroUso === f.k} onClick={() => setFiltroUso(f.k)}
+                className={`whitespace-nowrap rounded-md px-3 py-1 text-sm transition-colors ${filtroUso === f.k ? 'bg-white font-medium text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}>
+                {f.t} <span className="tabular-nums text-neutral-400">{clientes.filter(pasa[f.k]).length}</span>
               </button>
             ))}
           </div>
+          {filtroEspecial && (
+            <button onClick={() => setFiltroUso('todos')} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white" title="Quitar el filtro">
+              {filtroEspecial} <span aria-hidden>✕</span>
+            </button>
+          )}
+        </div>
+        <input type="search" value={buscar} onChange={ev => onBuscar(ev.target.value)} placeholder="Buscar empresa, usuario, nombre o correo…"
+          className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
+        <div className="flex items-center gap-2">
+          <div className="inline-flex shrink-0 rounded-lg bg-neutral-100 p-0.5" aria-label="Período">
+            {[7, 14, 30].map(d => (
+              <button key={d} onClick={() => setDias(d)}
+                className={`rounded-md px-2.5 py-1 text-sm tabular-nums transition-colors ${dias === d ? 'bg-white font-medium text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}>
+                {d} d
+              </button>
+            ))}
+          </div>
+          <select value={orden} onChange={e => setOrden(e.target.value as Orden)} aria-label="Ordenar"
+            className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-sm text-neutral-800 md:flex-none">
+            <option value="actividad">Más activos</option>
+            <option value="ultimo">Último uso</option>
+            <option value="ventas">Ventas</option>
+            <option value="nombre">Nombre</option>
+          </select>
         </div>
       </div>
 
@@ -268,7 +315,15 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
           <h3 className="flex items-baseline gap-2 px-1">
             <span className={`text-xs font-semibold uppercase tracking-wide ${g.k === 'atender' ? 'text-amber-700' : 'text-neutral-500'}`}>{g.t}</span>
             <span className="text-xs font-semibold tabular-nums text-neutral-400">{g.filas.length}</span>
-            <span className="hidden text-[11px] text-neutral-400 sm:inline">· {g.ayuda}</span>
+            {g.k === 'atender'
+              ? <span className="flex flex-wrap items-baseline gap-x-1 text-[11px]">
+                  {MOTIVOS.map(mo => ({ ...mo, n: atender.filter(x => x.m?.k === mo.k).length })).filter(mo => mo.n > 0).map(mo => {
+                    const f = `m_${mo.k}` as FiltroUso
+                    return <button key={mo.k} onClick={() => alternar(f)}
+                      className={`rounded-full px-1.5 py-px ${filtroUso === f ? 'bg-amber-600 font-semibold text-white' : 'text-amber-800 hover:bg-amber-50'}`}>· {mo.t(mo.n)}</button>
+                  })}
+                </span>
+              : <span className="hidden text-[11px] text-neutral-400 sm:inline">· {g.ayuda}</span>}
           </h3>
           <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
             <div className={`hidden ${COLS} gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-1.5 text-[11px] font-medium text-neutral-500 md:grid`}>

@@ -15,7 +15,7 @@ import AprendizajePanel from './AprendizajePanel'
 import AdopcionPanel, { type FiltroUso, type ResumenCobro } from './AdopcionPanel'
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
-import CobrosPanel from './CobrosPanel'
+import { PanelPagos } from './CobrosPanel'
 import { soloRadar as soloRadarModulos } from '@/lib/modulos'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 import { corteDeAlta, corteISO } from '@/lib/fundadoresCortes'
@@ -175,6 +175,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   const [hoy, setHoy]           = useState('')
   const [borrar, setBorrar]     = useState<Empresa | null>(null)
   const [abierta, setAbierta]   = useState<number | null>(null)
+  const cerrarPagos = useCallback(() => setVerPagos(false), [])
   // 13-11 (el dueño): «Ver como» directo desde la fila (el ojo), como su administrador. Solo lectura y queda
   // registrado en soporte_accesos (solo lo ve Plataforma; el cliente no se entera).
   const { update: actualizarSesion } = useSession()
@@ -358,44 +359,16 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
           onCreada={msg => { setNueva(false); setAviso(msg); cargar() }} />
       )}
 
-      {/* Lista corta: lo que se mira seguido. El detalle (módulos, IA, acciones) va en el panel lateral. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-neutral-600">
-          <b className="text-neutral-900">{clientesActivos}</b> clientes pueden entrar
-          {totalRadar.length > 0 && <span className="text-neutral-400"> · {totalRadar.length} solo Radar</span>}
-          {totalInactivas.length > 0 && <span className="text-neutral-400"> · {totalInactivas.length} inactivos guardados abajo</span>}
-        </p>
-        <input type="search" value={buscar} onChange={ev => setBuscar(ev.target.value)} placeholder="Buscar empresa, usuario, nombre o correo…"
-          className="border border-neutral-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-80" />
-      </div>
-
-      {/* Lo que espera por ti: solo aparece si hay algo. */}
-      {(() => {
-        const items: [string, () => void][] = []
-        if (pendientes.pagos) items.push([`💳 ${pendientes.pagos} pago${pendientes.pagos === 1 ? '' : 's'} por revisar`, () => setVerPagos(v => !v)])
-        if (pendientes.casos) items.push([`🆘 ${pendientes.casos} caso${pendientes.casos === 1 ? '' : 's'} de soporte abierto${pendientes.casos === 1 ? '' : 's'}`, verSoporte])
-        if (!items.length) return null
-        return (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-            <span className="font-medium">Por atender:</span>
-            {items.map(([t, ir]) => (
-              <button key={t} onClick={ir} className="rounded-full bg-white px-3 py-1 text-xs font-medium ring-1 ring-inset ring-amber-200 hover:bg-amber-100">{t} →</button>
-            ))}
-          </div>
-        )
-      })()}
-
-      {/* Una sola lista (2026-10-15): cada empresa con su estado de cuenta y su uso del sistema; la ficha
-          (módulos, IA, acciones) se abre al tocarla, como antes. */}
+      {/* 14-11 (el dueño): los pagos en un panel lateral (por revisar · pagados · datos), abierto desde «cobrado este mes»
+          o desde el botón del aviso de Telegram (?vista=cobros). */}
       {verPagos && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
-          <div className="mb-2 flex justify-end"><button onClick={() => setVerPagos(false)} className="text-xs text-neutral-500 hover:text-neutral-800">Ocultar ✕</button></div>
-          <CobrosPanel modo="pendientes" inicial={inicial?.cobros ?? null} onCambio={() => { leerPendientes(); cargar() }} onAbrir={abrirOrganizacion} />
-        </div>
+        <PanelPagos inicial={inicial?.cobros ?? null} pendientes={pendientes.pagos} onCerrar={cerrarPagos}
+          onCambio={() => { leerPendientes(); cargar() }} onAbrir={id => { setVerPagos(false); abrirOrganizacion(id) }} />
       )}
 
       <AdopcionPanel filtro={filtroUso} onFiltro={setFiltroUso} cobro={cobro} abierta={abierta} onAbrir={id => { setError(null); setAviso(null); setAbierta(id) }}
-        onVerComo={verComo}
+        onVerComo={verComo} buscar={buscar} onBuscar={setBuscar} pagosPendientes={pendientes.pagos} casos={pendientes.casos}
+        onPagos={() => setVerPagos(true)} onSoporte={verSoporte}
         base={activas.map(e => ({
           id: e.id, nombre: e.nombre, activa: true, pagando: e.estado === 'activo', prueba: e.estado === 'prueba',
           verComo: e.id !== empresaActual && e.is_active && e.admin_id ? e.admin_id : null,
@@ -466,8 +439,6 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
         </div>
       )}
 
-      {/* Lo de cobros que se mira poco: plegado al final. */}
-      <CobrosPanel modo="extras" inicial={inicial?.cobros ?? null} onCambio={leerPendientes} onAbrir={abrirOrganizacion} />
       </>}
 
       {/* 13-11: la ficha se abre desde la lista, los pagos por revisar y el buscador. */}
