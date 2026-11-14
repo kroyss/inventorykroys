@@ -15,7 +15,7 @@ export async function GET(_: NextRequest) {
     const costFactor = await localCostFactor(session.user.country)
     const { rows } = await db.query(`
       SELECT
-        p.code, p.name, p.is_active,
+        p.id, p.code, p.name, p.is_active,
         COALESCE(pp.total_cost, 0)                                        AS total_cost,
         COALESCE(i.sale_price, pp.final_price_usd, 0)                     AS sale_price,
         COALESCE(i.quantity, 0)                                           AS quantity,

@@ -31,6 +31,7 @@ export async function GET() {
       )
       SELECT
         a.reference,
+        p.id,
         p.code,
         p.name,
         a.delta::int                        AS delta,

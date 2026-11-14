@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { matchFuzzy } from '@/lib/search'
 import { cambio } from '@/lib/resumenAtencion'
 import { textoRango } from '@/lib/rangoInicio'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 
 // Reportes → Ventas → «Por producto» (14-11, el dueño: un top de verdad, en un solo lugar). Todo lo vendido en las
 // fechas elegidas arriba, contra los mismos días justo antes: podio con los 3 primeros, el resto con barra, ordenar
@@ -13,6 +14,8 @@ type Orden = 'unidades' | 'venta' | 'ganancia'
 
 function Variacion({ ahora, antes }: { ahora: number; antes: number }) {
   if (!antes) return <span className="text-neutral-400">nuevo</span>
+  // Con muy poca base el % engaña (de 1 a 98 = +9700%): mejor decir cuánto vendía.
+  if (antes < 5) return <span className={ahora >= antes ? 'text-emerald-600' : 'text-red-600'}>antes {antes}</span>
   const c = cambio(ahora, antes)!
   if (c === 0) return <span className="text-neutral-400">= {antes}</span>
   return <span className={c > 0 ? 'text-emerald-600' : 'text-red-600'} title={`Antes: ${antes} u`}>{c > 0 ? '▲' : '▼'} {Math.abs(c)}%</span>
@@ -91,19 +94,24 @@ export default function PorProducto({ dateFrom, dateTo }: { dateFrom: string; da
       </p>
 
       {podio.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-3">
           {podio.map((p, i) => (
-            <div key={p.id} className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${i === 0 ? 'border-amber-300 ring-1 ring-amber-200' : 'border-neutral-200'}`}>
-              <div className="flex items-center justify-between">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${i === 0 ? 'bg-amber-100 text-amber-800' : 'bg-neutral-100 text-neutral-700'}`}>{i + 1}</span>
-                <span className="text-xs num"><Variacion ahora={p.unidades} antes={p.antes} /></span>
+            <div key={p.id} className={`flex items-center gap-3 rounded-xl border bg-white px-3 py-2.5 shadow-sm ${i === 0 ? 'border-amber-300' : 'border-neutral-200'}`}>
+              <div className="relative shrink-0">
+                <FotoProducto id={p.id} nombre={p.nombre} tam="md" />
+                <span className={`absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ring-2 ring-white ${i === 0 ? 'bg-amber-400 text-white' : 'bg-neutral-700 text-white'}`}>{i + 1}</span>
               </div>
-              <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-5 text-neutral-900" title={p.nombre}>{p.nombre}</p>
-              <p className="num mt-1 text-2xl font-semibold tracking-tight text-neutral-900">{valor(p)}</p>
-              <p className="num text-xs text-neutral-500">
-                {orden === 'unidades' ? dinero(p.venta) : `${p.unidades.toLocaleString('es-VE')} u`}
-                {d.verCostos && orden !== 'ganancia' && p.ganancia != null && <> · ganancia {dinero(p.ganancia)}</>}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-neutral-900" title={p.nombre}>{p.nombre}</p>
+                <p className="num flex items-baseline gap-2 text-xs">
+                  <span className="text-base font-semibold text-neutral-900">{valor(p)}</span>
+                  <Variacion ahora={p.unidades} antes={p.antes} />
+                </p>
+                <p className="num truncate text-[11px] text-neutral-500">
+                  {orden === 'unidades' ? dinero(p.venta) : `${p.unidades.toLocaleString('es-VE')} u`}
+                  {d.verCostos && orden !== 'ganancia' && p.ganancia != null && <> · ganancia {dinero(p.ganancia)}</>}
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -127,13 +135,18 @@ export default function PorProducto({ dateFrom, dateTo }: { dateFrom: string; da
                 return (
                   <tr key={p.id} className="border-t border-neutral-100 hover:bg-neutral-50">
                     <td className="py-2.5 pl-4 text-xs text-neutral-400 num">{puesto}</td>
-                    <td className="max-w-0 py-2.5 pr-3">
+                    <td className="max-w-0 py-2 pr-3">
+                      <div className="flex items-center gap-2.5">
+                      <FotoProducto id={p.id} nombre={p.nombre} />
+                      <div className="min-w-0 flex-1">
                       <p className="truncate text-neutral-900" title={p.nombre}>{p.nombre}</p>
                       <div className="mt-1 flex items-center gap-2">
                         <div className="h-1.5 flex-1 rounded-full bg-neutral-100">
                           <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${Math.max(2, Math.max(0, p[orden] ?? 0) / max * 100)}%` }} />
                         </div>
                         <span className="hidden shrink-0 truncate text-[11px] text-neutral-400 lg:inline"><span className="font-mono">{p.code}</span>{p.categoria ? ` · ${p.categoria}` : ''}</span>
+                      </div>
+                      </div>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-right">

@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import { money } from '@/components/ui'
@@ -237,11 +238,14 @@ function Reponer({ lista, orden, r, pedido, setPedido }: { lista: P[]; orden: st
 
 function Nombre({ p }: { p: P }) {
   return (
+    <div className="flex min-w-0 items-center gap-2.5">
+    <FotoProducto id={p.id} nombre={p.name} />
     <div className="min-w-0">
       <p className="truncate font-medium text-neutral-900" title={p.name}>{p.name}
         {p.historial_roto && <span className="ml-1 cursor-help text-amber-600" title={`El historial de movimientos no cierra con el stock (desfase de ${p.historial_desfase} u): se calcula por calendario, sin ajuste por días con stock.`}>⚠</span>}
       </p>
       <p className="text-xs text-neutral-400"><span className="font-mono">{p.code}</span>{p.categoria ? ` · ${p.categoria}` : ''}</p>
+    </div>
     </div>
   )
 }

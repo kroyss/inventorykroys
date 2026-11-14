@@ -91,34 +91,37 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
+    // 14-11 (el dueño: "más profesional, sutil y que ocupe menos"): sin leyenda (las cifras de arriba llevan el color),
+    // sin puntos (aparecen al pasar el mouse), grillas apenas visibles y el eje de ventas concretadas escondido.
     plugins: {
-      legend: { position: 'top', align: 'end', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6, boxHeight: 6, padding: 16, color: '#525252' } },
+      legend: { display: false },
       tooltip: {
+        backgroundColor: 'rgba(23,23,23,0.92)', padding: 10, cornerRadius: 8, boxWidth: 8, boxHeight: 8, usePointStyle: true,
+        titleFont: { size: 11, weight: 'normal' }, bodyFont: { size: 12 },
         callbacks: {
           label: ctx => ctx.dataset.yAxisID === 'y1'
-            ? `${ctx.dataset.label}: ${ctx.parsed.y ?? 0}`
-            : `${ctx.dataset.label}: $${money(ctx.parsed.y ?? 0)}`,
+            ? ` ${ctx.dataset.label}: ${ctx.parsed.y ?? 0}`
+            : ` ${ctx.dataset.label}: $${money(ctx.parsed.y ?? 0)}`,
         },
       },
     },
+    elements: { point: { radius: 0, hoverRadius: 4, hitRadius: 12 }, line: { tension: 0.35, borderWidth: 2 } },
     scales: {
       y: {
         beginAtZero: true,
         position: 'left',
-        ticks: { callback: v => '$' + Math.round(Number(v)).toLocaleString('de-DE'), color: '#737373' },
-        grid: { color: 'rgba(0,0,0,0.05)' },
+        border: { display: false },
+        ticks: { maxTicksLimit: 4, font: { size: 11 }, color: '#a3a3a3', padding: 6,
+          callback: v => { const n = Number(v); return '$' + (n >= 1000 ? `${Math.round(n / 100) / 10}k` : Math.round(n)) } },
+        grid: { color: 'rgba(0,0,0,0.04)' },
       },
-      y1: {
-        beginAtZero: true,
-        position: 'right',
-        ticks: { callback: v => `${v} v`, color: '#a3a3a3' },
-        grid: { drawOnChartArea: false },
-      },
+      y1: { beginAtZero: true, position: 'right', display: false, grid: { drawOnChartArea: false } },
       // Días: "2026-09-14" → "14" (el mes ya se sabe por el período elegido)
       x: {
+        border: { display: false },
         grid: { display: false },
         ticks: {
-          color: '#737373', maxRotation: 0, autoSkipPadding: 8,
+          color: '#a3a3a3', font: { size: 11 }, maxRotation: 0, autoSkipPadding: 12,
           callback(v) {
             const l = String(this.getLabelForValue(Number(v)))
             return /^\d{4}-\d{2}-\d{2}$/.test(l) ? String(Number(l.slice(8))) : l
@@ -201,8 +204,8 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
       )}
 
       {/* Gráfico con métricas integradas arriba */}
-      <div className={`bg-white rounded-xl border border-neutral-200 p-4 shadow-sm ${country === 'VE' ? 'mt-2.5!' : ''}`}>
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div className={`bg-white rounded-xl border border-neutral-200 px-4 pb-3 pt-4 shadow-sm ${country === 'VE' ? 'mt-2.5!' : ''}`}>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="font-semibold text-neutral-900">Ventas, costos y ganancia</h3>
           <div className="flex gap-1.5 items-center flex-wrap">
             {(['today','month','quarter','year'] as Period[]).map(p => (
@@ -226,76 +229,54 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
           </div>
         </div>
 
-        {/* métricas del período (period-aware, una sola fuente) */}
+        {/* métricas del período (period-aware, una sola fuente); el punto de color es la leyenda del gráfico */}
         {chart && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Ventas
-              </div>
-              <div className="text-xl font-bold text-neutral-900 mt-0.5">${money(chart.summary.ventas)}</div>
-              {period === 'month' && salesDelta && (
-                <div className="text-xs mt-0.5 opacity-70">{salesDelta}</div>
-              )}
-            </div>
-            <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-red-400" /> Costos
-              </div>
-              <div className="text-xl font-bold text-neutral-900 mt-0.5">${money(chart.summary.costos)}</div>
-            </div>
-            <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-neutral-900" /> Ganancia
-              </div>
-              <div className="text-xl font-bold text-neutral-900 mt-0.5">
-                ${money(chart.summary.ganancia)}{' '}
-                <span className="text-sm text-neutral-400"
-                  title={`Margen sobre la venta: de cada $100 vendidos quedan $${chart.summary.margen_pct ?? 0}. Sobre el costo (markup) es ${chart.summary.ganancia_pct}%. No descuenta gastos del mes ni, en VE, la diferencia oficial/paralelo.`}>
-                  ({chart.summary.margen_pct ?? chart.summary.ganancia_pct}% s/venta)
-                </span>
-              </div>
-              {period === 'month' && profitDelta && (
-                <div className="text-xs mt-0.5 opacity-70">{profitDelta}</div>
-              )}
-            </div>
-            <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <span className="w-2 h-2 rounded-full bg-lime-500" /> Ventas concretadas
-              </div>
-              <div className="text-xl font-bold text-neutral-900 mt-0.5">{chart.summary.cantidad} <span className="text-sm text-neutral-400">ventas</span></div>
-              {chart.summary.cantidad > 0 && (
-                <div className="text-xs mt-0.5 text-neutral-500" title="Lo que deja en promedio cada venta (vendido ÷ ventas)">
-                  Ticket promedio ${money(chart.summary.ventas / chart.summary.cantidad)}
-                </div>
-              )}
-            </div>
+          <div className="mb-3 grid grid-cols-2 gap-y-3 md:grid-cols-4 md:divide-x md:divide-neutral-100">
+            <Cifra color="bg-emerald-500" titulo="Ventas" valor={`$${money(chart.summary.ventas)}`} nota={period === 'month' ? salesDelta : null} />
+            <Cifra color="bg-red-300" titulo="Costos" valor={`$${money(chart.summary.costos)}`} />
+            <Cifra color="bg-neutral-900" titulo="Ganancia" valor={`$${money(chart.summary.ganancia)}`}
+              nota={<>{period === 'month' && profitDelta}{period === 'month' && profitDelta ? ' · ' : ''}<span className="text-neutral-400"
+                title={`Margen sobre la venta: de cada $100 vendidos quedan $${chart.summary.margen_pct ?? 0}. Sobre el costo (markup) es ${chart.summary.ganancia_pct}%. No descuenta gastos del mes ni, en VE, la diferencia oficial/paralelo.`}>
+                {chart.summary.margen_pct ?? chart.summary.ganancia_pct}% de la venta</span></>} />
+            <Cifra color="bg-lime-400" titulo="Ventas concretadas" valor={chart.summary.cantidad.toLocaleString('es-VE')}
+              nota={chart.summary.cantidad > 0 ? <span className="text-neutral-400" title="Lo que deja en promedio cada venta (vendido ÷ ventas)">Ticket promedio ${money(chart.summary.ventas / chart.summary.cantidad)}</span> : null} />
           </div>
         )}
 
         {chart && chart.chart_data.length > 0 ? (
-          <div className="relative h-80">
+          <div className="relative h-52">
             <Line
               data={{
                 labels: chart.chart_data.map(d => d.label),
                 datasets: [
-                  { label: 'Ventas ($)',  data: chart.chart_data.map(d => d.ventas), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.10)', fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
-                  { label: 'Costos ($)',  data: chart.chart_data.map(d => d.costos), borderColor: '#f87171', backgroundColor: 'transparent', borderDash: [5, 4], tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
-                  { label: 'Ganancia ($)', data: chart.chart_data.map(d => d.ventas - d.costos), borderColor: '#171717', backgroundColor: 'transparent', tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y' },
-                  { label: 'Ventas concretadas', data: chart.chart_data.map(d => d.cantidad), borderColor: '#84cc16', backgroundColor: 'transparent', borderDash: [2, 3], tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y1' },
+                  { label: 'Ventas', data: chart.chart_data.map(d => d.ventas), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.07)', fill: true, yAxisID: 'y', pointBackgroundColor: '#10b981' },
+                  { label: 'Ganancia', data: chart.chart_data.map(d => d.ventas - d.costos), borderColor: '#262626', backgroundColor: 'transparent', borderWidth: 1.75, yAxisID: 'y', pointBackgroundColor: '#262626' },
+                  { label: 'Costos', data: chart.chart_data.map(d => d.costos), borderColor: '#fca5a5', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [4, 4], yAxisID: 'y', pointBackgroundColor: '#f87171' },
+                  { label: 'Ventas concretadas', data: chart.chart_data.map(d => d.cantidad), borderColor: 'rgba(132,204,22,0.55)', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [2, 3], yAxisID: 'y1', pointBackgroundColor: '#84cc16' },
                 ],
               }}
               options={chartOptions}
             />
           </div>
         ) : (
-          <div className="text-neutral-400 text-sm text-center py-12">Sin datos en el período</div>
+          <div className="text-neutral-400 text-sm text-center py-10">Sin datos en el período</div>
         )}
       </div>
 
       {/* 14-11: lo que era Reportes → Resumen, con el mismo período del gráfico */}
       <BloquesInicio period={period} dateFrom={period === 'custom' ? dateFrom : undefined} dateTo={period === 'custom' ? dateTo : undefined}
         reportes={reportes} cayendo={reportes && analisisStock} />
+    </div>
+  )
+}
+
+// Una cifra del período: punto de color (= su línea en el gráfico), título, valor y una nota chica.
+function Cifra({ color, titulo, valor, nota }: { color: string; titulo: string; valor: string; nota?: React.ReactNode }) {
+  return (
+    <div className="min-w-0 md:px-4 md:first:pl-0">
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500"><span className={`h-2 w-2 rounded-full ${color}`} />{titulo}</div>
+      <div className="num mt-0.5 text-lg font-semibold tracking-tight text-neutral-900">{valor}</div>
+      {nota && <div className="truncate text-xs">{nota}</div>}
     </div>
   )
 }

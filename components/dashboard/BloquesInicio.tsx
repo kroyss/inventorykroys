@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { cambio, textoMinutos, type CifrasAtencion } from '@/lib/resumenAtencion'
 import { textoRango, type RangoInicio } from '@/lib/rangoInicio'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 
 // Inicio (14-11, el dueño: "unir Inicio y Reportes → Resumen"): lo que solo estaba en el Resumen, debajo del gráfico
 // y con SU MISMO período (Hoy / Mes / Trim. / Año / fechas). Carga después del resto para que el Inicio abra igual de
@@ -120,6 +121,7 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                     {d.top.map((p, i) => (
                       <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
                         <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold num ${i === 0 ? 'bg-amber-100 text-amber-800' : i < 3 ? 'bg-neutral-100 text-neutral-700' : 'text-neutral-400'}`}>{i + 1}</span>
+                        <FotoProducto id={p.id} nombre={p.nombre} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm text-neutral-900" title={p.nombre}>{p.nombre}</p>
                           <div className="mt-1 h-1.5 rounded-full bg-neutral-100">
@@ -129,7 +131,9 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                         <div className="w-16 shrink-0 text-right">
                           <span className="num text-sm font-semibold text-neutral-900">{n(p.unidades)}</span>
                           <span className="block text-[11px] num">
-                            {p.antes === 0 ? <span className="text-neutral-400">nuevo</span> : <Cambio ahora={p.unidades} antes={p.antes} />}
+                            {p.antes === 0 ? <span className="text-neutral-400">nuevo</span>
+                              : p.antes < 5 ? <span className={p.unidades >= p.antes ? 'text-emerald-600' : 'text-red-600'}>antes {p.antes}</span>
+                              : <Cambio ahora={p.unidades} antes={p.antes} />}
                           </span>
                         </div>
                       </li>
@@ -138,7 +142,7 @@ export default function BloquesInicio({ period, dateFrom, dateTo, reportes, caye
                 )}
                 {reportes && (
                   <Link href={verTodos} className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100">
-                    <span>Ver todos los productos y Excel</span><span aria-hidden>→</span>
+                    <span>Ver todos los productos</span><span aria-hidden>→</span>
                   </Link>
                 )}
               </div>

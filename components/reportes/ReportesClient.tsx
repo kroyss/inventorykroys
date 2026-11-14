@@ -1,5 +1,6 @@
 'use client'
 import PorProducto from '@/components/reportes/PorProducto'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import { useRouter, useSearchParams } from 'next/navigation'
 import StockReport from '@/components/reportes/StockReport'
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
@@ -273,7 +274,7 @@ function InventoryReport({ data, search, setSearch }: any) {
 
   const cols: Column<any>[] = [
     { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
-    { key: 'name', label: 'Producto', sortValue: p => p.name },
+    { key: 'name', label: 'Producto', render: p => <span className="flex items-center gap-2.5"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span>{p.name}</span></span>, sortValue: p => p.name },
     { key: 'quantity', label: 'Stock', align: 'right', sortValue: p => p.quantity, total: rs => rs.reduce((a, x) => a + x.quantity, 0) },
     { key: 'total_cost', label: 'Costo', align: 'right', render: p => `$${money(p.total_cost)}`, sortValue: p => p.total_cost },
     { key: 'sale_price', label: 'Precio', align: 'right', render: p => `$${money(p.sale_price)}`, sortValue: p => p.sale_price },
@@ -324,7 +325,7 @@ function CountsReport({ data, search, setSearch }: any) {
 
   const cols: Column<any>[] = [
     { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
-    { key: 'name', label: 'Producto', sortValue: p => p.name },
+    { key: 'name', label: 'Producto', render: p => <span className="flex items-center gap-2.5"><FotoProducto id={p.id} nombre={p.name} tam="xs" /><span>{p.name}</span></span>, sortValue: p => p.name },
     { key: 'delta', label: 'Diferencia', align: 'right', sortValue: p => p.delta,
       render: p => <span className={p.delta < 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{p.delta > 0 ? '+' : ''}{p.delta}</span>,
       total: rs => rs.reduce((a, x) => a + x.delta, 0) },
