@@ -2,14 +2,15 @@
 
 <!-- INTERNO (se quita antes de mandarlo a la IA, lib/ayuda.ts): fuente del asistente de ayuda del Radar.
 Sale de la pestaña Ayuda del Radar (AnalisisMercadoML/web/app/ayuda/page.tsx): si cambia esa página, actualizar este
-archivo en el mismo cambio. Última revisión: 30-10-2026. -->
+archivo en el mismo cambio. Última revisión: 14-11-2026. -->
 
 **Qué es:** el Radar muestra los productos que más se venden en MercadoLibre Venezuela, categoría por categoría,
 con el **precio real** (pasado a dólar paralelo) y señales de demanda, para decidir qué importar o revender. Se
 entra en radar.elcomerciantedigital.com con el usuario y la contraseña de El Comerciante Digital.
 
 *Cómo lo pregunta la gente:* qué vendo, qué importo, productos ganadores, cómo busco, filtros, sellos, margen,
-ganancia, costo, Alibaba, competencia, tendencias, Pro, gratis, prueba, no puedo entrar, contraseña.
+ganancia, costo, Alibaba, competencia, tendencias, Pro, gratis, prueba, no puedo entrar, contraseña, olvidé mi clave,
+precio, cuánto cuesta, Radar mensual, pagar, renovar.
 
 ## 1. La idea: el precio real, no el que ML muestra
 
@@ -506,9 +507,20 @@ escribe por Telegram (t.me/elcomerciantedigital).
 > **Tu trabajo nunca se toca.** Lo que guardas en la cabina es tuyo para siempre, sin límite. Lo que guardaste un
 sábado lo sigues viendo entre semana, aunque sea un producto nuevo del mes.
 
+> **Entrar sin escribir la clave:** desde El Comerciante Digital, en el menú (arriba a la derecha) toca **Radar**, o el
+botón **Entrar al Radar** del aviso de los sábados y domingos: entras directo con tu sesión, con el mismo acceso que
+tendrías al iniciar sesión en el Radar.
+
 > **Sin plan (prueba terminada o plan vencido) el Radar queda en solo lectura:** entras y ves los productos que
-guardaste en tu cabina, con tus costos y notas, pero no puedes buscar en el catálogo ni modificarlos. Al activar o
-renovar el plan vuelve todo; si no se ve al instante, hay que salir y volver a entrar.
+guardaste en tu cabina, con tus costos y notas, pero no puedes buscar en el catálogo ni modificarlos. Arriba está el
+botón **Renovar mi plan**. Al activar o renovar el plan vuelve todo; si no se ve al instante, hay que salir y volver a
+entrar.
+
+> **Radar mensual (solo el Radar):** quien se registró en el Radar y no tiene plan del Sistema paga **$20 al mes**
+(en noviembre 2026, **$12**, −40%) y ese mes tiene el **Radar PRO todos los días**. Mientras no paga ve 5 productos de
+ejemplo y el botón **Pagar y activar**: lleva a **Mi plan** (app.elcomerciantedigital.com/renovar), donde entra con su
+mismo usuario y contraseña y paga por Pago Móvil o Binance. Cuando lo confirmamos se abre todo (salir y volver a
+entrar). Al vencer el mes vuelve la pantalla de pago. Los precios están en radar.elcomerciantedigital.com/precios.
 
 > **Programas y pruebas** (Programa Despegue, prueba de un día): el Radar abre **completo los días del programa o de
 la prueba**, de 00:00 a 23:59 (hora de Venezuela). Cuando ya no quedan días, se entra en solo lectura con la cabina
@@ -527,11 +539,15 @@ te deja pasar.
 Tu plan, tus productos en la cabina y tus costos siguen siendo tuyos dentro del
 Radar: la cuenta única no cambia nada de eso.
 
-**¿Olvidaste tu contraseña o tienes una duda?** Toca el botón de **Ayuda** (el globo de mensaje abajo a
-la derecha, en todas las pantallas): pregúntale al asistente o escríbenos en Soporte (también
-por Telegram). Te respondemos de lunes
-a sábado, de 8am a 6pm (hora de Venezuela). Para cambiarte la contraseña te pediremos
-tu usuario.
+**¿Olvidaste tu contraseña?** En la pantalla de entrar del Radar toca **«¿Olvidaste tu contraseña?»** (lleva a
+app.elcomerciantedigital.com/login/recuperar): escribes tu usuario o tu correo y te llega un **código de 6 números** a
+tu correo (y a tu Telegram, si lo vinculaste en El Comerciante Digital). Con el código eliges una clave nueva, que
+sirve para el Radar y para el Sistema. El código vale 15 minutos. El correo se pone o se cambia en **Mi cuenta** de El
+Comerciante Digital.
+
+**¿No te llega el código, tu cuenta no tiene correo o tienes otra duda?** Toca el botón de **Ayuda** (el globo de
+mensaje abajo a la derecha, en todas las pantallas): pregúntale al asistente o escríbenos en Soporte (también por
+Telegram) con tu usuario. Te respondemos de lunes a sábado, de 8am a 6pm (hora de Venezuela).
 
 ## 13. Ayuda y soporte
 
@@ -539,7 +555,8 @@ tu usuario.
   preguntar (responde un asistente con este manual) y **Soporte** para escribirnos a una persona, con capturas.
   Si quedaste dentro de una conversación, «↺ Empezar de nuevo» vuelve a las preguntas frecuentes.
 - **Horario:** lunes a sábado, 8:00 am a 6:00 pm (hora de Venezuela). También por Telegram: t.me/elcomerciantedigital.
-- **Olvidé mi contraseña:** escríbenos a Soporte con tu usuario y te la cambiamos (no hay recuperación por correo).
+- **Olvidé mi contraseña:** en la pantalla de entrar toca «¿Olvidaste tu contraseña?» y te llega un código al correo
+  o al Telegram (ver sección 12). Si no te llega o tu cuenta no tiene correo, escríbenos a Soporte con tu usuario.
 - **Prueba de un día / programa:** el Radar abre solo los días de tu prueba o programa, completo como Pro, de 00:00 a
   23:59 (hora de Venezuela). Los otros días no deja entrar y te dice cuándo abre. Lo que guardes en tu cabina queda.
 - **Automatizaciones para MercadoLibre** (otro producto de El Comerciante Digital: preguntas con IA, mensajes,
@@ -550,5 +567,6 @@ tu usuario.
 *Cómo lo pregunta la gente:* privacidad, mis datos, quién ve mis costos, ven lo que busco, es seguro.
 
 - **Tu cabina es privada:** tus costos, envíos, estados y notas solo los ves tú. El catálogo es el mismo para todos.
-- **Tu contraseña no la puede ver nadie.** Solo se puede poner una nueva (escríbenos a Soporte).
+- **Tu contraseña no la puede ver nadie.** Solo se puede poner una nueva: tú mismo con «¿Olvidaste tu contraseña?»,
+  o escribiéndonos a Soporte.
 - Cualquier otra duda sobre tus datos o la privacidad: escríbenos a **Soporte** y te respondemos personalmente.
