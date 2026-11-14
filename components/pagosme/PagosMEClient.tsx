@@ -199,8 +199,13 @@ export default function PagosMEClient({ isAdmin, inicial = null }: { isAdmin: bo
           <span className="font-medium text-neutral-800">Vigilante:</span>
           {despertador ? <>
             <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${despertador.conectado ? 'bg-green-500' : 'bg-red-400'}`} />
-              {despertador.conectado ? 'PC en espera' : `PC sin señal desde ${hora(despertador.visto_at)} (¿apagada?)`}
+              {/* 14-11 (el dueño): si el despertador no corre pero Chrome sí (la extensión tiene señal), igual trae: naranja.
+                  Rojo solo cuando no responde ninguno. */}
+              <span className={`w-2 h-2 rounded-full ${despertador.conectado ? 'bg-green-500' : perfiles.some(l => l.conectado) ? 'bg-orange-400' : 'bg-red-400'}`} />
+              {despertador.conectado ? 'PC en espera'
+                : perfiles.some(l => l.conectado)
+                  ? <span className="text-orange-700" title="Con Chrome abierto trae igual. Para que lo abra solo: reinicia la PC o abre instalar-despertador.cmd">Chrome conectado · el despertador no corre (reinicia la PC)</span>
+                  : `PC sin señal desde ${hora(despertador.visto_at)} (¿apagada?)`}
             </span>
             {perfiles.length > 0 && (
               <span className="text-neutral-400">abre Chrome solo al traer: {perfiles.map(l => l.cuenta ?? l.perfil).join(' · ')}</span>

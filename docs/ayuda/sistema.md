@@ -601,6 +601,7 @@ banco, no el que escribió el comprador.
 
 **Problemas comunes:**
 - *«PC sin señal» / «ningún perfil de Chrome tiene el Asistente conectado»:* la PC está apagada, o falta el paso 4.
+- *Punto naranja «Chrome conectado · el despertador no corre»:* trae igual mientras Chrome esté abierto; lo que no corre es el despertador (el que abre Chrome solo al tocar Traer). Reinicia la PC o abre otra vez instalar-despertador.cmd. Rojo «PC sin señal» = no responde ni Chrome ni el despertador.
 - *«No tiene la sesión de MercadoEnvíos iniciada»:* en la PC quedó abierta esa ventana; inicia sesión ahí y vuelve
   a traer. No cierres sesión de MercadoEnvíos en ningún perfil.
 - *«Un Chrome tiene abierta una cuenta de MercadoEnvíos que no corresponde a ninguna cuenta conectada»:* en ese

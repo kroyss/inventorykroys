@@ -37,6 +37,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo conecto MercadoEnvíos?', video: 'Conéctate con Mercadoenvios',
       respuesta: '1. Descarga el programa en la PC de las guías e instálalo.\n2. Toca **Genera tu código** y pégalo en el programa.\n3. Agrega el **Asistente de envíos** a Chrome (en el perfil con la sesión de MercadoEnvíos).\n4. Ábrelo y pega el mismo código: debe decir «Conectado al sistema».' },
     { pregunta: 'Dice «PC sin señal»', respuesta: 'La PC está apagada o el programa no corre. Préndela: no se pierde nada, al tocar **Traer pagos y guías** trae lo que faltaba.' },
+    { pregunta: 'Sale en naranja «el despertador no corre»', respuesta: 'Trae igual mientras Chrome esté abierto. Para que lo abra solo al tocar **Traer**, reinicia la PC o vuelve a abrir **instalar-despertador.cmd**.' },
     { pregunta: '¿Cómo comparo con el banco?', respuesta: 'En **Comprobar con el banco** sube los estados de cuenta descargados de tu banco: el sistema cruza referencia, monto y fecha, y los que coinciden quedan como «Pago correcto».' },
   ],
   '/despachos': [
