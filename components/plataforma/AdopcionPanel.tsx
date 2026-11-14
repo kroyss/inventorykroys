@@ -229,31 +229,28 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
   const pagando = clientes.filter(x => x.b.pagando)
   const atender = clientes.filter(x => x.m)
   const filtroEspecial = NOMBRE_FILTRO[filtroUso]
-  const stat = 'group flex shrink-0 items-baseline gap-1.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white hover:shadow-sm'
-  const statOn = 'bg-white shadow-sm ring-1 ring-neutral-200'
+  const stat = 'group flex shrink-0 cursor-pointer items-baseline gap-1.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md active:translate-y-0'
+  const statOn = '!border-neutral-900 ring-1 ring-neutral-900'
 
   return (
     <div className="space-y-4">
       {/* Franja 1 · los números del negocio */}
-      <div className="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
+      <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none]">
         <button onClick={() => alternar('en_linea')} className={`${stat} ${filtroUso === 'en_linea' ? statOn : ''}`}
           title={enLinea.length ? enLinea.map(x => x.b.nombre).join(', ') : 'Ningún cliente usando ahora'}>
           <span className={`h-2 w-2 shrink-0 self-center rounded-full ${enLinea.length ? 'bg-emerald-500' : 'bg-neutral-300'}`} />
           <b className="text-xl font-semibold tabular-nums text-neutral-900">{enLinea.length}</b>
           <span className="whitespace-nowrap text-xs text-neutral-500">en línea</span>
         </button>
-        <span className="text-neutral-200" aria-hidden>·</span>
         <button onClick={() => alternar('activos')} className={`${stat} ${filtroUso === 'activos' ? statOn : ''}`} title={`Usaron el sistema en ${dias} días, de los que tienen MercadoLibre conectado`}>
           <b className="text-xl font-semibold tabular-nums text-neutral-900">{clientes.filter(esActivo).length}<span className="text-sm font-normal text-neutral-400">/{conectados.length}</span></b>
           <span className="whitespace-nowrap text-xs text-neutral-500">lo usaron ({dias} d)</span>
         </button>
-        <span className="text-neutral-200" aria-hidden>·</span>
         <button onClick={() => alternar('pagando')} className={`${stat} ${filtroUso === 'pagando' ? statOn : ''}`}>
           <b className="text-xl font-semibold tabular-nums text-neutral-900">{pagando.length}</b>
           <span className="whitespace-nowrap text-xs text-neutral-500">pagando{cobro ? ` ≈ ${usd(cobro.recurrente)}/mes` : ''}</span>
         </button>
-        <span className="text-neutral-200" aria-hidden>·</span>
-        <button onClick={onPagos} className={`${stat} relative`} title={cobro ? `${cobro.pagos_mes} pago${cobro.pagos_mes === 1 ? '' : 's'} este mes · mes anterior ${usd(cobro.anterior)}. Toca para ver los pagos.` : 'Ver los pagos'}>
+        <button onClick={onPagos} className={`${stat} relative !border-lime-300 !bg-lime-50 hover:!border-lime-400`} title={cobro ? `${cobro.pagos_mes} pago${cobro.pagos_mes === 1 ? '' : 's'} este mes · mes anterior ${usd(cobro.anterior)}. Toca para ver los pagos.` : 'Ver los pagos'}>
           <b className="text-xl font-semibold tabular-nums text-neutral-900">{cobro ? usd(cobro.mes) : '—'}</b>
           <span className="whitespace-nowrap text-xs text-neutral-500 group-hover:text-neutral-800">cobrado este mes ›</span>
           {pagosPendientes > 0 && (
@@ -263,8 +260,7 @@ export default function AdopcionPanel({ base, onAbrir, abierta, filtro, onFiltro
           )}
         </button>
         {casos > 0 && <>
-          <span className="text-neutral-200" aria-hidden>·</span>
-          <button onClick={onSoporte} className="shrink-0 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 hover:bg-amber-100">
+            <button onClick={onSoporte} className={`${stat} !border-amber-300 !bg-amber-50 text-sm font-semibold text-amber-800 hover:!border-amber-400`}>
             🆘 {casos} caso{casos === 1 ? '' : 's'} de soporte
           </button>
         </>}
