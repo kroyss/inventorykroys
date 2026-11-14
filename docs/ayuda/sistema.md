@@ -886,7 +886,9 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Actualizar desde ML** (Publicaciones, Productos → Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
 - **Productos:** catálogo, precios y rentabilidad de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
-  tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
+  tus publicaciones (cada una, o cada color/modelo, queda vinculada). En cada publicación nueva, **Es uno que ya tengo**
+  abre un buscador: escribes el código o el nombre de tu producto, lo eliges y la publicación queda vinculada a él (no
+  se crea otro). Si ninguno coincide lo dice, y se crea como nueva. Clic en una fila abre la ficha; Editar en el pie.
   En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: solo el número = del portal de
   MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
   distinto en el portal: revisar en Publicaciones → MercadoEnvíos) o **Sin peso**. Se puede ordenar por peso.

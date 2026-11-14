@@ -12,7 +12,7 @@ export interface ComboOption { id: number; name: string }
  */
 export function Combobox({
   value, onChange, options, placeholder, allowCreate = true, className, onDelete,
-  onCreate, createLabel = 'Crear',
+  onCreate, createLabel = 'Crear', autoFocus, sinResultados,
 }: {
   value: string
   onChange: (name: string, id: number | null) => void
@@ -26,6 +26,9 @@ export function Combobox({
   onCreate?: (name: string) => void
   /** Verbo de la opción de crear (ej. "Crear", "Agregar", "Guardar"). */
   createLabel?: string
+  autoFocus?: boolean
+  /** Texto cuando lo escrito no coincide con ninguna opción (o no hay opciones). Sin él no se muestra nada. */
+  sinResultados?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -47,10 +50,14 @@ export function Combobox({
         value={value}
         onChange={e => { onChange(e.target.value, null); setOpen(true) }}
         onFocus={() => setOpen(true)}
+        autoFocus={autoFocus}
         placeholder={placeholder}
         autoComplete="off"
         className={className ?? 'w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800'}
       />
+      {open && sinResultados && matches.length === 0 && !showCreate && (q.length > 0 || options.length === 0) && (
+        <div className="absolute z-20 w-full mt-1 rounded-lg border bg-white px-3 py-2 text-xs text-neutral-500 shadow-lg">{sinResultados}</div>
+      )}
       {open && (matches.length > 0 || showCreate) && (
         <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-52 overflow-y-auto">
           {matches.slice(0, 30).map(o => (

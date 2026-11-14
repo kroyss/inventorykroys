@@ -324,8 +324,12 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
                           </>}
                           {eligiendo === f.codigo && (
                             <div className="flex items-center gap-2">
-                              <Combobox value={eleccion} options={productos} placeholder="Busca el producto…" className="w-72"
+                              {/* 14-11 (el dueño: «se queda buscando»): sin opción de crear (no hacía nada), con foco y aviso si no hay coincidencias. */}
+                              <Combobox value={eleccion} options={productos} placeholder="Escribe el código o el nombre de tu producto" autoFocus
+                                allowCreate={false} className="w-72 rounded-md border border-neutral-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-neutral-800"
+                                sinResultados={productos.length === 0 ? 'Todavía no tienes productos: créala como nueva.' : 'Ningún producto tuyo coincide. Si no lo tienes, créala como nueva.'}
                                 onChange={(name, id) => { setEleccion(name); if (id) vincular(f, id, name.split(' · ')[0]) }} />
+                              {ocupado === f.codigo && <span className="text-xs text-neutral-500">Vinculando…</span>}
                               <button type="button" onClick={() => setEligiendo(null)} className="text-xs text-neutral-500 hover:text-neutral-800">Cancelar</button>
                             </div>
                           )}
