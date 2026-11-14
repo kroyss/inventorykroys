@@ -9,7 +9,7 @@ import { deApi } from '@/lib/inicial'
 import { GET as resumen } from '@/app/api/dashboard/summary/route'
 import { GET as grafico } from '@/app/api/reports/chart-data/route'
 import type { Summary, ChartData } from '@/components/dashboard/DashboardAdmin'
-import { SugerenciaInventarioML } from '@/components/productos/AvisosML'
+import PrimerosPasos from '@/components/dashboard/PrimerosPasos'
 
 export const metadata = { title: 'Inicio' }
 
@@ -25,8 +25,8 @@ export default async function DashboardPage() {
   const importaciones = tieneModulo(session!.user, 'importaciones')
   // "Por confirmar" (ventas de ML sin registrar): con el módulo de las cuentas de ML y permiso de Ventas.
   const porConfirmar = tieneModulo(session!.user, 'preguntas') && puede(session!.user, 'ver_ventas')
-  // 13-11 (mig. 173): inventario recién activado (ningún producto vinculado con ML) → sugerencia de empezar desde ML.
-  const sugerencia = puede(session!.user, 'ver_productos') && puede(session!.user, 'importar_ml') ? <SugerenciaInventarioML /> : null
+  // 14-11: guía «Primeros pasos con tu inventario» (se marca sola; reemplaza la sugerencia de empezar desde ML del 13-11).
+  const sugerencia = puede(session!.user, 'ver_productos') ? <PrimerosPasos /> : null
   // Inicio completo (ventas, ganancia, bonos de todos) = permiso "Ver costos y ganancias".
   if (puede(session!.user, 'costos')) {
     // 12-11 (rapidez): el resumen y el gráfico del mes vienen dentro del HTML (mismos GET de la API, en paralelo).

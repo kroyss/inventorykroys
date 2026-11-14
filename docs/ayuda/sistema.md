@@ -827,8 +827,25 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   de respuesta, cuántas respondió la IA, ventas por pregunta) y **Calificaciones**. Ganancia y costos solo con el
   permiso de costos. Un empleado sin ese permiso pero con Reportes ve abajo, del mes, los más vendidos (en unidades),
   atención y calificaciones. Lo que antes era Reportes → Resumen y el botón «Métricas» ahora está aquí.
-  Si todavía no tienes productos vinculados con MercadoLibre, arriba sale **«Empieza tu inventario desde
-  MercadoLibre»** con el botón para conectar tu cuenta o crear los productos desde tus publicaciones (la ✕ lo cierra).
+- **Primeros pasos con tu inventario** (arriba en el Inicio, para quien ve Productos, mientras falten pasos): una lista
+  con tu avance que **se marca sola** a medida que lo haces, con un botón para ir a cada pantalla y **¿Cómo?** con la
+  explicación corta. Los pasos:
+  1. **Conecta tu cuenta de MercadoLibre** (si tu plan trae las cuentas de ML): botón Conectar, entras con tu cuenta
+     de ML y aceptas. Así tus productos salen de tus publicaciones y las ventas de ML llegan solas.
+  2. **Crea tus productos:** en Productos → «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones
+     su costo; cada una queda como producto ya vinculado. También se crean a mano con **+ Producto** (nombre, costo y
+     categoría de ganancia; el precio se calcula solo).
+  3. **Pon el stock que tienes hoy:** en Inventario, en cada producto **Ajustar** y escribes cuántas unidades tienes.
+     Después el stock baja con las ventas y sube con las compras.
+  4. **Registra tu primera venta:** en Ventas → **Por confirmar** confirmas las ventas de MercadoLibre (quedan
+     registradas con sus productos); las de fuera de ML, con **Nueva venta**.
+  5. **Carga tu primera compra:** en Compras → **+ Compra**: proveedor, productos, cantidades y costo; al recibirla el
+     stock sube solo.
+  6. **Mira cuánto ganas:** cuando una venta queda procesada, el Inicio muestra ventas, costos y ganancia, los más
+     vendidos y qué reponer; el detalle con Excel está en Reportes.
+  El paso que sigue queda resaltado y abierto. **Ocultar guía** la esconde para toda la empresa. Al completar todo
+  sale «Listo: ya usas tu inventario completo» con **Cerrar guía**. Reemplaza al aviso «Empieza tu inventario desde
+  MercadoLibre».
 - **Fotos de los productos:** cada producto muestra su foto en Productos, Inventario, Compras, Importaciones y Ventas
   (al tocarla se ve grande). Sale sola de la publicación de ML vinculada (si es una variante, la foto de ese color o
   modelo; si está en varias publicaciones, la activa con más stock). En la ficha del producto: **Cambiar foto** (o
