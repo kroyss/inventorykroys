@@ -1,7 +1,7 @@
 'use client'
 
 import { parseShippingTable, shippingThresholdVE, shippingCostVE } from '@/lib/mlShipping'
-import { umbralesDe, nivelDe, NIVEL, type Umbrales } from '@/lib/salud'
+import { umbralesDe, nivelDe, NIVEL, AYUDA_RENTABILIDAD, type Umbrales } from '@/lib/salud'
 
 // Cascada "lo que realmente te queda" después de ML — una sola fuente de verdad
 // para Productos (nuevo/edición/vista) y la calculadora de Ajustes, así nunca
@@ -16,10 +16,37 @@ const num = (ml: Record<string, string>, k: string, d: number) => {
   const v = parseFloat(ml?.[k]); return isNaN(v) ? d : v
 }
 
-// Color/estado del margen NETO sobre venta (14-11): sana / ajustada / pérdida, con los % de la empresa (lib/salud.ts).
-const netColor = (m: number, u: Umbrales) => NIVEL[nivelDe(m, u)].texto
-const netBg    = (m: number, u: Umbrales) => NIVEL[nivelDe(m, u)].fondo
-const netFlag  = (m: number, u: Umbrales) => { const n = NIVEL[nivelDe(m, u)]; return `${n.icono} ${n.nombre}` }
+// 14-11 (el dueño): el resultado se mide en RENTABILIDAD SOBRE COSTO (ganancia ÷ costo del producto), la misma base que el
+// recargo: «le sumaste 80 %, te queda 44,7 %; el resto se lo llevan ML y el cambio». Colores con los % de la empresa
+// (lib/salud.ts). Misma fórmula que el catálogo, Inicio y Reportes.
+const fmtPct = (n: number) => `${(Math.round(n * 10) / 10).toLocaleString('de-DE')} %`
+
+function Resultado({ ganancia, rentab, recargo, u, dinero, quien }: {
+  ganancia: number; rentab: number | null; recargo?: number | null; u: Umbrales; dinero: string; quien: string
+}) {
+  const n = NIVEL[nivelDe(rentab ?? (ganancia >= 0 ? u.sano : -1), u)]
+  const puntos = recargo != null && rentab != null ? recargo - rentab : null
+  return (
+    <div className={`rounded-lg p-3 border-2 ${n.fondo} space-y-1.5`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className={`text-sm font-bold uppercase tracking-wide ${n.texto}`}>Te queda</p>
+        <span className={`text-2xl font-bold tabular-nums ${n.texto}`}>{ganancia < 0 ? '−' : ''}${dinero}</span>
+      </div>
+      {rentab != null && <>
+        <div className="flex items-baseline justify-between gap-2" title={AYUDA_RENTABILIDAD}>
+          <p className="text-xs text-neutral-700">Rentabilidad sobre costo <span className="cursor-help text-neutral-400">ⓘ</span></p>
+          <span className={`text-sm font-semibold ${n.texto}`}>{fmtPct(rentab)} · {n.icono} {n.nombre}</span>
+        </div>
+        <p className="text-[11px] leading-snug text-neutral-600">
+          {rentab >= 0
+            ? <>Ganas <b>${Math.abs(rentab).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> por cada $100 que pusiste en mercancía.</>
+            : <>Pierdes <b>${Math.abs(rentab).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> por cada $100 que pusiste en mercancía.</>}
+          {puntos != null && puntos > 0.05 && <> Le sumaste <b>{fmtPct(recargo!)}</b> y te queda <b>{fmtPct(rentab)}</b>: los otros {(Math.round(puntos * 10) / 10).toLocaleString('de-DE')} puntos se los lleva{quien}.</>}
+        </p>
+      </>}
+    </div>
+  )
+}
 
 function Row({ label, value, neg, sub }: { label: string; value: string; neg?: boolean; sub?: string }) {
   return (
@@ -45,6 +72,8 @@ export interface MlBreakdownProps {
   // CO
   salePrice?: number   // pesos
   coTrm?: number
+  /** Recargo sobre costo (%) del producto, para «le sumaste X %, te queda Y %». Sin él no sale esa frase. */
+  recargo?: number | null
 }
 
 export default function MlBreakdown(p: MlBreakdownProps) {
@@ -54,7 +83,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
     const price = p.salePrice ?? 0
     const coTrm = p.coTrm ?? 0
     if (!(price > 0) || !(coTrm > 0)) {
-      return <p className="text-xs text-neutral-400 px-1">Carga el precio de venta y la TRM para ver la ganancia neta.</p>
+      return <p className="text-xs text-neutral-400 px-1">Carga el precio de venta y la TRM para ver lo que te queda.</p>
     }
     const comisionPct = num(p.ml, 'ml_comision', 15.5)
     const retenPct    = num(p.ml, 'ml_reten', 1.91)
@@ -64,24 +93,18 @@ export default function MlBreakdown(p: MlBreakdownProps) {
     const reten       = price * retenPct / 100
     const costoPesos  = p.totalCost * coTrm
     const ganancia    = price - comision - envio - reten - costoPesos
-    const margen      = ganancia / price * 100
-    const costPct     = costoPesos > 0 ? ganancia / costoPesos * 100 : 0   // ganancia sobre el costo (compra+envío)
+    const rentab      = costoPesos > 0 ? ganancia / costoPesos * 100 : null   // rentabilidad sobre costo
     return (
       <div className="space-y-2">
         <div className="text-sm space-y-0.5">
+          <p className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Resultado de tu venta</p>
           <Row label="Precio publicado (pesos)" value={`$${fmtPeso(price)}`} />
-          <Row label={`− Comisión ML (${comisionPct}%)`} value={`−$${fmtPeso(comision)}`} neg />
-          <Row label={`− Envío ML (${price >= umbral ? '≥' : '<'} umbral)`} value={`−$${fmtPeso(envio)}`} neg />
+          <Row label={`− Comisión MercadoLibre (${comisionPct}%)`} value={`−$${fmtPeso(comision)}`} neg />
+          <Row label={`− Envío MercadoLibre (${price >= umbral ? '≥' : '<'} umbral)`} value={`−$${fmtPeso(envio)}`} neg />
           <Row label={`− Retención (${retenPct}%)`} value={`−$${fmtPeso(reten)}`} neg />
-          <Row label="− Tu costo (×TRM)" value={`−$${fmtPeso(costoPesos)}`} neg />
+          <Row label="− Costo del producto (×TRM)" value={`−$${fmtPeso(costoPesos)}`} neg />
         </div>
-        <div className={`rounded-lg p-2.5 border-2 ${netBg(margen, u)} flex items-center justify-between`}>
-          <div>
-            <p className={`text-xs font-semibold ${netColor(margen, u)}`}>Ganancia neta · {netFlag(margen, u)}</p>
-            <p className="text-[10px] text-neutral-500">{margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta · {costPct >= 0 ? '+' : ''}{costPct.toFixed(1)}% sobre costo</p>
-          </div>
-          <span className={`text-lg font-bold ${netColor(margen, u)}`}>${fmtPeso(ganancia)}</span>
-        </div>
+        <Resultado ganancia={ganancia} rentab={rentab} recargo={p.recargo} u={u} dinero={fmtPeso(Math.abs(ganancia))} quien="n MercadoLibre y la retención" />
         <p className="text-[10px] text-neutral-400 px-1">Comisión, envío, retención y colores en Productos → Costos ML.</p>
       </div>
     )
@@ -91,7 +114,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   const final = p.finalPriceUsd ?? 0
   const rate  = p.veRate
   if (!rate || !(rate.parallel > 0) || !(rate.official > 0) || !(final > 0)) {
-    return <p className="text-xs text-neutral-400 px-1">Carga el costo y el precio para ver la ganancia neta.</p>
+    return <p className="text-xs text-neutral-400 px-1">Carga el costo y el precio para ver lo que te queda.</p>
   }
   const comisionPct = num(p.ml, 'ml_comision', 12)
   const realUsd   = final * rate.official / rate.parallel
@@ -106,26 +129,20 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   const envio     = shippingCostVE(final, p.weightKg, shipTable, envioBase, umbralG)
   const neto      = realUsd - comision - envio
   const ganancia  = neto - p.totalCost
-  const margen    = realUsd > 0 ? ganancia / realUsd * 100 : 0
-  const costPct   = p.totalCost > 0 ? ganancia / p.totalCost * 100 : 0   // ganancia sobre el costo (compra+envío)
+  const rentab    = p.totalCost > 0 ? ganancia / p.totalCost * 100 : null   // rentabilidad sobre costo
   return (
     <div className="space-y-2">
       <div className="text-sm space-y-0.5">
+        <p className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Resultado de tu venta</p>
         <Row label="Precio final en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
-        <Row label="En dólares reales (paralelo)" value={`$${fmtUsd(realUsd)}`} sub={`−$${fmtUsd(cambiario)} cambiario`} />
-        <Row label={`− Comisión ML (${comisionPct}%)`} value={`−$${fmtUsd(comision)}`} neg />
-        <Row label="− Envío ML" value={`−$${fmtUsd(envio)}`} neg
+        <Row label="− Pérdida por cambio (Bs → $)" value={`−$${fmtUsd(cambiario)}`} neg sub="oficial → paralelo" />
+        <Row label={`− Comisión MercadoLibre (${comisionPct}%)`} value={`−$${fmtUsd(comision)}`} neg />
+        <Row label="− Envío MercadoLibre" value={`−$${fmtUsd(envio)}`} neg
           sub={`gratis desde $${fmtUsd(umbral)}${porPeso ? ' por peso' : ' (sin peso)'}`} />
-        <Row label="− Tu costo" value={`−$${fmtUsd(p.totalCost)}`} neg />
+        <Row label="− Costo del producto" value={`−$${fmtUsd(p.totalCost)}`} neg />
       </div>
-      <div className={`rounded-lg p-2.5 border-2 ${netBg(margen, u)} flex items-center justify-between`}>
-        <div>
-          <p className={`text-xs font-semibold ${netColor(margen, u)}`}>Ganancia neta · {netFlag(margen, u)}</p>
-          <p className="text-[10px] text-neutral-500">{margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta · {costPct >= 0 ? '+' : ''}{costPct.toFixed(1)}% sobre costo</p>
-        </div>
-        <span className={`text-lg font-bold ${netColor(margen, u)}`}>${fmtUsd(ganancia)}</span>
-      </div>
-      <p className="text-[10px] text-neutral-400 px-1">Comisión, envío y colores en Productos → Costos ML. El cambiario es el spread oficial→paralelo.</p>
+      <Resultado ganancia={ganancia} rentab={rentab} recargo={p.recargo} u={u} dinero={fmtUsd(Math.abs(ganancia))} quien="n MercadoLibre y el cambio" />
+      <p className="text-[10px] text-neutral-400 px-1">Comisión, envío y colores en Productos → Costos ML. La pérdida por cambio es lo que pierden tus bolívares al pasarlos a dólar paralelo.</p>
     </div>
   )
 }

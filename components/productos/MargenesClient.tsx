@@ -12,7 +12,7 @@ import {
   liveFinalVE, livePublishedVE, globalDiscountVE, mlNetFor, storedPricesVE, type VeRate,
 } from '@/lib/pricingVE'
 
-// Revisión de márgenes de productos baratos (VE).
+// Revisión de rentabilidad de productos baratos (VE; antes «de márgenes»). Rentabilidad = sobre costo (14-11).
 //
 // Con la tabla de MercadoEnvíos de octubre 2026 el envío gratis empieza en $3 para
 // productos livianos: por debajo de $5 el costo de envío pasa a pesar más sobre el
@@ -24,7 +24,7 @@ import {
 // Aplicar deja la categoría y los precios guardados al día en un solo paso.
 
 const LIMITE = 5    // precio final por debajo del cual el cambio de envío pesa
-const SANO   = 20   // margen sobre venta sano (mismo corte que la ficha de producto)
+const SANO   = 25   // rentabilidad sobre costo sana (14-11: mismo corte por defecto que la ficha de producto)
 
 const fmt = (n: number) => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const pct = (n: number | null) => (n == null ? '—' : `${n >= 0 ? '' : '−'}${Math.abs(n).toFixed(1)}%`)
@@ -74,7 +74,7 @@ export default function MargenesClient({ initialProducts, categories }: {
     const eff   = shipInfo(p.weight_kg, publicado, globalDiscount, shipTable).effectiveDiscount
     const final = liveFinalVE(q, excess, eff)
     const net   = mlNetFor('VE', q, veRate, 0, ml, eff, table)
-    return { eff, final, publicado, margen: net?.margen ?? null, ganancia: net?.ganancia ?? null }
+    return { eff, final, publicado, margen: net?.rentabilidad ?? null, ganancia: net?.ganancia ?? null }
   }, [excess, globalDiscount, shipTable, settings, veRate])
 
   const rows: Row[] = useMemo(() => {
@@ -135,7 +135,7 @@ export default function MargenesClient({ initialProducts, categories }: {
   const kpi = {
     total:    rows.length,
     perdieron: rows.filter(r => r.now.ganancia != null && r.gananciaAntes != null && r.now.ganancia < r.gananciaAntes - 0.005).length,
-    rojo:     rows.filter(r => r.now.margen != null && r.now.margen < 8).length,
+    rojo:     rows.filter(r => r.now.margen != null && r.now.margen < 10).length,
     sugeridos: rows.filter(r => r.sugerida).length,
   }
 
@@ -152,9 +152,9 @@ export default function MargenesClient({ initialProducts, categories }: {
       'Descuento %':       Math.round(nuevo.eff * 10) / 10,
       'Final actual':      Math.round(r.now.final * 100) / 100,
       'Final nuevo':       Math.round(nuevo.final * 100) / 100,
-      'Margen antes %':    r.margenAntes == null ? '' : Math.round(r.margenAntes * 10) / 10,
-      'Margen ahora %':    r.now.margen == null ? '' : Math.round(r.now.margen * 10) / 10,
-      'Margen nuevo %':    nuevo.margen == null ? '' : Math.round(nuevo.margen * 10) / 10,
+      'Rentabilidad antes %':    r.margenAntes == null ? '' : Math.round(r.margenAntes * 10) / 10,
+      'Rentabilidad ahora %':    r.now.margen == null ? '' : Math.round(r.now.margen * 10) / 10,
+      'Rentabilidad nueva %':    nuevo.margen == null ? '' : Math.round(nuevo.margen * 10) / 10,
       'Ganancia/u antes':  r.gananciaAntes == null ? '' : Math.round(r.gananciaAntes * 100) / 100,
       'Ganancia/u ahora':  r.now.ganancia == null ? '' : Math.round(r.now.ganancia * 100) / 100,
       'Ganancia/u nueva':  nuevo.ganancia == null ? '' : Math.round(nuevo.ganancia * 100) / 100,
@@ -200,16 +200,16 @@ export default function MargenesClient({ initialProducts, categories }: {
   })
 
   if (loaded && !veRate) {
-    return <p className="text-sm text-red-600">No hay tasa cargada: sin oficial y paralelo no se puede calcular el margen real.</p>
+    return <p className="text-sm text-red-600">No hay tasa cargada: sin oficial y paralelo no se puede calcular la rentabilidad real.</p>
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-lg font-semibold">Revisión de márgenes · productos de menos de $5</h1>
+          <h1 className="text-lg font-semibold">Revisión de rentabilidad · productos de menos de $5</h1>
           <p className="text-xs text-neutral-500">
-            Compara el margen con la regla de envío anterior (gratis desde $5 fijo) contra la tabla de
+            Compara la rentabilidad (sobre costo) con la regla de envío anterior (gratis desde $5 fijo) contra la tabla de
             MercadoEnvíos vigente, por peso. Sugiere el menor escalón de categoría que devuelve la ganancia por
             unidad (en dólares) que tenía.
           </p>
@@ -219,8 +219,8 @@ export default function MargenesClient({ initialProducts, categories }: {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard compact label="Productos < $5" value={kpi.total} />
-        <KPICard compact label="Perdieron margen" value={kpi.perdieron} accent={kpi.perdieron ? 'text-amber-600' : undefined} />
-        <KPICard compact label="Margen < 8%" value={kpi.rojo} accent={kpi.rojo ? 'text-red-600' : undefined} />
+        <KPICard compact label="Perdieron ganancia" value={kpi.perdieron} accent={kpi.perdieron ? 'text-amber-600' : undefined} />
+        <KPICard compact label="Rentabilidad < 10%" value={kpi.rojo} accent={kpi.rojo ? 'text-red-600' : undefined} />
         <KPICard compact label="Con sugerencia de subir" value={kpi.sugeridos} />
       </div>
 
@@ -238,7 +238,7 @@ export default function MargenesClient({ initialProducts, categories }: {
           Solo con sugerencia
         </label>
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => exportRows(`plan_margenes_${new Date().toISOString().slice(0, 10)}`, plan(), 'Plan')}
+          <button onClick={() => exportRows(`plan_rentabilidad_${new Date().toISOString().slice(0, 10)}`, plan(), 'Plan')}
             disabled={aplicar.length === 0}
             className="px-3 py-1.5 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-100 disabled:opacity-40">
             ↓ Excel para ML ({aplicar.length})
@@ -263,12 +263,12 @@ export default function MargenesClient({ initialProducts, categories }: {
               <th className="px-2 py-2 text-right">Peso</th>
               <th className="px-2 py-2 text-right">Final</th>
               <th className="px-2 py-2 text-right" title="Ganancia por unidad con la regla anterior → con la tabla vigente">Ganancia/u antes → ahora</th>
-              <th className="px-2 py-2 text-right" title="Margen sobre venta con la regla anterior → con la tabla vigente">Margen antes → ahora</th>
+              <th className="px-2 py-2 text-right" title="Rentabilidad sobre costo con la regla anterior → con la tabla vigente">Rentabilidad antes → ahora</th>
               <th className="px-2 py-2 text-left">Categoría</th>
               <th className="px-2 py-2 text-right" title="Precio de lista a cargar en MercadoLibre">Lista ML nueva</th>
               <th className="px-2 py-2 text-right">Final nuevo</th>
               <th className="px-2 py-2 text-right">Ganancia/u nueva</th>
-              <th className="px-2 py-2 text-right">Margen nuevo</th>
+              <th className="px-2 py-2 text-right">Rentabilidad nueva</th>
             </tr>
           </thead>
           <tbody>

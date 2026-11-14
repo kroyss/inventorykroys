@@ -1,4 +1,4 @@
-// Precios y margen neto de ML — funciones puras compartidas.
+// Precios, ganancia y rentabilidad (sobre costo) de ML — funciones puras compartidas.
 //
 // Viven acá (y no dentro de ProductosClient) para que el catálogo, la ficha y la
 // revisión de márgenes calculen con el MISMO código: si cada pantalla tiene su
@@ -41,11 +41,12 @@ export function globalDiscountVE(settings: Record<string, string>, rate: VeRate 
   return isNaN(n) ? recDiscountVE(rate) : n
 }
 
-// Margen NETO real por producto (después de comisiones de ML), por país.
+// Ganancia y RENTABILIDAD real por producto (después de comisiones de ML), por país.
 // Reusa las mismas fórmulas que el simulador de Ajustes y la calculadora:
 //   VE: ingreso real = precio final llevado a paralelo; − comisión % − envío (con prorrateo bajo el umbral).
 //   CO: ingreso = precio de venta en pesos; − comisión % − envío por umbral − retención.
-// margen = ganancia ÷ ingreso real (SOBRE VENTA), consistente en ambos países. null si falta dato.
+// rentabilidad = ganancia ÷ costo del producto (SOBRE COSTO, 14-11 el dueño: se compara directo con el recargo y es la
+// misma fórmula en ficha, catálogo, Inicio y Reportes). null si falta dato.
 export function mlNetFor(
   country: Country,
   p: { total_cost: number; profit_percentage: number; discount_percent: number; sale_price: number; weight_kg?: number | null },
@@ -53,7 +54,7 @@ export function mlNetFor(
   shipTable?: ShipTier[],
   /** Inventario simple (sin "precios_categorias"): el precio es el GUARDADO (lo publicado), no el calculado. */
   precioFijo?: number,
-): { ganancia: number; margen: number; pesos: boolean } | null {
+): { ganancia: number; rentabilidad: number; pesos: boolean } | null {
   const num = (k: string, d: number) => { const v = parseFloat(ml[k]); return isNaN(v) ? d : v }
   if (country === 'CO') {
     const price = p.sale_price
@@ -62,7 +63,7 @@ export function mlNetFor(
     const envio    = price >= num('ml_umbral_envio', 60000) ? num('ml_envio_alto', 8000) : num('ml_envio_bajo', 2600)
     const reten    = price * num('ml_reten', 1.91) / 100
     const ganancia = (price - comision - envio - reten) - p.total_cost * coTrm
-    return { ganancia, margen: ganancia / price * 100, pesos: true }
+    return { ganancia, rentabilidad: ganancia / (p.total_cost * coTrm) * 100, pesos: true }
   }
   // VE: precio publicado calculado EN VIVO (base × exceso actual × (1−descuento)), igual que
   // la calculadora — así no se desincroniza con el final_price_usd guardado (que queda viejo
@@ -76,7 +77,8 @@ export function mlNetFor(
                                   num('ml_envio', 0.65), num('ml_umbral', 5))
   const neto     = realUsd * (1 - num('ml_comision', 12) / 100) - envio
   const ganancia = neto - p.total_cost
-  return { ganancia, margen: ganancia / realUsd * 100, pesos: false }
+  if (!(p.total_cost > 0)) return null
+  return { ganancia, rentabilidad: ganancia / p.total_cost * 100, pesos: false }
 }
 
 /**

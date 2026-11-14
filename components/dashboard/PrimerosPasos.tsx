@@ -26,7 +26,7 @@ function pasos(e: Estado): Paso[] {
       href: e.conML ? '/productos/importar-ml' : '/productos?new=1', ir: e.conML ? 'Crear desde ML' : 'Crear producto',
       como: e.conML
         ? 'En «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones su costo: cada una queda como un producto ya vinculado. También puedes crearlos a mano con + Producto.'
-        : 'En Productos toca + Producto: nombre, costo y % de ganancia con el medidor (el precio se calcula solo).',
+        : 'En Productos toca + Producto: nombre, costo y recargo sobre costo con el medidor (el precio se calcula solo).',
     },
     // 14-11: el peso decide el envío gratis y lo que ML te cobra de envío (tabla de MercadoEnvíos).
     ...(e.conPeso ? [{

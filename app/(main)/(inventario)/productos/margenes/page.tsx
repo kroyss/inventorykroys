@@ -7,7 +7,7 @@ import MargenesClient from '@/components/productos/MargenesClient'
 import type { Product, ProfitCategory } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 
-export const metadata = { title: 'Revisión de márgenes' }
+export const metadata = { title: 'Revisión de rentabilidad' }
 
 export default async function MargenesPage() {
   const session = await getServerSession(authOptions)

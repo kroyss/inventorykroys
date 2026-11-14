@@ -5,7 +5,7 @@ import { parseShippingTable } from '@/lib/mlShipping'
 import { umbralesDe, NIVEL } from '@/lib/salud'
 
 // Productos → Costos ML (14-11-2026, el dueño): lo que MercadoLibre te descuenta de cada venta y desde qué % la
-// ganancia neta es sana o ajustada. Antes estaba solo en Ajustes (y los colores fijos en el código). Lo cambia el admin
+// rentabilidad (sobre costo) es sana o ajustada. Antes estaba solo en Ajustes (y los colores fijos en el código). Lo cambia el admin
 // o quien tenga el permiso «Configurar costos ML». La tabla de MercadoEnvíos se muestra (solo lectura).
 type Campo = { key: string; label: string; ayuda?: string; paso: string; defecto: number; sufijo: string }
 
@@ -29,11 +29,11 @@ export default function CostosMLModal({ country, ml, onCerrar, onGuardado }: {
   const u = umbralesDe(ml)
   const [v, setV] = useState<Record<string, string>>(() => ({
     ...Object.fromEntries(campos.map(c => [c.key, ml[c.key] ?? String(c.defecto)])),
-    margen_sano: String(u.sano), margen_ajustado: String(u.ajustado),
+    rentab_sano: String(u.sano), rentab_ajustado: String(u.ajustado),
   }))
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const sano = parseFloat(v.margen_sano), ajustado = parseFloat(v.margen_ajustado)
+  const sano = parseFloat(v.rentab_sano), ajustado = parseFloat(v.rentab_ajustado)
   const coloresMal = isNaN(sano) || isNaN(ajustado) || ajustado > sano
   const tabla = country === 'VE' ? parseShippingTable(ml.ml_shipping_table) : []
 
@@ -49,7 +49,7 @@ export default function CostosMLModal({ country, ml, onCerrar, onGuardado }: {
   const input = (key: string, paso: string, sufijo: string) => (
     <span className="flex items-center gap-1">
       {sufijo === '$' && <span className="text-sm text-neutral-500">$</span>}
-      <input type="number" step={paso} min={key.startsWith('margen') ? -100 : 0} value={v[key]} onChange={e => setV(x => ({ ...x, [key]: e.target.value }))}
+      <input type="number" step={paso} min={key.startsWith('rentab') ? -100 : 0} value={v[key]} onChange={e => setV(x => ({ ...x, [key]: e.target.value }))}
         className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-right text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
       {sufijo === '%' && <span className="text-sm text-neutral-500">%</span>}
     </span>
@@ -57,7 +57,7 @@ export default function CostosMLModal({ country, ml, onCerrar, onGuardado }: {
 
   return (
     <Ventana titulo="Costos de MercadoLibre" onCerrar={onCerrar}>
-      <p className="text-xs text-neutral-500">Lo que MercadoLibre te descuenta de cada venta. Se usa en «Lo que realmente te queda», el margen neto del catálogo y Promociones.</p>
+      <p className="text-xs text-neutral-500">Lo que MercadoLibre te descuenta de cada venta. Se usa en «Te queda», la rentabilidad del catálogo y Promociones.</p>
       <div className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
         {campos.map(c => (
           <div key={c.key} className="flex items-center justify-between gap-3 px-3 py-2">
@@ -69,14 +69,14 @@ export default function CostosMLModal({ country, ml, onCerrar, onGuardado }: {
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold text-neutral-800">Colores de la ganancia neta</h4>
-        <p className="text-[11px] text-neutral-500">Sobre lo que te queda después de MercadoLibre (% sobre la venta).</p>
+        <h4 className="text-sm font-semibold text-neutral-800">Colores de la rentabilidad</h4>
+        <p className="text-[11px] text-neutral-500">Rentabilidad sobre costo: lo que te queda después de MercadoLibre ÷ lo que te costó el producto. 25 % = ganas $25 por cada $100 en mercancía.</p>
         <div className="mt-1.5 divide-y divide-neutral-100 rounded-lg border border-neutral-200">
           <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className={`text-sm font-medium ${NIVEL.sano.texto}`}>{NIVEL.sano.icono} Sana desde</span>{input('margen_sano', '1', '%')}
+            <span className={`text-sm font-medium ${NIVEL.sano.texto}`}>{NIVEL.sano.icono} Sana desde</span>{input('rentab_sano', '1', '%')}
           </div>
           <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className={`text-sm font-medium ${NIVEL.ajustado.texto}`}>{NIVEL.ajustado.icono} Ajustada desde</span>{input('margen_ajustado', '1', '%')}
+            <span className={`text-sm font-medium ${NIVEL.ajustado.texto}`}>{NIVEL.ajustado.icono} Ajustada desde</span>{input('rentab_ajustado', '1', '%')}
           </div>
           <div className="flex items-center justify-between gap-3 px-3 py-2">
             <span className={`text-sm font-medium ${NIVEL.perdida.texto}`}>{NIVEL.perdida.icono} Pérdida</span>

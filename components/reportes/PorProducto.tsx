@@ -58,7 +58,7 @@ export default function PorProducto({ dateFrom, dateTo }: { dateFrom: string; da
 
   const excel = async () => {
     const XLSX = await import('xlsx')
-    const enc = ['#', 'Código', 'Producto', 'Ganancia %', 'Unidades', 'Período anterior', 'Venta', ...(d.verCostos ? ['Costo', 'Comisión ML', 'Ganancia'] : [])]
+    const enc = ['#', 'Código', 'Producto', 'Recargo', 'Unidades', 'Período anterior', 'Venta', ...(d.verCostos ? ['Costo', 'Comisión ML', 'Ganancia'] : [])]
     const aoa: (string | number)[][] = [enc, ...filas.map((p, i) => [i + 1, p.code, p.nombre, p.categoria ?? '', p.unidades, p.antes, p.venta,
       ...(d.verCostos ? [p.costo ?? 0, p.comision ?? 0, p.ganancia ?? 0] : [])]),
       [], ['', '', 'TOTAL', '', tot.u, '', Math.round(tot.v * 100) / 100, ...(d.verCostos ? ['', '', Math.round(tot.g * 100) / 100] : [])]]
@@ -157,7 +157,7 @@ export default function PorProducto({ dateFrom, dateTo }: { dateFrom: string; da
                     {d.verCostos && (
                       <td className="hidden py-2.5 pl-3 pr-4 text-right md:table-cell" title={`Costo ${dinero(p.costo ?? 0)} · comisión ML ${dinero(p.comision ?? 0)}`}>
                         <span className={`num ${(p.ganancia ?? 0) < 0 ? 'text-red-600' : 'text-neutral-900'}`}>{dinero(p.ganancia ?? 0)}</span>
-                        {p.venta > 0 && <span className="block text-[11px] text-neutral-400">{Math.round((p.ganancia ?? 0) / p.venta * 100)}% de la venta</span>}
+                        {(p.costo ?? 0) > 0 && <span className="block text-[11px] text-neutral-400" title="Rentabilidad sobre costo: ganancia ÷ lo que te costó la mercancía">rentabilidad {Math.round((p.ganancia ?? 0) / p.costo! * 100)}%</span>}
                       </td>
                     )}
                   </tr>

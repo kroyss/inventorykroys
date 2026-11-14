@@ -40,7 +40,7 @@ export interface Summary {
 interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number }
 export interface ChartData {
   chart_data: ChartPoint[]
-  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; cantidad: number }
+  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; rentabilidad_pct?: number | null; cantidad: number }
 }
 
 type Period = 'today' | 'month' | 'quarter' | 'year'
@@ -233,9 +233,9 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
             <Cifra color="bg-emerald-500" titulo="Ventas" valor={`$${money(chart.summary.ventas)}`} nota={period === 'month' ? salesDelta : null} />
             <Cifra color="bg-red-300" titulo="Costos" valor={`$${money(chart.summary.costos)}`} />
             <Cifra color="bg-neutral-900" titulo="Ganancia" valor={`$${money(chart.summary.ganancia)}`}
-              nota={<>{period === 'month' && profitDelta}{period === 'month' && profitDelta ? ' · ' : ''}<span className="text-neutral-400"
-                title={`Margen sobre la venta: de cada $100 vendidos quedan $${chart.summary.margen_pct ?? 0}. Sobre el costo (markup) es ${chart.summary.ganancia_pct}%. No descuenta gastos del mes ni, en VE, la diferencia oficial/paralelo.`}>
-                {chart.summary.margen_pct ?? chart.summary.ganancia_pct}% de la venta</span></>} />
+              nota={<>{period === 'month' && profitDelta}{period === 'month' && profitDelta ? ' · ' : ''}{chart.summary.rentabilidad_pct != null && <span className="text-neutral-400 cursor-help"
+                title={`Rentabilidad sobre costo: ganancia ÷ lo que te costó la mercancía vendida. Ganaste $${chart.summary.rentabilidad_pct.toLocaleString('de-DE')} por cada $100 en mercancía. Es la misma cuenta que ves en cada producto. No descuenta gastos del mes ni, en VE, la diferencia oficial/paralelo.`}>
+                Rentabilidad {chart.summary.rentabilidad_pct.toLocaleString('de-DE')}%</span>}</>} />
             <Cifra color="bg-lime-400" titulo="Ventas concretadas" valor={chart.summary.cantidad.toLocaleString('es-VE')}
               nota={chart.summary.cantidad > 0 ? <span className="text-neutral-400" title="Lo que deja en promedio cada venta (vendido ÷ ventas)">Ticket promedio ${money(chart.summary.ventas / chart.summary.cantidad)}</span> : null} />
           </div>

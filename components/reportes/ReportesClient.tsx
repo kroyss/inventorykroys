@@ -206,7 +206,7 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF, despachaVE 
         <KPICard compact label="Ventas"   value={`$${money(data.totals.total_amount)}`} />
         <KPICard compact label="Costos"   value={`$${money(data.totals.total_cost)}`} />
         <KPICard compact label="Comisión" value={`$${money(data.totals.total_commission || 0)}`} />
-        <KPICard compact label={`Ganancia · ${data.totals.margin_pct ?? data.totals.profit_pct}% s/venta`}
+        <KPICard compact label={data.totals.rentabilidad_pct != null ? `Ganancia · rentabilidad ${String(data.totals.rentabilidad_pct).replace('.', ',')}%` : 'Ganancia'}
           value={`$${money(data.totals.profit)}`} tone="bueno" />
       </div>
       <div className="flex flex-wrap gap-2 items-center">

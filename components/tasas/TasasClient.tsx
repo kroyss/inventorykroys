@@ -364,7 +364,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
         {/* Price simulator */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
-          <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
+          <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → lo que te queda y tu rentabilidad sobre costo.</p>
           <div className="flex items-end gap-3 mb-4">
             <div className="flex-1">
               <label className="text-xs text-neutral-500">Costo (compra + envío) USD</label>
@@ -378,7 +378,7 @@ export default function TasasClient({ bonos, puedeTasas, descuento, finanzas, ca
             </div>
           </div>
 
-          {/* Parámetros + ganancia neta real en ML Venezuela */}
+          {/* Parámetros + lo que te queda en ML Venezuela */}
           <div className="mt-1 border-t border-neutral-100 pt-4">
             {(() => {
               const parametros = (

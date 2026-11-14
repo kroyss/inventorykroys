@@ -469,7 +469,9 @@ usuario la tienen):
 - **Editar** (en prueba, solo algunas empresas; permiso **Publicaciones (editar en MercadoLibre)**): ver abajo.
 - **Vincular:** unir cada publicación (o variante) con su producto.
 - **Stock:** el stock que muestra cada cuenta de ML contra tu inventario.
-- **Promociones** (Venezuela): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis.
+- **Promociones** (Venezuela): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis. La
+  columna **Rentabilidad** es lo que te queda al precio de la promo ÷ lo que te costó el producto (como en Productos);
+  **Rentabilidad mínima** (20 % por defecto) marca en naranja las que quedan por debajo y las filtra con «Rentabilidad < X %».
   Campañas propias: **Editar** cambia la fecha de fin (máx. 31 días desde que empezó; una vencida ya no se puede editar).
   **Pausar** les quita el descuento a todas sus publicaciones sin borrar la campaña y recuerda cuáles eran (va a la cola: se puede seguir trabajando o pausar otra; avance en Publicaciones → Tareas); **Reanudar**
   las vuelve a poner con el mismo %. **Renovar** (vencida o por vencer en 3 días) crea una campaña nueva desde hoy con
@@ -823,7 +825,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Inicio:** cómo va tu negocio. Arriba Nueva venta / Nueva compra / Por confirmar, la tasa (VE) y **Requiere
   atención** (reposición, sin stock, stock bajo, borradores, en tránsito, remate: cada tarjeta lleva a su lista). Luego
   el bono (si lo tienes) y el gráfico **Ventas, costos y ganancia** con los botones **Hoy / Mes / Trim. / Año** o
-  fechas: sus cifras (ventas, costos, ganancia, ventas concretadas y **ticket promedio**). **Esos mismos botones mandan
+  fechas: sus cifras (ventas, costos —mercancía + comisión ML—, ganancia con su **rentabilidad** sobre el costo de la
+  mercancía, ventas concretadas y **ticket promedio**). **Esos mismos botones mandan
   sobre todo lo de abajo**, siempre contra el período anterior (Mes = el mes pasado hasta el mismo día; Año = el año
   pasado hasta el mismo día; fechas = los mismos días justo antes): **Más vendidos** (top 5 con barra y cuánto subió o
   bajó; «Ver todos los productos y Excel» abre Reportes → Ventas → Por producto con esas fechas), **Por cuenta de
@@ -838,7 +841,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
      de ML y aceptas. Así tus productos salen de tus publicaciones y las ventas de ML llegan solas.
   2. **Crea tus productos:** en Productos → «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones
      su costo; cada una queda como producto ya vinculado. También se crean a mano con **+ Producto** (nombre, costo y
-     % de ganancia con el medidor; el precio se calcula solo).
+     recargo sobre costo con el medidor; el precio se calcula solo).
   - **Pon el peso de tus productos** (Venezuela; dice cuántos faltan): en Productos →
      MercadoEnvíos, el peso sale del portal (con Pagos ME se pide solo al importar o vincular, o de una vez con
      **Traer pesos de ML**); los que el portal no tenga se escriben a mano. Se marca hecho cuando todos los productos tienen peso.
@@ -848,7 +851,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
      registradas con sus productos); las de fuera de ML, con **Nueva venta**.
   5. **Carga tu primera compra:** en Compras → **+ Compra**: proveedor, productos, cantidades y costo; al recibirla el
      stock sube solo.
-  6. **Mira cuánto ganas:** cuando una venta queda procesada, el Inicio muestra ventas, costos y ganancia, los más
+  6. **Mira cuánto ganas:** cuando una venta queda procesada, el Inicio muestra ventas, costos, ganancia y rentabilidad, los más
      vendidos y qué reponer; el detalle con Excel está en Reportes.
   Ocupa poco: muestra **un paso a la vez** («Paso 2 de 6», con puntos de avance), su explicación y el botón para ir;
   al hacerlo pasa sola al siguiente. **Ver todos** despliega la lista completa con lo hecho marcado. Al final hay una
@@ -872,44 +875,68 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   el módulo Descuento ML. A mano solo los productos que el portal no da. **Pesos distintos
   en ML** = sus publicaciones pesan distinto en el portal: casi siempre un pack sin marcar «trae N u.» o un vínculo mal
   hecho; se revisa en Vincular o Stock, o se **elige con un clic** uno de los pesos que trae ML (en MercadoEnvíos o en la
-  ficha del producto). Precios, margen, Promociones y Costos ML usan ese mismo peso.
+  ficha del producto). Precios, rentabilidad, Promociones y Costos ML usan ese mismo peso.
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Cómo cargar productos:** si ya vendes en ML → Productos → **Importar desde ML** (crea el producto vinculado, con
   peso y foto). **El costo (en USD, mayor que 0) es obligatorio** para crear cada producto: sin costo la ganancia de
-  sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, % de ganancia, stock); cuando lo publiques,
+  sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, recargo, stock); cuando lo publiques,
   lo vinculas y el peso y la foto llegan solos.
 - **Actualizar desde ML** (Publicaciones, Productos → Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
-- **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
+- **Productos:** catálogo, precios y rentabilidad de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
   En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: **ML** = del portal de
   MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
   distinto en el portal: revisar en Publicaciones → MercadoEnvíos) o **Sin peso**. Se puede ordenar por peso.
-- **% de ganancia** (desde el 14-11 reemplaza a las «categorías de ganancia»): en la ficha (Editar o + Producto) hay
-  un **medidor** de 0 a 200 %: se mueve con la barra o se escribe el número, y los dos van juntos. Es la ganancia
-  sobre el costo (precio = costo × (1 + %)). Al moverlo cambian en vivo el precio y **«Lo que realmente te queda»**, y
-  el medidor se pinta del color de la ganancia neta: **verde sana**, **naranja ajustada**, **rojo pérdida**.
-  - Si tu empresa calcula los precios (precio por % de ganancia), el % **define** el precio. Los productos que tenían
+- **Recargo y rentabilidad (cómo se lee la ganancia; desde el 14-11, en todo el sistema):** son tres palabras.
+  - **Recargo sobre costo:** lo que **le sumas** a lo que te costó para sacar el precio (lo decides tú, en el medidor).
+    Precio = costo × (1 + recargo). Ej.: costo $2,40 con recargo 80 % → precio $4,32.
+  - **Ganancia ($) / Te queda:** los dólares (o pesos) que de verdad te quedan después de MercadoLibre: comisión, envío
+    y, en Venezuela, la **pérdida por cambio** (tus bolívares valen menos al pasarlos a dólar paralelo); en Colombia, la
+    retención. Ya está restado el costo del producto.
+  - **Rentabilidad sobre costo:** ganancia ÷ costo del producto. 44,7 % = **ganas $44,70 por cada $100 que pusiste en
+    mercancía**. Se mide sobre el costo igual que el recargo, así se comparan directo: «le sumaste 80 %, te queda
+    44,7 %: los otros 35 puntos se los llevan MercadoLibre y el cambio». Es la **misma cuenta** en la ficha, el
+    catálogo, Promociones, el Inicio y los Reportes (en Inicio y Reportes con las ventas ya hechas: ganancia ÷ costo
+    de la mercancía vendida). Ya no se usa el «margen neto» ni el «% sobre la venta».
+  - Cómo explicarlo en una frase: *«El recargo es lo que le sumas al costo; la rentabilidad es lo que de verdad te
+    queda. Los dos se miden sobre lo que te costó el producto.»*
+- **Recargo sobre costo** (desde el 14-11 reemplaza a las «categorías de ganancia»; antes se llamaba «% de ganancia»): en la ficha (Editar o + Producto) hay
+  un **medidor** de 0 a 200 %: se mueve con la barra o se escribe el número, y los dos van juntos (precio = costo ×
+  (1 + recargo)). Al moverlo cambian en vivo el precio y **«Lo que te queda»**, y el medidor se pinta del color de la
+  rentabilidad que deja: **verde sana**, **naranja ajustada**, **rojo pérdida**.
+  - **Lo que te queda** (en la ficha y en los simuladores de Ajustes): «Resultado de tu venta» = precio final en ML −
+    pérdida por cambio (VE) − comisión MercadoLibre − envío MercadoLibre − costo del producto (en CO: − retención, y
+    el costo × TRM). Abajo, grande, **TE QUEDA $X**, la **rentabilidad sobre costo** con su color y la frase «Ganas $Y
+    por cada $100 que pusiste en mercancía. Le sumaste X % y te queda Y %: los otros N puntos se los llevan
+    MercadoLibre y el cambio». El ⓘ explica la diferencia entre recargo y rentabilidad.
+  - Si tu empresa calcula los precios (precio por recargo), el recargo **define** el precio. Los productos que tenían
     categoría quedaron con su mismo % (ULTRA → 120 %, ALTO → 80 %…) y ahora se cambia producto por producto.
-  - Si el precio es el que publicas en ML, el medidor arranca en el % **real** que te deja tu precio de hoy y, al
-    moverlo, dice a qué precio publicar para ganar ese %: **Usar este precio** lo pone en la ficha.
+  - Si el precio es el que publicas en ML, el medidor arranca en el recargo **real** que lleva tu precio de hoy y, al
+    moverlo, dice a qué precio publicar para ese recargo: **Usar este precio** lo pone en la ficha.
   - **Guardar y publicar en ML** (si puedes editar publicaciones y el producto está vinculado): guarda y manda el
     precio a sus publicaciones de 1 unidad en MercadoLibre (por la cola: se ve en Publicaciones → Tareas). Pide
     confirmación; los packs no se tocan. Si la publicación tiene variantes de otros productos, cambia el precio de
     toda la publicación.
-  - La lista de Productos tiene la columna **Ganancia** (el % de cada uno). Con varios seleccionados: **% de ganancia**
-    + Aplicar se lo pone a todos (y recalcula sus precios). La tarjeta de arriba cuenta los **Sin % de ganancia**.
-  - Reportes (Más vendidos, Stock) muestran «Ganancia 60%» en vez del nombre de la categoría.
+  - La lista de Productos tiene las columnas **Recargo** (el % que le sumaste) y **Rentabilidad** (lo que te queda
+    sobre el costo, con su color; antes «Ganancia» y «Margen neto»). Con varios seleccionados: **Recargo** + Aplicar
+    se lo pone a todos (y recalcula sus precios). La tarjeta de arriba cuenta los **Sin recargo**.
+  - Reportes (Por producto, Stock) muestran «Recargo 60%» en vez del nombre de la categoría.
+  - **Revisión de rentabilidad** (Productos, Venezuela; antes «Revisión de márgenes»): productos de menos de $5, su
+    ganancia por unidad y rentabilidad con la regla de envío anterior contra la tabla de MercadoEnvíos vigente, y el
+    recargo sugerido para recuperar los dólares por unidad.
 - **Costos ML** (botón en Productos; admin o quien tenga el permiso **Configurar costos ML**): la **comisión de
   MercadoLibre** (12 % en Venezuela), el envío de los productos **sin peso** y desde qué precio es gratis, la **tabla
   de MercadoEnvíos** (envío gratis por peso, solo lectura: es la misma para todos los vendedores de ML Venezuela y la
-  mantiene al día El Comerciante Digital cuando ML la cambia) y los **colores de la ganancia neta**: «Sana desde» (20 %
-  por defecto) y «Ajustada desde» (0 %); por debajo es pérdida. Se miden sobre lo que queda después de MercadoLibre
-  (% sobre la venta). Se usan en la ficha, la columna Margen neto, los simuladores y Promociones.
+  mantiene al día El Comerciante Digital cuando ML la cambia) y los **colores de la rentabilidad**: «Sana desde» (25 %
+  por defecto) y «Ajustada desde» (0 %); por debajo es pérdida. Se miden sobre la **rentabilidad sobre costo** (lo
+  que te queda después de MercadoLibre ÷ lo que te costó). Si tu empresa ya había cambiado los colores cuando se
+  medían sobre la venta, se convirtieron solos a la nueva base (ningún producto cambió de color). Se usan en la
+  ficha, la columna Rentabilidad, los simuladores y Promociones.
   - El **«Envío»** del costo de la ficha es lo que te costó traer el producto (flete o importación) y se suma al costo;
-    es opcional y Compras no lo pide. El envío que cobra ML va aparte, en «Lo que realmente te queda».
+    es opcional y Compras no lo pide. El envío que cobra ML va aparte, en «Lo que te queda».
 - **Catálogo PDF** (Productos → botón Catálogo PDF; en prueba, solo algunas empresas): elige productos (buscar,
   «Solo con stock», «Solo con foto»), sube tu **logo**, pon el nombre, una línea debajo y un texto al final
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
@@ -986,10 +1013,10 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Reportes:** el detalle con Excel. Dos grupos de pestañas: **por fechas** (Ventas, Compras) y **cómo estás hoy**
   (Inventario, Stock, En tránsito, Conteos). El resumen del negocio ya no está aquí: está en el **Inicio**. Ya no
   existen las pestañas Resumen, Top productos ni Atención ML (un enlace viejo lleva al Inicio o a Por producto).
-- **Reportes → Ventas** tiene dos vistas: **Por venta** (cada venta con total, costo, comisión y ganancia) y **Por
+- **Reportes → Ventas** tiene dos vistas: **Por venta** (cada venta con total, costo, comisión y ganancia; arriba la ganancia total con su rentabilidad) y **Por
   producto** (el top completo de las fechas elegidas): podio con los 3 primeros, el resto con barra, ordenar por
   **Unidades, Venta o Ganancia**, cuánto subió o bajó cada uno contra los mismos días justo antes («nuevo» si antes
-  no vendía), qué % se llevan los 10 primeros, buscar, totales y **Excel**. Ganancia solo con el permiso de costos.
+  no vendía), qué % se llevan los 10 primeros, buscar, totales y **Excel**. Ganancia (con su rentabilidad debajo) solo con el permiso de costos.
 - **Reportes → Stock** (toda empresa con Inventario): arriba 4 tarjetas que son los filtros: **Reponer** (cuántos y
   cuántos urgentes), **Se están cayendo**, **Parados** (con la plata que tienes sin moverse) y **Recién llegados**.
   Debajo, una frase explica la regla con tus números y cuántos productos «van bien».

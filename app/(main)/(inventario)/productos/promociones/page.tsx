@@ -14,7 +14,7 @@ export const metadata = { title: 'Promociones' }
 
 // Promociones de MercadoLibre (migraciones 094 y 097, lib/promocionesML.ts). La foto de ML se guarda por
 // cuenta; aquí se cruza con el PESO del portal de MercadoEnvíos (me_productos) o el del producto vinculado,
-// y con el COSTO del producto (para el margen neto al precio de la promoción).
+// y con el COSTO del producto (para la rentabilidad al precio de la promoción).
 export default async function PromocionesPage() {
   const session = await getServerSession(authOptions)
   if (!session || !puede(session.user, 'ver_productos')) redirect('/dashboard')

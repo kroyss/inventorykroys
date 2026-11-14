@@ -1,12 +1,13 @@
 'use client'
 import { NIVEL, type Nivel } from '@/lib/salud'
 
-// % de ganancia (14-11-2026, el dueño): reemplaza a la "categoría de ganancia". Barra de 0 a 200 % y campo para
-// escribirlo; los dos se mueven juntos. El color sale del nivel de la GANANCIA NETA que deja ese % (sana / ajustada /
-// pérdida, configurable en Productos → Costos ML), así se ve al instante si el precio aguanta.
+// Recargo sobre costo (14-11-2026, el dueño; antes «% de ganancia», y antes la "categoría de ganancia"): lo que se le suma
+// al costo para el precio. Barra de 0 a 200 % y campo para escribirlo; los dos se mueven juntos. El color sale del nivel de
+// la RENTABILIDAD que deja ese recargo (sana / ajustada / pérdida, configurable en Productos → Costos ML), así se ve al
+// instante si el precio aguanta.
 export const GANANCIA_MAX = 200
 
-export default function MedidorGanancia({ valor, onChange, nivel, titulo = '% de ganancia', ayuda, children }: {
+export default function MedidorGanancia({ valor, onChange, nivel, titulo = 'Recargo sobre costo', ayuda, children }: {
   valor: number | null
   onChange: (n: number) => void
   nivel: Nivel | null           // null: sin datos para medir (sin costo o sin tasa)
@@ -25,6 +26,7 @@ export default function MedidorGanancia({ valor, onChange, nivel, titulo = '% de
         <label htmlFor="ganancia-pct" className="text-xs font-semibold text-neutral-700">
           {titulo}
           {n && <span className={`ml-2 text-[11px] font-semibold ${n.texto}`}>{n.icono} {n.nombre}</span>}
+          <span className="block text-[10px] font-normal text-neutral-500">lo que le sumas a lo que te costó</span>
         </label>
         <span className="flex items-center gap-1">
           <input id="ganancia-pct" type="number" inputMode="decimal" min={0} max={GANANCIA_MAX} step={0.5}

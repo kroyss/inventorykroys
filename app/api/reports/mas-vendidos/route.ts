@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const verCostos = puede(u, 'costos')
   try {
     const { rows } = await db.query(
-      `SELECT p.id, p.code, p.name AS nombre, CASE WHEN COALESCE(pp.ganancia_pct, pc.profit_percentage) IS NOT NULL THEN 'Ganancia ' || rtrim(rtrim(COALESCE(pp.ganancia_pct, pc.profit_percentage)::text, '0'), '.') || '%' END AS categoria,
+      `SELECT p.id, p.code, p.name AS nombre, CASE WHEN COALESCE(pp.ganancia_pct, pc.profit_percentage) IS NOT NULL THEN 'Recargo ' || rtrim(rtrim(COALESCE(pp.ganancia_pct, pc.profit_percentage)::text, '0'), '.') || '%' END AS categoria,
               COALESCE(SUM(si.quantity) FILTER (WHERE ${ACTUAL}), 0)::int AS unidades,
               COALESCE(SUM(si.total_price) FILTER (WHERE ${ACTUAL}), 0)::float AS venta,
               COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)) FILTER (WHERE ${ACTUAL}), 0)::float AS costo,

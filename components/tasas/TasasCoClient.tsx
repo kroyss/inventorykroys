@@ -153,7 +153,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
         {/* Simulador */}
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h2 className="font-semibold mb-1">Simulador de ganancia</h2>
-          <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → tu ganancia neta real.</p>
+          <p className="text-xs text-neutral-500 mb-3">Costo (compra + envío) + precio de venta estimado → lo que te queda y tu rentabilidad sobre costo.</p>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
               <label className="text-xs text-neutral-500">Costo (compra+envío) USD</label>
@@ -177,7 +177,7 @@ export default function TasasCoClient({ puedeTasas }: { puedeTasas: boolean }) {
                 className="mt-1 w-full border border-neutral-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800" />
             </div>
           </div>
-          {/* Parámetros + ganancia neta real en ML Colombia */}
+          {/* Parámetros + lo que te queda en ML Colombia */}
           <div className="mt-1 border-t border-neutral-100 pt-4">
             <p className="text-sm font-semibold text-neutral-700 mb-1">Costos de ML Colombia</p>
             <p className="text-[11px] text-neutral-400 mb-2">El envío se elige solo según el umbral: precios bajos pagan menos.</p>

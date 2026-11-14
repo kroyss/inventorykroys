@@ -8,7 +8,7 @@ const Schema = z.object({
   product_ids:       z.array(z.number().int().positive()),
   profit_category_id: z.number().int().positive().optional(),
   ganancia_pct:       z.number().min(0).max(200).optional(),   // 14-11 (mig. 179): % de ganancia (CO / sin tasa)
-}).refine(b => b.profit_category_id != null || b.ganancia_pct != null, 'Falta el % de ganancia')
+}).refine(b => b.profit_category_id != null || b.ganancia_pct != null, 'Falta el recargo')
 
 export async function PUT(req: NextRequest) {
   const { session, db } = await getSessionDb()

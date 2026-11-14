@@ -66,6 +66,15 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo agrego a alguien de mi equipo?', respuesta: 'Toca **+ Nuevo usuario**, pon nombre, usuario y contraseña inicial, y pásale su contraseña. Con **Permisos** eliges qué ve y qué puede hacer.' },
     { pregunta: 'Un empleado olvidó su contraseña', respuesta: 'En su fila toca **Cambiar contraseña** y pásale la nueva. Sus sesiones abiertas se cierran.' },
   ],
+  '/productos': [
+    { pregunta: '¿Qué es recargo y qué es rentabilidad?',
+      respuesta: 'El **recargo** es lo que le sumas al costo para sacar el precio. La **rentabilidad** es lo que de verdad te queda después de MercadoLibre (y del cambio en Venezuela). Los dos se miden sobre lo que te costó el producto.\n\nEj.: costo $2,40 y recargo 80 % → precio $4,32. Después de la comisión, el envío y el cambio te quedan $1,07: rentabilidad **44,7 %**, o sea ganas $44,70 por cada $100 que pusiste en mercancía. Los otros 35 puntos se los llevan ML y el cambio.' },
+    { pregunta: '¿Por qué la rentabilidad sale más baja que el recargo?', respuesta: 'Porque el recargo es antes de MercadoLibre y la rentabilidad es después: la comisión, el envío y (en Venezuela) la pérdida por cambio se llevan una parte. En la ficha, **Lo que te queda** muestra cada descuento y cuántos puntos se fueron.' },
+    { pregunta: '¿Desde cuánto es «Sana»?', respuesta: 'Por defecto, rentabilidad desde **25 %** es verde (Sana), de 0 a 25 % naranja (Ajustada) y menos de 0 rojo (Pérdida). Se cambia en **Productos → Costos ML**.' },
+  ],
+  '/dashboard': [
+    { pregunta: '¿Qué es la rentabilidad del Inicio?', respuesta: 'La ganancia del período ÷ lo que te costó la mercancía vendida. **30 %** = ganaste $30 por cada $100 en mercancía. Es la misma cuenta que ves en cada producto. No descuenta los gastos del mes.' },
+  ],
   '/productos/mercadoenvios': [
     { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },

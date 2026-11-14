@@ -61,10 +61,12 @@ export async function GET(req: NextRequest) {
         DATE_TRUNC('${trunc}', COALESCE(s.processed_at, s.created_at))          AS periodo,
         COALESCE(SUM(s.total_amount), 0)              AS ventas,
         COALESCE(SUM(si_cost.costo), 0)               AS costos,
+        COALESCE(SUM(si_cost.mercancia), 0)           AS mercancia,
         COUNT(DISTINCT s.id)                          AS cantidad_ventas
       FROM sales s
       LEFT JOIN (
-        SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo
+        SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo,
+               SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS mercancia
         FROM sale_items si
         GROUP BY si.sale_id
       ) si_cost ON si_cost.sale_id = s.id
@@ -76,6 +78,7 @@ export async function GET(req: NextRequest) {
 
     let totalVentas  = 0
     let totalCostos  = 0
+    let totalMercancia = 0
     let totalCantidad = 0
 
     // ISO label length: hour=13 (YYYY-MM-DDTHH), day=10 (YYYY-MM-DD), month=7 (YYYY-MM)
@@ -87,6 +90,7 @@ export async function GET(req: NextRequest) {
       const cant    = parseInt(r.cantidad_ventas, 10) || 0
       totalVentas   += ventas
       totalCostos   += costos
+      totalMercancia += parseFloat(r.mercancia) || 0
       totalCantidad += cant
       const periodoStr = r.periodo instanceof Date
         ? r.periodo.toISOString()
@@ -115,6 +119,11 @@ export async function GET(req: NextRequest) {
         ganancia_pct: totalCostos > 0
           ? Math.round(((totalVentas - totalCostos) / totalCostos) * 1000) / 10
           : 0,
+        // 14-11 (el dueño): RENTABILIDAD = ganancia ÷ costo de la mercancía (sin la comisión, que ya está restada en la
+        // ganancia). La misma fórmula que la ficha del producto y el catálogo. Es la que se muestra.
+        rentabilidad_pct: totalMercancia > 0
+          ? Math.round(((totalVentas - totalCostos) / totalMercancia) * 1000) / 10
+          : null,
         cantidad:     totalCantidad,
       },
     })

@@ -30,7 +30,8 @@ const ALLOWED = new Set([
   'transito_sale_factor',                            // Finanzas (global, vive en VE maestra)
   'bono_meta_1', 'bono_meta_2', 'bono_meta_3', 'bono_meta_4',       // Bonos: metas de ventas del mes
   'bono_monto_1', 'bono_monto_2', 'bono_monto_3', 'bono_monto_4',   // Bonos: monto de cada fase
-  'margen_sano', 'margen_ajustado',                  // 14-11: colores de la ganancia neta (lib/salud.ts)
+  'rentab_sano', 'rentab_ajustado',                  // 14-11: colores de la rentabilidad sobre costo (lib/salud.ts)
+  'margen_sano', 'margen_ajustado',                  // 14-11 (viejas, sobre venta): solo se leen para convertir
 ])
 
 // Lo que puede leer y guardar quien tiene "Configurar automatizaciones" sin ser admin (lib/permisos.ts).
@@ -38,7 +39,7 @@ const ALLOWED = new Set([
 const DE_AUTOMATIZACIONES = new Set(['despacho_remitente', 'preguntas_politicas', 'preguntas_plantillas',
                                      'mensajes_plantillas', 'calificaciones_plantillas'])
 // 14-11: Productos → Costos ML (permiso «Configurar costos ML», sin ser admin): comisión, envío y colores.
-const DE_COSTOS_ML = new Set(['ml_comision', 'ml_envio', 'ml_umbral', 'margen_sano', 'margen_ajustado',
+const DE_COSTOS_ML = new Set(['ml_comision', 'ml_envio', 'ml_umbral', 'rentab_sano', 'rentab_ajustado',
                               'ml_umbral_envio', 'ml_envio_bajo', 'ml_envio_alto', 'ml_reten'])
 const accesoAjustes = (user: Parameters<typeof puede>[0] & { role: string }) =>
   user.role === 'admin' ? 'todo' : puede(user, 'automatizaciones_config') ? 'automatizaciones' : null

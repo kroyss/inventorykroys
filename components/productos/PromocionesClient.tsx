@@ -10,13 +10,14 @@ import {
   envioPorTransportista, topeDescuento, unidadesParaGratis, huecoVariasUnidades, textoHueco, tierFor, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
 } from '@/lib/mlShipping'
 import { mlNetFor, type VeRate } from '@/lib/pricingVE'
+import { ventaACosto } from '@/lib/salud'
 import type { CampanaML, PromoDeItem } from '@/lib/promocionesML'
 
 // Promociones de MercadoLibre (migraciones 094 y 097).
 //  Fase 1: ver campañas, envío gratis por transportista, descuento máximo y unidades para el envío gratis.
 //  Fase 2: agregar publicaciones a una campaña (de ML o propia) o sacarlas, crear y borrar campañas propias;
 //          siempre con vista previa (precio, envío, unidades, margen) y registro de quién hizo qué.
-//  Fase 3: margen neto al precio de la promoción y sugerencias por campaña.
+//  Fase 3: rentabilidad (sobre costo) al precio de la promoción y sugerencias por campaña.
 
 export interface CampanaVista extends CampanaML { conexionId: number; cuentas: string[]; adentro: number; candidatas: number
   pctDefecto?: number | null   // campañas propias: el % que se propone al agregar (se elige al crearla)
@@ -142,9 +143,9 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     const ks = [...cuenta.keys()]
     return { ...c, pctML: ks.length ? { min: Math.min(...ks), max: Math.max(...ks) } : null }
   }), [campanasBase, filas])
-  const [margenMin, setMargenMin] = useState(15)
+  const [margenMin, setMargenMin] = useState(20)   // 14-11: rentabilidad mínima SOBRE COSTO (antes 15 % sobre venta)
   const [pctSug, setPctSug] = useState(10)
-  // Margen neto (Fase 3): tasas y parámetros de ML de Ajustes, como el catálogo.
+  // Rentabilidad (Fase 3; sobre costo desde 14-11): tasas y parámetros de ML, como el catálogo.
   const tIni = inicialTasa?.rate
   const [veRate, setVeRate] = useState<VeRate | null>(tIni?.official_rate ? { official: tIni.official_rate, parallel: tIni.parallel_rate, excess: tIni.excess_percentage } : null)
   const [ml, setMl] = useState<Record<string, string>>(inicialTasa?.settings ?? {})
@@ -158,7 +159,12 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
       if (!vivo) return
       if (r?.official_rate) setVeRate({ official: r.official_rate, parallel: r.parallel_rate, excess: r.excess_percentage })
       setMl(s ?? {})
-      try { const v = Number(localStorage.getItem('promo_margen_min')); if (v > 0 && v <= 90) setMargenMin(v) } catch { /* sin storage */ }
+      try {
+        const v = Number(localStorage.getItem('promo_rentab_min'))
+        const viejo = Number(localStorage.getItem('promo_margen_min'))   // el de antes, sobre venta → se convierte
+        if (v > 0 && v <= 300) setMargenMin(v)
+        else if (viejo > 0 && viejo <= 90) setMargenMin(Math.round(ventaACosto(viejo)))
+      } catch { /* sin storage */ }
     })
     return () => { vivo = false }
   }, [])
@@ -170,7 +176,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     if (f.costo == null || !veRate) return null
     const r = mlNetFor('VE', { total_cost: f.costo, profit_percentage: 0, discount_percent: 0, sale_price: precio, weight_kg: f.peso },
       veRate, 0, ml, 0, shipTable, precio)
-    return r ? r.margen : null
+    return r ? r.rentabilidad : null
   }, [veRate, ml, shipTable])
 
   const vistas = useMemo(() => filas.map(f => {
@@ -431,14 +437,14 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     setModal({ tipo: 'agregar', campana: k, pct: pctDe(c), pausa: { conexionId: c.conexionId, id: c.id },
       claves: (pausas[k] ?? []).map(id => `${c.conexionId}|${id}`).filter(x => porClave.has(x)) })
   }
-  const guardarMargen = (v: number) => { setMargenMin(v); try { localStorage.setItem('promo_margen_min', String(v)) } catch { /* sin storage */ } }
+  const guardarMargen = (v: number) => { setMargenMin(v); try { localStorage.setItem('promo_rentab_min', String(v)) } catch { /* sin storage */ } }
 
   const sinFoto = cuentas.length === 0
   const selVistas = [...sel].map(k => porClave.get(k)).filter(Boolean) as Vista[]
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y margen al precio de la promo"
+      <PageHeader title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm whitespace-nowrap">← Productos</Link>
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>
@@ -458,9 +464,9 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
         <span>Pesos del portal: {estadoPesos
           ? <span className={pedidoME ? 'text-sky-700' : 'text-amber-700'}>{estadoPesos}</span>
           : <>{cuando(pesosAl)}{conPagosME ? ' (se actualizan con la primera traída de Pagos ME del día)' : ''}</>}</span>
-        <label className="ml-auto flex items-center gap-1.5" title="Para las sugerencias y el filtro de margen bajo">
-          Margen mínimo
-          <input type="number" min={0} max={90} value={margenMin} onChange={e => guardarMargen(Math.max(0, Math.min(90, Number(e.target.value) || 0)))}
+        <label className="ml-auto flex items-center gap-1.5" title="Rentabilidad sobre costo mínima: para las sugerencias y el filtro de rentabilidad baja">
+          Rentabilidad mínima
+          <input type="number" min={0} max={300} value={margenMin} onChange={e => guardarMargen(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
             className="w-14 border border-neutral-300 rounded px-1.5 py-0.5 text-right" />%
         </label>
       </div>
@@ -544,7 +550,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
             { value: 'adentro', label: 'En promoción', count: cuenta_(filtros.adentro) },
             { value: 'candidatas', label: 'Pueden entrar', count: cuenta_(filtros.candidatas) },
             { value: 'quita', label: 'La promo quita el envío', count: cuenta_(filtros.quita) },
-            { value: 'margen', label: `Margen < ${margenMin}%`, count: cuenta_(filtros.margen) },
+            { value: 'margen', label: `Rentabilidad < ${margenMin}%`, count: cuenta_(filtros.margen) },
             { value: 'tealca', label: 'La promo quita ZOOM', count: cuenta_(filtros.tealca) },
             { value: 'destino', label: 'Cobro a destino', count: cuenta_(filtros.destino) },
             { value: 'sin_peso', label: 'Sin peso', count: cuenta_(filtros.sin_peso) },
@@ -593,7 +599,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                   <th className="px-3 py-2 text-left">En promoción</th>
                   <th className="px-3 py-2 text-left">Puede entrar</th>
                   <th className="px-3 py-2 text-left">Envío gratis hoy</th>
-                  <th className="px-3 py-2 text-right">Margen</th>
+                  <th className="px-3 py-2 text-right">Rentabilidad</th>
                   <th className="px-3 py-2 text-left">Descuento máximo</th>
                 </tr>
               </thead>
@@ -665,7 +671,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                         )}
                       </td>
                       <td className={`px-3 py-2 text-xs text-right whitespace-nowrap ${v.margen == null ? 'text-neutral-400' : v.margen < 0 ? 'text-red-700 font-medium' : v.margen < margenMin ? 'text-amber-700' : 'text-neutral-800'}`}
-                        title={v.costo == null ? 'Sin costo: la publicación no está vinculada a un producto con costo' : 'Margen neto sobre venta al precio actual'}>
+                        title={v.costo == null ? 'Sin costo: la publicación no está vinculada a un producto con costo' : 'Rentabilidad sobre costo al precio actual (lo que te queda ÷ lo que te costó)'}>
                         {v.margen == null ? '—' : pct(v.margen)}
                       </td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
@@ -689,7 +695,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
 
         <Historial historial={historial} />
         <p className="text-xs text-neutral-400">
-          Margen: neto sobre venta al precio de la promoción, con el costo del producto, la comisión, el envío y la fuga cambiaria (como en Productos).
+          Rentabilidad: lo que te queda al precio de la promoción (después de la comisión, el envío y la pérdida por cambio) ÷ lo que te costó el producto, como en Productos.
           «Desde N u.»: el cliente que compra esa cantidad llega al envío gratis (contando que el paquete pesa más).
         </p>
       </>}
@@ -861,7 +867,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
       : yaAdentro && !cambio ? `Ya está en la campaña${cand?.precio != null ? ` · ${usd(cand.precio)}` : ''}` : !puede ? 'ML no la invita a esta campaña'
       : bajoPiso ? `Bajo $${PISO_ML}: ML no la acepta` : bajoMin ? `ML acepta desde ${usd(cand!.minimo)}`
       : sobreMax ? `ML pide al menos −${pct(pctReal(f.precio, cand!.maximo!))} (hasta ${usd(cand!.maximo)})`
-      : seguro.sinMargen ? 'Sin margen: perdería el envío gratis'
+      : seguro.sinMargen ? 'Sin espacio para descuento: perdería el envío gratis'
       : sugML != null && sinGratis && !pierdeZoom ? 'Pierde envío gratis con el sugerido de ML' : null
     const advertencia = motivo ? null
       : ajustada ? `Ajustada a −${pct(pctReal(f.precio, precio))} (envío gratis)`
@@ -951,7 +957,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
     const avisos = [dobles.length && `⚠ OJO: ${dobles.length} quedaría${dobles.length === 1 ? '' : 'n'} con MÁS DEL DOBLE de tu descuento habitual (${textoExceso(dobles[0].exceso!)}${dobles.length > 1 ? ', y otras' : ''}). Confirma que es correcto.`,
       sinGratis && `• ${sinGratis} queda${sinGratis === 1 ? '' : 'n'} SIN envío gratis (cobro a destino, con 1 unidad o comprando 2 o 3).`,
       zoom && `• ${zoom} pierde${zoom === 1 ? '' : 'n'} ZOOM: solo tendrá${zoom === 1 ? '' : 'n'} envío gratis por TEALCA. En Preguntas y Mensajes se verá así mientras dure la promoción.`,
-      bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con margen menor a ${margenMin}%.`].filter(Boolean).join('\n')
+      bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con rentabilidad menor a ${margenMin}%.`].filter(Boolean).join('\n')
     if (avisos && !await confirmarAviso({
       title: dobles.length ? `⚠ Descuento fuera de lo normal en «${camp!.nombre}»` : `Revisa antes de agregar a «${camp!.nombre}»`,
       message: `${avisos}\n\n¿Agregar las ${validas.length} igual?`,
@@ -1090,7 +1096,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
                 <tr>
                   <th className="px-2 py-1.5 text-left">Publicación</th><th className="px-2 py-1.5 text-right">Publicado</th>
                   <th className="px-2 py-1.5 text-right">Nuevo</th><th className="px-2 py-1.5 text-left">Envío gratis</th>
-                  <th className="px-2 py-1.5 text-right">Margen</th><th className="px-2 py-1.5 text-left">Nota</th>
+                  <th className="px-2 py-1.5 text-right">Rentab.</th><th className="px-2 py-1.5 text-left">Nota</th>
                   <th className="px-2 py-1.5 w-6"></th>
                 </tr>
               </thead>

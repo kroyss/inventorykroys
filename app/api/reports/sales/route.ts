@@ -79,6 +79,8 @@ export async function GET(req: NextRequest) {
         // las categorías de ganancia, que están expresadas así.
         profit_pct:       (totalCost + totalComm) > 0
           ? Math.round((profit / (totalCost + totalComm)) * 1000) / 10 : 0,
+        // 14-11 (el dueño): rentabilidad = ganancia ÷ costo de la mercancía (la que se muestra, igual que Inicio y la ficha).
+        rentabilidad_pct: totalCost > 0 ? Math.round((profit / totalCost) * 1000) / 10 : null,
         count:            sales.length,
       },
     })

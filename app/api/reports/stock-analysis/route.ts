@@ -25,8 +25,8 @@ export async function GET(_: NextRequest) {
           COALESCE(i.min_stock, 0)                       AS min_stock,
           COALESCE(i.sale_price, pp.final_price_usd, 0)  AS sale_price,
           COALESCE(pp.total_cost, 0)                     AS cost,
-          -- 14-11 (mig. 179): «Ganancia 60%» en vez del nombre de la categoría.
-          CASE WHEN COALESCE(pp.ganancia_pct, pc.profit_percentage) IS NOT NULL THEN 'Ganancia ' || rtrim(rtrim(COALESCE(pp.ganancia_pct, pc.profit_percentage)::text, '0'), '.') || '%' END AS categoria,
+          -- 14-11 (mig. 179): «Recargo 60%» (14-11: antes «Ganancia 60%») en vez del nombre de la categoría.
+          CASE WHEN COALESCE(pp.ganancia_pct, pc.profit_percentage) IS NOT NULL THEN 'Recargo ' || rtrim(rtrim(COALESCE(pp.ganancia_pct, pc.profit_percentage)::text, '0'), '.') || '%' END AS categoria,
           COALESCE(pp.ganancia_pct, pc.profit_percentage) AS categoria_pct,
           pc.color                                       AS categoria_color,
           COALESCE(v.ventas_6m, 0)                       AS ventas_6m,
