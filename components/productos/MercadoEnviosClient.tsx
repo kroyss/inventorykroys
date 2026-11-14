@@ -205,7 +205,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
                   <td className="px-2 py-2 text-right">
                     {p.peso_origen === 'ml' ? (
                       <span className="whitespace-nowrap" title="Peso del portal de MercadoEnvíos: se actualiza solo">
-                        {p.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span>
+                        {p.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span>
                       </span>
                     ) : <>
                     <input type="number" step="0.001" min="0"

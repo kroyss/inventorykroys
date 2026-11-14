@@ -1022,7 +1022,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                         <div className="flex items-center justify-between gap-2">
                           <label className="text-xs font-medium text-neutral-700">Peso (kg) <span className="text-neutral-400">· MercadoEnvíos</span></label>
                           {form.peso_ml ? (
-                            <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{form.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span></span>
+                            <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{form.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span></span>
                           ) : <input type="number" step="0.001" min="0" value={form.weight_kg}
                             onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))}
                             placeholder="ej. 0.350"
@@ -1277,7 +1277,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       <div className="flex items-center justify-between gap-2">
                         <label className="text-xs text-neutral-600">Peso (kg)</label>
                         {viewing.peso_origen === 'ml' ? (
-                          <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{viewing.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span></span>
+                          <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{viewing.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span></span>
                         ) : <div className="flex items-center gap-1">
                           <input type="number" step="0.001" min="0" value={viewWeight}
                             onChange={e => setViewWeight(e.target.value)}
@@ -1369,7 +1369,7 @@ function PesoME({ p }: { p: Product }) {
     </span>)
   if (p.peso_origen === 'ml' && kg) return (
     <span className="text-neutral-800" title={`Del portal de MercadoEnvíos${p.peso_me_at ? ` · leído el ${p.peso_me_at}` : ''}: se actualiza solo`}>
-      {kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span>
+      {kg}
     </span>)
   if (kg) return <span className="text-neutral-600" title="Cargado a mano: no viene del portal de MercadoEnvíos">{kg} <span className="text-[10px] text-neutral-400">a mano</span></span>
   return <span className="text-[11px] text-neutral-400" title="Sin peso: no está en el portal de MercadoEnvíos ni cargado a mano">Sin peso</span>

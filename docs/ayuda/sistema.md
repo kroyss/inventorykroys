@@ -867,7 +867,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   Las hojas impresas (recepción y conteo) no llevan fotos.
 - **Pesos (Publicaciones → MercadoEnvíos, Venezuela):** el peso de cada producto sale **solo** del portal de
   MercadoEnvíos (el que usa ML para el envío gratis), por medio de sus vínculos: Pagos ME lo trae en la primera traída
-  del día. Se ve con la marca **ML** y no se edita a mano. El peso es **solo** el del portal (nunca el que declara la
+  del día. En la ficha y en MercadoEnvíos se ve con la marca **ME** y no se edita a mano. El peso es **solo** el del portal (nunca el que declara la
   publicación). Pasa al producto al crear, importar o vincular, y si a alguna publicación vinculada le falta, el sistema
   **pide solo** una traída de pesos a Pagos ME (llegan en 1 a 3 minutos con la PC prendida; no se repite si ya se pidió
   en la última media hora). También de una vez con **⬇ Traer pesos de ML** (en MercadoEnvíos, con Pagos ME).
@@ -887,7 +887,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   5 minutos no se vuelve a leer (ya está al día).
 - **Productos:** catálogo, precios y rentabilidad de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
-  En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: **ML** = del portal de
+  En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: solo el número = del portal de
   MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
   distinto en el portal: revisar en Publicaciones → MercadoEnvíos) o **Sin peso**. Se puede ordenar por peso.
 - **Recargo y rentabilidad (cómo se lee la ganancia; desde el 14-11, en todo el sistema):** son tres palabras.
