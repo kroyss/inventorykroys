@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pasarPesos } from '@/lib/pesosML'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
         ? await s.db.query(`UPDATE product_ml_codes SET unidades = $2, combo_revisado = TRUE, updated_at = NOW() WHERE id = $1`, [b.codigo_id, b.unidades])
         : await s.db.query(`UPDATE product_ml_codes SET sin_sincronizar = $2, updated_at = NOW() WHERE id = $1`, [b.codigo_id, b.sin_sincronizar])
       if (!rowCount) return NextResponse.json({ error: 'Vínculo no encontrado' }, { status: 404 })
+      if (b.accion === 'unidades') await pasarPesos(s.db)   // 14-11: al marcar «trae N u.» el peso puede quedar claro
       return NextResponse.json({ ok: true })
     }
     if (b.accion === 'reserva') {

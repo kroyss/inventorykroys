@@ -21,7 +21,7 @@ const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
 
 type Filter = 'all' | 'unregistered' | 'borrador' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
 
-export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean }) {
+export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false, descuento = true }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean; descuento?: boolean }) {
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>(initialProducts)
   // 14-11: «Traer pesos de ML» (borrador de la publicación + pedido al portal si hay Pagos ME).
@@ -148,10 +148,10 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
           className="btn-secondary text-sm disabled:opacity-50">
           {trayendo ? 'Trayendo…' : '⬇ Traer pesos de ML'}
         </button>
-        <div className="ml-auto text-sm text-neutral-500">
+        {descuento && <div className="ml-auto text-sm text-neutral-500">
           Descuento global: <b className="text-neutral-800">{globalDiscount.toFixed(1)}%</b>
           {rate && <span className="text-neutral-400"> · exceso {rate.excess}%</span>}
-        </div>
+        </div>}
       </div>
 
       <p className="text-xs text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg p-3 leading-relaxed">
@@ -159,9 +159,9 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
         trae Pagos ME una vez al día por medio de los vínculos). Sin eso, el producto sin peso toma el que declara su publicación
         (<b className="text-amber-700">Por revisar</b>: es lo que se cargó en ML y a veces no es el real; corrígelo o confírmalo con ✓). A mano solo los que ML no da.
         <b className="text-amber-700"> Pesos distintos</b> = sus publicaciones pesan distinto en ML: suele ser un pack sin marcar «trae N u.» o un
-        vínculo mal hecho (revísalo en Publicaciones → Vincular o Stock). El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
+        vínculo mal hecho (revísalo en Publicaciones → Vincular o Stock).{descuento && <> El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
         envío gratis (según la tabla de ML) y <b>limita solo</b> el descuento global a ese tope.
-        <span className="text-amber-700"> ⚠️ Tope</span> = se le baja el descuento para conservar el envío gratis;
+        <span className="text-amber-700"> ⚠️ Tope</span> = se le baja el descuento para conservar el envío gratis;</>}
         <span className="text-sky-700"> 🛒 Por volumen</span> = a 1 unidad no llega, pero sí juntando unidades (normal en productos baratos);
         <span className="text-red-700"> 🚫 Revisar precio</span> = ni juntando unidades alcanza el umbral (precio muy bajo para su peso).
       </p>
@@ -172,7 +172,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
         {chip('unregistered', '⚪ Sin peso', counts.unregistered, 'bg-neutral-700 text-white border-neutral-700')}
         {rows.some(r => r.p.peso_origen === 'publicacion') && chip('borrador', '📝 Por revisar', rows.filter(r => r.p.peso_origen === 'publicacion').length, 'bg-amber-500 text-white border-amber-500')}
         {rows.some(r => r.p.pesos_ml) && chip('distintos', 'Pesos distintos en ML', rows.filter(r => r.p.pesos_ml).length, 'bg-amber-600 text-white border-amber-600')}
-        {chip('capped', '⚠️ Con tope', counts.capped, 'bg-amber-500 text-white border-amber-500')}
+        {descuento && chip('capped', '⚠️ Con tope', counts.capped, 'bg-amber-500 text-white border-amber-500')}
         {chip('aggregate', '🛒 Por volumen', counts.aggregate, 'bg-sky-600 text-white border-sky-600')}
         {chip('impossible', '🚫 Revisar precio', counts.impossible + counts.overweight, 'bg-red-600 text-white border-red-600')}
         <input type="search" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)}
@@ -189,15 +189,15 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
               <th className="px-2 py-2 text-right">Peso (kg)</th>
               <th className="px-2 py-2 text-right">Publicado</th>
               <th className="px-2 py-2 text-right">Umbral</th>
-              <th className="px-2 py-2 text-right">Desc. máx</th>
-              <th className="px-2 py-2 text-right">Aplicado</th>
+              {descuento && <th className="px-2 py-2 text-right">Desc. máx</th>}
+              {descuento && <th className="px-2 py-2 text-right">Aplicado</th>}
               <th className="px-2 py-2 text-right">Venta final</th>
               <th className="px-2 py-2">Estado</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-neutral-400">Sin productos</td></tr>
+              <tr><td colSpan={descuento ? 9 : 7} className="px-3 py-8 text-center text-neutral-400">Sin productos</td></tr>
             )}
             {filtered.map(({ p, published, final, info }) => {
               const meta = STATUS_META[info.status]
@@ -233,10 +233,10 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
                   </td>
                   <td className="px-2 py-2 text-right">${fmt(published)}</td>
                   <td className="px-2 py-2 text-right text-neutral-500">{info.tier ? `$${fmt(info.tier.minPrice)}` : '—'}</td>
-                  <td className="px-2 py-2 text-right">{info.maxDiscount != null ? `${info.maxDiscount.toFixed(1)}%` : '—'}</td>
-                  <td className={`px-2 py-2 text-right font-medium ${info.status === 'capped' ? 'text-amber-700' : 'text-neutral-800'}`}>
+                  {descuento && <td className="px-2 py-2 text-right">{info.maxDiscount != null ? `${info.maxDiscount.toFixed(1)}%` : '—'}</td>}
+                  {descuento && <td className={`px-2 py-2 text-right font-medium ${info.status === 'capped' ? 'text-amber-700' : 'text-neutral-800'}`}>
                     {info.effectiveDiscount.toFixed(1)}%
-                  </td>
+                  </td>}
                   <td className="px-2 py-2 text-right text-green-700">${fmt(final)}</td>
                   <td className="px-2 py-2">
                     <span className={`text-[11px] px-2 py-0.5 rounded-full border whitespace-nowrap ${meta.chip}`}>

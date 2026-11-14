@@ -24,7 +24,8 @@ export function pestanasML(user: UsuarioML) {
   if (tieneModulo(user, 'preguntas') && puede(user, 'ver_productos') && puede(user, 'importar_ml')) p.push({ k: 'importar', t: 'Importar desde ML', href: '/productos/importar-ml' })
   if (tieneModulo(user, 'inventario') && tieneModulo(user, 'preguntas') && puede(user, 'ver_inventario')) p.push({ k: 'stock', t: 'Stock', href: '/inventario/stock-ml' })
   if (user.country === 'VE' && tieneModulo(user, 'promociones') && puede(user, 'promociones') && puede(user, 'ver_productos')) p.push({ k: 'promociones', t: 'Promociones', href: '/productos/promociones' })
-  if (user.country === 'VE' && tieneModulo(user, 'descuento_ml') && puede(user, 'ver_productos')) p.push({ k: 'envios', t: 'MercadoEnvíos', href: '/productos/mercadoenvios' })
+  // 14-11: MercadoEnvíos (pesos) para toda empresa de Venezuela con Inventario; el descuento solo se ve con Descuento ML.
+  if (user.country === 'VE' && tieneModulo(user, 'inventario') && puede(user, 'ver_productos')) p.push({ k: 'envios', t: 'MercadoEnvíos', href: '/productos/mercadoenvios' })
   // Tareas en MercadoLibre (09-11): lo que se manda a ML en segundo plano (Editar y Promociones); cada uno ve las suyas.
   if (tiposPermitidos(user).length) p.push({ k: 'tareas', t: 'Tareas', href: '/publicaciones/lotes' })
   return p

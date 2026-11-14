@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pasarPesos } from '@/lib/pesosML'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
       await s.db.query(`INSERT INTO product_ml_codes (product_id, ml_account, ml_code, is_active) VALUES ($1, $2, $3, TRUE)`,
         [b.product_id, b.cuenta, codigo])
     }
+    await pasarPesos(s.db, { pedirME: Number(s.session.user.id) })   // 14-11: el peso de ML llega al vincular (y se piden los del portal)
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues[0]?.message }, { status: 400 })

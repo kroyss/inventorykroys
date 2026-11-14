@@ -9,7 +9,7 @@
 //   - Historial: la búsqueda general de ML corta en 1.000 preguntas por cuenta; por publicación
 //     (/questions/search?item=) se llega a TODAS. Una vez por publicación, de a pocas por pasada.
 // Solo LEE de MercadoLibre. Lo corre el cron de preguntas en segundo plano.
-import { pesosDePublicaciones } from '@/lib/pesosML'
+import { pasarPesos } from '@/lib/pesosML'
 import type { Pool } from 'pg'
 import { mlFetch, leerItems } from '@/lib/ml'
 import { idsDe } from '@/lib/alertasStock'
@@ -141,7 +141,7 @@ export async function actualizarCatalogo(db: Pool, conexionId: number, forzar = 
                          AND c.item_id = ANY(o.items)))
      WHERE c.conexion_id = $1`, [conexionId, DIAS_MOVIMIENTO])
   // 14-11: los productos sin peso toman el «Peso del paquete» de su publicación (borrador para revisar, lib/pesosML.ts).
-  await pesosDePublicaciones(db).catch(e => console.error('[pesos publicacion]', e instanceof Error ? e.message : e))
+  await pasarPesos(db)
   return n
 }
 

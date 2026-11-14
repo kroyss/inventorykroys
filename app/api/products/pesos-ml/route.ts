@@ -3,7 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
-import { pesosDePublicaciones } from '@/lib/pesosML'
+import { pasarPesos } from '@/lib/pesosML'
 import { estadoTraida, ocupada } from '@/lib/meTraida'
 
 // POST /api/products/pesos-ml (14-11-2026, el dueño) → Productos → MercadoEnvíos → «Traer pesos de ML»:
@@ -15,7 +15,7 @@ export async function POST() {
   if (!session || !db) return unauthorized()
   if (!puede(session.user, 'ver_productos')) return forbidden()
   try {
-    const llenados = await pesosDePublicaciones(db)
+    const { portal: delPortal, publicacion: llenados } = await pasarPesos(db)
     let portal: 'pedido' | 'en_curso' | 'sin_pagos_me' = 'sin_pagos_me'
     if (session.user.country === 'VE' && tieneModulo(session.user, 'pagos_me')) {
       const e = await estadoTraida(db)
@@ -29,7 +29,7 @@ export async function POST() {
       `SELECT COUNT(*) FILTER (WHERE weight_kg IS NULL OR weight_kg <= 0)::int AS sin_peso,
               COUNT(*) FILTER (WHERE peso_origen = 'publicacion')::int AS por_revisar
        FROM products WHERE is_active`)
-    return NextResponse.json({ ok: true, llenados, portal, sin_peso: r?.sin_peso ?? 0, por_revisar: r?.por_revisar ?? 0 })
+    return NextResponse.json({ ok: true, llenados, del_portal: delPortal, portal, sin_peso: r?.sin_peso ?? 0, por_revisar: r?.por_revisar ?? 0 })
   } catch (err) {
     return apiError(err)
   }

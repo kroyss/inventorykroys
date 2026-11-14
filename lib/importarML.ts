@@ -14,7 +14,7 @@
 // que hay, con su movimiento ("Ingreso inicial desde MercadoLibre") y marcado "stock por verificar".
 import type { Pool, PoolClient } from 'pg'
 import type { VarianteCatalogo } from '@/lib/catalogoML'
-import { pesosDePublicaciones } from '@/lib/pesosML'
+import { pasarPesos } from '@/lib/pesosML'
 
 export type EstadoImportar = 'vinculada' | 'parecida' | 'nueva'
 const SIMILITUD_MIN = 0.42
@@ -200,7 +200,7 @@ export async function crearProductos(db: PoolClient, lista: NuevoProducto[], use
       creados.push(code)
     }
     // 14-11: el peso del paquete que declara la publicación, como borrador para revisar (lib/pesosML.ts).
-    if (creados.length) await pesosDePublicaciones(db)
+    if (creados.length) await pasarPesos(db, { pedirME: userId })   // y se piden los del portal (Pagos ME)
     await db.query('COMMIT')
     return creados
   } catch (e) {

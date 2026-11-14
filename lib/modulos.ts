@@ -87,7 +87,7 @@ export const MODULO_DE_RUTA: Record<string, Modulo> = {
   '/publicaciones': 'inventario',
   '/pagos-me':       'pagos_me',
   '/vincular-ml':    'inventario',
-  '/productos/mercadoenvios': 'descuento_ml',
+  '/productos/mercadoenvios': 'inventario',   // 14-11: los pesos son para todos (antes Descuento ML)
   '/productos/margenes':      'descuento_ml',
   '/productos/promociones':   'promociones',
   '/productos/catalogo':      'catalogo_pdf',

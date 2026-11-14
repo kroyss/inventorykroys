@@ -4,6 +4,7 @@
 // Si pesan distinto (pack sin marcar «trae N u.» o vínculo mal hecho) no se toca y MercadoEnvíos lo muestra para revisar.
 // Sin dato del portal: el peso cargado a mano. Así Promociones, precios, margen y Costos ML usan el mismo número.
 import type { Pool } from 'pg'
+import { estadoTraida, ocupada } from '@/lib/meTraida'
 
 export const PESOS_VINCULADOS = `
   SELECT pm.product_id, MIN(mp.peso_kg) AS mn, MAX(mp.peso_kg) AS mx,
@@ -48,4 +49,33 @@ export async function pesosDePublicaciones(db: Pick<Pool, 'query'>): Promise<num
     FROM pesos x
     WHERE x.product_id = p.id AND x.mn = x.mx AND x.mn <= 200 AND (p.weight_kg IS NULL OR p.weight_kg <= 0)`)
   return rowCount ?? 0
+}
+
+/** Los dos en orden (14-11): primero el peso real del portal (pisa al borrador) y después el de la publicación para los
+ *  que sigan sin peso. Se llama al crear, importar o vincular productos, al leer el catálogo y con «Traer pesos de ML»,
+ *  así un producto nuevo no se queda sin peso hasta la próxima traída de Pagos ME. Nunca rompe a quien la llama. */
+export async function pasarPesos(db: Pick<Pool, 'query'>, opc: { pedirME?: number } = {}): Promise<{ portal: number; publicacion: number }> {
+  const portal = await sincronizarPesos(db).catch(e => { console.error('[pesos portal]', e instanceof Error ? e.message : e); return 0 })
+  const publicacion = await pesosDePublicaciones(db).catch(e => { console.error('[pesos publicacion]', e instanceof Error ? e.message : e); return 0 })
+  if (opc.pedirME !== undefined) await pedirPesosSiFaltan(db, opc.pedirME).catch(e => console.error('[pesos pedir ME]', e instanceof Error ? e.message : e))
+  return { portal, publicacion }
+}
+
+/** Pide al programa de Pagos ME una traída CON pesos del portal (14-11, el dueño: el peso real solo llega así) cuando
+ *  hay publicaciones vinculadas que todavía no tienen peso del portal. Solo empresas de Venezuela con Pagos ME, sin
+ *  repetir: no si ya hay una traída en curso ni si se pidió una con pesos en los últimos 30 min. Al llegar los pesos,
+ *  el vigilante (api/pagos-me/vigilante/productos) los pasa a los productos. Devuelve true si la pidió. */
+export async function pedirPesosSiFaltan(db: Pick<Pool, 'query'>, usuarioId: number): Promise<boolean> {
+  const { rows: [r] } = await db.query(`
+    SELECT e.country = 'VE' AND 'pagos_me' = ANY(e.modulos) AS con_me,
+           EXISTS (SELECT 1 FROM product_ml_codes pm JOIN products p ON p.id = pm.product_id
+                   WHERE pm.is_active AND p.is_active AND pm.unidades = 1
+                     AND NOT EXISTS (SELECT 1 FROM me_productos mp
+                                     WHERE mp.publicacion = 'MLV' || split_part(pm.ml_code, ':', 1) AND mp.peso_kg > 0)) AS faltan,
+           EXISTS (SELECT 1 FROM me_pedidos WHERE pesos AND pedido_at > NOW() - INTERVAL '30 minutes') AS reciente
+    FROM empresas e WHERE e.id = NULLIF(current_setting('app.empresa_id', true), '')::int`)
+  if (!r?.con_me || !r.faltan || r.reciente) return false
+  if (ocupada(await estadoTraida(db))) return false
+  await db.query(`INSERT INTO me_pedidos (pedido_por, pesos) VALUES ($1, TRUE)`, [usuarioId])
+  return true
 }

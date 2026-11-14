@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pasarPesos } from '@/lib/pesosML'
 import { z } from 'zod'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
       const { rows: [p] } = await s.db.query(`SELECT id FROM products WHERE id = $1 AND is_active`, [body.product_id])
       if (!p) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
       await vincularCodigo(s.db, body.product_id, body.cuenta, body.codigo)
+      await pasarPesos(s.db, { pedirME: Number(s.session.user.id) })   // 14-11: el peso de ML llega al vincular (y se piden los del portal)
       return NextResponse.json({ ok: true })
     }
     const db = await requestConnection(s.db)

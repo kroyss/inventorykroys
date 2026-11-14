@@ -1,4 +1,4 @@
-import { PESOS_VINCULADOS, SQL_PESOS_DISTINTOS } from '@/lib/pesosML'
+import { PESOS_VINCULADOS, SQL_PESOS_DISTINTOS, pasarPesos } from '@/lib/pesosML'
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { z } from 'zod'
@@ -163,6 +163,7 @@ export async function PUT(
       await db.query('ROLLBACK')
       throw e
     }
+    if (body.ml_codes?.length) await pasarPesos(db, { pedirME: Number(session.user.id) })   // 14-11: el peso de ML llega al vincular
 
     return NextResponse.json({ ok: true })
   } catch (err) {

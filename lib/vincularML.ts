@@ -1,4 +1,5 @@
 // Vincular publicaciones de ML (20-10, migración 109; pantalla /vincular-ml). Un empleado une cada publicación —o
+import { pasarPesos } from '@/lib/pesosML'
 // cada VARIANTE: en este negocio cada color/modelo es un producto aparte ("Guantes - Azul")— con su producto, a mano
 // y de a una. El sistema solo SUGIERE (lib/importarML.ts: el producto parecido o el mismo SKU); no vincula nada solo.
 // Código guardado como siempre en product_ml_codes: "768007052" (publicación) o "768007052:180012345" (variante).
@@ -92,6 +93,7 @@ export async function vincular(db: Pool, productId: number, cuenta: string, codi
   await db.query(
     `UPDATE ml_vinculo_dudas SET resuelta_at = NOW(), resuelta_por = $2, resolucion = 'vinculada'
      WHERE codigo = $1 AND resuelta_at IS NULL`, [codigo, userId])
+  await pasarPesos(db, { pedirME: userId })   // 14-11: el peso de ML llega al vincular (y se piden los del portal)
 }
 
 /** Desvincula (se desactiva el código, no se borra: queda quién y cuándo). */

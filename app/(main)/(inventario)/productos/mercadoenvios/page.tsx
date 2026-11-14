@@ -15,8 +15,9 @@ export const metadata = { title: 'MercadoEnvíos' }
 export default async function MercadoEnviosPage() {
   const session = await getServerSession(authOptions)
   if (!session || !puede(session.user, 'ver_productos')) redirect('/dashboard')
-  // Función exclusiva de VE (tabla de envíos por peso de ML Venezuela).
-  if (session.user.country !== 'VE' || !tieneModulo(session.user, 'descuento_ml')) redirect('/productos')
+  // Función exclusiva de VE (tabla de envíos por peso de ML Venezuela). 14-11: para todos con Inventario; el
+  // descuento máximo y el aplicado solo se muestran con el módulo Descuento ML.
+  if (session.user.country !== 'VE' || !tieneModulo(session.user, 'inventario')) redirect('/productos')
 
   const db = dbDeSesion(session)
   // 12-11 (rapidez): solo las columnas que usa la pantalla (antes 17 por producto: 769 KB de HTML).
@@ -40,6 +41,6 @@ export default async function MercadoEnviosPage() {
   // 12-11 (rapidez): tasa y Ajustes en el HTML.
   return <>
     <PublicacionesMLTabs user={session.user} actual="envios" />
-    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} pagosME={tieneModulo(session.user, 'pagos_me')} />
+    <MercadoEnviosClient initialProducts={productsRes.rows as Product[]} inicialTasa={await tasaYAjustes()} pagosME={tieneModulo(session.user, 'pagos_me')} descuento={tieneModulo(session.user, 'descuento_ml')} />
   </>
 }

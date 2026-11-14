@@ -838,7 +838,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   2. **Crea tus productos:** en Productos → «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones
      su costo; cada una queda como producto ya vinculado. También se crean a mano con **+ Producto** (nombre, costo y
      % de ganancia con el medidor; el precio se calcula solo).
-  - **Pon el peso de tus productos** (Venezuela, con la tabla de MercadoEnvíos; dice cuántos faltan): en Productos →
+  - **Pon el peso de tus productos** (Venezuela; dice cuántos faltan): en Productos →
      MercadoEnvíos, **Traer pesos de ML** llena los que no tienen con el de su publicación (revísalos en «Por revisar»);
      los que falten se escriben a mano. Se marca hecho cuando todos los productos tienen peso.
   3. **Pon el stock que tienes hoy:** en Inventario, en cada producto **Ajustar** y escribes cuántas unidades tienes.
@@ -866,10 +866,12 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   del día. Se ve con la marca **ML** y no se edita a mano. **Sin Pagos ME** (o mientras no llega), el producto **sin
   peso** toma el «Peso del paquete» que declara su publicación de ML: queda **por revisar** (borde ámbar, «de la
   publicación», filtro **📝 Por revisar**), porque es lo que se cargó en ML y a veces no es el real; se corrige
-  escribiendo el peso o se confirma con **✓**. El del portal lo reemplaza cuando llega. Esto pasa solo al importar
-  productos y al leer el catálogo, y de una vez con el botón **⬇ Traer pesos de ML** (en MercadoEnvíos): llena los que
-  no tienen peso y, si tienes Pagos ME, pide además los pesos reales del portal (llegan en 1 a 3 minutos con la PC
-  prendida). Nunca pisa un peso que ya tenías. A mano solo los productos que ML no da. **Pesos distintos
+  escribiendo el peso o se confirma con **✓**. El del portal lo reemplaza cuando llega. Esto pasa **solo** al crear,
+  importar o vincular un producto (el peso llega en el mismo momento) y al leer el catálogo; si tienes Pagos ME y a
+  alguna publicación vinculada le falta el peso del portal, el sistema **pide solo** una traída de pesos (llegan en 1 a
+  3 minutos con la PC prendida; no se repite si ya se pidió en la última media hora). También de una vez con el botón
+  **⬇ Traer pesos de ML** (en MercadoEnvíos). Nunca pisa un peso que ya tenías. MercadoEnvíos está para toda empresa
+  de Venezuela con Inventario; el descuento máximo y el aplicado se ven solo con el módulo Descuento ML. A mano solo los productos que ML no da. **Pesos distintos
   en ML** = sus publicaciones pesan distinto en el portal: casi siempre un pack sin marcar «trae N u.» o un vínculo mal
   hecho; se revisa en Vincular o Stock, o se **elige con un clic** uno de los pesos que trae ML (en MercadoEnvíos o en la
   ficha del producto). Precios, margen, Promociones y Costos ML usan ese mismo peso.

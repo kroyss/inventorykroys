@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pasarPesos } from '@/lib/pesosML'
 import { z } from 'zod'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { requestConnection } from '@/lib/requestConnection'
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
         )
       }
       await db.query('COMMIT')
+      if (body.ml_codes?.some(c => c.code.trim())) await pasarPesos(db, { pedirME: Number(session.user.id) })   // 14-11: el peso de ML llega al vincular
 
       const { rows } = await db.query(
         `${PRODUCTS_SQL.replace('ORDER BY p.is_active DESC, p.name', 'WHERE p.id = $1')}`,
