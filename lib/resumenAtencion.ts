@@ -20,8 +20,12 @@ export interface CifrasAtencion {
 }
 export interface ResumenAtencion { dias: number; actual: CifrasAtencion; anterior: CifrasAtencion }
 
-async function cifras(db: Pool, desde: number, hasta: number): Promise<CifrasAtencion> {
-  // Ventana [NOW() - desde días, NOW() - hasta días)
+// Ventana sobre la columna `fecha`: por días hacia atrás (resumenAtencion) o por fechas (Inicio, atencionEntre).
+const POR_DIAS = `fecha >= NOW() - make_interval(days => $1) AND fecha < NOW() - make_interval(days => $2)`
+const POR_FECHAS = `fecha >= $1::date AND fecha < $2::date + 1`
+
+async function cifras(db: Pool, desde: number | string, hasta: number | string): Promise<CifrasAtencion> {
+  const W = typeof desde === 'number' ? POR_DIAS : POR_FECHAS
   const { rows: [q] } = await db.query(
     `SELECT COUNT(*)::int AS preguntas, COUNT(respuesta_fecha)::int AS respondidas,
             COUNT(*) FILTER (WHERE respondida_por IS NOT NULL)::int AS por_sistema,
@@ -29,17 +33,17 @@ async function cifras(db: Pool, desde: number, hasta: number): Promise<CifrasAte
             percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM respuesta_fecha - fecha) / 60)
               FILTER (WHERE respuesta_fecha IS NOT NULL AND respuesta_fecha >= fecha) AS mediana
      FROM ml_preguntas
-     WHERE fecha >= NOW() - make_interval(days => $1) AND fecha < NOW() - make_interval(days => $2)`, [desde, hasta])
+     WHERE ${W}`, [desde, hasta])
   const { rows: [o] } = await db.query(
     // La IA automática anota 'ia_auto' (lib/iaAutomatica.ts); 'automatica' son las respuestas rápidas automáticas.
     `SELECT COUNT(*) FILTER (WHERE modulo = 'preguntas' AND fuente = 'ia_auto')::int AS por_ia,
             COUNT(*) FILTER (WHERE modulo = 'mensajes')::int AS mensajes
      FROM respuestas_origen
-     WHERE fecha >= NOW() - make_interval(days => $1) AND fecha < NOW() - make_interval(days => $2)`, [desde, hasta])
+     WHERE ${W}`, [desde, hasta])
   const { rows: [v] } = await db.query(
     `SELECT COUNT(*)::int AS ventas FROM ml_ordenes
      WHERE COALESCE(estado, '') <> 'cancelled'
-       AND fecha >= NOW() - make_interval(days => $1) AND fecha < NOW() - make_interval(days => $2)`, [desde, hasta])
+       AND ${W}`, [desde, hasta])
   return {
     preguntas: q.preguntas, respondidas: q.respondidas, porSistema: q.por_sistema, rapidas: q.rapidas,
     mediana: q.mediana == null ? null : Math.round(Number(q.mediana)),
@@ -51,6 +55,12 @@ async function cifras(db: Pool, desde: number, hasta: number): Promise<CifrasAte
 export async function resumenAtencion(db: Pool, dias: number): Promise<ResumenAtencion> {
   const [actual, anterior] = await Promise.all([cifras(db, dias, 0), cifras(db, dias * 2, dias)])
   return { dias, actual, anterior }
+}
+
+/** Inicio (14-11): entre dos fechas del país (incluidas) contra otras dos. */
+export async function atencionEntre(db: Pool, r: { desde: string; hasta: string; antesDesde: string; antesHasta: string }) {
+  const [actual, anterior] = await Promise.all([cifras(db, r.desde, r.hasta), cifras(db, r.antesDesde, r.antesHasta)])
+  return { actual, anterior }
 }
 
 /** "12 min" · "1,5 h" · "2 días" */

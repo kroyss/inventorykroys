@@ -14,6 +14,7 @@ import BonusPipeline from './BonusPipeline'
 import RateBar from './RateBar'
 import { DateField } from '@/components/ui/DateField'
 import AvisoStockVerificar from './AvisoStockVerificar'
+import BloquesInicio from './BloquesInicio'
 import { usePorConfirmar, pendientesPorConfirmar, NumeroBoton } from '@/components/ventas/PorConfirmar'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
@@ -50,10 +51,10 @@ const money = (n: number) =>
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
-export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, metricas = false, inicial }: {
+export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, importaciones, analisisStock, etapas = true, categorias = true, porConfirmar = false, reportes = false, inicial }: {
   inicial?: { summary: Summary | null; chart: ChartData | null }   // 12-11: lo que ya vino en el HTML (lib/inicial.ts)
   country: Country; bonos: boolean; puedeTasas: boolean
-  metricas?: boolean       // módulo metricas (08-11): botón a Reportes → Resumen
+  reportes?: boolean       // permiso Reportes: «Ver todos» de Más vendidos y «Se están cayendo» (14-11, el Resumen vive aquí)
   porConfirmar?: boolean   // cuentas de ML conectadas: botón "Por confirmar" (principal) + "Nueva venta"
   etapas?: boolean   // módulo compras_etapas (sin él no hay compras en tránsito)
   categorias?: boolean   // módulo precios_categorias (sin él no se muestra el exceso)
@@ -153,7 +154,6 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
               Por confirmar<NumeroBoton n={pendientesPorConfirmar(pc.datos)} cargando={!pc.datos} />
             </Link>
           )}
-          {metricas && <Link href="/reportes?tab=resumen" className="btn-secondary text-sm whitespace-nowrap" title="Ventas, ganancia, cuentas de ML, productos y atención con período contra el anterior">Métricas</Link>}
           <Link href="/ventas?new=1" className={`${porConfirmar ? 'btn-secondary' : 'btn-primary'} text-sm whitespace-nowrap`}>Nueva venta</Link>
           {!importaciones ? (
             <Link href="/compras?new=1" className="btn-secondary text-sm">Nueva compra</Link>
@@ -264,6 +264,11 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
                 <span className="w-2 h-2 rounded-full bg-lime-500" /> Ventas concretadas
               </div>
               <div className="text-xl font-bold text-neutral-900 mt-0.5">{chart.summary.cantidad} <span className="text-sm text-neutral-400">ventas</span></div>
+              {chart.summary.cantidad > 0 && (
+                <div className="text-xs mt-0.5 text-neutral-500" title="Lo que deja en promedio cada venta (vendido ÷ ventas)">
+                  Ticket promedio ${money(chart.summary.ventas / chart.summary.cantidad)}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -287,6 +292,10 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
           <div className="text-neutral-400 text-sm text-center py-12">Sin datos en el período</div>
         )}
       </div>
+
+      {/* 14-11: lo que era Reportes → Resumen, con el mismo período del gráfico */}
+      <BloquesInicio period={period} dateFrom={period === 'custom' ? dateFrom : undefined} dateTo={period === 'custom' ? dateTo : undefined}
+        reportes={reportes} cayendo={reportes && analisisStock} />
     </div>
   )
 }

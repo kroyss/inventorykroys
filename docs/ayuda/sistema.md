@@ -802,6 +802,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Roles:** *Administrador* = todo, incluidos Usuarios y Ajustes. *Usuario* = lo que le marques en **Permisos**.
 - **Permisos:** secciones que ve (Preguntas, Mensajes, Despachos…) y acciones (ver costos, editar compras, configurar
   automatizaciones…). «Volver a lo predeterminado» lo deja como al inicio.
+  Con el módulo de Bonos, **Ver el bono del mes** decide quién ve la barra de bonos en su Inicio (viene marcado; se
+  quita a quien no deba verla). El administrador la ve siempre.
 - **Ver como:** te muestra el sistema exactamente como lo ve esa persona, sin poder guardar nada.
 - **Cambiar contraseña / Desactivar:** cierra las sesiones abiertas de esa persona. Al desactivar, su historial se
   conserva.
@@ -814,7 +816,17 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 
-- **Inicio:** cómo va tu negocio este mes (ventas, ganancia, sin stock, ventas pendientes).
+- **Inicio:** cómo va tu negocio. Arriba Nueva venta / Nueva compra / Por confirmar, la tasa (VE) y **Requiere
+  atención** (reposición, sin stock, stock bajo, borradores, en tránsito, remate: cada tarjeta lleva a su lista). Luego
+  el bono (si lo tienes) y el gráfico **Ventas, costos y ganancia** con los botones **Hoy / Mes / Trim. / Año** o
+  fechas: sus cifras (ventas, costos, ganancia, ventas concretadas y **ticket promedio**). **Esos mismos botones mandan
+  sobre todo lo de abajo**, siempre contra el período anterior (Mes = el mes pasado hasta el mismo día; Año = el año
+  pasado hasta el mismo día; fechas = los mismos días justo antes): **Más vendidos** (top 5 con barra y cuánto subió o
+  bajó; «Ver todos los productos y Excel» abre Reportes → Ventas → Por producto con esas fechas), **Por cuenta de
+  MercadoLibre**, **Se están cayendo** (cuántos, con «Ver en Stock»), **Atención en MercadoLibre** (preguntas, tiempo
+  de respuesta, cuántas respondió la IA, ventas por pregunta) y **Calificaciones**. Ganancia y costos solo con el
+  permiso de costos. Un empleado sin ese permiso pero con Reportes ve abajo, del mes, los más vendidos (en unidades),
+  atención y calificaciones. Lo que antes era Reportes → Resumen y el botón «Métricas» ahora está aquí.
   Si todavía no tienes productos vinculados con MercadoLibre, arriba sale **«Empieza tu inventario desde
   MercadoLibre»** con el botón para conectar tu cuenta o crear los productos desde tus publicaciones (la ✕ lo cierra).
 - **Fotos de los productos:** cada producto muestra su foto en Productos, Inventario, Compras, Importaciones y Ventas
@@ -901,20 +913,13 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   gratis, sale como «Pierde envío gratis» y no se manda. Para usar un % igual para todas toca «Usar mi propio %»
   (10% por defecto, lo subes tú). Las demás campañas de ML no traen sugerido (ML solo da el precio mínimo que acepta):
   ahí se usa tu %. Si pones menos de lo que pide ML, salen marcadas «ML pide al menos X%» y no se mandan.
-- **Reportes:** por período (ventas, compras, tránsito) o del estado actual del inventario; hoja de conteo físico. Ya no hay
-  pestaña «Top productos»: los más vendidos están en **Resumen → Más vendidos → Ver detalle y Excel**.
-- **Reportes → Resumen** (toda empresa con Inventario; también con el botón **Métricas** del Inicio): todo junto
-  para **7, 30, 90 días o 1 año** contra el período anterior del mismo largo: lo vendido, cantidad de ventas y
-  unidades, ticket promedio y **ganancia** (después de costo y comisión de ML; solo con el permiso de costos), un
-  gráfico día a día contra el período anterior, ventas **por cuenta de MercadoLibre**, **atención** (preguntas,
-  tiempo de respuesta, cuántas respondió sola la IA, ventas por pregunta), **calificaciones** recibidas (positivas,
-  neutrales, negativas, contradictorias), los **más vendidos** y los que **se están cayendo** (la misma regla de
-  Reportes → Stock, con enlace «Ver en Stock»). En **Más vendidos**, el botón **Ver detalle y Excel** abre un panel al
-  costado (sin salir del Resumen) con todos los productos vendidos en el período: ordenar por **Unidades, Venta o
-  Ganancia**, buscar, cuánto subió o bajó cada uno contra el período anterior, totales abajo y botón **Excel**. Costo,
-  comisión y ganancia solo con el permiso de costos. Se cierra con ✕ o Esc. Los demás bloques tienen enlace a su
-  reporte de detalle. Las ventas de ML se guardan unos 4 meses: con 1 año la
-  comparación por cuenta queda incompleta (lo avisa).
+- **Reportes:** el detalle con Excel. Dos grupos de pestañas: **por fechas** (Ventas, Compras) y **cómo estás hoy**
+  (Inventario, Stock, En tránsito, Conteos). El resumen del negocio ya no está aquí: está en el **Inicio**. Ya no
+  existen las pestañas Resumen, Top productos ni Atención ML (un enlace viejo lleva al Inicio o a Por producto).
+- **Reportes → Ventas** tiene dos vistas: **Por venta** (cada venta con total, costo, comisión y ganancia) y **Por
+  producto** (el top completo de las fechas elegidas): podio con los 3 primeros, el resto con barra, ordenar por
+  **Unidades, Venta o Ganancia**, cuánto subió o bajó cada uno contra los mismos días justo antes («nuevo» si antes
+  no vendía), qué % se llevan los 10 primeros, buscar, totales y **Excel**. Ganancia solo con el permiso de costos.
 - **Reportes → Stock** (toda empresa con Inventario): arriba 4 tarjetas que son los filtros: **Reponer** (cuántos y
   cuántos urgentes), **Se están cayendo**, **Parados** (con la plata que tienes sin moverse) y **Recién llegados**.
   Debajo, una frase explica la regla con tus números y cuántos productos «van bien».
@@ -933,11 +938,6 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 <!-- VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos -->
 
 
-**Reportes → Resumen → Atención en MercadoLibre** (en prueba, solo algunas empresas; necesita ver Preguntas): con el
-período elegido (7, 30, 90 días o 1 año) contra el anterior del mismo largo: preguntas recibidas y % respondido; tiempo
-de respuesta (la mitad se respondió en menos de ese tiempo, y cuántas en menos de 1 hora); cuántas respondió sola la IA;
-ventas de ML por pregunta. Verde = mejoró, rojo = empeoró (en el tiempo, bajar es lo bueno). Ya no hay pestaña
-«Atención ML» aparte: todo está en el Resumen.
 ---
 
 ## 16. Central de aprendizaje y Novedades

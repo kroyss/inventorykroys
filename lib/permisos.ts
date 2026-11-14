@@ -65,6 +65,9 @@ export const PERMISOS = {
                              detalle: 'Primeros pasos en Productos: crear y vincular productos a partir de las publicaciones (necesita ver Productos)' },
   promociones:             { tipo: 'accion', nombre: 'Promociones de MercadoLibre', usuario: false, modulo: 'promociones', soloVE: true,
                              detalle: 'Ver las campañas de ML, en cuáles está cada publicación y hasta dónde puede bajar el precio sin perder el envío gratis (necesita ver Productos)' },
+  // 14-11 (mig. 178): la barra de bonos del Inicio, por empleado (antes la veían todos los de la empresa con el módulo).
+  ver_bono:                { tipo: 'accion', nombre: 'Ver el bono del mes', usuario: true, modulo: 'bonos',
+                             detalle: 'La barra de bonos por ventas del mes en el Inicio' },
   pagos_me_config:         { tipo: 'accion', nombre: 'Configurar Pagos ME', usuario: false, modulo: 'pagos_me', soloVE: true,
                              detalle: 'Clave de MercadoEnvíos y horario automático' },
 } as const satisfies Record<string, DefPermiso>

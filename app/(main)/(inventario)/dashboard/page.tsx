@@ -17,7 +17,10 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   const country = session!.user.country
 
-  const bonos   = tieneModulo(session!.user, 'bonos')
+  // 14-11: el bono se ve con el módulo Y el permiso «Ver el bono» (cada empleado por separado; el admin siempre).
+  const bonos   = tieneModulo(session!.user, 'bonos') && puede(session!.user, 'ver_bono')
+  const reportes = puede(session!.user, 'ver_reportes')
+  const analisisStock = tieneModulo(session!.user, 'analisis_stock')
 
   const importaciones = tieneModulo(session!.user, 'importaciones')
   // "Por confirmar" (ventas de ML sin registrar): con el módulo de las cuentas de ML y permiso de Ventas.
@@ -34,12 +37,13 @@ export default async function DashboardPage() {
     return (<div className="space-y-4">{sugerencia}
     <DashboardAdmin inicial={{ summary, chart }} country={country} bonos={bonos} puedeTasas={esDuenoPlataforma(session!.user)}
       descuento={tieneModulo(session!.user, 'descuento_ml')} importaciones={importaciones}
-      analisisStock={tieneModulo(session!.user, 'analisis_stock')} etapas={tieneModulo(session!.user, 'compras_etapas')}
+      analisisStock={analisisStock} etapas={tieneModulo(session!.user, 'compras_etapas')}
       categorias={tieneModulo(session!.user, 'precios_categorias')} porConfirmar={porConfirmar}
-      metricas={tieneModulo(session!.user, 'metricas') && puede(session!.user, 'ver_reportes')} />
+      reportes={reportes} />
     </div>)
   }
   return <div className="space-y-4">{sugerencia}<DashboardUser country={country} bonos={bonos} importaciones={importaciones}
     verificarPagos={country !== 'VE' || tieneModulo(session!.user, 'verificar_pagos')} etapas={tieneModulo(session!.user, 'compras_etapas')}
-    porConfirmar={porConfirmar} despachos={tieneModulo(session!.user, 'despachos') && puede(session!.user, 'ver_despachos')} /></div>
+    porConfirmar={porConfirmar} despachos={tieneModulo(session!.user, 'despachos') && puede(session!.user, 'ver_despachos')}
+    reportes={reportes} cayendo={reportes && analisisStock} /></div>
 }

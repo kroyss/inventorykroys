@@ -1,5 +1,6 @@
 'use client'
-import ResumenMetricas from '@/components/reportes/ResumenMetricas'
+import PorProducto from '@/components/reportes/PorProducto'
+import { useRouter, useSearchParams } from 'next/navigation'
 import StockReport from '@/components/reportes/StockReport'
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import {
@@ -32,18 +33,23 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 // analisisStock: módulo. Sin él no están Stock (reposición/declive/remate, calibrado a importaciones)
 // ni Conteos (conteos físicos).
 // importaciones: módulo. Sin él no se ofrece el filtro Local/Importación (solo hay compras locales).
-// atencion: «Atención ML» (preguntas, respuestas, tiempo y ventas de ML; módulo atencion_ml, 08-11).
-// metricas: «Resumen» (módulo metricas, 08-11): todo junto con período contra el anterior; es la primera pestaña.
-export default function ReportesClient({ analisisStock, conteos = false, importaciones, despachaVE = false, metricas = false }: { analisisStock: boolean; conteos?: boolean; importaciones: boolean; despachaVE?: boolean; atencion?: boolean; metricas?: boolean }) {
-  const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', metricas ? 'resumen' : 'ventas')
-  // 14-11: «Atención ML» ya no es pestaña (sus números están en Resumen → Atención en MercadoLibre); un link viejo cae en Resumen.
-  // 14-11: «Top productos» pasó a Resumen → Más vendidos → Ver detalle; un link viejo (?tab=top) cae en Resumen.
-  const tab = tabGuardada === 'atencion' || tabGuardada === 'top' ? (metricas ? 'resumen' : 'ventas')
-    : (!analisisStock && tabGuardada === 'stock') || (!conteos && tabGuardada === 'conteos') || (!metricas && tabGuardada === 'resumen') ? 'ventas' : tabGuardada
+// 14-11 (el dueño: "cada pantalla, una pregunta"): Reportes = detalle y Excel. El Resumen se unió al Inicio (mismo
+// período que el gráfico); «Top productos» es Ventas → «Por producto». Links viejos: ?tab=resumen y ?tab=atencion
+// van al Inicio; ?tab=top abre Ventas → Por producto; una pestaña recordada que ya no existe cae en Ventas.
+export default function ReportesClient({ analisisStock, conteos = false, importaciones, despachaVE = false }: { analisisStock: boolean; conteos?: boolean; importaciones: boolean; despachaVE?: boolean }) {
+  const router = useRouter()
+  const sp = useSearchParams()
+  const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', 'ventas')
+  const tab: Tab = tabGuardada === 'resumen' || tabGuardada === 'atencion' || tabGuardada === 'top'
+    || (!analisisStock && tabGuardada === 'stock') || (!conteos && tabGuardada === 'conteos') ? 'ventas' : tabGuardada
+  // Ventas: «Por venta» (la lista) o «Por producto» (el top, con las mismas fechas).
+  const [vista, setVista] = useState<'venta' | 'producto'>(sp.get('vista') === 'producto' || sp.get('tab')?.toLowerCase() === 'top' ? 'producto' : 'venta')
   const stateTabs = STATE_TABS.filter(t => (analisisStock || t.key !== 'stock') && (conteos || t.key !== 'conteos'))
-  const [preset,   setPreset]   = useState<DatePreset>('last90')
-  const [dateFrom, setDateFrom] = useState(presetRange('last90').from)
-  const [dateTo,   setDateTo]   = useState(presetRange('last90').to)
+  // ?desde=&hasta= (los manda el Inicio en «Ver todos los productos»): ese mismo período.
+  const fechasUrl = /^\d{4}-\d{2}-\d{2}$/.test(sp.get('desde') ?? '') && /^\d{4}-\d{2}-\d{2}$/.test(sp.get('hasta') ?? '') && sp.get('desde')! <= sp.get('hasta')!
+  const [preset,   setPreset]   = useState<DatePreset>(fechasUrl ? 'custom' : 'last90')
+  const [dateFrom, setDateFrom] = useState(fechasUrl ? sp.get('desde')! : presetRange('last90').from)
+  const [dateTo,   setDateTo]   = useState(fechasUrl ? sp.get('hasta')! : presetRange('last90').to)
   const [data,     setData]     = useState<any>(null)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
@@ -61,10 +67,15 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
   // se re-aplican si cambia la URL sin desmontar la pantalla.
   const [urlTab] = useDeepLinkParam('tab', REPORT_TABS)
   const [urlSub] = useDeepLinkParam('sub', STOCK_SUBS)
-  useEffect(() => { if (urlTab) setTab(urlTab.toLowerCase() as Tab) }, [urlTab])
+  useEffect(() => {
+    if (!urlTab) return
+    if (urlTab === 'RESUMEN' || urlTab === 'ATENCION') { router.replace('/dashboard'); return }
+    if (urlTab === 'TOP') { setTab('ventas'); setVista('producto'); return }
+    setTab(urlTab.toLowerCase() as Tab)
+  }, [urlTab]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (urlSub) setStockSub(urlSub.toLowerCase() as typeof stockSub) }, [urlSub])
 
-  useEffect(() => { load() }, [tab, dateFrom, dateTo])
+  useEffect(() => { load() }, [tab, dateFrom, dateTo, vista])
 
   const handlePreset = (p: DatePreset) => {
     setPreset(p)
@@ -80,13 +91,13 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
     const myId = ++reqIdRef.current
     setLoading(true); setError(null); setData(null); setSearch('')
     let url = ''
-    if (tab === 'ventas')      url = `/api/reports/sales?date_from=${dateFrom}&date_to=${dateTo}`
+    if (tab === 'ventas' && vista === 'venta') url = `/api/reports/sales?date_from=${dateFrom}&date_to=${dateTo}`
     if (tab === 'compras')     url = `/api/reports/purchases?date_from=${dateFrom}&date_to=${dateTo}`
     if (tab === 'inventario')  url = `/api/reports/inventory`
     if (tab === 'stock')       url = `/api/reports/stock-analysis`
     if (tab === 'transito')    url = `/api/reports/in-transit`
     if (tab === 'conteos')     url = `/api/reports/counts`
-    if (!url) { setLoading(false); return }       // Atención ML carga sola (ResumenAtencion)
+    if (!url) { setLoading(false); return }       // Ventas → Por producto carga solo (PorProducto)
     try {
       const res = await fetch(url)
       if (myId !== reqIdRef.current) return        // respuesta obsoleta: la ignora
@@ -103,15 +114,23 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Reportes" subtitle="Por período (ventas, compras, más vendidos) o del estado actual del inventario" />
+      <PageHeader title="Reportes" subtitle="El detalle con Excel: ventas y compras por fechas, y cómo está tu inventario hoy. El resumen del negocio está en el Inicio." />
       {/* pestañas en dos grupos: por período | estado actual */}
       <Tabs value={tab} onChange={t => { setData(null); setTab(t) }} items={[
-        ...(metricas ? [{ value: 'resumen' as Tab, label: 'Resumen', group: 'periodo' }] : []),
         ...PERIOD_TABS.map(t => ({ value: t.key, label: t.label, group: 'periodo' })),
         ...stateTabs.map(t => ({ value: t.key, label: t.label, group: 'estado' })),
       ]} />
 
       {/* date filters */}
+      {tab === 'ventas' && (
+        <div role="tablist" aria-label="Ver ventas" className="inline-flex rounded-lg bg-neutral-100 p-0.5">
+          {([['venta', 'Por venta'], ['producto', 'Por producto']] as const).map(([k, t]) => (
+            <button key={k} type="button" role="tab" aria-selected={vista === k} onClick={() => { setData(null); setVista(k) }}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${vista === k ? 'bg-white font-medium text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'}`}>{t}</button>
+          ))}
+        </div>
+      )}
+
       {needsDates && (
         <div className="space-y-2">
           <DateRangeBar
@@ -125,7 +144,8 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded">{error}</div>}
       {loading && <Cargando />}
 
-      {!loading && data && tab === 'ventas'     && data.sales       && (
+      {tab === 'ventas' && vista === 'producto' && <PorProducto key={`${dateFrom}_${dateTo}`} dateFrom={dateFrom} dateTo={dateTo} />}
+      {!loading && data && tab === 'ventas' && vista === 'venta' && data.sales && (
         <SalesReport data={data} search={search} setSearch={setSearch} statusF={ventaStatus} setStatusF={setVentaStatus} despachaVE={despachaVE} />
       )}
       {!loading && data && tab === 'compras'    && data.purchases   && (
@@ -137,7 +157,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
       {!loading && data && tab === 'stock'      && data.reposicion  && (
         <StockReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} />
       )}
-      {tab === 'resumen' && <ResumenMetricas />}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
         <InTransitReport rows={data} tipo={importaciones ? transTipo : ''} setTipo={setTransTipo} importaciones={importaciones} />
       )}

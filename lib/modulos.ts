@@ -62,7 +62,7 @@ export const MODULOS = {
   catalogo_pdf:       'Catálogo PDF: armar un catálogo con logo, fotos y precios (o sin precios) para mandar por WhatsApp (Productos)',
   // 08-11 (migración 153): Ventas → Presupuestos (cotización imprimible; aceptado → venta) y Reportes → Resumen.
   presupuestos:       'Presupuestos: cotizaciones imprimibles con logo (cliente, productos, validez); aceptado se pasa a venta (Ventas)',
-  metricas:           'Métricas: Reportes → Resumen con período (7/30/90 días, 1 año) contra el anterior: ventas, ganancia, cuentas de ML, productos, atención y calificaciones',
+  metricas:           'Métricas: en el Inicio, con el período del gráfico contra el anterior: más vendidos, cuentas de ML, atención y calificaciones',
 } as const
 
 export type Modulo = keyof typeof MODULOS

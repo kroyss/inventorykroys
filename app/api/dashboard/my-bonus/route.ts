@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
-import { getSessionDb, unauthorized } from '@/lib/session'
+import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { puede } from '@/lib/permisos'
 import { parseBonusPhases } from '@/lib/bonus'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
+  if (!puede(session.user, 'ver_bono')) return forbidden()
 
   try {
     const [{ rows: [r1] }, { rows: [r2] }, { rows: cfg }] = await Promise.all([

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from '@/components/ui/Link'
 import type { Country } from '@/lib/types'
 import BonusPipeline from './BonusPipeline'
+import BloquesInicio from './BloquesInicio'
 import SalesMiniChart from './SalesMiniChart'
 import { parseLocalDate } from '@/lib/tz'
 import AvisoStockVerificar from './AvisoStockVerificar'
@@ -41,7 +42,9 @@ interface Rate {
 const fmt = (n: number) =>
   Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
-export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true, porConfirmar = false, despachos = false }: {
+export default function DashboardUser({ country, bonos, importaciones, verificarPagos = true, etapas = true, porConfirmar = false, despachos = false, reportes = false, cayendo = false }: {
+  reportes?: boolean         // 14-11: con permiso Reportes (sin costos) ve abajo lo que no muestra plata, del mes
+  cayendo?: boolean          // y Reportes → Stock disponible
   despachos?: boolean        // módulo y permiso de Despachos: "Por descargar" lleva ahí (las guías por generar)
   country: Country; bonos: boolean; importaciones: boolean
   porConfirmar?: boolean     // cuentas de ML conectadas: tarjeta "Por confirmar" (lo normal) antes de "Nueva venta"
@@ -150,6 +153,13 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
             </div>
           )}
         </Panel>
+      )}
+
+      {reportes && (
+        <div className="space-y-2">
+          <p className="text-xs text-neutral-500">Este mes</p>
+          <BloquesInicio period="month" reportes cayendo={cayendo} />
+        </div>
       )}
     </div>
   )
