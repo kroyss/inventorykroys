@@ -150,7 +150,7 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Inicio" subtitle="Cómo va tu negocio este mes" actions={
+      <PageHeader title="Inicio" subtitle={country === 'VE' ? <RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} /> : 'Cómo va tu negocio'} actions={
         <>
           {porConfirmar && (
             <Link href="/ventas?vista=confirmar" className="btn-secondary text-sm whitespace-nowrap" title="Ventas de MercadoLibre que todavía no están registradas">
@@ -176,8 +176,6 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
           </div>}
         </>
       } />
-
-      {country === 'VE' && <RateBar puedeActualizar={puedeTasas} descuento={descuento} exceso={categorias} />}
 
       <AvisoStockVerificar n={summary.por_verificar ?? 0} />
 

@@ -12,13 +12,14 @@ interface Rate {
   source: string
 }
 
-const fmt = (n: number) =>
-  Math.round(Number(n)).toLocaleString('de-DE')
+const fmt = (n: number) => Math.round(Number(n)).toLocaleString('de-DE')
+const pct = (n: number) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 2 })
 
-// descuento: módulo Descuento ML. Sin él no se muestra el descuento sugerido (solo tasas y exceso).
+// 14-11 (el dueño: "estas 2 líneas podrían ser una sola"): la tasa va como subtítulo del Inicio, en una línea, sin
+// caja propia. Solo <span> (vive dentro del <p> del PageHeader). En el celular se acomoda en dos renglones.
+// descuento: módulo Descuento ML (sin él no se muestra el sugerido) · exceso: módulo precios_categorias.
 export default function RateBar({ puedeActualizar = false, descuento = true, exceso = true }: {
-  puedeActualizar?: boolean; descuento?: boolean
-  exceso?: boolean   // módulo precios_categorias: sin él (Inventario simple) no hay exceso
+  puedeActualizar?: boolean; descuento?: boolean; exceso?: boolean
 }) {
   const [rate, setRate] = useState<Rate | null>(null)
   const [busy, setBusy] = useState(false)
@@ -32,35 +33,33 @@ export default function RateBar({ puedeActualizar = false, descuento = true, exc
     finally { setBusy(false) }
   }
 
-  if (!rate) return null
+  if (!rate) return <span className="inline-block h-4 w-72 max-w-full animate-pulse rounded bg-neutral-100 align-middle" aria-hidden />
 
+  const Dato = ({ t, v }: { t: string; v: string }) => <span className="whitespace-nowrap">{t} <b className="num font-medium text-neutral-700">{v}</b></span>
+  const sep = <span className="text-neutral-300" aria-hidden>·</span>
   return (
-    <div className="bg-white border border-neutral-200 shadow-sm rounded-xl px-4 py-3 text-sm flex flex-col md:flex-row md:items-center gap-3">
-      {/* Descuento sugerido destacado */}
-      {descuento && <div className="flex items-center gap-2 shrink-0">
-        <span className="text-sm font-medium text-neutral-500">Descuento ML sugerido</span>
-        <span className="text-2xl font-semibold tracking-tight text-neutral-900 num">{rate.recommended_discount}%</span>
-      </div>}
-
-      {/* Detalles — envuelven en móvil */}
-      <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-neutral-600 ${descuento ? 'md:border-l md:border-neutral-200 md:pl-4' : ''}`}>
-        <span>Oficial: <span className="font-semibold text-neutral-800">Bs {fmt(rate.official_rate)}</span></span>
-        <span>Paralelo: <span className="font-semibold text-neutral-800">Bs {fmt(rate.parallel_rate)}</span></span>
-        {rate.rate_date && (
-          <span className="text-neutral-400 text-xs">al {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE')}</span>
-        )}
-        <span>Spread: <span className="font-semibold text-neutral-800">{rate.spread_percentage}%</span></span>
-        {exceso && <span>Exceso: <span className="font-semibold text-neutral-800">{rate.excess_percentage}%</span></span>}
-      </div>
-
-      {/* La tasa es común a todas las empresas: solo la actualiza el dueño de la plataforma
-          (para el resto la actualiza el cron varias veces al día). */}
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-neutral-500">
+      {descuento && <>
+        <span className="whitespace-nowrap" title="Descuento a poner en MercadoLibre para no perder por la diferencia entre la tasa oficial y la paralela">
+          Descuento ML <b className="num font-semibold text-neutral-900">{pct(rate.recommended_discount)}%</b>
+        </span>
+        {sep}
+      </>}
+      <Dato t="Oficial" v={`Bs ${fmt(rate.official_rate)}`} />{sep}
+      <Dato t="Paralelo" v={`Bs ${fmt(rate.parallel_rate)}`} />{sep}
+      <Dato t="Spread" v={`${pct(rate.spread_percentage)}%`} />
+      {exceso && <>{sep}<Dato t="Exceso" v={`${pct(rate.excess_percentage)}%`} /></>}
+      {rate.rate_date && <>{sep}<span className="whitespace-nowrap text-xs text-neutral-400">al {parseLocalDate(rate.rate_date).toLocaleDateString('es-VE', { day: 'numeric', month: 'numeric' })}</span></>}
+      {/* La tasa es común a todas las empresas: solo la actualiza el dueño de la plataforma (al resto, el cron). */}
       {puedeActualizar && (
-        <button onClick={fetchBcv} disabled={busy}
-          className="btn-secondary w-full md:w-auto md:ml-auto shrink-0 py-1.5">
-          {busy ? 'Actualizando…' : 'Actualizar BCV'}
+        <button type="button" onClick={fetchBcv} disabled={busy} title="Actualizar BCV" aria-label="Actualizar BCV"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 disabled:opacity-60">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden>
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
+          </svg>
         </button>
       )}
-    </div>
+    </span>
   )
 }
