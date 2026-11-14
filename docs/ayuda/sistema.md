@@ -843,9 +843,13 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
      stock sube solo.
   6. **Mira cuánto ganas:** cuando una venta queda procesada, el Inicio muestra ventas, costos y ganancia, los más
      vendidos y qué reponer; el detalle con Excel está en Reportes.
-  El paso que sigue queda resaltado y abierto. **Ocultar guía** la esconde para toda la empresa. Al completar todo
-  sale «Listo: ya usas tu inventario completo» con **Cerrar guía**. Reemplaza al aviso «Empieza tu inventario desde
-  MercadoLibre».
+  Ocupa poco: muestra **un paso a la vez** («Paso 2 de 6», con puntos de avance), su explicación y el botón para ir;
+  al hacerlo pasa sola al siguiente. **Ver todos** despliega la lista completa con lo hecho marcado. Al final hay una
+  **recomendación** que no hace falta para terminar: conocer **Publicaciones** y **Reportes** en el Manual de
+  Inventario (Aprendizaje → Manuales). **Ocultar** pregunta antes y la esconde para toda la empresa; se vuelve a abrir
+  cuando quieras desde **Aprendizaje → Manuales → Manual de Inventario → «Ver la guía de Primeros pasos»**. Al
+  completar todo sale «Listo» con la recomendación y **Cerrar guía**. Los productos creados a mano también cuentan
+  para el paso 2 (no hace falta importarlos desde ML).
 - **Fotos de los productos:** cada producto muestra su foto en Productos, Inventario, Compras, Importaciones y Ventas
   (al tocarla se ve grande). Sale sola de la publicación de ML vinculada (si es una variante, la foto de ese color o
   modelo; si está en varias publicaciones, la activa con más stock). En la ficha del producto: **Cambiar foto** (o
@@ -962,6 +966,10 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 *Cómo lo pregunta la gente:* videos, tutoriales, cómo se usa, qué hay de nuevo.
 
 - **Central de aprendizaje** (menú Aprendizaje): videos cortos paso a paso; guarda por dónde vas en cada uno. Los videos nuevos o con versión nueva muestran «Nuevo» durante 14 días.
+- **Manuales** (arriba en Aprendizaje): el **Manual de Inventario** (para empresas con Inventario) explica cada pantalla
+  —Para empezar, Inicio, Productos, Publicaciones, Ventas, Inventario, Compras, Reportes y Ajustes— con capturas (se
+  abren grandes al tocarlas), índice y buscador. Dice lo mismo que el asistente de Ayuda (salen del mismo texto) y
+  trae el botón **Ver la guía de Primeros pasos** para volver a mostrar la guía en el Inicio si la ocultaste.
   **Cuando un video explica lo que preguntan, recomiéndalo** (además de responder), con su título:
 
   | Video | Qué enseña | Secciones |
