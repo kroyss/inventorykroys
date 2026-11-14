@@ -1,6 +1,7 @@
 'use client'
 
 import { parseShippingTable, shippingThresholdVE, shippingCostVE } from '@/lib/mlShipping'
+import { umbralesDe, nivelDe, NIVEL, type Umbrales } from '@/lib/salud'
 
 // Cascada "lo que realmente te queda" después de ML — una sola fuente de verdad
 // para Productos (nuevo/edición/vista) y la calculadora de Ajustes, así nunca
@@ -15,10 +16,10 @@ const num = (ml: Record<string, string>, k: string, d: number) => {
   const v = parseFloat(ml?.[k]); return isNaN(v) ? d : v
 }
 
-// Color/estado del margen NETO sobre venta: sano ≥20%, ajustado ≥8%, muy fino ≥0, pérdida <0.
-const netColor = (m: number) => m >= 20 ? 'text-green-600' : m >= 8 ? 'text-amber-600' : m >= 0 ? 'text-amber-600' : 'text-red-600'
-const netBg    = (m: number) => m >= 20 ? 'bg-emerald-50 border-emerald-300' : m >= 8 ? 'bg-amber-50 border-amber-300' : m >= 0 ? 'bg-amber-50 border-amber-300' : 'bg-red-50 border-red-300'
-const netFlag  = (m: number) => m >= 20 ? '✅ Sano' : m >= 8 ? '⚠️ Ajustado' : m >= 0 ? '⚠️ Muy fino' : '🔴 Pérdida'
+// Color/estado del margen NETO sobre venta (14-11): sana / ajustada / pérdida, con los % de la empresa (lib/salud.ts).
+const netColor = (m: number, u: Umbrales) => NIVEL[nivelDe(m, u)].texto
+const netBg    = (m: number, u: Umbrales) => NIVEL[nivelDe(m, u)].fondo
+const netFlag  = (m: number, u: Umbrales) => { const n = NIVEL[nivelDe(m, u)]; return `${n.icono} ${n.nombre}` }
 
 function Row({ label, value, neg, sub }: { label: string; value: string; neg?: boolean; sub?: string }) {
   return (
@@ -47,6 +48,7 @@ export interface MlBreakdownProps {
 }
 
 export default function MlBreakdown(p: MlBreakdownProps) {
+  const u = umbralesDe(p.ml)
   // ───────── Colombia ─────────
   if (p.country === 'CO') {
     const price = p.salePrice ?? 0
@@ -73,14 +75,14 @@ export default function MlBreakdown(p: MlBreakdownProps) {
           <Row label={`− Retención (${retenPct}%)`} value={`−$${fmtPeso(reten)}`} neg />
           <Row label="− Tu costo (×TRM)" value={`−$${fmtPeso(costoPesos)}`} neg />
         </div>
-        <div className={`rounded-lg p-2.5 border-2 ${netBg(margen)} flex items-center justify-between`}>
+        <div className={`rounded-lg p-2.5 border-2 ${netBg(margen, u)} flex items-center justify-between`}>
           <div>
-            <p className={`text-xs font-semibold ${netColor(margen)}`}>Ganancia neta · {netFlag(margen)}</p>
+            <p className={`text-xs font-semibold ${netColor(margen, u)}`}>Ganancia neta · {netFlag(margen, u)}</p>
             <p className="text-[10px] text-neutral-500">{margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta · {costPct >= 0 ? '+' : ''}{costPct.toFixed(1)}% sobre costo</p>
           </div>
-          <span className={`text-lg font-bold ${netColor(margen)}`}>${fmtPeso(ganancia)}</span>
+          <span className={`text-lg font-bold ${netColor(margen, u)}`}>${fmtPeso(ganancia)}</span>
         </div>
-        <p className="text-[10px] text-neutral-400 px-1">Comisión, envío y retención ajustables en Ajustes.</p>
+        <p className="text-[10px] text-neutral-400 px-1">Comisión, envío, retención y colores en Productos → Costos ML.</p>
       </div>
     )
   }
@@ -116,14 +118,14 @@ export default function MlBreakdown(p: MlBreakdownProps) {
           sub={`gratis desde $${fmtUsd(umbral)}${porPeso ? ' por peso' : ' (sin peso)'}`} />
         <Row label="− Tu costo" value={`−$${fmtUsd(p.totalCost)}`} neg />
       </div>
-      <div className={`rounded-lg p-2.5 border-2 ${netBg(margen)} flex items-center justify-between`}>
+      <div className={`rounded-lg p-2.5 border-2 ${netBg(margen, u)} flex items-center justify-between`}>
         <div>
-          <p className={`text-xs font-semibold ${netColor(margen)}`}>Ganancia neta · {netFlag(margen)}</p>
+          <p className={`text-xs font-semibold ${netColor(margen, u)}`}>Ganancia neta · {netFlag(margen, u)}</p>
           <p className="text-[10px] text-neutral-500">{margen >= 0 ? '+' : ''}{margen.toFixed(1)}% sobre venta · {costPct >= 0 ? '+' : ''}{costPct.toFixed(1)}% sobre costo</p>
         </div>
-        <span className={`text-lg font-bold ${netColor(margen)}`}>${fmtUsd(ganancia)}</span>
+        <span className={`text-lg font-bold ${netColor(margen, u)}`}>${fmtUsd(ganancia)}</span>
       </div>
-      <p className="text-[10px] text-neutral-400 px-1">Comisión y envío ajustables en Ajustes. El cambiario es el spread oficial→paralelo.</p>
+      <p className="text-[10px] text-neutral-400 px-1">Comisión, envío y colores en Productos → Costos ML. El cambiario es el spread oficial→paralelo.</p>
     </div>
   )
 }

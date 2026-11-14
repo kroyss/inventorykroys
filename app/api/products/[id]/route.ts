@@ -9,6 +9,8 @@ import { puede } from '@/lib/permisos'
 const UpdateSchema = z.object({
   name:               z.string().min(1).max(200).optional(),
   profit_category_id: z.number().int().positive().nullable().optional(),
+  // 14-11 (mig. 179): % de ganancia del producto (reemplaza a la categoría en la pantalla). null = sin definir.
+  ganancia_pct:       z.number().min(0).max(200).nullable().optional(),
   base_cost:          z.number().nonnegative().optional(),
   shipping_cost:      z.number().nonnegative().optional(),
   base_price_usd:     z.number().nonnegative().optional(),
@@ -42,8 +44,9 @@ export async function GET(
        COALESCE(pp.price_bolivares,        0)::float AS price_bolivares,
        COALESCE(pp.current_discount_percent,0)::float AS discount_percent,
        pc.name                                         AS category_name,
-       COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
+       COALESCE(pp.ganancia_pct, pc.profit_percentage,      0)::float AS profit_percentage,
        pp.profit_category_id,
+       pp.ganancia_pct::float AS ganancia_pct,
        p.weight_kg::float                            AS weight_kg,
        p.peso_origen,
        ${SQL_PESOS_DISTINTOS}                       AS pesos_ml,
@@ -94,6 +97,7 @@ export async function PUT(
 
       const pricingFields: [string, unknown][] = []
       if (body.profit_category_id  !== undefined) pricingFields.push(['profit_category_id',      body.profit_category_id])
+      if (body.ganancia_pct        !== undefined) pricingFields.push(['ganancia_pct',             body.ganancia_pct])
       if (body.base_cost           !== undefined) pricingFields.push(['base_cost',               body.base_cost])
       if (body.shipping_cost       !== undefined) pricingFields.push(['shipping_cost',            body.shipping_cost])
       // total_cost explícito (no depende del trigger): se actualiza cuando vienen ambos costos

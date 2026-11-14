@@ -30,8 +30,9 @@ export default async function ProductosPage() {
         COALESCE(pp.price_bolivares,        0)::float AS price_bolivares,
         COALESCE(pp.current_discount_percent,0)::float AS discount_percent,
         pc.name                                        AS category_name,
-        COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
+        COALESCE(pp.ganancia_pct, pc.profit_percentage,      0)::float AS profit_percentage,
         pp.profit_category_id,
+        pp.ganancia_pct::float AS ganancia_pct,
         p.weight_kg::float                             AS weight_kg,
         COALESCE(inv.sale_price,            0)::float AS sale_price,
         COALESCE(inv.quantity,              0)::int   AS quantity
@@ -62,6 +63,8 @@ export default async function ProductosPage() {
       catalogo={tieneModulo(session.user, 'catalogo_pdf')}
       categorias={tieneModulo(session.user, 'precios_categorias')}
       promociones={tieneModulo(session.user, 'promociones') && puede(session.user, 'promociones')}
+      publicarML={tieneModulo(session.user, 'publicaciones') && tieneModulo(session.user, 'preguntas') && puede(session.user, 'editar_publicaciones')}
+      costosML={puede(session.user, 'costos_ml_config')}
     />
     </div>
   )

@@ -58,7 +58,7 @@ export default function PorProducto({ dateFrom, dateTo }: { dateFrom: string; da
 
   const excel = async () => {
     const XLSX = await import('xlsx')
-    const enc = ['#', 'Código', 'Producto', 'Categoría', 'Unidades', 'Período anterior', 'Venta', ...(d.verCostos ? ['Costo', 'Comisión ML', 'Ganancia'] : [])]
+    const enc = ['#', 'Código', 'Producto', 'Ganancia %', 'Unidades', 'Período anterior', 'Venta', ...(d.verCostos ? ['Costo', 'Comisión ML', 'Ganancia'] : [])]
     const aoa: (string | number)[][] = [enc, ...filas.map((p, i) => [i + 1, p.code, p.nombre, p.categoria ?? '', p.unidades, p.antes, p.venta,
       ...(d.verCostos ? [p.costo ?? 0, p.comision ?? 0, p.ganancia ?? 0] : [])]),
       [], ['', '', 'TOTAL', '', tot.u, '', Math.round(tot.v * 100) / 100, ...(d.verCostos ? ['', '', Math.round(tot.g * 100) / 100] : [])]]

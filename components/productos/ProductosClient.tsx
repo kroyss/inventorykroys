@@ -14,7 +14,9 @@ import Link from '@/components/ui/Link'
 import MlBreakdown from './MlBreakdown'
 import VinculosML from './VinculosML'
 import ElegirPesoML from './ElegirPesoML'
-import { etiquetaCategoria } from '@/lib/categoriasGanancia'
+import MedidorGanancia from './MedidorGanancia'
+import CostosMLModal from './CostosMLModal'
+import { umbralesDe, nivelDe, colorMargen, type Umbrales } from '@/lib/salud'
 
 // ─── helpers ────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -64,14 +66,15 @@ function shipBadge(info: ShipInfo): { label: string; cls: string } {
   }
 }
 
-// Color del margen neto sobre venta: sano ≥20%, ajustado ≥8%, riesgo/pérdida abajo.
-const netColor = (m: number) => m >= 20 ? 'text-emerald-600' : m >= 8 ? 'text-amber-600' : 'text-red-600'
+// Color del margen neto sobre venta (14-11): sana / ajustada / pérdida con los % de la empresa (lib/salud.ts).
+const netColor = (m: number, u: Umbrales) => colorMargen(m, u)
+const fmtPct = (n: number) => `${Number.isInteger(Math.round(n * 10) / 10) ? Math.round(n) : (Math.round(n * 10) / 10).toLocaleString('de-DE')}%`
 
 // ─── types ──────────────────────────────────────────────────────
 interface FormState {
   code: string
   name: string
-  profit_category_id: number | null
+  ganancia_pct: number | null   // 14-11 (mig. 179): % de ganancia (reemplaza a la categoría)
   base_cost: number
   shipping_cost: number
   published_price_usd: number
@@ -86,7 +89,7 @@ interface FormState {
 const emptyForm = (): FormState => ({
   code: '',
   name: '',
-  profit_category_id: null,
+  ganancia_pct: null,
   base_cost: 0,
   shipping_cost: 0,
   published_price_usd: 0,
@@ -115,6 +118,7 @@ interface ProductDetail {
   category_name: string | null
   profit_percentage: number
   profit_category_id: number | null
+  ganancia_pct: number | null
   sale_price: number
   quantity: number
   weight_kg: number | null
@@ -132,15 +136,19 @@ interface Props {
   importarML?: boolean   // permiso "Importar productos desde MercadoLibre" + cuentas de ML (Primeros pasos)
   categorias?: boolean   // módulo precios_categorias. Apagado (Inventario simple): precio = lo publicado, sin categoría ni exceso
   promociones?: boolean  // módulo promociones + permiso (migración 094): link a Promociones
+  publicarML?: boolean   // 14-11: puede cambiar el precio en ML (módulo Publicaciones + permiso editar_publicaciones)
+  costosML?: boolean     // 14-11: puede configurar Costos ML (admin o permiso costos_ml_config)
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false, inicialTasa = null }: Props & { inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false, publicarML = false, costosML = false, inicialTasa = null }: Props & { inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
   // Inventario simple: el precio de venta es el que se guardó (lo publicado en ML), no costo × categoría × exceso.
   const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
   const [search,    setSearch]    = useState('')
   const [selected,  setSelected]  = useState<number[]>([])
-  const [batchCat,  setBatchCat]  = useState<number | null>(null)
+  const [batchPct,  setBatchPct]  = useState('')   // 14-11: % de ganancia en lote (antes categoría)
+  const [simPct,    setSimPct]    = useState<number | null>(null)   // modo simple: % que se está simulando en la ficha
+  const [verCostos, setVerCostos] = useState(false)
   const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
   const [editId,    setEditId]    = useState<number | null>(null)
   const [form,      setForm]      = useState<FormState>(emptyForm())
@@ -186,8 +194,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   }, [conSettings])
 
   // derived calculator values
-  const selectedCat = profitCategories.find(c => c.id === form.profit_category_id)
-  const profitPct   = selectedCat?.profit_percentage ?? 0
+  const profitPct   = form.ganancia_pct ?? 0
+  const umbr = umbralesDe(mlSettings)
   // Descuento GLOBAL efectivo (VE): el manual de Ajustes (ml_descuento) o, si está vacío, el recomendado.
   const recDiscountLive = recDiscountVE(veRate)
   const globalDiscount  = (() => {
@@ -211,6 +219,14 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const effDiscountFor = (p: { weight_kg: number | null; total_cost: number; profit_percentage: number }): number =>
     country === 'VE' ? shipFor(p).effectiveDiscount : globalDiscount
 
+  // % de ganancia que se muestra (14-11, igual para todos): con precios calculados, el del producto; en el modo
+  // simple (el precio es el de ML), el REAL que da su precio sobre el costo.
+  const gananciaDe = (p: Product): number | null => {
+    if (!simple) return p.ganancia_pct ?? (p.profit_category_id ? p.profit_percentage : null)
+    if (!(p.total_cost > 0) || !(p.sale_price > 0)) return null
+    const costo = country === 'CO' ? p.total_cost * coTrm : p.total_cost
+    return costo > 0 ? (p.sale_price / costo - 1) * 100 : null
+  }
   // Precio y margen por producto: en modo simple, el guardado (sale_price); si no, el calculado en vivo.
   const precioVE    = (p: Product) => simple ? p.sale_price : liveBaseVE(p)
   const publicadoVE = (p: Product) => simple ? p.sale_price : livePublishedVE(p, veRate?.excess ?? 0)
@@ -230,6 +246,25 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   // lleve comisión + envío + retención, quede el precio base (costo × markup).
   // Publicar base × TRM a secas se come el markup (ver lib/coPricing.ts).
   const suggestedPesos = coPublishedPrice(basePriceUsd * coTrm, mlSettings)
+
+  // Modo simple (14-11): el medidor arranca en el % REAL del precio publicado y, al moverlo, sugiere el precio.
+  const costoForm = country === 'CO' ? totalCost * coTrm : totalCost
+  const pctReal = costoForm > 0 && form.sale_price > 0 ? (form.sale_price / costoForm - 1) * 100 : null
+  const precioPara = (pct: number) => country === 'CO' ? Math.round(costoForm * (1 + pct / 100)) : Math.round(costoForm * (1 + pct / 100) * 100) / 100
+  const simulando = simple && simPct != null && costoForm > 0
+  const precioSim = simulando ? precioPara(simPct!) : form.sale_price
+  // Precio que se mira en la cascada y el que se mandaría a ML.
+  const precioVista = simple ? precioSim : country === 'CO' ? (form.sale_price || suggestedPesos) : finalPriceUsd
+  const precioParaML = simple ? precioSim : country === 'CO' ? form.sale_price : Math.round(publishedPriceUsd * 100) / 100
+  const netForm = totalCost > 0 ? mlNetFor(country,
+    { total_cost: totalCost, profit_percentage: profitPct, discount_percent: formEffDiscount, sale_price: country === 'CO' ? precioVista : form.sale_price, weight_kg: formWeight != null && !isNaN(formWeight) ? formWeight : null },
+    veRate, coTrm, mlSettings, formEffDiscount, shipTable, simple && country === 'VE' ? precioSim : undefined) : null
+  const nivelForm = netForm ? nivelDe(netForm.margen, umbr) : null
+  // Publicaciones de 1 unidad vinculadas: a ellas se les puede mandar el precio (los packs tienen su propio precio).
+  const pubsML = [...new Set(form.ml_codes.filter(c => (c.unidades ?? 1) === 1 && /^\d+/.test(c.code))
+    .map(c => `${country === 'CO' ? 'MCO' : 'MLV'}${c.code.split(':')[0]}`))]
+  const conVariantes = form.ml_codes.some(c => c.code.includes(':'))
+  const puedePublicar = publicarML && modal === 'edit' && pubsML.length > 0 && precioParaML > 0
 
   // CO: el precio de venta nunca debe quedar en blanco. Si el producto ya trae
   // un valor (nuevo o viejo) se respeta; si está vacío, se autocompleta con el
@@ -296,6 +331,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     const data = await res.json()
     setForm({ ...emptyForm(), code: data.next_code ?? data.code })
     setEditId(null)
+    setSimPct(null)
     setSalePriceAutoFilled(false)
     setModal('create')
   }
@@ -309,7 +345,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     setForm({
       code:               data.code,
       name:               data.name,
-      profit_category_id: data.profit_category_id ?? null,
+      ganancia_pct:       data.ganancia_pct ?? (data.profit_category_id ? data.profit_percentage : null),
       base_cost:          data.base_cost,
       shipping_cost:      data.shipping_cost,
       published_price_usd:data.published_price_usd,
@@ -321,13 +357,21 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       ml_codes:           data.ml_codes as MLCode[],
     })
     setEditId(id)
+    setSimPct(null)
     setModal('edit')
   }
 
   // ── save (create or update) ──
-  const handleSave = useCallback(async (keepOpen = false) => {
+  // over (14-11): «Guardar y publicar en ML» guarda con el precio sugerido y después lo manda a MercadoLibre.
+  const handleSave = useCallback(async (keepOpen = false, over?: { salePrice?: number; publicar?: number }) => {
+    if (over?.publicar && !await confirm({
+      title: 'Cambiar el precio en MercadoLibre',
+      message: `Se guarda el producto y el precio de ${pubsML.length === 1 ? 'su publicación' : `sus ${pubsML.length} publicaciones`} pasa a ${country === 'CO' ? `$${fmtPeso(over.publicar)}` : `$${fmt(over.publicar)}`} en MercadoLibre:\n${pubsML.join(' · ')}${conVariantes ? '\n\nOjo: si la publicación tiene variantes de otros productos, cambia el precio de toda la publicación.' : ''}\n\nLo verás en Publicaciones → Tareas.`,
+      confirmText: 'Guardar y publicar',
+    })) return
     setSaving(true)
     setError(''); setOkMsg('')
+    const salePrice = over?.salePrice ?? form.sale_price
     try {
       // CO (híbrido): costo en USD, precio de venta en PESOS (sale_price); los
       // campos *_usd no se usan en CO → 0. VE: calculadora USD como siempre.
@@ -337,20 +381,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       // Inventario simple VE: el precio que se escribe es el publicado y se guarda tal cual (sin descuento).
       const simpleVE = simple && !isCO
       const precios = {
-        base_price_usd:      isCO ? 0 : simpleVE ? form.sale_price : basePriceUsd,
-        published_price_usd: isCO ? 0 : simpleVE ? form.sale_price : publishedPriceUsd,
-        final_price_usd:     isCO ? 0 : simpleVE ? form.sale_price : finalPriceUsd,
+        base_price_usd:      isCO ? 0 : simpleVE ? salePrice : basePriceUsd,
+        published_price_usd: isCO ? 0 : simpleVE ? salePrice : publishedPriceUsd,
+        final_price_usd:     isCO ? 0 : simpleVE ? salePrice : finalPriceUsd,
         // descuento efectivo = global capado por el peso (envío gratis)
         discount_percent:    isCO || simpleVE ? 0 : formEffDiscount,
         // VE: el precio de inventario sigue al Precio Base (USD). CO y simple: el del input.
-        sale_price:          isCO || simpleVE ? form.sale_price : basePriceUsd,
+        sale_price:          isCO || simpleVE ? salePrice : basePriceUsd,
       }
       // Los códigos ML ya no se mandan (13-11): se vinculan en Publicaciones → Vincular.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { ml_codes: _codigos, peso_ml: _pm, pesos_ml: _pd, ...sinVinculos } = form
       const payload = {
         ...sinVinculos,
-        ...(simple ? { profit_category_id: null } : {}),
+        ganancia_pct: simple ? null : form.ganancia_pct,
         ...precios,
         weight_kg:           weightNum,
       }
@@ -368,7 +412,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name:               form.name,
-            profit_category_id: simple ? null : form.profit_category_id,
+            ...(simple ? {} : { ganancia_pct: form.ganancia_pct }),
             base_cost:          form.base_cost,
             shipping_cost:      form.shipping_cost,
             ...precios,
@@ -381,6 +425,15 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         const d = await res.json()
         setError(d.error ?? 'Error al guardar')
         return
+      }
+
+      // 14-11: «Guardar y publicar»: el precio va a la cola de MercadoLibre (Publicaciones → Tareas).
+      if (over?.publicar) {
+        const r = await fetch('/api/publicaciones/lotes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo: 'precio', seleccion: { items: pubsML }, modo: 'fijo', valor: over.publicar, redondeo: 'no', confirmar: true }) })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) { setError(`Se guardó el producto, pero el precio no se mandó a MercadoLibre: ${d.error ?? 'error'}`); setForm(f => ({ ...f, sale_price: salePrice })); setSimPct(null); return }
+        window.dispatchEvent(new Event('cola-ml'))
       }
 
       // refresh product list
@@ -402,7 +455,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       setSaving(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, modal, editId, basePriceUsd, publishedPriceUsd, finalPriceUsd])
+  }, [form, modal, editId, basePriceUsd, publishedPriceUsd, finalPriceUsd, pubsML.join(','), conVariantes])
 
   // ── status toggle / delete ──
   async function handleStatus(id: number, action: 'activate' | 'deactivate' | 'delete'): Promise<boolean> {
@@ -424,20 +477,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
   // ── batch category ──
   async function handleBatch() {
-    if (!batchCat || selected.length === 0) return
-    const cat = profitCategories.find(c => c.id === batchCat)
+    const pct = parseFloat(batchPct.replace(',', '.'))
+    if (isNaN(pct) || pct < 0 || pct > 200 || selected.length === 0) return
     let res: Response
-    if (country === 'VE' && veRate && cat) {
+    if (country === 'VE' && veRate) {
       // VE: además de la categoría, recalcula y guarda los precios (base, publicado,
       // final, Bs y el precio de inventario). Antes solo cambiaba la categoría: el
       // catálogo se veía bien porque calcula en vivo, pero ventas, reportes y la hoja
       // de inventario seguían leyendo el precio viejo guardado.
       const items = products.filter(p => selected.includes(p.id)).map(p => {
-        const q = { ...p, profit_percentage: cat.profit_percentage }
+        const q = { ...p, profit_percentage: pct }
         return {
           product_id: p.id,
-          profit_category_id: cat.id,
-          ...storedPricesVE(p.total_cost, cat.profit_percentage, veRate.excess ?? 0, effDiscountFor(q), veRate.official),
+          ganancia_pct: pct,
+          ...storedPricesVE(p.total_cost, pct, veRate.excess ?? 0, effDiscountFor(q), veRate.official),
         }
       })
       res = await fetch('/api/products/reprice', {
@@ -450,14 +503,14 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       res = await fetch('/api/products/batch-category', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_ids: selected, profit_category_id: batchCat }),
+        body: JSON.stringify({ product_ids: selected, ganancia_pct: pct }),
       })
     }
-    if (!res.ok) { alert('Error al actualizar categorías'); return }
+    if (!res.ok) { alert('Error al cambiar el % de ganancia'); return }
     const listRes = await fetch('/api/products')
     setProducts(await listRes.json())
     setSelected([])
-    setBatchCat(null)
+    setBatchPct('')
   }
 
   function toggleSelect(id: number) {
@@ -493,7 +546,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       switch (sortKey) {
         case 'code':     return p.code
         case 'name':     return p.name.toLowerCase()
-        case 'category': return p.category_name ?? '￿'
+        case 'category': return gananciaDe(p) ?? -Infinity
         case 'cost':     return p.total_cost
         case 'price':    return country === 'CO' ? p.sale_price : precioVE(p)
         case 'mlprice':  return publicadoVE(p)
@@ -520,7 +573,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
     total:       products.length,
     activos:     products.filter(p => p.is_active).length,
     inactivos:   products.filter(p => !p.is_active).length,
-    sinCat:      products.filter(p => p.is_active && (simple ? !(p.total_cost > 0) : !p.profit_category_id)).length,
+    sinCat:      products.filter(p => p.is_active && (simple ? !(p.total_cost > 0) : gananciaDe(p) == null)).length,
     valor:       products.filter(p => p.is_active).reduce((s, p) => s + p.quantity * p.total_cost, 0),
   }
 
@@ -531,10 +584,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             botón de la pantalla vacía (sin productos), primer paso de un cliente nuevo. */}
         {country === 'VE' && descuento && (
           <Link href="/productos/margenes" className="btn-secondary text-sm whitespace-nowrap"
-            title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de categoría">
+            title="Productos de menos de $5: margen antes y después de la tabla nueva de envíos, con sugerencia de % de ganancia">
             Márgenes &lt; $5
           </Link>
         )}
+        {costosML && <button onClick={() => setVerCostos(true)} className="btn-secondary text-sm whitespace-nowrap" title="Comisión de MercadoLibre, envío y colores de la ganancia">Costos ML</button>}
         {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF</Link>}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Producto</button>
       </>} />
@@ -558,7 +612,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         <KPICard compact label="Productos" value={int(kpis.total)} />
         <KPICard compact label="Activos" value={int(kpis.activos)} />
         <KPICard compact label="Inactivos" value={int(kpis.inactivos)} tone={kpis.inactivos > 0 ? 'apagado' : 'neutro'} />
-        <KPICard compact label={simple ? 'Sin costo' : 'Sin categoría'} value={int(kpis.sinCat)} tone={kpis.sinCat > 0 ? 'atencion' : 'neutro'} />
+        <KPICard compact label={simple ? 'Sin costo' : 'Sin % de ganancia'} value={int(kpis.sinCat)} tone={kpis.sinCat > 0 ? 'atencion' : 'neutro'} />
         <KPICard compact label="Valor catálogo (costo)" value={`$${fmt(kpis.valor)}`} />
       </div>
 
@@ -568,19 +622,14 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         {selected.length > 0 && !simple && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-neutral-500">{selected.length} seleccionados</span>
-            <select
-              value={batchCat ?? ''}
-              onChange={e => setBatchCat(Number(e.target.value) || null)}
-              className="border border-neutral-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
-            >
-              <option value="">Cambiar categoría…</option>
-              {profitCategories.map(c => (
-                <option key={c.id} value={c.id}>{etiquetaCategoria(c.name, c.profit_percentage)}</option>
-              ))}
-            </select>
+            <label className="flex items-center gap-1 text-sm text-neutral-600">
+              % de ganancia
+              <input type="number" min={0} max={200} step={0.5} value={batchPct} onChange={e => setBatchPct(e.target.value)} placeholder="60"
+                className="w-20 border border-neutral-300 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-neutral-800" />%
+            </label>
             <button
               onClick={handleBatch}
-              disabled={!batchCat}
+              disabled={batchPct.trim() === '' || isNaN(parseFloat(batchPct)) || parseFloat(batchPct) < 0 || parseFloat(batchPct) > 200}
               className="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-700 disabled:opacity-40"
             >
               Aplicar
@@ -619,12 +668,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Nombre{sortArrow('name')}
                 </th>
-                {!simple && (
-                  <th onClick={() => toggleSort('category')}
-                    className="px-3 py-2 text-left font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
-                    Categoría{sortArrow('category')}
-                  </th>
-                )}
+                <th onClick={() => toggleSort('category')} title={simple ? 'Lo que gana tu precio publicado sobre el costo' : '% de ganancia sobre el costo'}
+                  className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
+                  Ganancia{sortArrow('category')}
+                </th>
                 <th onClick={() => toggleSort('cost')}
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Costo{sortArrow('cost')}
@@ -658,7 +705,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={simple ? 9 : country === 'VE' ? 11 : 10} className="px-3 py-8 text-center text-neutral-400">
+                  <td colSpan={simple ? 10 : country === 'VE' ? 11 : 10} className="px-3 py-8 text-center text-neutral-400">
                     {search ? 'Sin resultados' : 'No hay productos'}
                   </td>
                 </tr>
@@ -678,17 +725,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500 whitespace-nowrap">{p.code}</td>
                   <td className="px-3 py-1.5 font-medium text-neutral-900"><div className="flex items-center gap-2"><FotoProducto id={p.id} nombre={p.name} />{p.name}</div></td>
-                  {!simple && (
-                    <td className="px-3 py-2">
-                      {p.category_name ? (
-                        <span className="text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                          {etiquetaCategoria(p.category_name, p.profit_percentage)}
-                        </span>
-                      ) : (
-                        <span className="text-neutral-300">—</span>
-                      )}
-                    </td>
-                  )}
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {(() => { const g = gananciaDe(p); return g == null ? <span className="text-neutral-300">—</span>
+                      : <span className="text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full">{fmtPct(g)}</span> })()}
+                  </td>
                   <td className="px-3 py-2 text-right text-neutral-600">${fmt(p.total_cost)}</td>
                   <td className="px-3 py-2 text-right font-medium text-neutral-900">
                     {country === 'CO' ? `$${fmtPeso(p.sale_price)}` : `$${fmt(precioVE(p))}`}
@@ -700,7 +740,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   )}
                   <td className="px-3 py-2 text-right">
                     {net ? (
-                      <span className={`font-medium ${netColor(net.margen)}`}>
+                      <span className={`font-medium ${netColor(net.margen, umbr)}`}>
                         {Math.round(net.margen)}%
                       </span>
                     ) : <span className="text-neutral-300">—</span>}
@@ -739,8 +779,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-neutral-400">{p.code}</div>
                     <div className="font-medium text-neutral-900 truncate">{p.name}</div>
-                    {p.category_name && !simple && (
-                      <span className="inline-block mt-1 text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{etiquetaCategoria(p.category_name, p.profit_percentage)}</span>
+                    {gananciaDe(p) != null && (
+                      <span className="inline-block mt-1 text-xs bg-neutral-100 px-2 py-0.5 rounded-full">Ganancia {fmtPct(gananciaDe(p)!)}</span>
                     )}
                   </div>
                   <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${p.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
@@ -753,7 +793,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <span className="text-neutral-500">ML: <span className="font-medium text-neutral-900">${fmt(publicadoVE(p))}</span></span>
                   )}
                   {net && (
-                    <span className={netColor(net.margen)}>{Math.round(net.margen)}% neto</span>
+                    <span className={netColor(net.margen, umbr)}>{Math.round(net.margen)}% neto</span>
                   )}
                   <span className="text-neutral-500 ml-auto">Stock: <span className="font-medium text-neutral-900">{p.quantity}</span></span>
                 </div>
@@ -884,22 +924,44 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     )}
                   </div>
                 ) : (
-                <div>
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Categoría de ganancia</label>
-                  <select
-                    value={form.profit_category_id ?? ''}
-                    onChange={e => setForm(f => ({ ...f, profit_category_id: Number(e.target.value) || null }))}
-                    className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-neutral-800 bg-white"
-                  >
-                    <option value="">Sin categoría</option>
-                    {profitCategories.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {etiquetaCategoria(c.name, c.profit_percentage, ' — ')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <MedidorGanancia valor={form.ganancia_pct} onChange={n => setForm(f => ({ ...f, ganancia_pct: n }))} nivel={nivelForm}
+                    ayuda={totalCost > 0 ? <>Precio de venta = costo × {(1 + profitPct / 100).toLocaleString('de-DE', { maximumFractionDigits: 3 })} = <b>${fmt(basePriceUsd)}</b>. El color es lo que te queda neto después de MercadoLibre.</> : 'Pon el costo para ver el precio.'}>
+                    {puedePublicar && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-black/5 pt-2">
+                        <button type="button" onClick={() => handleSave(false, { publicar: precioParaML })} disabled={saving}
+                          className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700 disabled:opacity-50">
+                          Guardar y publicar {country === 'CO' ? `$${fmtPeso(precioParaML)}` : `$${fmt(precioParaML)}`} en ML
+                        </button>
+                        <span className="text-[11px] text-neutral-500">{pubsML.length === 1 ? '1 publicación vinculada' : `${pubsML.length} publicaciones vinculadas`}</span>
+                      </div>
+                    )}
+                  </MedidorGanancia>
+                )}
+                {simple && costoForm > 0 && (
+                  <MedidorGanancia titulo="% de ganancia sobre el costo" valor={simPct ?? (pctReal != null ? Math.max(0, Math.round(pctReal * 10) / 10) : null)}
+                    onChange={n => setSimPct(n)} nivel={nivelForm}
+                    ayuda={simulando
+                      ? <>Para ganar <b>{fmtPct(simPct!)}</b> publica a <b>{country === 'CO' ? `$${fmtPeso(precioSim)}` : `$${fmt(precioSim)}`}</b> (hoy {country === 'CO' ? `$${fmtPeso(form.sale_price)}` : `$${fmt(form.sale_price)}`}{pctReal != null ? `, ${fmtPct(pctReal)}` : ''}). Abajo ves lo que te quedaría.</>
+                      : <>Hoy tu precio te deja {pctReal != null ? <b>{fmtPct(pctReal)}</b> : '—'} sobre el costo. Mueve la barra para ver a qué precio ganarías más o menos.</>}>
+                    {simulando && precioSim !== form.sale_price && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-black/5 pt-2">
+                        <button type="button" onClick={() => { setForm(f => ({ ...f, sale_price: precioSim })); setSimPct(null) }}
+                          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50">
+                          Usar este precio
+                        </button>
+                        {puedePublicar && (
+                          <button type="button" onClick={() => handleSave(false, { salePrice: precioSim, publicar: precioSim })} disabled={saving}
+                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700 disabled:opacity-50">
+                            Guardar y publicar en ML
+                          </button>
+                        )}
+                        <button type="button" onClick={() => setSimPct(null)} className="text-[11px] text-neutral-500 hover:underline">Volver al de hoy</button>
+                      </div>
+                    )}
+                    {!simulando && puedePublicar && (
+                      <p className="mt-1 text-[10px] text-neutral-400">Al mover la barra puedes publicar el precio nuevo en MercadoLibre desde aquí.</p>
+                    )}
+                  </MedidorGanancia>
                 )}
 
                 {/* Precios calculados (organización estilo legacy) */}
@@ -1025,16 +1087,16 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                   {/* Lo que realmente te queda — cascada compartida (parámetros en Ajustes) */}
                   <div className="border-t border-neutral-200 pt-3">
-                    <p className="text-sm font-semibold text-neutral-700 mb-2">Lo que realmente te queda</p>
+                    <p className="text-sm font-semibold text-neutral-700 mb-2">Lo que realmente te queda{simulando && <span className="ml-1 text-xs font-normal text-sky-700">· con el precio que estás probando</span>}</p>
                     <MlBreakdown
                       country={country}
                       totalCost={totalCost}
                       ml={mlSettings}
-                      finalPriceUsd={simple ? form.sale_price : finalPriceUsd}
+                      finalPriceUsd={simple ? precioSim : finalPriceUsd}
                       weightKg={formWeight != null && !isNaN(formWeight) ? formWeight : null}
                       veRate={veRate}
-                      priceBs={simple ? form.sale_price * (veRate?.official ?? 0) : priceBs}
-                      salePrice={form.sale_price || suggestedPesos}
+                      priceBs={simple ? precioSim * (veRate?.official ?? 0) : priceBs}
+                      salePrice={simple ? precioSim : form.sale_price || suggestedPesos}
                       coTrm={coTrm}
                     />
                   </div>
@@ -1119,8 +1181,8 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
                       {v.is_active ? 'Activo' : 'Inactivo'}
                     </span>
-                    {v.category_name && !simple && (
-                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">{etiquetaCategoria(v.category_name, v.profit_percentage)}</span>
+                    {gananciaDe(v as unknown as Product) != null && (
+                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">Ganancia {fmtPct(gananciaDe(v as unknown as Product)!)}</span>
                     )}
                   </div>
                 </div>
@@ -1149,7 +1211,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       <Field label="Precio de venta (publicado)" value={`$${fmt(v.sale_price)}`} accent="text-neutral-900" />
                       <Field label="Precio Bs" value={`Bs ${fmt(v.sale_price * (veRate?.official ?? 0))}`} />
                       {net && (
-                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
+                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen, umbr)} />
                       )}
                     </div>
                   ) : country === 'VE' ? (
@@ -1162,7 +1224,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       </>}
                       <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0))}`} />
                       {net && (
-                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
+                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen, umbr)} />
                       )}
                     </div>
                   ) : (
@@ -1170,7 +1232,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Precio venta ≈ USD" value={coTrm > 0 ? `$${fmt(v.sale_price / coTrm)}` : '—'} accent="text-green-700" />
                       {net && (
-                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen)} />
+                        <Field label="Margen neto" value={`${Math.round(net.margen)}%`} accent={netColor(net.margen, umbr)} />
                       )}
                     </div>
                   )}
@@ -1275,6 +1337,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           </div>
         )
       })()}
+      {verCostos && <CostosMLModal country={country} ml={mlSettings} onCerrar={() => setVerCostos(false)} onGuardado={nuevo => setMlSettings(m => ({ ...m, ...nuevo }))} />}
     </div>
   )
 }

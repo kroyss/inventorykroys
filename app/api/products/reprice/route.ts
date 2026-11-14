@@ -15,7 +15,8 @@ import { puede } from '@/lib/permisos'
 
 const Item = z.object({
   product_id:          z.number().int().positive(),
-  profit_category_id:  z.number().int().positive(),
+  profit_category_id:  z.number().int().positive().optional(),   // Revisión de márgenes (escalones)
+  ganancia_pct:        z.number().min(0).max(200).optional(),      // 14-11 (mig. 179): el % del producto
   base_price_usd:      z.number().nonnegative(),
   published_price_usd: z.number().nonnegative(),
   final_price_usd:     z.number().nonnegative(),
@@ -44,15 +45,16 @@ export async function PUT(req: NextRequest) {
       for (const it of items) {
         await client.query(
           `UPDATE product_pricing
-              SET profit_category_id       = $1,
+              SET profit_category_id       = COALESCE($1, profit_category_id),
+                  ganancia_pct             = COALESCE($8::numeric, (SELECT profit_percentage FROM profit_categories WHERE id = $1), ganancia_pct),
                   base_price_usd           = $2,
                   published_price_usd      = $3,
                   final_price_usd          = $4,
                   price_bolivares          = $5,
                   current_discount_percent = $6
             WHERE product_id = $7`,
-          [it.profit_category_id, it.base_price_usd, it.published_price_usd, it.final_price_usd,
-           it.price_bolivares, it.discount_percent, it.product_id]
+          [it.profit_category_id ?? null, it.base_price_usd, it.published_price_usd, it.final_price_usd,
+           it.price_bolivares, it.discount_percent, it.product_id, it.ganancia_pct ?? null]
         )
         await client.query(
           `UPDATE inventory SET sale_price = $1 WHERE product_id = $2`,

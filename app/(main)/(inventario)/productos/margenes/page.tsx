@@ -23,7 +23,7 @@ export default async function MargenesPage() {
         COALESCE(pp.total_cost,             0)::float AS total_cost,
         COALESCE(pp.current_discount_percent,0)::float AS discount_percent,
         pc.name                                        AS category_name,
-        COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
+        COALESCE(pp.ganancia_pct, pc.profit_percentage,      0)::float AS profit_percentage,
         pp.profit_category_id,
         p.weight_kg::float                             AS weight_kg,
         COALESCE(inv.sale_price,            0)::float AS sale_price,

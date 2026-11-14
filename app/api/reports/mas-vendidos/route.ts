@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const verCostos = puede(u, 'costos')
   try {
     const { rows } = await db.query(
-      `SELECT p.id, p.code, p.name AS nombre, pc.name AS categoria,
+      `SELECT p.id, p.code, p.name AS nombre, CASE WHEN COALESCE(pp.ganancia_pct, pc.profit_percentage) IS NOT NULL THEN 'Ganancia ' || rtrim(rtrim(COALESCE(pp.ganancia_pct, pc.profit_percentage)::text, '0'), '.') || '%' END AS categoria,
               COALESCE(SUM(si.quantity) FILTER (WHERE ${ACTUAL}), 0)::int AS unidades,
               COALESCE(SUM(si.total_price) FILTER (WHERE ${ACTUAL}), 0)::float AS venta,
               COALESCE(SUM(si.quantity * COALESCE(si.unit_cost, 0)) FILTER (WHERE ${ACTUAL}), 0)::float AS costo,
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
        LEFT JOIN product_pricing pp ON pp.product_id = p.id
        LEFT JOIN profit_categories pc ON pc.id = pp.profit_category_id
        WHERE ${VENDIDA} AND (${ACTUAL} OR ${ANTES})
-       GROUP BY p.id, p.code, p.name, pc.name`, [r.desde, r.hasta, r.antesDesde, r.antesHasta])
+       GROUP BY p.id, p.code, p.name, pp.ganancia_pct, pc.profit_percentage`, [r.desde, r.hasta, r.antesDesde, r.antesHasta])
     const productos = rows.filter(r => r.unidades > 0).map(r => ({
       id: r.id, code: r.code, nombre: r.nombre, categoria: r.categoria ?? null, unidades: r.unidades, antes: r.antes,
       venta: Math.round(r.venta * 100) / 100,

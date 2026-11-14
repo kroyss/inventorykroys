@@ -805,6 +805,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   automatizaciones…). «Volver a lo predeterminado» lo deja como al inicio.
   Con el módulo de Bonos, **Ver el bono del mes** decide quién ve la barra de bonos en su Inicio (viene marcado; se
   quita a quien no deba verla). El administrador la ve siempre.
+  **Configurar costos ML** deja a un empleado cambiar la comisión, el envío sin peso y los colores de la ganancia
+  (Productos → Costos ML) sin darle Ajustes.
 - **Ver como:** te muestra el sistema exactamente como lo ve esa persona, sin poder guardar nada.
 - **Cambiar contraseña / Desactivar:** cierra las sesiones abiertas de esa persona. Al desactivar, su historial se
   conserva.
@@ -835,7 +837,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
      de ML y aceptas. Así tus productos salen de tus publicaciones y las ventas de ML llegan solas.
   2. **Crea tus productos:** en Productos → «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones
      su costo; cada una queda como producto ya vinculado. También se crean a mano con **+ Producto** (nombre, costo y
-     categoría de ganancia; el precio se calcula solo).
+     % de ganancia con el medidor; el precio se calcula solo).
   3. **Pon el stock que tienes hoy:** en Inventario, en cada producto **Ajustar** y escribes cuántas unidades tienes.
      Después el stock baja con las ventas y sube con las compras.
   4. **Registra tu primera venta:** en Ventas → **Por confirmar** confirmas las ventas de MercadoLibre (quedan
@@ -867,12 +869,34 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Cómo cargar productos:** si ya vendes en ML → Publicaciones → **Importar desde ML** (crea el producto vinculado, con
   peso y foto). **El costo (en USD, mayor que 0) es obligatorio** para crear cada producto: sin costo la ganancia de
-  sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, categoría, stock); cuando lo publiques,
+  sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, % de ganancia, stock); cuando lo publiques,
   lo vinculas y el peso y la foto llegan solos.
 - **Actualizar desde ML** (Publicaciones, Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
 - **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (pestaña de Publicaciones; en Productos solo sale cuando todavía no hay productos) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
+- **% de ganancia** (desde el 14-11 reemplaza a las «categorías de ganancia»): en la ficha (Editar o + Producto) hay
+  un **medidor** de 0 a 200 %: se mueve con la barra o se escribe el número, y los dos van juntos. Es la ganancia
+  sobre el costo (precio = costo × (1 + %)). Al moverlo cambian en vivo el precio y **«Lo que realmente te queda»**, y
+  el medidor se pinta del color de la ganancia neta: **verde sana**, **naranja ajustada**, **rojo pérdida**.
+  - Si tu empresa calcula los precios (precio por % de ganancia), el % **define** el precio. Los productos que tenían
+    categoría quedaron con su mismo % (ULTRA → 120 %, ALTO → 80 %…) y ahora se cambia producto por producto.
+  - Si el precio es el que publicas en ML, el medidor arranca en el % **real** que te deja tu precio de hoy y, al
+    moverlo, dice a qué precio publicar para ganar ese %: **Usar este precio** lo pone en la ficha.
+  - **Guardar y publicar en ML** (si puedes editar publicaciones y el producto está vinculado): guarda y manda el
+    precio a sus publicaciones de 1 unidad en MercadoLibre (por la cola: se ve en Publicaciones → Tareas). Pide
+    confirmación; los packs no se tocan. Si la publicación tiene variantes de otros productos, cambia el precio de
+    toda la publicación.
+  - La lista de Productos tiene la columna **Ganancia** (el % de cada uno). Con varios seleccionados: **% de ganancia**
+    + Aplicar se lo pone a todos (y recalcula sus precios). La tarjeta de arriba cuenta los **Sin % de ganancia**.
+  - Reportes (Más vendidos, Stock) muestran «Ganancia 60%» en vez del nombre de la categoría.
+- **Costos ML** (botón en Productos; admin o quien tenga el permiso **Configurar costos ML**): la **comisión de
+  MercadoLibre** (12 % en Venezuela), el envío de los productos **sin peso** y desde qué precio es gratis, la **tabla
+  de MercadoEnvíos** (envío gratis por peso, solo lectura) y los **colores de la ganancia neta**: «Sana desde» (20 %
+  por defecto) y «Ajustada desde» (0 %); por debajo es pérdida. Se miden sobre lo que queda después de MercadoLibre
+  (% sobre la venta). Se usan en la ficha, la columna Margen neto, los simuladores y Promociones.
+  - El **«Envío»** del costo de la ficha es lo que te costó traer el producto (flete o importación) y se suma al costo;
+    es opcional y Compras no lo pide. El envío que cobra ML va aparte, en «Lo que realmente te queda».
 - **Catálogo PDF** (Productos → botón Catálogo PDF; en prueba, solo algunas empresas): elige productos (buscar,
   «Solo con stock», «Solo con foto»), sube tu **logo**, pon el nombre, una línea debajo y un texto al final
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar

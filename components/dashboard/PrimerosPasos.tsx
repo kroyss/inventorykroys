@@ -25,7 +25,7 @@ function pasos(e: Estado): Paso[] {
       href: e.conML ? '/productos/importar-ml' : '/productos?new=1', ir: e.conML ? 'Crear desde ML' : 'Crear producto',
       como: e.conML
         ? 'En «Importar desde ML» marcas tus publicaciones (o cada color/modelo) y pones su costo: cada una queda como un producto ya vinculado. También puedes crearlos a mano con + Producto.'
-        : 'En Productos toca + Producto: nombre, costo y categoría de ganancia (el precio se calcula solo).',
+        : 'En Productos toca + Producto: nombre, costo y % de ganancia con el medidor (el precio se calcula solo).',
     },
     {
       k: 'stock', titulo: 'Pon el stock que tienes hoy', hecho: e.stock, href: '/inventario', ir: 'Ir a Inventario',

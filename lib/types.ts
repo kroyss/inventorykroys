@@ -35,8 +35,9 @@ export interface Product {
   price_bolivares: number
   discount_percent: number
   category_name: string | null
-  profit_percentage: number
+  profit_percentage: number        // % de ganancia efectivo: el del producto (ganancia_pct) o, si no tiene, el de su categoría
   profit_category_id: number | null
+  ganancia_pct?: number | null     // 14-11 (mig. 179): % de ganancia del producto (null = sin definir)
   sale_price: number
   quantity: number
   weight_kg: number | null

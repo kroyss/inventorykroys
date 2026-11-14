@@ -68,6 +68,9 @@ export const PERMISOS = {
   // 14-11 (mig. 178): la barra de bonos del Inicio, por empleado (antes la veían todos los de la empresa con el módulo).
   ver_bono:                { tipo: 'accion', nombre: 'Ver el bono del mes', usuario: true, modulo: 'bonos',
                              detalle: 'La barra de bonos por ventas del mes en el Inicio' },
+  // 14-11: Productos → Costos ML (comisión, envío sin peso y colores de la ganancia), sin darle Ajustes.
+  costos_ml_config:        { tipo: 'accion', nombre: 'Configurar costos ML', usuario: false, modulo: 'inventario',
+                             detalle: 'Comisión de MercadoLibre, envío de los productos sin peso y desde qué % la ganancia es sana o ajustada (Productos → Costos ML)' },
   pagos_me_config:         { tipo: 'accion', nombre: 'Configurar Pagos ME', usuario: false, modulo: 'pagos_me', soloVE: true,
                              detalle: 'Clave de MercadoEnvíos y horario automático' },
 } as const satisfies Record<string, DefPermiso>

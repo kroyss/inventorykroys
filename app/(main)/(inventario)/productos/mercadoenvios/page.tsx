@@ -25,7 +25,7 @@ export default async function MercadoEnviosPage() {
       p.id, p.code, p.name,
       COALESCE(pp.total_cost,             0)::float AS total_cost,
       pc.name                                        AS category_name,
-      COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
+      COALESCE(pp.ganancia_pct, pc.profit_percentage,      0)::float AS profit_percentage,
       p.weight_kg::float                             AS weight_kg,
       p.peso_origen,
       ${SQL_PESOS_DISTINTOS}                         AS pesos_ml

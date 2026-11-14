@@ -16,8 +16,9 @@ const PRODUCTS_SQL = `
     COALESCE(pp.price_bolivares,        0)::float AS price_bolivares,
     COALESCE(pp.current_discount_percent,0)::float AS discount_percent,
     pc.name                                         AS category_name,
-    COALESCE(pc.profit_percentage,      0)::float AS profit_percentage,
+    COALESCE(pp.ganancia_pct, pc.profit_percentage,      0)::float AS profit_percentage,
     pp.profit_category_id,
+    pp.ganancia_pct::float AS ganancia_pct,
     p.weight_kg::float                            AS weight_kg,
     COALESCE(inv.sale_price,            0)::float AS sale_price,
     COALESCE(inv.quantity,              0)::int   AS quantity
@@ -32,6 +33,7 @@ const CreateSchema = z.object({
   code:               z.string().min(1).max(50),
   name:               z.string().min(1).max(200),
   profit_category_id: z.number().int().positive().nullable().optional(),
+  ganancia_pct:       z.number().min(0).max(200).nullable().optional(),   // 14-11 (mig. 179)
   base_cost:          z.number().nonnegative().default(0),
   shipping_cost:      z.number().nonnegative().default(0),
   base_price_usd:     z.number().nonnegative().default(0),
@@ -72,15 +74,15 @@ export async function POST(req: NextRequest) {
         `INSERT INTO product_pricing
            (product_id, base_cost, shipping_cost, total_cost, profit_category_id,
             base_price_usd, published_price_usd, final_price_usd,
-            price_bolivares, current_discount_percent)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            price_bolivares, current_discount_percent, ganancia_pct)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           product.id, body.base_cost, body.shipping_cost,
           // total_cost explícito (no depende del trigger trg_update_pricing_totals)
           body.base_cost + body.shipping_cost,
           body.profit_category_id ?? null,
           body.base_price_usd, body.published_price_usd,
-          body.final_price_usd, body.price_bolivares, body.discount_percent,
+          body.final_price_usd, body.price_bolivares, body.discount_percent, body.ganancia_pct ?? null,
         ]
       )
       const initialSalePrice = body.sale_price > 0 ? body.sale_price

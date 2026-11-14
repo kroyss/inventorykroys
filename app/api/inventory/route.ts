@@ -19,7 +19,7 @@ const INVENTORY_SQL = `
       COALESCE(pp.shipping_cost,   0)::float      AS shipping_cost,
       COALESCE(pp.total_cost,      0)::float      AS total_cost,
       COALESCE(pp.final_price_usd, 0)::float      AS final_price_usd,
-      COALESCE(pc.profit_percentage, 0)::float    AS profit_percentage,
+      COALESCE(pp.ganancia_pct, pc.profit_percentage, 0)::float    AS profit_percentage,
       inv.id                                      AS inventory_id,
       COALESCE(inv.quantity,   0)::int            AS quantity,
       COALESCE(inv.min_stock,  0)::int            AS min_stock,
