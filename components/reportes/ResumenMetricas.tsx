@@ -119,7 +119,7 @@ export default function ResumenMetricas() {
         )}
 
         {a && (
-          <Bloque titulo="Atención" ayuda="Preguntas de ML y cómo se respondieron." link={{ href: '/reportes?tab=atencion', t: 'Atención ML' }}>
+          <Bloque titulo="Atención en MercadoLibre" ayuda="Cuántas preguntas te hicieron en ML, cuántas respondiste, qué tan rápido y cuántas ventas salieron.">
             <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
               <Tarjeta titulo="Preguntas recibidas" valor={n(a.actual.preguntas)} ahora={a.actual.preguntas} antesN={a.anterior.preguntas} antes={n(a.anterior.preguntas)}
                 detalle={a.actual.preguntas ? `${Math.round(a.actual.respondidas / a.actual.preguntas * 100)}% respondidas` : undefined} />

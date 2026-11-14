@@ -915,10 +915,11 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 <!-- VERIFICAR con el dueño: el detalle de Inventario simple de los clientes se completará cuando se graben sus videos -->
 
 
-**Reportes → Atención ML** (en prueba, solo algunas empresas; necesita ver Preguntas): los últimos **7, 30 o 90 días**
-contra el período anterior del mismo largo: preguntas recibidas; % respondido (cuántas sola la IA y cuántas desde la
-app o la web de ML); tiempo de respuesta (la mitad se respondió en menos de ese tiempo, y el % en menos de 1 hora);
-ventas de ML no canceladas y preguntas por venta. Flecha verde = mejoró, roja = empeoró (en el tiempo, bajar es lo bueno).
+**Reportes → Resumen → Atención en MercadoLibre** (en prueba, solo algunas empresas; necesita ver Preguntas): con el
+período elegido (7, 30, 90 días o 1 año) contra el anterior del mismo largo: preguntas recibidas y % respondido; tiempo
+de respuesta (la mitad se respondió en menos de ese tiempo, y cuántas en menos de 1 hora); cuántas respondió sola la IA;
+ventas de ML por pregunta. Verde = mejoró, rojo = empeoró (en el tiempo, bajar es lo bueno). Ya no hay pestaña
+«Atención ML» aparte: todo está en el Resumen.
 ---
 
 ## 16. Central de aprendizaje y Novedades
