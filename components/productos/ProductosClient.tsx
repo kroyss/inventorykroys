@@ -525,7 +525,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const PAGE_SIZE = 100
   const [visible, setVisible] = useState(PAGE_SIZE)
 
-  type SortKey = 'code' | 'name' | 'category' | 'cost' | 'price' | 'mlprice' | 'margin' | 'stock' | 'status'
+  type SortKey = 'code' | 'name' | 'category' | 'cost' | 'price' | 'mlprice' | 'margin' | 'peso' | 'stock' | 'status'
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const toggleSort = (k: SortKey) => {
@@ -551,6 +551,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         case 'price':    return country === 'CO' ? p.sale_price : precioVE(p)
         case 'mlprice':  return publicadoVE(p)
         case 'margin':   return margin(p)
+        case 'peso':     return p.weight_kg ?? -Infinity
         case 'stock':    return p.quantity
         case 'status':   return p.is_active ? 0 : 1
       }
@@ -696,6 +697,13 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Margen neto{sortArrow('margin')}
                 </th>
+                {country === 'VE' && (
+                  <th onClick={() => toggleSort('peso')}
+                    className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800"
+                    title="Peso del portal de MercadoEnvíos (ML) o cargado a mano">
+                    Peso ME{sortArrow('peso')}
+                  </th>
+                )}
                 <th onClick={() => toggleSort('stock')}
                   className="px-3 py-2 text-right font-medium text-neutral-500 cursor-pointer select-none hover:text-neutral-800">
                   Stock{sortArrow('stock')}
@@ -710,7 +718,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={simple ? 10 : country === 'VE' ? 11 : 10} className="px-3 py-8 text-center text-neutral-400">
+                  <td colSpan={simple ? (country === 'VE' ? 11 : 10) : country === 'VE' ? 12 : 10} className="px-3 py-8 text-center text-neutral-400">
                     {search ? 'Sin resultados' : 'No hay productos'}
                   </td>
                 </tr>
@@ -750,6 +758,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       </span>
                     ) : <span className="text-neutral-300">—</span>}
                   </td>
+                  {country === 'VE' && <td className="px-3 py-2 text-right whitespace-nowrap"><PesoME p={p} /></td>}
                   <td className="px-3 py-2 text-right text-neutral-600">{p.quantity}</td>
                   <td className="px-3 py-2 text-center">
                     <StatusBadge status={p.is_active ? 'OK' : 'INACTIVO'} label={p.is_active ? 'Activo' : 'Inactivo'} />
@@ -797,6 +806,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   {country === 'VE' && !simple && (
                     <span className="text-neutral-500">ML: <span className="font-medium text-neutral-900">${fmt(publicadoVE(p))}</span></span>
                   )}
+                  {country === 'VE' && <span className="text-neutral-500">Peso: <PesoME p={p} /></span>}
                   {net && (
                     <span className={netColor(net.margen, umbr)}>{Math.round(net.margen)}% neto</span>
                   )}
@@ -1345,4 +1355,20 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       {verCostos && <CostosMLModal country={country} ml={mlSettings} onCerrar={() => setVerCostos(false)} onGuardado={nuevo => setMlSettings(m => ({ ...m, ...nuevo }))} />}
     </div>
   )
+}
+
+/** Columna «Peso ME» (14-11, el dueño): el peso del producto y de dónde sale, para saber si está al día con MercadoEnvíos.
+ *  ML = del portal (con la fecha en que se leyó) · a mano · pesos distintos en ML (pack o vínculo a revisar) · sin peso. */
+function PesoME({ p }: { p: Product }) {
+  const kg = p.weight_kg != null && p.weight_kg > 0 ? `${p.weight_kg.toLocaleString('de-DE', { maximumFractionDigits: 3 })} kg` : null
+  if (p.pesos_ml?.length) return (
+    <span className="text-amber-700" title={`Sus publicaciones pesan distinto en MercadoEnvíos (${p.pesos_ml.map(x => x.toLocaleString('de-DE')).join(' / ')} kg): revísalo en Publicaciones → MercadoEnvíos`}>
+      {kg ?? '—'} <span className="rounded bg-amber-50 px-1 text-[10px] font-semibold">⚠ distintos</span>
+    </span>)
+  if (p.peso_origen === 'ml' && kg) return (
+    <span className="text-neutral-800" title={`Del portal de MercadoEnvíos${p.peso_me_at ? ` · leído el ${p.peso_me_at}` : ''}: se actualiza solo`}>
+      {kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ML</span>
+    </span>)
+  if (kg) return <span className="text-neutral-600" title="Cargado a mano: no viene del portal de MercadoEnvíos">{kg} <span className="text-[10px] text-neutral-400">a mano</span></span>
+  return <span className="text-[11px] text-neutral-400" title="Sin peso: no está en el portal de MercadoEnvíos ni cargado a mano">Sin peso</span>
 }

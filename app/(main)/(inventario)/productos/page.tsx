@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth'
+import { PESOS_VINCULADOS, SQL_PESOS_DISTINTOS } from '@/lib/pesosML'
 import { authOptions } from '@/lib/auth'
 import { dbDeSesion } from '@/lib/session'
 import { redirect } from 'next/navigation'
@@ -34,12 +35,19 @@ export default async function ProductosPage() {
         pp.profit_category_id,
         pp.ganancia_pct::float AS ganancia_pct,
         p.weight_kg::float                             AS weight_kg,
+        p.peso_origen,
+        ${SQL_PESOS_DISTINTOS}                         AS pesos_ml,
+        -- 14-11 (el dueño): columna Peso ME; cuándo se leyó del portal (la publicación vinculada más reciente).
+        (SELECT to_char(MAX(mp.actualizado_at) AT TIME ZONE 'America/Caracas', 'DD/MM/YYYY') FROM product_ml_codes pm
+          JOIN me_productos mp ON mp.publicacion = 'MLV' || split_part(pm.ml_code, ':', 1) AND mp.peso_kg > 0
+          WHERE pm.product_id = p.id AND pm.is_active AND pm.unidades = 1) AS peso_me_at,
         COALESCE(inv.sale_price,            0)::float AS sale_price,
         COALESCE(inv.quantity,              0)::int   AS quantity
       FROM products p
       LEFT JOIN product_pricing   pp  ON p.id = pp.product_id
       LEFT JOIN profit_categories pc  ON pp.profit_category_id = pc.id
       LEFT JOIN inventory         inv ON p.id = inv.product_id
+      LEFT JOIN (${PESOS_VINCULADOS}) pv ON pv.product_id = p.id
       ORDER BY p.is_active DESC, p.name
     `),
     db.query(`

@@ -884,6 +884,9 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   5 minutos no se vuelve a leer (ya está al día).
 - **Productos:** catálogo, precios y margen neto de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). Clic en una fila abre la ficha; Editar en el pie.
+  En Venezuela, la columna **Peso ME** muestra el peso de cada producto y de dónde sale: **ML** = del portal de
+  MercadoEnvíos (al pasar el mouse, la fecha en que se leyó), **a mano**, **⚠ distintos** (sus publicaciones pesan
+  distinto en el portal: revisar en Publicaciones → MercadoEnvíos) o **Sin peso**. Se puede ordenar por peso.
 - **% de ganancia** (desde el 14-11 reemplaza a las «categorías de ganancia»): en la ficha (Editar o + Producto) hay
   un **medidor** de 0 a 200 %: se mueve con la barra o se escribe el número, y los dos van juntos. Es la ganancia
   sobre el costo (precio = costo × (1 + %)). Al moverlo cambian en vivo el precio y **«Lo que realmente te queda»**, y
