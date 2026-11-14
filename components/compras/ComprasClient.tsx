@@ -290,7 +290,8 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
 
   // Botón unificado "+ Compra" del padre: abre el form al activarse autoCreate
   useEffect(() => {
-    if (autoCreate && !historyMode && isAdmin) { openCreate(); onAutoCreateHandled?.() }
+    // 14-11: en Inventario simple (sin etapas) «+ Compra» puede caer en Entradas (historyMode) si no hay nada en curso.
+    if (autoCreate && (!historyMode || !etapas) && isAdmin) { openCreate(); onAutoCreateHandled?.() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCreate])
 
@@ -987,7 +988,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
           <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col">
             <div className="p-5 border-b flex justify-between shrink-0">
               <div>
-                <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : etapas ? 'Nueva orden de compra' : 'Entró mercancía'}</h3>
+                <h3 className="font-semibold text-lg">{editId ? 'Editar orden' : etapas ? 'Nueva orden de compra' : 'Nueva compra'}</h3>
                 {!etapas && !editId && (
                   <p className="text-xs text-neutral-500 mt-0.5">Se suma al stock al guardar, y el costo de cada producto pasa a ser lo que pagaste.</p>
                 )}

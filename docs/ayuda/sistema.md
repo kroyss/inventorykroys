@@ -832,7 +832,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Cómo cargar productos:** si ya vendes en ML → Publicaciones → **Importar desde ML** (crea el producto vinculado, con
-  peso y foto). Si no está en ML → Productos → **Nuevo** solo con lo tuyo (costo, categoría, stock); cuando lo publiques,
+  peso y foto). **El costo (en USD, mayor que 0) es obligatorio** para crear cada producto: sin costo la ganancia de
+  sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, categoría, stock); cuando lo publiques,
   lo vinculas y el peso y la foto llegan solos.
 - **Actualizar desde ML** (Publicaciones, Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).
@@ -879,7 +880,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   descontó, conviene hacer un conteo (hoja de conteo) y cargar las diferencias como ajuste.
 - **Inventario:** stock actual de cada producto y sus movimientos. Ajuste de stock: si contaste y está mal, se guarda
   como ajuste.
-- **Compras:** «Entró mercancía» (en un paso: carga el inventario), o por etapas si la empresa lo usa.
+- **Compras:** **+ Compra** (en un paso: carga el inventario), o por etapas si la empresa lo usa.
 - **Promociones:** campañas de MercadoLibre, qué publicaciones pueden entrar y hasta dónde bajar el precio sin
   perder el envío gratis. **Traer ME y ML** trae precios y campañas de MercadoLibre y los pesos del portal de
   MercadoEnvíos (con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar sale un aviso verde con cuántas

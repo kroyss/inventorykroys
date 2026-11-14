@@ -118,11 +118,13 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
   const nuevasVisibles = visibles.filter(f => estadoDe(f) === 'nueva')
   const todasMarcadas = nuevasVisibles.length > 0 && nuevasVisibles.every(f => marcadas.has(f.codigo))
   const aCrear = filas.filter(f => marcadas.has(f.codigo) && estadoDe(f) === 'nueva')
-  const invalidas = aCrear.filter(f => {
-    const b = bor(f)
-    return (b.costo.trim() !== '' && !(num(b.costo) >= 0)) || !(Number.isInteger(num(b.stock)) && num(b.stock) >= 0)
-  })
+  // 14-11 (el dueño): el costo es OBLIGATORIO al crear. Con costo 0 la venta congela ese costo y la ganancia sale
+  // del 100 % para siempre (no se corrige al completarlo después). Las marcadas sin costo quedan esperando.
+  const costoOk = (f: FilaImportar) => num(bor(f).costo) > 0
+  const stockMal = (f: FilaImportar) => !(Number.isInteger(num(bor(f).stock)) && num(bor(f).stock) >= 0)
+  const invalidas = aCrear.filter(f => (bor(f).costo.trim() !== '' && !costoOk(f)) || stockMal(f))
   const sinCosto = aCrear.filter(f => bor(f).costo.trim() === '').length
+  const listas = aCrear.filter(f => costoOk(f) && !stockMal(f))
 
   const post = async (body: unknown) => {
     const r = await fetch('/api/products/importar-ml', {
@@ -153,15 +155,15 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
   }
 
   const crear = async () => {
-    if (!aCrear.length || invalidas.length) return
+    if (!listas.length || invalidas.length) return
     setOcupado('crear'); setAviso(null)
     const { ok, d } = await post({
       accion: 'crear',
-      productos: aCrear.slice(0, 200).map(f => {
+      productos: listas.slice(0, 200).map(f => {
         const b = bor(f)
         return {
           codigo: f.codigo, cuenta: f.cuenta, nombre: f.variante ? `${f.titulo} · ${f.variante}` : f.titulo,
-          costo: b.costo.trim() === '' ? null : num(b.costo), stock: num(b.stock), precio: paraPrecio(f),
+          costo: num(b.costo), stock: num(b.stock), precio: paraPrecio(f),
         }
       }),
     })
@@ -171,7 +173,8 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
     setAviso({ ok: true, texto: n
       ? `${n} ${n === 1 ? 'producto creado' : 'productos creados'} (${d.creados[0]}${n > 1 ? ` a ${d.creados[n - 1]}` : ''}). Su stock quedó marcado "por verificar".`
       : 'No se creó nada: esas publicaciones ya estaban vinculadas.' })
-    setMarcadas(new Set())
+    // Quedan marcadas solo las que esperan su costo.
+    setMarcadas(new Set(aCrear.filter(f => !listas.includes(f)).map(f => f.codigo)))
     cargar(); cargarProductos()
   }
 
@@ -205,8 +208,8 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
           strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
         <p>
           El stock de los productos nuevos es el que <b>MercadoLibre</b> dice que hay, y suele no ser exacto: quedan marcados
-          <b> “stock por verificar”</b> hasta que lo confirmes producto por producto en Inventario. El costo lo puedes dejar
-          vacío y completarlo después. Publicaciones del catálogo al {fecha(datos?.actualizado_at ?? null)}
+          <b> “stock por verificar”</b> hasta que lo confirmes producto por producto en Inventario. <b>El costo es obligatorio</b>
+          (en USD): sin él tus ganancias saldrían mal desde la primera venta. Publicaciones del catálogo al {fecha(datos?.actualizado_at ?? null)}
         </p>
       </div>
 
@@ -305,7 +308,8 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
                           {e === 'nueva' && eligiendo !== f.codigo && <>
                             <label className="flex items-center gap-1 text-[11px] text-neutral-500">Costo
                               <input value={b.costo} onChange={ev => editar(f, 'costo', ev.target.value)} inputMode="decimal" placeholder="USD"
-                                className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-right text-xs num" />
+                                aria-required="true" aria-invalid={marcadas.has(f.codigo) && !costoOk(f)}
+                                className={`w-20 rounded-md border px-2 py-1 text-right text-xs num ${marcadas.has(f.codigo) && !costoOk(f) ? 'border-amber-400 bg-amber-50 placeholder:text-amber-600' : 'border-neutral-300'}`} />
                             </label>
                             <label className="flex items-center gap-1 text-[11px] text-neutral-500">Stock
                               <input value={b.stock} onChange={ev => editar(f, 'stock', ev.target.value)} inputMode="numeric"
@@ -347,14 +351,15 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-lg">
             <p className="text-sm text-neutral-700">
               <b>{aCrear.length}</b> {aCrear.length === 1 ? 'nueva marcada' : 'nuevas marcadas'}
-              {sinCosto > 0 && <span className="text-neutral-400"> · {sinCosto} sin costo (se completa después)</span>}
-              {invalidas.length > 0 && <span className="text-red-600"> · revisa costo o stock de {invalidas.length}</span>}
+              {sinCosto > 0 && <span className="font-medium text-amber-700"> · falta{sinCosto === 1 ? '' : 'n'} {sinCosto} costo{sinCosto === 1 ? '' : 's'} (en ámbar)</span>}
+              {invalidas.length > 0 && <span className="text-red-600"> · revisa costo (mayor que 0) o stock de {invalidas.length}</span>}
               {aCrear.length > 200 && <span className="text-neutral-400"> · se crean de a 200</span>}
             </p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setMarcadas(new Set())} className="btn-secondary text-sm">Desmarcar</button>
-              <button type="button" onClick={crear} disabled={ocupado === 'crear' || invalidas.length > 0} className="btn-primary text-sm">
-                {ocupado === 'crear' ? 'Creando…' : `Crear ${Math.min(aCrear.length, 200)} ${Math.min(aCrear.length, 200) === 1 ? 'producto' : 'productos'}`}
+              <button type="button" onClick={crear} disabled={ocupado === 'crear' || invalidas.length > 0 || listas.length === 0} className="btn-primary text-sm">
+                {ocupado === 'crear' ? 'Creando…' : listas.length === 0 ? 'Pon los costos para crear'
+                  : `Crear ${Math.min(listas.length, 200)} ${Math.min(listas.length, 200) === 1 ? 'producto' : 'productos'}`}
               </button>
             </div>
           </div>

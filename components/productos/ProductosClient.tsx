@@ -536,7 +536,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
           </Link>
         )}
         {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF</Link>}
-        <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Nuevo producto</button>
+        <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Producto</button>
       </>} />
 
       {/* Catálogo vacío (25-10): el primer paso de quien recién prende inventario es traer sus publicaciones. */}

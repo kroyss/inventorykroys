@@ -105,7 +105,7 @@ export default function ComprasTabs({
           : etapas ? 'Compras a tus proveedores, del pago a la recepción' : 'La mercancía que entra: suma al stock y registra lo que pagaste')
           : 'Mercancía que llega y hay que recibir'}
         actions={isAdmin && (!importaciones ? (
-          <button onClick={() => startCreate('local')} className="btn-primary text-sm whitespace-nowrap">{etapas ? '+ Compra' : '+ Entró mercancía'}</button>
+          <button onClick={() => startCreate('local')} className="btn-primary text-sm whitespace-nowrap">+ Compra</button>
         ) : (
           <div className="relative">
             <button onClick={() => setCreateOpen(o => !o)} className="btn-primary text-sm whitespace-nowrap">
@@ -148,7 +148,8 @@ export default function ComprasTabs({
             {subBtn('import', `Importaciones (${importHist})`)}
           </div>}
           {histType === 'local' || !importaciones
-            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} borradorKey={borradorKey} onChanged={refresh} historyMode />
+            ? <ComprasClient initialOrders={orders} initialSuppliers={localSuppliers} acceso={acceso} etapas={etapas} borradorKey={borradorKey} onChanged={refresh} historyMode
+                autoCreate={!etapas && pendingCreate === 'local'} onAutoCreateHandled={() => setPendingCreate(null)} />
             : <ImportsClient initialOrders={imports} suppliers={importSuppliers} acceso={acceso} onChanged={refresh} historyMode />}
         </div>
       )}

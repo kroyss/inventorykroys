@@ -42,7 +42,7 @@ const Body = z.discriminatedUnion('accion', [
     accion: z.literal('crear'),
     productos: z.array(z.object({
       codigo: Codigo, cuenta: z.string().min(1).max(50), nombre: z.string().trim().min(2).max(200),
-      costo: z.number().nonnegative().max(1_000_000).nullable(), stock: z.number().int().min(0).max(1_000_000),
+      costo: z.number({ message: 'Falta el costo de algún producto' }).positive('El costo debe ser mayor que 0').max(1_000_000), stock: z.number().int().min(0).max(1_000_000),
       precio: z.number().nonnegative().max(1_000_000_000).nullable(),
     })).min(1).max(200),
   }),

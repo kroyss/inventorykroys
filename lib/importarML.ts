@@ -159,7 +159,7 @@ export async function vincularCodigo(db: Pool | PoolClient, productId: number, c
     [productId, cuenta, codigo])
 }
 
-export interface NuevoProducto { codigo: string; cuenta: string; nombre: string; costo: number | null; stock: number; precio: number | null }
+export interface NuevoProducto { codigo: string; cuenta: string; nombre: string; costo: number; stock: number; precio: number | null }
 
 /** Crea los productos en UNA transacción (o todos o ninguno). Salta los códigos que ya quedaron
  *  vinculados (doble clic, otra pestaña). Devuelve los códigos de producto creados. */
@@ -176,7 +176,8 @@ export async function crearProductos(db: PoolClient, lista: NuevoProducto[], use
          WHERE m.is_active AND x.is_active AND m.ml_code = $1 LIMIT 1`, [p.codigo])
       if (ya) continue
       const code = `COD-${String(++n).padStart(4, '0')}`
-      const costo = p.costo ?? 0
+      const costo = p.costo
+      if (!(costo > 0)) throw new Error(`Falta el costo de «${p.nombre.slice(0, 60)}»`)
       const precio = p.precio ?? 0
       const { rows: [prod] } = await db.query(
         `INSERT INTO products (code, name, stock_por_verificar) VALUES ($1, $2, $3) RETURNING id`,
