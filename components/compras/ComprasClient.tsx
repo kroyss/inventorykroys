@@ -308,7 +308,7 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
       if (!raw) return
       sessionStorage.removeItem('repo_items')
       try {
-        const repoItems = JSON.parse(raw) as { id: number; code: string; name: string; quantity: number }[]
+        const repoItems = JSON.parse(raw) as { id: number; code: string; name: string; quantity: number; cost?: number }[]
         if (!repoItems.length) return
         // Pre-fill formItems immediately; product_id is what we need for the POST
         setFormItems(repoItems.map(r => ({
@@ -316,9 +316,9 @@ export default function ComprasClient({ initialOrders, initialSuppliers, acceso,
           product_name:  r.name,
           product_code:  r.code,
           quantity:      r.quantity,
-          unit_cost_usd: 0,
+          unit_cost_usd: r.cost ?? 0,   // 14-11: Reportes → Stock manda el último costo (se puede cambiar)
         })))
-        setFormMsg(`${repoItems.length} producto(s) cargados desde Reposición. Selecciona proveedor y completa los costos.`)
+        setFormMsg(`${repoItems.length} producto(s) cargados desde Reportes → Stock. Elige el proveedor y revisa los costos.`)
         setTimeout(() => setFormMsg(''), 5000)
       } catch { /* ignore */ }
     }

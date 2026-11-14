@@ -3,6 +3,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { localCostFactor } from '@/lib/localCost'
 import { puede } from '@/lib/permisos'
+import { leerReglas } from '@/lib/stockReglas'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -12,6 +13,10 @@ export async function GET(_: NextRequest) {
   try {
     // CO: el costo (USD) se lleva a pesos (×TRM) para el margen vs precio de venta (pesos).
     const costFactor = await localCostFactor(session.user.country)
+    // 14-11: reglas por empresa (Reportes → Stock → Reglas). Con las de SolucionesMC (4/2/6, 6 m, 4 m) todo da igual que antes.
+    const { reglas, propias } = await leerReglas(db)
+    const H = reglas.historia, C = reglas.cayendo, PM = reglas.paradoMeses
+    const W = Math.max(H, 2 * C, PM)   // la ventana más larga que se mira (meses)
     const [{ rows: products }, { rows: localTransit }, { rows: importTransit }, { rows: diasStock }] = await Promise.all([
       db.query(`
         SELECT
@@ -24,6 +29,7 @@ export async function GET(_: NextRequest) {
           pc.profit_percentage                           AS categoria_pct,
           pc.color                                       AS categoria_color,
           COALESCE(v.ventas_6m, 0)                       AS ventas_6m,
+          COALESCE(v.ventas_parado, 0)                   AS ventas_parado,
           -- Ventanas para detectar declive: últimos 4 meses vs los 4 meses previos (5-8).
           COALESCE(v.ventas_4m_recent, 0)                AS ventas_4m_recent,
           COALESCE(v.ventas_4m_prior, 0)                 AS ventas_4m_prior,
@@ -37,16 +43,17 @@ export async function GET(_: NextRequest) {
         LEFT JOIN profit_categories pc ON pp.profit_category_id = pc.id
         LEFT JOIN (
           SELECT si.product_id,
-            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - INTERVAL '6 months') AS ventas_6m,
-            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - INTERVAL '4 months') AS ventas_4m_recent,
+            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - make_interval(months => $1)) AS ventas_6m,
+            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - make_interval(months => $2)) AS ventas_4m_recent,
             SUM(si.quantity) FILTER (
-              WHERE s.created_at >= NOW() - INTERVAL '8 months'
-                AND s.created_at <  NOW() - INTERVAL '4 months'
-            ) AS ventas_4m_prior
+              WHERE s.created_at >= NOW() - make_interval(months => $2 * 2)
+                AND s.created_at <  NOW() - make_interval(months => $2)
+            ) AS ventas_4m_prior,
+            SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - make_interval(months => $3)) AS ventas_parado
           FROM sale_items si
           JOIN sales s ON si.sale_id = s.id
           WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-            AND s.created_at >= NOW() - INTERVAL '8 months'
+            AND s.created_at >= NOW() - make_interval(months => $4)
           GROUP BY si.product_id
         ) v ON v.product_id = p.id
         LEFT JOIN (
@@ -57,7 +64,7 @@ export async function GET(_: NextRequest) {
         ) fin ON fin.product_id = p.id
         WHERE p.is_active = TRUE
         ORDER BY p.code ASC
-      `),
+      `, [H, C, PM, W]),
       // Pending units in local purchase orders
       db.query(`
         SELECT poi.product_id,
@@ -91,14 +98,14 @@ export async function GET(_: NextRequest) {
       db.query(`
         WITH dias AS (
           SELECT generate_series(
-                   date_trunc('day', NOW() - INTERVAL '8 months'),
+                   date_trunc('day', NOW() - make_interval(months => $1)),
                    date_trunc('day', NOW()),
                    INTERVAL '1 day')::date AS d
         ),
         mov AS (
           SELECT product_id, created_at::date AS d, SUM(quantity)::int AS delta
           FROM inventory_movements
-          WHERE created_at >= NOW() - INTERVAL '8 months'
+          WHERE created_at >= NOW() - make_interval(months => $1)
           GROUP BY 1, 2
         ),
         base AS (
@@ -122,18 +129,22 @@ export async function GET(_: NextRequest) {
         SELECT
           product_id,
           COUNT(*) FILTER (WHERE stock_fin_dia > 0
-            AND d >= (NOW() - INTERVAL '4 months')::date)::int AS dias_recent,
+            AND d >= (NOW() - make_interval(months => $3))::date)::int AS dias_recent,
           COUNT(*) FILTER (WHERE stock_fin_dia > 0
-            AND d <  (NOW() - INTERVAL '4 months')::date)::int AS dias_prior,
+            AND d <  (NOW() - make_interval(months => $3))::date
+            AND d >= (NOW() - make_interval(months => $3 * 2))::date)::int AS dias_prior,
           COUNT(*) FILTER (WHERE stock_fin_dia > 0
-            AND d >= (NOW() - INTERVAL '6 months')::date)::int AS dias_6m,
+            AND d >= (NOW() - make_interval(months => $2))::date)::int AS dias_6m,
+          COUNT(*) FILTER (WHERE stock_fin_dia > 0
+            AND d >= (NOW() - make_interval(months => $4))::date)::int AS dias_parado,
           -- Nivel promedio de stock: tener 1 unidad no es estar abastecido.
           -- Sin esto, un producto que pasó el semestre raspando el cero cuenta
           -- como "disponible" y su caída de ventas parece falta de demanda.
           ROUND(AVG(GREATEST(stock_fin_dia, 0)) FILTER (
-            WHERE d >= (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_recent,
+            WHERE d >= (NOW() - make_interval(months => $3))::date), 1)::float AS stock_prom_recent,
           ROUND(AVG(GREATEST(stock_fin_dia, 0)) FILTER (
-            WHERE d <  (NOW() - INTERVAL '4 months')::date), 1)::float AS stock_prom_prior,
+            WHERE d <  (NOW() - make_interval(months => $3))::date
+              AND d >= (NOW() - make_interval(months => $3 * 2))::date), 1)::float AS stock_prom_prior,
           -- Stock mínimo reconstruido. Negativo es imposible: significa que el
           -- historial de movimientos no explica el stock real (cambios de
           -- inventario sin su movimiento, reaperturas mal registradas, datos del
@@ -141,7 +152,7 @@ export async function GET(_: NextRequest) {
           MIN(stock_fin_dia)::int AS stock_min
         FROM hist
         GROUP BY product_id
-      `),
+      `, [W, H, C, PM]),
     ])
 
     const transitLocal:  Record<number, number> = {}
@@ -150,11 +161,11 @@ export async function GET(_: NextRequest) {
     for (const r of importTransit) transitImport[r.product_id] = parseInt(r.pending, 10) || 0
 
     const diasConStock: Record<number, {
-      recent: number; prior: number; m6: number; promRecent: number; promPrior: number; min: number
+      recent: number; prior: number; m6: number; parado: number; promRecent: number; promPrior: number; min: number
     }> = {}
     for (const r of diasStock) {
       diasConStock[r.product_id] = {
-        recent: r.dias_recent, prior: r.dias_prior, m6: r.dias_6m,
+        recent: r.dias_recent, prior: r.dias_prior, m6: r.dias_6m, parado: r.dias_parado,
         promRecent: r.stock_prom_recent ?? 0, promPrior: r.stock_prom_prior ?? 0,
         min: r.stock_min ?? 0,
       }
@@ -166,28 +177,29 @@ export async function GET(_: NextRequest) {
     const declive:    any[] = []
 
     // Umbral de cobertura: la importación tarda ~4 meses en llegar.
-    const LEAD_MONTHS   = 4   // por debajo de esto, hay que reponer
-    const URGENT_MONTHS = 2   // por debajo de esto (incluso con tránsito), es urgente
-    const TARGET_MONTHS = 6   // objetivo de cobertura al pedir
+    const LEAD_MONTHS   = reglas.llegada    // por debajo de esto, hay que reponer
+    const URGENT_MONTHS = reglas.urgente    // por debajo de esto (incluso con tránsito), es urgente
+    const TARGET_MONTHS = reglas.objetivo   // objetivo de cobertura al pedir
     // Reposición: solo vale la pena importar (4 meses de lead) lo que rota lo
     // suficiente. Por debajo de esto NO se ofrece reponer (evita sugerir traer
     // productos que casi no se venden, incluso si están en stock 0).
-    const MIN_REPOSICION = 1  // unidades/mes mínimas para considerar reponer
+    const MIN_REPOSICION = reglas.minimo  // unidades/mes mínimas para considerar reponer
     // Declive: se compara últimos 4 meses vs los 4 previos (5-8). Es declive real
     // si el período anterior vendió al menos el DOBLE que el reciente, y con un
     // piso de unidades para no marcar ruido (ej. 2 vs 0).
     const DECLINE_FACTOR = 2  // anterior >= 2× reciente
     const DECLINE_FLOOR  = 8  // mínimo de unidades en el período anterior
-    const NEW_GRACE_MONTHS = 3 // recién llegados: período de prueba antes de juzgarlos
+    const NEW_GRACE_MONTHS = reglas.nuevo // recién llegados: período de prueba antes de juzgarlos
+    const DIAS_MES = 30.44
     // Para acusar declive, el período RECIENTE tiene que haber tenido stock al
     // menos la mitad de sus ~122 días: si estuvo agotado la mayor parte, no tuvo
     // oportunidad de vender y su caída no dice nada sobre la demanda.
-    const MIN_DIAS_RECIENTE = 60
+    const MIN_DIAS_RECIENTE = Math.round(C * DIAS_MES / 2)   // con 4 meses: 61 ≈ 60 de antes
     // Del período anterior hace falta base suficiente para que la tasa diaria sea
     // estable: con 20 días, un par de semanas buenas (o un artefacto del
     // historial) inflaba la demanda pasada y cualquier mes normal parecía un
     // derrumbe. 45 días ≈ un tercio de la ventana.
-    const MIN_DIAS_PREVIO   = 45
+    const MIN_DIAS_PREVIO   = Math.round(C * DIAS_MES * 0.37)   // con 4 meses: 45
     // Y el estante no puede haber estado mucho más flaco que antes: si el stock
     // promedio reciente es menos de la mitad del anterior, la caída se explica
     // por abastecimiento, no por demanda.
@@ -196,14 +208,17 @@ export async function GET(_: NextRequest) {
     const MIN_DIAS_VENTANA = 30
     // Un producto solo se juzga como remate si tuvo una oportunidad razonable de
     // venderse en los últimos 6 meses (~2 de 6 meses con stock).
-    const MIN_DIAS_REMATE  = 60
+    const MIN_DIAS_REMATE  = Math.round(PM * DIAS_MES / 3)   // con 6 meses: 61 ≈ 60 de antes
+    const PARADO_UNIDADES  = reglas.paradoUnidades
 
     const now = Date.now()
+    let sanos = 0
     for (const r of products) {
       const stock        = parseInt(r.stock_actual, 10) || 0
       const ventas6m     = parseInt(r.ventas_6m, 10) || 0
       const ventas4mRec  = parseInt(r.ventas_4m_recent, 10) || 0
       const ventas4mPrev = parseInt(r.ventas_4m_prior, 10) || 0
+      const ventasParado = parseInt(r.ventas_parado, 10) || 0
 
       // Antigüedad desde que el producto llegó por primera vez al inventario.
       const desde        = r.disponible_desde ? new Date(r.disponible_desde).getTime() : now
@@ -213,7 +228,7 @@ export async function GET(_: NextRequest) {
       // Tasa de venta JUSTA: dividir por los meses que el producto estuvo disponible
       // (entre 1 y 6), no siempre por 6. Así un recién llegado que vende bien no
       // queda subestimado, ni uno nuevo sin ventas se confunde con remate.
-      const divisorMeses = Math.min(6, Math.max(1, mesesDisp))
+      const divisorMeses = Math.min(H, Math.max(1, mesesDisp))
       const ventaMensual = Math.round((ventas6m / divisorMeses) * 10) / 10
       const enTransito   = (transitLocal[r.id] ?? 0) + (transitImport[r.id] ?? 0)
       const cost         = (parseFloat(r.cost) || 0) * costFactor
@@ -222,7 +237,7 @@ export async function GET(_: NextRequest) {
       const gananciaMensual = Math.round(ventaMensual * margenUnit * 100) / 100
 
       // Días que el producto REALMENTE estuvo disponible en cada ventana.
-      const dias = diasConStock[r.id] ?? { recent: 0, prior: 0, m6: 0, promRecent: 0, promPrior: 0, min: 0 }
+      const dias = diasConStock[r.id] ?? { recent: 0, prior: 0, m6: 0, parado: 0, promRecent: 0, promPrior: 0, min: 0 }
       // Si la reconstrucción pasa por stock negativo, el historial no cierra y
       // todo lo que sale de él (días con stock, promedios, tasa por día) es
       // ficción. Caso real: Rollos Papel Burbuja, historial desfasado en 84 u,
@@ -284,10 +299,14 @@ export async function GET(_: NextRequest) {
         stock_actual:     stock,
         min_stock:        parseInt(r.min_stock, 10) || 0,
         cost,
+        cost_usd:         parseFloat(r.cost) || 0,   // para precargar la compra (Compras va en USD)
         sale_price:       salePrice,
         margen_unit:      margenUnit,
         ganancia_mensual: gananciaMensual,
         ventas_6m:        ventas6m,
+        ventas_parado:    ventasParado,
+        dias_stock_parado: dias.parado,
+        valor_stock:      Math.round(stock * cost * 100) / 100,
         venta_mensual:    ventaMensual,
         meses_duracion:   cobertura,        // compat: misma columna que antes
         cobertura,
@@ -315,13 +334,13 @@ export async function GET(_: NextRequest) {
       if (esNuevo) {
         // Solo van a "Nuevos" si aún no despegan (baja rotación); si venden bien,
         // siguen el flujo normal (pueden entrar a reposición).
-        if (ventas6m < 6 && stock > 0) { nuevos.push(base); continue }
+        if (ventasParado < PARADO_UNIDADES && stock > 0) { nuevos.push(base); continue }
       }
 
       // Declive real (venía vendiendo y se cayó): tiene prioridad como señal de
       // "evaluar descontinuar". No se ofrece reponer aunque el promedio dé.
       if (!esNuevo && enDeclive) {
-        base.alerta = `📉 Cayó: ${ventas4mPrev} → ${ventas4mRec} u (con stock los 2 períodos)`
+        base.alerta = `Cayó: ${ventas4mPrev} → ${ventas4mRec} u (con stock los 2 períodos)`
         declive.push(base)
         continue
       }
@@ -332,7 +351,7 @@ export async function GET(_: NextRequest) {
       // Se exige además que haya tenido stock un tiempo razonable: rematar algo
       // que estuvo agotado casi todo el semestre es castigarlo por no haber
       // estado disponible.
-      if (ventas6m < 6 && stock > 0 && (historialRoto || dias.m6 >= MIN_DIAS_REMATE)) {
+      if (ventasParado < PARADO_UNIDADES && stock > 0 && (historialRoto || dias.parado >= MIN_DIAS_REMATE)) {
         if (esNuevo) nuevos.push(base)
         else         remate.push(base)
         continue
@@ -349,10 +368,13 @@ export async function GET(_: NextRequest) {
 
         base.prioridad = prioridad
         base.alerta = prioridad === 'EN_CAMINO'
-          ? `🔵 ${enTransito} en camino cubren la demanda`
-          : `⚠️ Aguanta ${coberturaTotal} m (importación tarda ${LEAD_MONTHS})`
+          ? `${enTransito} en camino cubren la demanda`
+          : `Alcanza ${coberturaTotal} m (tarda ${LEAD_MONTHS} m en llegar)`
         reposicion.push(base)
+        continue
       }
+      // Ni reponer, ni cayendo, ni parado, ni recién llegado, y con stock: va bien.
+      if (stock > 0) sanos++
     }
 
     const PRIO_RANK: Record<string, number> = { URGENTE: 0, PEDIR: 1, EN_CAMINO: 2 }
@@ -363,8 +385,9 @@ export async function GET(_: NextRequest) {
     )
 
     return NextResponse.json({
+      reglas, reglas_propias: propias, sanos,
       reposicion,
-      remate: remate.sort((a, b) => a.ventas_6m - b.ventas_6m),
+      remate: remate.sort((a, b) => b.valor_stock - a.valor_stock || a.ventas_parado - b.ventas_parado),
       // Recién llegados (en período de prueba): no se juzgan como remate todavía.
       nuevos: nuevos.sort((a, b) => a.meses_disponible - b.meses_disponible),
       // Declive: mayor caída primero (anterior − reciente en unidades).

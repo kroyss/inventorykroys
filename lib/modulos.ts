@@ -99,8 +99,13 @@ export function soloRadar(modulos: string[]) {
   return modulos.length > 0 && modulos.every(m => m === 'radar' || m === 'radar_dia')
 }
 
+/** 14-11 (el dueño): Reportes → Resumen y → Stock (con sus reglas) vienen con el Inventario, para todas las empresas
+ *  que lo llevan. No hace falta prenderlos aparte (siguen en la lista por las empresas viejas que ya los tenían). */
+export const CON_INVENTARIO: readonly Modulo[] = ['analisis_stock', 'metricas']
+
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {
-  return !!user?.modulos?.includes(modulo)
+  const m = user?.modulos
+  return !!m && (m.includes(modulo) || (CON_INVENTARIO.includes(modulo) && m.includes('inventario')))
 }
 
 /** ¿La ruta del menú está habilitada para estos módulos? */
