@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import ReportesClient from '@/components/reportes/ReportesClient'
-import { tieneModulo } from '@/lib/modulos'
+import { tieneModulo, conConteos } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 
 export const metadata = { title: 'Reportes' }
@@ -10,7 +10,7 @@ export const metadata = { title: 'Reportes' }
 export default async function ReportesPage() {
   const session = await getServerSession(authOptions)
   if (!session || !puede(session.user, 'ver_reportes')) redirect('/dashboard')
-  return <ReportesClient analisisStock={tieneModulo(session.user, 'analisis_stock')} importaciones={tieneModulo(session.user, 'importaciones')}
+  return <ReportesClient analisisStock={tieneModulo(session.user, 'analisis_stock')} conteos={conConteos(session.user)} importaciones={tieneModulo(session.user, 'importaciones')}
     despachaVE={session.user.country === 'VE' && tieneModulo(session.user, 'verificar_pagos')}
     metricas={tieneModulo(session.user, 'metricas')}
     atencion={tieneModulo(session.user, 'atencion_ml') && tieneModulo(session.user, 'preguntas') && puede(session.user, 'ver_preguntas')} />

@@ -103,6 +103,12 @@ export function soloRadar(modulos: string[]) {
  *  que lo llevan. No hace falta prenderlos aparte (siguen en la lista por las empresas viejas que ya los tenían). */
 export const CON_INVENTARIO: readonly Modulo[] = ['analisis_stock', 'metricas']
 
+/** Conteos físicos (Reportes → Conteos): todavía solo para quien tiene «analisis_stock» prendido DE VERDAD (SolucionesMC),
+ *  no por venir con el Inventario (14-11, el dueño). */
+export function conConteos(user: { modulos?: string[] } | null | undefined) {
+  return !!user?.modulos?.includes('analisis_stock')
+}
+
 export function tieneModulo(user: { modulos?: string[] } | null | undefined, modulo: Modulo) {
   const m = user?.modulos
   return !!m && (m.includes(modulo) || (CON_INVENTARIO.includes(modulo) && m.includes('inventario')))

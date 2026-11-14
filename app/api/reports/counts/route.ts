@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { puede } from '@/lib/permisos'
+import { conConteos } from '@/lib/modulos'
 
 // Reporte de conteos físicos.
 //
@@ -14,7 +15,7 @@ import { puede } from '@/lib/permisos'
 export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
-  if (!puede(session.user, 'ver_reportes')) return forbidden()
+  if (!puede(session.user, 'ver_reportes') || !conConteos(session.user)) return forbidden()
 
   try {
     const { rows } = await db.query(`

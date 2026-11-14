@@ -36,12 +36,12 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 // importaciones: módulo. Sin él no se ofrece el filtro Local/Importación (solo hay compras locales).
 // atencion: «Atención ML» (preguntas, respuestas, tiempo y ventas de ML; módulo atencion_ml, 08-11).
 // metricas: «Resumen» (módulo metricas, 08-11): todo junto con período contra el anterior; es la primera pestaña.
-export default function ReportesClient({ analisisStock, importaciones, despachaVE = false, metricas = false }: { analisisStock: boolean; importaciones: boolean; despachaVE?: boolean; atencion?: boolean; metricas?: boolean }) {
+export default function ReportesClient({ analisisStock, conteos = false, importaciones, despachaVE = false, metricas = false }: { analisisStock: boolean; conteos?: boolean; importaciones: boolean; despachaVE?: boolean; atencion?: boolean; metricas?: boolean }) {
   const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', metricas ? 'resumen' : 'ventas')
   // 14-11: «Atención ML» ya no es pestaña (sus números están en Resumen → Atención en MercadoLibre); un link viejo cae en Resumen.
   const tab = tabGuardada === 'atencion' ? (metricas ? 'resumen' : 'ventas')
-    : (!analisisStock && (tabGuardada === 'stock' || tabGuardada === 'conteos')) || (!metricas && tabGuardada === 'resumen') ? 'ventas' : tabGuardada
-  const stateTabs = analisisStock ? STATE_TABS : STATE_TABS.filter(t => t.key !== 'stock' && t.key !== 'conteos')
+    : (!analisisStock && tabGuardada === 'stock') || (!conteos && tabGuardada === 'conteos') || (!metricas && tabGuardada === 'resumen') ? 'ventas' : tabGuardada
+  const stateTabs = STATE_TABS.filter(t => (analisisStock || t.key !== 'stock') && (conteos || t.key !== 'conteos'))
   const [preset,   setPreset]   = useState<DatePreset>('last90')
   const [dateFrom, setDateFrom] = useState(presetRange('last90').from)
   const [dateTo,   setDateTo]   = useState(presetRange('last90').to)
