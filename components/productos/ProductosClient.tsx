@@ -917,9 +917,11 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
 
                 {/* categoría (Inventario simple: no hay; el precio es lo publicado) */}
                 {simple ? (
-                  <div className="rounded-lg border-2 border-green-400 bg-green-50 p-3">
+                  // 14-11 (el dueño): en Venezuela el precio y el peso van en la misma línea (2/3 precio, 1/3 peso).
+                  <div className={country === 'VE' ? 'grid grid-cols-3 gap-2' : ''}>
+                  <div className="col-span-2 rounded-lg border-2 border-green-400 bg-green-50 p-3">
                     <label className="mb-1 block text-[11px] font-medium text-green-700">
-                      Precio de venta {country === 'CO' ? '(pesos)' : '(USD)'} · lo que publicas en MercadoLibre
+                      Precio de venta {country === 'CO' ? '(pesos)' : '(USD)'} · lo que publicas en ML
                     </label>
                     {country === 'CO' ? (
                       <input type="text" inputMode="numeric" value={form.sale_price ? fmtPeso(form.sale_price) : ''}
@@ -937,6 +939,28 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     {country === 'VE' && form.sale_price > 0 && (veRate?.official ?? 0) > 0 && (
                       <p className="mt-1 text-[10px] text-neutral-500">≈ Bs {fmt(form.sale_price * (veRate?.official ?? 0))} a la tasa oficial</p>
                     )}
+                  </div>
+                  {country === 'VE' && (
+                    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"
+                      title="El peso define cuánto te cobra MercadoLibre por el envío, y eso se descuenta de tu ganancia">
+                      <label className="mb-1 block text-[11px] font-medium text-neutral-600">Peso (kg) · ME</label>
+                      {form.peso_ml ? (
+                        <p className="py-2 text-xl font-bold text-neutral-800" title="Peso del portal de MercadoEnvíos: se actualiza solo">
+                          {form.weight_kg} <span className="align-middle rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span>
+                        </p>
+                      ) : <input type="number" step="0.001" min="0" value={form.weight_kg}
+                        onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))}
+                        placeholder="0.350"
+                        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xl font-bold text-neutral-800 text-right focus:outline-none focus:ring-2 focus:ring-neutral-800" />}
+                      <p className="mt-1 text-[10px] text-neutral-500">{form.peso_ml ? 'del portal' : 'a mano'}</p>
+                    </div>
+                  )}
+                  {country === 'VE' && !form.peso_ml && form.pesos_ml && (
+                    <div className="col-span-3">
+                      <ElegirPesoML pesos={form.pesos_ml} actual={form.weight_kg}
+                        onElegir={kg => setForm(f => ({ ...f, weight_kg: String(kg) }))} />
+                    </div>
+                  )}
                   </div>
                 ) : (
                   <MedidorGanancia valor={form.ganancia_pct} onChange={n => setForm(f => ({ ...f, ganancia_pct: n }))} nivel={nivelForm}
@@ -1015,9 +1039,9 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     )}
                   </div>}
 
-                  {country === 'VE' ? (
+                  {country === 'VE' && simple ? null : country === 'VE' ? (
                     <>
-                      {/* MercadoEnvíos + Descuento (VE) */}
+                      {/* MercadoEnvíos + Descuento (VE). En el modo simple el peso va al lado del precio (arriba). */}
                       <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <label className="text-xs font-medium text-neutral-700">Peso (kg) <span className="text-neutral-400">· MercadoEnvíos</span></label>
@@ -1101,7 +1125,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                   )}
 
                   {/* Lo que realmente te queda — cascada compartida (parámetros en Ajustes) */}
-                  <div className="border-t border-neutral-200 pt-3">
+                  <div className={simple ? "" : "border-t border-neutral-200 pt-3"}>
                     <p className="text-sm font-semibold text-neutral-700 mb-2">Lo que te queda{simulando && <span className="ml-1 text-xs font-normal text-sky-700">· con el precio que estás probando</span>}</p>
                     <MlBreakdown
                       country={country}
