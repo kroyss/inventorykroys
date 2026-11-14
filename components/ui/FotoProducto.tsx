@@ -77,7 +77,11 @@ export async function achicarFoto(archivo: File, lado = 600): Promise<string> {
 }
 
 /** Ficha del producto: la foto grande con «Cambiar foto» (sube una propia) y «Usar la de ML» (si tiene propia). */
-export function FotoEditable({ id, nombre, puedeCambiar }: { id: number; nombre?: string | null; puedeCambiar: boolean }) {
+export function FotoEditable({ id, nombre, puedeCambiar, compacto, children }: {
+  id: number; nombre?: string | null; puedeCambiar: boolean
+  /** 14-11 (el dueño): ficha de Productos — miniatura junto al nombre (`children`) y «Cambiar foto» como enlace chico. */
+  compacto?: boolean; children?: React.ReactNode
+}) {
   const url = useFotoProducto(id)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,6 +104,25 @@ export function FotoEditable({ id, nombre, puedeCambiar }: { id: number; nombre?
     if (!r?.ok) setError('No se pudo quitar la foto'); else await recargarFotos()
     setOcupado(false)
   }
+  if (compacto) return (
+    <div className="flex min-w-0 items-start gap-3">
+      <FotoProducto id={id} nombre={nombre} tam="md" />
+      <div className="min-w-0 flex-1">
+        {children}
+        {puedeCambiar && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[11px]">
+            <label className={`cursor-pointer text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline ${ocupado ? 'pointer-events-none opacity-50' : ''}`}>
+              {ocupado ? 'Guardando…' : url ? 'Cambiar foto' : 'Subir foto'}
+              <input type="file" accept="image/*" className="hidden" disabled={ocupado} onChange={e => { subir(e.target.files?.[0]); e.target.value = '' }} />
+            </label>
+            {propia && <button type="button" onClick={usarML} disabled={ocupado} className="text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline">Usar la de MercadoLibre</button>}
+            {!propia && url && <span className="text-neutral-400">Foto de MercadoLibre</span>}
+            {error && <span className="text-red-700">{error}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
   return (
     <div className="flex items-center gap-3">
       <FotoProducto id={id} nombre={nombre} tam="lg" />

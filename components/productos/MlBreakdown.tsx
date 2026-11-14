@@ -21,11 +21,26 @@ const num = (ml: Record<string, string>, k: string, d: number) => {
 // (lib/salud.ts). Misma fórmula que el catálogo, Inicio y Reportes.
 const fmtPct = (n: number) => `${(Math.round(n * 10) / 10).toLocaleString('de-DE')} %`
 
-function Resultado({ ganancia, rentab, recargo, u, dinero, quien }: {
-  ganancia: number; rentab: number | null; recargo?: number | null; u: Umbrales; dinero: string; quien: string
+function Resultado({ ganancia, rentab, recargo, u, dinero, quien, compacto }: {
+  ganancia: number; rentab: number | null; recargo?: number | null; u: Umbrales; dinero: string; quien: string; compacto?: boolean
 }) {
   const n = NIVEL[nivelDe(rentab ?? (ganancia >= 0 ? u.sano : -1), u)]
   const puntos = recargo != null && rentab != null ? recargo - rentab : null
+  if (compacto) return (
+    <div className={`rounded-lg px-3 py-2 border-2 ${n.fondo}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xl font-bold tabular-nums ${n.texto}`}><span className="mr-1.5 text-xs font-bold uppercase tracking-wide">Te queda</span>{ganancia < 0 ? '−' : ''}${dinero}</span>
+        {rentab != null && (
+          <span className={`text-right text-xs font-semibold ${n.texto}`} title={AYUDA_RENTABILIDAD}>
+            Rentabilidad {fmtPct(rentab)} {n.icono}<span className="cursor-help font-normal text-neutral-400"> ⓘ</span>
+          </span>
+        )}
+      </div>
+      {rentab != null && puntos != null && puntos > 0.05 && (
+        <p className="mt-0.5 text-[11px] leading-snug text-neutral-600">Le sumaste <b>{fmtPct(recargo!)}</b>, te queda <b>{fmtPct(rentab)}</b>: {(Math.round(puntos * 10) / 10).toLocaleString('de-DE')} puntos se los lleva{quien}.</p>
+      )}
+    </div>
+  )
   return (
     <div className={`rounded-lg p-3 border-2 ${n.fondo} space-y-1.5`}>
       <div className="flex items-baseline justify-between gap-2">
@@ -50,7 +65,7 @@ function Resultado({ ganancia, rentab, recargo, u, dinero, quien }: {
 
 function Row({ label, value, neg, sub }: { label: string; value: string; neg?: boolean; sub?: string }) {
   return (
-    <div className="flex items-baseline justify-between px-1 py-0.5">
+    <div className="flex items-baseline justify-between px-1 py-px">
       <span className="text-neutral-600">
         {label}{sub && <span className="text-neutral-400 text-[10px] ml-1">{sub}</span>}
       </span>
@@ -74,6 +89,8 @@ export interface MlBreakdownProps {
   coTrm?: number
   /** Recargo sobre costo (%) del producto, para «le sumaste X %, te queda Y %». Sin él no sale esa frase. */
   recargo?: number | null
+  /** 14-11: ficha de solo lectura — filas apretadas, Te queda y rentabilidad en una franja, la nota en el ⓘ. */
+  compacto?: boolean
 }
 
 export default function MlBreakdown(p: MlBreakdownProps) {
@@ -97,15 +114,15 @@ export default function MlBreakdown(p: MlBreakdownProps) {
     return (
       <div className="space-y-2">
         <div className="text-sm space-y-0.5">
-          <p className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Resultado de tu venta</p>
+          {!p.compacto && <p className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Resultado de tu venta</p>}
           <Row label="Precio publicado (pesos)" value={`$${fmtPeso(price)}`} />
           <Row label={`− Comisión MercadoLibre (${comisionPct}%)`} value={`−$${fmtPeso(comision)}`} neg />
           <Row label={`− Envío MercadoLibre (${price >= umbral ? '≥' : '<'} umbral)`} value={`−$${fmtPeso(envio)}`} neg />
           <Row label={`− Retención (${retenPct}%)`} value={`−$${fmtPeso(reten)}`} neg />
           <Row label="− Costo del producto (×TRM)" value={`−$${fmtPeso(costoPesos)}`} neg />
         </div>
-        <Resultado ganancia={ganancia} rentab={rentab} recargo={p.recargo} u={u} dinero={fmtPeso(Math.abs(ganancia))} quien="n MercadoLibre y la retención" />
-        <p className="text-[10px] text-neutral-400 px-1">Comisión, envío, retención y colores en Productos → Costos ML.</p>
+        <Resultado ganancia={ganancia} rentab={rentab} recargo={p.recargo} u={u} dinero={fmtPeso(Math.abs(ganancia))} quien="n MercadoLibre y la retención" compacto={p.compacto} />
+        {!p.compacto && <p className="text-[10px] text-neutral-400 px-1">Comisión, envío, retención y colores en Productos → Costos ML.</p>}
       </div>
     )
   }
@@ -133,7 +150,7 @@ export default function MlBreakdown(p: MlBreakdownProps) {
   return (
     <div className="space-y-2">
       <div className="text-sm space-y-0.5">
-        <p className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Resultado de tu venta</p>
+        {!p.compacto && <p className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Resultado de tu venta</p>}
         <Row label="Precio final en ML" value={`$${fmtUsd(final)}`} sub={p.priceBs ? `Bs ${fmtPeso(p.priceBs)}` : undefined} />
         <Row label="− Pérdida por cambio (Bs → $)" value={`−$${fmtUsd(cambiario)}`} neg sub="oficial → paralelo" />
         <Row label={`− Comisión MercadoLibre (${comisionPct}%)`} value={`−$${fmtUsd(comision)}`} neg />
@@ -141,8 +158,8 @@ export default function MlBreakdown(p: MlBreakdownProps) {
           sub={`gratis desde $${fmtUsd(umbral)}${porPeso ? ' por peso' : ' (sin peso)'}`} />
         <Row label="− Costo del producto" value={`−$${fmtUsd(p.totalCost)}`} neg />
       </div>
-      <Resultado ganancia={ganancia} rentab={rentab} recargo={p.recargo} u={u} dinero={fmtUsd(Math.abs(ganancia))} quien="n MercadoLibre y el cambio" />
-      <p className="text-[10px] text-neutral-400 px-1">Comisión, envío y colores en Productos → Costos ML. La pérdida por cambio es lo que pierden tus bolívares al pasarlos a dólar paralelo.</p>
+      <Resultado ganancia={ganancia} rentab={rentab} recargo={p.recargo} u={u} dinero={fmtUsd(Math.abs(ganancia))} quien="n MercadoLibre y el cambio" compacto={p.compacto} />
+      {!p.compacto && <p className="text-[10px] text-neutral-400 px-1">Comisión, envío y colores en Productos → Costos ML. La pérdida por cambio es lo que pierden tus bolívares al pasarlos a dólar paralelo.</p>}
     </div>
   )
 }

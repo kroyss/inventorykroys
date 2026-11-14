@@ -1178,84 +1178,60 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         const net = netDe(v, vEff)
         // Precio que efectivamente se cobra en ML: el guardado (simple) o el calculado con descuento.
         const vFinal = simple ? v.sale_price : liveFinalVE(v, veRate?.excess ?? 0, vEff)
-        const Field = ({ label, value, accent = 'text-neutral-900' }: { label: string; value: ReactNode; accent?: string }) => (
-          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-2.5">
-            <p className="text-[11px] text-neutral-500">{label}</p>
-            <p className={`text-sm font-semibold ${accent}`}>{value}</p>
+        // 14-11 (el dueño: «mucho espacio vacío»): filas etiqueta → valor en vez de tarjetas.
+        const Field = ({ label, value, accent = 'text-neutral-900', sub }: { label: string; value: ReactNode; accent?: string; sub?: ReactNode }) => (
+          <div className="flex items-baseline justify-between gap-3 py-1">
+            <span className="text-neutral-500">{label}</span>
+            <span className="text-right"><span className={`font-semibold ${accent}`}>{value}</span>{sub && <span className="ml-2 text-xs text-neutral-400">{sub}</span>}</span>
           </div>
         )
+        const Titulo = ({ children }: { children: ReactNode }) => <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{children}</p>
         return (
           <div className="fixed inset-0 z-50">
             <div className={`absolute inset-0 bg-black/30 transition-opacity duration-200 ${viewMounted ? 'opacity-100' : 'opacity-0'}`} onClick={closeView} />
             <div className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-200 ${viewMounted ? 'translate-x-0' : 'translate-x-full'}`}>
               {/* header */}
-              <div className="flex items-start justify-between px-6 py-4 border-b border-neutral-100 shrink-0">
-                <div className="min-w-0">
-                  <div className="font-mono text-xs text-neutral-400">{v.code}</div>
-                  <h2 className="font-bold text-neutral-900 truncate">{v.name}</h2>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
+              {/* 13-11 (mig. 173) foto propia o de ML; 14-11 miniatura junto al nombre. */}
+              <div className="flex items-start justify-between gap-2 px-5 py-3 border-b border-neutral-100 shrink-0">
+                <FotoEditable id={v.id} nombre={v.name} puedeCambiar compacto>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="font-mono text-neutral-400">{v.code}</span>
+                    <span className={`px-1.5 py-0.5 rounded-full font-medium ${v.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-400'}`}>
                       {v.is_active ? 'Activo' : 'Inactivo'}
                     </span>
                     {gananciaDe(v as unknown as Product) != null && (
-                      <span className="text-xs bg-neutral-100 px-2 py-0.5 rounded-full">Recargo {fmtPct(gananciaDe(v as unknown as Product)!)}</span>
+                      <span className="bg-neutral-100 px-1.5 py-0.5 rounded-full">Recargo {fmtPct(gananciaDe(v as unknown as Product)!)}</span>
                     )}
                   </div>
-                </div>
-                <button onClick={closeView} className="text-neutral-400 hover:text-neutral-700 text-lg">✕</button>
-              </div>
-              {/* 13-11 (mig. 173): la foto del producto (propia o de MercadoLibre) y cambiarla. */}
-              <div className="px-6 py-3 border-b border-neutral-100 shrink-0">
-                <FotoEditable id={v.id} nombre={v.name} puedeCambiar />
+                  <h2 className="font-bold leading-snug text-neutral-900 line-clamp-2">{v.name}</h2>
+                </FotoEditable>
+                <button onClick={closeView} className="text-neutral-400 hover:text-neutral-700 text-lg" aria-label="Cerrar">✕</button>
               </div>
 
               {/* body */}
-              <div className="px-6 py-4 space-y-4 flex-1 overflow-y-auto text-sm">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Costos</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Field label="Costo" value={`$${fmt(v.base_cost)}`} />
-                    <Field label="Envío" value={`$${fmt(v.shipping_cost)}`} />
-                    <Field label="Costo total" value={`$${fmt(v.total_cost)}`} />
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Precios</p>
+              <div className="px-5 py-3 space-y-3 flex-1 overflow-y-auto text-sm">
+                <div className="divide-y divide-neutral-100">
+                  <Field label="Costo" value={`$${fmt(v.total_cost)}`}
+                    sub={v.shipping_cost > 0 ? `$${fmt(v.base_cost)} + envío $${fmt(v.shipping_cost)}` : undefined} />
                   {country === 'VE' && simple ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field label="Precio de venta (publicado)" value={`$${fmt(v.sale_price)}`} accent="text-neutral-900" />
-                      <Field label="Precio Bs" value={`Bs ${fmt(v.sale_price * (veRate?.official ?? 0))}`} />
-                      {net && (
-                        <Field label="Rentabilidad" value={`${Math.round(net.rentabilidad)}%`} accent={netColor(net.rentabilidad, umbr)} />
-                      )}
-                    </div>
-                  ) : country === 'VE' ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} accent="text-neutral-900" />
-                      <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`} />
-                      {descuento && <>
-                        <Field label="Descuento aplicado" value={`${fmt(vEff)}%`} />
-                        <Field label="Venta c/ descuento (ML)" value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff))}`} accent="text-green-700" />
-                      </>}
-                      <Field label="Precio Bs" value={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0))}`} />
-                      {net && (
-                        <Field label="Rentabilidad" value={`${Math.round(net.rentabilidad)}%`} accent={netColor(net.rentabilidad, umbr)} />
-                      )}
-                    </div>
-                  ) : (
-                    /* CO: el precio de venta está en pesos (sección Inventario); aquí el análisis en USD */
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field label="Precio venta ≈ USD" value={coTrm > 0 ? `$${fmt(v.sale_price / coTrm)}` : '—'} accent="text-green-700" />
-                      {net && (
-                        <Field label="Rentabilidad" value={`${Math.round(net.rentabilidad)}%`} accent={netColor(net.rentabilidad, umbr)} />
-                      )}
-                    </div>
+                    <Field label="Precio publicado" value={`$${fmt(v.sale_price)}`} sub={`Bs ${fmt(v.sale_price * (veRate?.official ?? 0))}`} />
+                  ) : country === 'VE' ? <>
+                    <Field label="Precio base (a Ventas)" value={`$${fmt(liveBaseVE(v))}`} />
+                    <Field label="Precio publicado" value={`$${fmt(liveBaseVE(v) * (1 + (veRate?.excess ?? 0) / 100))}`}
+                      sub={descuento ? undefined : `Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0))}`} />
+                    {descuento && (
+                      <Field label={`Con descuento ${fmt(vEff)}%`} value={`$${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff))}`} accent="text-green-700"
+                        sub={`Bs ${fmt(liveFinalVE(v, veRate?.excess ?? 0, vEff) * (veRate?.official ?? 0))}`} />
+                    )}
+                  </> : (
+                    /* CO: el precio de venta en pesos; aquí también ≈ USD */
+                    <Field label="Precio de venta" value={`$${fmtPeso(v.sale_price)}`} sub={coTrm > 0 ? `≈ USD ${fmt(v.sale_price / coTrm)}` : undefined} />
                   )}
+                  <Field label="Stock" value={int(v.quantity)} accent={v.quantity > 0 ? 'text-neutral-900' : 'text-red-600'} />
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Lo que te queda</p>
+                  <Titulo>Lo que te queda</Titulo>
                   <MlBreakdown
                     country={country}
                     totalCost={v.total_cost}
@@ -1267,17 +1243,21 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                     salePrice={v.sale_price}
                     coTrm={coTrm}
                     recargo={gananciaDe(v as unknown as Product)}
+                    compacto
                   />
                 </div>
 
                 {country === 'VE' && vShip && (
                   <div>
-                    <p className="text-sm font-semibold text-neutral-800 mb-2">MercadoEnvíos</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-xs text-neutral-600">Peso (kg)</label>
+                    <Titulo>MercadoEnvíos</Titulo>
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <span className="text-neutral-500">Peso</span>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded border ${shipBadge(vShip).cls}`}>{shipBadge(vShip).label}</span>
+                        </span>
                         {viewing.peso_origen === 'ml' ? (
-                          <span className="text-sm" title="Peso del portal de MercadoEnvíos: se actualiza solo">{viewing.weight_kg} <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span></span>
+                          <span className="text-sm font-semibold" title="Peso del portal de MercadoEnvíos: se actualiza solo">{viewing.weight_kg} kg <span className="rounded bg-sky-50 px-1 text-[10px] font-semibold text-sky-700">ME</span></span>
                         ) : <div className="flex items-center gap-1">
                           <input type="number" step="0.001" min="0" value={viewWeight}
                             onChange={e => setViewWeight(e.target.value)}
@@ -1293,13 +1273,10 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                       {viewing.peso_origen !== 'ml' && viewing.pesos_ml && (
                         <ElegirPesoML pesos={viewing.pesos_ml} actual={viewWeight} onElegir={kg => setViewWeight(String(kg))} />
                       )}
-                      <div className={`text-[11px] px-2 py-1.5 rounded border ${shipBadge(vShip).cls}`}>
-                        {shipBadge(vShip).label}
-                      </div>
                       {vShip.tier && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <Field label="Umbral envío gratis" value={`$${fmt(vShip.tier.minPrice)}`} />
-                          <Field label="Desc. máx sin perderlo" value={vShip.maxDiscount != null ? `${vShip.maxDiscount.toFixed(1)}%` : '—'} accent={vShip.status === 'capped' ? 'text-amber-700' : undefined} />
+                        <div className="divide-y divide-neutral-100">
+                          <Field label="Envío gratis desde" value={`$${fmt(vShip.tier.minPrice)}`} />
+                          {descuento && <Field label="Descuento máx. sin perderlo" value={vShip.maxDiscount != null ? `${vShip.maxDiscount.toFixed(1)}%` : '—'} accent={vShip.status === 'capped' ? 'text-amber-700' : undefined} />}
                         </div>
                       )}
                       {vShip.status === 'capped' && (
@@ -1310,15 +1287,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                 )}
 
                 <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Inventario</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Stock" value={int(v.quantity)} accent={v.quantity > 0 ? 'text-neutral-900' : 'text-red-600'} />
-                    <Field label="Precio de venta" value={country === 'CO' ? `$${fmtPeso(v.sale_price)}` : `$${fmt(v.sale_price)}`} accent={country === 'CO' ? 'text-green-700' : undefined} />
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-neutral-800 mb-2">Publicaciones de MercadoLibre</p>
+                  <Titulo>Publicaciones de MercadoLibre</Titulo>
                   <VinculosML codes={v.ml_codes} productCode={v.code} />
                 </div>
               </div>
