@@ -31,11 +31,10 @@ const reloj = (seg: number | null) => seg ? `${Math.floor(seg / 60)}:${String(se
 const input = 'w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm bg-white'
 
 /** Plataforma → Aprendizaje: videos (YouTube "No listado"), su orden, el link de "agendar" y el avance de cada cliente. */
-export default function AprendizajePanel() {
+export default function AprendizajePanel({ sub }: { sub: 'videos' | 'clientes' }) {
   const confirm = useConfirm()
   const [datos, setDatos] = useState<{ videos: Video[]; alumnos: Alumno[]; agendar: string | null; uso: Uso[]; enLinea: EnLinea[]; enLineaMinutos: number } | null>(null)
   const [nuevo, setNuevo] = useState({ url: '', titulo: '', descripcion: '', serie: 'automatizaciones' as Serie, duracion: '' })
-  const [sub, setSub] = useState<'clientes' | 'videos'>('videos')   // 12-11: lo que más se usa es editar el curso
   const [agregando, setAgregando] = useState(false)
   const [agendar, setAgendar] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -84,12 +83,6 @@ export default function AprendizajePanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-1.5">
-        {([['videos', `Curso (${activos} videos)`], ['clientes', 'Quién vio los cursos']] as const).map(([k, t]) => (
-          <button key={k} onClick={() => setSub(k)}
-            className={`px-3 py-1 rounded-full text-sm border ${sub === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
-        ))}
-      </div>
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
       {aviso && <div className="bg-lime-50 border border-lime-300 text-lime-900 px-4 py-2 rounded text-sm">✓ {aviso}</div>}
 

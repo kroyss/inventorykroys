@@ -1,4 +1,6 @@
 'use client'
+import { useState } from 'react'
+import Segmentos from './Segmentos'
 import { ESCALONES, PLANES, PLANES_PROXIMAMENTE, RECARGAS_IA, CREDITOS_PRUEBA, CUENTAS_INCLUIDAS, CUENTA_EXTRA,
   DESCUENTO_TRIMESTRAL, DESCUENTO_FUNDADOR, RADAR_PRO, precioRadarMes } from '@/lib/planes'
 import { VisitasRegistro } from './ResumenPanel'
@@ -13,13 +15,16 @@ const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
  *  leen de lib/planes.ts (la misma fuente que /precios): aquí solo se miran. */
 export default function ProgramasPanel({ hoy, visitas }: { hoy: string; visitas: unknown }) {
   const radar = precioRadarMes(hoy || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }))
+  // 14-11: segmentos en vez de una página larga con plegables al final (lo vigente primero; lo que pasó, aparte).
+  const [sub, setSub] = useState<'precios' | 'prueba' | 'despegue' | 'fundadores'>('precios')
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-neutral-900">Vigente</h2>
-          <p className="text-sm text-neutral-500">Lo que se ofrece hoy. Es lo mismo que muestra la página pública de precios.</p>
-        </div>
+    <div className="space-y-4">
+      <Segmentos etiqueta="Programas y promos" valor={sub} onCambio={setSub} items={[
+        { k: 'precios', t: 'Planes y precios' }, { k: 'prueba', t: 'Prueba 15 días' },
+        { k: 'despegue', t: 'Despegue · Grupo 1' }, { k: 'fundadores', t: 'Fundadores' }]} />
+
+      {sub === 'precios' && <section className="space-y-3">
+        <p className="text-sm text-neutral-500">Lo que se ofrece hoy. Es lo mismo que muestra la página pública de precios.</p>
 
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
@@ -59,6 +64,9 @@ export default function ProgramasPanel({ hoy, visitas }: { hoy: string; visitas:
             detalle={RECARGAS_IA.map(r => `${r.creditos.toLocaleString('de-DE')}`).join(' · ') + ' créditos · no vencen'} />
         </div>
 
+      </section>}
+
+      {sub === 'prueba' && <section className="space-y-3">
         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4 space-y-3">
           <div>
             <h3 className="text-sm font-semibold text-neutral-900">Prueba gratis de 15 días (autoregistro)</h3>
@@ -68,22 +76,17 @@ export default function ProgramasPanel({ hoy, visitas }: { hoy: string; visitas:
           </div>
           <VisitasRegistro inicial={visitas} />
         </div>
-      </section>
+      </section>}
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-neutral-900">Historial</h2>
-          <p className="text-sm text-neutral-500">Programas que ya pasaron. Quedan para consultar.</p>
-        </div>
-        <details className="group rounded-xl border border-neutral-200 bg-white px-4 py-3">
-          <summary className="cursor-pointer select-none text-sm font-semibold text-neutral-800">Programa Despegue · Grupo 1</summary>
-          <div className="mt-3"><DespegueCard /></div>
-        </details>
-        <details className="group rounded-xl border border-neutral-200 bg-white px-4 py-3">
-          <summary className="cursor-pointer select-none text-sm font-semibold text-neutral-800">Programa Fundadores · lista, rondas y postulaciones</summary>
-          <div className="mt-3"><FundadoresPanel /></div>
-        </details>
-      </section>
+      {sub === 'despegue' && <section className="space-y-2">
+        <p className="text-sm text-neutral-500">Programa que ya pasó: queda para consultar.</p>
+        <DespegueCard />
+      </section>}
+
+      {sub === 'fundadores' && <section className="space-y-2">
+        <p className="text-sm text-neutral-500">Programa concluido: la lista, las rondas y las postulaciones quedan para consultar.</p>
+        <FundadoresPanel />
+      </section>}
     </div>
   )
 }

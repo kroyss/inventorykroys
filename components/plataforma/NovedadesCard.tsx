@@ -1,6 +1,7 @@
 'use client'
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { MODULOS } from '@/lib/modulos'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 // Plataforma → Interno → Novedades (migración 095): lo que ven los clientes en el megáfono de la barra.
 // Los borradores no los ve nadie; "Publicar" los muestra con el puntito a quien todavía no los vio.
@@ -19,6 +20,7 @@ const MODULO_CORTO: Record<string, string> = {
 }
 
 export default function NovedadesCard() {
+  const confirmar = useConfirm()
   const [lista, setLista] = useState<Novedad[] | null>(null)
   const [form, setForm] = useState<Form | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +59,7 @@ export default function NovedadesCard() {
 
   const publicarTodas = async () => {
     const ids = (lista ?? []).filter(n => !n.publicada_at).map(n => n.id)
-    if (!ids.length || !confirm(`¿Publicar los ${ids.length} borradores? Los clientes los verán en el megáfono.`)) return
+    if (!ids.length || !await confirmar({ title: 'Publicar borradores', message: `Se publican los ${ids.length} borradores: los clientes los verán en el megáfono.`, confirmText: 'Publicar' })) return
     setBusy(true); setError(null)
     for (const id of ids) {
       const r = await fetch('/api/plataforma/novedades', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, publicar: true }) })
@@ -83,7 +85,7 @@ export default function NovedadesCard() {
           : <button onClick={() => llamar('PUT', { id: n.id, publicar: true })} disabled={busy} className="btn-secondary text-xs px-2.5 py-1">Publicar</button>}
         <button onClick={() => setForm({ id: n.id, fecha: n.fecha, titulo: n.titulo, texto: n.texto, modulo: n.modulo, enlace: n.enlace ?? '' })}
           className="underline text-neutral-500 hover:text-neutral-800">Editar</button>
-        <button onClick={() => { if (confirm('¿Borrar esta novedad?')) llamar('DELETE', undefined, `?id=${n.id}`) }}
+        <button onClick={async () => { if (await confirmar({ title: 'Borrar novedad', message: `Se borra «${n.titulo}».`, confirmText: 'Borrar' })) llamar('DELETE', undefined, `?id=${n.id}`) }}
           className="underline text-neutral-400 hover:text-red-700">Borrar</button>
       </div>
     </li>

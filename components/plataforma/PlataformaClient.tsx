@@ -16,6 +16,7 @@ import AdopcionPanel, { type FiltroUso, type ResumenCobro } from './AdopcionPane
 import PlanCliente from './PlanCliente'
 import SoportePanel from './SoportePanel'
 import { PanelPagos } from './CobrosPanel'
+import Segmentos from './Segmentos'
 import { soloRadar as soloRadarModulos } from '@/lib/modulos'
 import { DIAS_PRUEBA, ETIQUETA_ESTADO, estadoEfectivo, type EstadoCuenta } from '@/lib/cuenta'
 import { corteDeAlta, corteISO } from '@/lib/fundadoresCortes'
@@ -161,6 +162,7 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
   // y Despegue) e Interno con todo lo técnico adentro (IA, Soporte, Telegram, cuentas de personas).
   const [vista, setVista]       = useState<'uso' | 'novedades' | 'programas' | 'interno'>('uso')
   const [interno, setInterno]   = useState<'ia' | 'auto' | 'soporte' | 'telegram'>('ia')
+  const [novedadesSub, setNovedadesSub] = useState<'novedades' | 'curso' | 'alumnos'>('novedades')
   // 13-11 (el dueño, un solo panel por cliente): «Clientes» junta Uso y Cuentas y cobros. Los pagos por revisar se abren
   // desde «Por atender»; Vencen/Pagando son filtros de la lista; las personas viven en la ficha y el buscador las encuentra.
   const [filtroUso, setFiltroUso] = useState<FiltroUso>('todos')
@@ -327,25 +329,29 @@ export default function PlataformaClient({ empresaActual, inicial = null }: { em
 
       {/* En celular las 6 pestañas no caben: se deslizan de lado dentro de su línea (antes ensanchaban la página). */}
       <div className="flex gap-1 shadow-[inset_0_-1px_0_#e5e5e5] overflow-x-auto [scrollbar-width:none]">
-        {([['uso', `Clientes${empresas.length ? ` (${clientesActivos})` : ''}${pendientes.pagos ? ` · 💳 ${pendientes.pagos}` : ''}`],
-           ['novedades', 'Novedades y cursos'], ['programas', 'Programas y promos'], ['interno', `Interno${pendientes.casos ? ` (${pendientes.casos})` : ''}`]] as const).map(([v, t]) => (
-          <button key={v} onClick={() => setVista(v)}
-            className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border-b-2 ${vista === v ? 'border-neutral-900 font-semibold' : 'border-transparent text-neutral-500'}`}>
+        {/* 14-11: el número gris = cuántos; el rojo = algo por atender (pagos por revisar, casos de soporte abiertos). */}
+        {([['uso', 'Clientes', empresas.length ? clientesActivos : null, pendientes.pagos],
+           ['novedades', 'Novedades y cursos', null, 0], ['programas', 'Programas y promos', null, 0],
+           ['interno', 'Interno', null, pendientes.casos]] as const).map(([v, t, n, alerta]) => (
+          <button key={v} onClick={() => { if (v === 'interno' && vista !== 'interno' && pendientes.casos) setInterno('soporte'); setVista(v) }} aria-current={vista === v ? 'page' : undefined}
+            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors ${vista === v ? 'border-neutral-900 font-semibold text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
             {t}
+            {n != null && <span className={`rounded-full px-1.5 text-[11px] font-medium leading-4 tabular-nums ${vista === v ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-500'}`}>{n}</span>}
+            {alerta ? <span className="rounded-full bg-red-500 px-1.5 text-[11px] font-semibold leading-4 text-white" title="Por atender">{alerta}</span> : null}
           </button>
         ))}
       </div>
 
-      {vista === 'novedades' ? <div className="space-y-8"><NovedadesCard /><AprendizajePanel /></div>
+      {vista === 'novedades' ? <>
+          <Segmentos etiqueta="Novedades y cursos" valor={novedadesSub} onCambio={setNovedadesSub} items={[
+            { k: 'novedades', t: 'Novedades' }, { k: 'curso', t: 'Curso' }, { k: 'alumnos', t: 'Quién vio los cursos' }]} />
+          {novedadesSub === 'novedades' ? <NovedadesCard /> : <AprendizajePanel sub={novedadesSub === 'curso' ? 'videos' : 'clientes'} />}
+        </>
         : vista === 'programas' ? <ProgramasPanel hoy={hoy} visitas={inicial?.visitas ?? null} />
         : vista === 'interno' ? <>
-          <div className="flex flex-wrap gap-1.5">
-            {([['ia', 'Gasto de IA'], ['auto', 'IA automática por cliente'],
-               ['soporte', `Soporte${pendientes.casos ? ` (${pendientes.casos})` : ''}`], ['telegram', 'Telegram']] as const).map(([k, t]) => (
-              <button key={k} onClick={() => setInterno(k)}
-                className={`px-3 py-1 rounded-full text-sm border ${interno === k ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white border-neutral-200 text-neutral-600'}`}>{t}</button>
-            ))}
-          </div>
+          <Segmentos etiqueta="Interno" valor={interno} onCambio={setInterno} items={[
+            { k: 'soporte', t: 'Soporte', alerta: pendientes.casos }, { k: 'ia', t: 'Gasto de IA' },
+            { k: 'auto', t: 'IA automática por cliente' }, { k: 'telegram', t: 'Telegram' }]} />
           {interno === 'ia' ? <InternoPanel /> : interno === 'auto' ? <IaClientesPanel />
             : interno === 'soporte' ? <SoportePanel inicial={casoSoporte} /> : <AvisosTelegramCard />}
         </> : <>
