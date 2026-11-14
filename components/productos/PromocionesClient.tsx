@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Ventana } from '@/components/ui/Ventana'
 import Link from '@/components/ui/Link'
 import { useRouter } from 'next/navigation'
 import { PageHeader, EmptyState, FilterPills, Pagination } from '@/components/ui'
@@ -24,6 +25,7 @@ export interface CampanaVista extends CampanaML { conexionId: number; cuentas: s
 }
 export interface FilaPromo {
   id: string; conexionId: number; cuenta: string; titulo: string; precio: number; producto: string | null; costo: number | null
+  foto?: string | null   // miniatura de ML (ml_catalogo, 14-11)
   peso: number | null; pesoFuente: 'portal' | 'producto' | null
   promos: (PromoDeItem & { nombre: string })[]
   programadas: { nombre: string; precio: number; inicio: string | null }[]
@@ -78,14 +80,23 @@ const precioSeguro = (publicado: number, pct: number, base: { estado: EstadoEnvi
 }
 const hoyMas = (dias: number) => { const d = new Date(); d.setDate(d.getDate() + dias); return d.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }) }
 const clave = (f: { conexionId: number; id: string }) => `${f.conexionId}|${f.id}`
+/** Miniatura de la publicación (la de ML ya es chica: carga diferida, sin bloquear la tabla). */
+function Miniatura({ src, grande = false }: { src?: string | null; grande?: boolean }) {
+  const t = grande ? 'h-14 w-14' : 'h-10 w-10'
+  return src
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={src} alt="" loading="lazy" decoding="async" width={grande ? 56 : 40} height={grande ? 56 : 40} className={`${t} shrink-0 rounded-md border border-neutral-200 bg-white object-contain`} />
+    : <span className={`${t} shrink-0 rounded-md border border-neutral-200 bg-neutral-50`} aria-hidden />
+}
 // 14-11 (el dueño: una cinta RGB de PIKEKE se vendió con más de 50% por una promo que no correspondía): un descuento
-// que pasa del DOBLE del más bajo vigente en la cuenta (o de otra promo de la misma publicación) se marca y se advierte.
-// Ej.: las otras en 10% → todo lo que pase de 20% (30% = +200% de descuento). Menos de 1% no cuenta como promo.
+// que pasa del DOBLE del descuento HABITUAL de la cuenta (el más repetido; antes el mínimo, pero unas pocas promos de ML
+// en 1-2% lo dejaban en 1,5% y marcaba todo) o de otra promo de la misma publicación se marca y se advierte.
+// Ej.: lo habitual 10% → todo lo que pase de 20% (30% = +200% de descuento). Menos de 1% no cuenta como promo.
 const DOBLE = 2
 export const excesoDescuento = (nuevo: number, ref: number | null | undefined) =>
   ref != null && ref >= 1 && nuevo > ref * DOBLE + 0.05 ? { nuevo, ref, mas: Math.round((nuevo / ref - 1) * 100) } : null
 const textoExceso = (e: { nuevo: number; ref: number; mas: number }) =>
-  `${pct(e.nuevo)} es +${e.mas}% sobre tu mínimo (${pct(e.ref)})`
+  `${pct(e.nuevo)} es +${e.mas}% sobre tu descuento habitual (${pct(e.ref)})`
 
 const ENVIO: Record<EstadoEnvio, { t: string; c: string }> = {
   ambas:    { t: 'ZOOM y TEALCA', c: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
@@ -115,6 +126,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
   const [error, setError] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<Modal>(null)
+  const [verPromos, setVerPromos] = useState<string | null>(null)   // clave de la publicación (ventana «Ver sus promos», 14-11)
   // 08-11 (el dueño): lo que sugiere MercadoLibre (su "Nueva propuesta") es POR PRODUCTO (max_discounted_price = el
   // descuento mínimo que pide). En la campaña se muestra el rango; al agregar, cada publicación usa el suyo.
   const campanas = useMemo(() => campanasBase.map(c => {
@@ -186,15 +198,22 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
       margen: margenA(f, actual),
     }
   }), [filas, margenA, tablas])
-  // Descuento mínimo vigente por cuenta (14-11): la referencia contra la que se mide «más del doble».
+  // Descuento HABITUAL por cuenta (14-11): el % entero más repetido entre las promos vigentes (empate → el menor).
+  // Es la referencia contra la que se mide «más del doble».
   const minPorCuenta = useMemo(() => {
-    const m: Record<number, number> = {}
+    const cuentas: Record<number, Map<number, number>> = {}
     for (const v of vistas) for (const p of v.promos) {
       if (p.estado !== 'started' || p.precio == null || v.precio <= 0) continue
-      const d = pctReal(v.precio, p.precio)
-      if (d >= 1 && (m[v.conexionId] == null || d < m[v.conexionId])) m[v.conexionId] = d
+      const d = Math.round(pctReal(v.precio, p.precio))
+      if (d < 1) continue
+      const m = (cuentas[v.conexionId] ??= new Map())
+      m.set(d, (m.get(d) ?? 0) + 1)
     }
-    return m
+    const r: Record<number, number> = {}
+    for (const [con, m] of Object.entries(cuentas)) {
+      r[Number(con)] = [...m.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0]
+    }
+    return r
   }, [vistas])
   const conExceso = useMemo(() => vistas.map(v => ({ ...v,
     exceso: v.enPromo ? excesoDescuento(v.descuento, minPorCuenta[v.conexionId]) : null })), [vistas, minPorCuenta])
@@ -521,7 +540,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
         <div className="flex flex-wrap items-center gap-2">
           <FilterPills<Filtro> value={filtro} onChange={v => { setFiltro(v); setPagina(1) }} options={[
             { value: 'todas', label: 'Todas', count: base.length },
-            ...(cuenta_(filtros.doble) || filtro === 'doble' ? [{ value: 'doble' as Filtro, label: '⚠ Más del doble del mínimo', count: cuenta_(filtros.doble) }] : []),
+            ...(cuenta_(filtros.doble) || filtro === 'doble' ? [{ value: 'doble' as Filtro, label: '⚠ Más del doble de lo habitual', count: cuenta_(filtros.doble) }] : []),
             { value: 'adentro', label: 'En promoción', count: cuenta_(filtros.adentro) },
             { value: 'candidatas', label: 'Pueden entrar', count: cuenta_(filtros.candidatas) },
             { value: 'quita', label: 'La promo quita el envío', count: cuenta_(filtros.quita) },
@@ -550,8 +569,9 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
 
         {filtro === 'doble' && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-            Publicaciones con un descuento de <b>más del doble</b> del más bajo que tienes vigente en esa cuenta
-            ({Object.entries(minPorCuenta).map(([con, m]) => `${cuentas.find(c => c.id === Number(con))?.nombre ?? con}: mínimo ${pct(m)} → marca desde ${pct(m * DOBLE)}`).join(' · ') || 'sin promociones'}).
+            Publicaciones con <b>más del doble</b> de tu descuento habitual (el que más se repite en esa cuenta)
+            ({Object.entries(minPorCuenta).map(([con, m]) => `${cuentas.find(c => c.id === Number(con))?.nombre ?? con}: habitual ${pct(m)} → marca desde ${pct(m * DOBLE)}`).join(' · ') || 'sin promociones'}).
+            Usa «Ver sus promos» para ver en cuáles está cada una y quitar las que no correspondan.
             Revisa que de verdad correspondan.
           </p>
         )}
@@ -588,12 +608,17 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                           ? <span className="text-emerald-600" title={`Ya está en «${campElegida!.nombre}»`}>✓</span>
                           : <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} />}
                       </td>
-                      <td className="px-3 py-2 max-w-[300px]">
+                      <td className="px-3 py-2 max-w-[340px]">
+                        <div className="flex gap-2.5">
+                        <Miniatura src={v.foto} />
+                        <div className="min-w-0">
                         <a href={urlML(v.id)} target="_blank" rel="noreferrer" className="text-neutral-900 hover:underline line-clamp-2">{v.titulo}</a>
                         {campElegida && (yaEn
                           ? <div className="text-[11px] font-medium text-emerald-700">✓ Ya en {campElegida.nombre}{yaEn.precio != null ? ` a ${usd(yaEn.precio)}` : ''}</div>
                           : <div className="text-[11px] font-medium text-sky-700">Puede entrar a {campElegida.nombre}</div>)}
                         <div className="text-[11px] text-neutral-400">{v.id} · {v.cuenta}{v.producto ? ` · ${v.producto}` : ''}</div>
+                        </div>
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         {v.peso != null ? <>{v.peso.toLocaleString('de-DE')} kg<div className="text-[11px] text-neutral-400">{v.pesoFuente === 'portal' ? 'portal' : 'producto'}</div></> : <span className="text-neutral-400">—</span>}
@@ -602,7 +627,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                       <td className="px-3 py-2 text-xs">
                         {v.enPromo ? <>
                           <div className="font-medium text-neutral-900">{usd(v.actual)} <span className={v.exceso ? 'font-bold text-red-700' : 'text-emerald-700'}>−{pct(v.descuento)}</span></div>
-                          {v.exceso && <div className="mt-0.5 inline-block rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-800" title="Más del doble del descuento más bajo vigente en esta cuenta">⚠ {textoExceso(v.exceso)}</div>}
+                          {v.exceso && <div className="mt-0.5 inline-block rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-800" title="Más del doble del descuento habitual de esta cuenta">⚠ {textoExceso(v.exceso)}</div>}
                           <div className="text-neutral-500">{v.enPromo.nombre}</div>
                           {v.promos.filter(p => p.estado === 'started' && p.campana !== v.enPromo!.campana).map(p => (
                             <div key={p.campana} className="text-neutral-400" title="Guardada: se aplica cuando termine la más baja">
@@ -616,6 +641,10 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
                           <button onClick={() => sacar(v, v.enPromo!)} disabled={!!busy}
                             className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
                             {busy === `sacar-${k}` ? 'Quitando…' : '✕ Quitar promo'}
+                          </button>
+                          <button onClick={() => setVerPromos(k)}
+                            className="mt-1 ml-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-neutral-300 bg-white px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-sm hover:bg-neutral-50">
+                            Ver sus promos ({v.promos.filter(p => p.estado === 'started').length + v.programadas.length})
                           </button>
                         </> : (!v.programadas.length && <span className="text-neutral-400">—</span>)}
                         {v.programadas.map(p => (
@@ -665,6 +694,52 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
         </p>
       </>}
 
+      {verPromos && porClave.get(verPromos) && (() => {
+        const v = porClave.get(verPromos)!
+        const activas = v.promos.filter(p => p.estado === 'started').sort((a, b) => (a.precio ?? 0) - (b.precio ?? 0))
+        return (
+          <Ventana titulo="Promociones de la publicación" onCerrar={() => setVerPromos(null)}>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-3">
+                <Miniatura src={v.foto} grande />
+                <div className="min-w-0">
+                  <div className="font-medium text-neutral-900 line-clamp-2">{v.titulo}</div>
+                  <div className="text-xs text-neutral-500">{v.id} · {v.cuenta} · publicado {usd(v.precio)}</div>
+                </div>
+              </div>
+              {activas.length === 0 && !v.programadas.length && <p className="text-neutral-500">No está en ninguna promoción.</p>}
+              <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+                {activas.map((p, i) => {
+                  const d = p.precio != null ? pctReal(v.precio, p.precio) : 0
+                  const ex = excesoDescuento(d, minPorCuenta[v.conexionId])
+                  const camp = campanas.find(c => c.conexionId === v.conexionId && c.id === p.campana)
+                  return (
+                    <li key={p.campana} className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 ${ex ? 'bg-red-50' : ''}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-neutral-900">{p.nombre}
+                          <span className="ml-1.5 text-xs font-normal text-neutral-400">{camp?.tipo === 'SELLER_CAMPAIGN' ? 'propia' : 'de ML'}</span></div>
+                        <div className="text-xs text-neutral-500">
+                          {usd(p.precio)} · <span className={ex ? 'font-bold text-red-700' : 'text-emerald-700'}>−{pct(d)}</span>
+                          {' · '}{i === 0 ? <b className="text-neutral-700">la que cobra hoy</b> : 'en espera (se aplica si termina la más baja)'}
+                        </div>
+                        {ex && <div className="text-[11px] font-semibold text-red-800">⚠ {textoExceso(ex)}</div>}
+                      </div>
+                      <button onClick={async () => { await sacar(v, p); setVerPromos(null) }} disabled={!!busy}
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50">
+                        {busy === `sacar-${verPromos}` ? 'Quitando…' : '✕ Quitar de esta'}
+                      </button>
+                    </li>
+                  )
+                })}
+                {v.programadas.map(p => (
+                  <li key={p.nombre} className="px-3 py-2 text-sky-800">⏱ {p.nombre}: {usd(p.precio)} desde {fecha(p.inicio)} <span className="text-xs text-neutral-400">(programada)</span></li>
+                ))}
+              </ul>
+              <p className="text-xs text-neutral-500">Si está en varias, MercadoLibre cobra la más baja y las otras quedan en espera. Al quitar una, vuelve a la siguiente (o a su precio publicado).</p>
+            </div>
+          </Ventana>
+        )
+      })()}
       {modal?.tipo === 'agregar' && (
         <AgregarModal minPorCuenta={minPorCuenta} modal={modal} setModal={setModal} filas={modal.claves.map(k => porClave.get(k)).filter(Boolean) as Vista[]}
           campanas={campanas} margenA={margenA} margenMin={margenMin} tablas={tablas}
@@ -873,7 +948,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
     const zoom = validas.filter(x => x.pierdeZoom).length
     const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
     const dobles = validas.filter(x => x.exceso)
-    const avisos = [dobles.length && `⚠ OJO: ${dobles.length} quedaría${dobles.length === 1 ? '' : 'n'} con MÁS DEL DOBLE de descuento que tus otras promociones (${textoExceso(dobles[0].exceso!)}${dobles.length > 1 ? ', y otras' : ''}). Confirma que es correcto.`,
+    const avisos = [dobles.length && `⚠ OJO: ${dobles.length} quedaría${dobles.length === 1 ? '' : 'n'} con MÁS DEL DOBLE de tu descuento habitual (${textoExceso(dobles[0].exceso!)}${dobles.length > 1 ? ', y otras' : ''}). Confirma que es correcto.`,
       sinGratis && `• ${sinGratis} queda${sinGratis === 1 ? '' : 'n'} SIN envío gratis (cobro a destino, con 1 unidad o comprando 2 o 3).`,
       zoom && `• ${zoom} pierde${zoom === 1 ? '' : 'n'} ZOOM: solo tendrá${zoom === 1 ? '' : 'n'} envío gratis por TEALCA. En Preguntas y Mensajes se verá así mientras dure la promoción.`,
       bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con margen menor a ${margenMin}%.`].filter(Boolean).join('\n')
@@ -999,7 +1074,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
               <div className="rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-red-900">
                 <div className="text-base font-bold">⚠ Ojo: más del doble de descuento</div>
                 <div className="mt-0.5"><b>{d.length}</b> publicaci{d.length === 1 ? 'ón quedaría' : 'ones quedarían'} con más del doble del descuento
-                  de tus otras promociones. Ej.: otras <b>{pct(peor.exceso!.ref)}</b> → esta <b>{pct(peor.exceso!.nuevo)}</b> (+{peor.exceso!.mas}%).
+                  habitual de tus promociones. Ej.: habitual <b>{pct(peor.exceso!.ref)}</b> → esta <b>{pct(peor.exceso!.nuevo)}</b> (+{peor.exceso!.mas}%).
                   Revisa el % antes de agregar: están marcadas en rojo abajo.</div>
               </div>
             )
@@ -1029,7 +1104,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
                       {x.ajustada && <span className="block text-[11px] font-normal text-emerald-700" title="Máximo descuento sin perder el envío gratis">máx. seguro · −{pct(pctReal(x.f.precio, x.precio))}</span>}
                       {x.sugML && <span className="block text-[11px] font-normal text-yellow-800">−{pct(pctReal(x.f.precio, x.precio))} · sugerido ML</span>}
                       {x.enPiso && <span className="block text-[11px] font-normal text-sky-700" title={`ML no deja bajar de $${PISO_ML}: queda en el piso`}>piso $2 · −{pct(pctReal(x.f.precio, x.precio))}</span>}
-                      {x.exceso && <span className="block text-[11px] font-bold text-red-700">⚠ −{pct(x.exceso.nuevo)} · otras {pct(x.exceso.ref)} (+{x.exceso.mas}%)</span>}
+                      {x.exceso && <span className="block text-[11px] font-bold text-red-700">⚠ −{pct(x.exceso.nuevo)} · habitual {pct(x.exceso.ref)} (+{x.exceso.mas}%)</span>}
                     </td>
                     <td className="px-2 py-1.5">
                       {x.pierde ? <span className={x.sinGratis ? 'text-red-700' : 'text-amber-800'}>{ENVIO[x.f.envioBase.estado].t} → <b>{ENVIO[x.despues.estado].t}</b></span> : <Chip e={x.despues.estado} />}

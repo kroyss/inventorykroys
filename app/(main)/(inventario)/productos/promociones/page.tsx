@@ -21,7 +21,7 @@ export default async function PromocionesPage() {
   if (session.user.country !== 'VE' || !tieneModulo(session.user, 'promociones') || !puede(session.user, 'promociones')) redirect('/productos')
 
   const db = dbDeSesion(session)
-  const [{ rows: fotos }, { rows: portal }, { rows: vinculados }, { rows: acciones }] = await Promise.all([
+  const [{ rows: fotos }, { rows: portal }, { rows: vinculados }, { rows: acciones }, { rows: miniaturas }] = await Promise.all([
     db.query(`SELECT c.conexion_id, x.nickname, c.datos, c.error, c.actualizado_at
               FROM ml_promociones_cache c JOIN ml_conexiones x ON x.id = c.conexion_id
               WHERE x.estado = 'activa' ORDER BY x.id`),
@@ -36,7 +36,10 @@ export default async function PromocionesPage() {
                      COALESCE(u.full_name, u.username) AS usuario
               FROM ml_promociones_acciones a LEFT JOIN users u ON u.id = a.usuario_id
               WHERE a.creado_at > NOW() - INTERVAL '60 days' ORDER BY a.creado_at DESC LIMIT 300`),
+    // 14-11: miniatura de cada publicación (la que ya guarda Publicaciones, sin consultar a ML).
+    db.query(`SELECT item_id, thumbnail FROM ml_catalogo WHERE thumbnail IS NOT NULL`),
   ])
+  const miniatura = new Map(miniaturas.map(r => [r.item_id as string, String(r.thumbnail).replace(/^http:/, 'https:')]))
   const pctCampanas = await leerPctCampanas(db)
   // 11-11: campañas propias pausadas (Pausar / Reanudar): las publicaciones que tenían.
   const { rows: pausasRows } = await db.query(`SELECT key, value FROM app_settings WHERE key LIKE 'promo_pausa:%'`)
@@ -86,7 +89,7 @@ export default async function PromocionesPage() {
         if (v && p.estado === 'candidate') v.candidatas++
       }
       filas.push({
-        id: it.id, conexionId: f.conexion_id, cuenta: f.nickname, titulo: it.titulo, precio: it.precio,
+        id: it.id, conexionId: f.conexion_id, cuenta: f.nickname, titulo: it.titulo, precio: it.precio, foto: miniatura.get(it.id) ?? null,
         producto: prod?.code ?? null, costo: prod?.costo && prod.costo > 0 ? prod.costo : null,
         peso, pesoFuente: pp != null && pp > 0 ? 'portal' : peso != null ? 'producto' : null,
         promos: it.promos.map(p => ({ ...p, nombre: nombres.get(p.campana) ?? p.campana })),

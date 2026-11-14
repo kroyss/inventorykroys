@@ -918,13 +918,17 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   perder el envío gratis. **Traer ME y ML** trae precios y campañas de MercadoLibre y los pesos del portal de
   MercadoEnvíos (con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar sale un aviso verde con cuántas
   publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
-  **Aviso de «más del doble» (para no equivocarse de %):** el sistema toma el descuento **más bajo** que tienes
-  vigente en cada cuenta (ej. 10%). Toda publicación con **más del doble** (más de 20% en ese ejemplo; si el mínimo es
-  5%, más de 10%) sale con el descuento en rojo y «⚠ 30% es +200% sobre tu mínimo (10%)». El filtro rápido
-  **«⚠ Más del doble del mínimo»** (aparece cuando hay alguna) las junta para revisarlas. Al **agregar** a una
-  campaña o cambiar el %, si alguna quedaría con más del doble que tu mínimo o que otra promoción de esa misma
-  publicación, sale un recuadro rojo «Ojo: más del doble de descuento» con el ejemplo (otras 10% → esta 30%), la fila
-  marcada en rojo y una confirmación antes de mandarla.
+  **Aviso de «más del doble» (para no equivocarse de %):** el sistema toma tu **descuento habitual** en cada cuenta
+  (el % que más se repite entre tus promos vigentes, ej. 10%; no el más bajo, porque unas pocas promos de ML en 1-2%
+  lo distorsionaban). Toda publicación con **más del doble** (más de 20% en ese ejemplo; si lo habitual es 5%, más de
+  10%) sale con el descuento en rojo y «⚠ 30% es +200% sobre tu descuento habitual (10%)». El filtro rápido
+  **«⚠ Más del doble de lo habitual»** (aparece cuando hay alguna) las junta para revisarlas. Al **agregar** a una
+  campaña o cambiar el %, si alguna quedaría con más del doble de lo habitual o de otra promoción de esa misma
+  publicación, sale un recuadro rojo «Ojo: más del doble de descuento» con el ejemplo, la fila marcada en rojo y una
+  confirmación antes de mandarla.
+  **Ver sus promos (N):** en cada publicación en promoción, abre una ventana con **todas** las promociones en las que
+  está (nombre, si es de ML o propia, precio, %, cuál cobra hoy y cuáles quedan en espera, y las programadas), con
+  **Quitar de esta** en cada una. Cada publicación muestra su **foto miniatura** de MercadoLibre.
   En una campaña que **todavía no empezó** (ej. Black Friday del 16/11) puedes agregar publicaciones desde ya: quedan
   **programadas** y el precio se activa solo el día que empieza.
   **Agregar a una campaña ya no necesita la ventana abierta:** al tocar «Agregar N a la campaña» quedan en la cola y
