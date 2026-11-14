@@ -10,7 +10,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 // (recomendación: no cuenta para terminar). «Ocultar» pide confirmar y se vuelve a abrir desde Aprendizaje.
 // Textos = docs/ayuda/sistema.md (mantener iguales).
 interface Estado { ml: boolean; productos: boolean; stock: boolean; venta: boolean; procesada: boolean; compra: boolean; oculta: boolean; conML: boolean
-  conPeso?: boolean; sin_peso?: number; peso_por_revisar?: number }
+  conPeso?: boolean; sin_peso?: number }
 interface Paso { k: string; titulo: string; como: string; href: string; ir: string; hecho: boolean }
 const VISTA = 'guia-inventario-vista'
 export const MANUAL_INVENTARIO = '/aprendizaje/manual/inventario'
@@ -32,7 +32,7 @@ function pasos(e: Estado): Paso[] {
     ...(e.conPeso ? [{
       k: 'peso', titulo: e.sin_peso ? `Pon el peso de tus productos (faltan ${e.sin_peso})` : 'Pon el peso de tus productos',
       hecho: e.productos && !e.sin_peso, href: '/productos/mercadoenvios', ir: 'Ir a MercadoEnvíos',
-      como: 'El peso decide si el producto tiene envío gratis y cuánto te cobra ML de envío. En Productos → MercadoEnvíos toca «Traer pesos de ML»: los que no tienen peso toman el de su publicación (revísalos en «Por revisar»); los que falten, escríbelos a mano.',
+      como: 'El peso decide si el producto tiene envío gratis y cuánto te cobra ML de envío. Sale del portal de MercadoEnvíos (con Pagos ME): al importar o vincular se pide solo, y en Productos → MercadoEnvíos «Traer pesos de ML» lo trae de una vez. Los que el portal no tenga, escríbelos a mano.',
     }] : []),
     {
       k: 'stock', titulo: 'Pon el stock que tienes hoy', hecho: e.stock, href: '/inventario', ir: 'Ir a Inventario',

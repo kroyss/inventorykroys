@@ -30,8 +30,7 @@ export async function GET() {
              EXISTS (SELECT 1 FROM sales WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')) AS procesada,
              EXISTS (SELECT 1 FROM purchase_orders) OR EXISTS (SELECT 1 FROM import_orders) AS compra,
              COALESCE((SELECT value FROM app_settings WHERE key = '${CLAVE}'), '') = '1' AS oculta,
-             (SELECT COUNT(*)::int FROM products WHERE is_active AND (weight_kg IS NULL OR weight_kg <= 0)) AS sin_peso,
-             (SELECT COUNT(*)::int FROM products WHERE is_active AND peso_origen = 'publicacion') AS peso_por_revisar`)
+             (SELECT COUNT(*)::int FROM products WHERE is_active AND (weight_kg IS NULL OR weight_kg <= 0)) AS sin_peso`)
     // 14-11: paso «Pon el peso» en toda empresa de Venezuela (tabla de MercadoEnvíos); la guía ya exige Inventario.
     const conPeso = a.u.country === 'VE'
     return NextResponse.json({ ...r, conML: tieneModulo(a.u, 'preguntas'), conPeso })

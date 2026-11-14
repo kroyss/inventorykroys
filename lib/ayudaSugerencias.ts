@@ -67,7 +67,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: 'Un empleado olvidó su contraseña', respuesta: 'En su fila toca **Cambiar contraseña** y pásale la nueva. Sus sesiones abiertas se cierran.' },
   ],
   '/productos/mercadoenvios': [
-    { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'Toca **⬇ Traer pesos de ML**: los productos sin peso toman el que declara su publicación y quedan en **📝 Por revisar** (corrígelo o confírmalo con ✓). Si tienes Pagos ME, además llegan los pesos reales del portal en 1 a 3 minutos.' },
+    { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
   ],
   '/aprendizaje': [

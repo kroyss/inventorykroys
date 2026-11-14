@@ -82,7 +82,6 @@ interface FormState {
   sale_price: number
   weight_kg: string   // string para permitir vacío en el input
   peso_ml?: boolean   // mig. 174: el peso viene del portal de MercadoEnvíos (no se edita a mano)
-  peso_borrador?: boolean   // 14-11: el peso es el que declara la publicación (origen 'publicacion'), por revisar
   pesos_ml?: number[] | null   // sus publicaciones pesan distinto en ML: se elige uno con un clic
   ml_codes: MLCode[]   // solo lectura (13-11): los vínculos se hacen en Publicaciones → Vincular
 }
@@ -354,7 +353,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       sale_price:         data.sale_price,
       weight_kg:          data.weight_kg != null ? String(data.weight_kg) : '',
       peso_ml:            data.peso_origen === 'ml',
-      peso_borrador:      data.peso_origen === 'publicacion',
       pesos_ml:           data.pesos_ml ?? null,
       ml_codes:           data.ml_codes as MLCode[],
     })
@@ -393,7 +391,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
       }
       // Los códigos ML ya no se mandan (13-11): se vinculan en Publicaciones → Vincular.
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { ml_codes: _codigos, peso_ml: _pm, peso_borrador: _pb, pesos_ml: _pd, ...sinVinculos } = form
+      const { ml_codes: _codigos, peso_ml: _pm, pesos_ml: _pd, ...sinVinculos } = form
       const payload = {
         ...sinVinculos,
         ganancia_pct: simple ? null : form.ganancia_pct,
@@ -1016,9 +1014,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                             className="w-28 border border-neutral-300 rounded px-2 py-1 text-sm text-right
                                        focus:outline-none focus:ring-2 focus:ring-neutral-800" />}
                         </div>
-                        {!form.peso_ml && form.peso_borrador && (
-                          <p className="text-[11px] text-amber-700">📝 Peso que declara su publicación de ML: revísalo (al cambiarlo queda como tuyo).</p>
-                        )}
                         {!form.peso_ml && form.pesos_ml && (
                           <ElegirPesoML pesos={form.pesos_ml} actual={form.weight_kg}
                             onElegir={kg => setForm(f => ({ ...f, weight_kg: String(kg) }))} />
@@ -1278,9 +1273,6 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
                           </button>
                         </div>}
                       </div>
-                      {viewing.peso_origen === 'publicacion' && (
-                        <p className="text-[11px] text-amber-700">📝 Peso que declara su publicación de ML: revísalo y toca ✓ para confirmarlo.</p>
-                      )}
                       {viewing.peso_origen !== 'ml' && viewing.pesos_ml && (
                         <ElegirPesoML pesos={viewing.pesos_ml} actual={viewWeight} onElegir={kg => setViewWeight(String(kg))} />
                       )}

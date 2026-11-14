@@ -27,38 +27,14 @@ export async function sincronizarPesos(db: Pick<Pool, 'query'>): Promise<number>
 /** Para un LEFT JOIN (alias pv): los pesos distintos del portal cuando NO coinciden (float[]); NULL si coinciden o no hay. */
 export const SQL_PESOS_DISTINTOS = `CASE WHEN pv.mn <> pv.mx THEN pv.todos END`
 
-// ── Peso de la PUBLICACIÓN (14-11-2026, el dueño) ───────────────────────────────────────────────────────────────────
-// Sin el portal (empresas sin Pagos ME), el peso sale del atributo «Peso del paquete del seller» que ya trae el catálogo
-// (ml_catalogo.ficha, lib/catalogoML.ts): es lo que el vendedor declaró en ML. Queda como BORRADOR (origen
-// 'publicacion'): se usa, pero se marca «de la publicación · revísalo» y se puede cambiar (al editarlo pasa a 'manual').
-// Solo llena productos SIN peso, y si TODAS sus publicaciones de 1 unidad declaran el mismo. El del portal lo pisa.
-
-/** SQL: kg declarados en la ficha de la publicación (NULL si no lo tiene). `ficha` = columna de ml_catalogo. */
-export const sqlPesoFicha = (ficha: string) =>
-  `(NULLIF(replace(substring(${ficha} from 'Peso del paquete del seller: ([0-9]+(?:[.,][0-9]+)?) g'), ',', '.'), '')::numeric / 1000)`
-
-export async function pesosDePublicaciones(db: Pick<Pool, 'query'>): Promise<number> {
-  const { rowCount } = await db.query(`
-    WITH pesos AS (
-      SELECT pm.product_id, MIN(${sqlPesoFicha('c.ficha')}) AS mn, MAX(${sqlPesoFicha('c.ficha')}) AS mx
-      FROM product_ml_codes pm
-      JOIN ml_catalogo c ON substring(c.item_id FROM 4) = split_part(pm.ml_code, ':', 1)
-      WHERE pm.is_active AND pm.unidades = 1 AND ${sqlPesoFicha('c.ficha')} > 0
-      GROUP BY pm.product_id)
-    UPDATE products p SET weight_kg = round(x.mn, 3), peso_origen = 'publicacion'
-    FROM pesos x
-    WHERE x.product_id = p.id AND x.mn = x.mx AND x.mn <= 200 AND (p.weight_kg IS NULL OR p.weight_kg <= 0)`)
-  return rowCount ?? 0
-}
-
-/** Los dos en orden (14-11): primero el peso real del portal (pisa al borrador) y después el de la publicación para los
- *  que sigan sin peso. Se llama al crear, importar o vincular productos, al leer el catálogo y con «Traer pesos de ML»,
- *  así un producto nuevo no se queda sin peso hasta la próxima traída de Pagos ME. Nunca rompe a quien la llama. */
-export async function pasarPesos(db: Pick<Pool, 'query'>, opc: { pedirME?: number } = {}): Promise<{ portal: number; publicacion: number }> {
+/** 14-11 (el dueño): el peso es SOLO el del portal de MercadoEnvíos (nunca el que declara la publicación). Se pasa a los
+ *  productos al crear, importar o vincular, al leer el catálogo y con «Traer pesos de ML»; con `pedirME` además se
+ *  piden al programa de Pagos ME los que falten. Nunca rompe a quien la llama. Devuelve cuántos productos cambiaron. */
+export async function pasarPesos(db: Pick<Pool, 'query'>, opc: { pedirME?: number } = {}): Promise<{ portal: number; pedido: boolean }> {
   const portal = await sincronizarPesos(db).catch(e => { console.error('[pesos portal]', e instanceof Error ? e.message : e); return 0 })
-  const publicacion = await pesosDePublicaciones(db).catch(e => { console.error('[pesos publicacion]', e instanceof Error ? e.message : e); return 0 })
-  if (opc.pedirME !== undefined) await pedirPesosSiFaltan(db, opc.pedirME).catch(e => console.error('[pesos pedir ME]', e instanceof Error ? e.message : e))
-  return { portal, publicacion }
+  const pedido = opc.pedirME === undefined ? false
+    : await pedirPesosSiFaltan(db, opc.pedirME).catch(e => { console.error('[pesos pedir ME]', e instanceof Error ? e.message : e); return false })
+  return { portal, pedido }
 }
 
 /** Pide al programa de Pagos ME una traída CON pesos del portal (14-11, el dueño: el peso real solo llega así) cuando
