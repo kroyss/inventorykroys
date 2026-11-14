@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 import type { ResumenMetricas as R } from '@/lib/metricas'
 import { cambio, textoMinutos, type ResumenAtencion } from '@/lib/resumenAtencion'
+import PanelMasVendidos from './MasVendidos'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -39,12 +40,13 @@ function Tarjeta({ titulo, valor, antes, ahora, antesN, menosEsMejor, detalle }:
   )
 }
 
-function Bloque({ titulo, ayuda, children, link }: { titulo: string; ayuda?: string; children: React.ReactNode; link?: { href: string; t: string } }) {
+function Bloque({ titulo, ayuda, children, link, accion }: { titulo: string; ayuda?: string; children: React.ReactNode; link?: { href: string; t: string }; accion?: React.ReactNode }) {
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div><h2 className="text-sm font-semibold text-neutral-700">{titulo}</h2>{ayuda && <p className="text-xs text-neutral-500">{ayuda}</p>}</div>
         {link && <Link href={link.href} className="text-xs text-sky-700 hover:underline">{link.t} →</Link>}
+        {accion}
       </div>
       {children}
     </section>
@@ -55,6 +57,19 @@ export default function ResumenMetricas() {
   const [dias, setDias] = useState(30)
   const [d, setD] = useState<Datos | null>(null)
   const [error, setError] = useState(false)
+  // 14-11: «Más vendidos» abre su detalle aquí mismo (antes, la pestaña Top productos).
+  const [verTop, setVerTop] = useState(false)
+  const cerrarTop = useCallback(() => setVerTop(false), [])
+  // 14-11: «se está cayendo» tiene UNA definición: la de Reportes → Stock (descuenta los días sin stock y usa las
+  // reglas de la empresa). Si no se puede leer, queda la lista simple del resumen.
+  const [cayendo, setCayendo] = useState<{ id: number; name: string; ventas_4m_prior: number; ventas_4m_recent: number }[] | null>(null)
+  const [mesesCayendo, setMesesCayendo] = useState(4)
+  useEffect(() => {
+    let vivo = true
+    fetch('/api/reports/stock-analysis').then(x => x.ok ? x.json() : Promise.reject())
+      .then(j => { if (vivo) { setCayendo(j.declive ?? []); setMesesCayendo(j.reglas?.cayendo ?? 4) } }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
   useEffect(() => {
     let vivo = true
     fetch(`/api/reports/resumen?dias=${dias}`).then(x => x.ok ? x.json() : Promise.reject())
@@ -145,7 +160,8 @@ export default function ResumenMetricas() {
 
         {d.top && (
           <div className="grid gap-4 lg:grid-cols-2">
-            <Bloque titulo="Más vendidos" ayuda="Unidades en el período (y en el anterior)." link={{ href: '/reportes?tab=top', t: 'Top productos' }}>
+            <Bloque titulo="Más vendidos" ayuda="Unidades en el período, contra el anterior."
+              accion={<button type="button" onClick={() => setVerTop(true)} className="text-xs font-medium text-sky-700 hover:underline">Ver detalle y Excel →</button>}>
               {!d.top.length ? <p className="text-sm text-neutral-500">Sin ventas en el período.</p> : (
                 <ol className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 text-sm">
                   {d.top.map((p, i) => (
@@ -159,8 +175,24 @@ export default function ResumenMetricas() {
                 </ol>
               )}
             </Bloque>
+            {cayendo ? (
+              <Bloque titulo="Se están cayendo" ayuda={`Venden la mitad o menos que en los ${mesesCayendo} meses anteriores, teniendo stock (Reportes → Stock).`}
+                link={cayendo.length ? { href: '/reportes?tab=stock&sub=declive', t: 'Ver en Stock' } : undefined}>
+                {!cayendo.length ? <p className="rounded-xl border border-neutral-200 bg-white px-3 py-4 text-sm text-neutral-500">Ninguno se está cayendo.</p> : (
+                  <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white text-sm shadow-sm">
+                    {cayendo.slice(0, 8).map(p => (
+                      <li key={p.id} className="flex items-center gap-2 px-3 py-1.5">
+                        <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                        <span className="num text-xs text-neutral-500">{n(p.ventas_4m_prior)} → <b className="text-neutral-800">{n(p.ventas_4m_recent)}</b></span>
+                      </li>
+                    ))}
+                    {cayendo.length > 8 && <li className="px-3 py-1.5 text-xs text-neutral-500">y {cayendo.length - 8} más</li>}
+                  </ul>
+                )}
+              </Bloque>
+            ) : (
             <Bloque titulo="Los que cayeron" ayuda="Vendían y ahora venden mucho menos (40% menos o más). Revisa precio, stock o la publicación.">
-              {!d.caidas?.length ? <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 px-3 py-4">Ninguno cayó fuerte. 👍</p> : (
+              {!d.caidas?.length ? <p className="text-sm text-neutral-500 bg-white rounded-xl border border-neutral-200 px-3 py-4">Ninguno cayó fuerte.</p> : (
                 <ul className="bg-white rounded-xl border border-neutral-200 shadow-sm divide-y divide-neutral-100 text-sm">
                   {d.caidas.map(p => (
                     <li key={p.id} className="flex items-center gap-2 px-3 py-1.5">
@@ -171,9 +203,11 @@ export default function ResumenMetricas() {
                 </ul>
               )}
             </Bloque>
+            )}
           </div>
         )}
       </>}
+      {verTop && <PanelMasVendidos dias={dias} onCerrar={cerrarTop} />}
     </div>
   )
 }

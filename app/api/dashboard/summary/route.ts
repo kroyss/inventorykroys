@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
+import { leerReglas } from '@/lib/stockReglas'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -33,28 +34,34 @@ export async function GET(_: NextRequest) {
 
     // Sin rotación, reposición e importados por verificar en UNA consulta, con las ventas de 6 meses en una
     // sola pasada (12-11: antes 3 consultas seguidas y una subconsulta por producto, 0,3–0,4 s cada una).
-    //   a9  sin rotación: con stock y < 6 vendidas en 6 meses
-    //   a10 reposición: necesitan recompra (< 4 meses de stock según venta mensual)
+    //   a9  sin rotación (parados): con stock y menos de N vendidas en M meses
+    //   a10 reposición: lo que tiene alcanza para menos de lo que tarda en llegar
+    // 14-11: con las reglas de la empresa (Reportes → Stock → Reglas). Es la cuenta rápida; el detalle (días con stock,
+    // en camino, recién llegados) lo afina Reportes → Stock. Con las de SolucionesMC da lo mismo que antes (6/6/4).
+    const { reglas: rg } = await leerReglas(db)
     const { rows: [r9] } = await db.query(`
       WITH v6 AS (
-        SELECT si.product_id, SUM(si.quantity) AS q
+        SELECT si.product_id,
+               SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - make_interval(months => $1)) AS q,
+               SUM(si.quantity) FILTER (WHERE s.created_at >= NOW() - make_interval(months => $2)) AS qp
         FROM sales s JOIN sale_items si ON s.id = si.sale_id
         WHERE s.status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')
-          AND s.created_at >= NOW() - INTERVAL '6 months'
+          AND s.created_at >= NOW() - make_interval(months => GREATEST($1, $2))
         GROUP BY si.product_id
       ),
       t AS (
-        SELECT COALESCE(i.quantity, 0) AS stock, i.id AS inv_id, COALESCE(v6.q, 0) AS ventas_6m, p.stock_por_verificar
+        SELECT COALESCE(i.quantity, 0) AS stock, i.id AS inv_id, COALESCE(v6.q, 0) AS ventas_h, COALESCE(v6.qp, 0) AS ventas_p, p.stock_por_verificar
         FROM products p
         LEFT JOIN inventory i ON i.product_id = p.id
         LEFT JOIN v6 ON v6.product_id = p.id
         WHERE p.is_active = TRUE
       )
-      SELECT COUNT(*) FILTER (WHERE inv_id IS NOT NULL AND stock > 0 AND ventas_6m < 6) AS a9,
-             COUNT(*) FILTER (WHERE ventas_6m > 0 AND NOT (ventas_6m < 6 AND stock > 0) AND stock < (ventas_6m / 6.0) * 4) AS a10,
+      SELECT COUNT(*) FILTER (WHERE inv_id IS NOT NULL AND stock > 0 AND ventas_p < $3) AS a9,
+             COUNT(*) FILTER (WHERE ventas_h > 0 AND NOT (ventas_p < $3 AND stock > 0)
+                               AND ventas_h / $1::float >= $5 AND stock < (ventas_h / $1::float) * $4) AS a10,
              COUNT(*) FILTER (WHERE stock_por_verificar) AS a11
       FROM t
-    `)
+    `, [rg.historia, rg.paradoMeses, rg.paradoUnidades, rg.llegada, rg.minimo])
     const a9 = { n: r9.a9 }, a10 = { n: r9.a10 }, a11 = { n: r9.a11 }
 
     return NextResponse.json({

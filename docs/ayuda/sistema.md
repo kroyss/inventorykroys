@@ -901,14 +901,19 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   gratis, sale como «Pierde envío gratis» y no se manda. Para usar un % igual para todas toca «Usar mi propio %»
   (10% por defecto, lo subes tú). Las demás campañas de ML no traen sugerido (ML solo da el precio mínimo que acepta):
   ahí se usa tu %. Si pones menos de lo que pide ML, salen marcadas «ML pide al menos X%» y no se mandan.
-- **Reportes:** por período (ventas, compras, más vendidos) o del estado actual del inventario; hoja de conteo físico.
+- **Reportes:** por período (ventas, compras, tránsito) o del estado actual del inventario; hoja de conteo físico. Ya no hay
+  pestaña «Top productos»: los más vendidos están en **Resumen → Más vendidos → Ver detalle y Excel**.
 - **Reportes → Resumen** (toda empresa con Inventario; también con el botón **Métricas** del Inicio): todo junto
   para **7, 30, 90 días o 1 año** contra el período anterior del mismo largo: lo vendido, cantidad de ventas y
   unidades, ticket promedio y **ganancia** (después de costo y comisión de ML; solo con el permiso de costos), un
   gráfico día a día contra el período anterior, ventas **por cuenta de MercadoLibre**, **atención** (preguntas,
   tiempo de respuesta, cuántas respondió sola la IA, ventas por pregunta), **calificaciones** recibidas (positivas,
-  neutrales, negativas, contradictorias), los **más vendidos** y **los que cayeron** (vendían y ahora venden 40% menos
-  o más). Cada bloque tiene un enlace a su reporte de detalle. Las ventas de ML se guardan unos 4 meses: con 1 año la
+  neutrales, negativas, contradictorias), los **más vendidos** y los que **se están cayendo** (la misma regla de
+  Reportes → Stock, con enlace «Ver en Stock»). En **Más vendidos**, el botón **Ver detalle y Excel** abre un panel al
+  costado (sin salir del Resumen) con todos los productos vendidos en el período: ordenar por **Unidades, Venta o
+  Ganancia**, buscar, cuánto subió o bajó cada uno contra el período anterior, totales abajo y botón **Excel**. Costo,
+  comisión y ganancia solo con el permiso de costos. Se cierra con ✕ o Esc. Los demás bloques tienen enlace a su
+  reporte de detalle. Las ventas de ML se guardan unos 4 meses: con 1 año la
   comparación por cuenta queda incompleta (lo avisa).
 - **Reportes → Stock** (toda empresa con Inventario): arriba 4 tarjetas que son los filtros: **Reponer** (cuántos y
   cuántos urgentes), **Se están cayendo**, **Parados** (con la plata que tienes sin moverse) y **Recién llegados**.

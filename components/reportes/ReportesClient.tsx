@@ -9,7 +9,6 @@ import {
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { matchFuzzy } from '@/lib/search'
-import NumberInput from '@/components/ui/NumberInput'
 import { useDeepLinkParam } from '@/lib/useDeepLinkParam'
 
 type Tab = 'resumen' | 'ventas' | 'compras' | 'inventario' | 'stock' | 'top' | 'transito' | 'conteos' | 'atencion'
@@ -22,7 +21,6 @@ const STOCK_SUBS  = ['REPOSICION', 'REMATE', 'NUEVOS', 'DECLIVE'] as const
 const PERIOD_TABS: { key: Tab; label: string }[] = [
   { key: 'ventas',  label: 'Ventas' },
   { key: 'compras', label: 'Compras' },
-  { key: 'top',     label: 'Top productos' },
 ]
 const STATE_TABS: { key: Tab; label: string }[] = [
   { key: 'inventario', label: 'Inventario' },
@@ -39,7 +37,8 @@ const STATE_TABS: { key: Tab; label: string }[] = [
 export default function ReportesClient({ analisisStock, conteos = false, importaciones, despachaVE = false, metricas = false }: { analisisStock: boolean; conteos?: boolean; importaciones: boolean; despachaVE?: boolean; atencion?: boolean; metricas?: boolean }) {
   const [tabGuardada, setTab]    = usePersistedTab<Tab>('tab:reportes', metricas ? 'resumen' : 'ventas')
   // 14-11: «Atención ML» ya no es pestaña (sus números están en Resumen → Atención en MercadoLibre); un link viejo cae en Resumen.
-  const tab = tabGuardada === 'atencion' ? (metricas ? 'resumen' : 'ventas')
+  // 14-11: «Top productos» pasó a Resumen → Más vendidos → Ver detalle; un link viejo (?tab=top) cae en Resumen.
+  const tab = tabGuardada === 'atencion' || tabGuardada === 'top' ? (metricas ? 'resumen' : 'ventas')
     : (!analisisStock && tabGuardada === 'stock') || (!conteos && tabGuardada === 'conteos') || (!metricas && tabGuardada === 'resumen') ? 'ventas' : tabGuardada
   const stateTabs = STATE_TABS.filter(t => (analisisStock || t.key !== 'stock') && (conteos || t.key !== 'conteos'))
   const [preset,   setPreset]   = useState<DatePreset>('last90')
@@ -53,18 +52,10 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
   // Stock subtab
   const [stockSub, setStockSub] = useState<'reposicion' | 'remate' | 'nuevos' | 'declive'>('reposicion')
   // Top params
-  const [topN,       setTopN]       = useState(10)
-  const [topOrderBy, setTopOrderBy] = useState<'qty' | 'ganancia' | 'margen'>('qty')
-  const [topCat,     setTopCat]     = useState('')
   // Ventas status / Compras tipo / Tránsito tipo filters
   const [ventaStatus, setVentaStatus] = useState('')
   const [compraTipo,  setCompraTipo]  = useState('')
   const [transTipo,   setTransTipo]   = useState('')
-  const [categories,  setCategories]  = useState<string[]>([])
-
-  useEffect(() => {
-    fetch('/api/profit-categories').then(r => r.json()).then((cs: any[]) => setCategories(cs.map(c => c.name)))
-  }, [])
 
   // Deep-links desde las cards del dashboard: ?tab= y ?sub=. Con useSearchParams
   // se re-aplican si cambia la URL sin desmontar la pantalla.
@@ -73,7 +64,7 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
   useEffect(() => { if (urlTab) setTab(urlTab.toLowerCase() as Tab) }, [urlTab])
   useEffect(() => { if (urlSub) setStockSub(urlSub.toLowerCase() as typeof stockSub) }, [urlSub])
 
-  useEffect(() => { load() }, [tab, dateFrom, dateTo, topN, topOrderBy, topCat])
+  useEffect(() => { load() }, [tab, dateFrom, dateTo])
 
   const handlePreset = (p: DatePreset) => {
     setPreset(p)
@@ -93,7 +84,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
     if (tab === 'compras')     url = `/api/reports/purchases?date_from=${dateFrom}&date_to=${dateTo}`
     if (tab === 'inventario')  url = `/api/reports/inventory`
     if (tab === 'stock')       url = `/api/reports/stock-analysis`
-    if (tab === 'top')         url = `/api/reports/top-products?date_from=${dateFrom}&date_to=${dateTo}&top=${topN}&order_by=${topOrderBy}${topCat ? `&category=${encodeURIComponent(topCat)}` : ''}`
     if (tab === 'transito')    url = `/api/reports/in-transit`
     if (tab === 'conteos')     url = `/api/reports/counts`
     if (!url) { setLoading(false); return }       // Atención ML carga sola (ResumenAtencion)
@@ -109,7 +99,7 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
     }
   }
 
-  const needsDates = tab === 'ventas' || tab === 'compras' || tab === 'top'
+  const needsDates = tab === 'ventas' || tab === 'compras'
 
   return (
     <div className="space-y-4">
@@ -129,32 +119,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
             onPreset={handlePreset} onFrom={setDateFrom} onTo={setDateTo}
             onApply={load} loading={loading}
           />
-          {tab === 'top' && (
-            <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-3 flex flex-wrap gap-3 items-end">
-              <div>
-                <label className="text-xs text-neutral-500 block">Top N</label>
-                <NumberInput int min={1} value={topN} emptyValue={10} onValueChange={setTopN}
-                  className="mt-1 border rounded px-2 py-1 text-sm w-20" />
-              </div>
-              <div>
-                <label className="text-xs text-neutral-500 block">Ordenar por</label>
-                <select value={topOrderBy} onChange={e => setTopOrderBy(e.target.value as any)}
-                  className="mt-1 border rounded px-2 py-1 text-sm">
-                  <option value="qty">Cantidad</option>
-                  <option value="ganancia">Ganancia</option>
-                  <option value="margen">Margen</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-neutral-500 block">Categoría</label>
-                <select value={topCat} onChange={e => setTopCat(e.target.value)}
-                  className="mt-1 border rounded px-2 py-1 text-sm">
-                  <option value="">Todas</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -174,7 +138,6 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
         <StockReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} />
       )}
       {tab === 'resumen' && <ResumenMetricas />}
-      {!loading && data && tab === 'top'      && Array.isArray(data) && <TopProductsReport rows={data} />}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
         <InTransitReport rows={data} tipo={importaciones ? transTipo : ''} setTipo={setTransTipo} importaciones={importaciones} />
       )}
@@ -400,41 +363,6 @@ function CountsReport({ data, search, setSearch }: any) {
       )}
 
       <DataTable columns={cols} rows={rows} exportName={`conteo_${ref}`} />
-    </div>
-  )
-}
-
-// ───── top products ─────
-function TopProductsReport({ rows }: { rows: any[] }) {
-  const maxQty = Math.max(...rows.map(r => r.total_qty), 1)
-  const totalVenta = rows.reduce((a, x) => a + x.total_venta, 0)
-  const totalGan   = rows.reduce((a, x) => a + x.ganancia, 0)
-
-  const cols: Column<any>[] = [
-    { key: 'code', label: 'Código', render: p => <span className="font-mono text-xs">{p.code}</span>, sortValue: p => p.code },
-    { key: 'name', label: 'Producto', sortValue: p => p.name },
-    { key: 'category', label: 'Categoría', render: p => <span className="text-xs">{p.category}</span>, sortValue: p => p.category },
-    { key: 'total_qty', label: 'Cant.', align: 'right', sortValue: p => p.total_qty,
-      render: p => (
-        <div className="flex items-center justify-end gap-2">
-          <div className="h-1.5 bg-sky-200 rounded" style={{ width: `${Math.round(p.total_qty / maxQty * 60)}px` }} />
-          <span>{p.total_qty}</span>
-        </div>
-      ), total: rs => rs.reduce((a, x) => a + x.total_qty, 0) },
-    { key: 'total_venta', label: 'Venta', align: 'right', render: p => `$${money(p.total_venta)}`, sortValue: p => p.total_venta, total: () => `$${money(totalVenta)}`, exportValue: p => p.total_venta },
-    { key: 'total_costo', label: 'Costo', align: 'right', render: p => `$${money(p.total_costo)}`, sortValue: p => p.total_costo, exportValue: p => p.total_costo },
-    { key: 'total_comision', label: 'Comisión', align: 'right', render: p => <span className="text-neutral-600">${money(p.total_comision || 0)}</span>, sortValue: p => p.total_comision || 0, exportValue: p => p.total_comision || 0 },
-    { key: 'ganancia', label: 'Ganancia', align: 'right', render: p => <span className="text-emerald-600 font-medium">${money(p.ganancia)}</span>, sortValue: p => p.ganancia, total: () => `$${money(totalGan)}`, exportValue: p => p.ganancia },
-  ]
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <KPICard compact label="Productos"     value={rows.length} />
-        <KPICard compact label="Venta total"   value={`$${money(totalVenta)}`} />
-        <KPICard compact label="Ganancia total" value={`$${money(totalGan)}`} tone="bueno" />
-      </div>
-      <DataTable columns={cols} rows={rows} exportName="top_productos" emptyText="Sin ventas en el período" />
     </div>
   )
 }
