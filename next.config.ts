@@ -10,7 +10,8 @@ const nextConfig: NextConfig = {
   // página al navegar (en vez de mezclar archivos viejos y nuevos). Ver scripts/rolling.sh.
   deploymentId: process.env.DEPLOYMENT_ID || undefined,
   // El manual del Sistema (docs/ayuda/sistema.md) lo lee la ayuda con IA (lib/ayuda.ts) en tiempo de ejecución.
-  outputFileTracingIncludes: { '/api/ayuda/preguntar': ['./docs/ayuda/**/*'], '/api/externo/ayuda': ['./docs/ayuda/**/*'] },
+  // 14-11: también el manual web de Aprendizaje (lib/manual.ts).
+  outputFileTracingIncludes: { '/api/ayuda/preguntar': ['./docs/ayuda/**/*'], '/api/externo/ayuda': ['./docs/ayuda/**/*'], '/aprendizaje/manual/inventario': ['./docs/ayuda/**/*'] },
 }
 
 export default nextConfig

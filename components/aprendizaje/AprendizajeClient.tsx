@@ -2,6 +2,7 @@
 import { olvidar } from '@/lib/comun'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui'
+import Link from '@/components/ui/Link'
 
 export interface Video {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string
@@ -43,7 +44,30 @@ const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto
 
 /** Aprendizaje: videos en el orden recomendado, dentro de la web. Todos libres (28-10): el cliente llega con una
  *  necesidad concreta (p.ej. conectar MercadoEnvíos) y el candado lo frenaba; el orden queda como sugerencia. */
-export default function AprendizajeClient() {
+// 14-11: Manuales (formato nuevo, empezando por Inventario): tarjeta arriba de los videos.
+function Manuales({ inventario }: { inventario: boolean }) {
+  if (!inventario) return null
+  return (
+    <section aria-label="Manuales" className="space-y-2">
+      <h2 className="text-sm font-semibold text-neutral-700">Manuales</h2>
+      <Link href="/aprendizaje/manual/inventario"
+        className="group flex items-center gap-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition hover:-translate-y-px hover:shadow-md">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-lime-100 text-lime-800" aria-hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+            <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5z" /><path d="M8 7h6M8 11h6" />
+          </svg>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-neutral-900">Manual de Inventario</span>
+          <span className="block text-sm text-neutral-500">Primeros pasos, Inicio, Productos, Publicaciones, Ventas, Compras y Reportes, con capturas y buscador</span>
+        </span>
+        <span className="shrink-0 text-sm font-medium text-sky-700 group-hover:underline">Abrir →</span>
+      </Link>
+    </section>
+  )
+}
+
+export default function AprendizajeClient({ manualInventario = false }: { manualInventario?: boolean }) {
   const [videos, setVideos] = useState<Video[] | null>(null)
   const [agendar, setAgendar] = useState<string | null>(null)
   const [conectar, setConectar] = useState(false)   // empresa sin cuenta de ML y el usuario es admin
@@ -69,6 +93,7 @@ export default function AprendizajeClient() {
   if (!videos) return <PageHeader title="Aprendizaje" subtitle="Cargando…" />
   if (videos.length === 0) {
     return <div className="space-y-5"><PageHeader title="Aprendizaje" subtitle="Por dónde empezar" />
+      <Manuales inventario={manualInventario} />
       <PrimerosPasos agendar={agendar} hayVideos={false} /></div>
   }
 
@@ -92,7 +117,8 @@ export default function AprendizajeClient() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Aprendizaje" subtitle="Videos cortos para sacarle todo el provecho al sistema, en orden" />
+      <PageHeader title="Aprendizaje" subtitle="Manuales y videos cortos para sacarle todo el provecho al sistema" />
+      <Manuales inventario={manualInventario} />
 
       {/* Empujón a conectar (nunca bloquea: los videos se pueden seguir viendo sin conectar). */}
       {conectar && hechos >= 1 && (

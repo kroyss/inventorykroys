@@ -1,14 +1,18 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from '@/components/ui/Link'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 // Inicio → «Primeros pasos con tu inventario» (14-11, el dueño: piloto del formato de aprendizaje nuevo, en vez de
-// videos). Lista con el avance que se marca sola (/api/inventario/primeros-pasos), un botón «Ir» por paso y un
-// «¿Cómo?» de pocas líneas. Al completar todo felicita y se puede cerrar; «Ocultar guía» queda guardado por empresa.
-// Reemplaza a la sugerencia «Empieza tu inventario desde MercadoLibre». Textos = docs/ayuda/sistema.md (mantener iguales).
+// videos). Compacta: muestra SOLO el paso en el que vas («Paso 2 de 6»), con su explicación corta y el botón para ir;
+// al completarlo pasa sola al siguiente (/api/inventario/primeros-pasos se marca con lo que la empresa ya hizo).
+// «Ver todos» despliega la lista. Al terminar, felicita y recomienda leer Publicaciones y Reportes en Aprendizaje
+// (recomendación: no cuenta para terminar). «Ocultar» pide confirmar y se vuelve a abrir desde Aprendizaje.
+// Textos = docs/ayuda/sistema.md (mantener iguales).
 interface Estado { ml: boolean; productos: boolean; stock: boolean; venta: boolean; procesada: boolean; compra: boolean; oculta: boolean; conML: boolean }
-const VISTA = 'guia-inventario-vista'
 interface Paso { k: string; titulo: string; como: string; href: string; ir: string; hecho: boolean }
+const VISTA = 'guia-inventario-vista'
+export const MANUAL_INVENTARIO = '/aprendizaje/manual/inventario'
 
 function pasos(e: Estado): Paso[] {
   return [
@@ -46,8 +50,9 @@ function pasos(e: Estado): Paso[] {
 }
 
 export default function PrimerosPasos() {
+  const confirmar = useConfirm()
   const [e, setE] = useState<Estado | null>(null)
-  const [abierto, setAbierto] = useState<string | null>(null)
+  const [todos, setTodos] = useState(false)
   const [cerrando, setCerrando] = useState(false)
 
   useEffect(() => {
@@ -61,69 +66,81 @@ export default function PrimerosPasos() {
   const lista = pasos(e)
   const hechos = lista.filter(p => p.hecho).length
   const todo = hechos === lista.length
-  const siguiente = lista.find(p => !p.hecho)?.k
-  const ocultar = async () => {
-    setCerrando(true)
-    try { await fetch('/api/inventario/primeros-pasos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ocultar: true }) }) } catch { /* igual se oculta ahora */ }
-    setE({ ...e, oculta: true })
-  }
+  const idx = lista.findIndex(p => !p.hecho)
+  const actual = lista[idx]
 
   // Empresas que ya trabajaban con todo hecho no ven nada: el «Listo» sale solo a quien vio la guía con pasos pendientes.
   let vista = false
   try { vista = localStorage.getItem(VISTA) === '1'; if (!todo) localStorage.setItem(VISTA, '1') } catch { /* sin almacenamiento */ }
   if (todo && !vista) return null
 
+  const ocultar = async (preguntar: boolean) => {
+    if (preguntar && !await confirmar({
+      title: 'Ocultar la guía', confirmText: 'Ocultar',
+      message: 'Deja de verse en el Inicio para toda tu empresa. La puedes volver a abrir cuando quieras desde Aprendizaje → Manuales.',
+    })) return
+    setCerrando(true)
+    try { await fetch('/api/inventario/primeros-pasos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ocultar: true }) }) } catch { /* igual se oculta ahora */ }
+    setE({ ...e, oculta: true })
+  }
+
   if (todo) return (
     <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
+      <div className="min-w-0">
         <p className="font-medium text-emerald-900">Listo: ya usas tu inventario completo</p>
-        <p className="text-sm text-emerald-800">Si te queda una duda, toca Ayuda (abajo a la derecha) o mira el manual en Aprendizaje.</p>
+        <p className="text-sm text-emerald-800">
+          Te recomendamos leer cómo funcionan <Link href={`${MANUAL_INVENTARIO}#publicaciones`} className="font-medium underline">Publicaciones</Link> y{' '}
+          <Link href={`${MANUAL_INVENTARIO}#reportes`} className="font-medium underline">Reportes</Link> en el manual.
+        </p>
       </div>
-      <button type="button" onClick={ocultar} disabled={cerrando} className="btn-secondary shrink-0 text-sm">Cerrar guía</button>
+      <button type="button" onClick={() => ocultar(false)} disabled={cerrando} className="btn-secondary shrink-0 text-sm">Cerrar guía</button>
     </div>
   )
 
   return (
-    <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm" aria-label="Primeros pasos con tu inventario">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="font-semibold text-neutral-900">Primeros pasos con tu inventario</h2>
-          <p className="text-sm text-neutral-500">{hechos} de {lista.length} listos · se marcan solos a medida que avanzas</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="h-1.5 w-28 rounded-full bg-neutral-100" role="progressbar" aria-valuemin={0} aria-valuemax={lista.length} aria-valuenow={hechos}>
-            <div className="h-1.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${hechos / lista.length * 100}%` }} />
+    <section className="rounded-xl border border-neutral-200 bg-white shadow-sm" aria-label="Primeros pasos con tu inventario">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+            <span className="font-medium text-neutral-700">Primeros pasos · Paso {idx + 1} de {lista.length}</span>
+            <span className="flex items-center gap-1" role="progressbar" aria-valuemin={0} aria-valuemax={lista.length} aria-valuenow={hechos} aria-label={`${hechos} de ${lista.length} listos`}>
+              {lista.map((p, i) => (
+                <span key={p.k} title={p.titulo}
+                  className={`h-1.5 rounded-full transition-all ${p.hecho ? 'w-4 bg-emerald-500' : i === idx ? 'w-6 bg-neutral-900' : 'w-4 bg-neutral-200'}`} />
+              ))}
+            </span>
           </div>
-          <button type="button" onClick={ocultar} disabled={cerrando} className="text-xs text-neutral-400 hover:text-neutral-700">Ocultar guía</button>
+          <p className="mt-1 font-semibold text-neutral-900">{actual.titulo}</p>
+          <p className="mt-0.5 text-sm leading-relaxed text-neutral-600">{actual.como}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
+          <Link href={actual.href} className="btn-primary whitespace-nowrap px-4 text-sm">{actual.ir} →</Link>
+          <div className="flex items-center gap-3 text-xs">
+            <button type="button" onClick={() => setTodos(v => !v)} aria-expanded={todos} className="text-neutral-500 hover:text-neutral-800">
+              {todos ? 'Ocultar lista' : 'Ver todos'}
+            </button>
+            <button type="button" onClick={() => ocultar(true)} disabled={cerrando} className="text-neutral-400 hover:text-neutral-700">Ocultar</button>
+          </div>
         </div>
       </div>
-      <ol className="divide-y divide-neutral-100">
-        {lista.map((p, i) => {
-          const actual = p.k === siguiente
-          const ver = abierto === p.k || (abierto === null && actual)
-          return (
-            <li key={p.k} className={actual ? 'bg-lime-50/50' : ''}>
-              <div className="flex items-center gap-3 px-4 py-2.5">
-                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${p.hecho ? 'bg-emerald-500 text-white' : actual ? 'bg-neutral-900 text-white' : 'border border-neutral-300 text-neutral-500'}`} aria-hidden>
-                  {p.hecho ? '✓' : i + 1}
-                </span>
-                <button type="button" onClick={() => setAbierto(ver ? '' : p.k)} aria-expanded={ver}
-                  className={`min-w-0 flex-1 text-left text-sm ${p.hecho ? 'text-neutral-400 line-through decoration-neutral-300' : 'font-medium text-neutral-900'}`}>
-                  {p.titulo}
-                  <span className="sr-only">{p.hecho ? ' (listo)' : ''}</span>
-                </button>
-                {!p.hecho && (
-                  <>
-                    <button type="button" onClick={() => setAbierto(ver ? '' : p.k)} className="hidden text-xs text-neutral-500 hover:text-neutral-800 sm:inline">¿Cómo?</button>
-                    <Link href={p.href} className={`${actual ? 'btn-primary' : 'btn-secondary'} shrink-0 px-3 py-1 text-xs`}>{p.ir}</Link>
-                  </>
-                )}
-              </div>
-              {ver && !p.hecho && <p className="px-4 pb-3 text-sm leading-relaxed text-neutral-600 sm:pl-[3.25rem]">{p.como}</p>}
+      {todos && (
+        <ol className="grid gap-x-6 gap-y-1.5 border-t border-neutral-100 px-4 py-3 text-sm sm:grid-cols-2">
+          {lista.map((p, i) => (
+            <li key={p.k} className="flex items-center gap-2">
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${p.hecho ? 'bg-emerald-500 text-white' : i === idx ? 'bg-neutral-900 text-white' : 'border border-neutral-300 text-neutral-500'}`} aria-hidden>
+                {p.hecho ? '✓' : i + 1}
+              </span>
+              {p.hecho
+                ? <span className="truncate text-neutral-400 line-through decoration-neutral-300">{p.titulo}</span>
+                : <Link href={p.href} className="truncate text-neutral-800 hover:underline">{p.titulo}</Link>}
             </li>
-          )
-        })}
-      </ol>
+          ))}
+          <li className="flex items-center gap-2 sm:col-span-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-neutral-300 text-[11px] text-neutral-400" aria-hidden>+</span>
+            <span className="text-neutral-500">Recomendado: conoce <Link href={`${MANUAL_INVENTARIO}#publicaciones`} className="text-sky-700 hover:underline">Publicaciones</Link> y <Link href={`${MANUAL_INVENTARIO}#reportes`} className="text-sky-700 hover:underline">Reportes</Link> en el manual (no hace falta para terminar)</span>
+          </li>
+        </ol>
+      )}
     </section>
   )
 }
