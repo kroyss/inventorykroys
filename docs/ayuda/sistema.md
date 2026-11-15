@@ -68,8 +68,11 @@ el portal de MercadoEnvíos de Venezuela.
   registras**: conecta tu cuenta de MercadoLibre cuanto antes para aprovecharlos. Cada cuenta de MercadoLibre puede usar
   una sola prueba. Al terminar la prueba, para seguir se elige el plan y se paga en **Mi plan** (ver
   [Planes](#3-planes-y-créditos-de-ia)). Si eliges un plan con menos herramientas que el que tienes (la prueba es
-  Automatizaciones), Mi plan muestra en ámbar **«Con <plan> dejas de tener:»** y la lista; tus datos se conservan y
-  vuelve todo si después pasas a un plan mayor.
+  Automatizaciones), Mi plan muestra en ámbar **«Con <plan> dejas de tener:»**, la lista, cuánto menos pagas al mes y
+  **Seguir con <tu plan>** para volver con un clic; tus datos se conservan y vuelve todo si después pasas a un plan
+  mayor. Si eliges uno mayor, en verde **«Con <plan> ganas:»** y cuánto más al mes (con tu escalón, ciclo y descuento).
+  Con tu plan elegido, abajo sale la invitación al plan siguiente (**¿Pasas a…?**, con lo que suma y **Ver <plan>**);
+  los planes «Próximamente» no se ofrecen. **Mejorar mi plan** también muestra lo que ganas.
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al
   Radar; si intentas entrar al Sistema te lo indica. Para usar el Sistema, escríbenos.
 - **Radar mensual (solo Radar):** el registro del Radar está siempre abierto. Para entrar se paga el mes:

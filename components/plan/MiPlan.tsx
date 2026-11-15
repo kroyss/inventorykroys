@@ -5,7 +5,7 @@
 // `acceso`: entra desde /renovar (cuenta vencida, sin sesión) con el acceso firmado de /api/mi-plan/entrar.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
-import { PLANES_PROXIMAMENTE, RECARGAS_IA, pierdeAlBajar } from '@/lib/planes'
+import { PLANES_PROXIMAMENTE, RECARGAS_IA, pierdeAlBajar, ganaAlSubir, planSiguiente } from '@/lib/planes'
 import QueEsRadar from './QueEsRadar'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
@@ -49,6 +49,15 @@ function Dato({ etiqueta, valor, copiar = true }: { etiqueta: string; valor: str
       <span className="text-neutral-500 text-sm">{etiqueta}</span>
       <span className="flex items-center text-sm font-medium text-neutral-900 text-right">{valor}{copiar ? <Copiar texto={valor.replace(/^Bs |^\$/, '')} /> : <span className="ml-2 w-7" />}</span>
     </div>
+  )
+}
+
+/** 15-11: lista de lo que se gana o se pierde al cambiar de plan (los textos de /precios, máximo 5). */
+function Lista({ items, cls }: { items: string[]; cls: string }) {
+  return (
+    <ul className={`mt-1 space-y-0.5 text-xs ${cls}`}>
+      {items.slice(0, 5).map(t => <li key={t} className="flex gap-1.5"><span aria-hidden>•</span><span>{t}</span></li>)}
+    </ul>
   )
 }
 
@@ -101,8 +110,14 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   if (!s) return <p className="text-sm text-neutral-500">Cargando tu plan…</p>
 
   const op = s.opciones.find(o => o.id === plan) ?? s.opciones[0]
-  // Lo que deja de tener si baja: contra su plan o, sin plan (prueba o prueba vencida), contra la prueba = Automatizaciones.
-  const pierde = pierdeAlBajar(s.plan ?? 'automatizaciones', op.id)
+  // 15-11 (el dueño): qué cambia al mover el plan, contra su plan o, sin plan (prueba o prueba vencida), contra la prueba
+  // = Automatizaciones. Baja → «dejas de tener» (ámbar); sube → «ganas» (verde); su plan → invitación al siguiente.
+  const base = (s.plan ?? 'automatizaciones') as string
+  const pierde = pierdeAlBajar(base, op.id)
+  const gana = ganaAlSubir(base, op.id)
+  const sig = op.id === base ? planSiguiente(base) : null
+  const opSig = sig ? s.opciones.find(o => o.id === sig) : undefined
+  const opBase = s.opciones.find(o => o.id === base)
   const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
   // 09-11 (mig. 157): recargas de créditos de IA, en prueba o con plan activo.
   const puedeRecargar = s.estado !== 'vencido'
@@ -126,6 +141,9 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   // Fundador: su −30% es mayor que el −10% del trimestral (no se suman), así que el que aplica es el suyo.
   const esDescFundador = s.fundador && descCiclo === op.desc.mensual && descCiclo > 0
   const listaMes = r2(op.base + op.extrasMes)
+  // Diferencia real por mes (su escalón, su ciclo y su descuento de Fundador) contra su plan.
+  const difMes = opBase ? r2(porMes(op) - porMes(opBase)) : 0
+
   // Resumen tipo factura: de dónde sale el total (12-11).
   const lineas: { t: string; usd: number }[] =
     tipo === 'radar_mes' ? [{ t: 'Radar PRO todos los días · 1 mes', usd: s.radarMes.precio }]
@@ -268,6 +286,10 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 )}
                 <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm">
                   <p className="font-semibold">Pasar a {mej.nombre} desde hoy</p>
+                  {ganaAlSubir(s.plan, mej.plan).length > 0 && <>
+                    <p className="mt-1 text-xs font-medium text-emerald-800">Ganas:</p>
+                    <Lista items={ganaAlSubir(s.plan, mej.plan)} cls="text-emerald-900" />
+                  </>}
                   <ul className="mt-1 space-y-0.5 text-xs text-neutral-700">
                     {mej.lineas.map((l, i) => (
                       <li key={i} className="flex justify-between gap-3"><span>{l.texto}</span><span className="num whitespace-nowrap">{l.usd < 0 ? '−' : ''}{fmtUsd(Math.abs(l.usd))}</span></li>
@@ -315,11 +337,39 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                 Automatizaciones), qué deja de tener. Solo informa: sin datos de uso ni casilla de confirmación. */}
             {pierde.length > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                <p className="text-sm font-semibold text-amber-900">Con {op.nombre} dejas de tener:</p>
-                <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
-                  {pierde.map(t => <li key={t} className="flex gap-1.5"><span aria-hidden>•</span><span>{t}</span></li>)}
-                </ul>
-                <p className="mt-1.5 text-[11px] text-amber-800">Tus datos se conservan: si después pasas a un plan mayor, vuelve todo como estaba.</p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-sm font-semibold text-amber-900">Con {op.nombre} dejas de tener:</p>
+                  {difMes < 0 && <span className="shrink-0 text-xs text-amber-800 num">Pagas {fmtUsd(-difMes)} menos al mes</span>}
+                </div>
+                <Lista items={pierde} cls="text-amber-900" />
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-amber-800">Tus datos se conservan: si después pasas a un plan mayor, vuelve todo como estaba.</p>
+                  {opBase && (
+                    <button type="button" onClick={() => setPlan(base)} className="text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950">
+                      Seguir con {opBase.nombre}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {gana.length > 0 && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-sm font-semibold text-emerald-900">Con {op.nombre} ganas:</p>
+                  {difMes > 0 && <span className="shrink-0 text-xs text-emerald-800 num">{fmtUsd(difMes)} más al mes</span>}
+                </div>
+                <Lista items={gana} cls="text-emerald-900" />
+              </div>
+            )}
+            {opSig && (
+              <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-sm font-semibold text-neutral-800">¿Pasas a {opSig.nombre}?</p>
+                  {opBase && porMes(opSig) > porMes(opBase) && <span className="shrink-0 text-xs text-neutral-500 num">Por {fmtUsd(r2(porMes(opSig) - porMes(opBase)))} más al mes</span>}
+                </div>
+                <Lista items={ganaAlSubir(base, opSig.id)} cls="text-neutral-600" />
+                <button type="button" onClick={() => { setPlan(opSig.id); setCambiarPlan(true) }}
+                  className="mt-1.5 text-xs font-medium text-sky-700 hover:underline">Ver {opSig.nombre}</button>
               </div>
             )}
             {/* Mensual o trimestral (12-11): dos tarjetas con el precio por mes y lo que se ahorra. */}

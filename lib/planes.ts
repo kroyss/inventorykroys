@@ -47,10 +47,23 @@ export const PLANES: Plan[] = [
 
 /** 15-11 (el dueño): lo que se deja de tener al pasar de `desde` a un plan menor `hacia` (vacío si no baja). Sin datos de
  *  uso: solo la diferencia entre los planes, para decidir sabiendo. Sin el paréntesis de precios («+$6», etc.). */
+const sinParentesis = (t: string) => t.replace(/\s*\([^)]*\)\s*$/, '')
 export function pierdeAlBajar(desde: string | null | undefined, hacia: string): string[] {
   const a = PLANES.findIndex(p => p.id === desde), b = PLANES.findIndex(p => p.id === hacia)
   if (a < 0 || b < 0 || b >= a) return []
-  return PLANES.slice(b + 1, a + 1).flatMap(p => p.incluye).map(t => t.replace(/\s*\([^)]*\)\s*$/, ''))
+  return PLANES.slice(b + 1, a + 1).flatMap(p => p.incluye).map(sinParentesis)
+}
+/** 15-11: lo que se suma al pasar de `desde` a un plan mayor `hacia` (vacío si no sube). */
+export function ganaAlSubir(desde: string | null | undefined, hacia: string): string[] {
+  const a = PLANES.findIndex(p => p.id === desde), b = PLANES.findIndex(p => p.id === hacia)
+  if (a < 0 || b < 0 || b <= a) return []
+  return PLANES.slice(a + 1, b + 1).flatMap(p => p.incluye).map(sinParentesis)
+}
+/** El plan inmediatamente superior que se puede contratar (no «Próximamente»), o null. */
+export function planSiguiente(desde: string | null | undefined): Plan['id'] | null {
+  const a = PLANES.findIndex(p => p.id === desde)
+  const sig = a >= 0 ? PLANES[a + 1] : undefined
+  return sig && !PLANES_PROXIMAMENTE.includes(sig.id) ? sig.id : null
 }
 
 /** Escalones por ventas al mes (todas tus cuentas, sin canceladas): precio en USD de cada plan y créditos de IA de
