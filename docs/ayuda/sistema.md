@@ -67,7 +67,9 @@ el portal de MercadoEnvíos de Venezuela.
 - **Prueba gratis de 15 días:** incluye Automatizaciones y Pagos ME (sin Inventario). Los días **corren desde que te
   registras**: conecta tu cuenta de MercadoLibre cuanto antes para aprovecharlos. Cada cuenta de MercadoLibre puede usar
   una sola prueba. Al terminar la prueba, para seguir se elige el plan y se paga en **Mi plan** (ver
-  [Planes](#3-planes-y-créditos-de-ia)).
+  [Planes](#3-planes-y-créditos-de-ia)). Si eliges un plan con menos herramientas que el que tienes (la prueba es
+  Automatizaciones), Mi plan muestra en ámbar **«Con <plan> dejas de tener:»** y la lista; tus datos se conservan y
+  vuelve todo si después pasas a un plan mayor.
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al
   Radar; si intentas entrar al Sistema te lo indica. Para usar el Sistema, escríbenos.
 - **Radar mensual (solo Radar):** el registro del Radar está siempre abierto. Para entrar se paga el mes:

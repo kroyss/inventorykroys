@@ -5,7 +5,7 @@
 // `acceso`: entra desde /renovar (cuenta vencida, sin sesión) con el acceso firmado de /api/mi-plan/entrar.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CobroFila, SituacionPlan } from '@/lib/cobros'
-import { PLANES_PROXIMAMENTE, RECARGAS_IA } from '@/lib/planes'
+import { PLANES_PROXIMAMENTE, RECARGAS_IA, pierdeAlBajar } from '@/lib/planes'
 import QueEsRadar from './QueEsRadar'
 
 const fmtUsd = (n: number) => `$${n.toLocaleString('de-DE', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
@@ -101,6 +101,8 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
   if (!s) return <p className="text-sm text-neutral-500">Cargando tu plan…</p>
 
   const op = s.opciones.find(o => o.id === plan) ?? s.opciones[0]
+  // Lo que deja de tener si baja: contra su plan o, sin plan (prueba o prueba vencida), contra la prueba = Automatizaciones.
+  const pierde = pierdeAlBajar(s.plan ?? 'automatizaciones', op.id)
   const mej = s.mejoras.find(m => m.plan === mejora) ?? s.mejoras[0]
   // 09-11 (mig. 157): recargas de créditos de IA, en prueba o con plan activo.
   const puedeRecargar = s.estado !== 'vencido'
@@ -307,6 +309,17 @@ export default function MiPlan({ acceso }: { acceso?: string }) {
                   </button>
                   )
                 })}
+              </div>
+            )}
+            {/* 15-11 (el dueño): al elegir un plan con menos herramientas que el que tiene (o que la prueba, que es
+                Automatizaciones), qué deja de tener. Solo informa: sin datos de uso ni casilla de confirmación. */}
+            {pierde.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                <p className="text-sm font-semibold text-amber-900">Con {op.nombre} dejas de tener:</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-amber-900">
+                  {pierde.map(t => <li key={t} className="flex gap-1.5"><span aria-hidden>•</span><span>{t}</span></li>)}
+                </ul>
+                <p className="mt-1.5 text-[11px] text-amber-800">Tus datos se conservan: si después pasas a un plan mayor, vuelve todo como estaba.</p>
               </div>
             )}
             {/* Mensual o trimestral (12-11): dos tarjetas con el precio por mes y lo que se ahorra. */}

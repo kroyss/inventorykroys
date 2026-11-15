@@ -45,6 +45,14 @@ export const PLANES: Plan[] = [
   },
 ]
 
+/** 15-11 (el dueño): lo que se deja de tener al pasar de `desde` a un plan menor `hacia` (vacío si no baja). Sin datos de
+ *  uso: solo la diferencia entre los planes, para decidir sabiendo. Sin el paréntesis de precios («+$6», etc.). */
+export function pierdeAlBajar(desde: string | null | undefined, hacia: string): string[] {
+  const a = PLANES.findIndex(p => p.id === desde), b = PLANES.findIndex(p => p.id === hacia)
+  if (a < 0 || b < 0 || b >= a) return []
+  return PLANES.slice(b + 1, a + 1).flatMap(p => p.incluye).map(t => t.replace(/\s*\([^)]*\)\s*$/, ''))
+}
+
 /** Escalones por ventas al mes (todas tus cuentas, sin canceladas): precio en USD de cada plan y créditos de IA de
  *  BIENVENIDA. 09-11 (el dueño): los créditos se dan UNA sola vez, con el primer plan que contrata (como el mes de Radar
  *  PRO); no vencen, se acumulan con las recargas y no se vuelven a dar al renovar, cambiar de plan o reactivar. */
