@@ -1,13 +1,15 @@
 'use client'
 import Link from '@/components/ui/Link'
+import type { SeccionDemo } from '@/lib/demoDatos'
 import { useCallback, useEffect, useState } from 'react'
 import { Cargando, PageHeader } from '@/components/ui'
 
-interface Seccion { id: string; titulo: string; texto: string; pendientes: number }
+interface Seccion { id: SeccionDemo; titulo: string; texto: string; pendientes: number }
 
-const RUTA: Record<string, string> = {
+// Con el tipo de las secciones: una sección nueva sin ruta no compila (16-11: «Inventario» sin ruta tiraba la página).
+const RUTA: Record<SeccionDemo, string> = {
   despachos: '/despachos', reportador: '/reportador', preguntas: '/preguntas',
-  mensajes: '/mensajes', calificaciones: '/calificaciones', stock: '/alertas-stock', pagos: '/pagos-me',
+  mensajes: '/mensajes', calificaciones: '/calificaciones', stock: '/alertas-stock', pagos: '/pagos-me', inventario: '/dashboard',
 }
 
 // Cuenta de demostración: lo pendiente de cada sección y un botón para dejarla como al principio
