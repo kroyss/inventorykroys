@@ -31,6 +31,13 @@ export async function portadaSerie(): Promise<string> {
   }
 }
 
+/**
+ * El caso real TERMINADO (16-11-2026, el dueño): la cuenta desde cero llegó a MercadoLíder en 60 días con más de 80
+ * ventas y ahí se cerró el experimento (último video = cierre). Ya no suma ventas: la página muestra el resultado
+ * final fijo, no el "Hoy, día N … y sumando" (despegue_grupos.caso_ventas queda solo como histórico).
+ */
+export const CASO_FINAL = { dias: 60, ventas: 80, verde: 35, primera: 7 } as const
+
 /** Pago único (21-10: sin cuotas). */
 export const PRECIO = 99
 export const PRECIO_DESPUES = 119

@@ -1,14 +1,12 @@
 import { connection } from 'next/server'
-import { dbGlobal } from '@/lib/db'
-import { currentDate } from '@/lib/tz'
 import {
-  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, cifrasRadar, portadaSerie, diasEntre, ritmoVentas, PRECIO_DESPUES, TEMAS, TELEGRAM_DESPEGUE, type GrupoDespegue,
+  COMUNIDAD_TELEGRAM, PLAYLIST_PORTADA, PRECIO, cifrasRadar, portadaSerie, PRECIO_DESPUES, TEMAS, TELEGRAM_DESPEGUE, CASO_FINAL,
 } from '@/lib/despegue'
 import { BotonCupo, MedirVista, VideoSerie } from '@/components/despegue/DespegueCliente'
 
 export const metadata = {
   title: 'Programa Despegue',
-  description: 'Caso real: así llevé una cuenta nueva de 0, con reputación gris, a reputación verde con MercadoEnvíos activado en 5 semanas. '
+  description: 'Caso real: así llevé una cuenta nueva de 0, con reputación gris, a MercadoLíder en 60 días, con más de 80 ventas. '
     + '8 semanas de acompañamiento para vender en MercadoLibre Venezuela, empieces de cero o ya tengas cuenta. Empiezas cuando quieras.',
 }
 
@@ -62,19 +60,9 @@ function Icono({ d, className = 'h-4 w-4' }: { d: string; className?: string }) 
 // (migración 112) y se leen en cada visita: el dueño sube "tomados" en Plataforma cuando alguien paga.
 export default async function DespeguePage() {
   await connection()
-  const { rows: [g] } = await dbGlobal().query<GrupoDespegue>(
-    `SELECT id, nombre, cupos, tomados, to_char(inicio, 'YYYY-MM-DD') AS inicio, to_char(aparta_hasta, 'YYYY-MM-DD') AS aparta_hasta,
-            to_char(caso_inicio, 'YYYY-MM-DD') AS caso_inicio, caso_ventas
-     FROM despegue_grupos WHERE actual ORDER BY id DESC LIMIT 1`)
-  const hoy = currentDate('America/Caracas')
   const [portada, RADAR] = await Promise.all([portadaSerie(), cifrasRadar()])
-  // El caso real (mig. 113): día de la cuenta desde el 15-09 y las ventas que lleva (las sube el dueño en Plataforma).
-  const diaCaso = diasEntre(g?.caso_inicio ?? '2026-09-15', hoy)
-  const ventasCaso = g?.caso_ventas ?? 17
-  const ritmo = ritmoVentas(diaCaso, ventasCaso)
+  // 16-11 (el dueño): el caso real TERMINÓ (MercadoLíder en 60 días, +80 ventas). Resultado fijo: CASO_FINAL.
   const anio = new Date().getFullYear()
-  // 10-11 (el dueño): ya no hay grupos con fecha ni cupos: cada uno empieza cuando quiere. despegue_grupos sigue dando
-  // solo el caso real (caso_inicio, caso_ventas).
   const accion = (grande = false, className = '') => <BotonCupo grande={grande} className={className} />
 
   return (
@@ -110,24 +98,23 @@ export default async function DespeguePage() {
                   </span>
                 </span>
                 <span className="leading-tight">
-                  <span className="block text-xs font-bold uppercase tracking-[0.18em] text-lime-400">Caso real</span>
+                  <span className="block text-xs font-bold uppercase tracking-[0.18em] text-lime-400">Caso real · completado</span>
                   <span className="block text-sm text-neutral-200">Cuenta desde cero, grabada de principio a fin <span className="whitespace-nowrap text-lime-400">· ver ↓</span></span>
                 </span>
               </a>
-              {/* 21-10: el HITO (fijo, grabado en la serie) en el título; el avance va en la línea de abajo y se actualiza solo. */}
+              {/* 16-11: el RESULTADO FINAL del experimento (ya no suma ventas). */}
               <h1 className="mt-4 text-[1.85rem] font-semibold leading-[1.12] tracking-tight sm:text-[2.75rem]">
                 Así llevé una cuenta nueva de <span className="text-neutral-500">0, con reputación gris,</span> a{' '}
-                <span className="text-lime-400">reputación verde</span> con <span className="text-lime-400">MercadoEnvíos activado</span>{' '}
-                <span className="whitespace-nowrap">en <span className="text-lime-400">5 semanas</span>.</span>
+                <span className="text-lime-400">MercadoLíder</span>{' '}
+                <span className="whitespace-nowrap">en solo <span className="text-lime-400">{CASO_FINAL.dias} días</span>.</span>
               </h1>
-              {/* El avance de hoy (mig. 113): el día se calcula desde caso_inicio; las ventas las sube el dueño en Plataforma. */}
               <p className="mt-4 inline-flex items-start gap-2.5 text-sm leading-snug text-neutral-300 sm:text-base">
-                <span className="relative mt-1.5 flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-400 opacity-60" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-lime-400" />
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lime-400 text-neutral-950" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 </span>
                 <span>
-                  Hoy, día {diaCaso}: <b className="text-white">{ventasCaso} ventas</b>{ritmo ? <>, {ritmo}</> : null}, y sumando.
+                  Experimento completado: <b className="text-white">más de {CASO_FINAL.ventas} ventas</b> en {CASO_FINAL.dias} días,
+                  con cada paso grabado.
                 </span>
               </p>
               <p className="mt-5 leading-relaxed text-neutral-400 lg:text-lg">
@@ -206,12 +193,15 @@ export default async function DespeguePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">Esto lo hice yo</p>
             <h2 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">No te lo cuento: te lo muestro.</h2>
             <p className="mt-4 leading-relaxed text-neutral-400">
-              {/* 21-10: sin números fijos que se vuelvan viejos: el hito (7 y 35 días) y el avance de hoy (mismos datos que la
-                  línea de la portada: día desde caso_inicio, ventas desde Plataforma). */}
-              Abrí una cuenta desde cero, sin ventas y con reputación gris. A los <b className="text-white">7 días</b> llegó la primera
-              venta, y a los <b className="text-white">35 días</b> ya tenía <b className="text-white">reputación verde</b> y{' '}
-              <b className="text-white">MercadoEnvíos con envío gratis activo</b>. Hoy, <b className="text-white">día {diaCaso}</b>, llevo{' '}
-              <b className="text-white">{ventasCaso} ventas</b> y sigo grabando cada paso.
+              {/* 16-11: el caso cerrado, con sus hitos (CASO_FINAL). */}
+              Abrí una cuenta desde cero, sin ventas y con reputación gris. A los <b className="text-white">{CASO_FINAL.primera} días</b> llegó
+              la primera venta; a los <b className="text-white">{CASO_FINAL.verde} días</b> ya tenía <b className="text-white">reputación verde</b> y{' '}
+              <b className="text-white">MercadoEnvíos con envío gratis activo</b>; y a los <b className="text-white">{CASO_FINAL.dias} días</b> llegué
+              a <b className="text-white">MercadoLíder</b>, con <b className="text-white">más de {CASO_FINAL.ventas} ventas</b>.
+            </p>
+            <p className="mt-3 leading-relaxed text-neutral-400">
+              Ahí cerré el experimento: el último episodio es el cierre de la cuenta, con los números finales.
+              Todo quedó grabado, de la primera publicación al último día.
             </p>
             <p className="mt-3 leading-relaxed text-neutral-400">
               En Despegue te enseño a hacer lo mismo, <b className="text-white">paso a paso y con tu cuenta</b>.

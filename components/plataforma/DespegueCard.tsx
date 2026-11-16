@@ -3,7 +3,7 @@
 // mano cuando alguien paga: el cobro va por Telegram) y cómo va la página (entraron, vieron el video, tocaron
 // "Apartar mi cupo").
 import { useEffect, useState } from 'react'
-import { diasEntre, ritmoVentas } from '@/lib/despegue'
+import { CASO_FINAL } from '@/lib/despegue'
 
 interface Datos {
   grupo: { nombre: string; cupos: number; tomados: number; inicio: string; aparta_hasta: string; caso_inicio: string; caso_ventas: number } | null
@@ -63,25 +63,12 @@ export default function DespegueCard() {
             </div>
             <p className="mt-2 text-xs text-neutral-500">Apartan hasta el {dd(g.aparta_hasta)} · inicio {dd(g.inicio)}. Toca + cuando alguien paga.</p>
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-            {/* El caso real de la página (mig. 113): el día sale solo; las ventas las sumas tú (esa cuenta no está conectada). */}
-            {(() => {
-              const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas' }).format(new Date())
-              const dia = diasEntre(g.caso_inicio, hoy)
-              return (
-                <div className="mt-4 border-t border-neutral-100 pt-3">
-                  <p className="text-xs text-neutral-500">Mi cuenta (caso real) · día {dia} desde el {dd(g.caso_inicio)}</p>
-                  <div className="mt-1.5 flex items-center gap-3">
-                    <button type="button" onClick={() => cambiar({ caso_ventas: g.caso_ventas - 1 })} disabled={guardando || g.caso_ventas <= 0}
-                      className="btn-secondary !px-3 text-lg leading-none" aria-label="Una venta menos">−</button>
-                    <span className="min-w-[4.5rem] text-center text-2xl font-semibold tabular-nums">{g.caso_ventas}</span>
-                    <button type="button" onClick={() => cambiar({ caso_ventas: g.caso_ventas + 1 })} disabled={guardando}
-                      className="btn-primary !px-3 text-lg leading-none" aria-label="Una venta más">+</button>
-                    <span className="text-xs text-neutral-500">ventas</span>
-                  </div>
-                  <p className="mt-1.5 text-xs text-neutral-500">La página dice: «Hoy, día {dia}: {g.caso_ventas} ventas{ritmoVentas(dia, g.caso_ventas) ? `, ${ritmoVentas(dia, g.caso_ventas)}` : ''}, y sumando.»</p>
-                </div>
-              )
-            })()}
+            {/* 16-11 (el dueño): el caso real terminó; la página muestra el resultado fijo (CASO_FINAL en lib/despegue.ts). */}
+            <div className="mt-4 border-t border-neutral-100 pt-3">
+              <p className="text-xs text-neutral-500">Mi cuenta (caso real) · <b className="text-neutral-700">completado</b></p>
+              <p className="mt-1 text-sm text-neutral-800">MercadoLíder en {CASO_FINAL.dias} días, más de {CASO_FINAL.ventas} ventas.</p>
+              <p className="mt-1 text-xs text-neutral-500">Ya no suma ventas: la página muestra este resultado final.</p>
+            </div>
           </div>
           <div className="text-xs text-neutral-600">
             <p className="font-medium text-neutral-800">La página</p>

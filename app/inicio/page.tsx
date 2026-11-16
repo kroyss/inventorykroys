@@ -1,5 +1,5 @@
 import { connection } from 'next/server'
-import { COMUNIDAD_TELEGRAM, cifrasRadar, TELEGRAM_DESPEGUE, PRECIO, PRECIO_DESPUES } from '@/lib/despegue'
+import { COMUNIDAD_TELEGRAM, cifrasRadar, TELEGRAM_DESPEGUE, PRECIO, PRECIO_DESPUES, CASO_FINAL } from '@/lib/despegue'
 import { CREDITOS_PRUEBA, ESCALONES, PLANES, PRECIO_DESDE, RADAR_PRO, precioRadarMes } from '@/lib/planes'
 import { currentDate } from '@/lib/tz'
 import { dbGlobal } from '@/lib/db'
@@ -180,6 +180,11 @@ export default async function InicioPage() {
               <p className="mt-2 leading-relaxed text-neutral-400">
                 8 semanas acompañado para <b className="text-white">empezar desde cero o reactivar tu cuenta</b>: sesiones 1 a 1 y
                 contacto directo por Telegram. <b className="text-lime-400">Bono: Domingo de Radar.</b>
+              </p>
+              {/* 16-11 (el dueño): el caso real terminado. */}
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                <b className="text-white">Caso real:</b> una cuenta desde cero, a <b className="text-lime-400">MercadoLíder en {CASO_FINAL.dias} días</b>, con
+                más de {CASO_FINAL.ventas} ventas.
               </p>
               <a href="/despegue" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300">
                 Conocer el programa <span aria-hidden="true">→</span>
