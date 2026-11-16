@@ -80,7 +80,9 @@ const item = (id: string, variante = 0, cantidad = 1): ItemEnvio => {
 }
 const totalDe = (items: ItemEnvio[]) => Math.round(items.reduce((a, x) => a + CATALOGO.get(x.item_id)!.precio * x.cantidad, 0) * 100) / 100
 
-export const imagen = (p: ProductoDemo) => 'data:image/svg+xml,' + encodeURIComponent(
+// Fotos reales (Pexels, licencia libre, sin marcas; 16-11) en public/demo-productos/; el dibujo queda de respaldo.
+const FOTOS = new Set(['101', '102', '103', '104', '105', '106', '107', '108', '109', '110', '111', '112', '113', '114'].map(n => `MLV900100${n}`))
+export const imagen = (p: ProductoDemo) => FOTOS.has(p.id) ? `/demo-productos/${p.id}.jpg` : 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${p.color}"/><text x="32" y="44" font-size="34" text-anchor="middle">${p.icono}</text></svg>`)
 
 // ── Secciones ───────────────────────────────────────────────────────────────
