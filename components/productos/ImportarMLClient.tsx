@@ -11,8 +11,9 @@ import type { EstadoImportar, FilaImportar } from '@/lib/importarML'
 // (o cada variante) se vinculan a un producto existente o se crean como productos nuevos.
 
 type Filtro = 'revisar' | 'parecida' | 'nueva' | 'vinculada'
-interface Datos { filas: FilaImportar[]; actualizado_at: string | null; cuentas: number; pais: 'VE' | 'CO' }
-interface Borrador { costo: string; stock: string }
+interface Datos { filas: FilaImportar[]; actualizado_at: string | null; cuentas: number; pais: 'VE' | 'CO'; trm?: number }
+// est: el costo lo puso "Costo estimado" (% del precio). Escribirlo a mano lo vuelve real.
+interface Borrador { costo: string; stock: string; est?: boolean }
 
 const POR_PAGINA = 60
 const num = (s: string) => leerNumero(s)   // 10-11: «36.45» y «36,45» (lib/numeroTexto.ts)
@@ -71,6 +72,7 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
   const [eleccion, setEleccion] = useState('')
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null)
+  const [pctEst, setPctEst] = useState('50')   // costo estimado: % del precio de venta
 
   const cargar = useCallback(async () => {
     const r = await fetch('/api/products/importar-ml', { cache: 'no-store' })
@@ -107,8 +109,17 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
   const paraPrecio = (f: FilaImportar) =>
     (datos?.pais === 'VE' && f.moneda === 'USD') || (datos?.pais === 'CO' && f.moneda === 'COP') ? f.precio : null
   const bor = (f: FilaImportar): Borrador => borrador[f.codigo] ?? { costo: '', stock: String(Math.max(0, f.disponible)) }
-  const editar = (f: FilaImportar, campo: keyof Borrador, v: string) =>
-    setBorrador(b => ({ ...b, [f.codigo]: { ...bor(f), [campo]: v } }))
+  const editar = (f: FilaImportar, campo: 'costo' | 'stock', v: string) =>
+    setBorrador(b => ({ ...b, [f.codigo]: { ...bor(f), [campo]: v, ...(campo === 'costo' ? { est: false } : {}) } }))
+  // 16-11 (el dueño): con 50+ productos escribir cada costo es demasiado. Costo estimado = % del precio de ML
+  // (en CO el precio es en pesos: se pasa a USD con la TRM). Queda marcado y las ventas se corrigen al poner el real.
+  const costoEstimado = (f: FilaImportar, pct: number): number | null => {
+    const p = paraPrecio(f)
+    if (!p || !(pct > 0)) return null
+    const usd = datos?.pais === 'CO' ? p / (datos.trm && datos.trm > 1 ? datos.trm : NaN) : p
+    const c = Math.round(usd * pct) / 100
+    return Number.isFinite(c) && c > 0 ? c : null
+  }
   const marcar = (codigo: string, on: boolean) => setMarcadas(m => {
     const s = new Set(m)
     if (on) s.add(codigo); else s.delete(codigo)
@@ -125,6 +136,19 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
   const invalidas = aCrear.filter(f => (bor(f).costo.trim() !== '' && !costoOk(f)) || stockMal(f))
   const sinCosto = aCrear.filter(f => bor(f).costo.trim() === '').length
   const listas = aCrear.filter(f => costoOk(f) && !stockMal(f))
+  const pctNum = num(pctEst)
+  const pctOk = pctNum > 0 && pctNum <= 100
+  const estimables = aCrear.filter(f => bor(f).costo.trim() === '' && costoEstimado(f, pctNum) != null)
+  const sinPrecio = sinCosto - estimables.length
+  const nEstimados = aCrear.filter(f => bor(f).est).length
+  const aplicarEstimado = () => {
+    if (!pctOk) return
+    setBorrador(b => {
+      const n = { ...b }
+      for (const f of estimables) n[f.codigo] = { ...bor(f), costo: String(costoEstimado(f, pctNum)), est: true }
+      return n
+    })
+  }
 
   const post = async (body: unknown) => {
     const r = await fetch('/api/products/importar-ml', {
@@ -163,7 +187,7 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
         const b = bor(f)
         return {
           codigo: f.codigo, cuenta: f.cuenta, nombre: f.variante ? `${f.titulo} · ${f.variante}` : f.titulo,
-          costo: num(b.costo), stock: num(b.stock), precio: paraPrecio(f),
+          costo: num(b.costo), stock: num(b.stock), precio: paraPrecio(f), estimado: !!b.est,
         }
       }),
     })
@@ -171,7 +195,7 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
     if (!ok) { setAviso({ ok: false, texto: d.error ?? 'No se pudieron crear' }); return }
     const n = (d.creados as string[]).length
     setAviso({ ok: true, texto: n
-      ? `${n} ${n === 1 ? 'producto creado' : 'productos creados'} (${d.creados[0]}${n > 1 ? ` a ${d.creados[n - 1]}` : ''}). Su stock quedó marcado "por verificar".`
+      ? `${n} ${n === 1 ? 'producto creado' : 'productos creados'} (${d.creados[0]}${n > 1 ? ` a ${d.creados[n - 1]}` : ''}). Su stock quedó marcado "por verificar"${nEstimados ? ' y los de costo estimado los completas cuando puedas en Productos → Completar costos' : ''}.`
       : 'No se creó nada: esas publicaciones ya estaban vinculadas.' })
     // Quedan marcadas solo las que esperan su costo.
     setMarcadas(new Set(aCrear.filter(f => !listas.includes(f)).map(f => f.codigo)))
@@ -209,7 +233,8 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
         <p>
           El stock de los productos nuevos es el que <b>MercadoLibre</b> dice que hay, y suele no ser exacto: quedan marcados
           <b> “stock por verificar”</b> hasta que lo confirmes producto por producto en Inventario. <b>El costo es obligatorio</b>
-          (en USD): sin él tus ganancias saldrían mal desde la primera venta. Publicaciones del catálogo al {fecha(datos?.actualizado_at ?? null)}
+          (en USD): sin él tus ganancias saldrían mal desde la primera venta. ¿Son muchos? Usa <b>Costo estimado</b> (un % del precio) y
+          complétalos después: las ventas se corrigen solas al poner el real. Publicaciones del catálogo al {fecha(datos?.actualizado_at ?? null)}
         </p>
       </div>
 
@@ -309,7 +334,9 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
                             <label className="flex items-center gap-1 text-[11px] text-neutral-500">Costo
                               <input value={b.costo} onChange={ev => editar(f, 'costo', ev.target.value)} inputMode="decimal" placeholder="USD"
                                 aria-required="true" aria-invalid={marcadas.has(f.codigo) && !costoOk(f)}
-                                className={`w-20 rounded-md border px-2 py-1 text-right text-xs num ${marcadas.has(f.codigo) && !costoOk(f) ? 'border-amber-400 bg-amber-50 placeholder:text-amber-600' : 'border-neutral-300'}`} />
+                                title={b.est ? 'Costo estimado (% del precio). Escríbelo para que sea el real.' : undefined}
+                                className={`w-20 rounded-md border px-2 py-1 text-right text-xs num ${marcadas.has(f.codigo) && !costoOk(f) ? 'border-amber-400 bg-amber-50 placeholder:text-amber-600' : b.est ? 'border-amber-300 bg-amber-50/60 text-amber-900' : 'border-neutral-300'}`} />
+                              {b.est && <span className="rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-800">est.</span>}
                             </label>
                             <label className="flex items-center gap-1 text-[11px] text-neutral-500">Stock
                               <input value={b.stock} onChange={ev => editar(f, 'stock', ev.target.value)} inputMode="numeric"
@@ -357,8 +384,26 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
               <b>{aCrear.length}</b> {aCrear.length === 1 ? 'nueva marcada' : 'nuevas marcadas'}
               {sinCosto > 0 && <span className="font-medium text-amber-700"> · falta{sinCosto === 1 ? '' : 'n'} {sinCosto} costo{sinCosto === 1 ? '' : 's'} (en ámbar)</span>}
               {invalidas.length > 0 && <span className="text-red-600"> · revisa costo (mayor que 0) o stock de {invalidas.length}</span>}
+              {nEstimados > 0 && <span className="text-amber-700"> · {nEstimados} con costo estimado</span>}
               {aCrear.length > 200 && <span className="text-neutral-400"> · se crean de a 200</span>}
             </p>
+            {sinCosto > 0 && (
+              <div className="order-last flex w-full flex-wrap items-center gap-2 rounded-lg bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+                <span className="font-medium">Costo estimado:</span>
+                <label className="flex items-center gap-1">
+                  <input value={pctEst} onChange={e => setPctEst(e.target.value)} inputMode="decimal" aria-label="Porcentaje del precio"
+                    className="w-12 rounded-md border border-amber-300 bg-white px-1.5 py-1 text-right num" />
+                  % del precio
+                </label>
+                <button type="button" onClick={aplicarEstimado} disabled={!pctOk || estimables.length === 0}
+                  className="btn-secondary text-xs">
+                  {estimables.length ? `Poner en ${estimables.length}` : 'Sin precio para estimar'}
+                </button>
+                <span className="text-amber-800/80">
+                  {!pctOk ? 'Entre 1 y 100 %.' : sinPrecio > 0 ? `${sinPrecio} sin precio en USD: ese costo escríbelo tú.` : 'Lo completas después; las ventas se corrigen solas.'}
+                </span>
+              </div>
+            )}
             <div className="flex gap-2">
               <button type="button" onClick={() => setMarcadas(new Set())} className="btn-secondary text-sm">Desmarcar</button>
               <button type="button" onClick={crear} disabled={ocupado === 'crear' || invalidas.length > 0 || listas.length === 0} className="btn-primary text-sm">

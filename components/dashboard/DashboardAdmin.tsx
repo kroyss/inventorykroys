@@ -40,7 +40,7 @@ export interface Summary {
 interface ChartPoint { label: string; ventas: number; costos: number; cantidad: number }
 export interface ChartData {
   chart_data: ChartPoint[]
-  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; rentabilidad_pct?: number | null; cantidad: number }
+  summary: { ventas: number; costos: number; ganancia: number; ganancia_pct: number; margen_pct?: number; rentabilidad_pct?: number | null; cantidad: number; estimado_pct?: number }
 }
 
 type Period = 'today' | 'month' | 'quarter' | 'year'
@@ -238,6 +238,15 @@ export default function DashboardAdmin({ country, bonos, puedeTasas, descuento, 
                 Rentabilidad {chart.summary.rentabilidad_pct.toLocaleString('de-DE')}%</span>}</>} />
             <Cifra color="bg-lime-400" titulo="Ventas concretadas" valor={chart.summary.cantidad.toLocaleString('es-VE')}
               nota={chart.summary.cantidad > 0 ? <span className="text-neutral-400" title="Lo que deja en promedio cada venta (vendido ÷ ventas)">Ticket promedio ${money(chart.summary.ventas / chart.summary.cantidad)}</span> : null} />
+          </div>
+        )}
+        {/* Mig 180: productos importados con costo estimado → la ganancia de esas ventas es aproximada. */}
+        {chart && (chart.summary.estimado_pct ?? 0) > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+            <span>
+              El <b>{chart.summary.estimado_pct} %</b> de lo vendido en este período usa <b>costo estimado</b>: la ganancia es aproximada.
+            </span>
+            <Link href="/productos/costos" className="font-medium underline underline-offset-2 hover:text-amber-950">Completar costos</Link>
           </div>
         )}
 

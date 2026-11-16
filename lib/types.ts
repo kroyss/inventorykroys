@@ -44,6 +44,7 @@ export interface Product {
   peso_origen?: string | null      // 'ml' = del portal de MercadoEnvíos (mig. 174), no se edita a mano
   peso_me_at?: string | null       // 14-11: cuándo se leyó el peso del portal (DD/MM/YYYY), columna Peso ME de Productos
   pesos_ml?: number[] | null       // pesos distintos en sus publicaciones (revisar vínculo o pack)
+  costo_estimado?: boolean        // mig 180: costo puesto como % del precio al importar (Productos → Completar costos)
 }
 
 export interface MLCode {

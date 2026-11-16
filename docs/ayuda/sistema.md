@@ -885,8 +885,21 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
 - **Cómo cargar productos:** si ya vendes en ML → Productos → **Importar desde ML** (crea el producto vinculado, con
-  peso y foto). **El costo (en USD, mayor que 0) es obligatorio** para crear cada producto: sin costo la ganancia de
-  sus ventas saldría mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen. Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, recargo, stock); cuando lo publiques,
+  peso y foto). **Cada producto necesita un costo (en USD, mayor que 0)**: sin costo la ganancia de sus ventas saldría
+  mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen.
+  **¿Son muchos (50, 100…)?** En la barra de abajo está **Costo estimado: N % del precio → Poner en N**: llena el costo de
+  las que no tienen, como ese % del precio de ML (en CO se pasa a USD con la TRM), y quedan marcadas **est.** Las que no
+  tienen precio en USD (VE en Bs, CO en dólares) no se pueden estimar: ese costo se escribe a mano. Las ventas de un
+  producto con costo estimado guardan ese costo marcado; cuando pones el **costo real** (en **Productos → Completar
+  costos**, en la ficha del producto o al recibir una compra) **esas ventas se corrigen solas**. Las ventas con costo
+  real no cambian nunca.
+- **Completar costos** (Productos → aviso ámbar «N productos tienen costo estimado» → **Completar costos**, o
+  `/productos/costos`; requiere el permiso de costos): lista los productos con costo estimado, **los más vendidos en 30
+  días primero** (con pocos costos reales se cubre casi toda la ganancia). Por fila: el costo (prellenado con el
+  estimado), qué % del precio es, cuántas ventas se van a corregir. **Guardar** pone el real y corrige sus ventas; si el
+  estimado ya es correcto, **Está bien así** solo quita la marca. Con varios cambiados sale **Guardar N** abajo.
+  En **Inicio**, mientras haya ventas con costo estimado en el período sale: «El X % de lo vendido en este período usa
+  costo estimado: la ganancia es aproximada · Completar costos». Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, recargo, stock); cuando lo publiques,
   lo vinculas y el peso y la foto llegan solos.
 - **Actualizar desde ML** (Publicaciones, Productos → Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
   5 minutos no se vuelve a leer (ya está al día).

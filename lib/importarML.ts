@@ -160,7 +160,11 @@ export async function vincularCodigo(db: Pool | PoolClient, productId: number, c
     [productId, cuenta, codigo])
 }
 
-export interface NuevoProducto { codigo: string; cuenta: string; nombre: string; costo: number; stock: number; precio: number | null }
+export interface NuevoProducto {
+  codigo: string; cuenta: string; nombre: string; costo: number; stock: number; precio: number | null
+  /** Mig 180: costo puesto como "% del precio" (no el real). Las ventas lo marcan y se corrigen al poner el real. */
+  estimado?: boolean
+}
 
 /** Crea los productos en UNA transacción (o todos o ninguno). Salta los códigos que ya quedaron
  *  vinculados (doble clic, otra pestaña). Devuelve los códigos de producto creados. */
@@ -181,8 +185,8 @@ export async function crearProductos(db: PoolClient, lista: NuevoProducto[], use
       if (!(costo > 0)) throw new Error(`Falta el costo de «${p.nombre.slice(0, 60)}»`)
       const precio = p.precio ?? 0
       const { rows: [prod] } = await db.query(
-        `INSERT INTO products (code, name, stock_por_verificar) VALUES ($1, $2, $3) RETURNING id`,
-        [code, p.nombre.slice(0, 200), p.stock > 0])
+        `INSERT INTO products (code, name, stock_por_verificar, costo_estimado) VALUES ($1, $2, $3, $4) RETURNING id`,
+        [code, p.nombre.slice(0, 200), p.stock > 0, !!p.estimado])
       await db.query(
         `INSERT INTO product_pricing (product_id, base_cost, shipping_cost, total_cost, profit_category_id,
            base_price_usd, published_price_usd, final_price_usd, price_bolivares, current_discount_percent)

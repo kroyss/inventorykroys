@@ -180,6 +180,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           [id, pid, n.quantity, n.unit_price, n.quantity * n.unit_price, notaDe(pid), unitCost, unitCom])
       }
       total = Math.round((sale.discount_percent > 0 ? bruto * (1 - sale.discount_percent / 100) : bruto) * 100) / 100
+      // Mig 180: la línea de un producto con costo estimado queda marcada (se corrige sola al poner el real).
+      await db.query(
+        `UPDATE sale_items si SET costo_estimado = p.costo_estimado FROM products p WHERE p.id = si.product_id AND si.sale_id = $1`, [id])
     }
     await db.query(`UPDATE sales SET total_amount = $2, notes = CASE WHEN $3::boolean THEN $4 ELSE notes END, updated_at = NOW() WHERE id = $1`,
       [id, total, notaVentaCambia, notaVentaNueva])

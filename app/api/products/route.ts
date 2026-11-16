@@ -7,7 +7,7 @@ import { puede } from '@/lib/permisos'
 
 const PRODUCTS_SQL = `
   SELECT
-    p.id, p.code, p.name, p.is_active,
+    p.id, p.code, p.name, p.is_active, p.costo_estimado,
     COALESCE(pp.base_cost,              0)::float AS base_cost,
     COALESCE(pp.shipping_cost,          0)::float AS shipping_cost,
     COALESCE(pp.total_cost,             0)::float AS total_cost,

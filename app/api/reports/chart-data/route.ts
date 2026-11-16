@@ -62,11 +62,15 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(s.total_amount), 0)              AS ventas,
         COALESCE(SUM(si_cost.costo), 0)               AS costos,
         COALESCE(SUM(si_cost.mercancia), 0)           AS mercancia,
+        COALESCE(SUM(si_cost.bruto), 0)               AS bruto,
+        COALESCE(SUM(si_cost.estimado), 0)            AS estimado,
         COUNT(DISTINCT s.id)                          AS cantidad_ventas
       FROM sales s
       LEFT JOIN (
         SELECT si.sale_id, SUM(si.quantity * (COALESCE(si.unit_cost, 0) + COALESCE(si.unit_commission, 0))) AS costo,
-               SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS mercancia
+               SUM(si.quantity * COALESCE(si.unit_cost, 0)) AS mercancia,
+               -- Mig 180: lo vendido con costo estimado (la ganancia de eso es aproximada).
+               SUM(si.total_price) AS bruto, SUM(si.total_price) FILTER (WHERE si.costo_estimado) AS estimado
         FROM sale_items si
         GROUP BY si.sale_id
       ) si_cost ON si_cost.sale_id = s.id
@@ -80,6 +84,7 @@ export async function GET(req: NextRequest) {
     let totalCostos  = 0
     let totalMercancia = 0
     let totalCantidad = 0
+    let totalBruto = 0, totalEstimado = 0
 
     // ISO label length: hour=13 (YYYY-MM-DDTHH), day=10 (YYYY-MM-DD), month=7 (YYYY-MM)
     const labelLen = trunc === 'hour' ? 13 : trunc === 'month' ? 7 : 10
@@ -92,6 +97,8 @@ export async function GET(req: NextRequest) {
       totalCostos   += costos
       totalMercancia += parseFloat(r.mercancia) || 0
       totalCantidad += cant
+      totalBruto    += parseFloat(r.bruto) || 0
+      totalEstimado += parseFloat(r.estimado) || 0
       const periodoStr = r.periodo instanceof Date
         ? r.periodo.toISOString()
         : String(r.periodo ?? '')
@@ -125,6 +132,10 @@ export async function GET(req: NextRequest) {
           ? Math.round(((totalVentas - totalCostos) / totalMercancia) * 1000) / 10
           : null,
         cantidad:     totalCantidad,
+        // Mig 180: % de lo vendido con costo estimado (0 = todo con costo real).
+        estimado_pct: totalBruto > 0 && totalEstimado > 0
+          ? Math.max(1, Math.round((totalEstimado / totalBruto) * 100))
+          : 0,
       },
     })
   } catch (err) {

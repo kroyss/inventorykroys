@@ -21,7 +21,7 @@ export default async function ProductosPage() {
   const [productsRes, catsRes] = await Promise.all([
     db.query(`
       SELECT
-        p.id, p.code, p.name, p.is_active,
+        p.id, p.code, p.name, p.is_active, p.costo_estimado,
         COALESCE(pp.base_cost,              0)::float AS base_cost,
         COALESCE(pp.shipping_cost,          0)::float AS shipping_cost,
         COALESCE(pp.total_cost,             0)::float AS total_cost,
@@ -73,6 +73,7 @@ export default async function ProductosPage() {
       promociones={tieneModulo(session.user, 'promociones') && puede(session.user, 'promociones')}
       publicarML={tieneModulo(session.user, 'publicaciones') && tieneModulo(session.user, 'preguntas') && puede(session.user, 'editar_publicaciones')}
       costosML={puede(session.user, 'costos_ml_config')}
+      completarCostos={puede(session.user, 'costos')}
     />
     </div>
   )

@@ -36,8 +36,9 @@ export async function PUT(
     const costFactor = await localCostFactor(session.user.country)
     // Snapshot del costo unitario de todas las líneas de la venta (se llama al procesar).
     const snapshotCost = () => db.query(
-      `UPDATE sale_items si SET unit_cost = ROUND(COALESCE(pp.total_cost, 0) * $1, 2)
-       FROM product_pricing pp
+      // Mig 180: si el costo del producto es estimado, la línea queda marcada y se corrige sola al poner el real.
+      `UPDATE sale_items si SET unit_cost = ROUND(COALESCE(pp.total_cost, 0) * $1, 2), costo_estimado = p.costo_estimado
+       FROM product_pricing pp JOIN products p ON p.id = pp.product_id
        WHERE pp.product_id = si.product_id AND si.sale_id = $2`,
       [costFactor, id]
     )

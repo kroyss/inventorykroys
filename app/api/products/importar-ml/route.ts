@@ -8,6 +8,7 @@ import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { actualizarCatalogo } from '@/lib/catalogoML'
 import { crearProductos, filasImportar, vincularCodigo } from '@/lib/importarML'
+import { localCostFactor } from '@/lib/localCost'
 
 // Productos → Importar desde MercadoLibre (lib/importarML.ts). Permisos: ver Productos + "Importar
 // productos desde MercadoLibre"; las publicaciones salen del catálogo de Preguntas (módulo preguntas).
@@ -29,7 +30,9 @@ export async function GET() {
     const filas = await filasImportar(s.db)
     const { rows: [c] } = await s.db.query(
       `SELECT MIN(catalogo_at) AS at, COUNT(*)::int AS cuentas FROM ml_conexiones WHERE estado = 'activa'`)
-    return NextResponse.json({ filas, actualizado_at: c?.at ?? null, cuentas: c?.cuentas ?? 0, pais: s.session.user.country })
+    // trm: para el costo estimado en CO (el precio de ML es en pesos y el costo se guarda en USD).
+    const trm = s.session.user.country === 'CO' ? await localCostFactor('CO') : 1
+    return NextResponse.json({ filas, actualizado_at: c?.at ?? null, cuentas: c?.cuentas ?? 0, pais: s.session.user.country, trm })
   } catch (err) {
     return apiError(err)
   }
@@ -45,6 +48,7 @@ const Body = z.discriminatedUnion('accion', [
       codigo: Codigo, cuenta: z.string().min(1).max(50), nombre: z.string().trim().min(2).max(200),
       costo: z.number({ message: 'Falta el costo de algún producto' }).positive('El costo debe ser mayor que 0').max(1_000_000), stock: z.number().int().min(0).max(1_000_000),
       precio: z.number().nonnegative().max(1_000_000_000).nullable(),
+      estimado: z.boolean().optional(),
     })).min(1).max(200),
   }),
 ])

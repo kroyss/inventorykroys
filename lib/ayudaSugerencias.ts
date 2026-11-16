@@ -73,7 +73,16 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Desde cuánto es «Sana»?', respuesta: 'Por defecto, rentabilidad desde **25 %** es verde (Sana), de 0 a 25 % naranja (Ajustada) y menos de 0 rojo (Pérdida). Se cambia en **Productos → Costos ML**.' },
   ],
   '/dashboard': [
+    { pregunta: '¿Por qué dice que la ganancia es aproximada?', respuesta: 'Porque parte de lo vendido es de productos con **costo estimado** (un % del precio, puesto al importar). Toca **Completar costos** y pon el real: las ventas se corrigen solas y el aviso se va.' },
     { pregunta: '¿Qué es la rentabilidad del Inicio?', respuesta: 'La ganancia del período ÷ lo que te costó la mercancía vendida. **30 %** = ganaste $30 por cada $100 en mercancía. Es la misma cuenta que ves en cada producto. No descuenta los gastos del mes.' },
+  ],
+  '/productos/importar-ml': [
+    { pregunta: 'Son muchos productos, ¿tengo que poner cada costo?', respuesta: 'No. En la barra de abajo usa **Costo estimado**: pones un % del precio (por ejemplo 50 %) y toca **Poner en N**. Quedan marcados **est.** y los completas después en **Productos → Completar costos**: al poner el real, las ventas se corrigen solas.' },
+  ],
+  '/productos/costos': [
+    { pregunta: '¿Por cuáles empiezo?', respuesta: 'Por arriba: están ordenados por lo que más vendiste en 30 días. Con unos pocos costos reales ya cubres casi toda tu ganancia; los que casi no se venden pueden esperar.' },
+    { pregunta: '¿Qué pasa con las ventas que ya hice?', respuesta: 'Las que se hicieron con el costo estimado se **corrigen solas** al guardar el real. Las que ya tenían costo real no cambian.' },
+    { pregunta: 'El estimado ya está bien', respuesta: 'Toca **Está bien así**: queda como costo real y deja de salir aquí.' },
   ],
   '/productos/mercadoenvios': [
     { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },

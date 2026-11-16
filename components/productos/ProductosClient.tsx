@@ -140,7 +140,7 @@ interface Props {
   costosML?: boolean     // 14-11: puede configurar Costos ML (admin o permiso costos_ml_config)
 }
 
-export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false, publicarML = false, costosML = false, inicialTasa = null }: Props & { inicialTasa?: import('@/lib/inicial').TasaYAjustes | null }) {
+export default function ProductosClient({ initialProducts, profitCategories, country, mlAccounts, descuento, importarML = false, categorias = true, promociones = false, catalogo = false, publicarML = false, costosML = false, completarCostos = false, inicialTasa = null }: Props & { inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; completarCostos?: boolean }) {
   // Inventario simple: el precio de venta es el que se guardó (lo publicado en ML), no costo × categoría × exceso.
   const simple = !categorias
   const [products,  setProducts]  = useState<Product[]>(initialProducts)
@@ -149,6 +149,7 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
   const [batchPct,  setBatchPct]  = useState('')   // 14-11: recargo en lote (antes categoría)
   const [simPct,    setSimPct]    = useState<number | null>(null)   // modo simple: % que se está simulando en la ficha
   const [verCostos, setVerCostos] = useState(false)
+  const estimados = useMemo(() => products.filter(p => p.is_active && p.costo_estimado).length, [products])
   const [modal,     setModal]     = useState<'create' | 'edit' | null>(null)
   const [editId,    setEditId]    = useState<number | null>(null)
   const [form,      setForm]      = useState<FormState>(emptyForm())
@@ -598,6 +599,17 @@ export default function ProductosClient({ initialProducts, profitCategories, cou
         {catalogo && <Link href="/productos/catalogo" className="btn-secondary text-sm whitespace-nowrap" title="Catálogo con logo, fotos y precios para mandar por WhatsApp">Catálogo PDF</Link>}
         <button onClick={openCreate} className="btn-primary text-sm whitespace-nowrap">+ Producto</button>
       </>} />
+
+      {/* Mig 180: importados con costo estimado (% del precio) → completar el real, los más vendidos primero. */}
+      {completarCostos && estimados > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-sm text-amber-900">
+          <span className="flex-1">
+            <b>{estimados}</b> {estimados === 1 ? 'producto tiene' : 'productos tienen'} <b>costo estimado</b>: la ganancia de sus ventas es aproximada.
+            Pon el real cuando puedas y las ventas se corrigen solas.
+          </span>
+          <Link href="/productos/costos" className="btn-secondary text-xs whitespace-nowrap">Completar costos</Link>
+        </div>
+      )}
 
       {/* Catálogo vacío (25-10): el primer paso de quien recién prende inventario es traer sus publicaciones. */}
       {importarML && products.length === 0 && (
