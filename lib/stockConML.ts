@@ -214,6 +214,19 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
         }
       }
     }
+    // 16-11 (el dueño: «no sé qué hacer ahí»): en reserva y ML muestra más de lo que hay → una sugerencia válida que
+    // toca lo mínimo: se baja de a 1 la que más muestra (empate: la que menos vende). Así Igualar también lo arregla.
+    if (f.en_reserva && f.excede) {
+      const c = new Map(sincronizables.map(p => [p, p.ml_disponible ?? 0]))
+      let total = sincronizables.reduce((s, p) => s + c.get(p)! * p.unidades, 0)
+      while (total > f.disponible) {
+        const p = [...c.keys()].filter(x => c.get(x)! > 0)
+          .sort((a, b) => c.get(b)! - c.get(a)! || a.ventas60 - b.ventas60 || a.cuenta.localeCompare(b.cuenta))[0]
+        if (!p) break
+        c.set(p, c.get(p)! - 1); total -= p.unidades
+      }
+      for (const [p, n] of c) p.objetivo = n
+    }
     f.diferencia = f.pubs.some(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
       || (f.en_reserva && f.excede)   // en reserva y ML muestra más de lo que hay: hay que asignar a mano
     f.ofrece = f.pubs

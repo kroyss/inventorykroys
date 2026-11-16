@@ -29,6 +29,8 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
   '/inventario/stock-ml': [
+    { pregunta: '¿Qué hago con «Hay 2 y MercadoLibre ofrece 3»?',
+      respuesta: 'Toca **Dejar así en ML**: aplica la sugerencia (baja primero la cuenta que más muestra). Si prefieres otro reparto, toca **Cambiar** y pon cuántas muestra cada cuenta; también se arregla marcando varios y tocando **Igualar y reactivar**.' },
     { pregunta: '¿Qué es «Vende de más»?',
       respuesta: 'Productos que MercadoLibre sigue ofreciendo sin que los tengas: en **0** con una publicación activa (rojo) o con menos de lo que suman tus publicaciones activas (amarillo). Márcalos y toca **Igualar y reactivar**: los de 0 quedan en 0 en ML. Se revisa solo cada 10 min y avisa por Telegram (Mis avisos → «Vende sin tener stock»).' },
     { pregunta: '¿Por qué sale un número rojo en Publicaciones?',

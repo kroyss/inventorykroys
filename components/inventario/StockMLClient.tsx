@@ -207,7 +207,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           )}
           {visibles.slice(0, ver).map(f => (
             <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} conVincular={conVincular} marcable={accionables(f).length > 0}
-              marcado={marcados.has(f.product_id)} resultados={resultados}
+              marcado={marcados.has(f.product_id)} resultados={resultados} verCombos={filtro === 'combos'}
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
               onSincronizar={async (p, v) => { if (await pedir({ accion: 'sincronizar', codigo_id: p.codigo_id, sin_sincronizar: v })) await cargar() }}
@@ -267,8 +267,8 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir }: {
-  f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir }: {
+  f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
   onCorregir: (cantidad: number) => Promise<boolean>
@@ -280,7 +280,9 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
   const asignables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
   const [asig, setAsig] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState(false)
-  const valor = (p: PubStockML) => asig[clave(p)] ?? String(p.ml_disponible ?? 0)
+  const [editando, setEditando] = useState(false)
+  // Arranca con la sugerencia del servidor (objetivo) si ML muestra de más; si no, con lo que ya muestra ML.
+  const valor = (p: PubStockML) => asig[clave(p)] ?? String(p.objetivo ?? p.ml_disponible ?? 0)
   const totalAsig = asignables.reduce((s, p) => s + (Math.max(0, Math.round(Number(valor(p)) || 0))) * p.unidades, 0)
   const cambioAsig = asignables.some(p => Number(valor(p)) !== p.ml_disponible)
   return (
@@ -321,42 +323,62 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
         </div>
       </div>
       {f.en_reserva && (
-        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 text-xs ${f.excede ? 'border-red-100 bg-red-50 text-red-800' : 'border-amber-100 bg-amber-50 text-amber-900'}`}>
-          <span>
-            {f.excede ? <><b>ML muestra más de lo que hay</b> ({asignables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)} y hay {f.disponible}): </> : <><b>En reserva</b> (hay {f.disponible}): </>}
-            revisa que existan y asigna a mano cuántas va a mostrar cada cuenta.
-          </span>
+        <div className={`space-y-2 border-b px-4 py-3 text-sm ${f.excede ? 'border-red-100 bg-red-50 text-red-900' : 'border-amber-100 bg-amber-50 text-amber-900'}`}>
+          {/* 16-11 (el dueño: «no sé qué hacer ahí»): arranca con una sugerencia válida, dicha en claro, y un botón listo. */}
+          <p>
+            {f.excede
+              ? <><b>Hay {f.disponible} y MercadoLibre ofrece {asignables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)}.</b> {puedeCambiar ? (editando ? 'Pon cuántas muestra cada cuenta:' : 'Te sugerimos:') : 'Avísale a quien maneja el stock.'}</>
+              : <><b>Quedan pocas ({f.disponible}).</b> Con tan pocas el sistema no reparte solo: cada cuenta muestra lo que decidiste.</>}
+          </p>
+          {puedeCambiar && f.excede && !editando && (
+            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+              {asignables.map(p => {
+                const n = Math.max(0, Math.round(Number(valor(p)) || 0))
+                return <li key={clave(p)} className="tabular-nums"><b>{p.cuenta}</b>{p.variante ? ` · ${p.variante}` : ''}{' '}
+                  <span className="text-neutral-500">{p.ml_disponible}</span> → <b className={n !== p.ml_disponible ? 'text-red-700' : ''}>{n}</b></li>
+              })}
+            </ul>
+          )}
           {puedeCambiar && (
-            <span className="ml-auto flex items-center gap-2">
-              <span className={totalAsig > f.disponible ? 'font-semibold text-red-700' : ''}>Asignadas {totalAsig} de {f.disponible}</span>
-              <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-primary text-xs disabled:opacity-50"
-                onClick={async () => {
-                  setGuardando(true)
-                  const ok = await onAsignar(asignables.filter(p => Number(valor(p)) !== p.ml_disponible)
-                    .map(p => ({ item_id: p.item_id, variante_id: p.variante_id, cantidad: Math.max(0, Math.round(Number(valor(p)) || 0)) })))
-                  setGuardando(false)
-                  if (ok) setAsig({})
-                }}>{guardando ? 'Aplicando…' : 'Aplicar asignación'}</button>
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {(f.excede || editando) && (
+                <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-primary text-sm disabled:opacity-50"
+                  onClick={async () => {
+                    setGuardando(true)
+                    const ok = await onAsignar(asignables.filter(p => Number(valor(p)) !== p.ml_disponible)
+                      .map(p => ({ item_id: p.item_id, variante_id: p.variante_id, cantidad: Math.max(0, Math.round(Number(valor(p)) || 0)) })))
+                    setGuardando(false)
+                    if (ok) { setAsig({}); setEditando(false) }
+                  }}>{guardando ? 'Guardando en ML…' : 'Dejar así en ML'}</button>
+              )}
+              <button type="button" onClick={() => { setEditando(e => !e); setAsig({}) }} className="text-sm underline">
+                {editando ? 'Cancelar' : 'Cambiar'}</button>
+              {editando && totalAsig > f.disponible && <span className="font-semibold text-red-700">Te sobra{totalAsig - f.disponible === 1 ? '' : 'n'} {totalAsig - f.disponible}: baja alguna</span>}
+              {editando && totalAsig <= f.disponible && <span className="text-xs opacity-75">Usas {totalAsig} de {f.disponible}</span>}
+            </div>
           )}
         </div>
       )}
       <ul className="divide-y divide-neutral-100">
-        {f.pubs.map(p => <FilaPub key={p.codigo_id} p={p} res={resultados.get(clave(p))} puedeCambiar={puedeCambiar}
+        {f.pubs.map(p => <FilaPub key={p.codigo_id} p={p} res={resultados.get(clave(p))} puedeCambiar={puedeCambiar} reserva={f.en_reserva}
+          abrirOpciones={verCombos}
           onUnidades={u => onUnidades(p, u)} onSincronizar={v => onSincronizar(p, v)}
-          asignar={f.en_reserva && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
+          asignar={f.en_reserva && editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
       </ul>
     </section>
   )
 }
 
-function FilaPub({ p, res, puedeCambiar, onUnidades, onSincronizar, asignar }: {
-  p: PubStockML; res?: Res; puedeCambiar: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
+function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onSincronizar, asignar }: {
+  p: PubStockML; res?: Res; puedeCambiar: boolean; reserva: boolean; abrirOpciones: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
   /** Producto en reserva: cuántas va a mostrar esta publicación (lo decide la persona). */
   asignar?: { valor: string; onCambio: (v: string) => void }
 }) {
   const [u, setU] = useState(String(p.unidades))
   useEffect(() => setU(String(p.unidades)), [p.unidades])
+  // 16-11: «trae N u.», pack/combo y No sincronizar van en «Más opciones» (casi no se usan; en Revisar combos, abiertas).
+  const [opciones, setOpciones] = useState(false)
+  const verOpciones = opciones || abrirOpciones
   const cambia = p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar)
   const envio = p.envio ? ENVIO[p.envio] : null
   return (
@@ -369,12 +391,7 @@ function FilaPub({ p, res, puedeCambiar, onUnidades, onSincronizar, asignar }: {
         <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está activa ni pausada en ML (cerrada o finalizada); si la acabas de crear, pulsa «Actualizar desde ML»</span>}</div>
       </div>
 
-      <label className="flex items-center gap-1 text-xs text-neutral-500" title="Cuántas unidades del producto trae esta publicación (pack o combo). Lo pones tú; 1 = suelto">
-        trae
-        <input type="number" min={1} max={100} value={u} disabled={!puedeCambiar} onChange={e => setU(e.target.value)}
-          onBlur={() => { const n = Math.round(Number(u)); if (n >= 1 && n <= 100 && n !== p.unidades) onUnidades(n); else setU(String(p.unidades)) }}
-          className="w-12 rounded border border-neutral-300 px-1 py-0.5 text-right text-sm tabular-nums" /> u.
-      </label>
+      {!verOpciones && p.unidades > 1 && <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700" title="Pack o combo: cada venta descuenta esta cantidad">trae {p.unidades} u.</span>}
 
       <div className="w-28 text-xs">
         <div className="text-neutral-400">En ML</div>
@@ -392,13 +409,25 @@ function FilaPub({ p, res, puedeCambiar, onUnidades, onSincronizar, asignar }: {
           </label>
         ) : p.sin_sincronizar ? <div className="text-neutral-500">no se toca</div>
           : p.entera_con_variantes ? <div className="text-amber-700" title="Está vinculada la publicación entera pero tiene variantes: vincula cada variante en Vincular con ML">vincular por variante</div>
-          : p.objetivo == null ? <div className="text-neutral-400">—</div>
+          : p.objetivo == null ? <div className="text-neutral-400">{reserva ? 'lo que decidiste' : '—'}</div>
           : <div className={`tabular-nums ${cambia ? 'font-semibold text-lime-700' : 'text-neutral-500'}`}>
               {p.objetivo}{p.reactivar ? ' · se reactiva' : ''}{!cambia ? ' ✓ igual' : ''}
               {p.bloqueada_envio && <div className="font-normal text-red-700">pausada: sin envío gratis</div>}
             </div>}
       </div>
-      {p.posible_combo && puedeCambiar && (
+      {puedeCambiar && !abrirOpciones && (
+        <button type="button" onClick={() => setOpciones(o => !o)} className="text-[11px] text-neutral-500 underline">
+          {opciones ? 'Menos opciones' : '⋯ Más opciones'}</button>
+      )}
+      {verOpciones && (
+        <label className="flex items-center gap-1 text-xs text-neutral-500" title="Cuántas unidades del producto trae esta publicación (pack o combo). Lo pones tú; 1 = suelto">
+          trae
+          <input type="number" min={1} max={100} value={u} disabled={!puedeCambiar} onChange={e => setU(e.target.value)}
+            onBlur={() => { const n = Math.round(Number(u)); if (n >= 1 && n <= 100 && n !== p.unidades) onUnidades(n); else setU(String(p.unidades)) }}
+            className="w-12 rounded border border-neutral-300 px-1 py-0.5 text-right text-sm tabular-nums" /> u.
+        </label>
+      )}
+      {verOpciones && p.posible_combo && puedeCambiar && (
         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900 ring-1 ring-inset ring-amber-200"
           title="El título parece de un pack o combo. Si trae varias unidades, pon cuántas en «trae»; si no, toca «Es suelta» y no vuelve a aparecer">
           ¿pack o combo?
@@ -406,7 +435,7 @@ function FilaPub({ p, res, puedeCambiar, onUnidades, onSincronizar, asignar }: {
         </span>
       )}
       {envio && <span title={envio.title} className={`rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset ${envio.c}`}>{envio.t}</span>}
-      {puedeCambiar && (
+      {puedeCambiar && (verOpciones || p.sin_sincronizar) && (
         <label className="flex items-center gap-1 text-[11px] text-neutral-500" title="Rifas, encargos o lo que manejas aparte: esta pantalla no la toca">
           <input type="checkbox" checked={p.sin_sincronizar} onChange={e => onSincronizar(e.target.checked)} /> No sincronizar
         </label>

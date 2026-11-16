@@ -972,7 +972,12 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   no corresponde, **Corregir** abre esa publicación para cambiar el vínculo. La foto del producto en todo el sistema
   sale de estos vínculos: al corregir aquí se arregla sola en todos lados (no hay que actualizar nada).
 - **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
-  cuentas de una vez. Aquí se marca si una publicación es pack/combo («trae N u.»).
+  cuentas de una vez. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+  (en el filtro Revisar combos salen abiertas).
+  **Quedan pocas** (el disponible es igual o menor a la reserva): el sistema no reparte solo. Si ML ofrece más de lo que
+  hay, sale «Hay 2 y MercadoLibre ofrece 3. Te sugerimos: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» con el botón
+  **Dejar así en ML** (baja primero la que más muestra; también lo hace «Igualar» al marcar varios). **Cambiar** deja
+  poner a mano cuántas muestra cada cuenta.
   **Vende de más** (filtro rojo, se abre solo cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
   alguna publicación activa con stock (rojo: si alguien compra no puedes cumplir) o con menos de lo que suman tus
   publicaciones activas (amarillo). Las pausadas no cuentan. Al abrir la pantalla se comprueban en ML (sale «Comprobando
