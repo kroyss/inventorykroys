@@ -92,7 +92,7 @@ export const SECCIONES_DEMO = [
   { id: 'calificaciones', titulo: 'Calificaciones', texto: 'Ventas sin calificar: despachadas (positiva), sin despachar o canceladas (neutral) y recientes (esperar).' },
   { id: 'stock', titulo: 'Stock', texto: '6 publicaciones agotadas y 5 por agotarse, por variante, para reponer en un clic.' },
   { id: 'pagos', titulo: 'Pagos ME', texto: '14 pagos de MercadoEnvíos de hoy sin verificar, con comprobante, y sus guías ya en Despachos («pago sin verificar» hasta verificarlos); los de ayer verificados y despachados. La PC se ve conectada y «Traer» responde al momento. Necesita el módulo Pagos ME.' },
-  { id: 'inventario', titulo: 'Inventario', texto: '17 productos vinculados a las publicaciones (con costo, peso y recargo), 6 meses de ventas que crecen, compras a 2 proveedores y 3 ventas de hoy por procesar; 2 agotados y 3 bajo el mínimo para reponer. Borra todo el inventario de la demo. Necesita el módulo Inventario.' },
+  { id: 'inventario', titulo: 'Inventario', texto: '17 productos vinculados a las publicaciones (con costo, peso y recargo), 6 meses de ventas que crecen, compras a 2 proveedores y 3 ventas de hoy por procesar; 2 agotados y 3 bajo el mínimo para reponer. Después se llena sola: cada 15 minutos entran las ventas nuevas (con su venta de ML y calificación), así siempre se ve «de hoy». Borra todo el inventario de la demo. Necesita el módulo Inventario.' },
 ] as const
 export type SeccionDemo = typeof SECCIONES_DEMO[number]['id']
 
@@ -730,5 +730,5 @@ export async function traerDemo(db: Pool, userId: number) {
 
 const SEMBRAR: Record<SeccionDemo, (db: Pool, cx: Cuentas, op: OpcionesDemo) => Promise<void>> = {
   despachos, reportador, preguntas, mensajes, calificaciones, stock, pagos: pagosME,
-  inventario: (db) => sembrarInventario(db, D.catalogo, D.cuentas, D.compradores, azar),
+  inventario: (db) => sembrarInventario(db),
 }

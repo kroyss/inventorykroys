@@ -15,6 +15,7 @@ import { generarFichasPendientes } from '@/lib/fichasIA'
 import { iaConfigurada } from '@/lib/ia'
 import { mlConfigurado } from '@/lib/ml'
 import { esDemoEmpresa } from '@/lib/demo'
+import { rellenarInventarioDemo } from '@/lib/demoInventario'
 import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
 import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
@@ -60,7 +61,11 @@ export async function GET(req: NextRequest) {
         if (u?.reciente) { resultado[e.id] = { omitida: 'inactiva' }; continue }
       }
       // Demostración: datos sembrados, nada que traer ni revisar (lib/demo.ts).
-      if (await esDemoEmpresa(e.id, e.country as Country)) { resultado[e.id] = { omitida: 'demo' }; continue }
+      // Lo único que se mueve: las ventas de su inventario siguen entrando solas (lib/demoInventario.ts), siempre «de hoy».
+      if (await esDemoEmpresa(e.id, e.country as Country)) {
+        resultado[e.id] = { omitida: 'demo', ventas: e.inventario ? await conEmpresa(e.id, e.country as Country, db => rellenarInventarioDemo(db)) : 0 }
+        continue
+      }
       sincronizadas.push(e)
       resultado[e.id] = await conEmpresa(e.id, e.country as Country, db => sincronizarEmpresa(db))
     } catch (err) {
