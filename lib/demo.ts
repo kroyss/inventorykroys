@@ -12,6 +12,10 @@ import type { Country } from '@/lib/types'
 
 /** Marca de las cuentas de ML de demostración (en access_token_enc y refresh_token_enc). */
 export const TOKEN_DEMO = 'demo'
+/** Ventas de ML sembradas de práctica en la Demo (Despachos, Reportador, Calificaciones, Mensajes, Stock, Pagos ME):
+ *  quedan con la fecha del día en que se restauró cada sección e inflaban las comparaciones del Inicio (16-11).
+ *  Números ficticios que ML no usa: el filtro no toca a ninguna cuenta real. Las de Inventario (…997…) sí cuentan. */
+export const SQL_NO_PRACTICA_DEMO = (col: string) => `${col} NOT BETWEEN 2000099991000001 AND 2000099996999999`
 
 export async function esDemo(db: Pick<Pool, 'query'>) {
   const { rows: [r] } = await db.query(`SELECT value FROM app_settings WHERE key = 'modo_demo'`)

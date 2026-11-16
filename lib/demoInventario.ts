@@ -64,22 +64,25 @@ const comisionDe = (precio: number, peso: number) => red(precio * 0.12 + shippin
 // Peso por hora del día (Venezuela): de madrugada casi nada, el pico a media tarde y en la noche.
 const PESO_HORA = [0.2, 0.1, 0.05, 0.05, 0.05, 0.1, 0.3, 0.6, 1, 1.3, 1.5, 1.6, 1.5, 1.4, 1.5, 1.7, 1.8, 1.7, 1.6, 1.7, 1.8, 1.5, 1, 0.5]
 const SUMA_HORAS = PESO_HORA.reduce((a, x) => a + x, 0)
-/** Ventas del día (siempre varias; unos días mejores que otros): crece de 3 a 8 en 6 meses y después sigue, despacio. */
+/** Ventas del día (siempre varias; unos días mejores que otros): de 5 a 20 por día en 6 meses (~+12 % cada 15 días) y siguen
+ *  creciendo igual; la variación de un día a otro es chica, así cualquier período le gana al anterior (16-11, el dueño). */
 function ventasDelDia(dia: number, inicio: number) {
-  const x = (dia - inicio) / DIAS
-  const base = x <= 1 ? 3 + 5 * Math.max(0, x) : 8 + 0.03 * (dia - inicio - DIAS)
+  const base = 5 * Math.pow(4, Math.max(0, dia - inicio) / DIAS)
   const r = azar(dia * 7 + 11)
-  return base * (0.75 + 0.6 * r()) * ([0.9, 1, 1, 1.05, 1.1, 1.15, 0.95][((dia % 7) + 7) % 7])
+  return base * (0.92 + 0.16 * r()) * ([0.98, 1, 1, 1.01, 1.02, 1.03, 0.99][((dia % 7) + 7) % 7])
 }
-/** Momentos de las ventas entre dos instantes (ms), determinístico por hora: rellenar dos veces da lo mismo. */
-function momentos(desde: number, hasta: number, inicio: number): number[] {
+/** Momentos de las ventas entre dos instantes (ms), determinístico por hora: rellenar dos veces da lo mismo. El total del
+ *  día sigue de cerca lo esperado (se reparte lo acumulado del día, sin sorteo por hora que lo haga saltar). */
+export function momentos(desde: number, hasta: number, inicio: number): number[] {
   const out: number[] = []
   for (let h = Math.floor(desde / HORA) * HORA; h < hasta; h += HORA) {
     const local = h + TZ
     const dia = Math.floor(local / DIA)
+    const hora = Math.floor((local - dia * DIA) / HORA)
+    const porHora = ventasDelDia(dia, inicio) / SUMA_HORAS
+    const acum = (k: number) => azar(dia * 13 + 5)() + porHora * PESO_HORA.slice(0, k).reduce((x, y) => x + y, 0)
+    const n = Math.floor(acum(hora + 1)) - Math.floor(acum(hora))
     const r = azar(Math.floor(h / HORA))
-    const esperado = ventasDelDia(dia, inicio) * PESO_HORA[Math.floor((local - dia * DIA) / HORA)] / SUMA_HORAS
-    const n = Math.floor(esperado + r())
     for (let k = 0; k < n; k++) {
       const t = h + Math.floor(r() * HORA)
       if (t > desde && t <= hasta) out.push(t)

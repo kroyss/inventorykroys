@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { SQL_NO_PRACTICA_DEMO } from '@/lib/demo'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { tieneModulo } from '@/lib/modulos'
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
                 COALESCE(SUM(m.total) FILTER (WHERE ${ENTRE('m.fecha', 1, 2)}), 0)::float AS monto,
                 COUNT(*) FILTER (WHERE ${ENTRE('m.fecha', 3, 4)})::int AS antes_ventas
          FROM ml_ordenes m JOIN ml_conexiones k ON k.id = m.conexion_id
-         WHERE COALESCE(m.estado, '') <> 'cancelled' AND (${ENTRE('m.fecha', 1, 2)} OR ${ENTRE('m.fecha', 3, 4)})
+         WHERE COALESCE(m.estado, '') <> 'cancelled' AND ${SQL_NO_PRACTICA_DEMO('m.id')} AND (${ENTRE('m.fecha', 1, 2)} OR ${ENTRE('m.fecha', 3, 4)})
          GROUP BY k.nickname ORDER BY ventas DESC`, P).then(x => x.rows) : null,
       ml ? db.query(
         `SELECT COUNT(*) FILTER (WHERE cal_recibida = 'positive' AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS positivas,
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
                 COUNT(*) FILTER (WHERE cal_recibida = 'negative' AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS negativas,
                 COUNT(*) FILTER (WHERE cal_recibida = 'negative' AND ${ENTRE('cal_recibida_at', 3, 4)})::int AS antes_negativas,
                 COUNT(*) FILTER (WHERE cal_contradictoria AND ${ENTRE('cal_recibida_at', 1, 2)})::int AS contradictorias
-         FROM ml_ordenes WHERE ${ENTRE('cal_recibida_at', 1, 2)} OR ${ENTRE('cal_recibida_at', 3, 4)}`, P).then(x => x.rows[0]) : null,
+         FROM ml_ordenes WHERE ${SQL_NO_PRACTICA_DEMO('id')} AND (${ENTRE('cal_recibida_at', 1, 2)} OR ${ENTRE('cal_recibida_at', 3, 4)})`, P).then(x => x.rows[0]) : null,
       // ¿Las ventas de ML guardadas (~120 días) llegan al inicio del período anterior?
       ml ? db.query(`SELECT MIN(fecha) <= $1::date AS alcanza FROM ml_ordenes`, [r.antesDesde]).then(x => !!x.rows[0]?.alcanza) : false,
       ml && tieneModulo(u, 'atencion_ml') && puede(u, 'ver_preguntas') ? atencionEntre(db, r) : null,
