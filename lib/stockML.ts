@@ -106,6 +106,20 @@ function motivoML(e: unknown) {
   return e instanceof Error ? e.message : String(e)
 }
 
+/** Deja constancia de un cambio de stock hecho en ML (quién, qué publicación, antes → después, estado). 16-11: los caminos
+ *  que no pasan por aplicarCambio (Stock → cantidad, Reponer desde Preguntas) también lo guardan. Nunca rompe el cambio. */
+export async function registrarCambioStock(db: Pick<Pool, 'query'>, r: {
+  conexionId: number; itemId: string; varianteId: string | null; antes: number | null; despues: number | null
+  estadoAntes: string | null; estadoDespues: string | null; origen: string; error?: string | null; usuarioId: number | null
+}) {
+  await db.query(
+    `INSERT INTO ml_stock_cambios (conexion_id, item_id, variante_id, antes, despues, estado_antes, estado_despues, reactivada, origen, error, usuario_id)
+     VALUES ($1, $2, $3::bigint, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [r.conexionId, r.itemId, r.varianteId ?? '0', r.antes, r.despues, r.estadoAntes, r.estadoDespues,
+     r.estadoAntes === 'paused' && r.estadoDespues === 'active', r.origen, r.error ?? null, r.usuarioId],
+  ).catch(e => console.error('[ml_stock_cambios]', e))
+}
+
 export interface Cambio { item_id: string; variante_id: string | null; cantidad: number | null }
 export interface Resultado { item_id: string; variante_id: string | null; ok: boolean; estado?: string; disponible?: number; total?: number; error?: string; reactivada?: boolean }
 

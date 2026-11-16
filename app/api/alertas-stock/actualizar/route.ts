@@ -6,6 +6,7 @@ import { ErrorML, mlFetch } from '@/lib/ml'
 import { umbralStock } from '@/lib/alertasStock'
 import { esDemo } from '@/lib/demo'
 import { registrarUso } from '@/lib/usoAcciones'
+import { registrarCambioStock } from '@/lib/stockML'
 
 const Body = z.object({
   cambios: z.array(z.object({
@@ -33,12 +34,21 @@ export async function POST(req: NextRequest) {
     for (const c of cambios) {
       // La fila confirma que la publicación es de esta empresa (RLS) y de qué cuenta.
       const { rows: [a] } = await s.db.query(
-        `SELECT a.conexion_id, c.nickname FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
+        `SELECT a.conexion_id, c.nickname, a.disponible, a.estado FROM ml_stock_alertas a JOIN ml_conexiones c ON c.id = a.conexion_id
          WHERE a.item_id = $1 AND a.variante_id = $2::bigint`, [c.item_id, c.variante_id])
       if (!a) { resultado.push({ ...c, ok: false, error: 'No está en tu lista de Stock' }); continue }
+      // 16-11: registro de cada cambio (antes → después y el estado con que quedó en ML: si se reactivó, se ve).
+      const registro = { conexionId: a.conexion_id, itemId: c.item_id, varianteId: c.variante_id, antes: a.disponible ?? null,
+        estadoAntes: a.estado === 'pausada' ? 'paused' : a.estado ?? null, origen: 'stock', usuarioId: Number(s.session.user.id) }
       try {
         const ruta = c.variante_id === '0' ? `/items/${c.item_id}` : `/items/${c.item_id}/variations/${c.variante_id}`
         if (!demo) await mlFetch(s.db, a.conexion_id, ruta, { method: 'PUT', body: { available_quantity: c.cantidad } })
+        let estadoDespues: string | null = demo ? registro.estadoAntes : null
+        if (!demo) {
+          try { estadoDespues = (await mlFetch<{ status: string }>(s.db, a.conexion_id, `/items/${c.item_id}?attributes=status`)).status }
+          catch { /* sin releer: queda sin estado */ }
+        }
+        await registrarCambioStock(s.db, { ...registro, despues: c.cantidad, estadoDespues })
         await s.db.query(
           `UPDATE ml_stock_alertas SET disponible = $3,
              agotada_desde = CASE WHEN $3 <= 0 THEN COALESCE(agotada_desde, NOW()) END,
@@ -47,6 +57,7 @@ export async function POST(req: NextRequest) {
         resultado.push({ item_id: c.item_id, variante_id: c.variante_id, ok: true })
       } catch (e) {
         const st = e instanceof ErrorML ? e.status : 0
+        await registrarCambioStock(s.db, { ...registro, despues: null, estadoDespues: null, error: e instanceof Error ? e.message : String(e) })
         resultado.push({
           item_id: c.item_id, variante_id: c.variante_id, ok: false,
           error: st === 403 || st === 401
