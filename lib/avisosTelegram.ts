@@ -105,6 +105,8 @@ export function avisosDisponibles(u: { role: UserRole; permisos: string[] | null
     stock: u.modulos.includes('alertas_stock') && puede(user, 'ver_stock'),
     // Vende de más (16-11): a quien puede igualar el stock en ML (Stock en ML).
     vende: conML && u.modulos.includes('inventario') && puede(user, 'ver_inventario') && puede(user, 'reponer_stock'),
+    // «Se acabó» marcado por bodega (16-11): a quien ajusta el inventario.
+    sinFisico: conML && u.modulos.includes('inventario') && puede(user, 'inventario_config'),
     // Promociones: solo con Inventario + Promociones y el permiso (nunca los Fundadores, que no tienen inventario).
     promos: u.modulos.includes('promociones') && u.modulos.includes('inventario') && puede(user, 'promociones'),
     reportador: u.modulos.includes('despachos') && u.modulos.includes('reportador') && puede(user, 'ver_reportador'),
@@ -457,6 +459,30 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
           + `\n\nSi alguien compra no vas a poder cumplir: iguala el stock.`
       const url = lista.length === 1 ? `/inventario/stock-ml?buscar=${encodeURIComponent(lista[0].code)}` : '/inventario/stock-ml'
       if (await mandar(d, e, 'vende_de_mas', lista.map(x => x.ref), html, [[{ texto: 'Igualar en Stock en ML', url: urlSistema(url) }]])) enviados++
+    }
+  }
+
+  // «Se acabó» (16-11, mig 181): alguien de bodega marcó que no hay aunque el inventario diga que sí. Al que ajusta el
+  // inventario, una vez por marca (sale con la misma opción que «Vende sin tener stock»). No a quien lo marcó.
+  if (p.vende_de_mas && disp.sinFisico && !silencio) {
+    const { rows } = await db.query(
+      `SELECT p.id || ':' || extract(epoch FROM p.sin_fisico_at)::bigint AS ref, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock,
+              u.full_name AS por
+       FROM products p LEFT JOIN inventory i ON i.product_id = p.id LEFT JOIN users u ON u.id = p.sin_fisico_por
+       WHERE p.sin_fisico_at > GREATEST(NOW() - INTERVAL '1 day', $1::timestamptz) AND p.sin_fisico_por IS DISTINCT FROM $2
+         AND NOT EXISTS (SELECT 1 FROM inventory_movements mv WHERE mv.product_id = p.id AND mv.movement_type IN ('IN', 'ADJUST')
+                         AND mv.created_at > p.sin_fisico_at)
+       ORDER BY p.sin_fisico_at LIMIT 20`, [d.vinculado_at, d.user_id])
+    const nuevas = await pendientes(d, e, 'sin_fisico', rows.map(r => r.ref))
+    const lista = rows.filter(r => nuevas.has(r.ref))
+    if (lista.length) {
+      const linea = (r: typeof lista[number]) => `<b>${esc(r.code)}</b> ${esc(corto(r.name, 60))} · lo marcó ${esc(r.por ?? 'alguien')} · el inventario dice ${r.stock}`
+      const html = lista.length === 1
+        ? `${cab}📦 <b>Bodega: se acabó</b>\n${linea(lista[0])}\nSus publicaciones quedaron en 0 en ML. Ajusta el inventario si corresponde.`
+        : `${cab}📦 <b>Bodega marcó ${lista.length} productos sin stock físico</b>\n\n` + lista.map(r => `• ${linea(r)}`).join('\n')
+          + `\n\nSus publicaciones quedaron en 0 en ML. Ajusta el inventario si corresponde.`
+      const url = lista.length === 1 ? `/inventario/stock-ml?buscar=${encodeURIComponent(lista[0].code)}` : '/inventario/stock-ml'
+      if (await mandar(d, e, 'sin_fisico', lista.map(r => r.ref), html, [[{ texto: 'Ver en Stock en ML', url: urlSistema(url) }]])) enviados++
     }
   }
 

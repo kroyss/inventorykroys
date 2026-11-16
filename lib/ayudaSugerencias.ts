@@ -29,6 +29,10 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
   '/inventario/stock-ml': [
+    { pregunta: '¿Cómo pauso una publicación sin tocar el inventario?',
+      respuesta: 'En la publicación toca **Pausar** (puedes escribir el motivo). Queda «Pausada a mano» y «Igualar» no la reactiva; para volver a venderla toca **Activar**. Si el producto no está en bodega, mejor **Se acabó**: pone 0 en todas sus publicaciones y avisa al admin para que ajuste el inventario.' },
+    { pregunta: '¿Dónde veo quién cambió el stock en ML?',
+      respuesta: 'Arriba en **Historial**, o **Ver cambios** en cada producto: quién, cuándo, qué publicación, antes → después, pausas y reactivaciones. El admin ve los de todos y filtra por persona.' },
     { pregunta: '¿Qué hago con «Hay 2 y MercadoLibre ofrece 3»?',
       respuesta: 'Toca **Dejar así en ML**: aplica la sugerencia (baja primero la cuenta que más muestra). Si prefieres otro reparto, toca **Cambiar** y pon cuántas muestra cada cuenta; también se arregla marcando varios y tocando **Igualar y reactivar**.' },
     { pregunta: '¿Qué es «Vende de más»?',

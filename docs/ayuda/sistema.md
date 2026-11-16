@@ -978,6 +978,14 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   hay, sale «Hay 2 y MercadoLibre ofrece 3. Te sugerimos: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» con el botón
   **Dejar así en ML** (baja primero la que más muestra; también lo hace «Igualar» al marcar varios). **Cambiar** deja
   poner a mano cuántas muestra cada cuenta.
+  **Bodega** (con el permiso «Cambiar el stock en MercadoLibre»; no hace falta tocar el inventario):
+  **Pausar** (en cada publicación, con motivo opcional: dañado, sin foto…) deja de venderla; «Igualar» no la reactiva
+  hasta que alguien toque **Activar** (necesita stock en ML). Filtro **Pausadas a mano**. **Se acabó** (en el producto,
+  cuando no está en bodega aunque el sistema diga que hay): todas sus publicaciones a 0 en ML y quedan en 0 hasta que
+  entre mercancía o se ajuste el inventario (o **Ya hay**); al admin le llega por Telegram para que ajuste el inventario.
+  **Historial** (arriba) y **Ver cambios** (en cada producto): quién cambió qué en ML (stock, pausas, reactivaciones,
+  desde cualquier pantalla). El admin ve los de todos y filtra por persona; los demás ven los suyos.
+  En **Automatizaciones → Stock** sale una franja roja si hay productos en 0 a la venta (con inventario).
   **Vende de más** (filtro rojo, se abre solo cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
   alguna publicación activa con stock (rojo: si alguien compra no puedes cumplir) o con menos de lo que suman tus
   publicaciones activas (amarillo). Las pausadas no cuentan. Al abrir la pantalla se comprueban en ML (sale «Comprobando

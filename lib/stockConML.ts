@@ -45,6 +45,8 @@ export interface PubStockML {
   /** Ventas de 60 días de esta publicación (desempata el reparto). */
   ventas60: number
   actualizado_at: string | null
+  /** Pausada a mano desde Stock en ML (mig 181) y sigue pausada: Igualar no la reactiva. */
+  pausa_mano: { at: string; por: string | null; motivo: string | null } | null
 }
 
 export interface FilaStockML {
@@ -67,6 +69,8 @@ export interface FilaStockML {
   peso: number | null
   pubs: PubStockML[]
   diferencia: boolean
+  /** «Se acabó» (bodega, mig 181): vigente hasta que entra mercancía o se ajusta el inventario. Cuenta como 0 disponible. */
+  sin_fisico: { at: string; por: string | null } | null
 }
 
 export const RESERVA_DEFECTO = 2
@@ -129,11 +133,16 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
               m.id AS codigo_id, m.ml_code, m.ml_account AS cuenta, COALESCE(m.unidades, 1)::int AS unidades,
               COALESCE(m.sin_sincronizar, FALSE) AS sin_sincronizar, COALESCE(m.combo_revisado, FALSE) AS combo_revisado,
               c.item_id, c.titulo, c.estado, c.disponible::int AS disponible, c.precio::float AS precio, c.variantes,
-              c.actualizado_at
+              c.actualizado_at, m.pausa_mano_at, um.full_name AS pausa_mano_por, m.pausa_mano_motivo,
+              CASE WHEN p.sin_fisico_at > COALESCE((SELECT MAX(mv.created_at) FROM inventory_movements mv
+                     WHERE mv.product_id = p.id AND mv.movement_type IN ('IN', 'ADJUST')), '-infinity')
+                   THEN p.sin_fisico_at END AS sin_fisico_at, uf.full_name AS sin_fisico_por
        FROM products p
+       LEFT JOIN users uf ON uf.id = p.sin_fisico_por
        JOIN product_ml_codes m ON m.product_id = p.id AND m.is_active AND split_part(m.ml_code, ':', 1) ~ '^\\d+$'
        LEFT JOIN inventory i ON i.product_id = p.id
        LEFT JOIN ml_catalogo c ON substring(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
+       LEFT JOIN users um ON um.id = m.pausa_mano_por
        WHERE p.is_active
        ORDER BY p.name, m.ml_account, m.ml_code`),
     comprometidasPorCodigo(db),
@@ -147,7 +156,8 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     let f = porProducto.get(r.product_id)
     if (!f) {
       f = { product_id: r.product_id, code: r.code, name: r.name, stock: r.stock, comprometidas: 0, disponible: r.stock,
-            publicable: 0, en_reserva: false, excede: false, vende: null, ofrece: 0, peso: r.peso, pubs: [], diferencia: false, codigos: [] }
+            publicable: 0, en_reserva: false, excede: false, vende: null, ofrece: 0, peso: r.peso, pubs: [], diferencia: false, codigos: [],
+            sin_fisico: r.sin_fisico_at ? { at: r.sin_fisico_at, por: r.sin_fisico_por } : null }
       porProducto.set(r.product_id, f)
     }
     const [pub, varId] = String(r.ml_code).split(':')
@@ -171,6 +181,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       envio: null, objetivo: null, reactivar: false, bloqueada_envio: false,
       ventas60: ventas.get(String(r.ml_code)) ?? 0,
       actualizado_at: r.actualizado_at,
+      pausa_mano: r.pausa_mano_at && r.estado === 'paused' ? { at: r.pausa_mano_at, por: r.pausa_mano_por, motivo: r.pausa_mano_motivo } : null,
     })
   }
 
@@ -182,16 +193,18 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       f.comprometidas += (compromiso.get(codigo) ?? 0) * p.unidades
     }
     f.disponible = Math.max(0, f.stock - f.comprometidas)
-    f.publicable = Math.max(0, f.disponible - reserva)
+    // «Se acabó»: para ML cuenta como 0 (el inventario no se toca: lo ajusta quien puede).
+    const disp = f.sin_fisico ? 0 : f.disponible
+    f.publicable = Math.max(0, disp - reserva)
     for (const p of f.pubs) {
       if (pais === 'VE' && p.precio != null && p.precio > 0) {
         p.envio = envioPorTransportista(f.peso != null ? f.peso * p.unidades : null, p.precio, tablas).estado
       }
     }
     const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
-    f.excede = sincronizables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0) > f.disponible
+    f.excede = sincronizables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0) > disp
     // 16-11 (Vende de más): con 0 disponible no hay nada que repartir a mano: todas a 0 (Igualar lo arregla de un clic).
-    f.en_reserva = sincronizables.length > 0 && f.disponible > 0 && f.disponible <= reserva
+    f.en_reserva = sincronizables.length > 0 && disp > 0 && disp <= reserva
     if (!f.en_reserva && sincronizables.length) {
       // Por turnos: cada vuelta, a cada una (de la que más vende a la que menos) 1 publicación entera si todavía alcanza.
       // Antes era partes iguales en unidades y después ÷ lo que trae: 10 entre combos de 5/4/6 daba 0 en todas.
@@ -208,7 +221,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
         }
       }
       for (const p of orden) {
-        if (p.estado === 'paused' && (p.objetivo ?? 0) > 0) {
+        if (p.estado === 'paused' && (p.objetivo ?? 0) > 0 && !p.pausa_mano) {
           if (p.envio === 'destino') p.bloqueada_envio = true
           else p.reactivar = true
         }
@@ -219,7 +232,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     if (f.en_reserva && f.excede) {
       const c = new Map(sincronizables.map(p => [p, p.ml_disponible ?? 0]))
       let total = sincronizables.reduce((s, p) => s + c.get(p)! * p.unidades, 0)
-      while (total > f.disponible) {
+      while (total > disp) {
         const p = [...c.keys()].filter(x => c.get(x)! > 0)
           .sort((a, b) => c.get(b)! - c.get(a)! || a.ventas60 - b.ventas60 || a.cuenta.localeCompare(b.cuenta))[0]
         if (!p) break
@@ -232,7 +245,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     f.ofrece = f.pubs
       .filter(p => p.estado === 'active' && !p.sin_sincronizar && !p.entera_con_variantes && (p.ml_disponible ?? 0) > 0)
       .reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)
-    f.vende = f.ofrece <= 0 ? null : f.disponible <= 0 ? 'sin' : f.ofrece > f.disponible ? 'mas' : null
+    f.vende = f.ofrece <= 0 ? null : disp <= 0 ? 'sin' : f.ofrece > disp ? 'mas' : null
     const { codigos: _, ...fila } = f
     filas.push(fila)
   }

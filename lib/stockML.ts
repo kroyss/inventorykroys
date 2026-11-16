@@ -111,13 +111,53 @@ function motivoML(e: unknown) {
 export async function registrarCambioStock(db: Pick<Pool, 'query'>, r: {
   conexionId: number; itemId: string; varianteId: string | null; antes: number | null; despues: number | null
   estadoAntes: string | null; estadoDespues: string | null; origen: string; error?: string | null; usuarioId: number | null
+  motivo?: string | null
 }) {
   await db.query(
-    `INSERT INTO ml_stock_cambios (conexion_id, item_id, variante_id, antes, despues, estado_antes, estado_despues, reactivada, origen, error, usuario_id)
-     VALUES ($1, $2, $3::bigint, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT INTO ml_stock_cambios (conexion_id, item_id, variante_id, antes, despues, estado_antes, estado_despues, reactivada, origen, error, usuario_id, motivo)
+     VALUES ($1, $2, $3::bigint, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [r.conexionId, r.itemId, r.varianteId ?? '0', r.antes, r.despues, r.estadoAntes, r.estadoDespues,
-     r.estadoAntes === 'paused' && r.estadoDespues === 'active', r.origen, r.error ?? null, r.usuarioId],
+     r.estadoAntes === 'paused' && r.estadoDespues === 'active', r.origen, r.error ?? null, r.usuarioId, r.motivo ?? null],
   ).catch(e => console.error('[ml_stock_cambios]', e))
+}
+
+/** Pausa o activa una publicación ENTERA en ML (16-11, Stock en ML; ML no pausa variantes sueltas). Pausar deja la marca
+ *  «pausada a mano» (mig 181): Igualar no la reactiva sola. Activar exige stock en ML y borra la marca. Queda registrado. */
+export async function cambiarEstadoML(db: Pool, item: string, estado: 'active' | 'paused',
+  opc: { usuarioId: number | null; motivo?: string | null }): Promise<Resultado> {
+  const base = { item_id: item, variante_id: null }
+  const conexionId = await conexionDeItem(db, item)
+  if (!conexionId) return { ...base, ok: false, error: 'No se encontró en tus cuentas de MercadoLibre' }
+  const demo = await esDemo(db)
+  let antes: PubStock | null = null
+  if (!demo) {
+    try { antes = await leerPublicacion(db, conexionId, item) } catch (e) { return { ...base, ok: false, error: motivoML(e) } }
+    if (estado === 'active' && antes.disponible <= 0) {
+      return { ...base, ok: false, error: 'No tiene stock en MercadoLibre: iguala o pon unidades primero' }
+    }
+  }
+  let error: string | undefined
+  let despues: PubStock | null = null
+  if (!demo) {
+    try { await mlFetch(db, conexionId, `/items/${item}`, { method: 'PUT', body: { status: estado } }) } catch (e) { error = motivoML(e) }
+    try { despues = await leerPublicacion(db, conexionId, item) } catch { /* sin releer */ }
+  }
+  const final = demo ? estado : despues?.estado ?? null
+  if (!error && final && final !== estado) {
+    error = estado === 'paused' ? 'MercadoLibre la sigue mostrando activa: revísala en MercadoLibre'
+      : 'MercadoLibre la sigue mostrando pausada (puede estar en revisión): revísala en MercadoLibre'
+  }
+  if (!error) {
+    await db.query(`UPDATE ml_catalogo SET estado = $2 WHERE item_id = $1`, [item, final ?? estado])
+    await db.query(
+      `UPDATE product_ml_codes SET pausa_mano_at = CASE WHEN $2 THEN NOW() END, pausa_mano_por = CASE WHEN $2 THEN $3::int END,
+              pausa_mano_motivo = CASE WHEN $2 THEN $4 END
+       WHERE split_part(ml_code, ':', 1) = $1`, [item.replace(/^[A-Z]{3}/, ''), estado === 'paused', opc.usuarioId, opc.motivo || null])
+  }
+  await registrarCambioStock(db, { conexionId, itemId: item, varianteId: null, antes: antes?.disponible ?? null,
+    despues: despues?.disponible ?? antes?.disponible ?? null, estadoAntes: antes?.estado ?? null, estadoDespues: final,
+    origen: estado === 'paused' ? 'pausar' : 'activar', error: error ?? null, usuarioId: opc.usuarioId, motivo: opc.motivo || null })
+  return { ...base, ok: !error, error, estado: final ?? undefined, disponible: despues?.disponible }
 }
 
 export interface Cambio { item_id: string; variante_id: string | null; cantidad: number | null }

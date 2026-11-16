@@ -6,9 +6,11 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
 import { FotoProducto } from '@/components/ui/FotoProducto'
+import { Ventana } from '@/components/ui/Ventana'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { FilaStockML, PubStockML } from '@/lib/stockConML'
 
-type Filtro = 'vende' | 'diferencias' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
+type Filtro = 'vende' | 'diferencias' | 'pausadas' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
 
 const POR_PAGINA = 40
@@ -45,6 +47,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [reserva, setReserva] = useState<number | null>(inicial?.reserva ?? null)
   const [puedeReserva, setPuedeReserva] = useState(!!inicial?.puedeReserva)
   const [sinVincular, setSinVincular] = useState(inicial?.sinVincular ?? 0)
+  // 16-11 Historial (seguimiento de lo que se cambia en ML): null = cerrado; con producto = filtrado.
+  const [historial, setHistorial] = useState<{ product_id: number | null; nombre: string | null } | null>(null)
+  const confirmar = useConfirm()
 
   const cargar = (revisar = false) => fetch(`/api/stock-en-ml${revisar ? '?revisar=1' : ''}`, { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
@@ -75,7 +80,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const visibles = useMemo(() => {
     const q = buscar.trim().toLowerCase()
     return (filas ?? []).filter(f =>
-      (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
+      (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'pausadas' ? f.pubs.some(p => p.pausa_mano) : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
         : filtro === 'combos' ? f.pubs.some(p => p.posible_combo) : f.pubs.some(p => p.bloqueada_envio)))
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
       && (!q || `${f.code} ${f.name}`.toLowerCase().includes(q) || f.pubs.some(p => `${p.item_id} ${p.titulo ?? ''} ${p.variante ?? ''}`.toLowerCase().includes(q))))
@@ -85,6 +90,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
 
   const n = {
     vende: filas.filter(f => f.vende).length,
+    pausadas: filas.filter(f => f.pubs.some(p => p.pausa_mano)).length,
     diferencias: filas.filter(f => f.diferencia).length,
     reserva: filas.filter(f => f.en_reserva).length,
     reactivar: filas.filter(f => f.pubs.some(p => p.reactivar)).length,
@@ -121,6 +127,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         subtitle="Cada producto con todas sus publicaciones: iguala el stock y reactiva las pausadas en todas tus cuentas de una vez"
         actions={<>
           <Link href="/inventario" className="btn-secondary text-sm whitespace-nowrap">← Inventario</Link>
+          <button type="button" onClick={() => setHistorial({ product_id: null, nombre: null })} className="btn-secondary text-sm whitespace-nowrap"
+            title="Quién cambió qué en MercadoLibre: stock, pausas y reactivaciones">Historial</button>
           {puedeCambiar && (
             <button disabled={actualizando} className="btn-secondary text-sm whitespace-nowrap disabled:opacity-50"
               title="Vuelve a leer de MercadoLibre el stock y el estado de todas tus publicaciones (tarda un poco)"
@@ -158,7 +166,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
               Vende de más <span className="opacity-75">{n.vende}</span>
             </button>
           )}
-          {([['diferencias', 'Con diferencias'], ['reserva', 'En reserva (a mano)'], ['reactivar', 'Pausadas para reactivar'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const).map(([k, t]) => (
+          {([['diferencias', 'Con diferencias'], ['reserva', 'Quedan pocas'], ['reactivar', 'Pausadas para reactivar'], ['pausadas', 'Pausadas a mano'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const).map(([k, t]) => (
             <button key={k} onClick={() => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }}
               className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
               {t} <span className="opacity-60">{n[k]}</span>
@@ -224,13 +232,31 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
                 if (!d) return false
                 setResultados(r => { const x = new Map(r); for (const y of d.resultados as Res[]) x.set(clave(y), y); return x })
                 await cargar(); return true
-              }} />
+              }}
+              onEstado={async (p, estado, motivo) => {
+                const d = await pedir({ accion: 'estado', item_id: p.item_id, estado, motivo: motivo || undefined })
+                if (!d) return false
+                // La pausa es de la publicación entera: el resultado vale para todas sus variantes de esta fila.
+                setResultados(r => { const x = new Map(r); for (const q of f.pubs.filter(q => q.item_id === p.item_id)) x.set(clave(q), { ...(d.resultados as Res[])[0], variante_id: q.variante_id }); return x })
+                await cargar(); return (d.resultados as Res[])[0]?.ok ?? false
+              }}
+              onSinFisico={async valor => {
+                if (valor && !await confirmar({ title: 'Se acabó', danger: true, confirmText: 'Sí, poner en 0',
+                  message: `${f.code} ${f.name}: todas sus publicaciones quedan en 0 en MercadoLibre hasta que entre mercancía o se ajuste el inventario. El inventario no se toca (lo ajusta quien puede).` })) return
+                const d = await pedir({ accion: 'sin_fisico', product_id: f.product_id, valor })
+                if (!d) return
+                setResultados(r => { const x = new Map(r); for (const y of d.resultados as Res[]) x.set(clave(y), y); return x })
+                await cargar()
+              }}
+              onHistorial={() => setHistorial({ product_id: f.product_id, nombre: `${f.code} ${f.name}` })} />
           ))}
           {visibles.length > ver && (
             <button onClick={() => setVer(v => v + POR_PAGINA)} className="btn-secondary w-full text-sm">Ver {Math.min(POR_PAGINA, visibles.length - ver)} más ({visibles.length - ver} quedan)</button>
           )}
         </div>
       )}
+
+      {historial && <Historial filtro={historial} onFiltro={setHistorial} onCerrar={() => setHistorial(null)} />}
 
       {puedeCambiar && (marcados.size > 0 || trabajando) && (
         <div data-barra-fija className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
@@ -267,12 +293,17 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir }: {
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
   f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
   onCorregir: (cantidad: number) => Promise<boolean>
+  onEstado: (p: PubStockML, estado: 'paused' | 'active', motivo: string) => Promise<boolean>
+  onSinFisico: (valor: boolean) => Promise<void>
+  onHistorial: () => void
 }) {
+  const [marcando, setMarcando] = useState(false)
+  const conStockML = f.pubs.some(p => !p.sin_sincronizar && !p.entera_con_variantes && (p.ml_disponible ?? 0) > 0)
   const [corrigiendo, setCorrigiendo] = useState<string | null>(null)
   const [guardandoStock, setGuardandoStock] = useState(false)
   const nuevoStock = corrigiendo == null ? NaN : Math.round(Number(corrigiendo))
@@ -298,6 +329,22 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
             {f.vende === 'sin' ? `Tienes 0 y ML ofrece ${f.ofrece}` : `ML ofrece ${f.ofrece}, tienes ${f.disponible}`}</span>}
           {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
             title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
+          <button type="button" onClick={onHistorial} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
+            title="Quién cambió el stock o el estado de sus publicaciones en MercadoLibre">Ver cambios</button>
+          {f.sin_fisico ? (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700 ring-1 ring-red-200"
+                title="Para MercadoLibre cuenta como 0 hasta que entre mercancía o se ajuste el inventario">
+                Sin stock físico · {f.sin_fisico.por ?? 'alguien'}, {new Date(f.sin_fisico.at).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
+              {f.stock > 0 && <span className="text-neutral-500">el inventario dice {f.stock}: falta ajustarlo</span>}
+              {puedeCambiar && <button type="button" disabled={marcando} className="font-medium text-lime-700 underline disabled:opacity-50"
+                onClick={async () => { setMarcando(true); await onSinFisico(false); setMarcando(false) }}>Ya hay</button>}
+            </div>
+          ) : puedeCambiar && conStockML && (
+            <button type="button" disabled={marcando} className="mt-1 block rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              title="No lo encuentras en bodega aunque el sistema diga que hay: todas sus publicaciones a 0 en ML"
+              onClick={async () => { setMarcando(true); await onSinFisico(true); setMarcando(false) }}>{marcando ? 'Poniendo en 0…' : 'Se acabó'}</button>
+          )}
         </div>
         <div className="flex flex-wrap gap-x-3 text-xs text-neutral-500">
           {corrigiendo == null ? (
@@ -361,7 +408,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
       )}
       <ul className="divide-y divide-neutral-100">
         {f.pubs.map(p => <FilaPub key={p.codigo_id} p={p} res={resultados.get(clave(p))} puedeCambiar={puedeCambiar} reserva={f.en_reserva}
-          abrirOpciones={verCombos}
+          abrirOpciones={verCombos} onEstado={(e, m) => onEstado(p, e, m)}
           onUnidades={u => onUnidades(p, u)} onSincronizar={v => onSincronizar(p, v)}
           asignar={f.en_reserva && editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
       </ul>
@@ -369,8 +416,9 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
   )
 }
 
-function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onSincronizar, asignar }: {
+function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onSincronizar, onEstado, asignar }: {
   p: PubStockML; res?: Res; puedeCambiar: boolean; reserva: boolean; abrirOpciones: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
+  onEstado: (estado: 'paused' | 'active', motivo: string) => Promise<boolean>
   /** Producto en reserva: cuántas va a mostrar esta publicación (lo decide la persona). */
   asignar?: { valor: string; onCambio: (v: string) => void }
 }) {
@@ -379,6 +427,10 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onS
   // 16-11: «trae N u.», pack/combo y No sincronizar van en «Más opciones» (casi no se usan; en Revisar combos, abiertas).
   const [opciones, setOpciones] = useState(false)
   const verOpciones = opciones || abrirOpciones
+  // 16-11 Pausar / Activar (publicación entera). Al pausar se puede dejar el motivo.
+  const [pausando, setPausando] = useState<string | null>(null)
+  const [cambiandoEstado, setCambiandoEstado] = useState(false)
+  const estadoML = async (e: 'paused' | 'active', m = '') => { setCambiandoEstado(true); const ok = await onEstado(e, m); setCambiandoEstado(false); if (ok) setPausando(null) }
   const cambia = p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar)
   const envio = p.envio ? ENVIO[p.envio] : null
   return (
@@ -415,6 +467,31 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onS
               {p.bloqueada_envio && <div className="font-normal text-red-700">pausada: sin envío gratis</div>}
             </div>}
       </div>
+      {puedeCambiar && p.estado === 'active' && !p.sin_sincronizar && pausando == null && (
+        <button type="button" onClick={() => setPausando('')} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
+          title="Deja de venderse en MercadoLibre (la publicación entera). «Igualar» no la reactiva hasta que alguien la active">Pausar</button>
+      )}
+      {puedeCambiar && p.estado === 'paused' && !p.sin_sincronizar && (
+        <button type="button" disabled={cambiandoEstado || !(p.ml_disponible ?? 0)} onClick={() => estadoML('active')}
+          title={(p.ml_disponible ?? 0) ? 'Vuelve a venderse en MercadoLibre' : 'No tiene stock en ML: iguala o pon unidades primero'}
+          className="rounded-lg border border-lime-300 bg-lime-50 px-2.5 py-1 text-xs font-medium text-lime-800 hover:bg-lime-100 disabled:opacity-40">
+          {cambiandoEstado ? 'Activando…' : 'Activar'}</button>
+      )}
+      {pausando != null && (
+        <span className="flex w-full flex-wrap items-center gap-2 text-xs sm:w-auto">
+          <input autoFocus value={pausando} onChange={e => setPausando(e.target.value)} maxLength={200} placeholder="Motivo (opcional): dañado, sin foto…"
+            className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-2 py-1 text-base sm:w-56 sm:flex-none sm:text-xs" />
+          <button type="button" disabled={cambiandoEstado} onClick={() => estadoML('paused', pausando)} className="btn-primary px-2.5 py-1 text-xs disabled:opacity-50">
+            {cambiandoEstado ? 'Pausando…' : 'Pausar'}</button>
+          <button type="button" onClick={() => setPausando(null)} className="text-neutral-500 underline">cancelar</button>
+        </span>
+      )}
+      {p.pausa_mano && (
+        <span className="w-full text-[11px] text-amber-800">
+          Pausada a mano por {p.pausa_mano.por ?? 'alguien'} · {new Date(p.pausa_mano.at).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}
+          {p.pausa_mano.motivo ? ` · «${p.pausa_mano.motivo}»` : ''} — «Igualar» no la reactiva
+        </span>
+      )}
       {puedeCambiar && !abrirOpciones && (
         <button type="button" onClick={() => setOpciones(o => !o)} className="text-[11px] text-neutral-500 underline">
           {opciones ? 'Menos opciones' : '⋯ Más opciones'}</button>
@@ -446,5 +523,79 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onS
         </div>
       )}
     </li>
+  )
+}
+
+interface Cambio {
+  id: string; creado_at: string; item_id: string; variante_id: string | null; antes: number | null; despues: number | null
+  estado_antes: string | null; estado_despues: string | null; reactivada: boolean; origen: string | null; error: string | null
+  motivo: string | null; usuario: string | null; cuenta: string | null; titulo: string | null; product_id: number | null; code: string | null; name: string | null
+}
+const ORIGEN: Record<string, string> = {
+  stock_ml: 'Igualar', stock_ml_mano: 'Reparto a mano', se_acabo: 'Se acabó', pausar: 'Pausó', activar: 'Activó',
+  stock: 'Automatizaciones → Stock', pausadas: 'Reactivar (Automatizaciones)', reponer: 'Reponer desde Preguntas',
+  preguntas: 'Desde Preguntas', mensajes: 'Desde Mensajes', ficha: 'Desde la ficha',
+}
+
+/** 16-11 Historial de Stock en ML: quién cambió qué en MercadoLibre (stock, pausas, reactivaciones). */
+function Historial({ filtro, onFiltro, onCerrar }: {
+  filtro: { product_id: number | null; nombre: string | null }
+  onFiltro: (f: { product_id: number | null; nombre: string | null }) => void; onCerrar: () => void
+}) {
+  const [persona, setPersona] = useState('')
+  const [datos, setDatos] = useState<{ filas: Cambio[]; personas: { id: number; nombre: string }[]; todos: boolean } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    const q = new URLSearchParams()
+    if (filtro.product_id) q.set('product_id', String(filtro.product_id))
+    if (persona) q.set('usuario_id', persona)
+    fetch(`/api/stock-en-ml/historial?${q}`, { cache: 'no-store' }).then(async r => {
+      const d = await r.json().catch(() => ({}))
+      if (!vivo) return
+      if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+      setDatos(d); setError(null)
+    })
+    return () => { vivo = false }
+  }, [filtro.product_id, persona])
+  const fecha = (f: string) => new Date(f).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })
+  return (
+    <Ventana titulo={filtro.nombre ? `Cambios · ${filtro.nombre}` : 'Historial de cambios en MercadoLibre'} onCerrar={onCerrar}>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {datos?.todos && datos.personas.length > 0 && (
+          <select value={persona} onChange={e => setPersona(e.target.value)} className="rounded-lg border border-neutral-300 px-2 py-1">
+            <option value="">Todas las personas</option>
+            {datos.personas.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+        )}
+        {filtro.product_id && <button type="button" onClick={() => onFiltro({ product_id: null, nombre: null })} className="underline">Ver todos los productos</button>}
+        {datos && !datos.todos && <span className="text-neutral-500">Ves tus cambios.</span>}
+      </div>
+      {error ? <p className="text-sm text-red-700">{error}</p>
+        : !datos ? <p className="text-sm text-neutral-400">Cargando…</p>
+        : datos.filas.length === 0 ? <p className="py-6 text-center text-sm text-neutral-500">Todavía no hay cambios registrados.</p>
+        : (
+          <ul className="divide-y divide-neutral-100 text-sm">
+            {datos.filas.map(c => {
+              const accion = c.origen === 'pausar' ? 'Pausó' : c.origen === 'activar' ? 'Activó'
+                : `${c.antes ?? '?'} → ${c.despues ?? '?'} u.${c.reactivada ? ' · reactivó' : ''}`
+              return (
+                <li key={c.id} className="py-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs text-neutral-500">
+                    <span><b className="text-neutral-700">{c.usuario ?? 'Sistema'}</b> · {ORIGEN[c.origen ?? ''] ?? c.origen ?? '—'}</span>
+                    <span className="tabular-nums">{fecha(c.creado_at)}</span>
+                  </div>
+                  {!filtro.product_id && <div className="truncate text-neutral-800">{c.code ? <><span className="font-mono text-xs text-neutral-400">{c.code}</span> {c.name}</> : c.titulo ?? c.item_id}</div>}
+                  <div className="text-xs text-neutral-600">
+                    {c.cuenta ?? '—'} · <span className="font-mono">{c.item_id}</span> · <b className={c.error ? 'text-red-700' : 'text-neutral-800'}>{accion}</b>
+                    {c.motivo && <span> · «{c.motivo}»</span>}
+                  </div>
+                  {c.error && <div className="text-xs text-red-700">✗ {c.error}</div>}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+    </Ventana>
   )
 }

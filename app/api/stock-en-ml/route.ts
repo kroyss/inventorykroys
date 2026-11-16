@@ -7,7 +7,7 @@ import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { registrarUso } from '@/lib/usoAcciones'
 import { actualizarCatalogo } from '@/lib/catalogoML'
-import { aplicarCambio, type Resultado } from '@/lib/stockML'
+import { aplicarCambio, cambiarEstadoML, type Resultado } from '@/lib/stockML'
 import { filasStockML, leerReserva } from '@/lib/stockConML'
 import { contarSinVincular } from '@/lib/importarML'
 import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
@@ -21,6 +21,10 @@ import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
 //   POST { accion: 'asignar', product_id, asignaciones: [{ item_id, variante_id, cantidad }] } → producto EN RESERVA:
 //        lo que decide la persona, sin pasar el disponible (en unidades del producto)
 //   POST { accion: 'reserva', unidades } → la reserva de seguridad de la empresa (permiso inventario_config)
+//   POST { accion: 'estado', item_id, estado: 'paused'|'active', motivo? } (16-11, bodega) → pausar a mano (Igualar no la
+//        reactiva) o activar (exige stock en ML). Publicación entera.
+//   POST { accion: 'sin_fisico', product_id, valor } (16-11) → «Se acabó»: todas sus publicaciones a 0 y quedan en 0 hasta
+//        que entre mercancía o se ajuste el inventario; valor false = «Ya hay». No toca el inventario.
 //   GET ?revisar=1 (16-11, «Vende de más», lib/vendeDeMas.ts) → antes relee de ML las activas que parecen vender más de lo
 //        que hay (también para quien solo mira). Sin revisar, igual guarda el estado (numerito del menú al día).
 
@@ -63,6 +67,9 @@ const Body = z.discriminatedUnion('accion', [
     cantidad: z.number().int().min(0).max(99999),
   })).min(1).max(20) }),
   z.object({ accion: z.literal('reserva'), unidades: z.number().int().min(0).max(100) }),
+  z.object({ accion: z.literal('estado'), item_id: z.string().regex(/^[A-Z]{3}\d+$/), estado: z.enum(['paused', 'active']),
+             motivo: z.string().trim().max(200).optional() }),
+  z.object({ accion: z.literal('sin_fisico'), product_id: z.number().int().positive(), valor: z.boolean() }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -86,6 +93,30 @@ export async function POST(req: NextRequest) {
         `INSERT INTO app_settings (key, value) VALUES ('stock_ml_reserva', $1)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [String(b.unidades)])
       return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'estado') {
+      const r = await cambiarEstadoML(s.db, b.item_id, b.estado, { usuarioId: Number(s.session.user.id), motivo: b.motivo })
+      if (r.ok) await registrarUso(s.db, 'stock', 1)
+      return NextResponse.json({ resultados: [r] })
+    }
+    if (b.accion === 'sin_fisico') {
+      const usuario = Number(s.session.user.id)
+      if (!b.valor) {
+        await s.db.query(`UPDATE products SET sin_fisico_at = NULL, sin_fisico_por = NULL WHERE id = $1`, [b.product_id])
+        return NextResponse.json({ resultados: [] })
+      }
+      const { rowCount } = await s.db.query(`UPDATE products SET sin_fisico_at = NOW(), sin_fisico_por = $2 WHERE id = $1`, [b.product_id, usuario])
+      if (!rowCount) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
+      const f = (await filasStockML(s.db, s.session.user.country)).find(x => x.product_id === b.product_id)
+      const resultados: Resultado[] = []
+      for (const p of f?.pubs ?? []) {
+        if (p.sin_sincronizar || p.entera_con_variantes || p.estado == null || !(p.ml_disponible ?? 0)) continue
+        resultados.push(await aplicarCambio(s.db, { item_id: p.item_id, variante_id: p.variante_id, cantidad: 0 },
+          { reactivar: false, origen: 'se_acabo', usuarioId: usuario }))
+      }
+      const hechos = resultados.filter(x => x.ok).length
+      if (hechos) await registrarUso(s.db, 'stock', hechos)
+      return NextResponse.json({ resultados })
     }
     if (b.accion === 'asignar') {
       const f = (await filasStockML(s.db, s.session.user.country)).find(x => x.product_id === b.product_id)

@@ -26,7 +26,7 @@ interface Estado {
   conectado: { usuario: string | null; nombre: string | null; desde: string } | null
   error: string | null
   prefs: Prefs
-  disponibles: { desconectada: boolean; pregunta: boolean; mensaje: boolean; negativa: boolean; stock: boolean; vende?: boolean; promos: boolean; resumen: boolean }
+  disponibles: { desconectada: boolean; pregunta: boolean; mensaje: boolean; negativa: boolean; stock: boolean; vende?: boolean; sinFisico?: boolean; promos: boolean; resumen: boolean }
   empresa: string | null
   staging: boolean
 }
@@ -269,11 +269,12 @@ export default function MisAvisosClient({ inicial = null }: { inicial?: unknown 
                 </label>
               </Fila>
             )}
-            {d.vende && (
+            {(d.vende || d.sinFisico) && (
               <Fila icono="🔴" titulo="Vende sin tener stock" etiqueta="Recomendado" on={p.vende_de_mas} onCambio={v => cambiar({ vende_de_mas: v })}
                 ejemplo={'🔴 Quedó en 0 y sigue a la venta en ML\nCOD-0207 Kit Destornilladores 544 · PIKEKE ofrece 1\nSi alguien compra no vas a poder cumplir: iguala el stock (queda en 0).\n\n[ Igualar en Stock en ML ]'}>
                 Cuando un producto se queda en <b className="font-medium text-neutral-700">0 en tu inventario</b> pero una publicación activa sigue
                 ofreciéndolo en MercadoLibre. Se revisa cada 10 minutos. Una vez cada vez que pasa.
+                {d.sinFisico && <> También cuando alguien de bodega marca <b className="font-medium text-neutral-700">Se acabó</b> en un producto (para que ajustes el inventario).</>}
               </Fila>
             )}
             {d.promos && (
