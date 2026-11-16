@@ -103,7 +103,7 @@ ventas haces al mes (sumando todas tus cuentas, sin canceladas):
 - **Automatizaciones** (recomendado): lo de Esencial + respuestas automáticas con IA en Preguntas y Mensajes (las activa
   el cliente; cada respuesta usa 1 crédito) + Pagos MercadoEnvíos (programa en la PC y cruce con el banco)
   + Radar de Oportunidades.
-- **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios, Promociones y reportes.
+- **Completo:** lo anterior + Inventario, vincular publicaciones de ML, pesos y precios (rentabilidad real), Promociones y reportes (top de vendidos, stock con aviso de reposición y sugerencias de compra).
 - Incluye 2 cuentas de MercadoLibre; cada cuenta extra +$3. Usuarios ilimitados. Pago trimestral −10%
   (Fundadores: −30% mensual o trimestral, no se suman). El descuento es solo del plan: cuentas extra,
   Radar PRO y recargas de IA van a precio completo. El Fundador conserva el 30% mientras renueve a tiempo: si su mes gratis o

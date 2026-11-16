@@ -38,9 +38,9 @@ export const PLANES: Plan[] = [
     incluye: [
       'Inventario: stock, ventas y compras',
       'Publicaciones de MercadoLibre vinculadas a tus productos',
-      'Pesos y precios: envío gratis y márgenes reales con comisión y envío',
+      'Pesos y precios: envío gratis y rentabilidad real después de comisión y envío',
       'Promociones en lote sin perder el envío gratis',
-      'Reportes de tu negocio',
+      'Reportes: top de vendidos, stock con aviso de reposición y sugerencias de compra',
     ],
   },
 ]

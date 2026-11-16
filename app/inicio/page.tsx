@@ -39,13 +39,18 @@ function Icono({ d, className = 'h-5 w-5' }: { d: string; className?: string }) 
   )
 }
 
-const HACEMOS = [
-  { t: 'Automatizaciones', i: I.rayo, d: 'Lo que te quita el día, resuelto en un solo lugar para todas tus cuentas.',
-    x: ['Preguntas con respuesta sugerida por IA', 'Mensajes de tus ventas, sin perder ninguno', 'Calificaciones en bloque', 'Guías del día y manifiesto de envíos', 'Avisos por Telegram'] },
-  { t: 'Pagos MercadoEnvíos', i: I.pago, nuevo: true, d: 'Los pagos y las guías del portal llegan solos, listos para verificar.',
+// 15-11 (el dueño): textos al día (la IA ya responde sola, rentabilidad en vez de margen) y lo que faltaba; máximo 6
+// puntos por tarjeta. `etiqueta`: el aviso de la tarjeta (Inventario en Completo, «Próximamente» hasta que se abra).
+const HACEMOS: { t: string; i: string; d: string; x: string[]; etiqueta?: string }[] = [
+  { t: 'Automatizaciones', i: I.rayo, d: 'Lo que te quita el día, resuelto en un solo lugar para todas tus cuentas y tu equipo.',
+    x: ['La IA responde tus preguntas sola, con los datos de tu negocio', 'Mensajes de tus ventas y seguimiento de cada cliente',
+        'Calificaciones en lote, pedidos de cambio y alertas de contradictorias', 'Guías del día con el detalle del producto y manifiesto',
+        'Reportador: cada comprador recibe su guía en segundos', 'Avisos de stock y de todo por Telegram'] },
+  { t: 'Pagos MercadoEnvíos', i: I.pago, etiqueta: 'Nuevo', d: 'Los pagos y las guías del portal llegan solos, listos para verificar.',
     x: ['Pagos y comprobantes traídos solos', 'Comprobación con tu estado de cuenta del banco', 'Las guías pasan directo a despachos'] },
-  { t: 'Inventario', i: I.caja, d: 'Tu stock y tus ventas al día, sin cuaderno ni Excel.',
-    x: ['Stock, ventas y compras', 'Márgenes reales con comisión y envío', 'Publicaciones de ML unidas a tus productos'] },
+  { t: 'Inventario', i: I.caja, etiqueta: 'Plan Completo · Próximamente', d: 'Tu stock, tus ventas y tus ganancias al día, sin cuaderno ni Excel.',
+    x: ['Ventas, compras y stock con aviso de reposición', 'Rentabilidad real después de comisión, envío y cambio',
+        'Publicaciones y promociones en lote, en un clic', 'Top de vendidos y sugerencias de compra para los próximos meses'] },
   { t: 'Radar de Oportunidades', i: I.radar, d: 'Qué se vende en MercadoLibre Venezuela, a qué precio real y qué está creciendo.',
     x: ['Lo más vendido, categoría por categoría', 'Tendencias validadas con Google Trends', 'Competencia y señales de demanda'] },
 ]
@@ -84,11 +89,11 @@ export default async function InicioPage() {
         <div className="relative mx-auto max-w-5xl px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-400">MercadoLibre Venezuela</p>
           <h1 className="mt-3 max-w-3xl text-[2.1rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-            Herramientas y acompañamiento para <span className="text-lime-400">vender más en MercadoLibre.</span>
+            Automatizamos lo que <span className="text-lime-400">te quita el día</span> en MercadoLibre.
           </h1>
           <p className="mt-5 max-w-2xl leading-relaxed text-neutral-400 lg:text-lg">
-            Automatizamos lo que te quita el día (preguntas, mensajes, guías y pagos) y te ayudamos a encontrar qué vender.
-            Lo construimos para nuestras propias cuentas y hoy lo usan otros vendedores.
+            Preguntas, mensajes, pagos, guías y reportes en segundos, para todas tus cuentas. Lo construimos para nuestras
+            propias cuentas y hoy lo usan otros vendedores.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <a href={REGISTRO} className="inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-[0_8px_30px_-8px_rgba(163,230,53,0.6)] transition hover:bg-lime-300">
@@ -111,43 +116,17 @@ export default async function InicioPage() {
       </section>
 
       <main className="mx-auto max-w-5xl space-y-12 px-5 py-10 sm:space-y-14 sm:px-8 sm:py-14">
-        {/* ── Destacado: Programa Despegue ── */}
-        <section className="relative overflow-hidden rounded-3xl border border-lime-400/50 bg-neutral-950 p-6 text-white shadow-[0_0_70px_-25px_rgba(163,230,53,0.55)] sm:p-9">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full border border-lime-400/20" />
-          <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-lime-400/10 blur-2xl" />
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
-            <div>
-              <p className="inline-flex items-center gap-2 rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">
-                <Icono d={I.cohete} className="h-3.5 w-3.5" /> Empiezas cuando quieras
-              </p>
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">Programa Despegue</h2>
-              <p className="mt-2 leading-relaxed text-neutral-400">
-                8 semanas acompañado para <b className="text-white">empezar desde cero o reactivar tu cuenta</b>: sesiones 1 a 1 y
-                contacto directo por Telegram. <b className="text-lime-400">Bono: Domingo de Radar.</b>
-              </p>
-              <a href="/despegue" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300">
-                Conocer el programa <span aria-hidden="true">→</span>
-              </a>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm">
-              <p className="flex items-baseline gap-3"><span className="text-4xl font-semibold tracking-tight">${PRECIO}</span>
-                <span className="text-neutral-500 line-through">${PRECIO_DESPUES}</span><span className="text-xs text-lime-400">promoción</span></p>
-              <p className="mt-2 text-neutral-300">8 semanas de acompañamiento · <b className="text-white">empiezas cuando quieras</b></p>
-            </div>
-          </div>
-        </section>
-
         {/* ── Lo que hacemos ── */}
         <section>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-lime-700">Lo que hacemos</p>
-          <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">Todo lo que hoy ya funciona.</h2>
+          <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">Todo lo que haces cada día, en segundos.</h2>
           <ul className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4">
             {HACEMOS.map(h => (
               <li key={h.t} className="rounded-2xl border border-neutral-200 bg-white p-5">
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-lime-100 text-lime-800"><Icono d={h.i} /></span>
                   <p className="font-semibold text-neutral-900">{h.t}</p>
-                  {h.nuevo && <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-950">Nuevo</span>}
+                  {h.etiqueta && <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-950">{h.etiqueta}</span>}
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-neutral-500">{h.d}</p>
                 <ul className="mt-3 space-y-1.5">
@@ -186,6 +165,32 @@ export default async function InicioPage() {
               </li>
             ))}
           </ul>
+        </section>
+
+        {/* ── Destacado: Programa Despegue (15-11: después de lo que hace el sistema y los planes) ── */}
+        <section className="relative overflow-hidden rounded-3xl border border-lime-400/50 bg-neutral-950 p-6 text-white shadow-[0_0_70px_-25px_rgba(163,230,53,0.55)] sm:p-9">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full border border-lime-400/20" />
+          <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-lime-400/10 blur-2xl" />
+          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full bg-lime-400 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-neutral-950">
+                <Icono d={I.cohete} className="h-3.5 w-3.5" /> Empiezas cuando quieras
+              </p>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">Programa Despegue</h2>
+              <p className="mt-2 leading-relaxed text-neutral-400">
+                8 semanas acompañado para <b className="text-white">empezar desde cero o reactivar tu cuenta</b>: sesiones 1 a 1 y
+                contacto directo por Telegram. <b className="text-lime-400">Bono: Domingo de Radar.</b>
+              </p>
+              <a href="/despegue" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-lime-400 px-5 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300">
+                Conocer el programa <span aria-hidden="true">→</span>
+              </a>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm">
+              <p className="flex items-baseline gap-3"><span className="text-4xl font-semibold tracking-tight">${PRECIO}</span>
+                <span className="text-neutral-500 line-through">${PRECIO_DESPUES}</span><span className="text-xs text-lime-400">promoción</span></p>
+              <p className="mt-2 text-neutral-300">8 semanas de acompañamiento · <b className="text-white">empiezas cuando quieras</b></p>
+            </div>
+          </div>
         </section>
 
         {/* ── El Radar en números ── */}
