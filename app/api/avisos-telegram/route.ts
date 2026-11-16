@@ -52,6 +52,7 @@ const Prefs = z.object({
   contradictoria: z.boolean(),
   concreta_sola: z.boolean(),
   agotada: z.boolean(), bajo: z.boolean(),
+  vende_de_mas: z.boolean(),
   promos: z.boolean(),
   cierre: z.boolean(), cierre_hora: hora,
   resumen: z.boolean(), resumen_hora: hora,

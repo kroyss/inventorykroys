@@ -973,6 +973,12 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   sale de estos vínculos: al corregir aquí se arregla sola en todos lados (no hay que actualizar nada).
 - **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
   cuentas de una vez. Aquí se marca si una publicación es pack/combo («trae N u.»).
+  **Vende de más** (filtro rojo, se abre solo cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
+  alguna publicación activa con stock (rojo: si alguien compra no puedes cumplir) o con menos de lo que suman tus
+  publicaciones activas (amarillo). Las pausadas no cuentan. Al abrir la pantalla se comprueban en ML (sale «Comprobando
+  en ML…»). Márcalos e **Igualar**: los que están en 0 quedan en 0 en ML. El sistema lo revisa solo cada 10 minutos:
+  el número rojo en **Publicaciones** y en la pestaña **Stock** son los que están en 0, y por Telegram llega
+  «Vende sin tener stock» (Mis avisos) cada vez que uno entra. Cada fila muestra la foto del producto.
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
   toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).

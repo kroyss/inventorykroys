@@ -74,6 +74,21 @@ async function guardarItem(db: Pool, conexionId: number, it: ItemCatalogo) {
      vars ? JSON.stringify(vars) : null])
 }
 
+/** 16-11 (Vende de más, lib/vendeDeMas.ts): relee de ML SOLO estas publicaciones (multiget de a 20) y las deja al día en
+ *  el catálogo (stock, estado, variantes), sin esperar la pasada de 6 h. Devuelve cuántas leyó. */
+export async function refrescarItems(db: Pool, conexionId: number, ids: string[]) {
+  let n = 0
+  for (let i = 0; i < ids.length; i += POR_MULTIGET) {
+    const r = await leerItems<ItemCatalogo>(db, conexionId, ids.slice(i, i + POR_MULTIGET), CAMPOS)
+    for (const x of r) {
+      if (x.code !== 200 || !x.body) continue
+      await guardarItem(db, conexionId, x.body)
+      n++
+    }
+  }
+  return n
+}
+
 /** 13-11 (el dueño): al abrir Vincular con ML, las publicaciones NUEVAS de la cuenta sin esperar la pasada de 6 h.
  *  Liviano: la primera página de las activas más recientes; solo se lee el detalle de las que no están en el catálogo.
  *  A lo sumo cada 5 minutos por cuenta (aunque entren varias personas). Devuelve cuántas agregó (null = no tocaba). */

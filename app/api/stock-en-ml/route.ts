@@ -10,6 +10,7 @@ import { actualizarCatalogo } from '@/lib/catalogoML'
 import { aplicarCambio, type Resultado } from '@/lib/stockML'
 import { filasStockML, leerReserva } from '@/lib/stockConML'
 import { contarSinVincular } from '@/lib/importarML'
+import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
 
 // Stock en ML, Fase 1 (26-10; lib/stockConML.ts, pantalla Inventario → «Stock en ML»).
 //   GET → cada producto vinculado con sus publicaciones, lo que muestran en ML y lo que deberían mostrar
@@ -20,6 +21,8 @@ import { contarSinVincular } from '@/lib/importarML'
 //   POST { accion: 'asignar', product_id, asignaciones: [{ item_id, variante_id, cantidad }] } → producto EN RESERVA:
 //        lo que decide la persona, sin pasar el disponible (en unidades del producto)
 //   POST { accion: 'reserva', unidades } → la reserva de seguridad de la empresa (permiso inventario_config)
+//   GET ?revisar=1 (16-11, «Vende de más», lib/vendeDeMas.ts) → antes relee de ML las activas que parecen vender más de lo
+//        que hay (también para quien solo mira). Sin revisar, igual guarda el estado (numerito del menú al día).
 
 async function sesion(accion: boolean) {
   const s = await sesionPreguntas(accion ? 'reponer_stock' : undefined)
@@ -30,12 +33,17 @@ async function sesion(accion: boolean) {
   return s
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const s = await sesion(false)
   if ('error' in s) return s.error
   try {
+    const pais = s.session.user.country
+    const revisar = req.nextUrl.searchParams.get('revisar') === '1'
     // sinVincular: activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
-    const [filas, reserva, sinVincular] = await Promise.all([filasStockML(s.db, s.session.user.country), leerReserva(s.db), contarSinVincular(s.db)])
+    const [filas, reserva, sinVincular] = await Promise.all([
+      revisar ? revisarVendeDeMas(s.db, pais).then(r => r.filas)
+              : filasStockML(s.db, pais).then(async f => { await guardarEstadoVende(s.db, f).catch(() => {}); return f }),
+      leerReserva(s.db), contarSinVincular(s.db)])
     return NextResponse.json({ filas, reserva, sinVincular, puedeCambiar: puede(s.session.user, 'reponer_stock'),
                                puedeReserva: puede(s.session.user, 'inventario_config') })
   } catch (err) {

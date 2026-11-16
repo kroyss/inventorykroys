@@ -15,6 +15,7 @@ interface Prefs {
   contradictoria: boolean
   concreta_sola: boolean
   agotada: boolean; bajo: boolean
+  vende_de_mas: boolean
   promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
@@ -25,7 +26,7 @@ interface Estado {
   conectado: { usuario: string | null; nombre: string | null; desde: string } | null
   error: string | null
   prefs: Prefs
-  disponibles: { desconectada: boolean; pregunta: boolean; mensaje: boolean; negativa: boolean; stock: boolean; promos: boolean; resumen: boolean }
+  disponibles: { desconectada: boolean; pregunta: boolean; mensaje: boolean; negativa: boolean; stock: boolean; vende?: boolean; promos: boolean; resumen: boolean }
   empresa: string | null
   staging: boolean
 }
@@ -266,6 +267,13 @@ export default function MisAvisosClient({ inicial = null }: { inicial?: unknown 
                   <input type="checkbox" checked={p.bajo} onChange={ev => cambiar({ bajo: ev.target.checked })} className="h-4 w-4 accent-neutral-900" />
                   Avisarme también cuando esté <b className="font-medium">por agotarse</b> (el límite que pusiste en Stock)
                 </label>
+              </Fila>
+            )}
+            {d.vende && (
+              <Fila icono="🔴" titulo="Vende sin tener stock" etiqueta="Recomendado" on={p.vende_de_mas} onCambio={v => cambiar({ vende_de_mas: v })}
+                ejemplo={'🔴 Quedó en 0 y sigue a la venta en ML\nCOD-0207 Kit Destornilladores 544 · PIKEKE ofrece 1\nSi alguien compra no vas a poder cumplir: iguala el stock (queda en 0).\n\n[ Igualar en Stock en ML ]'}>
+                Cuando un producto se queda en <b className="font-medium text-neutral-700">0 en tu inventario</b> pero una publicación activa sigue
+                ofreciéndolo en MercadoLibre. Se revisa cada 10 minutos. Una vez cada vez que pasa.
               </Fila>
             )}
             {d.promos && (

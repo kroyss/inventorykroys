@@ -8,8 +8,8 @@ import { usePathname } from 'next/navigation'
 // El total urgente (preguntas + mensajes) también va en el título de la pestaña: "(5) Ventas".
 // negativas / neutrales: calificaciones recibidas de los últimos 30 días sin ver (Reputación): rojo y naranja.
 export interface Avisos { preguntas: number; mensajes: number; reportador: number; calificaciones: number; despachos: number; alertas: number
-                          negativas: number; neutrales: number }
-const VACIO: Avisos = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0, negativas: 0, neutrales: 0 }
+                          negativas: number; neutrales: number; vende_de_mas: number }
+const VACIO: Avisos = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0, negativas: 0, neutrales: 0, vende_de_mas: 0 }
 const Ctx = createContext<Avisos>(VACIO)
 
 export function useAvisos() { return useContext(Ctx) }
@@ -24,6 +24,14 @@ export const AVISO_DE_RUTA: Record<string, { clave: keyof Avisos; urgente: boole
   '/reportador': { clave: 'reportador', urgente: false },
   '/calificaciones': { clave: 'calificaciones', urgente: false },
   '/alertas-stock': { clave: 'alertas', urgente: false },
+  // 16-11: productos que ML vende sin tenerlos (lib/vendeDeMas.ts): rojo en Publicaciones y en su pestaña Stock.
+  '/publicaciones': { clave: 'vende_de_mas', urgente: true },
+}
+
+/** El numerito de un aviso suelto (p. ej. en una pestaña). */
+export function NumeritoAviso({ clave, urgente = true, className = '' }: { clave: keyof Avisos; urgente?: boolean; className?: string }) {
+  const avisos = useAvisos()
+  return <Numerito n={avisos[clave]} urgente={urgente} className={className} />
 }
 
 const tope = (n: number) => (n > 99 ? '99+' : n)

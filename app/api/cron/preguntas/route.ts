@@ -17,6 +17,7 @@ import { mlConfigurado } from '@/lib/ml'
 import { esDemoEmpresa } from '@/lib/demo'
 import { rellenarInventarioDemo } from '@/lib/demoInventario'
 import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
+import { revisarSiToca } from '@/lib/vendeDeMas'
 import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
 import { procesarColaML } from '@/lib/colaML'
@@ -112,6 +113,15 @@ export async function GET(req: NextRequest) {
         await conEmpresa(e.id, e.country as Country, db => revisarStockPendiente(db))
       } catch (err) {
         console.error('[alertas stock]', e.id, err instanceof Error ? err.message : err)
+      }
+    }
+    // Vende de más (lib/vendeDeMas.ts, 16-11): cada 10 min por empresa con inventario, relee de ML lo que parece vender sin
+    // stock y guarda el estado (numerito de Publicaciones + aviso de Telegram en la próxima pasada).
+    for (const e of sincronizadas.filter(x => x.inventario)) {
+      try {
+        await conEmpresa(e.id, e.country as Country, db => revisarSiToca(db, e.country))
+      } catch (err) {
+        console.error('[vende de más]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Respuestas automáticas (lib/automaticasPreguntas.ts): solo las respuestas rápidas que el

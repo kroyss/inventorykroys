@@ -60,6 +60,10 @@ export interface FilaStockML {
   en_reserva: boolean
   /** ML muestra entre todas sus publicaciones más unidades de las que hay (en unidades del producto). */
   excede: boolean
+  /** 16-11 Vende de más: 'sin' = 0 disponible y ML ofrece en activas · 'mas' = las activas ofrecen más de lo que hay. */
+  vende: 'sin' | 'mas' | null
+  /** Unidades que ofrecen en ML sus publicaciones ACTIVAS (en unidades del producto). */
+  ofrece: number
   peso: number | null
   pubs: PubStockML[]
   diferencia: boolean
@@ -143,7 +147,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     let f = porProducto.get(r.product_id)
     if (!f) {
       f = { product_id: r.product_id, code: r.code, name: r.name, stock: r.stock, comprometidas: 0, disponible: r.stock,
-            publicable: 0, en_reserva: false, excede: false, peso: r.peso, pubs: [], diferencia: false, codigos: [] }
+            publicable: 0, en_reserva: false, excede: false, vende: null, ofrece: 0, peso: r.peso, pubs: [], diferencia: false, codigos: [] }
       porProducto.set(r.product_id, f)
     }
     const [pub, varId] = String(r.ml_code).split(':')
@@ -186,7 +190,8 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     }
     const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
     f.excede = sincronizables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0) > f.disponible
-    f.en_reserva = sincronizables.length > 0 && f.disponible <= reserva
+    // 16-11 (Vende de más): con 0 disponible no hay nada que repartir a mano: todas a 0 (Igualar lo arregla de un clic).
+    f.en_reserva = sincronizables.length > 0 && f.disponible > 0 && f.disponible <= reserva
     if (!f.en_reserva && sincronizables.length) {
       // Por turnos: cada vuelta, a cada una (de la que más vende a la que menos) 1 publicación entera si todavía alcanza.
       // Antes era partes iguales en unidades y después ÷ lo que trae: 10 entre combos de 5/4/6 daba 0 en todas.
@@ -211,6 +216,10 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     }
     f.diferencia = f.pubs.some(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
       || (f.en_reserva && f.excede)   // en reserva y ML muestra más de lo que hay: hay que asignar a mano
+    f.ofrece = f.pubs
+      .filter(p => p.estado === 'active' && !p.sin_sincronizar && !p.entera_con_variantes && (p.ml_disponible ?? 0) > 0)
+      .reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)
+    f.vende = f.ofrece <= 0 ? null : f.disponible <= 0 ? 'sin' : f.ofrece > f.disponible ? 'mas' : null
     const { codigos: _, ...fila } = f
     filas.push(fila)
   }

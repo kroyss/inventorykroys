@@ -7,6 +7,7 @@ import { leerPlantillasCal, sqlBandeja, sqlLista } from '@/lib/calificacionesML'
 import { contarAlertas } from '@/lib/alertasStock'
 import { SQL_AVISO_REPUTACION } from '@/lib/reputacionML'
 import { puede } from '@/lib/permisos'
+import { leerEstadoVende } from '@/lib/vendeDeMas'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
 //   preguntas: sin responder · mensajes: conversaciones con mensajes sin leer
@@ -22,7 +23,7 @@ export async function GET() {
   const { session, db } = await getSessionDb()
   if (!session || !db) return unauthorized()
   const u = session.user
-  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0, negativas: 0, neutrales: 0 }
+  const out = { preguntas: 0, mensajes: 0, reportador: 0, calificaciones: 0, despachos: 0, alertas: 0, negativas: 0, neutrales: 0, vende_de_mas: 0 }
   try {
     if (tieneModulo(u, 'preguntas')) {
       const { rows: [r] } = await db.query(
@@ -47,6 +48,8 @@ export async function GET() {
            FROM ml_ordenes WHERE ${SQL_AVISO_REPUTACION}`)
         out.negativas = r.neg; out.neutrales = r.neu
       }
+      // Vende de más (16-11): lo guardado por el cron / Stock en ML; solo los que tienen 0 (lo urgente).
+      if (tieneModulo(u, 'inventario') && puede(u, 'ver_inventario')) out.vende_de_mas = (await leerEstadoVende(db))?.sin ?? 0
     }
     if (u.country === 'VE' && tieneModulo(u, 'despachos')) {
       const { rows: [d] } = await db.query(

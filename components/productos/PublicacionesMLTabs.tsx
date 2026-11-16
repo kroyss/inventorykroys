@@ -3,6 +3,7 @@ import type { UserRole } from '@/lib/types'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
 import { tiposPermitidos } from '@/lib/colaPermisos'
+import { NumeritoAviso } from '@/components/layout/Avisos'
 
 // Publicaciones (26-10; menú propio en Inventario desde 08-11): Editar, Vincular, Stock y Promociones son lo mismo visto
 // desde varios lados (mis publicaciones de ML). Cada pantalla sigue en su dirección de siempre (avisos de Telegram y
@@ -41,7 +42,7 @@ export default function PublicacionesMLTabs({ user, actual }: { user: UsuarioML;
         {p.map(x => (
           <Link key={x.k} href={x.href} aria-current={x.k === actual ? 'page' : undefined}
             className={`whitespace-nowrap border-b-2 px-3 pb-2 text-sm ${x.k === actual ? 'border-lime-500 font-medium text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}>
-            {x.t}
+            {x.t}{x.k === 'stock' && <NumeritoAviso clave="vende_de_mas" className="ml-1.5" />}
           </Link>
         ))}
       </nav>

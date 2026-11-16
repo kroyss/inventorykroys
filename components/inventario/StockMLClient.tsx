@@ -5,9 +5,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
+import { FotoProducto } from '@/components/ui/FotoProducto'
 import type { FilaStockML, PubStockML } from '@/lib/stockConML'
 
-type Filtro = 'diferencias' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
+type Filtro = 'vende' | 'diferencias' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
 
 const POR_PAGINA = 40
@@ -30,7 +31,10 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [puedeCambiar, setPuedeCambiar] = useState(!!inicial?.puedeCambiar)
   const [error, setError] = useState<string | null>(null)
   // Desde Vincular («ver stock») llega ?buscar=COD-…: se abre en Todos con ese producto.
-  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : 'diferencias')
+  // 16-11 «Vende de más» (lib/vendeDeMas.ts): si ML ofrece unidades que no hay, se abre en esa vista.
+  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : inicial?.filas.some(f => f.vende) ? 'vende' : 'diferencias')
+  const [tocado, setTocado] = useState(!!buscarInicial || !!inicial)
+  const [comprobando, setComprobando] = useState(false)
   const [cuenta, setCuenta] = useState('')
   const [buscar, setBuscar] = useState(buscarInicial)
   const [ver, setVer] = useState(POR_PAGINA)
@@ -42,14 +46,23 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [puedeReserva, setPuedeReserva] = useState(!!inicial?.puedeReserva)
   const [sinVincular, setSinVincular] = useState(inicial?.sinVincular ?? 0)
 
-  const cargar = () => fetch('/api/stock-en-ml', { cache: 'no-store' }).then(async r => {
+  const cargar = (revisar = false) => fetch(`/api/stock-en-ml${revisar ? '?revisar=1' : ''}`, { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
-    if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return }
+    if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return null }
     setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
+    return d.filas as FilaStockML[]
   })
   const conInicial = !!inicial
+  useEffect(() => {
+    (async () => {
+      const f = conInicial ? inicial!.filas : await cargar()
+      if (!conInicial && f?.some(x => x.vende)) setFiltro(v => (tocado ? v : 'vende'))
+      // Lo que parece vender de más se relee de ML en segundo plano (el catálogo guardado puede tener horas).
+      if (!f?.some(x => x.vende)) return
+      setComprobando(true); await cargar(true); setComprobando(false)
+    })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!conInicial) cargar() }, [])
+  }, [])
 
   const pedir = async (body: Record<string, unknown>) => {
     const r = await fetch('/api/stock-en-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -62,7 +75,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const visibles = useMemo(() => {
     const q = buscar.trim().toLowerCase()
     return (filas ?? []).filter(f =>
-      (filtro === 'todas' || (filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
+      (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
         : filtro === 'combos' ? f.pubs.some(p => p.posible_combo) : f.pubs.some(p => p.bloqueada_envio)))
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
       && (!q || `${f.code} ${f.name}`.toLowerCase().includes(q) || f.pubs.some(p => `${p.item_id} ${p.titulo ?? ''} ${p.variante ?? ''}`.toLowerCase().includes(q))))
@@ -71,6 +84,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   if (!filas) return <p className="text-sm text-neutral-400">{error ?? 'Cargando productos y publicaciones…'}</p>
 
   const n = {
+    vende: filas.filter(f => f.vende).length,
     diferencias: filas.filter(f => f.diferencia).length,
     reserva: filas.filter(f => f.en_reserva).length,
     reactivar: filas.filter(f => f.pubs.some(p => p.reactivar)).length,
@@ -137,8 +151,15 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
+          {(n.vende > 0 || filtro === 'vende') && (
+            <button onClick={() => { setFiltro('vende'); setTocado(true); setVer(POR_PAGINA) }}
+              title="MercadoLibre ofrece más unidades de las que tienes: una venta que no vas a poder cumplir"
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium sm:py-1 ${filtro === 'vende' ? 'border-red-600 bg-red-600 text-white' : 'border-red-200 bg-red-50 text-red-700'}`}>
+              Vende de más <span className="opacity-75">{n.vende}</span>
+            </button>
+          )}
           {([['diferencias', 'Con diferencias'], ['reserva', 'En reserva (a mano)'], ['reactivar', 'Pausadas para reactivar'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const).map(([k, t]) => (
-            <button key={k} onClick={() => { setFiltro(k); setVer(POR_PAGINA) }}
+            <button key={k} onClick={() => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }}
               className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
               {t} <span className="opacity-60">{n[k]}</span>
             </button>
@@ -154,6 +175,13 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           className="ml-auto w-full rounded-lg border border-neutral-300 px-3 py-2 text-base sm:w-72 sm:py-1.5 sm:text-sm" />
       </div>
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {filtro === 'vende' && n.vende > 0 && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
+          {puedeCambiar ? ' Márcalos e iguala: los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
+          {comprobando && <span className="ml-1 text-red-600">· Comprobando en ML…</span>}
+        </p>
+      )}
       {resultados.size > 0 && !trabajando && (
         <div className={`rounded border px-3 py-2 text-sm ${errores ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
           ✓ {okCount} publicación{okCount === 1 ? '' : 'es'} al día{errores ? ` · ${errores} con problema (mira el detalle en rojo)` : ''}
@@ -167,7 +195,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         </p>
       ) : visibles.length === 0 ? (
         <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500">
-          {filtro === 'diferencias' ? '¡Todo igual que en el sistema! 🎉' : filtro === 'combos' ? 'Ningún combo por revisar.' : 'Nada en esta vista.'}
+          {filtro === 'vende' ? 'Nada vende de más: ML no ofrece más de lo que tienes. 🎉' : filtro === 'diferencias' ? '¡Todo igual que en el sistema! 🎉' : filtro === 'combos' ? 'Ningún combo por revisar.' : 'Nada en esta vista.'}
         </p>
       ) : (
         <div className="space-y-3">
@@ -260,8 +288,12 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-100 px-4 py-2.5">
         {puedeCambiar && <input type="checkbox" checked={marcado} disabled={!marcable} onChange={onMarcar}
           title={marcable ? 'Marcar para igualar' : 'Nada que igualar'} className="h-4 w-4" />}
+        <FotoProducto id={f.product_id} nombre={f.name} />
         <div className="min-w-0 flex-1">
           <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
+          {f.vende && <span title="Lo que suman las publicaciones activas en ML contra lo que tienes disponible"
+            className={`ml-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${f.vende === 'sin' ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-amber-50 text-amber-800 ring-amber-200'}`}>
+            {f.vende === 'sin' ? `Tienes 0 y ML ofrece ${f.ofrece}` : `ML ofrece ${f.ofrece}, tienes ${f.disponible}`}</span>}
           {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
             title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
         </div>

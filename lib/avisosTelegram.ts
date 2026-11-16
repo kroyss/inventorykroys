@@ -32,6 +32,7 @@ import type { Country, UserRole } from '@/lib/types'
 import { resumenAtencion, cambio, textoMinutos } from '@/lib/resumenAtencion'
 import { leerReputacion } from '@/lib/reputacionML'
 import { cupoIA, nivelCreditos } from '@/lib/ia'
+import { leerEstadoVende } from '@/lib/vendeDeMas'
 
 // ── Mensajes de cierre (25-10) ─────────────────────────────────────────────
 /** Sin texto = mandó solo un archivo: casi siempre el comprobante del pago. */
@@ -59,6 +60,7 @@ export interface PrefsAvisos {
   contradictoria: boolean
   concreta_sola: boolean
   agotada: boolean; bajo: boolean
+  vende_de_mas: boolean
   promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
@@ -73,6 +75,7 @@ export const PREFS_INICIALES: PrefsAvisos = {
   contradictoria: true,
   concreta_sola: true,
   agotada: true, bajo: false,
+  vende_de_mas: true,
   promos: true,
   cierre: false, cierre_hora: 18,
   resumen: true, resumen_hora: 8,
@@ -100,6 +103,8 @@ export function avisosDisponibles(u: { role: UserRole; permisos: string[] | null
     mensaje: ve('ver_mensajes'),
     negativa: ve('ver_calificaciones'),
     stock: u.modulos.includes('alertas_stock') && puede(user, 'ver_stock'),
+    // Vende de más (16-11): a quien puede igualar el stock en ML (Stock en ML).
+    vende: conML && u.modulos.includes('inventario') && puede(user, 'ver_inventario') && puede(user, 'reponer_stock'),
     // Promociones: solo con Inventario + Promociones y el permiso (nunca los Fundadores, que no tienen inventario).
     promos: u.modulos.includes('promociones') && u.modulos.includes('inventario') && puede(user, 'promociones'),
     reportador: u.modulos.includes('despachos') && u.modulos.includes('reportador') && puede(user, 'ver_reportador'),
@@ -430,6 +435,28 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
           + (lista.length > 8 ? `\n… y ${lista.length - 8} más` : '')
       if (await mandar(d, e, t.tipo, lista.map(r => r.ref), html,
         [[{ texto: 'Reponer en Stock', url: urlSistema('/alertas-stock') }]])) enviados++
+    }
+  }
+
+  // Vende de más (16-11, lib/vendeDeMas.ts): un producto quedó en 0 y alguna publicación ACTIVA sigue ofreciéndolo en ML.
+  // Una vez por cada vez que entra (la ref lleva desde cuándo); el estado lo guarda el cron cada 10 min (ya releído de ML).
+  if (p.vende_de_mas && disp.vende && !silencio) {
+    const est = await leerEstadoVende(db)
+    const lim = Math.max(Date.now() - 86_400_000, new Date(d.vinculado_at).getTime())
+    const cand = (est?.lista ?? []).map(x => ({ ...x, desde: est!.desde[x.id] }))
+      .filter(x => x.desde && new Date(x.desde).getTime() > lim)
+      .map(x => ({ ...x, ref: `${x.id}:${Math.floor(new Date(x.desde).getTime() / 1000)}` }))
+    const nuevas = await pendientes(d, e, 'vende_de_mas', cand.map(x => x.ref))
+    const lista = cand.filter(x => nuevas.has(x.ref))
+    if (lista.length) {
+      const linea = (x: typeof lista[number]) => `<b>${esc(x.code)}</b> ${esc(corto(x.name, 60))} · ${esc(x.cuentas.join(', '))} ofrece ${x.ofrece}`
+      const html = lista.length === 1
+        ? `${cab}🔴 <b>Quedó en 0 y sigue a la venta en ML</b>\n${linea(lista[0])}\nSi alguien compra no vas a poder cumplir: iguala el stock (queda en 0).`
+        : `${cab}🔴 <b>${lista.length} productos en 0 siguen a la venta en ML</b>\n\n`
+          + lista.slice(0, 8).map(x => `• ${linea(x)}`).join('\n') + (lista.length > 8 ? `\n… y ${lista.length - 8} más` : '')
+          + `\n\nSi alguien compra no vas a poder cumplir: iguala el stock.`
+      const url = lista.length === 1 ? `/inventario/stock-ml?buscar=${encodeURIComponent(lista[0].code)}` : '/inventario/stock-ml'
+      if (await mandar(d, e, 'vende_de_mas', lista.map(x => x.ref), html, [[{ texto: 'Igualar en Stock en ML', url: urlSistema(url) }]])) enviados++
     }
   }
 

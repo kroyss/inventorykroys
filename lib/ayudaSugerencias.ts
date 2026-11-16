@@ -28,6 +28,12 @@ const S: Record<string, Sugerencia[]> = {
       respuesta: 'Toca el clip para adjuntar (JPG, PNG o PDF) o pega la imagen con **Ctrl+V** en el cuadro de texto. **Ctrl+Enter** envía.' },
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
+  '/inventario/stock-ml': [
+    { pregunta: '¿Qué es «Vende de más»?',
+      respuesta: 'Productos que MercadoLibre sigue ofreciendo sin que los tengas: en **0** con una publicación activa (rojo) o con menos de lo que suman tus publicaciones activas (amarillo). Márcalos y toca **Igualar y reactivar**: los de 0 quedan en 0 en ML. Se revisa solo cada 10 min y avisa por Telegram (Mis avisos → «Vende sin tener stock»).' },
+    { pregunta: '¿Por qué sale un número rojo en Publicaciones?',
+      respuesta: 'Son los productos en 0 que una publicación activa sigue ofreciendo en ML. Entra a **Publicaciones → Stock**, filtro **Vende de más**, e iguala.' },
+  ],
   '/alertas-stock': [
     { pregunta: '¿Cómo actualizo el stock en ML?', video: 'Calificaciones y Stock',
       respuesta: 'Escribe el stock nuevo en cada fila (✎) y toca **Actualizar en MercadoLibre**. Solo cambia la cantidad disponible, nada más.' },
