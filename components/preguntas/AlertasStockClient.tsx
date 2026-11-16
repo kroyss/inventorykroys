@@ -281,8 +281,8 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
         actions={<button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>} />
 
       {vendeDeMas > 0 && (
-        <Link href="/inventario/stock-ml" className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800 hover:bg-red-100">
-          <span>🔴 <b>{vendeDeMas} producto{vendeDeMas === 1 ? '' : 's'} en 0 sigue{vendeDeMas === 1 ? '' : 'n'} a la venta en MercadoLibre</b>: si alguien compra no vas a poder cumplir.</span>
+        <Link href="/inventario/stock-ml" className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 border-l-4 border-l-red-400 bg-white px-4 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50">
+          <span><b className="text-neutral-900">{vendeDeMas} producto{vendeDeMas === 1 ? '' : 's'} en 0 sigue{vendeDeMas === 1 ? '' : 'n'} a la venta en MercadoLibre</b>: si alguien compra no vas a poder cumplir.</span>
           <span className="shrink-0 font-medium underline">Ver en Stock en ML →</span>
         </Link>
       )}

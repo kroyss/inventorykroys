@@ -162,8 +162,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           {(n.vende > 0 || filtro === 'vende') && (
             <button onClick={() => { setFiltro('vende'); setTocado(true); setVer(POR_PAGINA) }}
               title="MercadoLibre ofrece más unidades de las que tienes: una venta que no vas a poder cumplir"
-              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium sm:py-1 ${filtro === 'vende' ? 'border-red-600 bg-red-600 text-white' : 'border-red-200 bg-red-50 text-red-700'}`}>
-              Vende de más <span className="opacity-75">{n.vende}</span>
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === 'vende' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}>
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" aria-hidden />Vende de más <span className="opacity-75">{n.vende}</span>
             </button>
           )}
           {([['diferencias', 'Con diferencias'], ['reserva', 'Quedan pocas'], ['reactivar', 'Pausadas para reactivar'], ['pausadas', 'Pausadas a mano'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const).map(([k, t]) => (
@@ -184,10 +184,10 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       </div>
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       {filtro === 'vende' && n.vende > 0 && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-red-400 bg-white px-3 py-2 text-xs text-neutral-700">
           <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
           {puedeCambiar ? ' Márcalos e iguala: los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
-          {comprobando && <span className="ml-1 text-red-600">· Comprobando en ML…</span>}
+          {comprobando && <span className="ml-1 text-neutral-400">· Comprobando en ML…</span>}
         </p>
       )}
       {resultados.size > 0 && !trabajando && (
@@ -325,7 +325,8 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
         <div className="min-w-0 flex-1">
           <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
           {f.vende && <span title="Lo que suman las publicaciones activas en ML contra lo que tienes disponible"
-            className={`ml-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${f.vende === 'sin' ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-amber-50 text-amber-800 ring-amber-200'}`}>
+            className={`ml-2 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium ${f.vende === 'sin' ? 'text-red-700' : 'text-amber-700'}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${f.vende === 'sin' ? 'bg-red-500' : 'bg-amber-500'}`} aria-hidden />
             {f.vende === 'sin' ? `Tienes 0 y ML ofrece ${f.ofrece}` : `ML ofrece ${f.ofrece}, tienes ${f.disponible}`}</span>}
           {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
             title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
@@ -333,7 +334,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
             title="Quién cambió el stock o el estado de sus publicaciones en MercadoLibre">Ver cambios</button>
           {f.sin_fisico ? (
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700 ring-1 ring-red-200"
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-700"
                 title="Para MercadoLibre cuenta como 0 hasta que entre mercancía o se ajuste el inventario">
                 Sin stock físico · {f.sin_fisico.por ?? 'alguien'}, {new Date(f.sin_fisico.at).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
               {f.stock > 0 && <span className="text-neutral-500">el inventario dice {f.stock}: falta ajustarlo</span>}
@@ -341,7 +342,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
                 onClick={async () => { setMarcando(true); await onSinFisico(false); setMarcando(false) }}>Ya hay</button>}
             </div>
           ) : puedeCambiar && conStockML && (
-            <button type="button" disabled={marcando} className="mt-1 block rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            <button type="button" disabled={marcando} className="mt-1 block rounded-lg border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-700 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
               title="No lo encuentras en bodega aunque el sistema diga que hay: todas sus publicaciones a 0 en ML"
               onClick={async () => { setMarcando(true); await onSinFisico(true); setMarcando(false) }}>{marcando ? 'Poniendo en 0…' : 'Se acabó'}</button>
           )}
@@ -370,7 +371,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
         </div>
       </div>
       {f.en_reserva && (
-        <div className={`space-y-2 border-b px-4 py-3 text-sm ${f.excede ? 'border-red-100 bg-red-50 text-red-900' : 'border-amber-100 bg-amber-50 text-amber-900'}`}>
+        <div className={`space-y-2 border-b border-l-4 border-b-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 ${f.excede ? 'border-l-red-400' : 'border-l-amber-300'}`}>
           {/* 16-11 (el dueño: «no sé qué hacer ahí»): arranca con una sugerencia válida, dicha en claro, y un botón listo. */}
           <p>
             {f.excede
@@ -382,7 +383,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
               {asignables.map(p => {
                 const n = Math.max(0, Math.round(Number(valor(p)) || 0))
                 return <li key={clave(p)} className="tabular-nums"><b>{p.cuenta}</b>{p.variante ? ` · ${p.variante}` : ''}{' '}
-                  <span className="text-neutral-500">{p.ml_disponible}</span> → <b className={n !== p.ml_disponible ? 'text-red-700' : ''}>{n}</b></li>
+                  <span className="text-neutral-500">{p.ml_disponible}</span> → <b className={n !== p.ml_disponible ? 'text-lime-700' : ''}>{n}</b></li>
               })}
             </ul>
           )}
