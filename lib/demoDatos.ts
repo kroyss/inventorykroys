@@ -404,11 +404,11 @@ async function preguntas(db: Pool, cx: Cuentas, op: OpcionesDemo = {}) {
     const p = CATALOGO.get(itemId)!
     return db.query(
       `INSERT INTO ml_preguntas (id, conexion_id, item_id, item_titulo, item_permalink, item_estado, texto, estado, fecha, comprador_id,
-                                 respuesta, respuesta_estado, respuesta_fecha, item_precio, item_moneda, item_actualizado_at)
+                                 respuesta, respuesta_estado, respuesta_fecha, item_precio, item_moneda, item_actualizado_at, item_imagen)
        VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, NOW() - make_interval(mins => $8), $9, $10, $11,
-               CASE WHEN $10::text IS NOT NULL THEN NOW() - make_interval(mins => $8 - 25) END, $12, 'USD', NOW())`,
+               CASE WHEN $10::text IS NOT NULL THEN NOW() - make_interval(mins => $8 - 25) END, $12, 'USD', NOW(), $13)`,
       [id, cuentaItem(itemId), itemId, p.titulo, itemId === 'MLV900100104' && !respuesta ? 'paused' : 'active', texto,
-       respuesta ? 'ANSWERED' : 'UNANSWERED', minutos, comprador, respuesta, respuesta ? 'ACTIVE' : null, p.precio])
+       respuesta ? 'ANSWERED' : 'UNANSWERED', minutos, comprador, respuesta, respuesta ? 'ACTIVE' : null, p.precio, imagen(p)])
   }
   const r = azar(5)
   let n = 0
