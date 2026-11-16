@@ -33,6 +33,7 @@ export async function GET() {
          (SELECT COUNT(*) FROM (${SQL_BANDEJA_ML}) b WHERE b.sugerencia <> 'esperar')::int AS calificaciones,
          (SELECT COUNT(*) FROM ml_stock_alertas WHERE disponible < 3 AND actualizado_at > NOW() - INTERVAL '1 day')::int AS stock,
          (SELECT COUNT(*) FROM me_pagos WHERE verificacion = 'pendiente')::int AS pagos,
+         (SELECT COUNT(*) FROM inventory i JOIN products p ON p.id = i.product_id WHERE p.is_active AND i.quantity <= i.min_stock)::int AS inventario,
          EXISTS (SELECT 1 FROM app_settings WHERE key LIKE 'demo_pagos_retenidos:%') AS pagos_vacio`, [3])
     return NextResponse.json({ secciones: SECCIONES_DEMO.map(x => ({ ...x, pendientes: n[x.id] as number })), esAdmin: s.session.user.role === 'admin', max: MAX_DEMO, pagosVacio: !!n.pagos_vacio })
   } catch (err) {
