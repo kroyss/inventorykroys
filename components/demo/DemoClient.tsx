@@ -1,5 +1,6 @@
 'use client'
 import Link from '@/components/ui/Link'
+import { recargarFotos } from '@/components/ui/FotoProducto'
 import type { SeccionDemo } from '@/lib/demoDatos'
 import { useCallback, useEffect, useState } from 'react'
 import { Cargando, PageHeader } from '@/components/ui'
@@ -42,6 +43,7 @@ export default function DemoClient() {
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error ?? 'No se pudo restaurar')
       await cargar()
+      recargarFotos()   // Inventario se vuelve a crear con productos nuevos: la lista de fotos guardada ya no sirve
       setListo(clave)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

@@ -2,19 +2,20 @@
 // Miniatura del producto en todo el inventario (13-11-2026, el dueño, mig. 173). Las fotos se piden UNA vez por página
 // (/api/products/fotos, lib/fotosProductos.ts: propia → variante de ML → publicación) y todas las miniaturas las
 // comparten. Sin foto: cuadro gris con un ícono («Sin foto» al pasar el mouse). Al tocarla se ve grande.
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Ventana } from '@/components/ui/Ventana'
 
 let pedido: Promise<void> | null = null
+let pedidoAt = 0
 let fotos: Record<number, string> | null = null
 const avisar = new Set<() => void>()
 
 function cargar() {
   // Si falla (sesión recién abierta, deploy a medias) NO se guarda el vacío: la próxima pantalla lo vuelve a pedir.
-  if (!pedido) pedido = fetch('/api/products/fotos').then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+  if (!pedido) { pedidoAt = Date.now(); pedido = fetch('/api/products/fotos').then(r => (r.ok ? r.json() : Promise.reject(r.status)))
     .then((d: Record<number, string>) => { fotos = d; avisar.forEach(f => f()) })
-    .catch(() => { pedido = null; if (!fotos) { fotos = {}; avisar.forEach(f => f()) } })
+    .catch(() => { pedido = null; if (!fotos) { fotos = {}; avisar.forEach(f => f()) } }) }
   return pedido
 }
 const suscribir = (f: () => void) => { avisar.add(f); cargar(); return () => { avisar.delete(f) } }
@@ -25,6 +26,10 @@ export function recargarFotos() { pedido = null; return cargar() }
 /** La url de la foto de un producto (null = sin foto; undefined = todavía cargando). */
 export function useFotoProducto(id: number | null | undefined) {
   const todas = useSyncExternalStore(suscribir, () => fotos, () => null)
+  // Un producto que la lista no conoce (recién creado, o la Demo restaurada con productos nuevos, 16-11): se vuelve a
+  // pedir la lista, como mucho cada 30 s. Sin esto quedaba «Sin foto» hasta recargar la página.
+  const falta = !!todas && !!id && !(id in todas)
+  useEffect(() => { if (falta && Date.now() - pedidoAt > 30_000) recargarFotos() }, [falta])
   if (!todas) return undefined
   return id ? todas[id] ?? null : null
 }
