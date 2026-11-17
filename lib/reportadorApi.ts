@@ -23,8 +23,12 @@ import { registrarOrigen } from '@/lib/respuestasOrigen'
 // para tu envío es: …" cuando el comprador llena el formulario. Tiene la misma guía pero NO es
 // nuestro reporte: si se contara, nunca se le escribiría a nadie.
 const AVISO_AUTOMATICO_ML = /n[uú]mero de gu[ií]a para tu env[ií]o es/i
-function esReporteNuestro(m: MensajeML, guia: string) {
+// 17-11 (el dueño: «¿por qué no le reportó su guía?»): la IA (o una persona) menciona la guía ANTES del despacho («ya
+// tiene la guía 1723…, sale el próximo día hábil») y eso se tomaba como el reporte: 27 compradores en 7 días se quedaron
+// sin el aviso de envío. Solo cuenta un mensaje escrito DESPUÉS de cerrar la jornada (cuando el paquete ya salió).
+function esReporteNuestro(m: MensajeML, guia: string, desde: string | Date | null) {
   return m.propio && m.texto.includes(guia) && !AVISO_AUTOMATICO_ML.test(m.texto)
+    && (!desde || new Date(m.fecha).getTime() >= new Date(desde).getTime())
 }
 
 export type ResultadoApi = 'ENVIADO' | 'YA_ENVIADO' | 'SIN_CHAT' | 'RECHAZADO' | 'ERROR' | 'SIN_CONEXION' | 'SIMULADO'
@@ -76,7 +80,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
 
   const baseSql = `
     SELECT e.id, e.venta, COALESCE(e.guia_final, e.guia) AS guia, e.carrier, e.remitente, ${SQL_CUENTA_VENTA} AS cuenta_venta,
-           e.file_path, e.sha256, l.archivos_borrados_at
+           e.file_path, e.sha256, l.archivos_borrados_at, COALESCE(j.closed_at, l.generated_at) AS despachada_at
     FROM despacho_etiquetas e
     JOIN despacho_lotes l ON l.id = e.lote_id
     JOIN despacho_jornadas j ON j.id = l.jornada_id
@@ -93,7 +97,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
         `UPDATE despacho_etiquetas t SET reporte_tomado_por = NULL, reporte_tomado_at = NOW()
          FROM (${baseSql} FOR UPDATE OF e SKIP LOCKED) s
          WHERE t.id = s.id
-         RETURNING t.id, s.venta, s.guia, s.carrier, s.remitente, s.cuenta_venta, s.file_path, s.sha256, s.archivos_borrados_at`,
+         RETURNING t.id, s.venta, s.guia, s.carrier, s.remitente, s.cuenta_venta, s.file_path, s.sha256, s.archivos_borrados_at, s.despachada_at`,
         [opciones.limite, RESERVA_HORAS, excluir])
 
   const procesados: EnvioProcesado[] = []
@@ -153,7 +157,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       const mensaje = mensajeEnvio(elegirPlantilla(), config.bloque, paginaDe(cuenta, porVenta ? orden.cuenta : null), base.guia, base.carrier)
 
       const antes = await mensajesDeOrden(db, orden.conexionId, orden.orden)
-      const previo = antes.find(m => esReporteNuestro(m, base.guia))
+      const previo = antes.find(m => esReporteNuestro(m, base.guia, e.despachada_at))
       if (previo) {
         await cerrar('ENVIADO', 'ya tenía la guía en la conversación', previo.texto)
         procesados.push({ ...base, resultado: 'YA_ENVIADO', detalle: 'El comprador ya tenía esta guía en la conversación', mensaje: null })
@@ -185,7 +189,7 @@ export async function reportarLote(db: Pool, opciones: { simular: boolean; limit
       })
       // Relectura: la moderación de ML dice si el comprador lo recibe.
       const despues = await mensajesDeOrden(db, orden.conexionId, o).catch(() => [])
-      const nuestro = despues.filter(m => esReporteNuestro(m, base.guia)).pop()
+      const nuestro = despues.filter(m => esReporteNuestro(m, base.guia, e.despachada_at)).pop()
       const mod = nuestro?.moderacion ?? null
       if (mod && !['clean', 'non_moderated'].includes(mod)) {
         await cerrar('RECHAZADO', `moderación ${mod}`, mensaje)
