@@ -37,6 +37,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : inicial?.filas.some(f => f.vende) ? 'vende' : 'diferencias')
   const [tocado, setTocado] = useState(!!buscarInicial || !!inicial)
   const [cuenta, setCuenta] = useState('')
+  // 16-11 (el dueño): Estado de la publicación en ML, combinable con las pestañas; con él se pausan/activan varias.
+  const [estadoML, setEstadoML] = useState<'' | 'active' | 'paused'>('')
+  const [motivoLote, setMotivoLote] = useState('')
   const [buscar, setBuscar] = useState(buscarInicial)
   const [ver, setVer] = useState(POR_PAGINA)
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
@@ -80,8 +83,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'pausadas' ? f.pubs.some(p => p.pausa_mano) : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
         : filtro === 'combos' ? f.pubs.some(p => p.posible_combo) : f.pubs.some(p => p.bloqueada_envio)))
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
+      && (!estadoML || f.pubs.some(p => p.estado === estadoML && (!cuenta || p.cuenta === cuenta)))
       && (!q || `${f.code} ${f.name}`.toLowerCase().includes(q) || f.pubs.some(p => `${p.item_id} ${p.titulo ?? ''} ${p.variante ?? ''}`.toLowerCase().includes(q))))
-  }, [filas, filtro, cuenta, buscar])
+  }, [filas, filtro, cuenta, buscar, estadoML])
 
   if (!filas) return <p className="text-sm text-neutral-400">{error ?? 'Cargando productos y publicaciones…'}</p>
 
@@ -96,8 +100,33 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     todas: filas.length,
   }
   const accionables = (f: FilaStockML) => f.pubs.filter(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
-  const marcables = visibles.slice(0, ver).filter(f => accionables(f).length)
+  // Las publicaciones (enteras: ML pausa la publicación, no la variante) que se pausan/activan con el Estado elegido.
+  const pubsEstado = (f: FilaStockML) => !estadoML ? [] : [...new Set(f.pubs.filter(p => p.estado === estadoML && !p.sin_sincronizar
+    && (!cuenta || p.cuenta === cuenta)).map(p => p.item_id))]
+  const activables = (f: FilaStockML) => pubsEstado(f).filter(it => f.pubs.some(p => p.item_id === it && (p.ml_disponible ?? 0) > 0))
+  const marcables = visibles.slice(0, ver).filter(f => accionables(f).length || pubsEstado(f).length)
   const todosMarcados = marcables.length > 0 && marcables.every(f => marcados.has(f.product_id))
+
+  const marcadasF = filas.filter(f => marcados.has(f.product_id))
+  const nIgualar = marcadasF.flatMap(accionables).length
+  // Sin repetir: una publicación con variantes puede estar en varios productos (ML la pausa entera).
+  const lote = [...new Set(estadoML === 'active' ? marcadasF.flatMap(pubsEstado) : estadoML === 'paused' ? marcadasF.flatMap(activables) : [])]
+  const sinStockLote = estadoML === 'paused' ? new Set(marcadasF.flatMap(pubsEstado)).size - lote.length : 0
+  const cambiarEstados = async () => {
+    if (!lote.length || !estadoML) return
+    const estado = estadoML === 'active' ? 'paused' : 'active'
+    setTrabajando({ hechos: 0, total: lote.length }); setError(null)
+    const res = new Map(resultados)
+    for (let i = 0; i < lote.length; i += 10) {
+      const d = await pedir({ accion: 'estados', items: lote.slice(i, i + 10), estado, motivo: motivoLote || undefined })
+      if (!d) break
+      for (const x of d.resultados as Res[]) for (const p of filas.flatMap(f => f.pubs).filter(p => p.item_id === x.item_id)) res.set(clave(p), { ...x, variante_id: p.variante_id })
+      setResultados(new Map(res))
+      setTrabajando({ hechos: Math.min(i + 10, lote.length), total: lote.length })
+    }
+    setTrabajando(null); setMarcados(new Set()); setMotivoLote('')
+    await cargar()
+  }
 
   const igualar = async () => {
     const pubs = filas.filter(f => marcados.has(f.product_id)).flatMap(accionables).map(p => ({ item_id: p.item_id, variante_id: p.variante_id }))
@@ -163,13 +192,20 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
               <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" aria-hidden />Vende de más <span className="opacity-75">{n.vende}</span>
             </button>
           )}
-          {([['diferencias', 'Con diferencias'], ['reserva', 'Quedan pocas'], ['reactivar', 'Pausadas para reactivar'], ['pausadas', 'Pausadas a mano'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const).map(([k, t]) => (
+          {([['diferencias', 'Con diferencias'], ['reserva', 'Quedan pocas'], ['reactivar', 'Pausadas para reactivar'], ['pausadas', 'Pausadas a mano'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const)
+            .filter(([k]) => n[k] > 0 || filtro === k || k === 'todas' || k === 'diferencias').map(([k, t]) => (
             <button key={k} onClick={() => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }}
               className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
               {t} <span className="opacity-60">{n[k]}</span>
             </button>
           ))}
         </div>
+        <select value={estadoML} onChange={e => { setEstadoML(e.target.value as '' | 'active' | 'paused'); setMarcados(new Set()); setVer(POR_PAGINA) }}
+          title="Estado de la publicación en MercadoLibre" className={`rounded-lg border px-2 py-1 text-xs ${estadoML ? 'border-neutral-900 font-medium' : 'border-neutral-300'}`}>
+          <option value="">Activas y pausadas</option>
+          <option value="active">Activas en ML</option>
+          <option value="paused">Pausadas en ML</option>
+        </select>
         {cuentas.length > 1 && (
           <select value={cuenta} onChange={e => { setCuenta(e.target.value); setVer(POR_PAGINA) }} className="rounded-lg border border-neutral-300 px-2 py-1 text-xs">
             <option value="">Todas las cuentas</option>
@@ -210,7 +246,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
             </label>
           )}
           {visibles.slice(0, ver).map(f => (
-            <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} conVincular={conVincular} marcable={accionables(f).length > 0}
+            <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} conVincular={conVincular} marcable={accionables(f).length > 0 || pubsEstado(f).length > 0}
+              resaltar={estadoML || null} cuenta={cuenta}
               marcado={marcados.has(f.product_id)} resultados={resultados} verCombos={filtro === 'combos'}
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
@@ -259,13 +296,25 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">
               {trabajando ? `Actualizando MercadoLibre… ${trabajando.hechos} de ${trabajando.total} publicaciones`
-                : `${marcados.size} producto${marcados.size === 1 ? '' : 's'} · ${filas.filter(f => marcados.has(f.product_id)).flatMap(accionables).length} publicaciones`}
+                : `${marcados.size} producto${marcados.size === 1 ? '' : 's'}${estadoML ? '' : ` · ${nIgualar} publicaciones`}`}
+              {!trabajando && sinStockLote > 0 && <span className="ml-2 text-xs text-amber-700">· {sinStockLote} sin stock en ML: iguálalas primero</span>}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {!trabajando && <button onClick={() => setMarcados(new Set())} className="btn-ghost text-sm">Cancelar</button>}
-              <button onClick={igualar} disabled={!!trabajando} className="btn-primary text-sm disabled:opacity-50">
-                {trabajando ? 'Trabajando…' : 'Igualar y reactivar'}
-              </button>
+              {estadoML === 'active' && !trabajando && (
+                <input value={motivoLote} onChange={e => setMotivoLote(e.target.value)} maxLength={200} placeholder="Motivo (opcional)"
+                  className="w-40 rounded-lg border border-neutral-300 px-2 py-1.5 text-base sm:text-sm" />
+              )}
+              {estadoML && (
+                <button onClick={cambiarEstados} disabled={!!trabajando || !lote.length} className="btn-primary text-sm disabled:opacity-50">
+                  {trabajando ? 'Trabajando…' : `${estadoML === 'active' ? 'Pausar' : 'Activar'} ${lote.length} publicaci${lote.length === 1 ? 'ón' : 'ones'}`}
+                </button>
+              )}
+              {(!estadoML || nIgualar > 0) && (
+                <button onClick={igualar} disabled={!!trabajando || !nIgualar} className={`${estadoML ? 'btn-secondary' : 'btn-primary'} text-sm disabled:opacity-50`}>
+                  {trabajando && !estadoML ? 'Trabajando…' : 'Igualar y reactivar'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -289,8 +338,10 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, resaltar, cuenta, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
   f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
+  /** Con Estado elegido: las publicaciones en otro estado (u otra cuenta) se atenúan. */
+  resaltar: 'active' | 'paused' | null; cuenta: string
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
   onCorregir: (cantidad: number) => Promise<boolean>
@@ -406,6 +457,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
       <ul className="divide-y divide-neutral-100">
         {f.pubs.map(p => <FilaPub key={p.codigo_id} p={p} res={resultados.get(clave(p))} puedeCambiar={puedeCambiar} reserva={f.en_reserva}
           abrirOpciones={verCombos} onEstado={(e, m) => onEstado(p, e, m)}
+          atenuada={(!!resaltar && p.estado !== resaltar) || (!!cuenta && p.cuenta !== cuenta)}
           onUnidades={u => onUnidades(p, u)} onSincronizar={v => onSincronizar(p, v)}
           asignar={f.en_reserva && editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
       </ul>
@@ -413,9 +465,10 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
   )
 }
 
-function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onSincronizar, onEstado, asignar }: {
+function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar }: {
   p: PubStockML; res?: Res; puedeCambiar: boolean; reserva: boolean; abrirOpciones: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
   onEstado: (estado: 'paused' | 'active', motivo: string) => Promise<boolean>
+  atenuada: boolean
   /** Producto en reserva: cuántas va a mostrar esta publicación (lo decide la persona). */
   asignar?: { valor: string; onCambio: (v: string) => void }
 }) {
@@ -431,7 +484,7 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, onUnidades, onS
   const cambia = p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar)
   const envio = p.envio ? ENVIO[p.envio] : null
   return (
-    <li className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 text-sm ${p.sin_sincronizar ? 'opacity-60' : ''}`}>
+    <li className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 text-sm ${p.sin_sincronizar || atenuada ? 'opacity-50' : ''}`}>
       <div className="min-w-[12rem] flex-1">
         <div className="text-xs text-neutral-500">
           <b className="text-neutral-700">{p.cuenta}</b> · <span className="font-mono">{p.item_id}</span>

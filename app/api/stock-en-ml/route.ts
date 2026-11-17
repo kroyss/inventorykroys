@@ -70,6 +70,8 @@ const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('estado'), item_id: z.string().regex(/^[A-Z]{3}\d+$/), estado: z.enum(['paused', 'active']),
              motivo: z.string().trim().max(200).optional() }),
   z.object({ accion: z.literal('sin_fisico'), product_id: z.number().int().positive(), valor: z.boolean() }),
+  z.object({ accion: z.literal('estados'), items: z.array(z.string().regex(/^[A-Z]{3}\d+$/)).min(1).max(10),
+             estado: z.enum(['paused', 'active']), motivo: z.string().trim().max(200).optional() }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -93,6 +95,16 @@ export async function POST(req: NextRequest) {
         `INSERT INTO app_settings (key, value) VALUES ('stock_ml_reserva', $1)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [String(b.unidades)])
       return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'estados') {
+      // 16-11: pausar / activar varias (la pantalla manda de a 10, con avance, como «Igualar»).
+      const resultados: Resultado[] = []
+      for (const it of [...new Set(b.items)]) {
+        resultados.push(await cambiarEstadoML(s.db, it, b.estado, { usuarioId: Number(s.session.user.id), motivo: b.motivo }))
+      }
+      const hechos = resultados.filter(x => x.ok).length
+      if (hechos) await registrarUso(s.db, 'stock', hechos)
+      return NextResponse.json({ resultados })
     }
     if (b.accion === 'estado') {
       const r = await cambiarEstadoML(s.db, b.item_id, b.estado, { usuarioId: Number(s.session.user.id), motivo: b.motivo })
