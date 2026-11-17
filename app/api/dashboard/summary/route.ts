@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized } from '@/lib/session'
 import { leerReglas } from '@/lib/stockReglas'
+import { noReponerSQL } from '@/lib/noReponer'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -50,14 +51,15 @@ export async function GET(_: NextRequest) {
         GROUP BY si.product_id
       ),
       t AS (
-        SELECT COALESCE(i.quantity, 0) AS stock, i.id AS inv_id, COALESCE(v6.q, 0) AS ventas_h, COALESCE(v6.qp, 0) AS ventas_p, p.stock_por_verificar
+        SELECT COALESCE(i.quantity, 0) AS stock, i.id AS inv_id, COALESCE(v6.q, 0) AS ventas_h, COALESCE(v6.qp, 0) AS ventas_p, p.stock_por_verificar,
+               ${noReponerSQL()} AS no_reponer   -- 17-11 (mig 184): «No volver a pedir» no cuenta para reponer
         FROM products p
         LEFT JOIN inventory i ON i.product_id = p.id
         LEFT JOIN v6 ON v6.product_id = p.id
         WHERE p.is_active = TRUE
       )
       SELECT COUNT(*) FILTER (WHERE inv_id IS NOT NULL AND stock > 0 AND ventas_p < $3) AS a9,
-             COUNT(*) FILTER (WHERE ventas_h > 0 AND NOT (ventas_p < $3 AND stock > 0)
+             COUNT(*) FILTER (WHERE ventas_h > 0 AND NOT no_reponer AND NOT (ventas_p < $3 AND stock > 0)
                                AND ventas_h / $1::float >= $5 AND stock < (ventas_h / $1::float) * $4) AS a10,
              COUNT(*) FILTER (WHERE stock_por_verificar) AS a11
       FROM t

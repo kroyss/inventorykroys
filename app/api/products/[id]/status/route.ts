@@ -68,8 +68,10 @@ export async function PUT(
     }
 
     const isActive = action === 'activate'
+    // 17-11 (mig 184): reactivar borra «No volver a pedir»; si no, el cron lo volvería a desactivar al rato.
     const { rowCount } = await db.query(
-      `UPDATE products SET is_active = $1 WHERE id = $2`,
+      `UPDATE products SET is_active = $1, no_reponer_at = CASE WHEN $1 THEN NULL ELSE no_reponer_at END,
+              no_reponer_por = CASE WHEN $1 THEN NULL ELSE no_reponer_por END WHERE id = $2`,
       [isActive, id]
     )
     if (!rowCount) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })

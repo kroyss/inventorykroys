@@ -8,7 +8,7 @@ import { tieneModulo } from '@/lib/modulos'
 import { registrarUso } from '@/lib/usoAcciones'
 import { actualizarCatalogo } from '@/lib/catalogoML'
 import { aplicarCambio, cambiarEstadoML, type Resultado } from '@/lib/stockML'
-import { filasStockML, leerReserva } from '@/lib/stockConML'
+import { desactivadosPublicados, filasStockML, leerReserva } from '@/lib/stockConML'
 import { contarSinVincular } from '@/lib/importarML'
 import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
 
@@ -44,12 +44,13 @@ export async function GET(req: NextRequest) {
     const pais = s.session.user.country
     const revisar = req.nextUrl.searchParams.get('revisar') === '1'
     // sinVincular: activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
-    const [filas, reserva, sinVincular] = await Promise.all([
+    // desactivados (17-11): productos desactivados con publicaciones activas en ML (ya no se les controla el stock).
+    const [filas, reserva, sinVincular, desactivados] = await Promise.all([
       revisar ? revisarVendeDeMas(s.db, pais).then(r => r.filas)
               : filasStockML(s.db, pais).then(async f => { await guardarEstadoVende(s.db, f).catch(() => {}); return f }),
-      leerReserva(s.db), contarSinVincular(s.db)])
-    return NextResponse.json({ filas, reserva, sinVincular, puedeCambiar: puede(s.session.user, 'reponer_stock'),
-                               puedeReserva: puede(s.session.user, 'inventario_config') })
+      leerReserva(s.db), contarSinVincular(s.db), desactivadosPublicados(s.db)])
+    return NextResponse.json({ filas, reserva, sinVincular, desactivados, puedeCambiar: puede(s.session.user, 'reponer_stock'),
+                               puedeReserva: puede(s.session.user, 'inventario_config'), puedeReactivar: puede(s.session.user, 'ver_productos') })
   } catch (err) {
     return apiError(err)
   }

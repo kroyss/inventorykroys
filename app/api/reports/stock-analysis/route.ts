@@ -4,6 +4,7 @@ import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { localCostFactor } from '@/lib/localCost'
 import { puede } from '@/lib/permisos'
 import { leerReglas } from '@/lib/stockReglas'
+import { listaNoReponer, noReponerSQL } from '@/lib/noReponer'
 
 export async function GET(_: NextRequest) {
   const { session, db } = await getSessionDb()
@@ -37,7 +38,9 @@ export async function GET(_: NextRequest) {
           -- "Disponible desde": primera llegada al inventario (primer movimiento IN),
           -- o la creación del producto si no hay movimientos. Sirve para no tratar
           -- como remate a lo que recién llegó y aún no tuvo tiempo de venderse.
-          COALESCE(fin.first_in, p.created_at)           AS disponible_desde
+          COALESCE(fin.first_in, p.created_at)           AS disponible_desde,
+          -- 17-11 (mig 184): «No volver a pedir» → nunca en Reponer (lib/noReponer.ts)
+          ${noReponerSQL()}                              AS no_reponer
         FROM products p
         LEFT JOIN inventory i ON p.id = i.product_id
         LEFT JOIN product_pricing pp ON p.id = pp.product_id
@@ -362,6 +365,7 @@ export async function GET(_: NextRequest) {
       // y se agota antes del lead time de importación. El umbral de rotación evita
       // ofrecer reponer productos que casi no se venden (aunque estén en stock 0).
       if (demandaMensual >= MIN_REPOSICION && cobertura < LEAD_MONTHS) {
+        if (r.no_reponer) continue   // 17-11: «No volver a pedir» (se termina de vender y se desactiva solo)
         let prioridad: 'URGENTE' | 'PEDIR' | 'EN_CAMINO'
         if (coberturaTotal >= LEAD_MONTHS)      prioridad = 'EN_CAMINO'   // lo que viene ya lo cubre
         else if (coberturaTotal < URGENT_MONTHS) prioridad = 'URGENTE'
@@ -387,6 +391,7 @@ export async function GET(_: NextRequest) {
 
     return NextResponse.json({
       reglas, reglas_propias: propias, sanos,
+      no_reponer: await listaNoReponer(db), puede_productos: puede(session.user, 'ver_productos'),
       reposicion,
       remate: remate.sort((a, b) => b.valor_stock - a.valor_stock || a.ventas_parado - b.ventas_parado),
       // Recién llegados (en período de prueba): no se juzgan como remate todavía.

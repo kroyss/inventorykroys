@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui'
 import { FotoProducto } from '@/components/ui/FotoProducto'
 import { Ventana } from '@/components/ui/Ventana'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
-import type { FilaStockML, PubStockML } from '@/lib/stockConML'
+import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
 
 type Filtro = 'vende' | 'diferencias' | 'pausadas' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
@@ -23,7 +23,8 @@ const ENVIO: Record<string, { t: string; c: string; title: string }> = {
   sin_peso: { t: 'Sin peso', c: 'bg-neutral-100 text-neutral-600 ring-neutral-200', title: 'Falta el peso del producto: no se sabe si tiene envío gratis' },
 }
 
-export interface StockMLRespuesta { filas: FilaStockML[]; reserva: number | null; sinVincular: number; puedeCambiar: boolean; puedeReserva: boolean }
+export interface StockMLRespuesta { filas: FilaStockML[]; reserva: number | null; sinVincular: number; puedeCambiar: boolean; puedeReserva: boolean
+  desactivados?: DesactivadoPublicado[]; puedeReactivar?: boolean }
 
 export default function StockMLClient({ buscarInicial = '', conVincular = false, inicial = null }: {
   buscarInicial?: string; conVincular?: boolean
@@ -49,6 +50,10 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [reserva, setReserva] = useState<number | null>(inicial?.reserva ?? null)
   const [puedeReserva, setPuedeReserva] = useState(!!inicial?.puedeReserva)
   const [sinVincular, setSinVincular] = useState(inicial?.sinVincular ?? 0)
+  // 17-11: productos desactivados que siguen publicados en ML (faltó pausar o la vinculación está mal).
+  const [desactivados, setDesactivados] = useState<DesactivadoPublicado[]>(inicial?.desactivados ?? [])
+  const [puedeReactivar, setPuedeReactivar] = useState(!!inicial?.puedeReactivar)
+  const [verDesactivados, setVerDesactivados] = useState(false)
   // 16-11 Historial (seguimiento de lo que se cambia en ML): null = cerrado; con producto = filtrado.
   const [historial, setHistorial] = useState<{ product_id: number | null; nombre: string | null } | null>(null)
   const confirmar = useConfirm()
@@ -57,6 +62,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return null }
     setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
+    setDesactivados(d.desactivados ?? []); setPuedeReactivar(!!d.puedeReactivar)
     return d.filas as FilaStockML[]
   })
   const conInicial = !!inicial
@@ -101,7 +107,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   }
   const accionables = (f: FilaStockML) => f.pubs.filter(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
   // Las publicaciones (enteras: ML pausa la publicación, no la variante) que se pausan/activan con el Estado elegido.
-  const pubsEstado = (f: FilaStockML) => !estadoML ? [] : [...new Set(f.pubs.filter(p => p.estado === estadoML && !p.sin_sincronizar
+  // 17-11 (el dueño): sin Estado elegido igual se pueden PAUSAR las activas de lo marcado (antes había que adivinar el filtro).
+  const modoEstado = estadoML || 'active'
+  const pubsEstado = (f: FilaStockML) => [...new Set(f.pubs.filter(p => p.estado === modoEstado && !p.sin_sincronizar
     && (!cuenta || p.cuenta === cuenta)).map(p => p.item_id))]
   const activables = (f: FilaStockML) => pubsEstado(f).filter(it => f.pubs.some(p => p.item_id === it && (p.ml_disponible ?? 0) > 0))
   const marcables = visibles.slice(0, ver).filter(f => accionables(f).length || pubsEstado(f).length)
@@ -110,11 +118,11 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const marcadasF = filas.filter(f => marcados.has(f.product_id))
   const nIgualar = marcadasF.flatMap(accionables).length
   // Sin repetir: una publicación con variantes puede estar en varios productos (ML la pausa entera).
-  const lote = [...new Set(estadoML === 'active' ? marcadasF.flatMap(pubsEstado) : estadoML === 'paused' ? marcadasF.flatMap(activables) : [])]
+  const lote = [...new Set(modoEstado === 'active' ? marcadasF.flatMap(pubsEstado) : marcadasF.flatMap(activables))]
   const sinStockLote = estadoML === 'paused' ? new Set(marcadasF.flatMap(pubsEstado)).size - lote.length : 0
   const cambiarEstados = async () => {
-    if (!lote.length || !estadoML) return
-    const estado = estadoML === 'active' ? 'paused' : 'active'
+    if (!lote.length) return
+    const estado = modoEstado === 'active' ? 'paused' : 'active'
     setTrabajando({ hechos: 0, total: lote.length }); setError(null)
     const res = new Map(resultados)
     for (let i = 0; i < lote.length; i += 10) {
@@ -163,6 +171,15 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
             </button>
           )}
         </>} />
+
+      {desactivados.length > 0 && (
+        <button type="button" onClick={() => setVerDesactivados(true)}
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-left text-sm text-amber-900 hover:bg-amber-100">
+          <span><b>{desactivados.length} producto{desactivados.length === 1 ? ' desactivado sigue publicado' : 's desactivados siguen publicados'} en ML</b>
+            <span className="block text-xs text-amber-800">El sistema ya no les controla el stock: pausa la publicación o, si el título no es de ese producto, corrige la vinculación.</span></span>
+          <span className="shrink-0 text-xs font-semibold underline">Revisar</span>
+        </button>
+      )}
 
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
         <p><b>Disponible</b> = stock del sistema − ventas de MercadoLibre que todavía no se registraron (ML ya las descontó de su publicación).
@@ -290,28 +307,30 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       )}
 
       {historial && <Historial filtro={historial} onFiltro={setHistorial} onCerrar={() => setHistorial(null)} />}
+      {verDesactivados && <Desactivados lista={desactivados} puedePausar={puedeCambiar} puedeDesvincular={conVincular} puedeReactivar={puedeReactivar}
+        onCerrar={() => setVerDesactivados(false)} onCambio={async () => { await cargar() }} />}
 
       {puedeCambiar && (marcados.size > 0 || trabajando) && (
         <div data-barra-fija className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">
               {trabajando ? `Actualizando MercadoLibre… ${trabajando.hechos} de ${trabajando.total} publicaciones`
-                : `${marcados.size} producto${marcados.size === 1 ? '' : 's'}${estadoML ? '' : ` · ${nIgualar} publicaciones`}`}
+                : `${marcados.size} producto${marcados.size === 1 ? '' : 's'}${estadoML || !nIgualar ? '' : ` · ${nIgualar} por igualar`}`}
               {!trabajando && sinStockLote > 0 && <span className="ml-2 text-xs text-amber-700">· {sinStockLote} sin stock en ML: iguálalas primero</span>}
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {!trabajando && <button onClick={() => setMarcados(new Set())} className="btn-ghost text-sm">Cancelar</button>}
-              {estadoML === 'active' && !trabajando && (
+              {modoEstado === 'active' && lote.length > 0 && !trabajando && (
                 <input value={motivoLote} onChange={e => setMotivoLote(e.target.value)} maxLength={200} placeholder="Motivo (opcional)"
                   className="w-40 rounded-lg border border-neutral-300 px-2 py-1.5 text-base sm:text-sm" />
               )}
-              {estadoML && (
-                <button onClick={cambiarEstados} disabled={!!trabajando || !lote.length} className="btn-primary text-sm disabled:opacity-50">
-                  {trabajando ? 'Trabajando…' : `${estadoML === 'active' ? 'Pausar' : 'Activar'} ${lote.length} publicaci${lote.length === 1 ? 'ón' : 'ones'}`}
+              {(estadoML || lote.length > 0) && (
+                <button onClick={cambiarEstados} disabled={!!trabajando || !lote.length} className={`${estadoML || !nIgualar ? 'btn-primary' : 'btn-secondary'} text-sm disabled:opacity-50`}>
+                  {trabajando ? 'Trabajando…' : `${modoEstado === 'active' ? 'Pausar' : 'Activar'} ${lote.length} publicaci${lote.length === 1 ? 'ón' : 'ones'}`}
                 </button>
               )}
-              {(!estadoML || nIgualar > 0) && (
-                <button onClick={igualar} disabled={!!trabajando || !nIgualar} className={`${estadoML ? 'btn-secondary' : 'btn-primary'} text-sm disabled:opacity-50`}>
+              {nIgualar > 0 && (
+                <button onClick={igualar} disabled={!!trabajando} className={`${estadoML ? 'btn-secondary' : 'btn-primary'} text-sm disabled:opacity-50`}>
                   {trabajando && !estadoML ? 'Trabajando…' : 'Igualar y reactivar'}
                 </button>
               )}
@@ -646,6 +665,96 @@ function Historial({ filtro, onFiltro, onCerrar }: {
             })}
           </ul>
         )}
+    </Ventana>
+  )
+}
+
+// ── Desactivados que siguen publicados (17-11, el dueño) ───────────────────────────────────────────────────────────
+// Lado a lado el producto y el título de cada publicación: si no coinciden es una vinculación equivocada (Desvincular y
+// vincularla al correcto en Vincular con ML). Si coinciden, faltó pausarla. O fue un error y se reactiva el producto.
+function Desactivados({ lista, puedePausar, puedeDesvincular, puedeReactivar, onCerrar, onCambio }: {
+  lista: DesactivadoPublicado[]; puedePausar: boolean; puedeDesvincular: boolean; puedeReactivar: boolean
+  onCerrar: () => void; onCambio: () => Promise<void>
+}) {
+  const [ocupado, setOcupado] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [hechos, setHechos] = useState<Record<string, string>>({})
+  const json = async (url: string, method: string, body: unknown) => {
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(d.error ?? 'No se pudo')
+    return d
+  }
+  // Lo hecho queda marcado en la ventana aunque la lista se recargue (la fila desaparece al recargar).
+  const correr = async (claves: string[], fn: () => Promise<string>) => {
+    setOcupado(claves[0]); setError(null)
+    try { const t = await fn(); setHechos(h => ({ ...h, ...Object.fromEntries(claves.map(c => [c, t])) })); await onCambio() }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo') }
+    finally { setOcupado(null) }
+  }
+  const pausar = async (items: string[]) => {
+    for (let i = 0; i < items.length; i += 10) {
+      const d = await json('/api/stock-en-ml', 'POST', { accion: 'estados', items: items.slice(i, i + 10), estado: 'paused', motivo: 'Producto desactivado' })
+      const mal = (d.resultados as Res[]).find(x => !x.ok)
+      if (mal) throw new Error(`${mal.item_id}: ${mal.error ?? 'ML no la pausó'}`)
+    }
+    return 'Pausada'
+  }
+  const todas = [...new Set(lista.flatMap(p => p.pubs.map(x => x.item_id)))].filter(it => !hechos[it])
+  return (
+    <Ventana titulo="Desactivados que siguen publicados en ML" onCerrar={onCerrar}>
+      <p className="text-xs text-neutral-600">Compara el <b>producto</b> con el <b>título</b> de cada publicación. Si el título no es de ese
+        producto, la vinculación está equivocada: <b>Desvincular</b> y vincúlala al correcto en Vincular con ML. Si coincide, <b>Pausar</b>.
+        Si lo desactivaste por error, <b>Reactivar producto</b>.</p>
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+      {!lista.length && <p className="text-sm text-neutral-500">Listo: ninguno queda publicado.</p>}
+      <ul className="space-y-3">
+        {lista.map(p => (
+          <li key={p.product_id} className="rounded-xl border border-neutral-200">
+            <div className="flex items-center gap-2.5 border-b border-neutral-100 px-3 py-2">
+              <FotoProducto id={p.product_id} nombre={p.name} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-neutral-900" title={p.name}>{p.name}</p>
+                <p className="text-xs text-neutral-500"><span className="font-mono">{p.code}</span> · <span className="text-amber-700">desactivado</span></p>
+              </div>
+              {puedeReactivar && (hechos[`p${p.product_id}`]
+                ? <span className="text-xs text-emerald-700">{hechos[`p${p.product_id}`]}</span>
+                : <button type="button" disabled={!!ocupado} className="btn-secondary shrink-0 text-xs disabled:opacity-50"
+                    onClick={() => correr([`p${p.product_id}`], async () => { await json(`/api/products/${p.product_id}/status`, 'PUT', { action: 'activate' }); return 'Reactivado' })}>
+                    {ocupado === `p${p.product_id}` ? '…' : 'Reactivar producto'}
+                  </button>)}
+            </div>
+            <ul className="divide-y divide-neutral-100">
+              {p.pubs.map(x => (
+                <li key={x.codigo_id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-neutral-500"><b className="text-neutral-700">{x.cuenta}</b> · <span className="font-mono">{x.item_id}</span> · {x.disponible ?? 0} en ML</p>
+                    <p className="text-neutral-800">{x.titulo ?? 'Sin título guardado'}</p>
+                  </div>
+                  {hechos[x.item_id] || hechos[`d${x.codigo_id}`]
+                    ? <span className="text-xs text-emerald-700">{hechos[x.item_id] ?? hechos[`d${x.codigo_id}`]}</span>
+                    : <div className="flex gap-1.5">
+                        {puedePausar && <button type="button" disabled={!!ocupado} className="btn-secondary text-xs disabled:opacity-50"
+                          onClick={() => correr([x.item_id], () => pausar([x.item_id]))}>{ocupado === x.item_id ? '…' : 'Pausar'}</button>}
+                        {puedeDesvincular && <button type="button" disabled={!!ocupado} className="btn-ghost text-xs disabled:opacity-50"
+                          onClick={() => correr([`d${x.codigo_id}`], async () => {
+                            await json('/api/vincular-ml', 'POST', { accion: 'desvincular', codigo: x.ml_code, product_id: p.product_id }); return 'Desvinculada'
+                          })}>{ocupado === `d${x.codigo_id}` ? '…' : 'Desvincular'}</button>}
+                      </div>}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      {puedePausar && todas.length > 1 && (
+        <div className="flex justify-end border-t border-neutral-100 pt-3">
+          <button type="button" disabled={!!ocupado} className="btn-primary text-sm disabled:opacity-50"
+            onClick={() => correr(todas, () => pausar(todas))}>
+            {ocupado === todas[0] ? 'Pausando…' : `Pausar las ${todas.length}`}
+          </button>
+        </div>
+      )}
     </Ventana>
   )
 }

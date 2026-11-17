@@ -30,7 +30,9 @@ const S: Record<string, Sugerencia[]> = {
   ],
   '/inventario/stock-ml': [
     { pregunta: '¿Cómo pauso o activo varias a la vez?',
-      respuesta: 'En el selector de estado elige **Activas en ML** (o **Pausadas en ML**), marca los productos y toca abajo **Pausar N publicaciones** (o **Activar**). Activar solo funciona con las que tienen stock en ML; las demás iguálalas primero.' },
+      respuesta: 'Marca los productos y toca abajo **Pausar N publicaciones** (pausa sus activas). Para activar, en el selector de estado elige **Pausadas en ML**, marca y toca **Activar N publicaciones**: solo funciona con las que tienen stock en ML; las demás iguálalas primero.' },
+    { pregunta: '¿Qué es «desactivados que siguen publicados»?',
+      respuesta: 'Productos desactivados con publicaciones activas en ML: el sistema ya no les controla el stock. Toca **Revisar**: si el título de la publicación no es de ese producto, está mal vinculada → **Desvincular** y vincúlala al correcto; si coincide → **Pausar**; si fue un error → **Reactivar producto**.' },
     { pregunta: '¿Cómo pauso una publicación sin tocar el inventario?',
       respuesta: 'En la publicación toca **Pausar** (puedes escribir el motivo). Queda «Pausada a mano» y «Igualar» no la reactiva; para volver a venderla toca **Activar**. Si el producto no está en bodega, mejor **Se acabó**: pone 0 en todas sus publicaciones y avisa al admin para que ajuste el inventario.' },
     { pregunta: '¿Dónde veo quién cambió el stock en ML?',

@@ -18,6 +18,7 @@ import { esDemoEmpresa } from '@/lib/demo'
 import { rellenarInventarioDemo } from '@/lib/demoInventario'
 import { enviarAvisosTelegram } from '@/lib/avisosTelegram'
 import { revisarSiToca } from '@/lib/vendeDeMas'
+import { desactivarNoReponer } from '@/lib/noReponer'
 import { corteFundadores } from '@/lib/fundadoresCorte'
 import { vigilarCampanas } from '@/lib/promocionesML'
 import { procesarColaML } from '@/lib/colaML'
@@ -122,6 +123,13 @@ export async function GET(req: NextRequest) {
         await conEmpresa(e.id, e.country as Country, db => revisarSiToca(db, e.country))
       } catch (err) {
         console.error('[vende de más]', e.id, err instanceof Error ? err.message : err)
+      }
+      // «No volver a pedir» (17-11, lib/noReponer.ts): los marcados que se terminaron de vender se desactivan solos.
+      try {
+        const n = await conEmpresa(e.id, e.country as Country, db => desactivarNoReponer(db))
+        if (n.length) console.log('[no reponer]', e.id, n)
+      } catch (err) {
+        console.error('[no reponer]', e.id, err instanceof Error ? err.message : err)
       }
     }
     // Respuestas automáticas (lib/automaticasPreguntas.ts): solo las respuestas rápidas que el

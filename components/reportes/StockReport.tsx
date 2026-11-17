@@ -7,6 +7,7 @@ import { money } from '@/components/ui'
 import { matchFuzzy } from '@/lib/search'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { ReglasStock } from '@/lib/stockReglas'
+import { Ventana } from '@/components/ui/Ventana'
 
 // Reportes → Stock (14-11, el dueño): rehecho para que se lea de un vistazo. Cuatro tarjetas que son los filtros,
 // una frase por vista con TUS reglas, tablas cortas (tarjetas en el celular), un solo color con significado
@@ -23,11 +24,30 @@ const GRUPOS = [
   { k: 'PEDIR', t: 'Pedir', ayuda: 'se acaba antes de que llegue lo nuevo' },
   { k: 'EN_CAMINO', t: 'Ya viene en camino', ayuda: 'lo que pediste lo cubre' },
 ] as const
+const TODOS_GRUPOS: string[] = GRUPOS.map(g => g.k)
+const CLAVE_FILTROS = 'stock_reponer_filtros'
+function filtrosGuardados(): { grupos?: string[]; soloAgotados?: boolean; minVende?: string } | null {
+  try {
+    const f = JSON.parse(localStorage.getItem(CLAVE_FILTROS) ?? 'null')
+    if (!f || typeof f !== 'object') return null
+    const grupos = Array.isArray(f.grupos) ? f.grupos.filter((g: unknown) => typeof g === 'string' && TODOS_GRUPOS.includes(g)) : undefined
+    return { grupos, soloAgotados: !!f.soloAgotados, minVende: typeof f.minVende === 'string' ? f.minVende : '' }
+  } catch { return null }
+}
 
 export default function StockReport({ data, sub, setSub, onReload }: { data: P; sub: StockSub; setSub: (s: StockSub) => void; onReload: () => void }) {
   const r: ReglasStock = data.reglas
   const [buscar, setBuscar] = useState('')
-  const [ocultarCamino, setOcultarCamino] = useState(false)
+  // 17-11 (el dueño): filtros de Reponer (grupos, solo agotados, vende al menos N); se recuerdan en este navegador.
+  // (Los datos llegan por fetch en el cliente: leer el storage al iniciar no choca con el HTML del servidor.)
+  const [guardados] = useState(filtrosGuardados)
+  const [grupos, setGrupos] = useState<string[]>(guardados?.grupos ?? TODOS_GRUPOS)
+  const [soloAgotados, setSoloAgotados] = useState(!!guardados?.soloAgotados)
+  const [minVende, setMinVende] = useState(guardados?.minVende ?? '')
+  const [noPedir, setNoPedir] = useState<P[] | null>(null)
+  useEffect(() => {
+    try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify({ grupos, soloAgotados, minVende })) } catch { /* sin storage */ }
+  }, [grupos, soloAgotados, minVende])
   const [orden, setOrden] = useState<'urgencia' | 'ganancia' | 'nombre'>('urgencia')
   const [pedido, setPedido] = useState<Record<number, number>>({})
   const [verReglas, setVerReglas] = useState(false)
@@ -41,6 +61,16 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
   const remate: P[] = data.remate ?? []
   const nuevos: P[] = data.nuevos ?? []
   const urgentes = repo.filter(p => p.prioridad === 'URGENTE').length
+  const minimo = Number(minVende.replace(',', '.')) || 0
+  const repoF = repo.filter(p => grupos.includes(p.prioridad) && (!soloAgotados || p.stock_actual <= 0)
+    && (!minimo || (p.demanda_mensual ?? p.venta_mensual) >= minimo))
+  const hayFiltro = grupos.length < TODOS_GRUPOS.length || soloAgotados || minimo > 0
+  const limpiarFiltros = () => { setGrupos(TODOS_GRUPOS); setSoloAgotados(false); setMinVende('') }
+  const devolver = async (ids: number[]) => {
+    const res = await fetch('/api/reports/no-reponer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, deshacer: true }) })
+    if (res.ok) onReload()
+    else { const d = await res.json().catch(() => ({})); await confirmar({ title: 'No se pudo devolver', message: d.error ?? 'Intenta de nuevo.', confirmText: 'Entendido' }) }
+  }
   const plataParada = remate.reduce((s, p) => s + (p.valor_stock || 0), 0)
 
   const filtra = (l: P[]) => buscar.trim() ? l.filter(p => matchFuzzy(buscar, p.code, p.name, p.categoria)) : l
@@ -98,15 +128,46 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
             <option value="ganancia">Más ganancia al mes</option>
             <option value="nombre">Nombre</option>
           </select>
-          <label className="flex items-center gap-2 text-sm text-neutral-600">
-            <input type="checkbox" checked={ocultarCamino} onChange={e => setOcultarCamino(e.target.checked)} /> Ocultar lo que ya viene en camino
-          </label>
         </>}
       </div>
 
+      {sub === 'reposicion' && repo.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {GRUPOS.map(g => {
+            const n = repo.filter(p => p.prioridad === g.k).length
+            const on = grupos.includes(g.k)
+            return (
+              <button key={g.k} type="button" aria-pressed={on} title={g.ayuda}
+                onClick={() => setGrupos(x => on ? x.filter(y => y !== g.k) : [...x, g.k])}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${on ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-500'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${g.k === 'URGENTE' ? 'bg-red-500' : g.k === 'PEDIR' ? 'bg-amber-400' : 'bg-neutral-300'}`} aria-hidden />
+                {g.t} <span className="opacity-60">{n}</span>
+              </button>
+            )
+          })}
+          <button type="button" aria-pressed={soloAgotados} onClick={() => setSoloAgotados(v => !v)}
+            className={`rounded-full border px-3 py-1 text-xs ${soloAgotados ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
+            Solo agotados <span className="opacity-60">{repo.filter(p => p.stock_actual <= 0).length}</span>
+          </button>
+          <label className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs ${minimo ? 'border-neutral-900 text-neutral-900' : 'border-neutral-200 text-neutral-600'} bg-white`}>
+            Vende al menos
+            <input type="number" min={0} step={1} inputMode="decimal" value={minVende} onChange={e => setMinVende(e.target.value)} placeholder="—"
+              aria-label="Vende al menos, al mes" className="w-12 border-0 bg-transparent p-0.5 text-center text-base tabular-nums focus:outline-none focus:ring-0 sm:text-xs" />
+            al mes
+          </label>
+          {hayFiltro && <>
+            <span className="text-xs text-neutral-500">{repo.length} → <b className="text-neutral-800">{repoF.length}</b></span>
+            <button type="button" onClick={limpiarFiltros} className="text-xs font-medium text-neutral-600 underline hover:text-neutral-900">Limpiar filtros</button>
+          </>}
+        </div>
+      )}
+
       {sub === 'reposicion' && (
-        <Reponer lista={filtra(ocultarCamino ? repo.filter(p => p.prioridad !== 'EN_CAMINO') : repo)} orden={orden} r={r}
+        <Reponer lista={filtra(repoF)} orden={orden} r={r} filtrado={hayFiltro} limpiar={limpiarFiltros}
           pedido={pedido} setPedido={setPedido} />
+      )}
+      {sub === 'reposicion' && (data.no_reponer ?? []).length > 0 && (
+        <NoVuelves lista={data.no_reponer} puede={!!data.puede_productos} onDevolver={devolver} />
       )}
       {sub === 'declive' && (
         <Lista filas={filtra(declive)} vacio="Ningún producto se está cayendo." cols={[
@@ -134,19 +195,23 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
 
       {sub === 'reposicion' && Object.keys(pedido).length > 0 && (
         <BarraPedido repo={repo} pedido={pedido} limpiar={() => setPedido({})}
+          noPedir={data.puede_productos ? filas => setNoPedir(filas.map(f => f.p)) : undefined}
           crear={filas => {
             try { sessionStorage.setItem('repo_items', JSON.stringify(filas.map(({ p, n }) => ({ id: p.id, code: p.code, name: p.name, quantity: n, cost: p.cost_usd || 0 })))) } catch { /* sin storage */ }
             router.push('/compras?new=1&from=reposicion')
           }} />
       )}
 
+      {noPedir && <NoVolverAPedir productos={noPedir} onCerrar={() => setNoPedir(null)}
+        onHecho={() => { setNoPedir(null); setPedido({}); onReload() }} />}
       {verReglas && <PanelReglas onCerrar={cerrarReglas} onGuardado={() => { setVerReglas(false); onReload() }} />}
     </div>
   )
 }
 
 // ── Reponer: agrupado por urgencia, el único color está en «Te alcanza» ─────────────────────────────────────────
-function Reponer({ lista, orden, r, pedido, setPedido }: { lista: P[]; orden: string; r: ReglasStock; pedido: Record<number, number>; setPedido: (f: (p: Record<number, number>) => Record<number, number>) => void }) {
+function Reponer({ lista, orden, r, pedido, setPedido, filtrado, limpiar }: { lista: P[]; orden: string; r: ReglasStock; pedido: Record<number, number>; setPedido: (f: (p: Record<number, number>) => Record<number, number>) => void
+  filtrado: boolean; limpiar: () => void }) {
   const ord = (l: P[]) => [...l].sort(orden === 'ganancia' ? (a, b) => b.ganancia_mensual - a.ganancia_mensual
     : orden === 'nombre' ? (a, b) => String(a.name).localeCompare(String(b.name)) : (a, b) => a.cobertura_total - b.cobertura_total)
   const grupos = orden === 'urgencia'
@@ -156,7 +221,10 @@ function Reponer({ lista, orden, r, pedido, setPedido }: { lista: P[]; orden: st
   const conSugerido = lista.filter(p => p.sugerido_comprar > 0)
   const todos = conSugerido.length > 0 && conSugerido.every(p => p.id in pedido)
 
-  if (!lista.length) return <Vacio t="No hay nada para reponer. Todo alcanza según tus reglas." />
+  if (!lista.length) return filtrado
+    ? <div className="rounded-xl border border-dashed border-neutral-200 bg-white py-10 text-center text-sm text-neutral-400">
+        Nada con estos filtros. <button type="button" onClick={limpiar} className="font-medium text-neutral-700 underline">Limpiar filtros</button></div>
+    : <Vacio t="No hay nada para reponer. Todo alcanza según tus reglas." />
   const alcanza = (p: P) => (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap font-medium tabular-nums ${p.prioridad === 'URGENTE' ? 'text-red-600' : p.prioridad === 'PEDIR' ? 'text-amber-700' : 'text-neutral-500'}`}
       title={`Con lo que tienes: ${m(p.cobertura)}. Con lo que viene en camino: ${m(p.cobertura_total)}. Tarda ${m(r.llegada)} en llegar.`}>
@@ -295,7 +363,8 @@ function Vacio({ t }: { t: string }) {
 }
 
 // ── Barra del pedido: crear la compra o descargarlo ─────────────────────────────────────────────────────────────
-function BarraPedido({ repo, pedido, limpiar, crear }: { repo: P[]; pedido: Record<number, number>; limpiar: () => void; crear: (f: { p: P; n: number }[]) => void }) {
+function BarraPedido({ repo, pedido, limpiar, crear, noPedir }: { repo: P[]; pedido: Record<number, number>; limpiar: () => void; crear: (f: { p: P; n: number }[]) => void
+  noPedir?: (f: { p: P; n: number }[]) => void }) {
   const filas = Object.entries(pedido).map(([id, n]) => ({ p: repo.find(x => x.id === Number(id)), n })).filter(f => f.p)
     .sort((a, b) => String(a.p.code).localeCompare(String(b.p.code)))
   const unidades = filas.reduce((s, f) => s + f.n, 0)
@@ -321,6 +390,8 @@ function BarraPedido({ repo, pedido, limpiar, crear }: { repo: P[]; pedido: Reco
         <p className="text-sm"><b>{filas.length}</b> producto{filas.length === 1 ? '' : 's'} · <b>{unidades}</b> u · <b>${money(costo)}</b></p>
         <div className="flex flex-wrap gap-2">
           <button onClick={limpiar} className="px-2 py-1.5 text-sm text-neutral-300 hover:text-white">Limpiar</button>
+          {noPedir && <button onClick={() => noPedir(filas)} title="No los vas a pedir más: salen de Reponer y se desactivan cuando se terminan de vender"
+            className="rounded-lg border border-neutral-600 px-3 py-1.5 text-sm hover:bg-neutral-800">No volver a pedir</button>}
           <button onClick={excel} className="rounded-lg border border-neutral-600 px-3 py-1.5 text-sm hover:bg-neutral-800">Excel</button>
           <button onClick={txt} className="rounded-lg border border-neutral-600 px-3 py-1.5 text-sm hover:bg-neutral-800">TXT</button>
           <button onClick={() => crear(filas)} className="rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100">Crear compra</button>
@@ -411,6 +482,125 @@ function PanelReglas({ onCerrar, onGuardado }: { onCerrar: () => void; onGuardad
           </div>
         )}
       </aside>
+    </div>
+  )
+}
+
+// ── «No volver a pedir» (17-11, el dueño; mig 184, lib/noReponer.ts) ───────────────────────────────────────────────
+// Confirmación: separa los que se desactivan ya (stock 0, nada en camino, sin ventas de ML por registrar) de los que
+// solo salen de Reponer y se desactivan solos al terminar de venderse. Muestra los títulos de sus publicaciones
+// activas en ML para ver de paso una vinculación equivocada.
+function NoVolverAPedir({ productos, onCerrar, onHecho }: { productos: P[]; onCerrar: () => void; onHecho: () => void }) {
+  const [info, setInfo] = useState<{ pubs: { product_id: number; cuenta: string; item_id: string; titulo: string | null; disponible: number | null }[]; comprometidos: number[] } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const ids = productos.map(p => p.id)
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/reports/no-reponer?ids=${ids.join(',')}`, { cache: 'no-store' }).then(async r => {
+      const d = await r.json().catch(() => ({}))
+      if (!vivo) return
+      if (r.ok) setInfo(d); else setError(d.error ?? 'No se pudo revisar')
+    }).catch(() => { if (vivo) setError('No se pudo revisar') })
+    return () => { vivo = false }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const comprometido = (p: P) => !!info?.comprometidos.includes(p.id)
+  const ahora = productos.filter(p => p.stock_actual <= 0 && !(p.en_transito > 0) && !comprometido(p))
+  const despues = productos.filter(p => !ahora.includes(p))
+  const porque = (p: P) => [p.stock_actual > 0 && `quedan ${p.stock_actual}`, p.en_transito > 0 && `${p.en_transito} en camino`,
+    comprometido(p) && 'venta de ML sin registrar'].filter(Boolean).join(' · ')
+  const pubsDe = (id: number) => (info?.pubs ?? []).filter(x => x.product_id === id)
+
+  const confirmar = async () => {
+    setEnviando(true); setError(null)
+    const r = await fetch('/api/reports/no-reponer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) })
+    const d = await r.json().catch(() => ({}))
+    setEnviando(false)
+    if (r.ok) onHecho(); else setError(d.error ?? 'No se pudo')
+  }
+
+  const fila = (p: P, nota?: string) => (
+    <li key={p.id} className="px-3 py-2">
+      <div className="flex items-center gap-2.5">
+        <FotoProducto id={p.id} nombre={p.name} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-neutral-900" title={p.name}>{p.name}</p>
+          <p className="text-xs text-neutral-500"><span className="font-mono">{p.code}</span>{nota ? ` · ${nota}` : ''}</p>
+        </div>
+      </div>
+      {pubsDe(p.id).length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 border-l-2 border-neutral-200 pl-2.5 text-xs text-neutral-600">
+          {pubsDe(p.id).map(x => <li key={x.item_id}><b className="font-medium text-neutral-700">{x.cuenta}</b> · {x.titulo ?? x.item_id} <span className="text-neutral-400">· {x.disponible ?? 0} en ML</span></li>)}
+        </ul>
+      )}
+    </li>
+  )
+
+  return (
+    <Ventana titulo={`No volver a pedir · ${productos.length} producto${productos.length === 1 ? '' : 's'}`} onCerrar={onCerrar}>
+      {!info && !error && <p className="text-sm text-neutral-500">Revisando stock, compras y ventas pendientes…</p>}
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+      {info && <>
+        {ahora.length > 0 && (
+          <section>
+            <p className="text-xs font-semibold text-neutral-800">Se desactivan ahora · {ahora.length}</p>
+            <p className="text-[11px] text-neutral-500">Sin stock y sin nada en camino: salen de todo el sistema (Inventario, Stock en ML, búsquedas).</p>
+            <ul className="mt-1.5 divide-y divide-neutral-100 rounded-lg border border-neutral-200">{ahora.map(p => fila(p))}</ul>
+          </section>
+        )}
+        {despues.length > 0 && (
+          <section>
+            <p className="text-xs font-semibold text-neutral-800">Salen de Reponer y se desactivan solos al terminar de venderse · {despues.length}</p>
+            <p className="text-[11px] text-neutral-500">Siguen activos para vender lo que queda; cuando lleguen a 0 se desactivan sin que hagas nada.</p>
+            <ul className="mt-1.5 divide-y divide-neutral-100 rounded-lg border border-neutral-200">{despues.map(p => fila(p, porque(p)))}</ul>
+          </section>
+        )}
+        {info.pubs.length > 0 && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Debajo de cada producto están sus publicaciones activas en ML. Si un título no es de ese producto, la vinculación está
+            equivocada: corrígela en Vincular con ML. Las que queden publicadas te las avisa <b>Stock en ML</b> para pausarlas.
+          </p>
+        )}
+        <p className="text-[11px] text-neutral-500">Si vuelves a hacer una compra o importación de alguno, vuelve solo a Reponer. También puedes
+          devolverlos desde «No vuelves a pedir» (abajo de la lista) o reactivarlos en Productos.</p>
+        <div className="flex justify-end gap-2 border-t border-neutral-100 pt-3">
+          <button type="button" onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
+          <button type="button" onClick={confirmar} disabled={enviando} className="btn-primary text-sm disabled:opacity-50">
+            {enviando ? 'Guardando…' : 'Sí, no volver a pedir'}
+          </button>
+        </div>
+      </>}
+    </Ventana>
+  )
+}
+
+// Lista «No vuelves a pedir»: quién y cuándo, en qué quedó, y Devolver (vuelve a Reponer y se reactiva).
+function NoVuelves({ lista, puede, onDevolver }: { lista: P[]; puede: boolean; onDevolver: (ids: number[]) => Promise<void> }) {
+  const [abierto, setAbierto] = useState(false)
+  const [ocupado, setOcupado] = useState<number | null>(null)
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <button type="button" onClick={() => setAbierto(v => !v)} aria-expanded={abierto}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm">
+        <span><b className="font-semibold text-neutral-800">No vuelves a pedir</b> <span className="text-neutral-400">· {lista.length}</span></span>
+        <span className="text-xs text-neutral-500">{abierto ? 'Ocultar' : 'Ver'}</span>
+      </button>
+      {abierto && (
+        <ul className="divide-y divide-neutral-100 border-t border-neutral-100">
+          {lista.map(p => (
+            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-neutral-900" title={p.name}>{p.name}</p>
+                <p className="text-xs text-neutral-500"><span className="font-mono">{p.code}</span> · {p.activo ? `activo, quedan ${p.stock}` : 'desactivado'}
+                  {' · '}{p.por ?? 'alguien'} el {new Date(p.at).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' })}</p>
+              </div>
+              {puede && <button type="button" disabled={ocupado === p.id} className="btn-secondary px-2.5 py-1 text-xs disabled:opacity-50"
+                onClick={async () => { setOcupado(p.id); await onDevolver([p.id]); setOcupado(null) }}>{ocupado === p.id ? '…' : 'Devolver'}</button>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

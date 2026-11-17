@@ -126,6 +126,39 @@ async function comprometidasPorCodigo(db: Pool): Promise<Map<string, number>> {
   return porCodigo(rows)
 }
 
+/** Productos con ventas de ML todavía sin registrar (17-11, «No volver a pedir»: esos no se desactivan aún). */
+export async function productosComprometidos(db: Pool): Promise<Set<number>> {
+  const codigos = [...(await comprometidasPorCodigo(db)).keys()]
+  if (!codigos.length) return new Set()
+  const { rows } = await db.query<{ product_id: number }>(
+    `SELECT DISTINCT product_id FROM product_ml_codes WHERE is_active AND ml_code = ANY($1::text[])`, [codigos])
+  return new Set(rows.map(r => r.product_id))
+}
+
+/** Productos DESACTIVADOS que siguen con publicaciones activas en ML (17-11): ya no se les controla el stock. Puede ser
+ *  que falte pausarlas o una vinculación equivocada (la publicación es de otro producto): se ve por el título. */
+export interface DesactivadoPublicado {
+  product_id: number; code: string; name: string
+  pubs: { codigo_id: number; ml_code: string; item_id: string; cuenta: string; titulo: string | null; disponible: number | null }[]
+}
+export async function desactivadosPublicados(db: Pool): Promise<DesactivadoPublicado[]> {
+  const { rows } = await db.query(
+    `SELECT p.id AS product_id, p.code, p.name, m.id AS codigo_id, m.ml_code, m.ml_account AS cuenta, c.item_id, c.titulo,
+            c.disponible::int AS disponible
+     FROM products p
+     JOIN product_ml_codes m ON m.product_id = p.id AND m.is_active AND split_part(m.ml_code, ':', 1) ~ '^\d+$'
+     JOIN ml_catalogo c ON substring(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
+     WHERE NOT p.is_active AND c.estado = 'active'
+     ORDER BY p.name, m.ml_account, m.ml_code`)
+  const m = new Map<number, DesactivadoPublicado>()
+  for (const r of rows) {
+    const f: DesactivadoPublicado = m.get(r.product_id) ?? { product_id: r.product_id, code: r.code, name: r.name, pubs: [] }
+    f.pubs.push({ codigo_id: r.codigo_id, ml_code: r.ml_code, item_id: r.item_id, cuenta: r.cuenta, titulo: r.titulo, disponible: r.disponible })
+    m.set(r.product_id, f)
+  }
+  return [...m.values()]
+}
+
 export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[]> {
   const [{ rows }, compromiso, tablas, ventas, reserva] = await Promise.all([
     db.query(
