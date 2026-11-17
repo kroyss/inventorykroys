@@ -48,7 +48,7 @@ async function pasada() {
   const inicio = Date.now()
   // Empresas con algo en curso (la lista de empresas es global; las tareas, por empresa con RLS).
   const { rows: empresas } = await dbGlobal().query<{ id: number; country: Country }>(
-    `SELECT id, country FROM empresas WHERE is_active AND ('publicaciones' = ANY(modulos) OR 'promociones' = ANY(modulos)) ORDER BY id`)
+    `SELECT id, country FROM empresas WHERE is_active AND ('publicaciones' = ANY(modulos) OR 'promociones' = ANY(modulos) OR 'inventario' = ANY(modulos)) ORDER BY id`)
   const grupos: { e: number; country: Country; con: number | null; n: number; cupo: number }[] = []
   for (const e of empresas) {
     const { rows } = await conEmpresa(e.id, e.country, async db => {

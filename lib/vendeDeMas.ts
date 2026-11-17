@@ -9,6 +9,7 @@
 import type { Pool } from 'pg'
 import { filasStockML, type FilaStockML } from '@/lib/stockConML'
 import { refrescarItems } from '@/lib/catalogoML'
+import { grupoDe } from '@/lib/stockGrupos'
 
 export type NivelVende = 'sin' | 'mas'
 const CLAVE = 'stock_ml_vende_de_mas'
@@ -28,6 +29,11 @@ export interface EstadoVende {
   desde: Record<string, string>
   /** Los de «sin», para el texto del aviso (hasta 50). */
   lista: ProductoVende[]
+  /** 17-11: los mismos grupos de Stock en ML (lib/stockGrupos.ts), para el numerito configurable en Mis avisos. */
+  sinpub?: number; ajustar?: number; decidir?: number
+  /** «Tienes y no vendes»: desde cuándo y los primeros 50 (aviso de Telegram). */
+  desde_sinpub?: Record<string, string>
+  lista_sinpub?: { id: number; code: string; name: string; disponible: number }[]
 }
 
 export async function leerEstadoVende(db: Pick<Pool, 'query'>): Promise<EstadoVende | null> {
@@ -60,8 +66,18 @@ export async function guardarEstadoVende(db: Pick<Pool, 'query'>, filas: FilaSto
   const ahora = new Date().toISOString()
   const desde: Record<string, string> = {}
   const lista: ProductoVende[] = []
-  let sin = 0, mas = 0
+  let sin = 0, mas = 0, sinpub = 0, ajustar = 0, decidir = 0
+  const desdeSinpub: Record<string, string> = {}
+  const listaSinpub: NonNullable<EstadoVende['lista_sinpub']> = []
   for (const f of filas) {
+    const g = grupoDe(f)
+    if (g === 'ajustar') ajustar++
+    if (g === 'decidir') decidir++
+    if (g === 'sinpub') {
+      sinpub++
+      desdeSinpub[f.product_id] = antes?.desde_sinpub?.[f.product_id] ?? ahora
+      if (listaSinpub.length < 50) listaSinpub.push({ id: f.product_id, code: f.code, name: f.name, disponible: f.disponible })
+    }
     const n = nivelVende(f)
     if (n === 'mas') mas++
     if (n !== 'sin') continue
@@ -72,7 +88,7 @@ export async function guardarEstadoVende(db: Pick<Pool, 'query'>, filas: FilaSto
       cuentas: [...new Set(f.pubs.filter(p => p.estado === 'active' && (p.ml_disponible ?? 0) > 0).map(p => p.cuenta))],
     })
   }
-  const estado: EstadoVende = { at: ahora, sin, mas, desde, lista }
+  const estado: EstadoVende = { at: ahora, sin, mas, desde, lista, sinpub, ajustar, decidir, desde_sinpub: desdeSinpub, lista_sinpub: listaSinpub }
   await db.query(
     `INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`,
     [CLAVE, JSON.stringify(estado)])

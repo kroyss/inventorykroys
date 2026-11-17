@@ -29,6 +29,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
   '/inventario/stock-ml': [
+    { pregunta: '¿Por qué dice «va por la cola de MercadoLibre»?', respuesta: 'Cuando arreglas o pausas **más de 10 publicaciones** juntas, van por la cola (60 por minuto) para que ML no las rechace. Arriba ves el avance y sigue aunque cierres la pantalla; cada una toma el stock del momento en que le toca.' },
     { pregunta: '¿Cómo está ordenada Stock en ML?', respuesta: 'Arriba hay 3 tarjetas: **Vende de más** (rojo, riesgo de reclamo), **Tienes y no vendes** (celeste, ventas perdidas) y **Por ajustar** (ámbar). Cada producto está en un solo grupo. **Arreglar N productos** te muestra la lista de cambios antes de aplicar. Lo que el sistema no resuelve solo está en **Para decidir**; la configuración, en **⚙ Ajustes**.' },
     { pregunta: '¿Qué es «Tienes y no vendes»?', respuesta: 'Es el revés de «Vende de más»: productos con unidades en el inventario que ninguna publicación activa ofrece (pausadas o en 0). Toca **Aplicar en ML** para ponerles stock y reactivarlas; si alguna la pausaste a mano a propósito, déjala así.' },
     { pregunta: '¿Qué significa «Compartida con COD-…»?',
@@ -90,6 +91,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo pido que cambien una negativa?', respuesta: 'Toca **Pedir cambio**: se abre en MercadoLibre (entra con esa cuenta). ML deja pedirlo una sola vez por venta y hasta 30 días después de recibirla.' },
   ],
   '/mis-avisos': [
+    { pregunta: '¿Qué cuenta el numerito de Stock?', respuesta: 'Siempre lo que **vende sin tener stock**. En Mis avisos, en «Numerito de Publicaciones → Stock», puedes sumar también **Tienes y no vendes** y **Por ajustar**. Es solo tuyo.' },
     { pregunta: '¿Cómo conecto Telegram?', respuesta: 'Toca **Conecta tu Telegram**, se abre el bot y tocas **Iniciar**. Después elige qué avisos quieres recibir.' },
   ],
   '/usuarios': [

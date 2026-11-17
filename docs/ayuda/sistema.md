@@ -780,6 +780,10 @@ escribe a ti.
 - Calificación contradictoria.
 - Venta sin pago que ML va a concretar sola (dos días antes).
 - Producto agotado (y opcionalmente por agotarse). Puede llegar hasta 1 hora después.
+- **Tienes y no vendes** (con Inventario, apagado al empezar): un producto con unidades que ninguna publicación activa
+  ofrece en ML (pausadas o en 0). Una vez cada vez que pasa.
+- **Numerito de Publicaciones → Stock:** siempre cuenta lo que vende sin tener stock; en Mis avisos eliges si suma también
+  «Tienes y no vendes» y «Por ajustar». Es por persona y se ve aunque no tengas Telegram conectado.
 - Promociones de MercadoLibre: campaña nueva, campañas por cerrar y tus campañas propias que vencen en 3 días.
 - **Resumen de la mañana** y **cierre del día** con lo que quedó pendiente.
 - Los **lunes**, el resumen de la mañana trae además **Tu semana** (en prueba, solo algunas empresas): ventas,
@@ -897,6 +901,9 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Filtros** (botón): estado en ML (activas/pausadas) y cuenta. **⚙ Ajustes** (arriba): «Mi inventario está al día»,
   reserva de seguridad y cómo se calcula el disponible. Las **pausadas a mano** no se reactivan solas: se activan en la
   fila si fue sin querer. Lo marcado «No sincronizar» no cuenta.
+  **Más de 10 publicaciones** (Arreglar o Pausar/Activar en lote) van por la **cola de MercadoLibre** (60 por minuto):
+  arriba se ve el avance y sigue aunque cierres la pantalla. Cada publicación toma lo que calcula el sistema en el momento
+  en que le toca (si entra una venta mientras tanto, ya la cuenta).
 - **Vínculo viejo (publicación entera + variantes):** si una publicación con variantes sigue vinculada ENTERA a un
   producto y además cada variante tiene el suyo, en Vincular con ML sale una franja ámbar **«Vínculo viejo»** con
   **Quitar vínculo viejo** (también en la pestaña «Por publicación entera»). Mientras tanto ese vínculo no cuenta para

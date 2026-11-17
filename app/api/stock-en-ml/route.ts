@@ -8,6 +8,8 @@ import { tieneModulo } from '@/lib/modulos'
 import { registrarUso } from '@/lib/usoAcciones'
 import { actualizarCatalogo } from '@/lib/catalogoML'
 import { aplicarCambio, cambiarEstadoML, type Resultado } from '@/lib/stockML'
+import { igualarPub, pubsPorClave } from '@/lib/igualarStock'
+import { crearLote } from '@/lib/lotesPublicaciones'
 import { desactivadosPublicados, filasStockML, leerReserva } from '@/lib/stockConML'
 import { contarSinVincular } from '@/lib/importarML'
 import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
@@ -47,11 +49,16 @@ export async function GET(req: NextRequest) {
     const revisar = req.nextUrl.searchParams.get('revisar') === '1'
     // sinVincular: activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
     // desactivados (17-11): productos desactivados con publicaciones activas en ML (ya no se les controla el stock).
-    const [filas, reserva, sinVincular, desactivados, inventarioAlDia] = await Promise.all([
+    const [filas, reserva, sinVincular, desactivados, inventarioAlDia, { rows: [cola] }] = await Promise.all([
       revisar ? revisarVendeDeMas(s.db, pais).then(r => r.filas)
               : filasStockML(s.db, pais).then(async f => { await guardarEstadoVende(s.db, f).catch(() => {}); return f }),
-      leerReserva(s.db), contarSinVincular(s.db), desactivadosPublicados(s.db), leerInventarioAlDia(s.db)])
-    return NextResponse.json({ filas, reserva, sinVincular, desactivados, inventarioAlDia, puedeCambiar: puede(s.session.user, 'reponer_stock'),
+      leerReserva(s.db), contarSinVincular(s.db), desactivadosPublicados(s.db), leerInventarioAlDia(s.db),
+      // 17-11: lo que está en la cola de ML desde esta pantalla (al volver, se sigue viendo el avance).
+      s.db.query(`SELECT id::int, total::int, tipo FROM ml_pub_lotes WHERE tipo IN ('stock', 'estado') AND estado = 'en_curso'
+                  ORDER BY creado_at DESC LIMIT 1`)])
+    return NextResponse.json({ filas, reserva, sinVincular, desactivados, inventarioAlDia,
+                               cola: cola ? { id: cola.id, total: cola.total, que: cola.tipo === 'stock' ? 'Poniendo en ML lo que hay' : 'Cambiando el estado de publicaciones' } : null,
+                               puedeCambiar: puede(s.session.user, 'reponer_stock'),
                                puedeReserva: puede(s.session.user, 'inventario_config'), puedeReactivar: puede(s.session.user, 'ver_productos') })
   } catch (err) {
     return apiError(err)
@@ -76,6 +83,12 @@ const Body = z.discriminatedUnion('accion', [
   z.object({ accion: z.literal('sin_fisico'), product_id: z.number().int().positive(), valor: z.boolean() }),
   z.object({ accion: z.literal('estados'), items: z.array(z.string().regex(/^[A-Z]{3}\d+$/)).min(1).max(10),
              estado: z.enum(['paused', 'active']), motivo: z.string().trim().max(200).optional() }),
+  // 17-11 (mig 185): más de 10 publicaciones van por la cola de ML (siguen aunque se cierre la pantalla).
+  z.object({ accion: z.literal('cola_stock'), pubs: z.array(z.object({
+    item_id: z.string().regex(/^[A-Z]{3}\d+$/), variante_id: z.string().regex(/^\d+$/).nullable() })).min(1).max(3000) }),
+  z.object({ accion: z.literal('cola_estado'), items: z.array(z.string().regex(/^[A-Z]{3}\d+$/)).min(1).max(3000),
+             estado: z.enum(['paused', 'active']), motivo: z.string().trim().max(200).optional() }),
+  z.object({ accion: z.literal('lote'), id: z.number().int().positive() }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -104,6 +117,31 @@ export async function POST(req: NextRequest) {
       if (!puede(s.session.user, 'inventario_config')) return NextResponse.json({ error: 'No tienes permiso para cambiar esto' }, { status: 403 })
       await guardarInventarioAlDia(s.db, b.valor)
       return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'cola_stock' || b.accion === 'cola_estado') {
+      const usuario = Number(s.session.user.id)
+      if (b.accion === 'cola_stock') {
+        const porItem = new Map<string, (string | null)[]>()
+        for (const p of b.pubs) porItem.set(p.item_id, [...new Set([...(porItem.get(p.item_id) ?? []), p.variante_id])])
+        const id = await crearLote(s.db, 'stock', `Poner en ML lo que hay (${b.pubs.length})`, {},
+          [...porItem].map(([item, variantes]) => ({ item, datos: { variantes } })), usuario)
+        return NextResponse.json({ lote: { id, total: porItem.size, que: 'Poniendo en ML lo que hay' } })
+      }
+      const items = [...new Set(b.items)]
+      const id = await crearLote(s.db, 'estado', `${b.estado === 'paused' ? 'Pausar' : 'Activar'} ${items.length} publicaciones`,
+        { estado: b.estado, motivo: b.motivo ?? null }, items.map(item => ({ item })), usuario)
+      return NextResponse.json({ lote: { id, total: items.length, que: b.estado === 'paused' ? 'Pausando publicaciones' : 'Activando publicaciones' } })
+    }
+    if (b.accion === 'lote') {
+      const { rows: [l] } = await s.db.query(
+        `SELECT l.estado, COUNT(i.*)::int AS total,
+                COUNT(*) FILTER (WHERE i.estado IN ('ok', 'sin_cambio', 'saltada'))::int AS hechos,
+                COUNT(*) FILTER (WHERE i.estado = 'error')::int AS errores,
+                (array_agg(i.item_id || ': ' || COALESCE(i.mensaje, 'error')) FILTER (WHERE i.estado = 'error'))[1:5] AS lista
+         FROM ml_pub_lotes l LEFT JOIN ml_pub_lote_items i ON i.lote_id = l.id
+         WHERE l.id = $1 AND l.tipo IN ('stock', 'estado') GROUP BY l.id`, [b.id])
+      if (!l) return NextResponse.json({ error: 'No se encontró' }, { status: 404 })
+      return NextResponse.json({ ...l, terminado: l.estado !== 'en_curso', lista: l.lista ?? [] })
     }
     if (b.accion === 'estados') {
       // 16-11: pausar / activar varias (la pantalla manda de a 10, con avance, como «Igualar»).
@@ -175,36 +213,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Igualar: con lo que calcula el servidor en este momento.
-    const filas = await filasStockML(s.db, s.session.user.country)
-    const pubs = new Map(filas.flatMap(f => f.pubs).map(p => [`${p.item_id}:${p.variante_id ?? ''}`, p]))
+    const pubs = pubsPorClave(await filasStockML(s.db, s.session.user.country))
     const resultados: Resultado[] = []
-    for (const x of b.pubs) {
-      const p = pubs.get(`${x.item_id}:${x.variante_id ?? ''}`)
-      if (!p || p.objetivo == null) {
-        resultados.push({ item_id: x.item_id, variante_id: x.variante_id, ok: false, error: 'Esta publicación no se iguala desde aquí' })
-        continue
-      }
-      // 17-11: vinculada entera con variantes y todos sus productos en 0 → cada variante a 0 (un solo resultado por fila).
-      if (p.entera_con_variantes) {
-        if (p.objetivo !== 0) {
-          resultados.push({ item_id: x.item_id, variante_id: x.variante_id, ok: false, error: 'Divídela por variantes primero' })
-          continue
-        }
-        let error: string | undefined
-        for (const v of p.variantes_ml ?? []) {
-          const r = await aplicarCambio(s.db, { item_id: p.item_id, variante_id: v.id, cantidad: 0 },
-            { reactivar: false, origen: 'stock_ml', usuarioId: Number(s.session.user.id) })
-          if (!r.ok) error ??= `${v.nombre ?? v.id}: ${r.error ?? 'no se pudo'}`
-        }
-        resultados.push({ item_id: x.item_id, variante_id: x.variante_id, ok: !error, error, estado: p.estado ?? undefined, disponible: 0 })
-        continue
-      }
-      const nada = p.objetivo === p.ml_disponible && !p.reactivar
-      resultados.push(nada
-        ? { item_id: x.item_id, variante_id: x.variante_id, ok: true, estado: p.estado ?? undefined, disponible: p.objetivo }
-        : await aplicarCambio(s.db, { item_id: p.item_id, variante_id: p.variante_id, cantidad: p.objetivo },
-            { reactivar: p.reactivar, origen: 'stock_ml', usuarioId: Number(s.session.user.id) }))
-    }
+    for (const x of b.pubs) resultados.push(await igualarPub(s.db, pubs, x, Number(s.session.user.id)))
     const hechos = resultados.filter(x => x.ok).length
     if (hechos) await registrarUso(s.db, 'stock', hechos)
     return NextResponse.json({ resultados })

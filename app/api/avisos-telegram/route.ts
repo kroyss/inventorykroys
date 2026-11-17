@@ -53,6 +53,7 @@ const Prefs = z.object({
   concreta_sola: z.boolean(),
   agotada: z.boolean(), bajo: z.boolean(),
   vende_de_mas: z.boolean(),
+  tienes_no_vendes: z.boolean(), numero_sinpub: z.boolean(), numero_ajustar: z.boolean(),
   promos: z.boolean(),
   cierre: z.boolean(), cierre_hora: hora,
   resumen: z.boolean(), resumen_hora: hora,

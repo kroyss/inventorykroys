@@ -16,6 +16,8 @@ interface Prefs {
   concreta_sola: boolean
   agotada: boolean; bajo: boolean
   vende_de_mas: boolean
+  tienes_no_vendes: boolean
+  numero_sinpub: boolean; numero_ajustar: boolean
   promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
@@ -276,6 +278,28 @@ export default function MisAvisosClient({ inicial = null }: { inicial?: unknown 
                 ofreciéndolo en MercadoLibre. Se revisa cada 10 minutos. Una vez cada vez que pasa.
                 {d.sinFisico && <> También cuando alguien de bodega marca <b className="font-medium text-neutral-700">Se acabó</b> en un producto (para que ajustes el inventario).</>}
               </Fila>
+            )}
+            {d.vende && (
+              <Fila icono="🔵" titulo="Tienes y no vendes" on={p.tienes_no_vendes} onCambio={v => cambiar({ tienes_no_vendes: v })}
+                ejemplo={'🔵 Tienes y no vendes\nCOD-0175 Hub USB C + 3.0 · tienes 161\nNinguna publicación activa lo ofrece en ML (pausadas o en 0).\n\n[ Ver en Stock en ML ]'}>
+                Cuando un producto <b className="font-medium text-neutral-700">tiene unidades</b> y ninguna publicación activa lo ofrece en MercadoLibre
+                (se pausó o quedó en 0, a propósito o sin querer). Una vez cada vez que pasa.
+              </Fila>
+            )}
+            {d.vende && (
+              <li className="px-5 py-4">
+                <p className="text-sm font-semibold text-neutral-900">Numerito de Publicaciones → Stock</p>
+                <p className="mt-0.5 text-sm text-neutral-500">Siempre cuenta lo que <b className="font-medium text-neutral-700">vende sin tener stock</b> (rojo). Sumar también:</p>
+                <label className="mt-2 flex items-center gap-2 text-sm text-neutral-600">
+                  <input type="checkbox" checked={p.numero_sinpub} onChange={ev => cambiar({ numero_sinpub: ev.target.checked })} className="h-4 w-4 accent-neutral-900" />
+                  <span><b className="font-medium">Tienes y no vendes</b> (productos con unidades que ML no ofrece)</span>
+                </label>
+                <label className="mt-1.5 flex items-center gap-2 text-sm text-neutral-600">
+                  <input type="checkbox" checked={p.numero_ajustar} onChange={ev => cambiar({ numero_ajustar: ev.target.checked })} className="h-4 w-4 accent-neutral-900" />
+                  <span><b className="font-medium">Por ajustar</b> (cantidades distintas a lo sugerido)</span>
+                </label>
+                <p className="mt-1.5 text-xs text-neutral-400">Este numerito es solo tuyo y se ve aunque no tengas Telegram conectado.</p>
+              </li>
             )}
             {d.promos && (
               <Fila icono="🏷️" titulo="Promociones de MercadoLibre" on={p.promos} onCambio={v => cambiar({ promos: v })}

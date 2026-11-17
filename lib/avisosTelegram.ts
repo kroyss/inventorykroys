@@ -61,6 +61,10 @@ export interface PrefsAvisos {
   concreta_sola: boolean
   agotada: boolean; bajo: boolean
   vende_de_mas: boolean
+  /** 17-11: Telegram cuando un producto con unidades queda sin ninguna publicación activa. */
+  tienes_no_vendes: boolean
+  /** 17-11: qué suma el numerito de Publicaciones → Stock (siempre «Vende de más» en 0). */
+  numero_sinpub: boolean; numero_ajustar: boolean
   promos: boolean
   cierre: boolean; cierre_hora: number
   resumen: boolean; resumen_hora: number
@@ -76,6 +80,8 @@ export const PREFS_INICIALES: PrefsAvisos = {
   concreta_sola: true,
   agotada: true, bajo: false,
   vende_de_mas: true,
+  tienes_no_vendes: false,
+  numero_sinpub: false, numero_ajustar: false,
   promos: true,
   cierre: false, cierre_hora: 18,
   resumen: true, resumen_hora: 8,
@@ -459,6 +465,28 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
           + `\n\nSi alguien compra no vas a poder cumplir: pon en ML lo que hay.`
       const url = lista.length === 1 ? `/inventario/stock-ml?buscar=${encodeURIComponent(lista[0].code)}` : '/inventario/stock-ml'
       if (await mandar(d, e, 'vende_de_mas', lista.map(x => x.ref), html, [[{ texto: 'Arreglar en Stock en ML', url: urlSistema(url) }]])) enviados++
+    }
+  }
+
+  // «Tienes y no vendes» (17-11): un producto con unidades se quedó sin ninguna publicación activa que lo ofrezca.
+  // Una vez por cada vez que entra (la ref lleva desde cuándo), como Vende de más.
+  if (p.tienes_no_vendes && disp.vende && !silencio) {
+    const est = await leerEstadoVende(db)
+    const lim = Math.max(Date.now() - 86_400_000, new Date(d.vinculado_at).getTime())
+    const cand = (est?.lista_sinpub ?? []).map(x => ({ ...x, desde: est!.desde_sinpub?.[x.id] }))
+      .filter(x => x.desde && new Date(x.desde).getTime() > lim)
+      .map(x => ({ ...x, ref: `${x.id}:${Math.floor(new Date(x.desde!).getTime() / 1000)}` }))
+    const nuevas = await pendientes(d, e, 'tienes_no_vendes', cand.map(x => x.ref))
+    const lista = cand.filter(x => nuevas.has(x.ref))
+    if (lista.length) {
+      const linea = (x: typeof lista[number]) => `<b>${esc(x.code)}</b> ${esc(corto(x.name, 60))} · tienes ${x.disponible}`
+      const html = lista.length === 1
+        ? `${cab}🔵 <b>Tienes y no vendes</b>\n${linea(lista[0])}\nNinguna publicación activa lo ofrece en ML (pausadas o en 0).`
+        : `${cab}🔵 <b>${lista.length} productos con unidades que ML no ofrece</b>\n\n`
+          + lista.slice(0, 8).map(x => `• ${linea(x)}`).join('\n') + (lista.length > 8 ? `\n… y ${lista.length - 8} más` : '')
+          + `\n\nSus publicaciones están pausadas o en 0.`
+      const url = lista.length === 1 ? `/inventario/stock-ml?buscar=${encodeURIComponent(lista[0].code)}` : '/inventario/stock-ml'
+      if (await mandar(d, e, 'tienes_no_vendes', lista.map(x => x.ref), html, [[{ texto: 'Ver en Stock en ML', url: urlSistema(url) }]])) enviados++
     }
   }
 

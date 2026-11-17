@@ -8,6 +8,8 @@ import { contarAlertas } from '@/lib/alertasStock'
 import { SQL_AVISO_REPUTACION } from '@/lib/reputacionML'
 import { puede } from '@/lib/permisos'
 import { leerEstadoVende } from '@/lib/vendeDeMas'
+import { dbGlobal } from '@/lib/db'
+import { leerPrefs } from '@/lib/avisosTelegram'
 
 // GET /api/avisos → contadores para los numeritos del menú (se piden cada minuto).
 //   preguntas: sin responder · mensajes: conversaciones con mensajes sin leer
@@ -49,7 +51,13 @@ export async function GET() {
         out.negativas = r.neg; out.neutrales = r.neu
       }
       // Vende de más (16-11): lo guardado por el cron / Stock en ML; solo los que tienen 0 (lo urgente).
-      if (tieneModulo(u, 'inventario') && puede(u, 'ver_inventario')) out.vende_de_mas = (await leerEstadoVende(db))?.sin ?? 0
+      // 17-11: cada persona elige en Mis avisos si suma también «Tienes y no vendes» y «Por ajustar».
+      if (tieneModulo(u, 'inventario') && puede(u, 'ver_inventario')) {
+        const [est, { rows: [ue] }] = await Promise.all([leerEstadoVende(db),
+          dbGlobal().query(`SELECT avisos FROM usuario_empresas WHERE user_id = $1 AND empresa_id = $2`, [Number(u.id), u.empresaId])])
+        const pr = leerPrefs(ue?.avisos)
+        out.vende_de_mas = (est?.sin ?? 0) + (pr.numero_sinpub ? est?.sinpub ?? 0 : 0) + (pr.numero_ajustar ? est?.ajustar ?? 0 : 0)
+      }
     }
     if (u.country === 'VE' && tieneModulo(u, 'despachos')) {
       const { rows: [d] } = await db.query(

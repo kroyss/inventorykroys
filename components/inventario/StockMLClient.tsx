@@ -10,25 +10,13 @@ import { Ventana } from '@/components/ui/Ventana'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
 import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
+import { grupoDe, motivosDecidir, sinPublicar, type GrupoStock } from '@/lib/stockGrupos'
 
 // 17-11 (el dueño: «nos llenamos de opciones»): la pantalla se ordena por QUÉ HAY QUE HACER. Cada producto cae en UN
 // solo grupo, por prioridad (los números suman lo que falta, sin repetir): Vende de más → Tienes y no vendes → Para
 // decidir → Por ajustar. Antes eran 9 pestañas que se pisaban (un producto salía en 3 a la vez).
-type Grupo = 'vende' | 'sinpub' | 'decidir' | 'ajustar'
+type Grupo = GrupoStock
 type Filtro = Grupo | 'todas'
-/** 17-11 (el dueño: «también tengo que saber lo que tengo y no está publicado»): el revés de «Vende de más». Hay
- *  disponible y ninguna publicación activa lo ofrece (todas pausadas, a mano o no, o en 0). Las «No sincronizar» no cuentan. */
-const sinPublicar = (f: FilaStockML) => !f.sin_fisico && f.disponible > 0
-  && f.pubs.some(p => !p.sin_sincronizar && p.estado != null)
-  && !f.pubs.some(p => p.estado === 'active' && (p.ml_disponible ?? 0) > 0)   // la vinculada entera con variantes también vende
-/** Lo que el sistema no resuelve solo (cada uno se muestra como etiqueta en la fila). */
-const motivosDecidir = (f: FilaStockML) => [
-  ...(f.en_reserva && f.diferencia ? ['Quedan pocas: elige a mano'] : []),
-  ...(f.pubs.some(p => p.bloqueada_envio) ? ['Al reactivar queda sin envío gratis'] : []),
-  ...(f.pubs.some(p => p.posible_combo) ? ['¿Pack o combo?'] : []),
-]
-const grupoDe = (f: FilaStockML): Grupo | null =>
-  f.vende || (f.en_reserva && f.excede) ? 'vende' : sinPublicar(f) ? 'sinpub' : motivosDecidir(f).length ? 'decidir' : f.diferencia ? 'ajustar' : null
 const ORDEN: Grupo[] = ['vende', 'sinpub', 'ajustar', 'decidir']
 /** Al entrar se abre lo más urgente que tenga algo. */
 const primero = (filas: FilaStockML[]): Filtro => ORDEN.find(g => filas.some(f => grupoDe(f) === g)) ?? 'ajustar'
@@ -53,7 +41,11 @@ const ENVIO: Record<string, { t: string; c: string; title: string }> = {
 }
 
 export interface StockMLRespuesta { filas: FilaStockML[]; reserva: number | null; sinVincular: number; puedeCambiar: boolean; puedeReserva: boolean
-  desactivados?: DesactivadoPublicado[]; puedeReactivar?: boolean; inventarioAlDia?: boolean }
+  desactivados?: DesactivadoPublicado[]; puedeReactivar?: boolean; inventarioAlDia?: boolean
+  cola?: { id: number; total: number; que: string } | null }
+/** 17-11: más de 10 publicaciones van por la cola de ML (lib/colaML.ts, 60 por minuto, sigue aunque cierres la pantalla). */
+const TOPE_DIRECTO = 10
+interface Cola { id: number; total: number; que: string; hechos: number; errores: number; lista: string[]; terminado: boolean }
 
 export default function StockMLClient({ buscarInicial = '', conVincular = false, inicial = null }: {
   buscarInicial?: string; conVincular?: boolean
@@ -69,6 +61,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [verAjustes, setVerAjustes] = useState(false)
   // «Arreglar N productos» de una tarjeta: primero la lista de lo que cambia (con casillas), recién ahí se aplica.
   const [revisar, setRevisar] = useState<Grupo | null>(null)
+  const [cola, setCola] = useState<Cola | null>(inicial?.cola ? { ...inicial.cola, hechos: 0, errores: 0, lista: [], terminado: false } : null)
   const [tocado, setTocado] = useState(!!buscarInicial || !!inicial)
   const [cuenta, setCuenta] = useState('')
   // 16-11 (el dueño): Estado de la publicación en ML, combinable con las pestañas; con él se pausan/activan varias.
@@ -100,6 +93,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return null }
     setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
     setDesactivados(d.desactivados ?? []); setPuedeReactivar(!!d.puedeReactivar); setAlDia(d.inventarioAlDia ?? true)
+    if (d.cola) setCola(c => (c && c.id === d.cola.id ? c : { ...d.cola, hechos: 0, errores: 0, lista: [], terminado: false }))
     return d.filas as FilaStockML[]
   })
   const conInicial = !!inicial
@@ -111,6 +105,22 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Avance de la cola: cada 4 s; al terminar se recarga la lista.
+  const colaId = cola && !cola.terminado ? cola.id : null
+  useEffect(() => {
+    if (!colaId) return
+    let vivo = true
+    const t = setInterval(async () => {
+      const r = await fetch('/api/stock-en-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'lote', id: colaId }) })
+      const d = await r.json().catch(() => null)
+      if (!vivo || !r.ok || !d) return
+      setCola(c => c && c.id === colaId ? { ...c, hechos: d.hechos, errores: d.errores, lista: d.lista ?? [], terminado: d.terminado } : c)
+      if (d.terminado) cargar()
+    }, 4000)
+    return () => { vivo = false; clearInterval(t) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colaId])
 
   const pedir = async (body: Record<string, unknown>) => {
     const r = await fetch('/api/stock-en-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -153,6 +163,11 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const cambiarEstados = async () => {
     if (!lote.length) return
     const estado = modoEstado === 'active' ? 'paused' : 'active'
+    if (lote.length > TOPE_DIRECTO) {
+      const d = await pedir({ accion: 'cola_estado', items: lote, estado, motivo: motivoLote || undefined })
+      if (d?.lote) { setCola({ ...d.lote, hechos: 0, errores: 0, lista: [], terminado: false }); setMarcados(new Set()); setMotivoLote('') }
+      return
+    }
     setTrabajando({ hechos: 0, total: lote.length }); setError(null)
     const res = new Map(resultados)
     for (let i = 0; i < lote.length; i += 10) {
@@ -174,6 +189,14 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     if (avisar && demas.length && !await confirmar({ title: `${demas.length} producto${demas.length === 1 ? ' vende' : 's venden'} de más`,
       message: `${demas.slice(0, 5).map(f => `${f.code} ${f.name}: ML ofrece ${f.ofrece}, tienes ${f.disponible}`).join('\n')}${demas.length > 5 ? `\n… y ${demas.length - 5} más` : ''}\n\nSe bajan en ML a lo que hay (lo que muestra «Quedará»).`,
       confirmText: 'Sí, poner lo que hay' })) return
+    if (pubs.length > TOPE_DIRECTO) {
+      const d = await pedir({ accion: 'cola_stock', pubs })
+      if (d?.lote) {
+        setCola({ ...d.lote, hechos: 0, errores: 0, lista: [], terminado: false })
+        setMarcados(m => { const x = new Set(m); for (const f of prods) x.delete(f.product_id); return x })
+      }
+      return
+    }
     setTrabajando({ hechos: 0, total: pubs.length }); setError(null)
     const res = new Map(resultados)
     for (let i = 0; i < pubs.length; i += 10) {
@@ -317,6 +340,18 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           <b>El sistema no lo resuelve solo:</b> cada producto dice por qué. Quedan pocas (eliges a qué cuenta va cada unidad), al reactivar
           quedaría sin envío gratis, o el título parece un pack («trae N u.» o «Es suelta»).
         </p>
+      )}
+      {cola && (
+        <div className={`rounded-lg border px-3 py-2 text-sm ${cola.terminado ? (cola.errores ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800') : 'border-sky-200 bg-sky-50 text-sky-900'}`}>
+          {cola.terminado
+            ? <>✓ Listo: {cola.hechos} de {cola.total} en MercadoLibre{cola.errores ? ` · ${cola.errores} con problema` : ''}</>
+            : <>{cola.que}… <b className="tabular-nums">{cola.hechos + cola.errores} de {cola.total}</b>
+                <span className="ml-1 text-xs text-sky-800">· va por la cola de MercadoLibre (60 por minuto): sigue aunque cierres la pantalla</span></>}
+          {!cola.terminado && <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-sky-100">
+            <span className="block h-full bg-sky-500 transition-all" style={{ width: `${Math.round((cola.hechos + cola.errores) * 100 / Math.max(1, cola.total))}%` }} /></span>}
+          {cola.lista.length > 0 && <ul className="mt-1 text-xs">{cola.lista.map(x => <li key={x}>{x}</li>)}</ul>}
+          {cola.terminado && <button type="button" className="ml-3 underline" onClick={() => setCola(null)}>Ocultar</button>}
+        </div>
       )}
       {resultados.size > 0 && !trabajando && (
         <div className={`rounded border px-3 py-2 text-sm ${errores ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>

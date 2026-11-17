@@ -84,7 +84,7 @@ export async function mandarDescripcion(db: Pool, conexionId: number, itemId: st
 export type ParametrosDescripcion = { parte: TipoTexto; plantillaId: number | null; noReconocida?: 'saltar' | 'agregar' }
 export type ParametrosPrecio = { modo: 'porcentaje' | 'monto' | 'fijo'; valor: number; redondeo: 'no' | 'entero' | '90' }
 
-export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer' | 'promocion', titulo: string, parametros: object,
+export async function crearLote(db: Pool, tipo: 'descripcion' | 'precio' | 'leer' | 'promocion' | 'stock' | 'estado', titulo: string, parametros: object,
   items: { item: string; datos?: object; conexionId?: number }[], userId: number | null) {
   const unicos = [...new Map(items.map(x => [x.item, x])).values()]
   const { rows: [l] } = await db.query(
@@ -171,6 +171,8 @@ export async function procesarItemLote(db: Pool, l: { tipo: string; parametros: 
 
 async function procesarItem(db: Pool, l: { tipo: string; parametros: Record<string, unknown>; user_id: number | null },
   it: { item_id: string; datos: Record<string, unknown> }): Promise<[string, string | null]> {
+  // 17-11 Stock en ML por la cola (mig 185): poner lo que calcula el sistema AHORA, o pausar/activar.
+  if (l.tipo === 'stock' || l.tipo === 'estado') return procesarStock(db, l, it)
   const cuenta = await cuentaDe(db, it.item_id)
   if (!cuenta) return ['error', 'La publicación ya no está en una cuenta conectada']
 
@@ -247,4 +249,29 @@ export async function resepararLeidas(db: Pool, conexionId: number | null) {
     }
   }
   return n
+}
+
+// ── Stock en ML (17-11, mig 185) ──
+async function procesarStock(db: Pool, l: { tipo: string; parametros: Record<string, unknown>; user_id: number | null },
+  it: { item_id: string; datos: Record<string, unknown> }): Promise<[string, string | null]> {
+  const { cambiarEstadoML } = await import('@/lib/stockML')
+  const { registrarUso } = await import('@/lib/usoAcciones')
+  if (l.tipo === 'estado') {
+    const estado = l.parametros.estado === 'active' ? 'active' : 'paused'
+    const r = await cambiarEstadoML(db, it.item_id, estado, { usuarioId: l.user_id, motivo: (l.parametros.motivo as string | undefined) || null })
+    if (r.ok) await registrarUso(db, 'stock', 1)
+    return r.ok ? ['ok', null] : ['error', r.error ?? 'No se pudo']
+  }
+  const { filasRecientes, igualarPub, pubsPorClave } = await import('@/lib/igualarStock')
+  const { rows: [e] } = await db.query(
+    `SELECT id::text, country FROM empresas WHERE id = NULLIF(current_setting('app.empresa_id', true), '')::int`)
+  const pubs = pubsPorClave(await filasRecientes(db, e?.country ?? 'VE', e?.id ?? '?'))
+  const errores: string[] = []
+  let hechos = 0
+  for (const v of (it.datos.variantes as (string | null)[] | undefined) ?? [null]) {
+    const r = await igualarPub(db, pubs, { item_id: it.item_id, variante_id: v }, l.user_id)
+    if (r.ok) hechos++; else errores.push(r.error ?? 'No se pudo')
+  }
+  if (hechos) await registrarUso(db, 'stock', hechos)
+  return errores.length ? ['error', errores.join(' · ')] : ['ok', null]
 }
