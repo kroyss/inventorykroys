@@ -901,6 +901,11 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Filtros** (botón): estado en ML (activas/pausadas) y cuenta. **⚙ Ajustes** (arriba): «Mi inventario está al día»,
   reserva de seguridad y cómo se calcula el disponible. Las **pausadas a mano** no se reactivan solas: se activan en la
   fila si fue sin querer. Lo marcado «No sincronizar» no cuenta.
+  **Una etiqueta por fila** (del color de su tarjeta, junto al nombre): 🔴 «Urgente: tienes 0, ML ofrece 2» ·
+  🟠 «ML ofrece 10, tienes 1» · 🔵 «Tienes 161 · ninguna activa» · 🟡 «ML 5 → quedará 2». En cada tarjeta lo más urgente
+  va arriba (Vende de más: primero los de 0; Tienes y no vendes: los de más unidades; Por ajustar: la mayor diferencia).
+  La tarjeta Vende de más dice cuántos son urgentes (lo mismo que el numerito del menú). «ML ofrece» cuenta solo las
+  publicaciones **activas**: las pausadas no venden, así que no hacen sonar Vende de más.
   **Más de 10 publicaciones** (Arreglar o Pausar/Activar en lote) van por la **cola de MercadoLibre** (60 por minuto):
   arriba se ve el avance y sigue aunque cierres la pantalla. Cada publicación toma lo que calcula el sistema en el momento
   en que le toca (si entra una venta mientras tanto, ya la cuenta).

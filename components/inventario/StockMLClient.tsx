@@ -10,7 +10,7 @@ import { Ventana } from '@/components/ui/Ventana'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
 import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
-import { grupoDe, motivosDecidir, sinPublicar, type GrupoStock } from '@/lib/stockGrupos'
+import { cambioML, grupoDe, motivosDecidir, urgencia, type GrupoStock } from '@/lib/stockGrupos'
 
 // 17-11 (el dueño: «nos llenamos de opciones»): la pantalla se ordena por QUÉ HAY QUE HACER. Cada producto cae en UN
 // solo grupo, por prioridad (los números suman lo que falta, sin repetir): Vende de más → Tienes y no vendes → Para
@@ -137,6 +137,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
       && (!estadoML || f.pubs.some(p => p.estado === estadoML && (!cuenta || p.cuenta === cuenta)))
       && (!q || `${f.code} ${f.name}`.toLowerCase().includes(q) || f.pubs.some(p => `${p.item_id} ${p.titulo ?? ''} ${p.variante ?? ''}`.toLowerCase().includes(q))))
+      // 17-11 (el dueño: «no se sabe cuál es la urgencia»): en cada tarjeta, lo más urgente arriba.
+      .sort((a, b) => filtro === 'todas' ? 0 : urgencia(b) - urgencia(a))
   }, [filas, filtro, cuenta, buscar, estadoML])
 
   if (!filas) return <p className="text-sm text-neutral-400">{error ?? 'Cargando productos y publicaciones…'}</p>
@@ -144,6 +146,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const n: Record<Filtro, number> = { vende: 0, sinpub: 0, decidir: 0, ajustar: 0, todas: filas.length }
   for (const f of filas) { const g = grupoDe(f); if (g) n[g]++ }
   const pendientes = n.vende + n.sinpub + n.decidir + n.ajustar
+  // Urgente = tienes 0 y ML lo ofrece (lo mismo que cuenta el numerito del menú).
+  const urgentes = filas.filter(f => f.vende === 'sin').length
   const elegir = (k: Filtro) => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }
   const accionables = (f: FilaStockML) => f.pubs.filter(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
   // Las publicaciones (enteras: ML pausa la publicación, no la variante) que se pausan/activan con el Estado elegido.
@@ -185,7 +189,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const aplicar = async (prods: FilaStockML[], avisar: boolean) => {
     const pubs = prods.flatMap(accionables).map(p => ({ item_id: p.item_id, variante_id: p.variante_id }))
     if (!pubs.length) return
-    const demas = prods.filter(f => f.vende || (f.en_reserva && f.excede))
+    const demas = prods.filter(f => f.vende)
     if (avisar && demas.length && !await confirmar({ title: `${demas.length} producto${demas.length === 1 ? ' vende' : 's venden'} de más`,
       message: `${demas.slice(0, 5).map(f => `${f.code} ${f.name}: ML ofrece ${f.ofrece}, tienes ${f.disponible}`).join('\n')}${demas.length > 5 ? `\n… y ${demas.length - 5} más` : ''}\n\nSe bajan en ML a lo que hay (lo que muestra «Quedará»).`,
       confirmText: 'Sí, poner lo que hay' })) return
@@ -268,7 +272,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
               <button type="button" onClick={() => elegir(t.k)} aria-pressed={filtro === t.k} className="flex-1 px-4 pt-3 text-left">
                 <span className="flex items-center gap-2 text-sm font-medium text-neutral-800">
                   <span className={`h-2 w-2 rounded-full ${t.punto}`} aria-hidden />{t.titulo}</span>
-                <span className={`mt-1 block text-2xl font-semibold tabular-nums ${cant ? t.numero : 'text-neutral-300'}`}>{cant}</span>
+                <span className={`mt-1 block text-2xl font-semibold tabular-nums ${cant ? t.numero : 'text-neutral-300'}`}>{cant}
+                  {t.k === 'vende' && cant > 0 && <span className={`ml-2 text-sm font-medium ${urgentes ? 'text-red-700' : 'text-neutral-400'}`}>
+                    · {urgentes ? `${urgentes} urgente${urgentes === 1 ? '' : 's'}` : 'ninguno urgente'}</span>}</span>
                 <span className="block text-xs text-neutral-500">{cant ? t.que : t.vacio}</span>
               </button>
               <div className="flex min-h-[2.25rem] items-center px-4 pb-3 pt-1 text-xs">
@@ -573,14 +579,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
         <FotoProducto id={f.product_id} nombre={f.name} />
         <div className="min-w-0 flex-1">
           <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
-          {f.vende && <span title="Lo que suman las publicaciones activas en ML contra lo que tienes disponible"
-            className={`ml-2 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium ${f.vende === 'sin' ? 'text-red-700' : 'text-amber-700'}`}>
-            <span className={`inline-block h-1.5 w-1.5 rounded-full ${f.vende === 'sin' ? 'bg-red-500' : 'bg-amber-500'}`} aria-hidden />
-            {f.vende === 'sin' ? `Tienes 0 y ML ofrece ${f.ofrece}` : `ML ofrece ${f.ofrece}, tienes ${f.disponible}`}</span>}
-          {sinPublicar(f) && <span title="Hay disponible y ninguna publicación activa lo ofrece"
-            className="ml-2 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-sky-700">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden />
-            Tienes {f.disponible} y ML no ofrece ninguna{f.pubs.some(p => p.pausa_mano) ? ' (pausada a mano)' : ''}</span>}
+          <EtiquetaGrupo f={f} />
           {etiquetas.map(e => <span key={e} className="ml-2 inline-flex items-center whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-700">{e}</span>)}
           {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
             title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
@@ -631,11 +630,13 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
         )}
       </div>
       {f.en_reserva && (
-        <div className={`space-y-2 border-b border-l-4 border-b-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 ${f.excede ? 'border-l-red-400' : 'border-l-amber-300'}`}>
+        <div className="space-y-2 border-b border-l-4 border-b-neutral-100 border-l-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-800">
           {/* 16-11 (el dueño: «no sé qué hacer ahí»): arranca con una sugerencia válida, dicha en claro, y un botón listo. */}
           <p>
             {f.excede
-              ? <><b>Hay {f.disponible} y MercadoLibre ofrece {asignables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)}.</b> {puedeCambiar ? (editando ? 'Pon cuántas muestra cada cuenta:' : 'Con «Aplicar en ML» queda así:') : 'Avísale a quien maneja el stock.'}</>
+              ? <><b>Quedan pocas ({f.disponible}): repártelas entre las cuentas.</b>{(() => {
+                  const pausadas = asignables.filter(p => p.estado !== 'active').reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)
+                  return pausadas > 0 ? <span className="text-neutral-500"> ({pausadas} guardadas en pausadas)</span> : null })()} {puedeCambiar ? (editando ? 'Pon cuántas muestra cada cuenta:' : 'Con «Aplicar en ML» queda así:') : 'Avísale a quien maneja el stock.'}</>
               : <><b>Quedan pocas ({f.disponible}).</b> Con tan pocas el sistema no reparte solo: cada cuenta muestra lo que decidiste.</>}
           </p>
           {puedeCambiar && f.excede && !editando && (
@@ -1126,4 +1127,21 @@ function RevisarCambios({ grupo, prods, faltan, onCerrar, onAplicar }: {
       </div>
     </Ventana>
   )
+}
+
+/** 17-11 (el dueño: «unas con etiqueta, otras sin, no se entiende la prioridad»): UNA etiqueta por fila, del color de su
+ *  tarjeta y siempre en el mismo lugar, con el motivo en números. Lo demás va en gris (etiquetas de «Para decidir»). */
+function EtiquetaGrupo({ f }: { f: FilaStockML }) {
+  const g = grupoDe(f)
+  if (!g || g === 'decidir') return null
+  const c = cambioML(f)
+  const [color, texto, title] =
+    g === 'vende' ? (f.vende === 'sin'
+      ? ['bg-red-50 text-red-700 ring-red-200', `Urgente: tienes 0, ML ofrece ${f.ofrece}`, 'Si alguien compra no vas a poder cumplir']
+      : ['bg-orange-50 text-orange-700 ring-orange-200', `ML ofrece ${f.ofrece}, tienes ${f.disponible}`, 'Las publicaciones activas suman más de lo que tienes'])
+    : g === 'sinpub' ? ['bg-sky-50 text-sky-700 ring-sky-200', `Tienes ${f.disponible} · ninguna activa${f.pubs.some(p => p.pausa_mano) ? ' (pausada a mano)' : ''}`,
+        'Hay unidades y ninguna publicación activa las ofrece en ML']
+    : ['bg-amber-50 text-amber-800 ring-amber-200', c.pubs ? `ML ${c.antes} → quedará ${c.despues}` : 'Por ajustar',
+        `${c.pubs} publicaci${c.pubs === 1 ? 'ón cambia' : 'ones cambian'} con «Aplicar en ML»`]
+  return <span title={title} className={`ml-2 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${color}`}>{texto}</span>
 }
