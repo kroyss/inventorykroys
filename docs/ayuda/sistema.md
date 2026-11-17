@@ -974,6 +974,11 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; pone en ML lo que hay y reactiva las pausadas en todas tus
   cuentas de una vez. Cada producto con algo por cambiar tiene su botón **Aplicar en ML** (manda lo que dice «Quedará»,
   sin marcar nada). Para varios: márcalos y **Poner en ML lo que hay** (abajo); si alguno vende de más, avisa cuáles antes.
+  **A mano** (sin aceptar la sugerencia): toca el número de **Quedará** (✎) y el producto pasa a «A mano»: cada publicación
+  muestra una casilla con la sugerencia para cambiarla, y arriba «Usas X de Y». Si te comes la reserva o le pones stock a
+  una pausada a mano, avisa; **pasarte de lo que tienes no se puede** (si en bodega hay más, primero **Corregir stock**).
+  **Guardar en ML** manda solo lo que cambia; **Volver a la sugerencia** deshace. Lo puesto a mano dura hasta que alguien
+  toque «Aplicar en ML» en ese producto (para que no se toque nunca: «No sincronizar»).
   **Mi inventario está al día** (casilla en el recuadro de arriba, la cambia quien configura el inventario): prendida, al
   poner stock en ML (aquí, en Automatizaciones → Stock y en la ventana de cambiar stock) avisa si pones más de lo que
   tienes y pide «Actualizar igual» (no bloquea). Apagada, el inventario se ve solo como dato y aquí sale una nota para

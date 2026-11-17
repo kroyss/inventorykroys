@@ -41,6 +41,8 @@ const S: Record<string, Sugerencia[]> = {
       respuesta: 'Arriba en **Historial**, o **Ver cambios** en cada producto: quién, cuándo, qué publicación, antes → después, pausas y reactivaciones. El admin ve los de todos y filtra por persona.' },
     { pregunta: '¿Qué hago con «Hay 2 y MercadoLibre ofrece 3»?',
       respuesta: 'Toca **Aplicar en ML** en ese producto: deja lo que muestra la sugerencia (baja primero las pausadas y la cuenta que más muestra). Si prefieres otro reparto, toca **Cambiar a mano**, pon cuántas muestra cada cuenta y **Guardar en ML**.' },
+    { pregunta: '¿Cómo pongo otro número sin aceptar la sugerencia?',
+      respuesta: 'Toca el número de **Quedará** (✎): el producto pasa a «A mano» y cada publicación muestra una casilla. Arriba ves «Usas X de Y». No deja pasarte de lo que tienes (si hay más, primero **Corregir stock**). Toca **Guardar en ML**; **Volver a la sugerencia** deshace.' },
     { pregunta: '¿Qué es «Mi inventario está al día»?',
       respuesta: 'Una casilla de la empresa (arriba en Stock en ML). Prendida: al poner stock en ML más de lo que tienes en inventario, te avisa y pide «Actualizar igual» (no bloquea). Apagada: el inventario se ve solo como dato. Préndela solo si tu inventario está al día.' },
     { pregunta: '¿Qué es «Vende de más»?',

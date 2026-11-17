@@ -152,12 +152,13 @@ export async function POST(req: NextRequest) {
           && (!p.pausa_mano || pedidas.has(`${p.item_id}:${p.variante_id ?? ''}`)))
         .reduce((sum, p) => sum + (pedidas.get(`${p.item_id}:${p.variante_id ?? ''}`) ?? p.ml_disponible ?? 0) * p.unidades, 0)
       if (total > f.disponible) {
-        return NextResponse.json({ error: `Entre todas las publicaciones serían ${total} y hay ${f.disponible} disponibles` }, { status: 400 })
+        return NextResponse.json({ error: `Entre todas las publicaciones serían ${total} y hay ${f.disponible} disponibles. Si hay más, corrige el stock primero.` }, { status: 400 })
       }
       const resultados: Resultado[] = []
       for (const [k, cantidad] of pedidas) {
         const p = pubs.get(k)!
-        const reactivar = p.estado === 'paused' && cantidad > 0 && p.envio !== 'destino'
+        // 17-11: una pausada a mano no se reactiva por cambiarle el número (se activa con «Activar»).
+        const reactivar = p.estado === 'paused' && cantidad > 0 && p.envio !== 'destino' && !p.pausa_mano
         resultados.push(cantidad === p.ml_disponible && !reactivar
           ? { item_id: p.item_id, variante_id: p.variante_id, ok: true, estado: p.estado ?? undefined, disponible: cantidad }
           : await aplicarCambio(s.db, { item_id: p.item_id, variante_id: p.variante_id, cantidad },

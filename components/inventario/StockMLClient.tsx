@@ -408,7 +408,29 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
   const [aplicando, setAplicando] = useState(false)
   // Arranca con la sugerencia del servidor (objetivo) si ML muestra de más; si no, con lo que ya muestra ML.
   const valor = (p: PubStockML) => asig[clave(p)] ?? String(p.objetivo ?? p.ml_disponible ?? 0)
-  const totalAsig = asignables.reduce((s, p) => s + (Math.max(0, Math.round(Number(valor(p)) || 0))) * p.unidades, 0)
+  const num = (p: PubStockML) => Math.max(0, Math.round(Number(valor(p)) || 0))
+  const totalAsig = asignables.reduce((s, p) => s + (p.pausa_mano && num(p) === p.ml_disponible ? 0 : num(p) * p.unidades), 0)
+  const guardarAMano = async () => {
+    setGuardando(true)
+    const ok = await onAsignar(asignables.filter(p => num(p) !== p.ml_disponible)
+      .map(p => ({ item_id: p.item_id, variante_id: p.variante_id, cantidad: num(p) })))
+    setGuardando(false)
+    if (ok) { setAsig({}); setEditando(false) }
+  }
+  // 17-11 (el dueño): a mano en cualquier producto. Pasarse de lo que hay NO se puede (el inventario manda: si hay más,
+  // Corregir stock); comerse la reserva o tocar una pausada a mano son solo avisos.
+  const pasa = totalAsig - f.disponible
+  const pausadasConStock = asignables.filter(p => p.pausa_mano && num(p) > 0 && num(p) !== p.ml_disponible)
+  const avisosAMano = (
+    <>
+      {pasa > 0
+        ? <span className="font-semibold text-red-700">Te pasas por {pasa}: tienes {f.disponible} y pondrías {totalAsig}. Si hay más, toca Corregir stock.</span>
+        : !f.en_reserva && totalAsig > f.publicable
+          ? <span className="text-amber-800">Usas {totalAsig} de {f.disponible} · te comes la reserva ({f.disponible - totalAsig} sin publicar)</span>
+          : <span className="text-xs text-neutral-600">Usas {totalAsig} de {f.disponible}{f.disponible - totalAsig > 0 ? ` · ${f.disponible - totalAsig} sin publicar` : ''}</span>}
+      {pausadasConStock.length > 0 && <span className="text-xs text-amber-800">{pausadasConStock.map(p => p.cuenta).join(', ')}: pausada a mano, no se vende hasta que la actives</span>}
+    </>
+  )
   const cambioAsig = asignables.some(p => Number(valor(p)) !== p.ml_disponible)
   return (
     <section className={`rounded-xl border bg-white shadow-sm ${marcado ? 'border-lime-400 ring-1 ring-lime-300' : 'border-neutral-200'}`}>
@@ -490,21 +512,25 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           {puedeCambiar && (
             <div className="flex flex-wrap items-center gap-3">
               {editando && (
-                <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-primary text-sm disabled:opacity-50"
-                  onClick={async () => {
-                    setGuardando(true)
-                    const ok = await onAsignar(asignables.filter(p => Number(valor(p)) !== p.ml_disponible)
-                      .map(p => ({ item_id: p.item_id, variante_id: p.variante_id, cantidad: Math.max(0, Math.round(Number(valor(p)) || 0)) })))
-                    setGuardando(false)
-                    if (ok) { setAsig({}); setEditando(false) }
-                  }}>{guardando ? 'Guardando en ML…' : 'Guardar en ML'}</button>
+                <button disabled={guardando || !cambioAsig || pasa > 0} className="btn-primary text-sm disabled:opacity-50"
+                  onClick={guardarAMano}>{guardando ? 'Guardando en ML…' : 'Guardar en ML'}</button>
               )}
               <button type="button" onClick={() => { setEditando(e => !e); setAsig({}) }} className="text-sm underline">
                 {editando ? 'Cancelar' : 'Cambiar a mano'}</button>
-              {editando && totalAsig > f.disponible && <span className="font-semibold text-red-700">Te sobra{totalAsig - f.disponible === 1 ? '' : 'n'} {totalAsig - f.disponible}: baja alguna</span>}
-              {editando && totalAsig <= f.disponible && <span className="text-xs opacity-75">Usas {totalAsig} de {f.disponible}</span>}
+              {editando && avisosAMano}
             </div>
           )}
+        </div>
+      )}
+      {editando && !f.en_reserva && puedeCambiar && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-l-4 border-b-neutral-100 border-l-sky-300 bg-sky-50/40 px-4 py-2.5 text-sm">
+          <b className="text-neutral-800">A mano:</b>
+          {avisosAMano}
+          <span className="ml-auto flex items-center gap-3">
+            <button type="button" onClick={() => { setEditando(false); setAsig({}) }} className="text-sm underline">Volver a la sugerencia</button>
+            <button type="button" disabled={guardando || !cambioAsig || pasa > 0} className="btn-primary text-sm disabled:opacity-50"
+              onClick={guardarAMano}>{guardando ? 'Guardando en ML…' : 'Guardar en ML'}</button>
+          </span>
         </div>
       )}
       <ul className="divide-y divide-neutral-100">
@@ -512,18 +538,21 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           abrirOpciones={verCombos} onEstado={(e, m) => onEstado(p, e, m)}
           atenuada={(!!resaltar && p.estado !== resaltar) || (!!cuenta && p.cuenta !== cuenta)}
           onUnidades={u => onUnidades(p, u)} onSincronizar={v => onSincronizar(p, v)}
-          asignar={f.en_reserva && editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
+          editar={puedeCambiar && !editando && asignables.includes(p) ? () => setEditando(true) : undefined}
+          asignar={editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
       </ul>
     </section>
   )
 }
 
-function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar }: {
+function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar, editar }: {
   p: PubStockML; res?: Res; puedeCambiar: boolean; reserva: boolean; abrirOpciones: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
   onEstado: (estado: 'paused' | 'active', motivo: string) => Promise<boolean>
   atenuada: boolean
   /** Producto en reserva: cuántas va a mostrar esta publicación (lo decide la persona). */
   asignar?: { valor: string; onCambio: (v: string) => void }
+  /** 17-11: tocar «Quedará» pasa el producto a «a mano». */
+  editar?: () => void
 }) {
   const [u, setU] = useState(String(p.unidades))
   useEffect(() => setU(String(p.unidades)), [p.unidades])
@@ -561,16 +590,21 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
       <div className="w-36 text-xs">
         <div className="text-neutral-400">Quedará</div>
         {asignar ? (
-          <label className="flex items-center gap-1 text-neutral-500">asignar
-            <input type="number" min={0} max={99999} value={asignar.valor} onChange={e => asignar.onCambio(e.target.value)}
+          <label className="flex items-center gap-1 text-neutral-500">poner
+            <input type="number" min={0} max={99999} value={asignar.valor} onChange={e => asignar.onCambio(e.target.value)} onFocus={e => e.target.select()}
               className="w-14 rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-right text-sm tabular-nums" />
             {p.unidades > 1 && <span title="Cada una trae varias unidades del producto">×{p.unidades}</span>}
           </label>
         ) : p.sin_sincronizar ? <div className="text-neutral-500">no se toca</div>
           : p.entera_con_variantes ? <div className="text-amber-700" title="Está vinculada la publicación entera pero tiene variantes: vincula cada variante en Vincular con ML">vincular por variante</div>
-          : p.objetivo == null ? <div className="text-neutral-400">{reserva ? 'lo que decidiste' : '—'}</div>
+          : p.objetivo == null ? (editar
+              ? <button type="button" onClick={editar} title="Poner a mano cuántas muestra" className="text-neutral-400 underline decoration-dotted underline-offset-2 hover:text-neutral-700">{reserva ? 'lo que decidiste' : '—'} ✎</button>
+              : <div className="text-neutral-400">{reserva ? 'lo que decidiste' : '—'}</div>)
           : <div className={`tabular-nums ${cambia ? 'font-semibold text-lime-700' : 'text-neutral-500'}`}>
-              {p.objetivo}{p.reactivar ? ' · se reactiva' : ''}{!cambia ? ' ✓ igual' : ''}
+              {editar
+                ? <button type="button" onClick={editar} title="Tocar para poner otro número a mano" className="tabular-nums underline decoration-dotted underline-offset-2 hover:text-neutral-900">
+                    {p.objetivo}{p.reactivar ? ' · se reactiva' : ''}{!cambia ? ' ✓ igual' : ''} ✎</button>
+                : <>{p.objetivo}{p.reactivar ? ' · se reactiva' : ''}{!cambia ? ' ✓ igual' : ''}</>}
               {p.bloqueada_envio && <div className="font-normal text-red-700">pausada: sin envío gratis</div>}
             </div>}
       </div>
