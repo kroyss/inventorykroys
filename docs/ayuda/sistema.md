@@ -884,6 +884,10 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
+- **Tienes y no vendes** (Stock en ML, punto celeste, junto a «Vende de más»): productos con unidades disponibles y
+  ninguna publicación activa que las ofrezca (todas pausadas o en 0, a propósito o sin querer). «Aplicar en ML» pone el
+  stock y reactiva las pausadas por falta de stock; las **pausadas a mano** no se reactivan solas: se activan en la fila
+  si fue sin querer. Las marcadas «No sincronizar» no cuentan.
 - **Vínculo viejo (publicación entera + variantes):** si una publicación con variantes sigue vinculada ENTERA a un
   producto y además cada variante tiene el suyo, en Vincular con ML sale una franja ámbar **«Vínculo viejo»** con
   **Quitar vínculo viejo** (también en la pestaña «Por publicación entera»). Mientras tanto ese vínculo no cuenta para

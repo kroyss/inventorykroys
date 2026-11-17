@@ -11,7 +11,12 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
 import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
 
-type Filtro = 'vende' | 'diferencias' | 'pausadas' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
+type Filtro = 'vende' | 'sinpub' | 'diferencias' | 'pausadas' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
+/** 17-11 (el dueño: «también tengo que saber lo que tengo y no está publicado»): el revés de «Vende de más». Hay
+ *  disponible y ninguna publicación activa lo ofrece (todas pausadas, a mano o no, o en 0). Las «No sincronizar» no cuentan. */
+const sinPublicar = (f: FilaStockML) => !f.sin_fisico && f.disponible > 0
+  && f.pubs.some(p => !p.sin_sincronizar && p.estado != null)
+  && !f.pubs.some(p => p.estado === 'active' && (p.ml_disponible ?? 0) > 0)   // la vinculada entera con variantes también vende
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
 
 const POR_PAGINA = 40
@@ -91,7 +96,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const visibles = useMemo(() => {
     const q = buscar.trim().toLowerCase()
     return (filas ?? []).filter(f =>
-      (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'pausadas' ? f.pubs.some(p => p.pausa_mano) : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
+      (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'sinpub' ? sinPublicar(f) : filtro === 'pausadas' ? f.pubs.some(p => p.pausa_mano) : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
         : filtro === 'combos' ? f.pubs.some(p => p.posible_combo) : f.pubs.some(p => p.bloqueada_envio)))
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
       && (!estadoML || f.pubs.some(p => p.estado === estadoML && (!cuenta || p.cuenta === cuenta)))
@@ -102,6 +107,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
 
   const n = {
     vende: filas.filter(f => f.vende).length,
+    sinpub: filas.filter(sinPublicar).length,
     pausadas: filas.filter(f => f.pubs.some(p => p.pausa_mano)).length,
     diferencias: filas.filter(f => f.diferencia).length,
     reserva: filas.filter(f => f.en_reserva).length,
@@ -235,6 +241,13 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
               <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" aria-hidden />Vende de más <span className="opacity-75">{n.vende}</span>
             </button>
           )}
+          {(n.sinpub > 0 || filtro === 'sinpub') && (
+            <button onClick={() => { setFiltro('sinpub'); setTocado(true); setVer(POR_PAGINA) }}
+              title="Tienes unidades en el inventario y ninguna publicación activa las ofrece: ventas que no estás haciendo"
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === 'sinpub' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}>
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-sky-500 align-middle" aria-hidden />Tienes y no vendes <span className="opacity-75">{n.sinpub}</span>
+            </button>
+          )}
           {([['diferencias', 'Con diferencias'], ['reserva', 'Quedan pocas'], ['reactivar', 'Pausadas para reactivar'], ['pausadas', 'Pausadas a mano'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const)
             .filter(([k]) => n[k] > 0 || filtro === k || k === 'todas' || k === 'diferencias').map(([k, t]) => (
             <button key={k} onClick={() => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }}
@@ -263,6 +276,12 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         <p className="rounded-lg border border-neutral-200 border-l-4 border-l-red-400 bg-white px-3 py-2 text-xs text-neutral-700">
           <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
           {puedeCambiar ? ' Toca «Aplicar en ML» en cada uno (o márcalos y «Poner en ML lo que hay»): los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
+        </p>
+      )}
+      {filtro === 'sinpub' && n.sinpub > 0 && (
+        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-sky-400 bg-white px-3 py-2 text-xs text-neutral-700">
+          <b>Tienes unidades y en MercadoLibre no se ofrece ninguna</b>: todas sus publicaciones están pausadas o en 0.
+          {puedeCambiar ? ' «Aplicar en ML» las pone con stock y reactiva las pausadas por falta de stock. Las pausadas a mano no se reactivan solas: actívalas en la fila si fue sin querer, o déjalas si fue a propósito.' : ' Avísale a quien maneja el stock.'}
         </p>
       )}
       {resultados.size > 0 && !trabajando && (
@@ -451,6 +470,10 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
             className={`ml-2 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium ${f.vende === 'sin' ? 'text-red-700' : 'text-amber-700'}`}>
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${f.vende === 'sin' ? 'bg-red-500' : 'bg-amber-500'}`} aria-hidden />
             {f.vende === 'sin' ? `Tienes 0 y ML ofrece ${f.ofrece}` : `ML ofrece ${f.ofrece}, tienes ${f.disponible}`}</span>}
+          {sinPublicar(f) && <span title="Hay disponible y ninguna publicación activa lo ofrece"
+            className="ml-2 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-sky-700">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden />
+            Tienes {f.disponible} y ML no ofrece ninguna{f.pubs.some(p => p.pausa_mano) ? ' (pausada a mano)' : ''}</span>}
           {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
             title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
           <button type="button" onClick={onHistorial} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
