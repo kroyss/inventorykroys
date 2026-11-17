@@ -316,7 +316,9 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago, onPagoChip }: {
   onPagoChip?: Verificar
 }) {
   const sinInventario = !!onVerificar
-  const verPago = sinInventario || !!onPago   // monto, comprobante y datos del pago a la vista
+  // monto, comprobante («ver pago») y datos del pago a la vista. 16-11 (el dueño): también en Ventas → Por confirmar con
+  // Pagos ME, igual que en Pagos ME (que las dos se vean y trabajen igual).
+  const verPago = sinInventario || !!onPago || !!onPagoChip
   const [haciendo, setHaciendo] = useState(false)
   const verificar = async (v: 'valido' | 'invalido' | 'pendiente') => {
     const fn = onVerificar ?? onPago ?? onPagoChip
