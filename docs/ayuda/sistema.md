@@ -884,10 +884,19 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
-- **Tienes y no vendes** (Stock en ML, punto celeste, junto a «Vende de más»): productos con unidades disponibles y
-  ninguna publicación activa que las ofrezca (todas pausadas o en 0, a propósito o sin querer). «Aplicar en ML» pone el
-  stock y reactiva las pausadas por falta de stock; las **pausadas a mano** no se reactivan solas: se activan en la fila
-  si fue sin querer. Las marcadas «No sincronizar» no cuentan.
+- **Stock en ML: cómo está ordenada (17-11).** Arriba, **3 tarjetas** con lo que hay que hacer; cada producto cae en UN
+  solo grupo (por prioridad), así los números suman lo que falta sin repetir:
+  🔴 **Vende de más** (ML ofrece lo que no tienes: riesgo de reclamo) · 🔵 **Tienes y no vendes** (hay unidades y ninguna
+  publicación activa las ofrece: pausadas o en 0, a propósito o sin querer) · 🟡 **Por ajustar** (cantidades distintas a lo
+  sugerido o pausadas por falta de stock para reactivar). Al entrar se abre la más urgente que tenga algo.
+  **Arreglar N productos** (en cada tarjeta, quien puede cambiar el stock): primero muestra la lista de lo que cambia en ML
+  («PIKEKE · Talla M: 0 → 24 · se reactiva») con casillas para desmarcar, y recién ahí **Aplicar N cambios en ML**. Con el
+  inventario NO marcado al día, en lote solo se arregla «Vende de más» (bajar es seguro); lo demás, uno por uno.
+  **Para decidir** (pestaña gris): lo que el sistema no resuelve solo, con la etiqueta del motivo: «Quedan pocas: elige a
+  mano», «Al reactivar queda sin envío gratis», «¿Pack o combo?». **Todos**: todos los productos, con el buscador.
+  **Filtros** (botón): estado en ML (activas/pausadas) y cuenta. **⚙ Ajustes** (arriba): «Mi inventario está al día»,
+  reserva de seguridad y cómo se calcula el disponible. Las **pausadas a mano** no se reactivan solas: se activan en la
+  fila si fue sin querer. Lo marcado «No sincronizar» no cuenta.
 - **Vínculo viejo (publicación entera + variantes):** si una publicación con variantes sigue vinculada ENTERA a un
   producto y además cada variante tiene el suyo, en Vincular con ML sale una franja ámbar **«Vínculo viejo»** con
   **Quitar vínculo viejo** (también en la pestaña «Por publicación entera»). Mientras tanto ese vínculo no cuenta para
@@ -988,14 +997,14 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   una pausada a mano, avisa; **pasarte de lo que tienes no se puede** (si en bodega hay más, primero **Corregir stock**).
   **Guardar en ML** manda solo lo que cambia; **Volver a la sugerencia** deshace. Lo puesto a mano dura hasta que alguien
   toque «Aplicar en ML» en ese producto (para que no se toque nunca: «No sincronizar»).
-  **Mi inventario está al día** (casilla en el recuadro de arriba, la cambia quien configura el inventario): prendida, al
+  **Mi inventario está al día** (en **⚙ Ajustes**, la cambia quien configura el inventario): prendida, al
   poner stock en ML (aquí, en Automatizaciones → Stock y en la ventana de cambiar stock) avisa si pones más de lo que
   tienes y pide «Actualizar igual» (no bloquea). Apagada, el inventario se ve solo como dato y aquí sale una nota para
   revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días.
   Prendida, **Automatizaciones → Stock** usa el mismo reparto: «sugerido: N u. · usar» pone lo que sugiere Stock en ML (no
   todo el inventario) y la que está en 0 porque lo que hay está en otra publicación dice «en 0 a propósito: lo que hay está
   en PIKEKE 1». Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
-  (en el filtro Revisar combos salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
+  (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
   convertidor con varias versiones). ML muestra la **suma** de lo que aporta cada producto («aporta N»). Si alguno está en
@@ -1012,13 +1021,13 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   stock que no se vendería. Con pocas unidades, primero van las publicaciones activas.
   **Bodega** (con el permiso «Cambiar el stock en MercadoLibre»; no hace falta tocar el inventario):
   **Pausar** (en cada publicación, con motivo opcional: dañado, sin foto…) deja de venderla; «Poner en ML lo que hay» no la reactiva
-  hasta que alguien toque **Activar** (necesita stock en ML). Filtro **Pausadas a mano**. **Se acabó** (en el producto,
+  hasta que alguien toque **Activar** (necesita stock en ML); en la fila dice «pausada a mano». **Se acabó** (en el producto,
   cuando no está en bodega aunque el sistema diga que hay): todas sus publicaciones a 0 en ML y quedan en 0 hasta que
   entre mercancía o se ajuste el inventario (o **Ya hay**); al admin le llega por Telegram para que ajuste el inventario.
-  **Estado** (selector junto a las cuentas): Activas en ML / Pausadas en ML, se combina con las pestañas, la cuenta y el
+  **Estado** (en **Filtros**): Activas en ML / Pausadas en ML, se combina con las tarjetas, la cuenta y el
   buscador; las publicaciones en otro estado se ven atenuadas. Al marcar productos, abajo sale **Pausar N publicaciones**
   (sus activas, motivo opcional) aunque no elijas Estado; con Pausadas, **Activar N publicaciones** (solo las que tienen
-  stock en ML). Las pestañas en 0 no se muestran.
+  stock en ML).
   **Desactivados que siguen publicados** (aviso ámbar arriba, solo si hay): productos desactivados con publicaciones activas
   en ML (el sistema ya no les controla el stock). **Revisar** muestra el producto junto al título de cada publicación: si el
   título no es de ese producto, la vinculación está equivocada → **Desvincular** (y vincularla al correcto en Vincular con
@@ -1027,7 +1036,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Historial** (arriba) y **Ver cambios** (en cada producto): quién cambió qué en ML (stock, pausas, reactivaciones,
   desde cualquier pantalla). El admin ve los de todos y filtra por persona; los demás ven los suyos.
   En **Automatizaciones → Stock** sale una franja roja si hay productos en 0 a la venta (con inventario).
-  **Vende de más** (filtro rojo, se abre solo cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
+  **Vende de más** (tarjeta roja, se abre sola cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
   alguna publicación activa con stock (rojo: si alguien compra no puedes cumplir) o con menos de lo que suman tus
   publicaciones activas (amarillo). Las pausadas no cuentan.
   **Aplicar en ML** en cada uno (o márcalos y **Poner en ML lo que hay**): los que están en 0 quedan en 0 en ML. El sistema lo revisa solo cada 10 minutos:

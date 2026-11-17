@@ -29,6 +29,8 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
   '/inventario/stock-ml': [
+    { pregunta: '¿Cómo está ordenada Stock en ML?', respuesta: 'Arriba hay 3 tarjetas: **Vende de más** (rojo, riesgo de reclamo), **Tienes y no vendes** (celeste, ventas perdidas) y **Por ajustar** (ámbar). Cada producto está en un solo grupo. **Arreglar N productos** te muestra la lista de cambios antes de aplicar. Lo que el sistema no resuelve solo está en **Para decidir**; la configuración, en **⚙ Ajustes**.' },
+    { pregunta: '¿Qué es «Tienes y no vendes»?', respuesta: 'Es el revés de «Vende de más»: productos con unidades en el inventario que ninguna publicación activa ofrece (pausadas o en 0). Toca **Aplicar en ML** para ponerles stock y reactivarlas; si alguna la pausaste a mano a propósito, déjala así.' },
     { pregunta: '¿Qué significa «Compartida con COD-…»?',
       respuesta: 'Esa publicación está vinculada a varios productos (por ejemplo, un mismo anuncio con varios modelos). ML muestra la **suma** de lo que aporta cada uno; «aporta N» es la parte de este producto. Toca el **código MLV** para ver la publicación aquí mismo y confirmar que todos son de verdad de ese anuncio.' },
     { pregunta: '¿Cómo pauso o activo varias a la vez?',
@@ -46,11 +48,11 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo pongo otro número sin aceptar la sugerencia?',
       respuesta: 'Toca el número de **Quedará** (✎): el producto pasa a «A mano» y cada publicación muestra una casilla. Arriba ves «Usas X de Y». No deja pasarte de lo que tienes (si hay más, primero **Corregir stock**). Toca **Guardar en ML**; **Volver a la sugerencia** deshace.' },
     { pregunta: '¿Qué es «Mi inventario está al día»?',
-      respuesta: 'Una casilla de la empresa (arriba en Stock en ML). Prendida: al poner stock en ML más de lo que tienes en inventario, te avisa y pide «Actualizar igual» (no bloquea). Apagada: el inventario se ve solo como dato. Préndela solo si tu inventario está al día.' },
+      respuesta: 'Una casilla de la empresa (Stock en ML → **⚙ Ajustes**). Prendida: al poner stock en ML más de lo que tienes en inventario, te avisa y pide «Actualizar igual» (no bloquea). Apagada: el inventario se ve solo como dato. Préndela solo si tu inventario está al día.' },
     { pregunta: '¿Qué es «Vende de más»?',
-      respuesta: 'Productos que MercadoLibre sigue ofreciendo sin que los tengas: en **0** con una publicación activa (rojo) o con menos de lo que suman tus publicaciones activas (amarillo). Toca **Aplicar en ML** en cada uno (o márcalos y **Poner en ML lo que hay**): los de 0 quedan en 0 en ML. Se revisa solo cada 10 min y avisa por Telegram (Mis avisos → «Vende sin tener stock»).' },
+      respuesta: 'Productos que MercadoLibre sigue ofreciendo sin que los tengas: en **0** con una publicación activa (rojo) o con menos de lo que suman tus publicaciones activas (amarillo). Toca **Arreglar N productos** en la tarjeta roja (te muestra la lista antes de aplicar) o **Aplicar en ML** en cada uno: los de 0 quedan en 0 en ML. Se revisa solo cada 10 min y avisa por Telegram (Mis avisos → «Vende sin tener stock»).' },
     { pregunta: '¿Por qué sale un número rojo en Publicaciones?',
-      respuesta: 'Son los productos en 0 que una publicación activa sigue ofreciendo en ML. Entra a **Publicaciones → Stock**, filtro **Vende de más**, y toca **Aplicar en ML**.' },
+      respuesta: 'Son los productos en 0 que una publicación activa sigue ofreciendo en ML. Entra a **Publicaciones → Stock**, tarjeta roja **Vende de más**, y toca **Arreglar**.' },
   ],
   '/alertas-stock': [
     { pregunta: '¿Cómo actualizo el stock en ML?', video: 'Calificaciones y Stock',
@@ -94,6 +96,9 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo agrego a alguien de mi equipo?', respuesta: 'Toca **+ Nuevo usuario**, pon nombre, usuario y contraseña inicial, y pásale su contraseña. Con **Permisos** eliges qué ve y qué puede hacer.' },
     { pregunta: 'Un empleado olvidó su contraseña', respuesta: 'En su fila toca **Cambiar contraseña** y pásale la nueva. Sus sesiones abiertas se cierran.' },
   ],
+  '/vincular-ml': [
+    { pregunta: '¿Qué es «Vínculo viejo» en Vincular con ML?', respuesta: 'La publicación sigue vinculada entera a un producto aunque cada variante ya tiene el suyo (vínculo de antes). No se usa para nada, pero confundía Preguntas, pesos y Stock en ML. Toca **Quitar vínculo viejo**: las variantes y las ventas ya registradas no cambian.' },
+  ],
   '/productos': [
     { pregunta: '¿Qué es recargo y qué es rentabilidad?',
       respuesta: 'El **recargo** es lo que le sumas al costo para sacar el precio. La **rentabilidad** es lo que de verdad te queda después de MercadoLibre (y del cambio en Venezuela). Los dos se miden sobre lo que te costó el producto.\n\nEj.: costo $2,40 y recargo 80 % → precio $4,32. Después de la comisión, el envío y el cambio te quedan $1,07: rentabilidad **44,7 %**, o sea ganas $44,70 por cada $100 que pusiste en mercancía. Los otros 35 puntos se los llevan ML y el cambio.' },
@@ -113,8 +118,6 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: 'El estimado ya está bien', respuesta: 'Toca **Está bien así**: queda como costo real y deja de salir aquí.' },
   ],
   '/productos/mercadoenvios': [
-    { pregunta: '¿Qué es «Tienes y no vendes»?', respuesta: 'Es el revés de «Vende de más»: productos con unidades en el inventario que ninguna publicación activa ofrece (pausadas o en 0). Toca **Aplicar en ML** para ponerles stock y reactivarlas; si alguna la pausaste a mano a propósito, déjala así.' },
-    { pregunta: '¿Qué es «Vínculo viejo» en Vincular con ML?', respuesta: 'La publicación sigue vinculada entera a un producto aunque cada variante ya tiene el suyo (vínculo de antes). No se usa para nada, pero confundía Preguntas, pesos y Stock en ML. Toca **Quitar vínculo viejo**: las variantes y las ventas ya registradas no cambian.' },
     { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
   ],

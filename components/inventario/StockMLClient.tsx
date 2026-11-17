@@ -11,12 +11,35 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
 import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
 
-type Filtro = 'vende' | 'sinpub' | 'diferencias' | 'pausadas' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
+// 17-11 (el dueño: «nos llenamos de opciones»): la pantalla se ordena por QUÉ HAY QUE HACER. Cada producto cae en UN
+// solo grupo, por prioridad (los números suman lo que falta, sin repetir): Vende de más → Tienes y no vendes → Para
+// decidir → Por ajustar. Antes eran 9 pestañas que se pisaban (un producto salía en 3 a la vez).
+type Grupo = 'vende' | 'sinpub' | 'decidir' | 'ajustar'
+type Filtro = Grupo | 'todas'
 /** 17-11 (el dueño: «también tengo que saber lo que tengo y no está publicado»): el revés de «Vende de más». Hay
  *  disponible y ninguna publicación activa lo ofrece (todas pausadas, a mano o no, o en 0). Las «No sincronizar» no cuentan. */
 const sinPublicar = (f: FilaStockML) => !f.sin_fisico && f.disponible > 0
   && f.pubs.some(p => !p.sin_sincronizar && p.estado != null)
   && !f.pubs.some(p => p.estado === 'active' && (p.ml_disponible ?? 0) > 0)   // la vinculada entera con variantes también vende
+/** Lo que el sistema no resuelve solo (cada uno se muestra como etiqueta en la fila). */
+const motivosDecidir = (f: FilaStockML) => [
+  ...(f.en_reserva && f.diferencia ? ['Quedan pocas: elige a mano'] : []),
+  ...(f.pubs.some(p => p.bloqueada_envio) ? ['Al reactivar queda sin envío gratis'] : []),
+  ...(f.pubs.some(p => p.posible_combo) ? ['¿Pack o combo?'] : []),
+]
+const grupoDe = (f: FilaStockML): Grupo | null =>
+  f.vende || (f.en_reserva && f.excede) ? 'vende' : sinPublicar(f) ? 'sinpub' : motivosDecidir(f).length ? 'decidir' : f.diferencia ? 'ajustar' : null
+const ORDEN: Grupo[] = ['vende', 'sinpub', 'ajustar', 'decidir']
+/** Al entrar se abre lo más urgente que tenga algo. */
+const primero = (filas: FilaStockML[]): Filtro => ORDEN.find(g => filas.some(f => grupoDe(f) === g)) ?? 'ajustar'
+const TARJETAS = [
+  { k: 'vende', titulo: 'Vende de más', punto: 'bg-red-500', numero: 'text-red-700', marco: 'border-red-300 ring-1 ring-red-200',
+    que: 'ML ofrece lo que no tienes: riesgo de reclamo', vacio: 'ML no ofrece de más ✓' },
+  { k: 'sinpub', titulo: 'Tienes y no vendes', punto: 'bg-sky-500', numero: 'text-sky-700', marco: 'border-sky-300 ring-1 ring-sky-200',
+    que: 'Hay unidades y ML no ofrece ninguna', vacio: 'Lo que tienes está a la venta ✓' },
+  { k: 'ajustar', titulo: 'Por ajustar', punto: 'bg-amber-500', numero: 'text-amber-700', marco: 'border-amber-300 ring-1 ring-amber-200',
+    que: 'Cantidades distintas a lo sugerido', vacio: 'Igual que en el sistema ✓' },
+] as const
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
 
 const POR_PAGINA = 40
@@ -41,7 +64,11 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [error, setError] = useState<string | null>(null)
   // Desde Vincular («ver stock») llega ?buscar=COD-…: se abre en Todos con ese producto.
   // 16-11 «Vende de más» (lib/vendeDeMas.ts): si ML ofrece unidades que no hay, se abre en esa vista.
-  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : inicial?.filas.some(f => f.vende) ? 'vende' : 'diferencias')
+  const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : primero(inicial?.filas ?? []))
+  const [verFiltros, setVerFiltros] = useState(false)
+  const [verAjustes, setVerAjustes] = useState(false)
+  // «Arreglar N productos» de una tarjeta: primero la lista de lo que cambia (con casillas), recién ahí se aplica.
+  const [revisar, setRevisar] = useState<Grupo | null>(null)
   const [tocado, setTocado] = useState(!!buscarInicial || !!inicial)
   const [cuenta, setCuenta] = useState('')
   // 16-11 (el dueño): Estado de la publicación en ML, combinable con las pestañas; con él se pausan/activan varias.
@@ -79,7 +106,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   useEffect(() => {
     (async () => {
       const f = conInicial ? inicial!.filas : await cargar()
-      if (!conInicial && f?.some(x => x.vende)) setFiltro(v => (tocado ? v : 'vende'))
+      if (!conInicial && f) setFiltro(v => (tocado ? v : primero(f)))
       // 16-11: ya no se relee ML al abrir (hacía la pantalla pesada): el cron lo revisa cada 10 min (lib/vendeDeMas.ts).
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,8 +123,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const visibles = useMemo(() => {
     const q = buscar.trim().toLowerCase()
     return (filas ?? []).filter(f =>
-      (filtro === 'todas' || (filtro === 'vende' ? !!f.vende : filtro === 'sinpub' ? sinPublicar(f) : filtro === 'pausadas' ? f.pubs.some(p => p.pausa_mano) : filtro === 'diferencias' ? f.diferencia : filtro === 'reserva' ? f.en_reserva : filtro === 'reactivar' ? f.pubs.some(p => p.reactivar)
-        : filtro === 'combos' ? f.pubs.some(p => p.posible_combo) : f.pubs.some(p => p.bloqueada_envio)))
+      (filtro === 'todas' || grupoDe(f) === filtro)
       && (!cuenta || f.pubs.some(p => p.cuenta === cuenta))
       && (!estadoML || f.pubs.some(p => p.estado === estadoML && (!cuenta || p.cuenta === cuenta)))
       && (!q || `${f.code} ${f.name}`.toLowerCase().includes(q) || f.pubs.some(p => `${p.item_id} ${p.titulo ?? ''} ${p.variante ?? ''}`.toLowerCase().includes(q))))
@@ -105,17 +131,10 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
 
   if (!filas) return <p className="text-sm text-neutral-400">{error ?? 'Cargando productos y publicaciones…'}</p>
 
-  const n = {
-    vende: filas.filter(f => f.vende).length,
-    sinpub: filas.filter(sinPublicar).length,
-    pausadas: filas.filter(f => f.pubs.some(p => p.pausa_mano)).length,
-    diferencias: filas.filter(f => f.diferencia).length,
-    reserva: filas.filter(f => f.en_reserva).length,
-    reactivar: filas.filter(f => f.pubs.some(p => p.reactivar)).length,
-    bloqueadas: filas.filter(f => f.pubs.some(p => p.bloqueada_envio)).length,
-    combos: filas.filter(f => f.pubs.some(p => p.posible_combo)).length,
-    todas: filas.length,
-  }
+  const n: Record<Filtro, number> = { vende: 0, sinpub: 0, decidir: 0, ajustar: 0, todas: filas.length }
+  for (const f of filas) { const g = grupoDe(f); if (g) n[g]++ }
+  const pendientes = n.vende + n.sinpub + n.decidir + n.ajustar
+  const elegir = (k: Filtro) => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }
   const accionables = (f: FilaStockML) => f.pubs.filter(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
   // Las publicaciones (enteras: ML pausa la publicación, no la variante) que se pausan/activan con el Estado elegido.
   // 17-11 (el dueño): sin Estado elegido igual se pueden PAUSAR las activas de lo marcado (antes había que adivinar el filtro).
@@ -180,6 +199,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           <Link href="/inventario" className="btn-secondary text-sm whitespace-nowrap">← Inventario</Link>
           <button type="button" onClick={() => setHistorial({ product_id: null, nombre: null })} className="btn-secondary text-sm whitespace-nowrap"
             title="Quién cambió qué en MercadoLibre: stock, pausas y reactivaciones">Historial</button>
+          <button type="button" onClick={() => setVerAjustes(true)} className="btn-secondary text-sm whitespace-nowrap"
+            title="Inventario al día, reserva de seguridad y cómo se calcula">⚙ Ajustes</button>
           {puedeCambiar && (
             <button disabled={actualizando} className="btn-secondary text-sm whitespace-nowrap disabled:opacity-50"
               title="Vuelve a leer de MercadoLibre el stock y el estado de todas tus publicaciones (tarda un poco)"
@@ -198,90 +219,103 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         </button>
       )}
 
-      <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
-        <p><b>Disponible</b> = stock del sistema − ventas de MercadoLibre que todavía no se registraron (ML ya las descontó de su publicación).
-          Al poner en ML lo que hay, cada publicación queda con el disponible; si <b>trae varias unidades</b> (pack o combo), con el disponible ÷ las que trae.</p>
-        {sinVincular > 0 && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-            <b>{sinVincular} publicaci{sinVincular === 1 ? 'ón activa' : 'ones activas'} con stock en ML no {sinVincular === 1 ? 'está vinculada' : 'están vinculadas'}</b>: sus ventas
-            no descuentan nada del inventario.{' '}
-            {conVincular ? <Link href="/vincular-ml?vista=activas" className="font-medium underline">Vincularlas →</Link> : 'Avísale a quien vincula.'}
-          </p>
-        )}
-        <p><b>Reserva de seguridad</b>: {reserva ?? '…'} u. por producto quedan sin publicar por si hay un error. Lo demás se reparte
-          en partes iguales entre las publicaciones (lo que sobra, a la que más vende). Con {reserva ?? '…'} o menos el producto
-          queda <b>en reserva</b>: tú decides a qué cuenta va cada unidad.
-          {puedeReserva && reserva != null && <CambiarReserva valor={reserva} onGuardar={async u => { if (await pedir({ accion: 'reserva', unidades: u })) await cargar() }} />}
+      {sinVincular > 0 && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+          <b>{sinVincular} publicaci{sinVincular === 1 ? 'ón activa' : 'ones activas'} con stock en ML no {sinVincular === 1 ? 'está vinculada' : 'están vinculadas'}</b>: sus ventas
+          no descuentan nada del inventario.{' '}
+          {conVincular ? <Link href="/vincular-ml?vista=activas" className="font-medium underline">Vincularlas →</Link> : 'Avísale a quien vincula.'}
         </p>
-        <p className="flex flex-wrap items-center gap-x-1">
-          {puedeReserva ? (
-            <label className="inline-flex items-center gap-1.5">
-              <input type="checkbox" checked={alDia} className="h-3.5 w-3.5"
-                onChange={async e => { const v = e.target.checked; setAlDia(v); if (!await pedir({ accion: 'al_dia', valor: v })) setAlDia(!v) }} />
-              <b>Mi inventario está al día</b>
-            </label>
-          ) : <b>Inventario {alDia ? 'al día' : 'sin marcar como al día'}</b>}
-          <span>: al poner stock en ML (también en Automatizaciones → Stock) avisa si pones más de lo que tienes.</span>
+      )}
+      {!alDia && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+          Tu inventario no está marcado como al día: las sugerencias salen de lo que dice el inventario, revísalas antes de aplicar.
+          En lote solo se arregla «Vende de más» (bajar es seguro).
+          <button type="button" onClick={() => setVerAjustes(true)} className="ml-1 font-medium underline">Ajustes</button>
         </p>
-        {!alDia && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-            Tu inventario no está marcado como al día: revisa las sugerencias antes de aplicar (salen de lo que dice el inventario).
-          </p>
-        )}
-        <p>Una pausada se reactiva si tiene stock, salvo que a su precio y peso quede <b>sin envío gratis</b>: esas las revisas tú.
-          Lo que marques <b>No sincronizar</b> (rifas, encargos) no se toca.</p>
+      )}
+
+      {/* 17-11: tres tarjetas = lo que hay que hacer (riesgo, venta perdida, ajuste). En el celular se deslizan. */}
+      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
+        {TARJETAS.map(t => {
+          const cant = n[t.k]
+          const lote = filas.filter(f => grupoDe(f) === t.k && accionables(f).length > 0)
+          const puedeLote = puedeCambiar && lote.length > 0 && (alDia || t.k === 'vende') && !trabajando
+          return (
+            <div key={t.k} className={`flex min-w-[14.5rem] shrink-0 snap-start flex-col rounded-xl border bg-white shadow-sm sm:min-w-0 ${filtro === t.k ? t.marco : 'border-neutral-200'}`}>
+              <button type="button" onClick={() => elegir(t.k)} aria-pressed={filtro === t.k} className="flex-1 px-4 pt-3 text-left">
+                <span className="flex items-center gap-2 text-sm font-medium text-neutral-800">
+                  <span className={`h-2 w-2 rounded-full ${t.punto}`} aria-hidden />{t.titulo}</span>
+                <span className={`mt-1 block text-2xl font-semibold tabular-nums ${cant ? t.numero : 'text-neutral-300'}`}>{cant}</span>
+                <span className="block text-xs text-neutral-500">{cant ? t.que : t.vacio}</span>
+              </button>
+              <div className="flex min-h-[2.25rem] items-center px-4 pb-3 pt-1 text-xs">
+                {puedeLote
+                  ? <button type="button" onClick={() => setRevisar(t.k)} className="font-semibold text-neutral-900 underline underline-offset-2 hover:text-neutral-600">
+                      Arreglar {lote.length === 1 ? '1 producto' : `${lote.length} productos`} →</button>
+                  : cant > 0 && puedeCambiar && !alDia && t.k !== 'vende' ? <span className="text-neutral-400">Revisa uno por uno</span> : null}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
-          {(n.vende > 0 || filtro === 'vende') && (
-            <button onClick={() => { setFiltro('vende'); setTocado(true); setVer(POR_PAGINA) }}
-              title="MercadoLibre ofrece más unidades de las que tienes: una venta que no vas a poder cumplir"
-              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === 'vende' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}>
-              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" aria-hidden />Vende de más <span className="opacity-75">{n.vende}</span>
-            </button>
-          )}
-          {(n.sinpub > 0 || filtro === 'sinpub') && (
-            <button onClick={() => { setFiltro('sinpub'); setTocado(true); setVer(POR_PAGINA) }}
-              title="Tienes unidades en el inventario y ninguna publicación activa las ofrece: ventas que no estás haciendo"
-              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === 'sinpub' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}>
-              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-sky-500 align-middle" aria-hidden />Tienes y no vendes <span className="opacity-75">{n.sinpub}</span>
-            </button>
-          )}
-          {([['diferencias', 'Con diferencias'], ['reserva', 'Quedan pocas'], ['reactivar', 'Pausadas para reactivar'], ['pausadas', 'Pausadas a mano'], ['bloqueadas', 'Pausadas sin envío gratis'], ['combos', 'Revisar combos'], ['todas', 'Todos']] as const)
-            .filter(([k]) => n[k] > 0 || filtro === k || k === 'todas' || k === 'diferencias').map(([k, t]) => (
-            <button key={k} onClick={() => { setFiltro(k); setTocado(true); setVer(POR_PAGINA) }}
-              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
-              {t} <span className="opacity-60">{n[k]}</span>
-            </button>
-          ))}
-        </div>
-        <select value={estadoML} onChange={e => { setEstadoML(e.target.value as '' | 'active' | 'paused'); setMarcados(new Set()); setVer(POR_PAGINA) }}
-          title="Estado de la publicación en MercadoLibre" className={`rounded-lg border px-2 py-1 text-xs ${estadoML ? 'border-neutral-900 font-medium' : 'border-neutral-300'}`}>
-          <option value="">Activas y pausadas</option>
-          <option value="active">Activas en ML</option>
-          <option value="paused">Pausadas en ML</option>
-        </select>
-        {cuentas.length > 1 && (
-          <select value={cuenta} onChange={e => { setCuenta(e.target.value); setVer(POR_PAGINA) }} className="rounded-lg border border-neutral-300 px-2 py-1 text-xs">
-            <option value="">Todas las cuentas</option>
-            {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        )}
+        {([['decidir', 'Para decidir'], ['todas', 'Todos']] as const).map(([k, t]) => (
+          <button key={k} type="button" onClick={() => elegir(k)} aria-pressed={filtro === k}
+            title={k === 'decidir' ? 'Lo que el sistema no resuelve solo: quedan pocas, sin envío gratis al reactivar o posible pack' : 'Todos los productos vinculados'}
+            className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${filtro === k ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}>
+            {k === 'decidir' && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-neutral-400 align-middle" aria-hidden />}
+            {t} <span className="opacity-60">{n[k]}</span>
+          </button>
+        ))}
+        <button type="button" onClick={() => setVerFiltros(v => !v)} aria-expanded={verFiltros}
+          className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs sm:py-1 ${cuenta || estadoML ? 'border-neutral-900 font-medium text-neutral-900' : 'border-neutral-200 bg-white text-neutral-600'}`}>
+          Filtros{cuenta || estadoML ? ` · ${(cuenta ? 1 : 0) + (estadoML ? 1 : 0)}` : ''} {verFiltros ? '▴' : '▾'}</button>
         <input type="search" value={buscar} onChange={e => { setBuscar(e.target.value); setVer(POR_PAGINA) }} placeholder="Buscar producto, código o MLV…"
           className="ml-auto w-full rounded-lg border border-neutral-300 px-3 py-2 text-base sm:w-72 sm:py-1.5 sm:text-sm" />
       </div>
+      {verFiltros && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs">
+          <select value={estadoML} onChange={e => { setEstadoML(e.target.value as '' | 'active' | 'paused'); setMarcados(new Set()); setVer(POR_PAGINA) }}
+            title="Estado de la publicación en MercadoLibre" className={`rounded-lg border bg-white px-2 py-1 ${estadoML ? 'border-neutral-900 font-medium' : 'border-neutral-300'}`}>
+            <option value="">Activas y pausadas</option>
+            <option value="active">Activas en ML</option>
+            <option value="paused">Pausadas en ML</option>
+          </select>
+          {cuentas.length > 1 && (
+            <select value={cuenta} onChange={e => { setCuenta(e.target.value); setVer(POR_PAGINA) }}
+              className={`rounded-lg border bg-white px-2 py-1 ${cuenta ? 'border-neutral-900 font-medium' : 'border-neutral-300'}`}>
+              <option value="">Todas las cuentas</option>
+              {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          {(cuenta || estadoML) && <button type="button" onClick={() => { setCuenta(''); setEstadoML(''); setMarcados(new Set()) }} className="text-neutral-600 underline">Quitar filtros</button>}
+          <span className="text-neutral-500">Con un estado elegido puedes marcar varios y pausarlos o activarlos juntos.</span>
+        </div>
+      )}
       {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       {filtro === 'vende' && n.vende > 0 && (
         <p className="rounded-lg border border-neutral-200 border-l-4 border-l-red-400 bg-white px-3 py-2 text-xs text-neutral-700">
           <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
-          {puedeCambiar ? ' Toca «Aplicar en ML» en cada uno (o márcalos y «Poner en ML lo que hay»): los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
+          {puedeCambiar ? ' «Arreglar» (arriba) o «Aplicar en ML» en cada uno: los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
         </p>
       )}
       {filtro === 'sinpub' && n.sinpub > 0 && (
         <p className="rounded-lg border border-neutral-200 border-l-4 border-l-sky-400 bg-white px-3 py-2 text-xs text-neutral-700">
-          <b>Tienes unidades y en MercadoLibre no se ofrece ninguna</b>: todas sus publicaciones están pausadas o en 0.
-          {puedeCambiar ? ' «Aplicar en ML» las pone con stock y reactiva las pausadas por falta de stock. Las pausadas a mano no se reactivan solas: actívalas en la fila si fue sin querer, o déjalas si fue a propósito.' : ' Avísale a quien maneja el stock.'}
+          <b>Tienes unidades y en MercadoLibre no se ofrece ninguna</b>: sus publicaciones están pausadas o en 0.
+          {puedeCambiar ? ' «Arreglar» las pone con stock y reactiva las pausadas por falta de stock. Las pausadas a mano no se reactivan solas: actívalas en la fila si fue sin querer, o déjalas si fue a propósito.' : ' Avísale a quien maneja el stock.'}
+        </p>
+      )}
+      {filtro === 'ajustar' && n.ajustar > 0 && (
+        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-amber-400 bg-white px-3 py-2 text-xs text-neutral-700">
+          <b>ML muestra cantidades distintas a las sugeridas</b> (o hay pausadas por falta de stock que se pueden reactivar). No es urgente:
+          {puedeCambiar ? ' «Arreglar» te muestra la lista antes de cambiar nada.' : ' avísale a quien maneja el stock.'}
+        </p>
+      )}
+      {filtro === 'decidir' && n.decidir > 0 && (
+        <p className="rounded-lg border border-neutral-200 border-l-4 border-l-neutral-400 bg-white px-3 py-2 text-xs text-neutral-700">
+          <b>El sistema no lo resuelve solo:</b> cada producto dice por qué. Quedan pocas (eliges a qué cuenta va cada unidad), al reactivar
+          quedaría sin envío gratis, o el título parece un pack («trae N u.» o «Es suelta»).
         </p>
       )}
       {resultados.size > 0 && !trabajando && (
@@ -297,7 +331,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         </p>
       ) : visibles.length === 0 ? (
         <p className="rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500">
-          {filtro === 'vende' ? 'Nada vende de más: ML no ofrece más de lo que tienes. 🎉' : filtro === 'diferencias' ? '¡Todo igual que en el sistema! 🎉' : filtro === 'combos' ? 'Ningún combo por revisar.' : 'Nada en esta vista.'}
+          {filtro === 'todas' || buscar || cuenta || estadoML ? 'Nada con esa búsqueda o filtro.'
+            : pendientes === 0 ? '✓ Todo al día: lo que muestra MercadoLibre coincide con tu inventario.'
+            : 'Nada aquí ✓ Mira las otras tarjetas.'}
         </p>
       ) : (
         <div className="space-y-3">
@@ -312,7 +348,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
               resaltar={estadoML || null} cuenta={cuenta}
               aplicables={accionables(f).length} ocupado={!!trabajando} onAplicar={() => aplicar([f], false)}
               onDividir={conVincular ? p => setDividir(p) : undefined}
-              marcado={marcados.has(f.product_id)} resultados={resultados} verCombos={filtro === 'combos'}
+              marcado={marcados.has(f.product_id)} resultados={resultados} verCombos={filtro === 'decidir'}
+              etiquetas={filtro === 'decidir' || filtro === 'todas' ? motivosDecidir(f) : []}
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
               onSincronizar={async (p, v) => { if (await pedir({ accion: 'sincronizar', codigo_id: p.codigo_id, sin_sincronizar: v })) await cargar() }}
@@ -354,6 +391,39 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       )}
 
       {historial && <Historial filtro={historial} onFiltro={setHistorial} onCerrar={() => setHistorial(null)} />}
+      {revisar && <RevisarCambios grupo={revisar} prods={filas.filter(f => grupoDe(f) === revisar && accionables(f).length > 0)}
+        faltan={n[revisar] - filas.filter(f => grupoDe(f) === revisar && accionables(f).length > 0).length}
+        onCerrar={() => setRevisar(null)} onAplicar={async ps => { setRevisar(null); await aplicar(ps, false) }} />}
+      {verAjustes && (
+        <Ventana titulo="Ajustes de stock" onCerrar={() => setVerAjustes(false)}>
+          <div className="space-y-4 text-sm text-neutral-700">
+            <section className="space-y-1">
+              {puedeReserva ? (
+                <label className="flex items-center gap-2 font-medium text-neutral-900">
+                  <input type="checkbox" checked={alDia} className="h-4 w-4"
+                    onChange={async e => { const v = e.target.checked; setAlDia(v); if (!await pedir({ accion: 'al_dia', valor: v })) setAlDia(!v) }} />
+                  Mi inventario está al día
+                </label>
+              ) : <p className="font-medium text-neutral-900">Inventario {alDia ? 'al día' : 'sin marcar como al día'}</p>}
+              <p className="text-xs text-neutral-600">Prendido: puedes arreglar en lote y al poner stock en ML (también en Automatizaciones → Stock) avisa si
+                pones más de lo que tienes. Apagado: las tarjetas solo informan y en lote solo se arregla «Vende de más» (bajar es seguro).</p>
+            </section>
+            <section className="space-y-1">
+              <p className="font-medium text-neutral-900">Reserva de seguridad: {reserva ?? '…'} u.
+                {puedeReserva && reserva != null && <CambiarReserva valor={reserva} onGuardar={async u => { if (await pedir({ accion: 'reserva', unidades: u })) await cargar() }} />}</p>
+              <p className="text-xs text-neutral-600">Quedan sin publicar por producto por si hay un error. Lo demás se reparte en partes iguales entre las
+                publicaciones (lo que sobra, a la que más vende). Con {reserva ?? '…'} o menos el producto queda en «Para decidir»: tú eliges a qué
+                cuenta va cada unidad.</p>
+            </section>
+            <section className="space-y-1 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
+              <p><b>Disponible</b> = stock del sistema − ventas de MercadoLibre que todavía no se registraron (ML ya las descontó de su publicación).
+                Si una publicación <b>trae varias unidades</b> (pack o combo), recibe el disponible ÷ las que trae.</p>
+              <p>Una pausada se reactiva si tiene stock, salvo que a su precio y peso quede <b>sin envío gratis</b> (eso va a «Para decidir»).
+                Lo marcado <b>No sincronizar</b> (rifas, encargos) no se toca. Las <b>pausadas a mano</b> no se reactivan solas.</p>
+            </section>
+          </div>
+        </Ventana>
+      )}
       {dividir && <DividirVariantes p={dividir} onCerrar={() => setDividir(null)}
         vinculados={filas.filter(f => f.pubs.some(q => q.item_id === dividir.item_id && q.entera_con_variantes)).map(f => ({ id: f.product_id, code: f.code, name: f.name }))}
         onHecho={async () => { setDividir(null); await cargar() }} />}
@@ -407,8 +477,10 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, resaltar, cuenta, aplicables, ocupado, onAplicar, onDividir, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, etiquetas, resaltar, cuenta, aplicables, ocupado, onAplicar, onDividir, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
   f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
+  /** 17-11: por qué está en «Para decidir». */
+  etiquetas: string[]
   /** Con Estado elegido: las publicaciones en otro estado (u otra cuenta) se atenúan. */
   resaltar: 'active' | 'paused' | null; cuenta: string
   /** 17-11: publicaciones de este producto que cambian al aplicar; «Aplicar en ML» las manda sin marcar nada. */
@@ -474,6 +546,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
             className="ml-2 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-sky-700">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden />
             Tienes {f.disponible} y ML no ofrece ninguna{f.pubs.some(p => p.pausa_mano) ? ' (pausada a mano)' : ''}</span>}
+          {etiquetas.map(e => <span key={e} className="ml-2 inline-flex items-center whitespace-nowrap rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-700">{e}</span>)}
           {conVincular && <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.code)}`} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
             title="Ver y corregir con qué publicaciones está vinculado este producto">Revisar vínculos</Link>}
           <button type="button" onClick={onHistorial} className="ml-2 text-xs text-neutral-500 underline hover:text-neutral-800"
@@ -971,6 +1044,50 @@ function DividirVariantes({ p, vinculados, onCerrar, onHecho }: {
         <button type="button" onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
         <button type="button" disabled={guardando || faltan > 0} onClick={guardar} className="btn-primary text-sm disabled:opacity-50">
           {guardando ? 'Guardando…' : 'Guardar'}</button>
+      </div>
+    </Ventana>
+  )
+}
+
+// ── «Arreglar N productos» (17-11): nada se cambia en ML sin ver antes la lista ───────────────────────────────────────
+function RevisarCambios({ grupo, prods, faltan, onCerrar, onAplicar }: {
+  grupo: Grupo; prods: FilaStockML[]; faltan: number; onCerrar: () => void; onAplicar: (p: FilaStockML[]) => Promise<void>
+}) {
+  const [quitar, setQuitar] = useState<Set<number>>(new Set())
+  const t = TARJETAS.find(x => x.k === grupo)
+  const cambios = (f: FilaStockML) => f.pubs.filter(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar))
+  const elegidos = prods.filter(f => !quitar.has(f.product_id))
+  const nPubs = elegidos.reduce((s, f) => s + cambios(f).length, 0)
+  const alternar = (id: number) => setQuitar(q => { const x = new Set(q); if (x.has(id)) x.delete(id); else x.add(id); return x })
+  return (
+    <Ventana titulo={`${t?.titulo ?? 'Arreglar'}: revisa antes de aplicar`} onCerrar={onCerrar}>
+      <p className="text-xs text-neutral-600">Esto cambia en MercadoLibre. Desmarca lo que no quieras tocar.
+        {faltan > 0 && <> {faltan === 1 ? 'Otro producto necesita' : `Otros ${faltan} productos necesitan`} que elijas a mano: quedan en la lista.</>}</p>
+      <ul className="max-h-[55vh] divide-y divide-neutral-100 overflow-y-auto rounded-lg border border-neutral-200">
+        {prods.map(f => (
+          <li key={f.product_id} className={`px-3 py-2 text-sm ${quitar.has(f.product_id) ? 'opacity-50' : ''}`}>
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={!quitar.has(f.product_id)} onChange={() => alternar(f.product_id)} />
+              <span className="min-w-0 flex-1">
+                <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
+                <span className="ml-1 whitespace-nowrap text-xs text-neutral-500">· tienes {f.disponible}</span>
+                <span className="mt-0.5 block text-xs text-neutral-600">
+                  {cambios(f).map(p => (
+                    <span key={clave(p)} className="block tabular-nums">{p.cuenta}{p.variante ? ` · ${p.variante}` : ''}:{' '}
+                      <span className="text-neutral-400">{p.ml_disponible ?? '—'}</span> → <b className="text-neutral-900">{p.objetivo}</b>
+                      {p.reactivar && <span className="ml-1 text-sky-700">· se reactiva</span>}</span>
+                  ))}
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-100 pt-3">
+        <span className="mr-auto text-xs text-neutral-500">{elegidos.length} producto{elegidos.length === 1 ? '' : 's'} · {nPubs} publicaci{nPubs === 1 ? 'ón' : 'ones'}</span>
+        <button type="button" onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
+        <button type="button" disabled={!nPubs} onClick={() => onAplicar(elegidos)} className="btn-primary text-sm disabled:opacity-50">
+          Aplicar {nPubs} cambio{nPubs === 1 ? '' : 's'} en ML</button>
       </div>
     </Ventana>
   )
