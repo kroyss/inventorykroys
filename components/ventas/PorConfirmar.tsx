@@ -118,7 +118,7 @@ function QuitarSinInventario({ filas, onCerrar }: { filas: Fila[]; onCerrar: () 
   const recargar = useContext(Recargar)
   const grupos = (() => {
     const m = new Map<string, Fila[]>()
-    for (const f of filas) { const k = nombreLinea(f); m.set(k, [...(m.get(k) ?? []), f]) }
+    for (const f of filas.filter(x => !x.concretadaSinVenta)) { const k = nombreLinea(f); m.set(k, [...(m.get(k) ?? []), f]) }
     return [...m.entries()].map(([nombre, fs]) => ({ nombre, filas: fs, foto: fs[0].lineas[0]?.foto ?? null }))
       .sort((a, b) => b.filas.length - a.filas.length || a.nombre.localeCompare(b.nombre))
   })()
@@ -127,7 +127,11 @@ function QuitarSinInventario({ filas, onCerrar }: { filas: Fila[]; onCerrar: () 
   const [seguro, setSeguro] = useState(false)
   const [haciendo, setHaciendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const todas = filas.map(f => f.numero)
+  // 17-11 (el dueño): las ya concretadas en ML sin venta van aparte y «Marcar todas» no las toma: si el producto tiene
+  // inventario hay que registrarlas (ya se entregaron); se quitan solo una por una.
+  const concretadas = filas.filter(f => f.concretadaSinVenta)
+  const todas = filas.filter(f => !f.concretadaSinVenta).map(f => f.numero)
+  const nTodas = todas.filter(x => marcadas.has(x)).length
   const cambiar = (nums: string[], si: boolean) => setMarcadas(prev => {
     const s = new Set(prev); nums.forEach(n => (si ? s.add(n) : s.delete(n))); return s
   })
@@ -149,12 +153,29 @@ function QuitarSinInventario({ filas, onCerrar }: { filas: Fila[]; onCerrar: () 
           <button type="button" onClick={onCerrar} className="btn-ghost !px-2 !py-1" aria-label="Cerrar">✕</button>
         </div>
         <label className="flex items-center gap-2 border-b bg-neutral-50 px-5 py-2 text-sm">
-          <input type="checkbox" checked={n === todas.length && n > 0} ref={el => { if (el) el.indeterminate = n > 0 && n < todas.length }}
-            onChange={e => setMarcadas(e.target.checked ? new Set(todas) : new Set())} />
+          <input type="checkbox" checked={nTodas === todas.length && nTodas > 0} ref={el => { if (el) el.indeterminate = nTodas > 0 && nTodas < todas.length }}
+            onChange={e => cambiar(todas, e.target.checked)} />
           <span className="font-medium text-neutral-800">Marcar todas</span>
           <span className="text-neutral-400">{todas.length} ventas · {grupos.length} productos</span>
         </label>
         <ul className="flex-1 divide-y divide-neutral-100 overflow-y-auto">
+          {concretadas.length > 0 && (
+            <li className="bg-amber-50/70 px-5 py-2.5">
+              <p className="text-xs font-semibold text-amber-900">Concretadas en ML · revisa antes <span className="font-medium text-amber-700">{concretadas.length}</span></p>
+              <p className="mt-0.5 text-[11px] text-amber-800">Ya se entregaron. Si el producto tiene inventario, regístralas (si no, el stock queda de más). «Marcar todas» no las toma: márcalas una por una solo si no llevan inventario.</p>
+              <ul className="mt-2 divide-y divide-amber-100 rounded-lg border border-amber-200 bg-white">
+                {concretadas.map(f => (
+                  <li key={f.numero}>
+                    <label className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                      <input type="checkbox" checked={marcadas.has(f.numero)} onChange={e => cambiar([f.numero], e.target.checked)} />
+                      <span className="min-w-0 truncate text-neutral-800"><b className="font-medium">{f.comprador ?? f.nick ?? 'Sin nombre'}</b> · {nombreLinea(f)}</span>
+                      <span className="ml-auto shrink-0 text-neutral-400">{fechaCorta(f.fecha)}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
           {grupos.map(g => {
             const nums = g.filas.map(f => f.numero)
             const enG = nums.filter(x => marcadas.has(x)).length
@@ -874,12 +895,6 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
               🏦 Comprobar con el banco
             </button>
           )}
-          {!sinInventario && datos.conInventario && datos.filas.length > 0 && (
-            <button type="button" onClick={() => setSinInv(true)} title="Quitar de pendientes las ventas que no vas a registrar"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-50">
-              Sin inventario
-            </button>
-          )}
           {!sinInventario && (() => {
             const ocupado = actualizando || (datos.pagosME && (buscandoME || tme.ocupada))
             return (
@@ -923,6 +938,12 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por nombre, apodo, número de venta o producto…"
             className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm sm:max-w-md" />
           {q && <span className="shrink-0 text-xs text-neutral-500">{filas.length} de {datos.filas.length}</span>}
+          {!sinInventario && datos.conInventario && (
+            <button type="button" onClick={() => setSinInv(true)} title="Quitar de pendientes las ventas que no vas a registrar"
+              className="shrink-0 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-50">
+              Sin inventario
+            </button>
+          )}
         </div>
       )}
 
