@@ -134,8 +134,10 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
               COALESCE(m.sin_sincronizar, FALSE) AS sin_sincronizar, COALESCE(m.combo_revisado, FALSE) AS combo_revisado,
               c.item_id, c.titulo, c.estado, c.disponible::int AS disponible, c.precio::float AS precio, c.variantes,
               c.actualizado_at, m.pausa_mano_at, um.full_name AS pausa_mano_por, m.pausa_mano_motivo,
-              CASE WHEN p.sin_fisico_at > COALESCE((SELECT MAX(mv.created_at) FROM inventory_movements mv
-                     WHERE mv.product_id = p.id AND mv.movement_type IN ('IN', 'ADJUST')), '-infinity')
+              -- El CASE corta primero: la búsqueda en movimientos solo corre para los marcados «Se acabó» (antes 2,6 s).
+              CASE WHEN p.sin_fisico_at IS NULL THEN NULL
+                   WHEN NOT EXISTS (SELECT 1 FROM inventory_movements mv WHERE mv.product_id = p.id
+                          AND mv.movement_type IN ('IN', 'ADJUST') AND mv.created_at > p.sin_fisico_at)
                    THEN p.sin_fisico_at END AS sin_fisico_at, uf.full_name AS sin_fisico_por
        FROM products p
        LEFT JOIN users uf ON uf.id = p.sin_fisico_por

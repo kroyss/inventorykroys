@@ -36,7 +36,6 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   // 16-11 «Vende de más» (lib/vendeDeMas.ts): si ML ofrece unidades que no hay, se abre en esa vista.
   const [filtro, setFiltro] = useState<Filtro>(buscarInicial ? 'todas' : inicial?.filas.some(f => f.vende) ? 'vende' : 'diferencias')
   const [tocado, setTocado] = useState(!!buscarInicial || !!inicial)
-  const [comprobando, setComprobando] = useState(false)
   const [cuenta, setCuenta] = useState('')
   const [buscar, setBuscar] = useState(buscarInicial)
   const [ver, setVer] = useState(POR_PAGINA)
@@ -62,9 +61,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     (async () => {
       const f = conInicial ? inicial!.filas : await cargar()
       if (!conInicial && f?.some(x => x.vende)) setFiltro(v => (tocado ? v : 'vende'))
-      // Lo que parece vender de más se relee de ML en segundo plano (el catálogo guardado puede tener horas).
-      if (!f?.some(x => x.vende)) return
-      setComprobando(true); await cargar(true); setComprobando(false)
+      // 16-11: ya no se relee ML al abrir (hacía la pantalla pesada): el cron lo revisa cada 10 min (lib/vendeDeMas.ts).
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -187,7 +184,6 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
         <p className="rounded-lg border border-neutral-200 border-l-4 border-l-red-400 bg-white px-3 py-2 text-xs text-neutral-700">
           <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
           {puedeCambiar ? ' Márcalos e iguala: los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
-          {comprobando && <span className="ml-1 text-neutral-400">· Comprobando en ML…</span>}
         </p>
       )}
       {resultados.size > 0 && !trabajando && (
