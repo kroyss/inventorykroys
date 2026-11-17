@@ -990,7 +990,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Desactivados que siguen publicados** (aviso ámbar arriba, solo si hay): productos desactivados con publicaciones activas
   en ML (el sistema ya no les controla el stock). **Revisar** muestra el producto junto al título de cada publicación: si el
   título no es de ese producto, la vinculación está equivocada → **Desvincular** (y vincularla al correcto en Vincular con
-  ML); si coincide → **Pausar** (o **Pausar las N**); si fue un error → **Reactivar producto**.
+  ML); si coincide → **Pausar** (o **Pausar las N**); si fue un error → **Reactivar producto**. Si reutilizas esa
+  publicación para un producto nuevo (Vincular con ML), el vínculo con el producto desactivado se quita solo.
   **Historial** (arriba) y **Ver cambios** (en cada producto): quién cambió qué en ML (stock, pausas, reactivaciones,
   desde cualquier pantalla). El admin ve los de todos y filtra por persona; los demás ven los suyos.
   En **Automatizaciones → Stock** sale una franja roja si hay productos en 0 a la venta (con inventario).
@@ -1093,6 +1094,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   separando: los que tienen stock 0, nada en camino y ninguna venta de ML sin registrar **se desactivan ya** (salen de
   todo el sistema); los demás salen de Reponer y **se desactivan solos** al terminar de venderse. Muestra los títulos de
   sus publicaciones activas en ML (para ver una mala vinculación); las que queden publicadas las avisa Stock en ML.
+  Salen de la lista al instante (sin recargar) y abajo aparece el aviso con **Deshacer**. Los números de los chips cuentan
+  con los demás filtros puestos.
   Si vuelves a hacer una compra o importación de alguno, vuelve solo a Reponer. Abajo, **No vuelves a pedir** muestra
   quién y cuándo, con **Devolver** (vuelve a Reponer y se reactiva); reactivarlo en Productos también lo devuelve.
   **Se están cayendo**: venden la mitad o menos que antes teniendo stock. **Parados**: vendieron menos de lo que

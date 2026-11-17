@@ -86,6 +86,12 @@ export async function productosParaVincular(db: Pool) {
 
 /** Vincula y deja registrado quién y cuándo; si había una duda de ese código, queda resuelta. */
 export async function vincular(db: Pool, productId: number, cuenta: string, codigo: string, userId: number) {
+  // 17-11 (el dueño): si la publicación (o variante) estaba vinculada a un producto DESACTIVADO (reutilizar la publicación
+  // para un producto nuevo), ese vínculo viejo ya no sirve: se quita, con quién y cuándo (no se borra).
+  await db.query(
+    `UPDATE product_ml_codes m SET is_active = FALSE, desvinculado_por = $3, desvinculado_at = NOW()
+     FROM products p WHERE p.id = m.product_id AND NOT p.is_active AND m.is_active AND m.ml_code = $1 AND m.product_id <> $2`,
+    [codigo, productId, userId])
   await vincularCodigo(db, productId, cuenta, codigo)
   await db.query(
     `UPDATE product_ml_codes SET vinculado_por = $3, vinculado_at = NOW(), desvinculado_por = NULL, desvinculado_at = NULL

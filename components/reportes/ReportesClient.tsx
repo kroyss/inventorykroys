@@ -77,6 +77,16 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
   useEffect(() => { if (urlSub) setStockSub(urlSub.toLowerCase() as typeof stockSub) }, [urlSub])
 
   useEffect(() => { load() }, [tab, dateFrom, dateTo, vista])
+  // 17-11: Stock se actualiza por detrás (sin pantalla en blanco ni perder filtros) tras «No volver a pedir» / Devolver.
+  const refrescarStock = async () => {
+    const myId = ++reqIdRef.current
+    try {
+      const res = await fetch('/api/reports/stock-analysis', { cache: 'no-store' })
+      if (!res.ok || myId !== reqIdRef.current) return
+      const json = await res.json()
+      if (myId === reqIdRef.current) setData(json)
+    } catch { /* queda lo que se ve */ }
+  }
 
   const handlePreset = (p: DatePreset) => {
     setPreset(p)
@@ -156,7 +166,7 @@ export default function ReportesClient({ analisisStock, conteos = false, importa
         <InventoryReport data={data} search={search} setSearch={setSearch} />
       )}
       {!loading && data && tab === 'stock'      && data.reposicion  && (
-        <StockReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} />
+        <StockReport data={data} sub={stockSub} setSub={setStockSub} onReload={load} onRefrescar={refrescarStock} />
       )}
       {!loading && data && tab === 'transito' && Array.isArray(data) && (
         <InTransitReport rows={data} tipo={importaciones ? transTipo : ''} setTipo={setTransTipo} importaciones={importaciones} />

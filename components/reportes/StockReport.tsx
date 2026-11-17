@@ -35,7 +35,8 @@ function filtrosGuardados(): { grupos?: string[]; soloAgotados?: boolean; minVen
   } catch { return null }
 }
 
-export default function StockReport({ data, sub, setSub, onReload }: { data: P; sub: StockSub; setSub: (s: StockSub) => void; onReload: () => void }) {
+export default function StockReport({ data, sub, setSub, onReload, onRefrescar }: { data: P; sub: StockSub; setSub: (s: StockSub) => void; onReload: () => void
+  onRefrescar: () => Promise<void> }) {
   const r: ReglasStock = data.reglas
   const [buscar, setBuscar] = useState('')
   // 17-11 (el dueño): filtros de Reponer (grupos, solo agotados, vende al menos N); se recuerdan en este navegador.
@@ -45,6 +46,15 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
   const [soloAgotados, setSoloAgotados] = useState(!!guardados?.soloAgotados)
   const [minVende, setMinVende] = useState(guardados?.minVende ?? '')
   const [noPedir, setNoPedir] = useState<P[] | null>(null)
+  // 17-11: lo marcado sale de la lista al instante (sin recargar); el servidor se relee por detrás.
+  const [quitados, setQuitados] = useState<Set<number>>(new Set())
+  const [devueltos, setDevueltos] = useState<Set<number>>(new Set())
+  const [aviso, setAviso] = useState<{ texto: string; ids: number[] } | null>(null)
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 10000)
+    return () => clearTimeout(t)
+  }, [aviso])
   useEffect(() => {
     try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify({ grupos, soloAgotados, minVende })) } catch { /* sin storage */ }
   }, [grupos, soloAgotados, minVende])
@@ -56,19 +66,26 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
   const router = useRouter()
   const cerrarReglas = useCallback(() => setVerReglas(false), [])
 
-  const repo: P[] = data.reposicion ?? []
+  const repo: P[] = (data.reposicion ?? []).filter((p: P) => !quitados.has(p.id))
+  const listaNo: P[] = (data.no_reponer ?? []).filter((p: P) => !devueltos.has(p.id))
   const declive: P[] = data.declive ?? []
   const remate: P[] = data.remate ?? []
   const nuevos: P[] = data.nuevos ?? []
   const urgentes = repo.filter(p => p.prioridad === 'URGENTE').length
   const minimo = Number(minVende.replace(',', '.')) || 0
-  const repoF = repo.filter(p => grupos.includes(p.prioridad) && (!soloAgotados || p.stock_actual <= 0)
-    && (!minimo || (p.demanda_mensual ?? p.venta_mensual) >= minimo))
+  const pasaGrupo = (p: P) => grupos.includes(p.prioridad)
+  const pasaAgotado = (p: P) => !soloAgotados || p.stock_actual <= 0
+  const pasaVende = (p: P) => !minimo || (p.demanda_mensual ?? p.venta_mensual) >= minimo
+  const repoF = repo.filter(p => pasaGrupo(p) && pasaAgotado(p) && pasaVende(p))
   const hayFiltro = grupos.length < TODOS_GRUPOS.length || soloAgotados || minimo > 0
   const limpiarFiltros = () => { setGrupos(TODOS_GRUPOS); setSoloAgotados(false); setMinVende('') }
   const devolver = async (ids: number[]) => {
     const res = await fetch('/api/reports/no-reponer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, deshacer: true }) })
-    if (res.ok) onReload()
+    if (res.ok) {
+      setDevueltos(x => new Set([...x, ...ids])); setQuitados(x => new Set([...x].filter(id => !ids.includes(id))))
+      await onRefrescar()
+      setDevueltos(new Set())
+    }
     else { const d = await res.json().catch(() => ({})); await confirmar({ title: 'No se pudo devolver', message: d.error ?? 'Intenta de nuevo.', confirmText: 'Entendido' }) }
   }
   const plataParada = remate.reduce((s, p) => s + (p.valor_stock || 0), 0)
@@ -134,7 +151,7 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
       {sub === 'reposicion' && repo.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {GRUPOS.map(g => {
-            const n = repo.filter(p => p.prioridad === g.k).length
+            const n = repo.filter(p => p.prioridad === g.k && pasaAgotado(p) && pasaVende(p)).length
             const on = grupos.includes(g.k)
             return (
               <button key={g.k} type="button" aria-pressed={on} title={g.ayuda}
@@ -147,7 +164,7 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
           })}
           <button type="button" aria-pressed={soloAgotados} onClick={() => setSoloAgotados(v => !v)}
             className={`rounded-full border px-3 py-1 text-xs ${soloAgotados ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>
-            Solo agotados <span className="opacity-60">{repo.filter(p => p.stock_actual <= 0).length}</span>
+            Solo agotados <span className="opacity-60">{repo.filter(p => p.stock_actual <= 0 && pasaGrupo(p) && pasaVende(p)).length}</span>
           </button>
           <label className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs ${minimo ? 'border-neutral-900 text-neutral-900' : 'border-neutral-200 text-neutral-600'} bg-white`}>
             Vende al menos
@@ -166,8 +183,8 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
         <Reponer lista={filtra(repoF)} orden={orden} r={r} filtrado={hayFiltro} limpiar={limpiarFiltros}
           pedido={pedido} setPedido={setPedido} />
       )}
-      {sub === 'reposicion' && (data.no_reponer ?? []).length > 0 && (
-        <NoVuelves lista={data.no_reponer} puede={!!data.puede_productos} onDevolver={devolver} />
+      {sub === 'reposicion' && listaNo.length > 0 && (
+        <NoVuelves lista={listaNo} puede={!!data.puede_productos} onDevolver={devolver} />
       )}
       {sub === 'declive' && (
         <Lista filas={filtra(declive)} vacio="Ningún producto se está cayendo." cols={[
@@ -203,7 +220,23 @@ export default function StockReport({ data, sub, setSub, onReload }: { data: P; 
       )}
 
       {noPedir && <NoVolverAPedir productos={noPedir} onCerrar={() => setNoPedir(null)}
-        onHecho={() => { setNoPedir(null); setPedido({}); onReload() }} />}
+        onHecho={(ids, desactivados) => {
+          setNoPedir(null); setPedido({}); setQuitados(x => new Set([...x, ...ids]))
+          setAviso({ ids, texto: `${ids.length} producto${ids.length === 1 ? '' : 's'} fuera de Reponer${desactivados ? ` (${desactivados} desactivado${desactivados === 1 ? '' : 's'})` : ''}` })
+          void onRefrescar()
+        }} />}
+      {aviso && !Object.keys(pedido).length && (
+        <div data-barra-fija role="status" className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 px-4 md:bottom-4">
+          <div className="mx-auto flex max-w-xl items-center justify-between gap-3 rounded-xl bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg">
+            <span>{aviso.texto}</span>
+            <span className="flex shrink-0 items-center gap-3">
+              <button type="button" className="font-semibold underline underline-offset-2"
+                onClick={async () => { const ids = aviso.ids; setAviso(null); await devolver(ids) }}>Deshacer</button>
+              <button type="button" aria-label="Cerrar aviso" className="text-neutral-400 hover:text-white" onClick={() => setAviso(null)}>×</button>
+            </span>
+          </div>
+        </div>
+      )}
       {verReglas && <PanelReglas onCerrar={cerrarReglas} onGuardado={() => { setVerReglas(false); onReload() }} />}
     </div>
   )
@@ -490,7 +523,7 @@ function PanelReglas({ onCerrar, onGuardado }: { onCerrar: () => void; onGuardad
 // Confirmación: separa los que se desactivan ya (stock 0, nada en camino, sin ventas de ML por registrar) de los que
 // solo salen de Reponer y se desactivan solos al terminar de venderse. Muestra los títulos de sus publicaciones
 // activas en ML para ver de paso una vinculación equivocada.
-function NoVolverAPedir({ productos, onCerrar, onHecho }: { productos: P[]; onCerrar: () => void; onHecho: () => void }) {
+function NoVolverAPedir({ productos, onCerrar, onHecho }: { productos: P[]; onCerrar: () => void; onHecho: (ids: number[], desactivados: number) => void }) {
   const [info, setInfo] = useState<{ pubs: { product_id: number; cuenta: string; item_id: string; titulo: string | null; disponible: number | null }[]; comprometidos: number[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -517,7 +550,7 @@ function NoVolverAPedir({ productos, onCerrar, onHecho }: { productos: P[]; onCe
     const r = await fetch('/api/reports/no-reponer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) })
     const d = await r.json().catch(() => ({}))
     setEnviando(false)
-    if (r.ok) onHecho(); else setError(d.error ?? 'No se pudo')
+    if (r.ok) onHecho(ids, d.desactivados ?? 0); else setError(d.error ?? 'No se pudo')
   }
 
   const fila = (p: P, nota?: string) => (
