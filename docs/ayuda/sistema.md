@@ -1009,6 +1009,15 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   orden y sin acentos, busca en los últimos 6 meses); sin buscar muestra las de 20 días alrededor de la venta. Mejor: registra esas ventas desde Por confirmar, con
   el número de MercadoLibre, no como LOCAL (la LOCAL no cuenta la comisión de ML).
   **No se concretaron** = las marcadas a mano «No se concretó» (se ven 30 días para ver quién y deshacer).
+  **Traer pagos y ventas** (un solo botón, como en Pagos ME): trae al instante las ventas nuevas de MercadoLibre y
+  pide los pagos y guías de MercadoEnvíos (1 a 3 min; al llegar vuelve a traer las ventas). Sin Pagos ME se llama
+  **Traer ventas**. Igual se traen solas cada hora.
+  **Sin inventario** (botón arriba, con Inventario): abre todas las ventas pendientes de registrar agrupadas por
+  producto, con casillas y «Marcar todas»; **Quitar N de pendientes** saca las que no vas a registrar (por ejemplo,
+  vendidas antes de llevar inventario o de productos que no cargaste). Las quitadas no piden registro, **no restan**
+  en Stock en ML y en Calificaciones siguen como cualquier venta (no cuentan como «despachada por fuera»). No esconde
+  productos a futuro: las ventas nuevas siguen llegando a pendientes; lo correcto es cargar su inventario. Abajo,
+  **Quitadas por sin inventario** muestra quién y cuándo, con **Devolver** (una o todas) a pendientes.
 - **Presupuestos** (Ventas → ícono de hoja junto a las fechas; en prueba, solo algunas empresas): cotizaciones para un cliente.
   **+ Nuevo presupuesto:** cliente (cédula/RIF y teléfono opcionales), productos del inventario (el precio se carga
   solo y se puede cambiar) o **ítems libres** (servicio, envío), moneda (US$, Bs o pesos), descuento % y cuántos días

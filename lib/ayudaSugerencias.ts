@@ -104,6 +104,12 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
   ],
+  '/ventas': [
+    { pregunta: 'Tengo muchas ventas viejas por confirmar que no voy a registrar',
+      respuesta: 'En **Por confirmar** toca **Sin inventario**: marca las ventas (o **Marcar todas**) y toca **Quitar N de pendientes**. No restan en Stock en ML y se pueden **Devolver** desde la lista de abajo. Las ventas nuevas siguen llegando: carga el inventario de esos productos para registrarlas.' },
+    { pregunta: '¿Qué hace «Traer pagos y ventas»?',
+      respuesta: 'Trae al instante las ventas nuevas de MercadoLibre y pide los pagos y guías de MercadoEnvíos (tarda 1 a 3 min). Igual se traen solas cada hora.' },
+  ],
   '/aprendizaje': [
     { pregunta: '¿En qué orden veo los videos?', respuesta: 'En el orden de la lista: primero la serie de Automatizaciones (del 1 al 7) y, si usas Pagos ME, la de MercadoEnvíos.' },
   ],

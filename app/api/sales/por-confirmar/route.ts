@@ -5,7 +5,8 @@ import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { dbGlobal } from '@/lib/db'
 import { sincronizarOrdenes } from '@/lib/calificacionesML'
-import { DIAS_MAX, cargadasConPago, despachadasFuera, marcarFuera, marcarNoConcretada, noConcretadas, ventasPorConfirmar } from '@/lib/porConfirmar'
+import { DIAS_MAX, cargadasConPago, despachadasFuera, marcarFuera, marcarNoConcretada, marcarSinInventario, noConcretadas,
+  quitadasSinInventario, ventasPorConfirmar } from '@/lib/porConfirmar'
 import { MOTIVOS_NO_CONCRETADA } from '@/lib/noConcretada'
 
 // GET  /api/sales/por-confirmar → ventas de ML sin registrar (lib/porConfirmar.ts) + última búsqueda de pagos
@@ -13,6 +14,7 @@ import { MOTIVOS_NO_CONCRETADA } from '@/lib/noConcretada'
 // POST /api/sales/por-confirmar → trae ya de ML las ventas de los últimos días (sin esperar al cron)
 // PUT  /api/sales/por-confirmar { numero, motivo, nota } → "No se concretó" (mig 115); motivo null = deshacer
 //      { fuera: [numeros], deshacer? } → "Ya la despaché por fuera" (mig 120, solo sin inventario); una o varias
+//      { sin_inventario: [numeros], deshacer? } → «Sin inventario» (mig 183, con inventario): fuera de pendientes
 export async function GET() {
   const s = await sesionPreguntas()
   if ('error' in s) return s.error
@@ -23,8 +25,8 @@ export async function GET() {
       ? await dbGlobal().query(`SELECT inventario_desde FROM empresas WHERE id = $1`, [s.session.user.empresaId])
       : { rows: [] }
     const desde: string | null = emp?.inventario_desde ? new Date(emp.inventario_desde).toISOString() : null
-    const [{ dias, filas }, noConc, fuera] = await Promise.all([ventasPorConfirmar(s.db, desde), noConcretadas(s.db),
-      conInventario ? Promise.resolve([]) : despachadasFuera(s.db)])
+    const [{ dias, filas }, noConc, fuera, quitadas] = await Promise.all([ventasPorConfirmar(s.db, desde), noConcretadas(s.db),
+      conInventario ? Promise.resolve([]) : despachadasFuera(s.db), conInventario ? quitadasSinInventario(s.db) : Promise.resolve([])])
     let ultimaBusqueda: string | null = null
     // Solo con inventario: sin inventario (Fundadores) no hay ventas cargadas.
     const cargadas = tieneModulo(s.session.user, 'pagos_me') && tieneModulo(s.session.user, 'inventario') ? await cargadasConPago(s.db) : []
@@ -35,7 +37,7 @@ export async function GET() {
       ultimaBusqueda = fin ?? (p ? new Date(p.pedido_at).toISOString() : null)
     }
     const { rows: [sync] } = await s.db.query(`SELECT MIN(ordenes_sync_at) AS at FROM ml_conexiones WHERE estado = 'activa'`)
-    return NextResponse.json({ dias, filas, cargadas, conInventario, inventarioDesde: desde, noConcretadas: noConc, despachadasFuera: fuera, ultimaBusqueda, pagosME: tieneModulo(s.session.user, 'pagos_me'), sincronizadas_at: sync?.at ?? null })
+    return NextResponse.json({ dias, filas, cargadas, conInventario, inventarioDesde: desde, noConcretadas: noConc, despachadasFuera: fuera, sinInventario: quitadas, ultimaBusqueda, pagosME: tieneModulo(s.session.user, 'pagos_me'), sincronizadas_at: sync?.at ?? null })
   } catch (err) {
     return apiError(err)
   }
@@ -66,6 +68,11 @@ const NoConcretadaSchema = z.object({
   nota:   z.string().trim().max(300).nullable().optional(),
 })
 
+const SinInventarioSchema = z.object({
+  sin_inventario: z.array(z.string().regex(/^\d+$/)).min(1).max(500),
+  deshacer:       z.boolean().optional(),
+})
+
 const FueraSchema = z.object({
   fuera:    z.array(z.string().regex(/^\d+$/)).min(1).max(500),
   deshacer: z.boolean().optional(),
@@ -76,6 +83,12 @@ export async function PUT(req: NextRequest) {
   if ('error' in s) return s.error
   try {
     const cuerpo = await req.json()
+    if (cuerpo && typeof cuerpo === 'object' && 'sin_inventario' in cuerpo) {
+      if (!tieneModulo(s.session.user, 'inventario')) return NextResponse.json({ error: 'Solo con inventario' }, { status: 403 })
+      const b = SinInventarioSchema.parse(cuerpo)
+      const n = await marcarSinInventario(s.db, b.sin_inventario, parseInt(s.session.user.id, 10), !b.deshacer)
+      return NextResponse.json({ ok: true, n })
+    }
     if (cuerpo && typeof cuerpo === 'object' && 'fuera' in cuerpo) {
       // Con inventario no: la venta se carga en Ventas (descuenta el stock); despachar por fuera descuadra el inventario.
       if (tieneModulo(s.session.user, 'inventario')) return NextResponse.json({ error: 'Con inventario, carga la venta en Ventas' }, { status: 403 })

@@ -52,7 +52,10 @@ interface Datos { dias: number; filas: Fila[]; ultimaBusqueda: string | null; pa
   /** Marcadas "No se concretó" (mig 115), para ver y deshacer. */
   noConcretadas?: NoConcretada[]
   /** Marcadas "Ya la despaché por fuera" (mig 120, sin inventario), para ver y deshacer. */
-  despachadasFuera?: DespachadaFuera[] }
+  despachadasFuera?: DespachadaFuera[]
+  conInventario?: boolean
+  /** Quitadas de pendientes con «Sin inventario» (mig 183, con inventario), para ver y devolver. */
+  sinInventario?: DespachadaFuera[] }
 /** Recargar la lista desde cualquier fila (lo da PorConfirmar). */
 const Recargar = createContext<() => Promise<void>>(async () => {})
 
@@ -89,6 +92,170 @@ function DespacheFuera({ f }: { f: Fila }) {
         }}>Ya la despaché por fuera</button>
       {error && <span className="ml-1 text-red-700">{error}</span>}
     </span>
+  )
+}
+
+async function pedirSinInventario(numeros: string[], deshacer = false) {
+  let n = 0
+  for (let i = 0; i < numeros.length; i += 500) {
+    const r = await fetch('/api/sales/por-confirmar', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sin_inventario: numeros.slice(i, i + 500), deshacer }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error ?? 'No se pudo')
+    n += Number(j.n) || 0
+  }
+  return n
+}
+
+const nombreLinea = (f: Fila) => f.lineas.map(l => `${l.titulo}${l.variante ? ` (${l.variante})` : ''}`).join(' + ') || 'Sin producto'
+const fechaCorta = (s: string) => new Date(s).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })
+
+/** 17-11 (el dueño): «Sin inventario». Todas las ventas pendientes de registrar, agrupadas por producto: se marcan las que
+ *  no se van a registrar (vendidas antes de llevar inventario, productos que no se cargaron) y salen de pendientes. No
+ *  esconde productos a futuro: las ventas nuevas siguen llegando, la idea es cargar el inventario. Se pueden devolver. */
+function QuitarSinInventario({ filas, onCerrar }: { filas: Fila[]; onCerrar: () => void }) {
+  const recargar = useContext(Recargar)
+  const grupos = (() => {
+    const m = new Map<string, Fila[]>()
+    for (const f of filas) { const k = nombreLinea(f); m.set(k, [...(m.get(k) ?? []), f]) }
+    return [...m.entries()].map(([nombre, fs]) => ({ nombre, filas: fs, foto: fs[0].lineas[0]?.foto ?? null }))
+      .sort((a, b) => b.filas.length - a.filas.length || a.nombre.localeCompare(b.nombre))
+  })()
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set())
+  const [seguro, setSeguro] = useState(false)
+  const [haciendo, setHaciendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const todas = filas.map(f => f.numero)
+  const cambiar = (nums: string[], si: boolean) => setMarcadas(prev => {
+    const s = new Set(prev); nums.forEach(n => (si ? s.add(n) : s.delete(n))); return s
+  })
+  const quitar = async () => {
+    setHaciendo(true); setError(null)
+    try { await pedirSinInventario([...marcadas]); await recargar(); onCerrar() }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo'); setHaciendo(false) }
+  }
+  const n = marcadas.size
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" role="dialog" aria-modal="true" onClick={onCerrar}>
+      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-3">
+          <div>
+            <h3 className="font-semibold text-neutral-900">Ventas sin inventario</h3>
+            <p className="mt-0.5 text-xs text-neutral-500">Marca las ventas que no vas a registrar (por ejemplo, de antes de llevar inventario).
+              Salen de pendientes y no restan en Stock en ML. Las ventas nuevas siguen llegando aquí: carga tu inventario para registrarlas.</p>
+          </div>
+          <button type="button" onClick={onCerrar} className="btn-ghost !px-2 !py-1" aria-label="Cerrar">✕</button>
+        </div>
+        <label className="flex items-center gap-2 border-b bg-neutral-50 px-5 py-2 text-sm">
+          <input type="checkbox" checked={n === todas.length && n > 0} ref={el => { if (el) el.indeterminate = n > 0 && n < todas.length }}
+            onChange={e => setMarcadas(e.target.checked ? new Set(todas) : new Set())} />
+          <span className="font-medium text-neutral-800">Marcar todas</span>
+          <span className="text-neutral-400">{todas.length} ventas · {grupos.length} productos</span>
+        </label>
+        <ul className="flex-1 divide-y divide-neutral-100 overflow-y-auto">
+          {grupos.map(g => {
+            const nums = g.filas.map(f => f.numero)
+            const enG = nums.filter(x => marcadas.has(x)).length
+            const abierto = abiertos.has(g.nombre)
+            return (
+              <li key={g.nombre}>
+                <div className="flex items-center gap-3 px-5 py-2.5">
+                  <input type="checkbox" aria-label={`Marcar ${g.nombre}`} checked={enG === nums.length}
+                    ref={el => { if (el) el.indeterminate = enG > 0 && enG < nums.length }} onChange={e => cambiar(nums, e.target.checked)} />
+                  {g.foto
+                    ? <img src={g.foto} alt="" className="h-9 w-9 shrink-0 rounded-md border border-neutral-200 object-cover" loading="lazy" />
+                    : <span className="h-9 w-9 shrink-0 rounded-md bg-neutral-100" aria-hidden="true" />}
+                  <button type="button" onClick={() => setAbiertos(prev => { const s = new Set(prev); if (s.has(g.nombre)) s.delete(g.nombre); else s.add(g.nombre); return s })}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left">
+                    <span className="min-w-0 truncate text-sm text-neutral-900">{g.nombre}</span>
+                    <span className="shrink-0 text-xs text-neutral-500">
+                      {enG > 0 && enG < nums.length ? `${enG} de ` : ''}{nums.length} {nums.length === 1 ? 'venta' : 'ventas'}
+                      <span className="ml-1 text-neutral-400" aria-hidden="true">{abierto ? '▴' : '▾'}</span>
+                    </span>
+                  </button>
+                </div>
+                {abierto && (
+                  <ul className="mb-2 ml-12 mr-5 divide-y divide-neutral-100 rounded-lg border border-neutral-100 bg-neutral-50/60">
+                    {g.filas.map(f => (
+                      <li key={f.numero}>
+                        <label className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                          <input type="checkbox" checked={marcadas.has(f.numero)} onChange={e => cambiar([f.numero], e.target.checked)} />
+                          <span className="font-medium text-neutral-800">{f.comprador ?? f.nick ?? 'Sin nombre'}</span>
+                          <span className="text-neutral-400">{fechaCorta(f.fecha)} · {f.cuenta}</span>
+                          {f.pago && f.pago.verificacion !== 'invalido' && <span className="text-sky-700">con pago</span>}
+                          <span className="ml-auto font-mono text-[11px] text-neutral-400">{f.numero}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        <div className="border-t bg-white px-5 py-3">
+          {error && <p className="mb-2 text-xs text-red-700">{error}</p>}
+          {seguro ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span className="mr-auto text-xs text-neutral-600">¿Quitar {n} {n === 1 ? 'venta' : 'ventas'} de pendientes? Se pueden devolver después.</span>
+              <button type="button" onClick={() => setSeguro(false)} disabled={haciendo} className="btn-secondary text-sm">Cancelar</button>
+              <button type="button" onClick={quitar} disabled={haciendo} className="btn-primary text-sm disabled:opacity-50">{haciendo ? 'Quitando…' : 'Sí, quitar'}</button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button type="button" onClick={onCerrar} className="btn-ghost text-sm">Cerrar</button>
+              <button type="button" onClick={() => setSeguro(true)} disabled={!n} className="btn-primary text-sm disabled:opacity-50">
+                Quitar {n || ''} de pendientes</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>, document.body)
+}
+
+/** Las quitadas con «Sin inventario» (mig 183): quién y cuándo, y «Devolver» a pendientes. */
+function ListaQuitadas({ filas }: { filas: DespachadaFuera[] }) {
+  const recargar = useContext(Recargar)
+  const [ver, setVer] = useState(false)
+  const [haciendo, setHaciendo] = useState<string | null>(null)
+  if (!filas.length) return null
+  const devolver = async (nums: string[], clave: string) => {
+    setHaciendo(clave); try { await pedirSinInventario(nums, true); await recargar() } finally { setHaciendo(null) }
+  }
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-neutral-50/60">
+      <button type="button" onClick={() => setVer(v => !v)} className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left">
+        <span className="text-sm font-medium text-neutral-600">Quitadas por sin inventario <span className="text-neutral-400">{filas.length}</span></span>
+        <span className="text-xs text-neutral-400">No piden registro ni restan en Stock en ML · {ver ? 'Ocultar' : 'Ver'}</span>
+      </button>
+      {ver && (
+        <ul className="divide-y divide-neutral-100 border-t border-neutral-200 bg-white">
+          {filas.length > 1 && (
+            <li className="flex justify-end px-4 py-2">
+              <button type="button" disabled={!!haciendo} onClick={() => devolver(filas.map(f => f.numero), '*')}
+                className="text-xs font-medium text-neutral-600 underline hover:text-neutral-900 disabled:opacity-50">
+                {haciendo === '*' ? 'Devolviendo…' : `Devolver las ${filas.length} a pendientes`}</button>
+            </li>
+          )}
+          {filas.map(n => (
+            <li key={n.numero} className="flex flex-col gap-1 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <span className="font-medium text-neutral-900">{n.comprador ?? n.nick ?? 'Sin nombre'}</span>
+                <span className="ml-2 font-mono text-[11px] text-neutral-400">{n.numero}</span>
+                {n.productos && <div className="truncate text-xs text-neutral-500">{n.productos}</div>}
+                <div className="text-xs text-neutral-400">Quitada por {n.por ?? '—'} · {hora(n.at)}</div>
+              </div>
+              <button type="button" disabled={!!haciendo} className="self-start text-xs text-neutral-500 underline hover:text-neutral-800 disabled:opacity-50 sm:self-center"
+                onClick={() => devolver([n.numero], n.numero)}>
+                {haciendo === n.numero ? 'Devolviendo…' : 'Devolver'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -578,6 +745,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   }, [tme.ocupada, tme.traida, pidiendoME])
   // "Comprobar con el banco" (20-10): cualquier usuario sube los estados de cuenta; el resultado queda en cada venta.
   const [banco, setBanco] = useState(false)
+  // 17-11: «Sin inventario» (quitar de pendientes las que no se van a registrar).
+  const [sinInv, setSinInv] = useState(false)
   // Estados de cuenta de hoy en este navegador (22-10, lib/bancoMemoria.ts): cuando llegan pagos nuevos sin lo que
   // dijo el banco, se cruzan solos. `cruzados` = los pagos ya intentados (los que no aparecen no se reintentan en bucle).
   const [memoria, setMemoria] = useState<EstadoGuardado[]>(() => typeof window === 'undefined' ? [] : leerMemoria())
@@ -682,18 +851,19 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
                 : <>última vez <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
             </p>
           ) : <>
-          {datos.pagosME && (
-            <p>
-              <b className="text-neutral-700">Traer ME</b>: pagos y guías de MercadoEnvíos (tarda 1 a 3 min; al terminar trae también las ventas) · {buscandoME
-                ? <b className="text-violet-700">buscando…</b>
-                : <>última <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}
-            </p>
-          )}
+          {/* 17-11 (el dueño): un solo botón, como en Pagos ME: las ventas al instante y los pagos/guías cuando llegan. */}
           <p>
-            <b className="text-neutral-700">Traer ML</b>: ventas nuevas de MercadoLibre (solas cada hora) · {revisado
-              ? <>recién {hora(revisado.at)}: <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
+            <b className="text-neutral-700">{datos.pagosME ? '«Traer pagos y ventas»' : '«Traer ventas»'}</b>: ventas nuevas de MercadoLibre
+            {datos.pagosME ? ' al instante y pagos y guías de MercadoEnvíos (1 a 3 min)' : ' (solas cada hora)'}
+          </p>
+          <p>
+            Ventas: {revisado
+              ? <>recién {hora(revisado.at)}, <b className={revisado.nuevas ? 'text-emerald-700' : 'text-neutral-700'}>
                   {revisado.nuevas ? `${revisado.nuevas} ${revisado.nuevas === 1 ? 'nueva' : 'nuevas'}` : 'nada nuevo'}</b></>
               : <>última <b className="text-neutral-700">{datos.sincronizadas_at ? hora(datos.sincronizadas_at) : '—'}</b></>}
+            {datos.pagosME && <> · Pagos: {buscandoME
+              ? <b className="text-violet-700">trayendo…</b>
+              : <>última <b className="text-neutral-700">{datos.ultimaBusqueda ? hora(datos.ultimaBusqueda) : '—'}</b></>}</>}
           </p>
           </>}
         </div>
@@ -704,18 +874,24 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
               🏦 Comprobar con el banco
             </button>
           )}
-          {datos.pagosME && !sinInventario && (
-            <button type="button" onClick={traerME} disabled={buscandoME || tme.ocupada} title="Trae de MercadoEnvíos los pagos y guías (lo hace la PC de los pagos)"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
-              <IconoActualizar girando={buscandoME || tme.ocupada} />
-              {buscandoME || tme.ocupada ? 'Buscando pagos…' : 'Traer ME'}
+          {!sinInventario && datos.conInventario && datos.filas.length > 0 && (
+            <button type="button" onClick={() => setSinInv(true)} title="Quitar de pendientes las ventas que no vas a registrar"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm hover:border-neutral-400 hover:bg-neutral-50">
+              Sin inventario
             </button>
           )}
-          {!sinInventario && <button type="button" onClick={actualizar} disabled={actualizando} title="Trae de MercadoLibre las ventas nuevas"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
-            <IconoActualizar girando={actualizando} />
-            {actualizando ? 'Trayendo…' : 'Traer ML'}
-          </button>}
+          {!sinInventario && (() => {
+            const ocupado = actualizando || (datos.pagosME && (buscandoME || tme.ocupada))
+            return (
+              <button type="button" disabled={ocupado}
+                onClick={() => { actualizar(); if (datos.pagosME) traerME() }}
+                title={datos.pagosME ? 'Trae las ventas nuevas de MercadoLibre y los pagos y guías de MercadoEnvíos (lo hace la PC de los pagos)' : 'Trae de MercadoLibre las ventas nuevas'}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-sm hover:border-neutral-400 hover:bg-neutral-200 disabled:cursor-wait disabled:text-neutral-400">
+                <IconoActualizar girando={ocupado} />
+                {actualizando ? 'Trayendo ventas…' : ocupado ? 'Trayendo pagos…' : datos.pagosME ? 'Traer pagos y ventas' : 'Traer ventas'}
+              </button>
+            )
+          })()}
         </div>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
@@ -740,6 +916,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             </div>
           </div>
         </div>, document.body)}
+      {sinInv && <QuitarSinInventario filas={datos.filas} onCerrar={() => setSinInv(false)} />}
       {avisoME && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{avisoME}</div>}
       {datos.filas.length > 0 && (
         <div className="flex items-center gap-2">
@@ -834,6 +1011,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
       )}
       <ListaNoConcretadas filas={datos.noConcretadas ?? []} />
       <ListaFuera filas={datos.despachadasFuera ?? []} />
+      <ListaQuitadas filas={datos.sinInventario ?? []} />
     </div>
     </Recargar.Provider>
   )

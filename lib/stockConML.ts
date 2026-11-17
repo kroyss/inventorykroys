@@ -120,7 +120,7 @@ async function comprometidasPorCodigo(db: Pool): Promise<Map<string, number>> {
        AND (o.fecha > NOW() - make_interval(days => $1)
             OR (o.fecha > NOW() - make_interval(days => $2) AND EXISTS (
                 SELECT 1 FROM me_pagos p WHERE (p.venta = o.id::text OR p.venta = o.pack_id::text) AND p.verificacion <> 'invalido')))
-       AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL
+       AND COALESCE(o.estado, '') <> 'cancelled' AND o.no_concretada_at IS NULL AND o.fuera_at IS NULL AND o.sin_inv_at IS NULL
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.id::text)
        AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.ml_order_number = o.pack_id::text)`, [DIAS_MAX, DIAS_CON_PAGO])
   return porCodigo(rows)
