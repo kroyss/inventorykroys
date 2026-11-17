@@ -9,6 +9,7 @@ import { FotoProducto } from '@/components/ui/FotoProducto'
 import { Ventana } from '@/components/ui/Ventana'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockConML'
+import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
 
 type Filtro = 'vende' | 'diferencias' | 'pausadas' | 'reserva' | 'reactivar' | 'bloqueadas' | 'combos' | 'todas'
 interface Res { item_id: string; variante_id: string | null; ok: boolean; error?: string; disponible?: number; estado?: string }
@@ -456,7 +457,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           {puedeCambiar && (
             <div className="flex flex-wrap items-center gap-3">
               {(f.excede || editando) && (
-                <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-primary text-sm disabled:opacity-50"
+                <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-secondary text-sm disabled:opacity-50"
                   onClick={async () => {
                     setGuardando(true)
                     const ok = await onAsignar(asignables.filter(p => Number(valor(p)) !== p.ml_disponible)
@@ -506,8 +507,12 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
     <li className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 text-sm ${p.sin_sincronizar || atenuada ? 'opacity-50' : ''}`}>
       <div className="min-w-[12rem] flex-1">
         <div className="text-xs text-neutral-500">
-          <b className="text-neutral-700">{p.cuenta}</b> · <span className="font-mono">{p.item_id}</span>
+          <b className="text-neutral-700">{p.cuenta}</b> · <AbrirFicha item={p.item_id} title="Ver la publicación aquí mismo"
+            className="font-mono text-sky-700 underline decoration-dotted underline-offset-2 hover:text-sky-900">{p.item_id}</AbrirFicha>
           {p.variante && <span className="ml-1 rounded-full bg-sky-50 px-1.5 py-px text-[11px] text-sky-800 ring-1 ring-inset ring-sky-200">{p.variante}</span>}
+          {p.compartida && <span className="ml-1 rounded-full bg-violet-50 px-1.5 py-px text-[11px] text-violet-800 ring-1 ring-inset ring-violet-200"
+            title={`La misma publicación está vinculada a otros productos: ML muestra la suma de todos.${p.compartida.aporte != null ? ` Este aporta ${p.compartida.aporte}.` : ''}`}>
+            Compartida con {p.compartida.con.join(', ')}{p.compartida.aporte != null ? ` · aporta ${p.compartida.aporte}` : ''}</span>}
         </div>
         <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está activa ni pausada en ML (cerrada o finalizada); si la acabas de crear, pulsa «Actualizar desde ML»</span>}</div>
       </div>
@@ -728,7 +733,8 @@ function Desactivados({ lista, puedePausar, puedeDesvincular, puedeReactivar, on
               {p.pubs.map(x => (
                 <li key={x.codigo_id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-sm">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-neutral-500"><b className="text-neutral-700">{x.cuenta}</b> · <span className="font-mono">{x.item_id}</span> · {x.disponible ?? 0} en ML</p>
+                    <p className="text-xs text-neutral-500"><b className="text-neutral-700">{x.cuenta}</b> · <AbrirFicha item={x.item_id} title="Ver la publicación aquí mismo"
+                      className="font-mono text-sky-700 underline decoration-dotted underline-offset-2 hover:text-sky-900">{x.item_id}</AbrirFicha> · {x.disponible ?? 0} en ML</p>
                     <p className="text-neutral-800">{x.titulo ?? 'Sin título guardado'}</p>
                   </div>
                   {hechos[x.item_id] || hechos[`d${x.codigo_id}`]

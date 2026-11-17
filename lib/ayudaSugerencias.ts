@@ -29,6 +29,8 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Para qué es la nota de la venta?', respuesta: 'Es una nota interna que se guarda en MercadoLibre; el comprador **no la ve**. Sirve para dejar dicho, por ejemplo, «cambia a talla L».' },
   ],
   '/inventario/stock-ml': [
+    { pregunta: '¿Qué significa «Compartida con COD-…»?',
+      respuesta: 'Esa publicación está vinculada a varios productos (por ejemplo, un mismo anuncio con varios modelos). ML muestra la **suma** de lo que aporta cada uno; «aporta N» es la parte de este producto. Toca el **código MLV** para ver la publicación aquí mismo y confirmar que todos son de verdad de ese anuncio.' },
     { pregunta: '¿Cómo pauso o activo varias a la vez?',
       respuesta: 'Marca los productos y toca abajo **Pausar N publicaciones** (pausa sus activas). Para activar, en el selector de estado elige **Pausadas en ML**, marca y toca **Activar N publicaciones**: solo funciona con las que tienen stock en ML; las demás iguálalas primero.' },
     { pregunta: '¿Qué es «desactivados que siguen publicados»?',

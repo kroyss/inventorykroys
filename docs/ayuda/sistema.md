@@ -973,10 +973,14 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   sale de estos vínculos: al corregir aquí se arregla sola en todos lados (no hay que actualizar nada).
 - **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
   cuentas de una vez. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
-  (en el filtro Revisar combos salen abiertas).
+  (en el filtro Revisar combos salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
+  variantes, descripción) sin ir a MercadoLibre.
+  **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
+  convertidor con varias versiones). ML muestra la **suma** de lo que aporta cada producto («aporta N»). Si alguno está en
+  «Quedan pocas» o no se sincroniza, esa publicación no se toca sola.
   **Quedan pocas** (el disponible es igual o menor a la reserva): el sistema no reparte solo. Si ML ofrece más de lo que
   hay, sale «Hay 2 y MercadoLibre ofrece 3. Te sugerimos: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» con el botón
-  **Dejar así en ML** (baja primero la que más muestra; también lo hace «Igualar» al marcar varios). **Cambiar** deja
+  **Dejar así en ML** (botón discreto: guarda en ML; baja primero la que más muestra; también lo hace «Igualar» al marcar varios). **Cambiar** deja
   poner a mano cuántas muestra cada cuenta.
   **Bodega** (con el permiso «Cambiar el stock en MercadoLibre»; no hace falta tocar el inventario):
   **Pausar** (en cada publicación, con motivo opcional: dañado, sin foto…) deja de venderla; «Igualar» no la reactiva

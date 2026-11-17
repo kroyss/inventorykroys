@@ -47,6 +47,9 @@ export interface PubStockML {
   actualizado_at: string | null
   /** Pausada a mano desde Stock en ML (mig 181) y sigue pausada: Igualar no la reactiva. */
   pausa_mano: { at: string; por: string | null; motivo: string | null } | null
+  /** 17-11 Compartida: la misma publicación (o variante) vinculada a varios productos activos (modelos que el comprador
+   *  elige). ML recibe la SUMA de lo que aporta cada uno; `aporte` = lo de este producto. */
+  compartida: { con: string[]; aporte: number | null } | null
 }
 
 export interface FilaStockML {
@@ -217,6 +220,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       ventas60: ventas.get(String(r.ml_code)) ?? 0,
       actualizado_at: r.actualizado_at,
       pausa_mano: r.pausa_mano_at && r.estado === 'paused' ? { at: r.pausa_mano_at, por: r.pausa_mano_por, motivo: r.pausa_mano_motivo } : null,
+      compartida: null,
     })
   }
 
@@ -284,5 +288,49 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     const { codigos: _, ...fila } = f
     filas.push(fila)
   }
+  compartidas(filas)
   return filas
+}
+
+// 17-11 (el dueño): una publicación vinculada a varios productos activos (p. ej. un convertidor con 4 modelos) recibía
+// el número de un solo producto («gana el último que igualaste»). Ahora recibe la SUMA de lo que aporta cada uno.
+// Si alguno está en reserva o no se sincroniza, la publicación no se toca sola (queda como está en ML).
+function compartidas(filas: FilaStockML[]) {
+  const grupos = new Map<string, { f: FilaStockML; p: PubStockML }[]>()
+  for (const f of filas) for (const p of f.pubs) {
+    const k = `${p.item_id}:${p.variante_id ?? ''}`
+    const g = grupos.get(k) ?? []
+    if (!g.some(x => x.f.product_id === f.product_id)) g.push({ f, p })
+    grupos.set(k, g)
+  }
+  const tocadas = new Set<FilaStockML>()
+  const parte = new Map<PubStockML, number>()   // qué fracción de lo que muestra ML se cuenta para cada producto
+  for (const g of grupos.values()) {
+    if (g.length < 2) continue
+    const manual = g.some(({ f, p }) => p.objetivo == null || f.en_reserva)
+    const suma = g.reduce((s, { p }) => s + (p.objetivo ?? 0), 0)
+    const bloqueada = g.some(({ p }) => p.envio === 'destino')
+    for (const { f, p } of g) {
+      p.compartida = { con: g.filter(x => x.f !== f).map(x => x.f.code), aporte: p.objetivo }
+      parte.set(p, suma > 0 && !manual ? (p.objetivo ?? 0) / suma : 1 / g.length)
+      tocadas.add(f)
+      if (manual) { p.objetivo = null; p.reactivar = false; p.bloqueada_envio = false; continue }
+      p.objetivo = suma
+      const pausada = p.estado === 'paused' && suma > 0 && !p.pausa_mano
+      p.bloqueada_envio = pausada && bloqueada
+      p.reactivar = pausada && !bloqueada
+    }
+  }
+  // Lo que muestra ML en una compartida se reparte entre sus productos (si no, cada uno «vendería de más»).
+  for (const f of tocadas) {
+    const disp = f.sin_fisico ? 0 : f.disponible
+    const cuenta = (p: PubStockML) => (p.ml_disponible ?? 0) * p.unidades * (parte.get(p) ?? 1)
+    const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
+    f.excede = sincronizables.reduce((s, p) => s + cuenta(p), 0) > disp
+    f.ofrece = Math.round(f.pubs
+      .filter(p => p.estado === 'active' && !p.sin_sincronizar && !p.entera_con_variantes && (p.ml_disponible ?? 0) > 0)
+      .reduce((s, p) => s + cuenta(p), 0))
+    f.vende = f.ofrece <= 0 ? null : disp <= 0 ? 'sin' : f.ofrece > disp ? 'mas' : null
+    f.diferencia = f.pubs.some(p => p.objetivo != null && (p.objetivo !== p.ml_disponible || p.reactivar)) || (f.en_reserva && f.excede)
+  }
 }
