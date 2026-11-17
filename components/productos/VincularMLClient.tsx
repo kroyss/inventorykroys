@@ -20,6 +20,7 @@ interface Fila {
   ventas60: number; vinculado_por: string | null; vinculado_at: string | null; propio: boolean
   duda: { id: number; nota: string; por: string | null; creada_at: string } | null
   otros?: { id: number; code: string; name: string }[]   // más productos con el mismo código (21-10)
+  entera_vieja?: { id: number; code: string; name: string }[]   // 17-11: vínculo viejo por la publicación entera (nadie lo usa)
   conflicto?: ConflictoPesos | null                       // …de distinto peso y el envío gratis cambia según cuál
   no_usa?: { por: string | null; creada_at: string } | null   // marcada "No se usa" (26-10)
 }
@@ -48,7 +49,7 @@ const activaSinVincular = (f: Fila) => f.estado !== 'vinculada' && f.estado_ml =
 // Pausada sin ventas ni preguntas en 90 días y sin vincular (migración 127): solo al buscar o en "Todas".
 const quieta = (f: Fila) => f.estado !== 'vinculada' && !!f.sin_movimiento
 /** Variante que hereda el vínculo viejo de la publicación entera (código cargado en la ficha, antes de vincular por variante). */
-const porToda = (f: Fila) => f.estado === 'vinculada' && !!f.producto?.toda
+const porToda = (f: Fila) => (f.estado === 'vinculada' && !!f.producto?.toda) || !!f.entera_vieja?.length
 /** 13-11 (mig. 173): publicada en los últimos 15 días y todavía sin producto. */
 const nuevaSinVincular = (f: Fila) => !!f.reciente && f.estado !== 'vinculada' && !f.no_usa
 const palabrasDe = (q: string) => sinAcentos(q).split(/\s+/).filter(Boolean)
@@ -139,11 +140,11 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     setDatos(d => d && { ...d, filas: d.filas.map(f => f.codigo === codigo ? { ...f, ...c } : f) })
   const quitarFila = (codigo: string) => setDatos(d => d && { ...d, filas: d.filas.filter(f => f.codigo !== codigo) })
 
-  const pedir = async (body: Record<string, unknown>) => {
+  const pedir = async (body: Record<string, unknown>, alResponder?: (d: Record<string, unknown>) => void) => {
     const r = await fetch('/api/vincular-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo'); return false }
-    setError(null); return true
+    setError(null); alResponder?.(d); return true
   }
 
   return (
@@ -243,7 +244,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
                 </div>
                 <div className="shrink-0 text-right text-xs text-neutral-500"><b className="text-base tabular-nums text-neutral-900">{g.ventas}</b><div>vendidas 60 d</div></div>
               </div>
-              {datos.esDueno && <QuitarToda filas={g.filas} item={g.item_id} pedir={pedir} onHecho={cargar} />}
+              <QuitarToda filas={g.filas} item={g.item_id} pedir={pedir} onHecho={cargar} esDueno={datos.esDueno} />
               <ul className="divide-y divide-neutral-100">
                 {g.visibles.map(f => (
                   <FilaVariante key={f.codigo} f={f} productos={datos.productos} esDueno={datos.esDueno} paraQuien={paraQuien} pedir={pedir}
@@ -265,7 +266,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
 
 function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQuitar, onCambio }: {
   f: Fila; productos: Producto[]; esDueno: boolean; paraQuien: string
-  pedir: (b: Record<string, unknown>) => Promise<boolean>
+  pedir: (b: Record<string, unknown>, alResponder?: (d: Record<string, unknown>) => void) => Promise<boolean>
   hermanas: number; onQuitar: () => void
   onCambio: (c: Partial<Fila>, sumaHoy?: number) => void
 }) {
@@ -279,9 +280,18 @@ function FilaVariante({ f, productos, esDueno, paraQuien, pedir, hermanas, onQui
 
   const vincularA = async (p: { id: number; code: string; name: string }) => {
     setOcupado(true)
-    const ok = await pedir({ accion: 'vincular', codigo: f.codigo, cuenta: f.cuenta, product_id: p.id })
+    let viejo: { id: number; code: string; name: string }[] = []
+    const ok = await pedir({ accion: 'vincular', codigo: f.codigo, cuenta: f.cuenta, product_id: p.id },
+      d => { viejo = (d.viejo as typeof viejo | undefined) ?? [] })
     setOcupado(false)
     if (ok) { onCambio({ estado: 'vinculada', producto: { ...p, toda: false }, otros: undefined, conflicto: null, vinculado_por: 'tú', vinculado_at: new Date().toISOString(), propio: true, duda: null }, 1); setModo('nada'); setTexto('') }
+    // 17-11: era la última variante sin producto propio y la publicación sigue vinculada ENTERA a otro producto
+    // (vínculo viejo): se ofrece quitarlo (solo quien puede deshacer vínculos ajenos).
+    if (ok && viejo.length && esDueno && await confirm({ title: 'Quitar el vínculo viejo', confirmText: 'Quitar', cancelText: 'Dejarlo',
+      message: `Todas las variantes ya tienen su producto, pero la publicación entera sigue vinculada a ${viejo.map(x => `${x.code} · ${x.name}`).join(', ')}.\n\n`
+        + 'Ese vínculo ya no lo usa ninguna variante y confunde (Preguntas, pesos, Stock en ML). ¿Lo quito? Las ventas ya registradas no cambian.' })) {
+      for (const x of viejo) await pedir({ accion: 'desvincular', codigo: f.codigo.split(':')[0], product_id: x.id })
+    }
   }
 
   return (
@@ -498,13 +508,30 @@ function SelectorCelular({ f, productos, ocupado, onElegir, onCerrar }: {
 
 /** "Quitar de toda la publicación" (27-10, solo el dueño): desactiva el vínculo viejo por la publicación entera
  *  (todas sus variantes a la vez). Las variantes que ya tienen su propio vínculo no cambian. */
-function QuitarToda({ filas, item, pedir, onHecho }: {
-  filas: Fila[]; item: string; pedir: (b: Record<string, unknown>) => Promise<boolean>; onHecho: () => void
+function QuitarToda({ filas, item, pedir, onHecho, esDueno }: {
+  filas: Fila[]; item: string; pedir: (b: Record<string, unknown>) => Promise<boolean>; onHecho: () => void; esDueno: boolean
 }) {
   const confirm = useConfirm()
   const [ocupado, setOcupado] = useState(false)
-  const heredan = filas.filter(porToda)
-  if (!heredan.length) return null
+  const heredan = filas.filter(f => f.estado === 'vinculada' && !!f.producto?.toda)
+  // 17-11: todas las variantes ya tienen su producto y quedó el vínculo viejo de la publicación entera (antes invisible).
+  const vieja = !heredan.length ? filas.find(f => f.entera_vieja?.length)?.entera_vieja : undefined
+  if (vieja) return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+      <span><b>Vínculo viejo:</b> la publicación entera sigue vinculada a <b>{vieja.map(p => `${p.code} · ${p.name}`).join(', ')}</b>.
+        Todas las variantes ya tienen su producto, así que no se usa{esDueno ? '' : ' (pídele al administrador que lo quite)'}.</span>
+      {esDueno && <button disabled={ocupado} className="btn-secondary ml-auto px-2.5 py-1 text-xs disabled:opacity-50" onClick={async () => {
+        if (!await confirm({ title: 'Quitar el vínculo viejo', confirmText: 'Quitar', cancelText: 'Cancelar',
+          message: `Se separa ${item} de ${vieja.map(p => `${p.code} · ${p.name}`).join(', ')}.\n\nLas variantes no cambian (cada una sigue con su producto) y las ventas ya registradas tampoco.` })) return
+        setOcupado(true)
+        let ok = true
+        for (const p of vieja) ok = await pedir({ accion: 'desvincular', codigo: item.replace(/^[A-Z]{3}/, ''), product_id: p.id }) && ok
+        setOcupado(false)
+        if (ok) onHecho()
+      }}>{ocupado ? 'Quitando…' : 'Quitar vínculo viejo'}</button>}
+    </div>
+  )
+  if (!heredan.length || !esDueno) return null
   const base = heredan[0].codigo.split(':')[0]
   const prods = [heredan[0].producto!, ...(heredan[0].otros ?? [])]
   return (

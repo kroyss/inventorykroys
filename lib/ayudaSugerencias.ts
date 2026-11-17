@@ -113,6 +113,7 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: 'El estimado ya está bien', respuesta: 'Toca **Está bien así**: queda como costo real y deja de salir aquí.' },
   ],
   '/productos/mercadoenvios': [
+    { pregunta: '¿Qué es «Vínculo viejo» en Vincular con ML?', respuesta: 'La publicación sigue vinculada entera a un producto aunque cada variante ya tiene el suyo (vínculo de antes). No se usa para nada, pero confundía Preguntas, pesos y Stock en ML. Toca **Quitar vínculo viejo**: las variantes y las ventas ya registradas no cambian.' },
     { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
   ],

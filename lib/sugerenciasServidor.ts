@@ -13,6 +13,7 @@ import { tasaBCVHoy } from '@/lib/tasaDia'
 import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { envioGratisAhora } from '@/lib/mlShipping'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 
 const HISTORIAL = 3000           // preguntas respondidas con las que se calibra
 const CACHE_HORAS = 24
@@ -121,7 +122,7 @@ export async function sugerenciasPara(db: Pool, preguntas: { id: string; texto: 
             (SELECT FLOOR(COALESCE(i.quantity, 0)::numeric / GREATEST(COALESCE(m.unidades, 1), 1))::int
              FROM product_ml_codes m JOIN products pd ON pd.id = m.product_id AND pd.is_active
              LEFT JOIN inventory i ON i.product_id = pd.id
-             WHERE m.is_active AND m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '') LIMIT 1) AS real
+             WHERE m.is_active AND m.ml_code = regexp_replace(p.item_id, '^[A-Z]{3}', '') AND ${sinEnteraVieja('m')} LIMIT 1) AS real
      FROM ml_preguntas p WHERE p.id::text = ANY($1::text[])`, [preguntas.map(p => p.id)])
   const stockDe = new Map(stocks.map(r => [r.id as string, {
     stock: r.item_stock_ml === null ? null : r.real === null ? Number(r.item_stock_ml) : Math.min(Number(r.item_stock_ml), Number(r.real)),

@@ -12,6 +12,7 @@ import { esDemo } from '@/lib/demo'
 import { empresaConPromociones, sqlPesoPublicacion } from '@/lib/promocionesSesion'
 import { huecoVariasUnidades, type HuecoUnidades } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 
 interface ItemML {
   id: string; title: string; status: string; sub_status?: string[]; available_quantity: number; thumbnail?: string
@@ -79,12 +80,12 @@ export async function gemelasDe(db: Pool, item: string, variante: string | null)
     `SELECT p.id, p.code, p.name, i.quantity::int AS stock
      FROM product_ml_codes m JOIN products p ON p.id = m.product_id AND p.is_active
      LEFT JOIN inventory i ON i.product_id = p.id
-     WHERE m.is_active AND m.ml_code = ANY($1::text[])
+     WHERE m.is_active AND m.ml_code = ANY($1::text[]) AND ${sinEnteraVieja('m')}
      ORDER BY (m.ml_code = $2) DESC LIMIT 1`, [[variante ? `${pub}:${variante}` : pub, pub], variante ? `${pub}:${variante}` : pub])
   if (!p) return { producto: null, gemelas: [] }
   const { rows } = await db.query(
     `SELECT DISTINCT m.ml_code FROM product_ml_codes m
-     WHERE m.product_id = $1 AND m.is_active AND split_part(m.ml_code, ':', 1) <> $2 AND split_part(m.ml_code, ':', 1) ~ '^\\d+$'`, [p.id, pub])
+     WHERE m.product_id = $1 AND m.is_active AND ${sinEnteraVieja('m')} AND split_part(m.ml_code, ':', 1) <> $2 AND split_part(m.ml_code, ':', 1) ~ '^\\d+$'`, [p.id, pub])
   return {
     producto: { id: p.id, code: p.code, name: p.name, stock: p.stock ?? null },
     gemelas: rows.map(r => {

@@ -884,6 +884,11 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 - **Publicaciones de MercadoLibre en la ficha del producto:** se ven los códigos MLV vinculados (cuenta, variante,
   «trae N u.») **solo de lectura**. Para vincular o corregir: botón **Vincular con ML** / **Revisar vínculos con ML**
   (abre Publicaciones → Vincular con ese producto). Los vínculos se hacen en un solo lugar.
+- **Vínculo viejo (publicación entera + variantes):** si una publicación con variantes sigue vinculada ENTERA a un
+  producto y además cada variante tiene el suyo, en Vincular con ML sale una franja ámbar **«Vínculo viejo»** con
+  **Quitar vínculo viejo** (también en la pestaña «Por publicación entera»). Mientras tanto ese vínculo no cuenta para
+  la publicación completa (Preguntas, IA, Stock en ML, pesos, fotos, No reponer): manda lo de las variantes. Al vincular
+  la última variante, el sistema pregunta si quitas el vínculo entero. Quitarlo no cambia ventas ya registradas.
 - **Cómo cargar productos:** si ya vendes en ML → Productos → **Importar desde ML** (crea el producto vinculado, con
   peso y foto). **Cada producto necesita un costo (en USD, mayor que 0)**: sin costo la ganancia de sus ventas saldría
   mal. Las marcadas sin costo se resaltan en ámbar y quedan esperando; se crean solo las que lo tienen.

@@ -7,6 +7,21 @@ import { tieneModulo } from '@/lib/modulos'
 import { desvincular, eliminarVarianteML, filasVincular, marcarNoUsa, productosParaVincular, vincular } from '@/lib/vincularML'
 import { ErrorML } from '@/lib/ml'
 import { buscarNuevas } from '@/lib/catalogoML'
+import type { Pool } from 'pg'
+
+/** 17-11: productos vinculados a la publicación ENTERA cuando todas sus variantes (del catálogo) ya tienen su propio vínculo. */
+async function enteraVieja(db: Pool, pub: string) {
+  const { rows } = await db.query(
+    `SELECT p.id, p.code, p.name FROM product_ml_codes m JOIN products p ON p.id = m.product_id
+     WHERE m.is_active AND m.ml_code = $1
+       AND NOT EXISTS (
+         SELECT 1 FROM ml_catalogo c, jsonb_array_elements(c.variantes) v
+         WHERE substring(c.item_id FROM 4) = $1
+           AND NOT EXISTS (SELECT 1 FROM product_ml_codes x WHERE x.is_active AND x.ml_code = $1 || ':' || (v->>'id')))
+       AND EXISTS (SELECT 1 FROM ml_catalogo c WHERE substring(c.item_id FROM 4) = $1 AND jsonb_array_length(c.variantes) > 0)
+     ORDER BY p.code`, [pub])
+  return rows as { id: number; code: string; name: string }[]
+}
 
 // Vincular publicaciones de ML (20-10, migración 109; lib/vincularML.ts). Permiso "vincular_ml" (empleados, sin ver
 // Productos). Precios solo para quien tiene "costos". Resolver dudas como "ignorada": quien ve Productos (el dueño).
@@ -94,7 +109,8 @@ export async function POST(req: NextRequest) {
       const { rows: [p] } = await s.db.query(`SELECT id FROM products WHERE id = $1 AND is_active`, [b.product_id])
       if (!p) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
       await vincular(s.db, b.product_id, b.cuenta, b.codigo, userId)
-      return NextResponse.json({ ok: true })
+      // 17-11: si era la última variante sin producto propio y la publicación sigue vinculada entera (vínculo viejo), se avisa.
+      return NextResponse.json({ ok: true, viejo: b.codigo.includes(':') ? await enteraVieja(s.db, b.codigo.split(':')[0]) : [] })
     }
     if (b.accion === 'desvincular') {
       const n = await desvincular(s.db, b.product_id, b.codigo, userId, !puede(s.session.user, 'ver_productos'))

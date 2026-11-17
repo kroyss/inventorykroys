@@ -1,5 +1,6 @@
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { NextRequest, NextResponse } from 'next/server'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { sqlDisponible, sqlPesoPublicacion, sqlPesosVinculados, sqlSituacion } from '@/lib/promocionesSesion'
 import { tieneModulo } from '@/lib/modulos'
 import { sugerenciasPara } from '@/lib/sugerenciasServidor'
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
          JOIN products pd ON pd.id = m.product_id
          LEFT JOIN inventory i ON i.product_id = pd.id
          LEFT JOIN product_pricing pp ON pp.product_id = pd.id
-         WHERE split_part(m.ml_code, ':', 1) = regexp_replace(p.item_id, '^[A-Z]{3}', '')
+         WHERE split_part(m.ml_code, ':', 1) = regexp_replace(p.item_id, '^[A-Z]{3}', '') AND m.is_active AND ${sinEnteraVieja('m')}
          ORDER BY (m.ml_code LIKE '%:%'), pd.is_active DESC LIMIT 1
        ) pr ON TRUE
        WHERE ${filtroEstado}${filtroTexto}

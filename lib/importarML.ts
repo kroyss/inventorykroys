@@ -38,6 +38,9 @@ export interface FilaImportar {
   producto: { id: number; code: string; name: string; toda: boolean } | null   // vinculada (toda = por la publicación) o parecida
   /** Otros productos vinculados al MISMO código (21-10): antes solo se veía el primero y un vínculo de más quedaba escondido. */
   otros?: { id: number; code: string; name: string }[]
+  /** 17-11: vínculo VIEJO por la publicación entera cuando todas sus variantes ya tienen su producto (no lo usa nadie y
+   *  antes confundía Preguntas, pesos y Stock en ML; ver lib/vinculoEntero.ts). */
+  entera_vieja?: { id: number; code: string; name: string }[]
 }
 
 /** Trigramas como pg_trgm: por palabra (letras y números), en minúscula, con "  " delante y " " detrás. */
@@ -124,6 +127,14 @@ export async function filasImportar(db: Pool, { parecidas = true } = {}): Promis
       const otros = (todosDe.get(exacto ? f.codigo : f.codigo.split(':')[0]) ?? []).slice(1)
       if (otros.length) f.otros = otros
     }
+  }
+
+  // 17-11: publicación con variantes, TODAS con su propio producto, y además un vínculo por la publicación entera.
+  const porPub = new Map<string, FilaImportar[]>()
+  for (const f of filas) if (f.codigo.includes(':')) porPub.set(f.codigo.split(':')[0], [...(porPub.get(f.codigo.split(':')[0]) ?? []), f])
+  for (const [pub, vs] of porPub) {
+    const viejo = todosDe.get(pub)
+    if (viejo?.length && vs.every(f => f.estado === 'vinculada' && !f.producto?.toda)) for (const f of vs) f.entera_vieja = viejo
   }
 
   // Parecidas: SKU = código del producto, o nombre parecido (trigramas, como pg_trgm). Se calcula en

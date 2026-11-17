@@ -10,6 +10,7 @@ import { llamarClaude, MODELO_SIMPLE, type UsoIA } from '@/lib/ia'
 import { itemsDeVenta, envioML, leerHilo, sugerenciasMensaje, textoPlano } from '@/lib/mensajesML'
 import { leerNotas } from '@/lib/notasML'
 import { mlFetch } from '@/lib/ml'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { fichasActivas } from '@/lib/fichasIA'
 import { COUNTRY_TZ } from '@/lib/tz'
 import { contextoFotos, fichaDeAtributos, lineasFotos, type FotoML } from '@/lib/fotosIA'
@@ -114,7 +115,7 @@ export async function borradorMensaje(db: Pool, conexionId: number, sellerId: nu
               COALESCE((array_agg(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code NOT LIKE '%:%'))[1],
                        SUM(COALESCE(i.quantity, 0)) FILTER (WHERE m.ml_code LIKE '%:%'))::int AS stock
        FROM product_ml_codes m JOIN products p ON p.id = m.product_id LEFT JOIN inventory i ON i.product_id = p.id
-       WHERE split_part(m.ml_code, ':', 1) = ANY($1::text[]) AND p.is_active
+       WHERE split_part(m.ml_code, ':', 1) = ANY($1::text[]) AND p.is_active AND m.is_active AND ${sinEnteraVieja('m')}
        GROUP BY 1`, [codigos])   // el de la publicación como siempre; si solo hay productos por variante, la suma
     L.push('PRODUCTOS DE LA VENTA:')
     for (const it of venta.items) {

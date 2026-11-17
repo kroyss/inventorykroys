@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
       const opciones = (exactas.length ? exactas : dePublicacion.length ? dePublicacion : otrasVariantes)
         .map(r => ({ id: r.product_id as number, code: r.code as string, name: r.name as string }))
       // De otra variante nunca se elige solo (aunque sea una): sería el color o la talla equivocada.
-      const segura = exactas.length > 0 || dePublicacion.length > 0
+      // 17-11: el vínculo de la publicación entera no es seguro si sus variantes ya tienen su propio producto (vínculo viejo).
+      const segura = exactas.length > 0 || (dePublicacion.length > 0 && !otrasVariantes.length)
       // Pack o combo (26-10, opción B del dueño): «trae N u.» lo puso una persona (Stock en ML); la cantidad viene ya
       // multiplicada y se puede cambiar. Nunca se adivina por el título. Si los vínculos no coinciden, 1.
       const us = [...new Set((exactas.length ? exactas : dePublicacion).map(r => r.unidades as number))]

@@ -1,5 +1,6 @@
 // Sesión para Promociones (migración 094): módulo prendido, Venezuela, con inventario y el permiso.
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { tieneModulo } from '@/lib/modulos'
 import { puede } from '@/lib/permisos'
 import type { Pool } from 'pg'
@@ -28,7 +29,7 @@ export async function empresaConPromociones(db: Pool) {
 export const sqlPesoPublicacion = (col: string) => `COALESCE(
   (SELECT mp.peso_kg::float FROM me_productos mp WHERE mp.publicacion = ${col} AND mp.peso_kg > 0),
   (SELECT MAX(pd.weight_kg)::float FROM product_ml_codes pm JOIN products pd ON pd.id = pm.product_id
-   WHERE pm.is_active AND pm.unidades = 1 AND pd.weight_kg > 0
+   WHERE pm.is_active AND pm.unidades = 1 AND pd.weight_kg > 0 AND ${sinEnteraVieja('pm')}
      AND split_part(pm.ml_code, ':', 1) = regexp_replace(${col}, '^[A-Z]{3}', '')))`
 
 /** SQL (21-10): los productos vinculados a la publicación entera ({code, kg}) cuando NO hay peso del portal y
@@ -39,7 +40,7 @@ export const sqlPesosVinculados = (col: string) => `CASE WHEN NOT EXISTS (
                THEN jsonb_agg(jsonb_build_object('code', pd.code, 'kg', pd.weight_kg::float) ORDER BY pd.weight_kg) END
    FROM product_ml_codes pm JOIN products pd ON pd.id = pm.product_id
    WHERE pm.is_active AND pd.is_active AND pm.unidades = 1 AND pd.weight_kg > 0
-     AND pm.ml_code = regexp_replace(${col}, '^[A-Z]{3}', '')) END`
+     AND pm.ml_code = regexp_replace(${col}, '^[A-Z]{3}', '') AND ${sinEnteraVieja('pm')}) END`
 
 /** SQL de la situación de una publicación (17-10): 'activa', 'agotada' (pausada sin stock) o 'pausada' (a mano, con
  *  stock), del catálogo que ya se trae de ML; si no está en el catálogo, la del estado guardado (`estadoCol`). */

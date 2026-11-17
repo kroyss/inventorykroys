@@ -24,6 +24,7 @@ import { contextoFotos, fichaDeAtributos, lineasFotos, type ContextoFotos, type 
 import { verificarBorrador } from '@/lib/verificadorIA'
 import { CODIGO_INTERNO, sinCodigo } from '@/lib/codigoInterno'
 import { esDemo } from '@/lib/demo'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { riesgoDe } from '@/lib/sugerenciasPreguntas'
 import { variantesDe, textoVariantes, type Variante, type VariacionML } from '@/lib/variantesML'
 
@@ -312,7 +313,7 @@ export async function armarContexto(db: Pool, preguntaId: number, country: strin
      JOIN products p ON p.id = m.product_id
      LEFT JOIN inventory i ON i.product_id = p.id
      LEFT JOIN product_pricing pp ON pp.product_id = p.id
-     WHERE split_part(m.ml_code, ':', 1) = $1 AND p.is_active   -- también los productos por variante (stock sumado)
+     WHERE split_part(m.ml_code, ':', 1) = $1 AND p.is_active AND m.is_active AND ${sinEnteraVieja('m')}   -- también los productos por variante (stock sumado)
      ORDER BY (m.ml_code LIKE '%:%')
      LIMIT 1`, [codigo])
   const { rows: [tasa] } = await db.query(

@@ -17,6 +17,7 @@
 import type { Pool } from 'pg'
 import { envioPorTransportista, type EstadoEnvio } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { DIAS_CON_PAGO, DIAS_MAX } from '@/lib/porConfirmar'
 
 export interface PubStockML {
@@ -183,7 +184,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
        LEFT JOIN inventory i ON i.product_id = p.id
        LEFT JOIN ml_catalogo c ON substring(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
        LEFT JOIN users um ON um.id = m.pausa_mano_por
-       WHERE p.is_active
+       WHERE p.is_active AND ${sinEnteraVieja('m')}
        ORDER BY p.name, m.ml_account, m.ml_code`),
     comprometidasPorCodigo(db),
     leerTablasEnvio(db),

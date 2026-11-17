@@ -5,13 +5,14 @@
 // Sin dato del portal: el peso cargado a mano. Así Promociones, precios, margen y Costos ML usan el mismo número.
 import type { Pool } from 'pg'
 import { estadoTraida, ocupada } from '@/lib/meTraida'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 
 export const PESOS_VINCULADOS = `
   SELECT pm.product_id, MIN(mp.peso_kg) AS mn, MAX(mp.peso_kg) AS mx,
          array_agg(DISTINCT mp.peso_kg::float ORDER BY mp.peso_kg::float) AS todos
   FROM product_ml_codes pm
   JOIN me_productos mp ON mp.publicacion = 'MLV' || split_part(pm.ml_code, ':', 1)
-  WHERE pm.is_active AND pm.unidades = 1 AND mp.peso_kg > 0
+  WHERE pm.is_active AND pm.unidades = 1 AND mp.peso_kg > 0 AND ${sinEnteraVieja('pm')}
   GROUP BY pm.product_id`
 
 /** Pasa a los productos el peso del portal (después de cada traída de pesos). Devuelve cuántos cambiaron. */

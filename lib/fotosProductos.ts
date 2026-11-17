@@ -6,6 +6,7 @@ import type { Pool } from 'pg'
 import path from 'path'
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { randomBytes } from 'crypto'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? './uploads'
 const DIR = path.join(UPLOAD_DIR, 'productos')
@@ -21,7 +22,7 @@ export async function fotosProductos(db: Pick<Pool, 'query'>): Promise<Record<nu
              COALESCE((SELECT v->>'foto' FROM jsonb_array_elements(c.variantes) v WHERE v->>'id' = split_part(m.ml_code, ':', 2)), c.thumbnail) AS url
       FROM product_ml_codes m
       JOIN ml_catalogo c ON SUBSTRING(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
-      WHERE m.is_active
+      WHERE m.is_active AND ${sinEnteraVieja('m')}
       ORDER BY m.product_id, c.estado = 'active' DESC, c.disponible DESC, c.item_id)
     SELECT p.id, CASE WHEN p.foto_path IS NOT NULL THEN '/api/products/' || p.id || '/foto?v=' || floor(extract(epoch FROM p.foto_at))::bigint
                       ELSE ml.url END AS url

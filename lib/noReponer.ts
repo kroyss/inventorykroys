@@ -7,6 +7,7 @@
 //   - Reactivar en Productos o «Devolver» borra la marca.
 import type { Pool } from 'pg'
 import { productosComprometidos } from '@/lib/stockConML'
+import { sinEnteraVieja } from '@/lib/vinculoEntero'
 
 /** La marca vale (alias de products): no hubo una compra/importación nueva después. */
 export const noReponerSQL = (p = 'p') => `(${p}.no_reponer_at IS NOT NULL
@@ -73,7 +74,7 @@ export async function antesDeMarcar(db: Pool, ids: number[]) {
     db.query(
       `SELECT DISTINCT ON (m.product_id, c.item_id) m.product_id, m.ml_account AS cuenta, c.item_id, c.titulo, c.disponible::int AS disponible
        FROM product_ml_codes m JOIN ml_catalogo c ON substring(c.item_id FROM 4) = split_part(m.ml_code, ':', 1)
-       WHERE m.is_active AND m.product_id = ANY($1::int[]) AND c.estado = 'active'
+       WHERE m.is_active AND m.product_id = ANY($1::int[]) AND c.estado = 'active' AND ${sinEnteraVieja('m')}
        ORDER BY m.product_id, c.item_id`, [ids]),
     productosComprometidos(db),
   ])
