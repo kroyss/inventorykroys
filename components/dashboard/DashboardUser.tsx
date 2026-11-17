@@ -105,7 +105,7 @@ export default function DashboardUser({ country, bonos, importaciones, verificar
             accent={saleCounts.borrador   > 0 ? 'text-amber-600' : undefined}
             href="/ventas?estado=BORRADOR" />
           {/* Lo procesado sigue en Despachos (ahí se generan las guías); sin Despachos, en Ventas. */}
-          <StatCard label={!verificarPagos ? 'Procesadas' : country === 'VE' ? 'Por despachar' : 'Por descargar'} value={saleCounts.procesada}
+          <StatCard label={country === 'VE' && (verificarPagos || despachos) ? 'Por despachar' : !verificarPagos ? 'Procesadas' : 'Por descargar'} value={saleCounts.procesada}
             accent={saleCounts.procesada  > 0 ? 'text-green-600' : undefined}
             href={despachos ? '/despachos' : '/ventas?estado=PROCESADA'} />
         </div>

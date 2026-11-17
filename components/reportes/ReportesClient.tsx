@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
 import {
   DateRangeBar, presetRange, type DatePreset,
   KPICard, DataTable, exportRows, money, type Column,
-  PageHeader, Tabs, StatusBadge, Cargando,
+  PageHeader, Tabs, StatusBadge, Cargando, ESTADOS_VENTA_VE,
 } from '@/components/ui'
 import { usePersistedTab } from '@/lib/usePersistedTab'
 import { matchFuzzy } from '@/lib/search'
@@ -192,7 +192,7 @@ function SalesReport({ data, search, setSearch, statusF, setStatusF, despachaVE 
     { key: 'ml_order_number', label: 'Orden', render: s => <span className="font-mono text-xs">{s.ml_order_number}</span>, sortValue: s => s.ml_order_number },
     { key: 'created_at', label: 'Fecha', render: s => <span className="text-xs">{new Date(s.created_at).toLocaleDateString('es-VE')}</span>, sortValue: s => new Date(s.created_at).getTime() },
     { key: 'customer_name', label: 'Cliente', render: s => s.customer_name || '—', sortValue: s => s.customer_name ?? '' },
-    { key: 'status', label: 'Estado', render: s => <StatusBadge status={s.status} />, sortValue: s => s.status },
+    { key: 'status', label: 'Estado', render: s => <StatusBadge status={s.status} label={(despachaVE && ESTADOS_VENTA_VE[s.status]) || undefined} />, sortValue: s => s.status },
     { key: 'total_amount', label: 'Total', align: 'right', render: s => `$${money(s.total_amount)}`, sortValue: s => s.total_amount, total: rs => `$${money(rs.reduce((a, x) => a + x.total_amount, 0))}`, exportValue: s => s.total_amount },
     { key: 'cost', label: 'Costo', align: 'right', render: s => `$${money(s.cost)}`, sortValue: s => s.cost, total: rs => `$${money(rs.reduce((a, x) => a + x.cost, 0))}`, exportValue: s => s.cost },
     { key: 'commission', label: 'Comisión', align: 'right', render: s => <span className="text-neutral-600">${money(s.commission || 0)}</span>, sortValue: s => s.commission || 0, total: rs => `$${money(rs.reduce((a, x) => a + (x.commission || 0), 0))}`, exportValue: s => s.commission || 0 },

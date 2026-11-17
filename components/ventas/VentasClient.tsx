@@ -75,6 +75,7 @@ interface Props {
   porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
   pagoEnFila?: boolean   // cliente con inventario y Pagos ME (25-10): ✓ / ✗ del pago también en Por confirmar
   pagoChip?: boolean     // 16-11: con Pagos ME, el chip «Pago por verificar» se verifica de un toque
+  conDespachos?: boolean // 17-11: módulo Despachos (sin él la venta nunca pasa a Despachada: no se dice «Por despachar»)
   verificarPagos?: boolean   // VE: paso "Pago verificado" antes de procesar (módulo verificar_pagos; apagado = Inventario simple)
   inicial?: SalesResponse | null   // 12-11: la 1ª página (orden por fecha, sin filtros) ya vino en el HTML (lib/inicial.ts)
 }
@@ -86,11 +87,12 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, pagoChip = false, presupuestos = false, inicial = null }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, pagoChip = false, conDespachos = false, presupuestos = false, inicial = null }: Props) {
   // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
   const directoVE = country === 'VE' && !verificarPagos
-  // VE con el flujo completo: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE); CO y VE simple quedan igual.
-  const despachaVE = country === 'VE' && !directoVE
+  // VE: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE). 17-11 (el dueño): en TODAS las empresas VE, tengan o no
+  // «Verificar pagos» (antes las simples veían Procesada / Descargada). Solo texto. CO queda igual (ahí sí se baja Excel).
+  const despachaVE = country === 'VE' && conDespachos
   const STATUS_LABELS = despachaVE ? { ...STATUS_BASE, ...ESTADOS_VENTA_VE } : STATUS_BASE
   const CHIP_LABELS = despachaVE ? { ...CHIP_BASE, ...ESTADOS_VENTA_VE } : CHIP_BASE
   // Por confirmar (2026-10-12): ventas de ML sin registrar; "Confirmar" abre el form con ese número.
@@ -444,7 +446,9 @@ export default function VentasClient({ products: initialProducts, userRole, coun
           )}
           {porConfirmar && <span className="mx-0.5 w-px self-stretch bg-neutral-200" aria-hidden="true" />}
           {(['all','BORRADOR','PAGO_VERIFICADO','PROCESADA','DESCARGADA','DESCARGADA_LOCAL'] as Filter[])
-            .filter(f => (country !== 'CO' && !directoVE) || f !== 'PAGO_VERIFICADO')
+            // 17-11 (el dueño): «Verificado» casi siempre está en 0 (Registrar venta verifica y procesa de una): sale solo
+            // si hay alguna ahí (camino manual «Verificar pago» → «Procesar») o si es el filtro elegido.
+            .filter(f => f !== 'PAGO_VERIFICADO' || (country !== 'CO' && !directoVE && (counts.PAGO_VERIFICADO > 0 || filter === 'PAGO_VERIFICADO')))
             .map(f => {
             const count  = f === 'all' ? counts.all : counts[f as keyof Counts]
             const active = !vistaPC && filter === f

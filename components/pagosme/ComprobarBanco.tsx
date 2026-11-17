@@ -20,7 +20,7 @@ const BANCOS = ['Bancamiga', 'Banesco', 'Mercantil', 'BBVA Provincial', 'Banco P
 const BDV_NOMBRE = 'Banco de Venezuela (pegado)'
 const bs = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const dm = (f: string | null) => f ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : '—'
-const ESTADO_VENTA: Record<string, string> = { BORRADOR: 'Borrador', REABIERTA: 'Reabierta', PAGO_VERIFICADO: 'Pago verificado', PROCESADA: 'Procesada', DESCARGADA: 'Despachada', DESCARGADA_LOCAL: 'Entregada' }
+const ESTADO_VENTA: Record<string, string> = { BORRADOR: 'Borrador', REABIERTA: 'Reabierta', PAGO_VERIFICADO: 'Pago verificado', PROCESADA: 'Por despachar', DESCARGADA: 'Despachada', DESCARGADA_LOCAL: 'Entregada' }
 const lib = () => import('@/lib/conciliacionBanco')   // xlsx pesa: solo se carga al subir un archivo
 
 const GRUPOS: { k: ResultadoPago['nivel']; t: string; ayuda: string; cls: string }[] = [

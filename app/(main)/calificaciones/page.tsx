@@ -33,7 +33,7 @@ export default async function CalificacionesPage({ searchParams }: { searchParam
     <div className="space-y-3">
       <VistasCalificaciones recibidas={recibidas} />
       {recibidas ? <ReputacionClient inicial={inicial} /> : <CalificacionesClient inicial={inicial} isAdmin={puede(session!.user, 'automatizaciones_config')}
-        despachaVE={session!.user.country === 'VE' && tieneModulo(session!.user, 'verificar_pagos')} />}
+        despachaVE={session!.user.country === 'VE' && tieneModulo(session!.user, 'despachos')} />}
     </div>
   )
 }

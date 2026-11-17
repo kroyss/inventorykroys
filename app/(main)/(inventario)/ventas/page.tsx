@@ -47,6 +47,7 @@ export default async function VentasPage() {
       pagoEnFila={ventasDesdeML(session!.user) && tieneModulo(session!.user, 'pagos_me') && puede(session!.user, 'ver_pagos_me')}
       // 16-11: con Pagos ME, «Pago por verificar» se verifica tocando el chip (las demás empresas también).
       pagoChip={session!.user.country === 'VE' && tieneModulo(session!.user, 'pagos_me') && puede(session!.user, 'ver_pagos_me')}
+      conDespachos={tieneModulo(session!.user, 'despachos')}
     />
   )
 }

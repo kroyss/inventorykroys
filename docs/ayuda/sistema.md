@@ -996,6 +996,10 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   el número rojo en **Publicaciones** y en la pestaña **Stock** son los que están en 0, y por Telegram llega
   «Vende sin tener stock» (Mis avisos) cada vez que uno entra. Cada fila muestra la foto del producto.
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
+  **Estados de una venta (VE):** **Borrador** (falta registrarla) · **Por despachar** (registrada, el inventario ya se
+  descontó, falta imprimir la guía) · **Despachada** (la guía salió en Despachos; pasa sola al generar el lote, o directo
+  si es retiro en tienda o la guía ya estaba impresa) · **Local** (venta LOCAL entregada). «Verificado» casi nunca se
+  ve: «Registrar venta» verifica y procesa de una vez; solo aparece si alguna quedó ahí con «Verificar pago».
   **Verificar el pago de un toque:** toca el chip azul «Pago por verificar · Bs …» → «✓ Sí, verificado» (o «✗ Inválido»):
   queda verificado como cuando cuadra con el banco y el botón pasa a «Registrar venta»; «deshacer» lo vuelve atrás.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
