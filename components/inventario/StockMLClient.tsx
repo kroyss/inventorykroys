@@ -538,7 +538,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
   const conStockML = f.pubs.some(p => !p.sin_sincronizar && !p.entera_con_variantes && (p.ml_disponible ?? 0) > 0)
   const [corrigiendo, setCorrigiendo] = useState<string | null>(null)
   const [guardandoStock, setGuardandoStock] = useState(false)
-  const nuevoStock = corrigiendo == null ? NaN : Math.round(Number(corrigiendo))
+  const nuevoStock = corrigiendo == null || corrigiendo.trim() === '' ? NaN : Math.round(Number(corrigiendo))
   // En reserva: lo que la persona asigna a cada publicación (arranca con lo que muestra ML).
   const asignables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
   const [asig, setAsig] = useState<Record<string, string>>({})
@@ -603,13 +603,13 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
         <div className="flex flex-wrap gap-x-3 text-xs text-neutral-500">
           {corrigiendo == null ? (
             <span>Stock <b className="text-neutral-800 tabular-nums">{f.stock}</b>
-              {puedeCambiar && <button type="button" onClick={() => setCorrigiendo(String(f.stock))}
+              {puedeCambiar && <button type="button" onClick={() => setCorrigiendo('')}
                 title="Si contaste y el inventario está mal: se guarda como ajuste de inventario" className="ml-1.5 text-lime-700 underline">Corregir stock</button>}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1">
               Contaste
-              <input type="number" min={0} max={99999} autoFocus value={corrigiendo} onChange={e => setCorrigiendo(e.target.value)}
+              <input type="number" min={0} max={99999} autoFocus value={corrigiendo} placeholder={String(f.stock)} onChange={e => setCorrigiendo(e.target.value)}
                 className="w-16 rounded border border-lime-400 px-1 py-0.5 text-right text-sm tabular-nums" />
               <button type="button" disabled={guardandoStock || !(nuevoStock >= 0) || nuevoStock === f.stock} className="btn-primary px-2 py-0.5 text-xs disabled:opacity-50"
                 onClick={async () => { setGuardandoStock(true); const ok = await onCorregir(nuevoStock); setGuardandoStock(false); if (ok) setCorrigiendo(null) }}>
