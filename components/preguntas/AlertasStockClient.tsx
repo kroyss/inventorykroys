@@ -15,6 +15,8 @@ interface Fila {
   sub_status?: string | null      // migración 111: motivo de ML (vacío = la pausó el vendedor)
   caliente: boolean; descartada_at: string | null   // migración 087: en caliente (suma al aviso) / quitada a mano
   inventario?: number | null      // lo que hay en el inventario del producto vinculado (solo empresas con inventario; 28-10 en las 3 vistas)
+  sugerido?: number | null        // 17-11, inventario al día: lo que sugiere Stock en ML para esta publicación (mismo reparto)
+  en_otras?: string | null        // 17-11: está en 0 a propósito, lo que hay está en estas publicaciones
 }
 export interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
@@ -267,7 +269,15 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
         </p>
         {sinStockML(f) && f.inventario != null && <p className="text-[11px] font-medium text-emerald-700 whitespace-nowrap">en inventario: {f.inventario} u.</p>}
         {/* 28-10, empresas con inventario: lo que hay en el depósito; con un clic queda escrito como stock nuevo. */}
-        {vista !== 'pausadas' && f.inventario != null && (
+        {vista !== 'pausadas' && f.inventario != null && datos?.alDia && f.sugerido === 0 && f.en_otras ? (
+          <p className="max-w-[11rem] text-[11px] leading-tight text-neutral-600" title="Stock en ML reparte lo que hay entre tus publicaciones">
+            en 0 a propósito: lo que hay está en {f.en_otras}</p>
+        ) : vista !== 'pausadas' && f.inventario != null && datos?.alDia && f.sugerido != null ? (
+          f.sugerido > f.disponible && datos?.puedeStock
+            ? <button type="button" onClick={() => escribir(f, String(f.sugerido))} title="Lo que sugiere Stock en ML (reparte lo que hay entre tus publicaciones)"
+                className="text-[11px] font-medium text-emerald-700 whitespace-nowrap hover:underline underline-offset-2">sugerido: {f.sugerido} u. · usar</button>
+            : <p className="text-[11px] whitespace-nowrap text-neutral-500">en inventario: {f.inventario} u. · sugerido {f.sugerido}</p>
+        ) : vista !== 'pausadas' && f.inventario != null && (
           f.inventario > f.disponible && datos?.puedeStock
             ? <button type="button" onClick={() => escribir(f, String(f.inventario))} title="Usar lo del inventario como stock nuevo"
                 className="text-[11px] font-medium text-emerald-700 whitespace-nowrap hover:underline underline-offset-2">en inventario: {f.inventario} u. · usar</button>

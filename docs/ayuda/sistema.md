@@ -982,12 +982,20 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Mi inventario está al día** (casilla en el recuadro de arriba, la cambia quien configura el inventario): prendida, al
   poner stock en ML (aquí, en Automatizaciones → Stock y en la ventana de cambiar stock) avisa si pones más de lo que
   tienes y pide «Actualizar igual» (no bloquea). Apagada, el inventario se ve solo como dato y aquí sale una nota para
-  revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+  revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días.
+  Prendida, **Automatizaciones → Stock** usa el mismo reparto: «sugerido: N u. · usar» pone lo que sugiere Stock en ML (no
+  todo el inventario) y la que está en 0 porque lo que hay está en otra publicación dice «en 0 a propósito: lo que hay está
+  en PIKEKE 1». Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en el filtro Revisar combos salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
   convertidor con varias versiones). ML muestra la **suma** de lo que aporta cada producto («aporta N»). Si alguno está en
   «Quedan pocas» o no se sincroniza, esa publicación no se toca sola.
+  **Vinculada entera con variantes** (vínculos viejos: el inventario va por variante): el sistema no sabe qué variante es
+  cada producto, así que **solo baja**: si todos sus productos están en 0, «Quedará: 0 en todas las variantes» (cuenta en
+  Vende de más y se arregla con Aplicar en ML); si alguno tiene stock, «no se toca sola». **Dividir por variantes** (en la
+  fila, con permiso de vincular) abre cada variante con su foto para elegir su producto (sugiere por nombre; «otro
+  producto…» busca); al guardar se vincula cada variante y se quita el vínculo entero.
   **Quedan pocas** (el disponible es igual o menor a la reserva): el sistema no reparte solo. Si ML ofrece más de lo que
   hay, sale «Hay 2 y MercadoLibre ofrece 3. Con «Aplicar en ML» queda así: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» (baja
   primero las pausadas y después la que más muestra). **Cambiar a mano** deja poner cuántas muestra cada cuenta y se guarda

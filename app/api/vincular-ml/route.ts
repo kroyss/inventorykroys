@@ -25,10 +25,12 @@ async function sesion() {
   return { session, db } as const
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const s = await sesion()
   if ('error' in s) return s.error
   try {
+    // 17-11: solo la lista de productos (para «Dividir por variantes» en Stock en ML).
+    if (req.nextUrl.searchParams.get('productos') === '1') return NextResponse.json({ productos: await productosParaVincular(s.db) })
     const userId = Number(s.session.user.id)
     const [filas, productos, { rows: [hoy] }, { rows: [c] }] = await Promise.all([
       filasVincular(s.db, puede(s.session.user, 'costos'), userId),
@@ -58,6 +60,8 @@ const Body = z.discriminatedUnion('accion', [
              titulo: z.string().max(300).optional(), variante: z.string().max(200).nullable().optional() }),
   z.object({ accion: z.literal('eliminar_variante'), codigo: Codigo, con_stock: z.boolean().optional() }),
   z.object({ accion: z.literal('buscar_nuevas') }),
+  z.object({ accion: z.literal('dividir'), item: z.string().regex(/^\d{5,15}$/), cuenta: z.string().min(1).max(50),
+             asignaciones: z.array(z.object({ variante: z.string().regex(/^\d{1,15}$/), product_id: z.number().int().positive() })).min(1).max(100) }),
 ])
 
 export async function POST(req: NextRequest) {
@@ -72,6 +76,19 @@ export async function POST(req: NextRequest) {
       let nuevas = 0
       for (const c of cs) nuevas += (await buscarNuevas(s.db, c.id).catch(e => { console.error('[nuevas ML]', c.id, e instanceof Error ? e.message : e); return 0 })) ?? 0
       return NextResponse.json({ ok: true, nuevas })
+    }
+    // 17-11 «Dividir por variantes»: cada variante a su producto y se quita el vínculo de la publicación entera (el entero se quita al final).
+    if (b.accion === 'dividir') {
+      const ids = [...new Set(b.asignaciones.map(a => a.product_id))]
+      const { rows } = await s.db.query(`SELECT id FROM products WHERE id = ANY($1::int[]) AND is_active`, [ids])
+      if (rows.length !== ids.length) return NextResponse.json({ error: 'Algún producto no existe o está desactivado' }, { status: 400 })
+      // Sin transacción (vincular() pide pesos y traga sus errores): si algo falla a medias, la variante vinculada ya le
+      // gana al vínculo entero, y el entero se quita solo al final, cuando todas quedaron.
+      for (const a of b.asignaciones) await vincular(s.db, a.product_id, b.cuenta, `${b.item}:${a.variante}`, userId)
+      await s.db.query(
+        `UPDATE product_ml_codes SET is_active = FALSE, desvinculado_por = $2, desvinculado_at = NOW() WHERE ml_code = $1 AND is_active`,
+        [b.item, userId])
+      return NextResponse.json({ ok: true })
     }
     if (b.accion === 'vincular') {
       const { rows: [p] } = await s.db.query(`SELECT id FROM products WHERE id = $1 AND is_active`, [b.product_id])

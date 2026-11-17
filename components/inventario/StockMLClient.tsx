@@ -55,6 +55,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [desactivados, setDesactivados] = useState<DesactivadoPublicado[]>(inicial?.desactivados ?? [])
   const [puedeReactivar, setPuedeReactivar] = useState(!!inicial?.puedeReactivar)
   const [verDesactivados, setVerDesactivados] = useState(false)
+  // 17-11: «Dividir por variantes» de una publicación vinculada entera.
+  const [dividir, setDividir] = useState<PubStockML | null>(null)
   // 17-11: «Mi inventario está al día» (lib/inventarioAlDia.ts). Apagado: nota para revisar las sugerencias antes de aplicar.
   const [alDia, setAlDia] = useState(inicial?.inventarioAlDia ?? true)
   // 16-11 Historial (seguimiento de lo que se cambia en ML): null = cerrado; con producto = filtrado.
@@ -290,6 +292,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
             <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} conVincular={conVincular} marcable={accionables(f).length > 0 || pubsEstado(f).length > 0}
               resaltar={estadoML || null} cuenta={cuenta}
               aplicables={accionables(f).length} ocupado={!!trabajando} onAplicar={() => aplicar([f], false)}
+              onDividir={conVincular ? p => setDividir(p) : undefined}
               marcado={marcados.has(f.product_id)} resultados={resultados} verCombos={filtro === 'combos'}
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
@@ -332,6 +335,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       )}
 
       {historial && <Historial filtro={historial} onFiltro={setHistorial} onCerrar={() => setHistorial(null)} />}
+      {dividir && <DividirVariantes p={dividir} onCerrar={() => setDividir(null)}
+        vinculados={filas.filter(f => f.pubs.some(q => q.item_id === dividir.item_id && q.entera_con_variantes)).map(f => ({ id: f.product_id, code: f.code, name: f.name }))}
+        onHecho={async () => { setDividir(null); await cargar() }} />}
       {verDesactivados && <Desactivados lista={desactivados} puedePausar={puedeCambiar} puedeDesvincular={conVincular} puedeReactivar={puedeReactivar}
         onCerrar={() => setVerDesactivados(false)} onCambio={async () => { await cargar() }} />}
 
@@ -382,12 +388,13 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, resaltar, cuenta, aplicables, ocupado, onAplicar, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, resaltar, cuenta, aplicables, ocupado, onAplicar, onDividir, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
   f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
   /** Con Estado elegido: las publicaciones en otro estado (u otra cuenta) se atenúan. */
   resaltar: 'active' | 'paused' | null; cuenta: string
   /** 17-11: publicaciones de este producto que cambian al aplicar; «Aplicar en ML» las manda sin marcar nada. */
   aplicables: number; ocupado: boolean; onAplicar: () => Promise<void>
+  onDividir?: (p: PubStockML) => void
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
   onCorregir: (cantidad: number) => Promise<boolean>
@@ -539,13 +546,14 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           atenuada={(!!resaltar && p.estado !== resaltar) || (!!cuenta && p.cuenta !== cuenta)}
           onUnidades={u => onUnidades(p, u)} onSincronizar={v => onSincronizar(p, v)}
           editar={puedeCambiar && !editando && asignables.includes(p) ? () => setEditando(true) : undefined}
+          dividir={onDividir && p.entera_con_variantes && p.variantes_ml?.length ? () => onDividir(p) : undefined}
           asignar={editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
       </ul>
     </section>
   )
 }
 
-function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar, editar }: {
+function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar, editar, dividir }: {
   p: PubStockML; res?: Res; puedeCambiar: boolean; reserva: boolean; abrirOpciones: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
   onEstado: (estado: 'paused' | 'active', motivo: string) => Promise<boolean>
   atenuada: boolean
@@ -553,6 +561,8 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
   asignar?: { valor: string; onCambio: (v: string) => void }
   /** 17-11: tocar «Quedará» pasa el producto a «a mano». */
   editar?: () => void
+  /** 17-11: vinculada entera con variantes → abrir «Dividir por variantes». */
+  dividir?: () => void
 }) {
   const [u, setU] = useState(String(p.unidades))
   useEffect(() => setU(String(p.unidades)), [p.unidades])
@@ -596,7 +606,16 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
             {p.unidades > 1 && <span title="Cada una trae varias unidades del producto">×{p.unidades}</span>}
           </label>
         ) : p.sin_sincronizar ? <div className="text-neutral-500">no se toca</div>
-          : p.entera_con_variantes ? <div className="text-amber-700" title="Está vinculada la publicación entera pero tiene variantes: vincula cada variante en Vincular con ML">vincular por variante</div>
+          : p.entera_con_variantes ? (
+              <div className="space-y-0.5">
+                {p.objetivo === 0
+                  ? <div className={`tabular-nums ${p.ml_disponible ? 'font-semibold text-lime-700' : 'text-neutral-500'}`}>0 en todas las variantes{p.ml_disponible ? '' : ' ✓ igual'}</div>
+                  : <div className="text-amber-700" title="Vinculada la publicación entera: no se sabe qué variante es este producto. Solo se toca sola si todos sus productos están en 0">no se toca sola</div>}
+                {dividir
+                  ? <button type="button" onClick={dividir} className="font-medium text-sky-700 underline hover:text-sky-900">Dividir por variantes</button>
+                  : <div className="text-amber-700">dividir por variantes</div>}
+              </div>
+            )
           : p.objetivo == null ? (editar
               ? <button type="button" onClick={editar} title="Poner a mano cuántas muestra" className="text-neutral-400 underline decoration-dotted underline-offset-2 hover:text-neutral-700">{reserva ? 'lo que decidiste' : '—'} ✎</button>
               : <div className="text-neutral-400">{reserva ? 'lo que decidiste' : '—'}</div>)
@@ -828,6 +847,108 @@ function Desactivados({ lista, puedePausar, puedeDesvincular, puedeReactivar, on
           </button>
         </div>
       )}
+    </Ventana>
+  )
+}
+
+// ── Dividir por variantes (17-11, el dueño: «MUY importante») ─────────────────────────────────────────────────────
+// Publicación vinculada ENTERA que tiene variantes: cada variante se vincula a su producto (el inventario ya va por
+// variante) y se quita el vínculo entero. Sugerencia por nombre (la variante «Negro» → el producto que dice «negro»).
+const SIN_PESO = new Set(['color', 'talla', 'modelo', 'tamano', 'tamaño', 'diseno', 'diseño', 'tipo', 'de', 'y', 'con', 'x', 'para'])
+const palabras = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/)
+  .filter(w => w.length > 1 && !SIN_PESO.has(w))
+function sugerir(variante: string | null, productos: { id: number; name: string }[]): number | null {
+  if (!variante) return null
+  const v = palabras(variante)
+  const puntos = productos.map(p => { const n = new Set(palabras(p.name)); return { id: p.id, n: v.filter(w => n.has(w)).length } })
+    .filter(x => x.n > 0).sort((a, b) => b.n - a.n)
+  return puntos.length && (puntos.length === 1 || puntos[0].n > puntos[1].n) ? puntos[0].id : null
+}
+
+function DividirVariantes({ p, vinculados, onCerrar, onHecho }: {
+  p: PubStockML; vinculados: { id: number; code: string; name: string }[]; onCerrar: () => void; onHecho: () => Promise<void>
+}) {
+  const variantes = p.variantes_ml ?? []
+  const [todos, setTodos] = useState<{ id: number; code: string; name: string; stock: number }[] | null>(null)
+  const [elegido, setElegido] = useState<Record<string, number | null>>(() =>
+    Object.fromEntries(variantes.map(v => [v.id, sugerir(v.nombre, vinculados)])))
+  const [buscando, setBuscando] = useState<string | null>(null)
+  const [texto, setTexto] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch('/api/vincular-ml?productos=1', { cache: 'no-store' }).then(r => r.json()).then(d => { if (vivo) setTodos(d.productos ?? []) })
+      .catch(() => { if (vivo) setTodos([]) })
+    return () => { vivo = false }
+  }, [])
+  const nombre = (id: number | null) => {
+    if (id == null) return null
+    const x = vinculados.find(y => y.id === id) ?? todos?.find(y => y.id === id)
+    return x ? `${x.code} · ${x.name}` : `#${id}`
+  }
+  const q = texto.trim().toLowerCase()
+  const encontrados = q.length >= 2 ? (todos ?? []).filter(x => `${x.code} ${x.name}`.toLowerCase().includes(q)).slice(0, 8) : []
+  const faltan = variantes.filter(v => elegido[v.id] == null).length
+  const guardar = async () => {
+    setGuardando(true); setError(null)
+    const r = await fetch('/api/vincular-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      accion: 'dividir', item: p.item_id.replace(/^[A-Z]{3}/, ''), cuenta: p.cuenta,
+      asignaciones: variantes.map(v => ({ variante: v.id, product_id: elegido[v.id] })) }) })
+    const d = await r.json().catch(() => ({}))
+    setGuardando(false)
+    if (!r.ok) { setError(d.error ?? 'No se pudo'); return }
+    await onHecho()
+  }
+  return (
+    <Ventana titulo="Dividir por variantes" onCerrar={onCerrar}>
+      <p className="text-xs text-neutral-600"><b>{p.cuenta}</b> · <AbrirFicha item={p.item_id} title="Ver la publicación aquí mismo"
+        className="font-mono text-sky-700 underline decoration-dotted underline-offset-2">{p.item_id}</AbrirFicha> · {p.titulo}</p>
+      <p className="text-xs text-neutral-600">Hoy está vinculada <b>entera</b>{vinculados.length ? <> a {vinculados.map(x => x.code).join(', ')}</> : null}: el sistema no sabe
+        qué variante es cada producto. Elige el producto de cada variante; al guardar se vincula cada una y se quita el vínculo entero.</p>
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+      <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+        {variantes.map(v => (
+          <li key={v.id} className="space-y-1.5 px-3 py-2.5">
+            <div className="flex items-center gap-2.5">
+              {v.foto ? <img src={v.foto} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded border bg-white object-contain" />
+                : <span className="h-10 w-10 shrink-0 rounded border bg-neutral-50" aria-hidden />}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-neutral-900">{v.nombre ?? `Variante ${v.id}`}</p>
+                <p className="text-xs text-neutral-500">{v.disponible} en ML</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 pl-12 text-xs">
+              {elegido[v.id] != null && buscando !== v.id
+                ? <span className="rounded-full bg-lime-100 px-2 py-0.5 text-lime-900">✓ {nombre(elegido[v.id])}</span>
+                : buscando !== v.id && <span className="text-amber-700">Elige el producto:</span>}
+              {buscando !== v.id && vinculados.filter(x => x.id !== elegido[v.id]).map(x => (
+                <button key={x.id} type="button" onClick={() => setElegido(e => ({ ...e, [v.id]: x.id }))}
+                  title={x.name} className="rounded-full border border-neutral-300 px-2 py-0.5 hover:border-neutral-500">{x.code}</button>
+              ))}
+              {buscando !== v.id
+                ? <button type="button" onClick={() => { setBuscando(v.id); setTexto('') }} className="text-neutral-500 underline hover:text-neutral-800">otro producto…</button>
+                : <span className="w-full space-y-1">
+                    <input autoFocus value={texto} onChange={e => setTexto(e.target.value)} placeholder={todos ? 'Busca por código o nombre' : 'Cargando productos…'}
+                      className="w-full rounded-lg border border-neutral-300 px-2 py-1 text-base sm:text-sm" />
+                    <span className="block">
+                      {encontrados.map(x => (
+                        <button key={x.id} type="button" onClick={() => { setElegido(e => ({ ...e, [v.id]: x.id })); setBuscando(null) }}
+                          className="block w-full truncate rounded px-2 py-1 text-left hover:bg-neutral-100">{x.code} · {x.name} <span className="text-neutral-400">· {x.stock} u.</span></button>
+                      ))}
+                      <button type="button" onClick={() => setBuscando(null)} className="mt-1 text-neutral-500 underline">cancelar</button>
+                    </span>
+                  </span>}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-100 pt-3">
+        {faltan > 0 && <span className="mr-auto text-xs text-amber-700">Faltan {faltan} variante{faltan === 1 ? '' : 's'} por elegir</span>}
+        <button type="button" onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
+        <button type="button" disabled={guardando || faltan > 0} onClick={guardar} className="btn-primary text-sm disabled:opacity-50">
+          {guardando ? 'Guardando…' : 'Guardar'}</button>
+      </div>
     </Ventana>
   )
 }

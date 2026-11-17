@@ -184,6 +184,21 @@ export async function POST(req: NextRequest) {
         resultados.push({ item_id: x.item_id, variante_id: x.variante_id, ok: false, error: 'Esta publicación no se iguala desde aquí' })
         continue
       }
+      // 17-11: vinculada entera con variantes y todos sus productos en 0 → cada variante a 0 (un solo resultado por fila).
+      if (p.entera_con_variantes) {
+        if (p.objetivo !== 0) {
+          resultados.push({ item_id: x.item_id, variante_id: x.variante_id, ok: false, error: 'Divídela por variantes primero' })
+          continue
+        }
+        let error: string | undefined
+        for (const v of p.variantes_ml ?? []) {
+          const r = await aplicarCambio(s.db, { item_id: p.item_id, variante_id: v.id, cantidad: 0 },
+            { reactivar: false, origen: 'stock_ml', usuarioId: Number(s.session.user.id) })
+          if (!r.ok) error ??= `${v.nombre ?? v.id}: ${r.error ?? 'no se pudo'}`
+        }
+        resultados.push({ item_id: x.item_id, variante_id: x.variante_id, ok: !error, error, estado: p.estado ?? undefined, disponible: 0 })
+        continue
+      }
       const nada = p.objetivo === p.ml_disponible && !p.reactivar
       resultados.push(nada
         ? { item_id: x.item_id, variante_id: x.variante_id, ok: true, estado: p.estado ?? undefined, disponible: p.objetivo }

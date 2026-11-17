@@ -50,6 +50,8 @@ export interface PubStockML {
   /** 17-11 Compartida: la misma publicación (o variante) vinculada a varios productos activos (modelos que el comprador
    *  elige). ML recibe la SUMA de lo que aporta cada uno; `aporte` = lo de este producto. */
   compartida: { con: string[]; aporte: number | null } | null
+  /** 17-11: vinculada ENTERA y tiene variantes → sus variantes (para «Dividir por variantes» y para ponerlas en 0). */
+  variantes_ml: { id: string; nombre: string | null; disponible: number; foto: string | null }[] | null
 }
 
 export interface FilaStockML {
@@ -199,7 +201,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       porProducto.set(r.product_id, f)
     }
     const [pub, varId] = String(r.ml_code).split(':')
-    const variantes: { id: number; nombre: string | null; disponible: number }[] = Array.isArray(r.variantes) ? r.variantes : []
+    const variantes: { id: number; nombre: string | null; disponible: number; foto?: string | null }[] = Array.isArray(r.variantes) ? r.variantes : []
     const v = varId ? variantes.find(x => String(x.id) === varId) : null
     f.codigos.push(String(r.ml_code))
     f.pubs.push({
@@ -221,6 +223,8 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       actualizado_at: r.actualizado_at,
       pausa_mano: r.pausa_mano_at && r.estado === 'paused' ? { at: r.pausa_mano_at, por: r.pausa_mano_por, motivo: r.pausa_mano_motivo } : null,
       compartida: null,
+      variantes_ml: !varId && variantes.length
+        ? variantes.map(x => ({ id: String(x.id), nombre: x.nombre, disponible: Number(x.disponible) || 0, foto: x.foto ?? null })) : null,
     })
   }
 
@@ -294,7 +298,28 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     filas.push(fila)
   }
   compartidas(filas)
+  enteras(filas)
   return filas
+}
+
+// 17-11 (el dueño): publicación vinculada ENTERA que tiene variantes (vínculos viejos; el inventario va por variante).
+// No se sabe qué variante es cada producto, así que la regla es la segura: SOLO BAJA. Si todos sus productos están
+// en 0, todas sus variantes van a 0 (y cuenta en «Vende de más»). Si alguno tiene stock, no se toca sola: «Dividir por
+// variantes» (vincular cada variante a su producto) y desde ahí el control es exacto.
+function enteras(filas: FilaStockML[]) {
+  const grupos = new Map<string, { f: FilaStockML; p: PubStockML }[]>()
+  for (const f of filas) for (const p of f.pubs) {
+    if (!p.entera_con_variantes || p.sin_sincronizar || p.estado == null) continue
+    grupos.set(p.item_id, [...(grupos.get(p.item_id) ?? []), { f, p }])
+  }
+  for (const g of grupos.values()) {
+    if (!g.every(({ f }) => (f.sin_fisico ? 0 : f.disponible) <= 0)) continue
+    for (const { f, p } of g) {
+      p.objetivo = 0; p.reactivar = false; p.bloqueada_envio = false
+      if (p.estado === 'active' && (p.ml_disponible ?? 0) > 0) { f.ofrece += p.ml_disponible ?? 0; f.vende = 'sin' }
+      if (p.ml_disponible !== 0) f.diferencia = true
+    }
+  }
 }
 
 // 17-11 (el dueño): una publicación vinculada a varios productos activos (p. ej. un convertidor con 4 modelos) recibía

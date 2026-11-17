@@ -41,6 +41,8 @@ const S: Record<string, Sugerencia[]> = {
       respuesta: 'Arriba en **Historial**, o **Ver cambios** en cada producto: quién, cuándo, qué publicación, antes → después, pausas y reactivaciones. El admin ve los de todos y filtra por persona.' },
     { pregunta: '¿Qué hago con «Hay 2 y MercadoLibre ofrece 3»?',
       respuesta: 'Toca **Aplicar en ML** en ese producto: deja lo que muestra la sugerencia (baja primero las pausadas y la cuenta que más muestra). Si prefieres otro reparto, toca **Cambiar a mano**, pon cuántas muestra cada cuenta y **Guardar en ML**.' },
+    { pregunta: '¿Qué es «Dividir por variantes»?',
+      respuesta: 'La publicación está vinculada entera pero tiene variantes, y el sistema no sabe qué variante es cada producto: solo la baja (a 0 si todos sus productos están en 0). Toca **Dividir por variantes**, elige el producto de cada variante y **Guardar**: queda vinculada variante por variante y desde ahí el stock se controla exacto.' },
     { pregunta: '¿Cómo pongo otro número sin aceptar la sugerencia?',
       respuesta: 'Toca el número de **Quedará** (✎): el producto pasa a «A mano» y cada publicación muestra una casilla. Arriba ves «Usas X de Y». No deja pasarte de lo que tienes (si hay más, primero **Corregir stock**). Toca **Guardar en ML**; **Volver a la sugerencia** deshace.' },
     { pregunta: '¿Qué es «Mi inventario está al día»?',
@@ -53,6 +55,8 @@ const S: Record<string, Sugerencia[]> = {
   '/alertas-stock': [
     { pregunta: '¿Cómo actualizo el stock en ML?', video: 'Calificaciones y Stock',
       respuesta: 'Escribe el stock nuevo en cada fila (✎) y toca **Actualizar en MercadoLibre**. Solo cambia la cantidad disponible, nada más. Si tu inventario está marcado como al día y pones más de lo que tienes, la casilla se pone ámbar y te pide «Actualizar igual».' },
+    { pregunta: '¿Qué significa «en 0 a propósito»?',
+      respuesta: 'Con el inventario al día, esta pantalla usa el mismo reparto que Stock en ML: esa publicación está en 0 porque lo que tienes ya está publicado en otra (te dice cuál). «sugerido: N · usar» pone lo que sugiere Stock en ML, no todo el inventario.' },
     { pregunta: '¿Cada cuánto se revisa?', respuesta: 'Sola cada hora. Con **Revisar ahora** buscas en el momento (cada 10 minutos como máximo).' },
   ],
   '/pagos-me': [

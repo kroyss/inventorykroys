@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { leerInventarioAlDia } from '@/lib/inventarioAlDia'
+import { filasStockML, type FilaStockML, type PubStockML } from '@/lib/stockConML'
 import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
 import { SQL_VENDIDA, sqlCaliente, umbralStock } from '@/lib/alertasStock'
@@ -60,6 +61,25 @@ export async function GET(req: NextRequest) {
                   FROM ml_conexiones WHERE estado = 'activa'`),
       conInventario ? leerInventarioAlDia(s.db) : Promise.resolve(false),
     ])
+    // 17-11 (el dueño: «las dos pantallas chocan»): con el inventario al día, cada fila trae lo que sugiere Stock en ML
+    // (el mismo reparto entre cuentas): «usar» pone eso y no todo el inventario, y la que está en 0 a propósito lo dice.
+    if (alDia && rows.length) {
+      const pubs = new Map<string, { f: FilaStockML; p: PubStockML }>()
+      for (const f of await filasStockML(s.db, s.session.user.country)) for (const p of f.pubs) {
+        const k = `${p.item_id}:${p.variante_id ?? ''}`
+        if (!pubs.has(k)) pubs.set(k, { f, p })
+      }
+      for (const r of rows) {
+        const x = pubs.get(`${r.item_id}:${r.variante_id === '0' ? '' : r.variante_id}`) ?? pubs.get(`${r.item_id}:`)
+        if (!x) continue
+        r.sugerido = x.p.objetivo
+        if (x.p.objetivo === 0 && x.f.disponible > 0) {
+          const otras = x.f.pubs.filter(q => q !== x.p && (q.objetivo ?? q.ml_disponible ?? 0) > 0)
+            .map(q => `${q.cuenta}${q.variante ? ` ${q.variante}` : ''} ${q.objetivo ?? q.ml_disponible}`)
+          r.en_otras = otras.length ? otras.join(', ') : null
+        }
+      }
+    }
     return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock'), conInventario, alDia })
   } catch (err) {
     return apiError(err)
