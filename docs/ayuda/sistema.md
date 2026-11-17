@@ -588,8 +588,9 @@ referencia, monto vs. orden, envío y guía, en qué va en el sistema y el compr
 Inválido o volver a sin verificar, sin salir de la sección.
 
 **Montos:** la columna **Pagado** es lo que el comprador **declaró** en MercadoEnvíos; al lado, **vs. orden** lo compara
-con el total de la orden (Coincide / Pagó de más / Incluye embalaje / Pagó de menos). Mientras el pago no se cruce con
-el banco dice **«Coincide según ME»**: el monto real que llegó solo lo confirma **Comprobar con el banco**. Si la **misma referencia de pago** aparece en otra
+con el total de la orden, pero **solo avisa si hay diferencia**: «Pagó de menos según ME», «Pagó de más según ME»,
+«Incluye embalaje según ME». Si coincide no muestra nada (casi siempre coincide, porque lo escribe el comprador): no es una
+confirmación. El monto real que llegó solo lo confirma **Comprobar con el banco**. Si la **misma referencia de pago** aparece en otra
 venta (últimos 90 días), debajo de la referencia sale **⚠️ También en …** con esas ventas: puede ser un pago de dos
 compras juntas (revisa que el monto alcance para todas) o el mismo comprobante usado dos veces. Solo avisa, no bloquea.
 
