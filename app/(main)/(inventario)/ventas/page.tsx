@@ -45,6 +45,8 @@ export default async function VentasPage() {
       // 25-10: donde las guías van solas a Despachos al verificar (clientes), el pago también se verifica aquí.
       presupuestos={tieneModulo(session!.user, 'presupuestos')}
       pagoEnFila={ventasDesdeML(session!.user) && tieneModulo(session!.user, 'pagos_me') && puede(session!.user, 'ver_pagos_me')}
+      // 16-11: con Pagos ME, «Pago por verificar» se verifica tocando el chip (las demás empresas también).
+      pagoChip={session!.user.country === 'VE' && tieneModulo(session!.user, 'pagos_me') && puede(session!.user, 'ver_pagos_me')}
     />
   )
 }

@@ -237,6 +237,51 @@ function Etiqueta({ tono, children, title }: { tono: Tono; children: React.React
   )
 }
 
+/** 16-11 (el dueño): «Pago por verificar» se toca y se confirma ahí mismo (válido / inválido), sin abrir la venta. */
+function ChipVerificar({ texto, monto, quien, haciendo, onElegir }: {
+  texto: string; monto: number | null | undefined; quien: string | null; haciendo: boolean
+  onElegir: (v: 'valido' | 'invalido') => Promise<void>
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const boton = useRef<HTMLButtonElement>(null)
+  const caja = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!caja.current?.contains(t) && !boton.current?.contains(t)) setAbierto(false)
+    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
+    document.addEventListener('mousedown', fuera); document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', fuera); document.removeEventListener('keydown', esc) }
+  }, [abierto])
+  const elegir = async (v: 'valido' | 'invalido') => { await onElegir(v); setAbierto(false) }
+  return (
+    <>
+      <button ref={boton} type="button" onClick={() => setAbierto(a => !a)} aria-expanded={abierto} title="Toca para marcar el pago como verificado"
+        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${TONO.azul} hover:ring-sky-400`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${PUNTO.azul}`} aria-hidden="true" />
+        {texto}
+        <span className="ml-0.5 opacity-60" aria-hidden="true">▾</span>
+      </button>
+      {abierto && (
+        // En el flujo de la fila (no flotante): la lista tiene overflow-hidden y lo cortaría en la última fila.
+        <span ref={caja} role="dialog" className="order-last basis-full rounded-xl border border-sky-200 bg-white p-3 text-left text-sm shadow-sm sm:max-w-sm">
+          <span className="block text-neutral-800">
+            ¿El pago{monto != null ? <> de <b>Bs {usd(monto)}</b></> : ''}{quien ? <> de {quien}</> : ''} llegó bien?
+          </span>
+          <span className="mt-2.5 flex flex-wrap items-center gap-2">
+            <button type="button" disabled={haciendo} onClick={() => elegir('valido')} className="btn-primary px-3 py-1 text-xs disabled:opacity-50">
+              {haciendo ? 'Guardando…' : '✓ Sí, verificado'}</button>
+            <button type="button" disabled={haciendo} onClick={() => elegir('invalido')} className="btn-secondary px-3 py-1 text-xs text-red-700 disabled:opacity-50">✗ Inválido</button>
+            <button type="button" onClick={() => setAbierto(false)} className="text-xs text-neutral-500 underline">cancelar</button>
+          </span>
+        </span>
+      )}
+    </>
+  )
+}
+
 function IconoActualizar({ girando }: { girando: boolean }) {
   return (
     <svg className={`h-4 w-4 ${girando ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -263,16 +308,18 @@ function estadoPago(f: Fila, ultima: string | null): { tono: Tono; texto: string
 
 const METODO: Record<string, string> = { mobile_payment: 'Pago móvil', transfer: 'Transferencia', zelle: 'Zelle' }
 
-function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
+function FilaVenta({ f, d, onConfirmar, onVerificar, onPago, onPagoChip }: {
   f: Fila; d: Datos; onConfirmar: (numero: string) => void; onVerificar?: Verificar
   /** Con inventario en un cliente (25-10): también se verifica el pago en la fila, además de registrar la venta. */
   onPago?: Verificar
+  /** 16-11 (el dueño): el chip «Pago por verificar» se verifica de un toque (como cuando cuadra con el banco). */
+  onPagoChip?: Verificar
 }) {
   const sinInventario = !!onVerificar
   const verPago = sinInventario || !!onPago   // monto, comprobante y datos del pago a la vista
   const [haciendo, setHaciendo] = useState(false)
   const verificar = async (v: 'valido' | 'invalido' | 'pendiente') => {
-    const fn = onVerificar ?? onPago
+    const fn = onVerificar ?? onPago ?? onPagoChip
     if (!fn || !f.pago) return
     setHaciendo(true)
     try { await fn(f.pago.id, v) } finally { setHaciendo(false) }
@@ -306,7 +353,17 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
         </div>
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           {!sinInventario && <Etiqueta tono={prod.tono} title={prod.title}>{prod.texto}</Etiqueta>}
-          {pago && <Etiqueta tono={pago.tono} title={pago.title}>{pago.texto}</Etiqueta>}
+          {pago && (onVerificar ?? onPago ?? onPagoChip) && f.pago?.verificacion === 'pendiente'
+            ? <ChipVerificar texto={pago.texto} monto={f.pago.monto} quien={f.comprador ?? f.nick} haciendo={haciendo} onElegir={verificar} />
+            : pago && <Etiqueta tono={pago.tono} title={pago.title}>{pago.texto}</Etiqueta>}
+          {pago && onPagoChip && !onVerificar && !onPago && f.pago?.verificacion === 'valido' && (
+            <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo}
+              title="Vuelve a «Pago por verificar»" className="text-[11px] text-neutral-400 underline hover:text-neutral-700 disabled:opacity-50">deshacer</button>
+          )}
+          {pago && onPagoChip && !onVerificar && !onPago && f.pago?.verificacion === 'invalido' && (
+            <button type="button" onClick={() => verificar('pendiente')} disabled={haciendo}
+              className="text-[11px] text-neutral-500 underline hover:text-neutral-800 disabled:opacity-50">volver a revisar</button>
+          )}
           {verPago && f.pago && f.pago.verificacion === 'pendiente' && f.pago.monto != null && (
             <Monto p={{ monto_pagado: f.pago.monto, total_orden: f.pago.totalOrden }} banco={!!f.pago.bancoRes} />
           )}
@@ -402,8 +459,9 @@ function FilaVenta({ f, d, onConfirmar, onVerificar, onPago }: {
   )
 }
 
-function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar, onPago }: {
+function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar, onPago, onPagoChip }: {
   titulo: string; nota: string; filas: Fila[]; d: Datos; onConfirmar: (numero: string) => void; plegable?: boolean; onVerificar?: Verificar; onPago?: Verificar
+  onPagoChip?: Verificar
 }) {
   const [abierto, setAbierto] = useState(!plegable)
   if (!filas.length) return null
@@ -424,7 +482,7 @@ function Grupo({ titulo, nota, filas, d, onConfirmar, plegable, onVerificar, onP
       </button>
       {abierto && (
         <ul className="divide-y divide-neutral-100">
-          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onPago} />)}
+          {filas.map(f => <FilaVenta key={f.numero} f={f} d={d} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onPago} onPagoChip={onPagoChip} />)}
         </ul>
       )}
     </section>
@@ -469,7 +527,7 @@ function FilaCargada({ c, onVerificar }: { c: CargadaConPago; onVerificar: (sale
   )
 }
 
-export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada, onVerificarPago }: {
+export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerificar, onVerificarCargada, onVerificarPago, onPagoChip }: {
   datos: Datos | null
   onRecargar: () => Promise<void>
   onConfirmar: (numero: string) => void
@@ -479,6 +537,8 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
   onVerificar?: Verificar
   /** Con inventario en un cliente (25-10): ✓ / ✗ del pago en la fila, como en Pagos ME (es el mismo pago). */
   onVerificarPago?: Verificar
+  /** 16-11: verificar el pago tocando su chip (Ventas → Por confirmar con Pagos ME). */
+  onPagoChip?: Verificar
 }) {
   const sinInventario = !!onVerificar
   const [actualizando, setActualizando] = useState(false)
@@ -713,14 +773,14 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
             <Grupo titulo="Listos para despachar" nota="Pago verificado: sus guías están en Despachos" filas={listos} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
             <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha traído" filas={sinPago} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} plegable />
           </> : datos.pagosME ? <>
-            <Grupo titulo="Con pago" nota="Falta descontarlas del inventario: revisa y registra cada una" filas={conPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} />
+            <Grupo titulo="Con pago" nota="Falta descontarlas del inventario: revisa y registra cada una" filas={conPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} onPagoChip={onPagoChip} />
             {!conPago.length && (
               <div className="px-4 py-6 text-center border-b border-neutral-100">
                 <p className="text-sm font-medium text-neutral-700">Nada con pago por confirmar</p>
                 <p className="mt-1 text-xs text-neutral-400">Cuando un cliente pague, su venta aparece aquí después de buscar los pagos.</p>
               </div>
             )}
-            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} plegable />
+            <Grupo titulo="Sin pago todavía" nota="El cliente no ha pagado, o el pago no se ha buscado" filas={sinPago} d={datos} onConfirmar={onConfirmar} onPago={onVerificarPago} onPagoChip={onPagoChip} plegable />
           </> : (
             <ul className="divide-y divide-neutral-100">
               {vigentes.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} />)}
@@ -748,7 +808,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           </button>
           {verVencidas && (
             <ul className="divide-y divide-neutral-100 border-t border-neutral-200 bg-white">
-              {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />)}
+              {vencidas.map(f => <FilaVenta key={f.numero} f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} onPagoChip={onPagoChip} />)}
             </ul>
           )}
         </div>
@@ -762,7 +822,7 @@ export default function PorConfirmar({ datos, onRecargar, onConfirmar, onVerific
           <ul className="divide-y divide-amber-100 border-t border-amber-200 bg-white">
             {concretadasSinVenta.map(f => (
               <div key={f.numero}>
-                <FilaVenta f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} />
+                <FilaVenta f={f} d={datos} onConfirmar={onConfirmar} onVerificar={onVerificar} onPago={onVerificarPago} onPagoChip={onPagoChip} />
                 {/* 11-11: cobro destino registrado como LOCAL-…: se enlaza y sale del aviso (mig 165). */}
                 <div className="px-4 pb-2.5 -mt-1"><EnlazarLocal numero={f.numero} onHecho={onRecargar} /></div>
               </div>

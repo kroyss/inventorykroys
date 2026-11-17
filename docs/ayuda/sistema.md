@@ -993,6 +993,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   el número rojo en **Publicaciones** y en la pestaña **Stock** son los que están en 0, y por Telegram llega
   «Vende sin tener stock» (Mis avisos) cada vez que uno entra. Cada fila muestra la foto del producto.
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.
+  **Verificar el pago de un toque:** toca el chip azul «Pago por verificar · Bs …» → «✓ Sí, verificado» (o «✗ Inválido»):
+  queda verificado como cuando cuadra con el banco y el botón pasa a «Registrar venta»; «deshacer» lo vuelve atrás.
   **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
   toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
   Abajo de la lista: **Vencidas** = ventas de más de N días (el plazo de «no concretada» de Calificaciones) sin pago y

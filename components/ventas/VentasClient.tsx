@@ -74,6 +74,7 @@ interface Props {
   presupuestos?: boolean  // módulo presupuestos (08-11): botón a Ventas → Presupuestos
   porConfirmar: boolean   // cuentas de ML conectadas (módulo preguntas): pestaña "Por confirmar"
   pagoEnFila?: boolean   // cliente con inventario y Pagos ME (25-10): ✓ / ✗ del pago también en Por confirmar
+  pagoChip?: boolean     // 16-11: con Pagos ME, el chip «Pago por verificar» se verifica de un toque
   verificarPagos?: boolean   // VE: paso "Pago verificado" antes de procesar (módulo verificar_pagos; apagado = Inventario simple)
   inicial?: SalesResponse | null   // 12-11: la 1ª página (orden por fecha, sin filtros) ya vino en el HTML (lib/inicial.ts)
 }
@@ -85,7 +86,7 @@ const EMPTY_COUNTS: Counts = {
   DESCARGADA: 0, DESCARGADA_LOCAL: 0, REABIERTA: 0,
 }
 
-export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, presupuestos = false, inicial = null }: Props) {
+export default function VentasClient({ products: initialProducts, userRole, country, facturas, porConfirmar, verificarPagos = true, pagoEnFila = false, pagoChip = false, presupuestos = false, inicial = null }: Props) {
   // VE sin verificar pagos: se procesa directo desde borrador (como CO, pero sin FLEX ni Excel).
   const directoVE = country === 'VE' && !verificarPagos
   // VE con el flujo completo: "Por despachar" / "Despachada" (ESTADOS_VENTA_VE); CO y VE simple quedan igual.
@@ -401,6 +402,14 @@ export default function VentasClient({ products: initialProducts, userRole, coun
   // CO no tiene Despachos: ahí se mantiene.
   const excelVisible = country !== 'VE'
 
+  // Verificar un pago desde la fila de Por confirmar (✓ en fila o tocando el chip): el mismo de Pagos ME.
+  const verificarPago = async (id: number, v: 'valido' | 'invalido' | 'pendiente') => {
+    const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
+    if (!r?.ok) setError('No se pudo guardar la verificación del pago')
+    await pc.cargar()
+  }
+
   return (
     <div>
       <PageHeader title="Ventas" subtitle="Órdenes de MercadoLibre y ventas locales" actions={
@@ -536,12 +545,8 @@ export default function VentasClient({ products: initialProducts, userRole, coun
       {vistaPC && (
         <PorConfirmar datos={pc.datos} onRecargar={pc.cargar}
           onConfirmar={n => { setNumeroNuevo(n); setEditing(null); setShowForm(true) }}
-          onVerificarPago={pagoEnFila ? async (id, v) => {
-            const r = await fetch('/api/pagos-me/verificar', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ids: [id], verificacion: v }) }).catch(() => null)
-            if (!r?.ok) setError('No se pudo guardar la verificación del pago')
-            await pc.cargar()
-          } : undefined}
+          onVerificarPago={pagoEnFila ? verificarPago : undefined}
+          onPagoChip={pagoChip ? verificarPago : undefined}
           onVerificarCargada={async id => {
             // Ya cargada con pago (22-10): la MISMA venta en Editar venta (no se crea otra), con su pago para verificar.
             const fresh: Sale = await fetch(`/api/sales/${id}`).then(r => r.json()).catch(() => null)

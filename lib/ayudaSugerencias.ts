@@ -46,6 +46,8 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: '¿Cada cuánto se revisa?', respuesta: 'Sola cada hora. Con **Revisar ahora** buscas en el momento (cada 10 minutos como máximo).' },
   ],
   '/pagos-me': [
+    { pregunta: '¿Cómo verifico un pago rápido?',
+      respuesta: 'Toca el chip azul **Pago por verificar · Bs …** y elige **✓ Sí, verificado** (o **✗ Inválido**). Queda verificado como cuando cuadra con el banco y el botón pasa a **Registrar venta**. Si te equivocaste, toca **deshacer**.' },
     { pregunta: '¿Cómo conecto MercadoEnvíos?', video: 'Conéctate con Mercadoenvios',
       respuesta: '1. Descarga el programa en la PC de las guías e instálalo.\n2. Toca **Genera tu código** y pégalo en el programa.\n3. Agrega el **Asistente de envíos** a Chrome (en el perfil con la sesión de MercadoEnvíos).\n4. Ábrelo y pega el mismo código: debe decir «Conectado al sistema».' },
     { pregunta: 'Dice «PC sin señal»', respuesta: 'La PC está apagada o el programa no corre. Préndela: no se pierde nada, al tocar **Traer pagos y guías** trae lo que faltaba.' },
