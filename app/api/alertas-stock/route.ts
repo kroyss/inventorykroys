@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { leerInventarioAlDia } from '@/lib/inventarioAlDia'
 import { apiError } from '@/lib/apiError'
 import { sesionStock } from '@/lib/preguntasSesion'
 import { SQL_VENDIDA, sqlCaliente, umbralStock } from '@/lib/alertasStock'
@@ -23,7 +24,8 @@ const PAUSADA = `a.actualizado_at > NOW() - INTERVAL '1 day' AND (a.estado = 'pa
 // 28-10: lo que hay en el inventario para CADA fila (Agotadas, Por agotarse y Pausadas), solo en empresas con el
 // módulo inventario (sin él la columna ni se calcula). La variante busca su vínculo propio ("item:variante") y, si no
 // tiene, el de la publicación; combos ("trae N u."): alcanza para inventario ÷ N publicaciones.
-const SQL_INVENTARIO_FILA = `(SELECT MAX(FLOOR(i.quantity / GREATEST(COALESCE(m.unidades, 1), 1)))::int FROM product_ml_codes m
+// 17-11: publicación compartida por varios productos (modelos) → la SUMA de lo que hay de cada uno (antes el mayor).
+const SQL_INVENTARIO_FILA = `(SELECT SUM(FLOOR(GREATEST(i.quantity, 0) / GREATEST(COALESCE(m.unidades, 1), 1)))::int FROM product_ml_codes m
     JOIN products p ON p.id = m.product_id AND p.is_active JOIN inventory i ON i.product_id = p.id
    WHERE m.is_active AND m.ml_code = CASE
      WHEN a.variante_id <> 0 AND EXISTS (SELECT 1 FROM product_ml_codes v WHERE v.is_active
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
       : vista === 'bajas' ? `${FRESCA} AND a.disponible > 0 AND a.disponible < $1` : `${FRESCA} AND a.disponible <= 0`
     const orden = vista === 'pausadas' ? 'COALESCE(a.pausada_desde, a.agotada_desde) DESC' : vista === 'bajas' ? 'a.disponible, a.bajo_desde' : 'a.agotada_desde DESC'
     const caliente = vista === 'pausadas' ? PAUSADA_EN_LISTA : vista === 'bajas' ? sqlCaliente('a.bajo_desde') : sqlCaliente('a.agotada_desde')
-    const [{ rows }, { rows: [n] }, { rows: [rev] }] = await Promise.all([
+    const [{ rows }, { rows: [n] }, { rows: [rev] }, alDia] = await Promise.all([
       s.db.query(
         `SELECT a.item_id, a.variante_id::text, a.titulo, a.variante, a.disponible, a.estado, a.permalink, a.imagen,
                 a.agotada_desde, a.bajo_desde, a.ultima_agotada_at, a.pausada_desde, a.sub_status, c.nickname AS cuenta,
@@ -56,8 +58,9 @@ export async function GET(req: NextRequest) {
          FROM ml_stock_alertas a`, [umbral]),
       s.db.query(`SELECT MIN(stock_alertas_at) AS desde, MAX(stock_alertas_at) AS hasta, COUNT(*)::int AS cuentas
                   FROM ml_conexiones WHERE estado = 'activa'`),
+      conInventario ? leerInventarioAlDia(s.db) : Promise.resolve(false),
     ])
-    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock'), conInventario })
+    return NextResponse.json({ filas: rows, contadores: n, umbral, revision: rev, esAdmin: puede(s.session.user, 'automatizaciones_config'), puedeStock: puede(s.session.user, 'reponer_stock'), conInventario, alDia })
   } catch (err) {
     return apiError(err)
   }

@@ -19,6 +19,8 @@ interface Fila {
 export interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
   revision: { desde: string | null; hasta: string | null; cuentas: number }; esAdmin: boolean; puedeStock: boolean
+  /** 17-11 «Mi inventario está al día» (lib/inventarioAlDia.ts): avisa si pones en ML más de lo que hay. */
+  alDia?: boolean
 }
 type Vista = 'agotadas' | 'bajas' | 'pausadas'
 
@@ -94,6 +96,9 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
     } finally { setGuardandoUmbral(false) }
   }
 
+  // 17-11: solo con el inventario al día y publicación vinculada (inventario != null); sin inventario no avisa nada.
+  const pasaInventario = (f: Fila) => !!datos?.alDia && f.inventario != null && (nuevo[clave(f)] ?? '') !== ''
+    && parseInt(nuevo[clave(f)], 10) > Math.max(0, f.inventario)
   const escribir = (f: Fila, v: string) => {
     const limpio = v.replace(/\D/g, '').slice(0, 5)
     setNuevo(n => ({ ...n, [clave(f)]: limpio }))
@@ -105,7 +110,10 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
     const lista = (datos?.filas ?? []).filter(f => marcadas.has(clave(f)) && (nuevo[clave(f)] ?? '') !== '')
     if (!lista.length) return
     const cuentas = [...new Set(lista.map(f => f.cuenta))].join(', ')
-    if (!await confirm({ title: 'Actualizar stock en MercadoLibre',
+    const mas = lista.filter(f => pasaInventario(f))
+    if (!await confirm(mas.length ? { title: 'Más de lo que tienes en inventario', danger: true,
+      message: `${mas.slice(0, 5).map(f => `${f.titulo}${f.variante ? ` (${f.variante})` : ''} · ${f.cuenta}: pones ${nuevo[clave(f)]}, tienes ${f.inventario}`).join('\n')}${mas.length > 5 ? `\n… y ${mas.length - 5} más` : ''}\n\nSi se vende de más no vas a poder cumplir.`,
+      confirmText: 'Actualizar igual' } : { title: 'Actualizar stock en MercadoLibre',
       message: `Vas a cambiar la cantidad disponible de ${lista.length} publicación${lista.length === 1 ? '' : 'es'} en ${cuentas}. Solo cambia la cantidad, nada más.`,
       confirmText: 'Actualizar' })) return
     setEnviando(true); setAviso(null)
@@ -226,7 +234,8 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
       {datos?.puedeStock && vista !== 'pausadas' && (
         <input inputMode="numeric" value={nuevo[clave(f)] ?? ''} onChange={e => escribir(f, e.target.value)} placeholder="Nuevo"
           aria-label={`Stock nuevo de ${f.titulo}`}
-          className="order-6 sm:order-none w-20 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-right num shrink-0" />
+          title={pasaInventario(f) ? `Más de lo que tienes en inventario (${f.inventario})` : undefined}
+          className={`order-6 sm:order-none w-20 border rounded-lg px-2 py-1 text-sm text-right num shrink-0 ${pasaInventario(f) ? 'border-amber-400 bg-amber-50' : 'border-neutral-300'}`} />
       )}
       {/* "Volver a avisar" solo si la quitaron a mano y todavía está dentro de los 7 días (si no, ya es vieja). */}
       {/* Columna de ancho fijo (con o sin botón) para que el stock y el estado queden alineados. */}
@@ -265,6 +274,7 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
             : <p className={`text-[11px] whitespace-nowrap ${f.inventario > 0 ? 'font-medium text-emerald-700' : 'text-neutral-500'}`}>
                 {f.inventario > 0 ? `en inventario: ${f.inventario} u.` : 'sin stock en inventario'}</p>
         )}
+        {pasaInventario(f) && <p className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">⚠ más de lo que tienes</p>}
         <p className="text-[11px] text-neutral-400 whitespace-nowrap">
           {vista === 'pausadas' ? `pausada ${hace(f.pausada_desde ?? f.agotada_desde ?? null)}` : vista === 'agotadas' ? `sin stock desde ${hace(f.agotada_desde)}` : `bajo desde ${hace(f.bajo_desde)}`}
         </p>

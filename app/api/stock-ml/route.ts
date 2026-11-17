@@ -4,6 +4,8 @@ import { apiError } from '@/lib/apiError'
 import { sesionPreguntas } from '@/lib/preguntasSesion'
 import { ErrorML, CuentaDesconectada } from '@/lib/ml'
 import { registrarUso } from '@/lib/usoAcciones'
+import { tieneModulo } from '@/lib/modulos'
+import { leerInventarioAlDia } from '@/lib/inventarioAlDia'
 import { aplicarCambio, conexionDeItem, gemelasDe, huecoDePublicacion, leerPublicacion, type PubStock } from '@/lib/stockML'
 
 // Cambiar stock y reactivar en MercadoLibre (2026-10-21, lib/stockML.ts). Permiso "Cambiar el stock en
@@ -24,10 +26,11 @@ export async function GET(req: NextRequest) {
   try {
     const conexionId = await conexionDeItem(s.db, item)
     if (!conexionId) return NextResponse.json({ error: 'Publicación no encontrada en tus cuentas' }, { status: 404 })
-    const [pub, { producto, gemelas }, hueco] = await Promise.all([
+    const [pub, { producto, gemelas }, hueco, alDia] = await Promise.all([
       leerPublicacion(s.db, conexionId, item),
       gemelasDe(s.db, item, variante),
       huecoDePublicacion(s.db, conexionId, item),
+      tieneModulo(s.session.user, 'inventario') ? leerInventarioAlDia(s.db) : Promise.resolve(false),
     ])
     const principal = { ...pub, hueco }
     // Las gemelas, leídas de ML (de a una; suelen ser 1 o 2).
@@ -40,7 +43,7 @@ export async function GET(req: NextRequest) {
         otras.push({ ...p, variante_foco: g.variante_id, hueco })
       } catch { /* sin acceso: se omite */ }
     }
-    return NextResponse.json({ principal, variante_foco: variante, gemelas: otras, producto })
+    return NextResponse.json({ principal, variante_foco: variante, gemelas: otras, producto, al_dia: alDia })
   } catch (err) {
     if (err instanceof CuentaDesconectada) return NextResponse.json({ error: 'La cuenta de MercadoLibre está desconectada' }, { status: 409 })
     if (err instanceof ErrorML) return NextResponse.json({ error: `MercadoLibre: ${err.message}` }, { status: 502 })

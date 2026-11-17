@@ -971,19 +971,25 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Revisar con fotos** (filtro de Vincular): cada producto con las fotos de todas sus publicaciones vinculadas; si una
   no corresponde, **Corregir** abre esa publicación para cambiar el vínculo. La foto del producto en todo el sistema
   sale de estos vínculos: al corregir aquí se arregla sola en todos lados (no hay que actualizar nada).
-- **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; iguala el stock y reactiva las pausadas en todas tus
-  cuentas de una vez. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+- **Stock en ML** (Publicaciones → Stock): cada producto con todas sus publicaciones; pone en ML lo que hay y reactiva las pausadas en todas tus
+  cuentas de una vez. Cada producto con algo por cambiar tiene su botón **Aplicar en ML** (manda lo que dice «Quedará»,
+  sin marcar nada). Para varios: márcalos y **Poner en ML lo que hay** (abajo); si alguno vende de más, avisa cuáles antes.
+  **Mi inventario está al día** (casilla en el recuadro de arriba, la cambia quien configura el inventario): prendida, al
+  poner stock en ML (aquí, en Automatizaciones → Stock y en la ventana de cambiar stock) avisa si pones más de lo que
+  tienes y pide «Actualizar igual» (no bloquea). Apagada, el inventario se ve solo como dato y aquí sale una nota para
+  revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en el filtro Revisar combos salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
   convertidor con varias versiones). ML muestra la **suma** de lo que aporta cada producto («aporta N»). Si alguno está en
   «Quedan pocas» o no se sincroniza, esa publicación no se toca sola.
   **Quedan pocas** (el disponible es igual o menor a la reserva): el sistema no reparte solo. Si ML ofrece más de lo que
-  hay, sale «Hay 2 y MercadoLibre ofrece 3. Te sugerimos: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» con el botón
-  **Dejar así en ML** (botón discreto: guarda en ML; baja primero la que más muestra; también lo hace «Igualar» al marcar varios). **Cambiar** deja
-  poner a mano cuántas muestra cada cuenta.
+  hay, sale «Hay 2 y MercadoLibre ofrece 3. Con «Aplicar en ML» queda así: PIKEKE 1 → 1 · SOLUCIONES_MC 2 → 1» (baja
+  primero las pausadas y después la que más muestra). **Cambiar a mano** deja poner cuántas muestra cada cuenta y se guarda
+  con **Guardar en ML**. Una publicación **pausada a mano** no entra al reparto ni cuenta como que vende: no se le deja
+  stock que no se vendería. Con pocas unidades, primero van las publicaciones activas.
   **Bodega** (con el permiso «Cambiar el stock en MercadoLibre»; no hace falta tocar el inventario):
-  **Pausar** (en cada publicación, con motivo opcional: dañado, sin foto…) deja de venderla; «Igualar» no la reactiva
+  **Pausar** (en cada publicación, con motivo opcional: dañado, sin foto…) deja de venderla; «Poner en ML lo que hay» no la reactiva
   hasta que alguien toque **Activar** (necesita stock en ML). Filtro **Pausadas a mano**. **Se acabó** (en el producto,
   cuando no está en bodega aunque el sistema diga que hay): todas sus publicaciones a 0 en ML y quedan en 0 hasta que
   entre mercancía o se ajuste el inventario (o **Ya hay**); al admin le llega por Telegram para que ajuste el inventario.
@@ -1002,7 +1008,7 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
   **Vende de más** (filtro rojo, se abre solo cuando hay): productos que MercadoLibre ofrece y no tienes — en **0** con
   alguna publicación activa con stock (rojo: si alguien compra no puedes cumplir) o con menos de lo que suman tus
   publicaciones activas (amarillo). Las pausadas no cuentan.
-  Márcalos e **Igualar**: los que están en 0 quedan en 0 en ML. El sistema lo revisa solo cada 10 minutos:
+  **Aplicar en ML** en cada uno (o márcalos y **Poner en ML lo que hay**): los que están en 0 quedan en 0 en ML. El sistema lo revisa solo cada 10 minutos:
   el número rojo en **Publicaciones** y en la pestaña **Stock** son los que están en 0, y por Telegram llega
   «Vende sin tener stock» (Mis avisos) cada vez que uno entra. Cada fila muestra la foto del producto.
 - **Ventas:** órdenes de MercadoLibre y ventas locales. Al registrar una venta se descuenta el inventario.

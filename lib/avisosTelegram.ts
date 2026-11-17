@@ -453,12 +453,12 @@ async function avisosDe(db: Pool, e: EmpresaAvisos, d: Destinatario, multi: bool
     if (lista.length) {
       const linea = (x: typeof lista[number]) => `<b>${esc(x.code)}</b> ${esc(corto(x.name, 60))} · ${esc(x.cuentas.join(', '))} ofrece ${x.ofrece}`
       const html = lista.length === 1
-        ? `${cab}🔴 <b>Quedó en 0 y sigue a la venta en ML</b>\n${linea(lista[0])}\nSi alguien compra no vas a poder cumplir: iguala el stock (queda en 0).`
+        ? `${cab}🔴 <b>Quedó en 0 y sigue a la venta en ML</b>\n${linea(lista[0])}\nSi alguien compra no vas a poder cumplir: ponlo en 0 en Stock en ML.`
         : `${cab}🔴 <b>${lista.length} productos en 0 siguen a la venta en ML</b>\n\n`
           + lista.slice(0, 8).map(x => `• ${linea(x)}`).join('\n') + (lista.length > 8 ? `\n… y ${lista.length - 8} más` : '')
-          + `\n\nSi alguien compra no vas a poder cumplir: iguala el stock.`
+          + `\n\nSi alguien compra no vas a poder cumplir: pon en ML lo que hay.`
       const url = lista.length === 1 ? `/inventario/stock-ml?buscar=${encodeURIComponent(lista[0].code)}` : '/inventario/stock-ml'
-      if (await mandar(d, e, 'vende_de_mas', lista.map(x => x.ref), html, [[{ texto: 'Igualar en Stock en ML', url: urlSistema(url) }]])) enviados++
+      if (await mandar(d, e, 'vende_de_mas', lista.map(x => x.ref), html, [[{ texto: 'Arreglar en Stock en ML', url: urlSistema(url) }]])) enviados++
     }
   }
 

@@ -240,14 +240,18 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
         p.envio = envioPorTransportista(f.peso != null ? f.peso * p.unidades : null, p.precio, tablas).estado
       }
     }
-    const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
+    // 17-11 (el dueño, COD-0144: quedó 1 unidad en una pausada a mano y no se vendía en ninguna): la pausada a mano no
+    // entra al reparto ni cuenta como «ofrece» (no vende); queda como está hasta que alguien la active.
+    const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null && !p.pausa_mano)
     f.excede = sincronizables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0) > disp
     // 16-11 (Vende de más): con 0 disponible no hay nada que repartir a mano: todas a 0 (Igualar lo arregla de un clic).
     f.en_reserva = sincronizables.length > 0 && disp > 0 && disp <= reserva
     if (!f.en_reserva && sincronizables.length) {
       // Por turnos: cada vuelta, a cada una (de la que más vende a la que menos) 1 publicación entera si todavía alcanza.
       // Antes era partes iguales en unidades y después ÷ lo que trae: 10 entre combos de 5/4/6 daba 0 en todas.
-      const orden = [...sincronizables].sort((a, b) => b.ventas60 - a.ventas60 || a.cuenta.localeCompare(b.cuenta))
+      // 17-11: con pocas unidades, primero las que ya están activas (menos cambios en ML que reactivar una pausada).
+      const orden = [...sincronizables].sort((a, b) => Number(b.estado === 'active') - Number(a.estado === 'active')
+        || b.ventas60 - a.ventas60 || a.cuenta.localeCompare(b.cuenta))
       for (const p of orden) p.objetivo = 0
       let quedan = f.publicable
       for (let dio = true; dio;) {
@@ -272,8 +276,9 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       const c = new Map(sincronizables.map(p => [p, p.ml_disponible ?? 0]))
       let total = sincronizables.reduce((s, p) => s + c.get(p)! * p.unidades, 0)
       while (total > disp) {
+          // 17-11: primero se baja la pausada (no vende), después la que más muestra.
         const p = [...c.keys()].filter(x => c.get(x)! > 0)
-          .sort((a, b) => c.get(b)! - c.get(a)! || a.ventas60 - b.ventas60 || a.cuenta.localeCompare(b.cuenta))[0]
+          .sort((a, b) => Number(a.estado === 'active') - Number(b.estado === 'active') || c.get(b)! - c.get(a)! || a.ventas60 - b.ventas60 || a.cuenta.localeCompare(b.cuenta))[0]
         if (!p) break
         c.set(p, c.get(p)! - 1); total -= p.unidades
       }
@@ -325,7 +330,7 @@ function compartidas(filas: FilaStockML[]) {
   for (const f of tocadas) {
     const disp = f.sin_fisico ? 0 : f.disponible
     const cuenta = (p: PubStockML) => (p.ml_disponible ?? 0) * p.unidades * (parte.get(p) ?? 1)
-    const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null)
+    const sincronizables = f.pubs.filter(p => !p.sin_sincronizar && !p.entera_con_variantes && p.estado != null && p.ml_disponible != null && !p.pausa_mano)
     f.excede = sincronizables.reduce((s, p) => s + cuenta(p), 0) > disp
     f.ofrece = Math.round(f.pubs
       .filter(p => p.estado === 'active' && !p.sin_sincronizar && !p.entera_con_variantes && (p.ml_disponible ?? 0) > 0)

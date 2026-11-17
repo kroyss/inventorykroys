@@ -271,7 +271,7 @@ export default function MisAvisosClient({ inicial = null }: { inicial?: unknown 
             )}
             {(d.vende || d.sinFisico) && (
               <Fila icono="🔴" titulo="Vende sin tener stock" etiqueta="Recomendado" on={p.vende_de_mas} onCambio={v => cambiar({ vende_de_mas: v })}
-                ejemplo={'🔴 Quedó en 0 y sigue a la venta en ML\nCOD-0207 Kit Destornilladores 544 · PIKEKE ofrece 1\nSi alguien compra no vas a poder cumplir: iguala el stock (queda en 0).\n\n[ Igualar en Stock en ML ]'}>
+                ejemplo={'🔴 Quedó en 0 y sigue a la venta en ML\nCOD-0207 Kit Destornilladores 544 · PIKEKE ofrece 1\nSi alguien compra no vas a poder cumplir: ponlo en 0 en Stock en ML.\n\n[ Arreglar en Stock en ML ]'}>
                 Cuando un producto se queda en <b className="font-medium text-neutral-700">0 en tu inventario</b> pero una publicación activa sigue
                 ofreciéndolo en MercadoLibre. Se revisa cada 10 minutos. Una vez cada vez que pasa.
                 {d.sinFisico && <> También cuando alguien de bodega marca <b className="font-medium text-neutral-700">Se acabó</b> en un producto (para que ajustes el inventario).</>}

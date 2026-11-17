@@ -11,6 +11,7 @@ import { aplicarCambio, cambiarEstadoML, type Resultado } from '@/lib/stockML'
 import { desactivadosPublicados, filasStockML, leerReserva } from '@/lib/stockConML'
 import { contarSinVincular } from '@/lib/importarML'
 import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
+import { guardarInventarioAlDia, leerInventarioAlDia } from '@/lib/inventarioAlDia'
 
 // Stock en ML, Fase 1 (26-10; lib/stockConML.ts, pantalla Inventario → «Stock en ML»).
 //   GET → cada producto vinculado con sus publicaciones, lo que muestran en ML y lo que deberían mostrar
@@ -23,6 +24,7 @@ import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
 //   POST { accion: 'reserva', unidades } → la reserva de seguridad de la empresa (permiso inventario_config)
 //   POST { accion: 'estado', item_id, estado: 'paused'|'active', motivo? } (16-11, bodega) → pausar a mano (Igualar no la
 //        reactiva) o activar (exige stock en ML). Publicación entera.
+//   POST { accion: 'al_dia', valor } (17-11) → «Mi inventario está al día» de la empresa (permiso inventario_config)
 //   POST { accion: 'sin_fisico', product_id, valor } (16-11) → «Se acabó»: todas sus publicaciones a 0 y quedan en 0 hasta
 //        que entre mercancía o se ajuste el inventario; valor false = «Ya hay». No toca el inventario.
 //   GET ?revisar=1 (16-11, «Vende de más», lib/vendeDeMas.ts) → antes relee de ML las activas que parecen vender más de lo
@@ -45,11 +47,11 @@ export async function GET(req: NextRequest) {
     const revisar = req.nextUrl.searchParams.get('revisar') === '1'
     // sinVincular: activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
     // desactivados (17-11): productos desactivados con publicaciones activas en ML (ya no se les controla el stock).
-    const [filas, reserva, sinVincular, desactivados] = await Promise.all([
+    const [filas, reserva, sinVincular, desactivados, inventarioAlDia] = await Promise.all([
       revisar ? revisarVendeDeMas(s.db, pais).then(r => r.filas)
               : filasStockML(s.db, pais).then(async f => { await guardarEstadoVende(s.db, f).catch(() => {}); return f }),
-      leerReserva(s.db), contarSinVincular(s.db), desactivadosPublicados(s.db)])
-    return NextResponse.json({ filas, reserva, sinVincular, desactivados, puedeCambiar: puede(s.session.user, 'reponer_stock'),
+      leerReserva(s.db), contarSinVincular(s.db), desactivadosPublicados(s.db), leerInventarioAlDia(s.db)])
+    return NextResponse.json({ filas, reserva, sinVincular, desactivados, inventarioAlDia, puedeCambiar: puede(s.session.user, 'reponer_stock'),
                                puedeReserva: puede(s.session.user, 'inventario_config'), puedeReactivar: puede(s.session.user, 'ver_productos') })
   } catch (err) {
     return apiError(err)
@@ -68,6 +70,7 @@ const Body = z.discriminatedUnion('accion', [
     cantidad: z.number().int().min(0).max(99999),
   })).min(1).max(20) }),
   z.object({ accion: z.literal('reserva'), unidades: z.number().int().min(0).max(100) }),
+  z.object({ accion: z.literal('al_dia'), valor: z.boolean() }),
   z.object({ accion: z.literal('estado'), item_id: z.string().regex(/^[A-Z]{3}\d+$/), estado: z.enum(['paused', 'active']),
              motivo: z.string().trim().max(200).optional() }),
   z.object({ accion: z.literal('sin_fisico'), product_id: z.number().int().positive(), valor: z.boolean() }),
@@ -95,6 +98,11 @@ export async function POST(req: NextRequest) {
       await s.db.query(
         `INSERT INTO app_settings (key, value) VALUES ('stock_ml_reserva', $1)
          ON CONFLICT (empresa_id, key) DO UPDATE SET value = EXCLUDED.value`, [String(b.unidades)])
+      return NextResponse.json({ ok: true })
+    }
+    if (b.accion === 'al_dia') {
+      if (!puede(s.session.user, 'inventario_config')) return NextResponse.json({ error: 'No tienes permiso para cambiar esto' }, { status: 403 })
+      await guardarInventarioAlDia(s.db, b.valor)
       return NextResponse.json({ ok: true })
     }
     if (b.accion === 'estados') {
@@ -140,7 +148,8 @@ export async function POST(req: NextRequest) {
       if ([...pedidas.keys()].some(k => !pubs.get(k) || pubs.get(k)!.sin_sincronizar || pubs.get(k)!.entera_con_variantes || pubs.get(k)!.estado == null)) {
         return NextResponse.json({ error: 'Alguna publicación no se puede asignar desde aquí' }, { status: 400 })
       }
-      const total = f.pubs.filter(p => p.estado != null && p.ml_disponible != null && !p.sin_sincronizar)
+      const total = f.pubs.filter(p => p.estado != null && p.ml_disponible != null && !p.sin_sincronizar
+          && (!p.pausa_mano || pedidas.has(`${p.item_id}:${p.variante_id ?? ''}`)))
         .reduce((sum, p) => sum + (pedidas.get(`${p.item_id}:${p.variante_id ?? ''}`) ?? p.ml_disponible ?? 0) * p.unidades, 0)
       if (total > f.disponible) {
         return NextResponse.json({ error: `Entre todas las publicaciones serían ${total} y hay ${f.disponible} disponibles` }, { status: 400 })

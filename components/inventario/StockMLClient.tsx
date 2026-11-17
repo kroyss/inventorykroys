@@ -1,7 +1,7 @@
 'use client'
 // Inventario → «Stock en ML» (26-10, Fase 1; API /api/stock-en-ml, lib/stockConML.ts). Cada producto vinculado con
 // TODAS sus publicaciones (cuentas y variantes): lo que muestra ML y lo que debería mostrar. Se marcan varios y
-// «Igualar y reactivar» los deja todos al día de una vez (antes: de a una publicación, cuenta por cuenta).
+// «Poner en ML lo que hay» (antes «Igualar y reactivar») los deja todos al día de una vez (antes: de a una publicación, cuenta por cuenta).
 import { useEffect, useMemo, useState } from 'react'
 import Link from '@/components/ui/Link'
 import { PageHeader } from '@/components/ui'
@@ -25,7 +25,7 @@ const ENVIO: Record<string, { t: string; c: string; title: string }> = {
 }
 
 export interface StockMLRespuesta { filas: FilaStockML[]; reserva: number | null; sinVincular: number; puedeCambiar: boolean; puedeReserva: boolean
-  desactivados?: DesactivadoPublicado[]; puedeReactivar?: boolean }
+  desactivados?: DesactivadoPublicado[]; puedeReactivar?: boolean; inventarioAlDia?: boolean }
 
 export default function StockMLClient({ buscarInicial = '', conVincular = false, inicial = null }: {
   buscarInicial?: string; conVincular?: boolean
@@ -55,6 +55,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [desactivados, setDesactivados] = useState<DesactivadoPublicado[]>(inicial?.desactivados ?? [])
   const [puedeReactivar, setPuedeReactivar] = useState(!!inicial?.puedeReactivar)
   const [verDesactivados, setVerDesactivados] = useState(false)
+  // 17-11: «Mi inventario está al día» (lib/inventarioAlDia.ts). Apagado: nota para revisar las sugerencias antes de aplicar.
+  const [alDia, setAlDia] = useState(inicial?.inventarioAlDia ?? true)
   // 16-11 Historial (seguimiento de lo que se cambia en ML): null = cerrado; con producto = filtrado.
   const [historial, setHistorial] = useState<{ product_id: number | null; nombre: string | null } | null>(null)
   const confirmar = useConfirm()
@@ -63,7 +65,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return null }
     setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
-    setDesactivados(d.desactivados ?? []); setPuedeReactivar(!!d.puedeReactivar)
+    setDesactivados(d.desactivados ?? []); setPuedeReactivar(!!d.puedeReactivar); setAlDia(d.inventarioAlDia ?? true)
     return d.filas as FilaStockML[]
   })
   const conInicial = !!inicial
@@ -137,9 +139,14 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     await cargar()
   }
 
-  const igualar = async () => {
-    const pubs = filas.filter(f => marcados.has(f.product_id)).flatMap(accionables).map(p => ({ item_id: p.item_id, variante_id: p.variante_id }))
+  // 17-11 (el dueño): «Aplicar en ML» de un producto o «Poner en ML lo que hay» con varios marcados.
+  const aplicar = async (prods: FilaStockML[], avisar: boolean) => {
+    const pubs = prods.flatMap(accionables).map(p => ({ item_id: p.item_id, variante_id: p.variante_id }))
     if (!pubs.length) return
+    const demas = prods.filter(f => f.vende || (f.en_reserva && f.excede))
+    if (avisar && demas.length && !await confirmar({ title: `${demas.length} producto${demas.length === 1 ? ' vende' : 's venden'} de más`,
+      message: `${demas.slice(0, 5).map(f => `${f.code} ${f.name}: ML ofrece ${f.ofrece}, tienes ${f.disponible}`).join('\n')}${demas.length > 5 ? `\n… y ${demas.length - 5} más` : ''}\n\nSe bajan en ML a lo que hay (lo que muestra «Quedará»).`,
+      confirmText: 'Sí, poner lo que hay' })) return
     setTrabajando({ hechos: 0, total: pubs.length }); setError(null)
     const res = new Map(resultados)
     for (let i = 0; i < pubs.length; i += 10) {
@@ -149,9 +156,10 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       setResultados(new Map(res))
       setTrabajando({ hechos: Math.min(i + 10, pubs.length), total: pubs.length })
     }
-    setTrabajando(null); setMarcados(new Set())
+    setTrabajando(null); setMarcados(m => { const x = new Set(m); for (const f of prods) x.delete(f.product_id); return x })
     await cargar()
   }
+  const igualar = () => aplicar(filas.filter(f => marcados.has(f.product_id)), true)
 
   const errores = [...resultados.values()].filter(r => !r.ok).length
   const okCount = [...resultados.values()].filter(r => r.ok).length
@@ -159,7 +167,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   return (
     <div className="space-y-4 pb-20">
       <PageHeader title="Stock en MercadoLibre"
-        subtitle="Cada producto con todas sus publicaciones: iguala el stock y reactiva las pausadas en todas tus cuentas de una vez"
+        subtitle="Cada producto con todas sus publicaciones: pon en ML lo que hay y reactiva las pausadas en todas tus cuentas de una vez"
         actions={<>
           <Link href="/inventario" className="btn-secondary text-sm whitespace-nowrap">← Inventario</Link>
           <button type="button" onClick={() => setHistorial({ product_id: null, nombre: null })} className="btn-secondary text-sm whitespace-nowrap"
@@ -184,7 +192,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
 
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 space-y-1">
         <p><b>Disponible</b> = stock del sistema − ventas de MercadoLibre que todavía no se registraron (ML ya las descontó de su publicación).
-          Al igualar, cada publicación queda con el disponible; si <b>trae varias unidades</b> (pack o combo), con el disponible ÷ las que trae.</p>
+          Al poner en ML lo que hay, cada publicación queda con el disponible; si <b>trae varias unidades</b> (pack o combo), con el disponible ÷ las que trae.</p>
         {sinVincular > 0 && (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
             <b>{sinVincular} publicaci{sinVincular === 1 ? 'ón activa' : 'ones activas'} con stock en ML no {sinVincular === 1 ? 'está vinculada' : 'están vinculadas'}</b>: sus ventas
@@ -197,6 +205,21 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           queda <b>en reserva</b>: tú decides a qué cuenta va cada unidad.
           {puedeReserva && reserva != null && <CambiarReserva valor={reserva} onGuardar={async u => { if (await pedir({ accion: 'reserva', unidades: u })) await cargar() }} />}
         </p>
+        <p className="flex flex-wrap items-center gap-x-1">
+          {puedeReserva ? (
+            <label className="inline-flex items-center gap-1.5">
+              <input type="checkbox" checked={alDia} className="h-3.5 w-3.5"
+                onChange={async e => { const v = e.target.checked; setAlDia(v); if (!await pedir({ accion: 'al_dia', valor: v })) setAlDia(!v) }} />
+              <b>Mi inventario está al día</b>
+            </label>
+          ) : <b>Inventario {alDia ? 'al día' : 'sin marcar como al día'}</b>}
+          <span>: al poner stock en ML (también en Automatizaciones → Stock) avisa si pones más de lo que tienes.</span>
+        </p>
+        {!alDia && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+            Tu inventario no está marcado como al día: revisa las sugerencias antes de aplicar (salen de lo que dice el inventario).
+          </p>
+        )}
         <p>Una pausada se reactiva si tiene stock, salvo que a su precio y peso quede <b>sin envío gratis</b>: esas las revisas tú.
           Lo que marques <b>No sincronizar</b> (rifas, encargos) no se toca.</p>
       </div>
@@ -237,7 +260,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
       {filtro === 'vende' && n.vende > 0 && (
         <p className="rounded-lg border border-neutral-200 border-l-4 border-l-red-400 bg-white px-3 py-2 text-xs text-neutral-700">
           <b>MercadoLibre ofrece unidades que no tienes.</b> Si alguien compra, no vas a poder cumplir (reclamo y baja de reputación).
-          {puedeCambiar ? ' Márcalos e iguala: los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
+          {puedeCambiar ? ' Toca «Aplicar en ML» en cada uno (o márcalos y «Poner en ML lo que hay»): los que están en 0 quedan en 0 en ML y dejan de venderse.' : ' Avísale a quien maneja el stock.'}
         </p>
       )}
       {resultados.size > 0 && !trabajando && (
@@ -266,6 +289,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           {visibles.slice(0, ver).map(f => (
             <Producto key={f.product_id} f={f} puedeCambiar={puedeCambiar} conVincular={conVincular} marcable={accionables(f).length > 0 || pubsEstado(f).length > 0}
               resaltar={estadoML || null} cuenta={cuenta}
+              aplicables={accionables(f).length} ocupado={!!trabajando} onAplicar={() => aplicar([f], false)}
               marcado={marcados.has(f.product_id)} resultados={resultados} verCombos={filtro === 'combos'}
               onMarcar={() => setMarcados(m => { const x = new Set(m); if (x.has(f.product_id)) x.delete(f.product_id); else x.add(f.product_id); return x })}
               onUnidades={async (p, u) => { if (await pedir({ accion: 'unidades', codigo_id: p.codigo_id, unidades: u })) await cargar() }}
@@ -316,8 +340,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-neutral-700">
               {trabajando ? `Actualizando MercadoLibre… ${trabajando.hechos} de ${trabajando.total} publicaciones`
-                : `${marcados.size} producto${marcados.size === 1 ? '' : 's'}${estadoML || !nIgualar ? '' : ` · ${nIgualar} por igualar`}`}
-              {!trabajando && sinStockLote > 0 && <span className="ml-2 text-xs text-amber-700">· {sinStockLote} sin stock en ML: iguálalas primero</span>}
+                : `${marcados.size} producto${marcados.size === 1 ? '' : 's'}${estadoML || !nIgualar ? '' : ` · ${nIgualar} por actualizar`}`}
+              {!trabajando && sinStockLote > 0 && <span className="ml-2 text-xs text-amber-700">· {sinStockLote} sin stock en ML: ponles lo que hay primero</span>}
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {!trabajando && <button onClick={() => setMarcados(new Set())} className="btn-ghost text-sm">Cancelar</button>}
@@ -332,7 +356,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
               )}
               {nIgualar > 0 && (
                 <button onClick={igualar} disabled={!!trabajando} className={`${estadoML ? 'btn-secondary' : 'btn-primary'} text-sm disabled:opacity-50`}>
-                  {trabajando && !estadoML ? 'Trabajando…' : 'Igualar y reactivar'}
+                  {trabajando && !estadoML ? 'Trabajando…' : 'Poner en ML lo que hay'}
                 </button>
               )}
             </div>
@@ -358,10 +382,12 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, resaltar, cuenta, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, resaltar, cuenta, aplicables, ocupado, onAplicar, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
   f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
   /** Con Estado elegido: las publicaciones en otro estado (u otra cuenta) se atenúan. */
   resaltar: 'active' | 'paused' | null; cuenta: string
+  /** 17-11: publicaciones de este producto que cambian al aplicar; «Aplicar en ML» las manda sin marcar nada. */
+  aplicables: number; ocupado: boolean; onAplicar: () => Promise<void>
   onMarcar: () => void; onUnidades: (p: PubStockML, u: number) => void; onSincronizar: (p: PubStockML, v: boolean) => void
   onAsignar: (a: { item_id: string; variante_id: string | null; cantidad: number }[]) => Promise<boolean>
   onCorregir: (cantidad: number) => Promise<boolean>
@@ -379,6 +405,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
   const [asig, setAsig] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState(false)
   const [editando, setEditando] = useState(false)
+  const [aplicando, setAplicando] = useState(false)
   // Arranca con la sugerencia del servidor (objetivo) si ML muestra de más; si no, con lo que ya muestra ML.
   const valor = (p: PubStockML) => asig[clave(p)] ?? String(p.objetivo ?? p.ml_disponible ?? 0)
   const totalAsig = asignables.reduce((s, p) => s + (Math.max(0, Math.round(Number(valor(p)) || 0))) * p.unidades, 0)
@@ -387,7 +414,7 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
     <section className={`rounded-xl border bg-white shadow-sm ${marcado ? 'border-lime-400 ring-1 ring-lime-300' : 'border-neutral-200'}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-100 px-4 py-2.5">
         {puedeCambiar && <input type="checkbox" checked={marcado} disabled={!marcable} onChange={onMarcar}
-          title={marcable ? 'Marcar para igualar' : 'Nada que igualar'} className="h-4 w-4" />}
+          title={marcable ? 'Marcar (para hacer varios a la vez)' : 'Nada que cambiar'} className="h-4 w-4" />}
         <FotoProducto id={f.product_id} nombre={f.name} />
         <div className="min-w-0 flex-1">
           <span className="font-mono text-xs text-neutral-400">{f.code}</span> <span className="font-medium text-neutral-900">{f.name}</span>
@@ -436,13 +463,19 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           {!f.en_reserva && f.publicable !== f.disponible && <span title="Disponible menos la reserva de seguridad">Publicable <b className="text-neutral-800 tabular-nums">{f.publicable}</b></span>}
           <span>{f.peso ? `${f.peso} kg` : <span className="text-amber-700">sin peso</span>}</span>
         </div>
+        {puedeCambiar && aplicables > 0 && !editando && (
+          <button type="button" disabled={ocupado || aplicando} className="btn-primary px-3 py-1 text-xs disabled:opacity-50"
+            title={`Manda a MercadoLibre lo que dice «Quedará» (${aplicables} publicaci${aplicables === 1 ? 'ón' : 'ones'})`}
+            onClick={async () => { setAplicando(true); await onAplicar(); setAplicando(false) }}>
+            {aplicando ? 'Aplicando…' : 'Aplicar en ML'}</button>
+        )}
       </div>
       {f.en_reserva && (
         <div className={`space-y-2 border-b border-l-4 border-b-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 ${f.excede ? 'border-l-red-400' : 'border-l-amber-300'}`}>
           {/* 16-11 (el dueño: «no sé qué hacer ahí»): arranca con una sugerencia válida, dicha en claro, y un botón listo. */}
           <p>
             {f.excede
-              ? <><b>Hay {f.disponible} y MercadoLibre ofrece {asignables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)}.</b> {puedeCambiar ? (editando ? 'Pon cuántas muestra cada cuenta:' : 'Te sugerimos:') : 'Avísale a quien maneja el stock.'}</>
+              ? <><b>Hay {f.disponible} y MercadoLibre ofrece {asignables.reduce((s, p) => s + (p.ml_disponible ?? 0) * p.unidades, 0)}.</b> {puedeCambiar ? (editando ? 'Pon cuántas muestra cada cuenta:' : 'Con «Aplicar en ML» queda así:') : 'Avísale a quien maneja el stock.'}</>
               : <><b>Quedan pocas ({f.disponible}).</b> Con tan pocas el sistema no reparte solo: cada cuenta muestra lo que decidiste.</>}
           </p>
           {puedeCambiar && f.excede && !editando && (
@@ -456,18 +489,18 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           )}
           {puedeCambiar && (
             <div className="flex flex-wrap items-center gap-3">
-              {(f.excede || editando) && (
-                <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-secondary text-sm disabled:opacity-50"
+              {editando && (
+                <button disabled={guardando || !cambioAsig || totalAsig > f.disponible} className="btn-primary text-sm disabled:opacity-50"
                   onClick={async () => {
                     setGuardando(true)
                     const ok = await onAsignar(asignables.filter(p => Number(valor(p)) !== p.ml_disponible)
                       .map(p => ({ item_id: p.item_id, variante_id: p.variante_id, cantidad: Math.max(0, Math.round(Number(valor(p)) || 0)) })))
                     setGuardando(false)
                     if (ok) { setAsig({}); setEditando(false) }
-                  }}>{guardando ? 'Guardando en ML…' : 'Dejar así en ML'}</button>
+                  }}>{guardando ? 'Guardando en ML…' : 'Guardar en ML'}</button>
               )}
               <button type="button" onClick={() => { setEditando(e => !e); setAsig({}) }} className="text-sm underline">
-                {editando ? 'Cancelar' : 'Cambiar'}</button>
+                {editando ? 'Cancelar' : 'Cambiar a mano'}</button>
               {editando && totalAsig > f.disponible && <span className="font-semibold text-red-700">Te sobra{totalAsig - f.disponible === 1 ? '' : 'n'} {totalAsig - f.disponible}: baja alguna</span>}
               {editando && totalAsig <= f.disponible && <span className="text-xs opacity-75">Usas {totalAsig} de {f.disponible}</span>}
             </div>
@@ -543,11 +576,11 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
       </div>
       {puedeCambiar && p.estado === 'active' && !p.sin_sincronizar && pausando == null && (
         <button type="button" onClick={() => setPausando('')} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
-          title="Deja de venderse en MercadoLibre (la publicación entera). «Igualar» no la reactiva hasta que alguien la active">Pausar</button>
+          title="Deja de venderse en MercadoLibre (la publicación entera). «Poner en ML lo que hay» no la reactiva hasta que alguien la active">Pausar</button>
       )}
       {puedeCambiar && p.estado === 'paused' && !p.sin_sincronizar && (
         <button type="button" disabled={cambiandoEstado || !(p.ml_disponible ?? 0)} onClick={() => estadoML('active')}
-          title={(p.ml_disponible ?? 0) ? 'Vuelve a venderse en MercadoLibre' : 'No tiene stock en ML: iguala o pon unidades primero'}
+          title={(p.ml_disponible ?? 0) ? 'Vuelve a venderse en MercadoLibre' : 'No tiene stock en ML: aplica o pon unidades primero'}
           className="rounded-lg border border-lime-300 bg-lime-50 px-2.5 py-1 text-xs font-medium text-lime-800 hover:bg-lime-100 disabled:opacity-40">
           {cambiandoEstado ? 'Activando…' : 'Activar'}</button>
       )}
@@ -563,7 +596,7 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
       {p.pausa_mano && (
         <span className="w-full text-[11px] text-amber-800">
           Pausada a mano por {p.pausa_mano.por ?? 'alguien'} · {new Date(p.pausa_mano.at).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}
-          {p.pausa_mano.motivo ? ` · «${p.pausa_mano.motivo}»` : ''} — «Igualar» no la reactiva
+          {p.pausa_mano.motivo ? ` · «${p.pausa_mano.motivo}»` : ''} — no se reactiva sola
         </span>
       )}
       {puedeCambiar && !abrirOpciones && (
@@ -606,7 +639,7 @@ interface Cambio {
   motivo: string | null; usuario: string | null; cuenta: string | null; titulo: string | null; product_id: number | null; code: string | null; name: string | null
 }
 const ORIGEN: Record<string, string> = {
-  stock_ml: 'Igualar', stock_ml_mano: 'Reparto a mano', se_acabo: 'Se acabó', pausar: 'Pausó', activar: 'Activó',
+  stock_ml: 'Puso lo que hay', stock_ml_mano: 'Reparto a mano', se_acabo: 'Se acabó', pausar: 'Pausó', activar: 'Activó',
   stock: 'Automatizaciones → Stock', pausadas: 'Reactivar (Automatizaciones)', reponer: 'Reponer desde Preguntas',
   preguntas: 'Desde Preguntas', mensajes: 'Desde Mensajes', ficha: 'Desde la ficha',
 }

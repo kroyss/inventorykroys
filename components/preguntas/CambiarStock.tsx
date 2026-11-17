@@ -15,7 +15,9 @@ interface Pub {
   /** Con la promo, comprando 2 o 3 queda sin envío gratis (24-10). Solo empresas con Promociones. */
   hueco?: HuecoUnidades | null
 }
-interface Datos { principal: Pub; variante_foco: string | null; gemelas: Pub[]; producto: { code: string; name: string; stock: number | null } | null }
+interface Datos { principal: Pub; variante_foco: string | null; gemelas: Pub[]; producto: { code: string; name: string; stock: number | null } | null
+  /** 17-11 «Mi inventario está al día»: avisa (no bloquea) si entre todas quedaría más de lo que hay. */
+  al_dia?: boolean }
 export interface ResultadoStock { item_id: string; variante_id: string | null; ok: boolean; estado?: string; disponible?: number; total?: number; error?: string }
 
 const clave = (item: string, v: string | null) => `${item}:${v ?? ''}`
@@ -68,6 +70,11 @@ export default function CambiarStock({ item, variante = null, origen, publicar, 
     .map(p => ({ item_id: p.item_id, variante_id: null, cantidad: null })) : []
   const todo = [...cambios, ...aReactivar]
   const cuentas = new Set(todo.map(c => c.item_id)).size
+  // 17-11: lo que quedaría entre todas (solo sin variantes: cada variante puede ser otro producto).
+  const stockInv = d?.al_dia ? d.producto?.stock ?? null : null
+  const quedaria = stockInv != null && pubs.every(p => !p.variantes.length)
+    ? pubs.reduce((s, p) => { const t = valores[clave(p.item_id, null)]; return s + (t ? parseInt(t, 10) || 0 : p.disponible) }, 0) : null
+  const pasa = quedaria != null && stockInv != null && cambios.length > 0 && quedaria > Math.max(0, stockInv)
 
   const guardar = async () => {
     if (!todo.length) return
@@ -148,6 +155,11 @@ export default function CambiarStock({ item, variante = null, origen, publicar, 
         </div>
         {d && (
           <div className="space-y-2 border-t border-neutral-100 px-4 py-3">
+            {pasa && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                ⚠ Entre {pubs.length > 1 ? 'todas' : 'la publicación'} quedarían <b>{quedaria}</b> y tienes <b>{stockInv}</b> en inventario.
+              </p>
+            )}
             {hayPausada && (
               <label className="flex items-center gap-2 text-sm text-neutral-700">
                 <input type="checkbox" checked={reactivar} onChange={e => setReactivar(e.target.checked)} className="h-4 w-4 accent-neutral-900" />
@@ -163,7 +175,7 @@ export default function CambiarStock({ item, variante = null, origen, publicar, 
             <div className="flex items-center justify-end gap-2">
               <button onClick={onCerrar} className="btn-ghost text-sm">Cancelar</button>
               <button onClick={guardar} disabled={guardando || !todo.length} className="btn-primary text-sm">
-                {guardando ? 'Guardando…' : cuentas > 1 ? `Guardar en las ${cuentas} publicaciones` : 'Guardar en MercadoLibre'}
+                {guardando ? 'Guardando…' : pasa ? 'Guardar igual' : cuentas > 1 ? `Guardar en las ${cuentas} publicaciones` : 'Guardar en MercadoLibre'}
               </button>
             </div>
           </div>
