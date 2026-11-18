@@ -3,6 +3,7 @@ import { olvidar } from '@/lib/comun'
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui'
 import Link from '@/components/ui/Link'
+import { Nuevo, type ClaveNuevo } from '@/components/ui/Nuevo'
 
 export interface Video {
   id: number; orden: number; titulo: string; descripcion: string | null; youtube_id: string
@@ -44,30 +45,46 @@ const pct = (v: Video) => (v.duracion_seg > 0 ? Math.min(100, Math.round(v.visto
 
 /** Aprendizaje: videos en el orden recomendado, dentro de la web. Todos libres (28-10): el cliente llega con una
  *  necesidad concreta (p.ej. conectar MercadoEnvíos) y el candado lo frenaba; el orden queda como sugerencia. */
-// 14-11: Manuales (formato nuevo, empezando por Inventario): tarjeta arriba de los videos.
-function Manuales({ inventario }: { inventario: boolean }) {
-  if (!inventario) return null
+// 14-11: Manuales (formato nuevo). 18-11 (el dueño): también el de Automatizaciones, y «Abrir» como botón de verdad.
+function TarjetaManual({ href, titulo, texto, color, nuevo }: { href: string; titulo: string; texto: string; color: string; nuevo?: ClaveNuevo }) {
+  return (
+    <Link href={href}
+      className="group flex items-center gap-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition hover:-translate-y-px hover:border-neutral-300 hover:shadow-md">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`} aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+          <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5z" /><path d="M8 7h6M8 11h6" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium text-neutral-900">{titulo}{nuevo && <Nuevo clave={nuevo} />}</span>
+        <span className="block text-sm text-neutral-500">{texto}</span>
+      </span>
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition group-hover:bg-neutral-700">
+        Abrir
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" aria-hidden>
+          <path d="M4 10h12M11 5l5 5-5 5" />
+        </svg>
+      </span>
+    </Link>
+  )
+}
+
+function Manuales({ inventario, automatizaciones }: { inventario: boolean; automatizaciones: boolean }) {
+  if (!inventario && !automatizaciones) return null
   return (
     <section aria-label="Manuales" className="space-y-2">
       <h2 className="text-sm font-semibold text-neutral-700">Manuales</h2>
-      <Link href="/aprendizaje/manual/inventario"
-        className="group flex items-center gap-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition hover:-translate-y-px hover:shadow-md">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-lime-100 text-lime-800" aria-hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-            <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2V5z" /><path d="M8 7h6M8 11h6" />
-          </svg>
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium text-neutral-900">Manual de Inventario</span>
-          <span className="block text-sm text-neutral-500">Primeros pasos, Inicio, Productos, Publicaciones, Ventas, Compras y Reportes, con capturas y buscador</span>
-        </span>
-        <span className="shrink-0 text-sm font-medium text-sky-700 group-hover:underline">Abrir →</span>
-      </Link>
+      <div className={`grid gap-3 ${inventario && automatizaciones ? 'lg:grid-cols-2' : ''}`}>
+        {automatizaciones && <TarjetaManual href="/aprendizaje/manual/automatizaciones" titulo="Manual de Automatizaciones" color="bg-sky-100 text-sky-800" nuevo="manual_automatizaciones"
+          texto="Cuentas de MercadoLibre, Preguntas, Mensajes, Calificaciones, Stock, Pagos ME, Despachos y Reportador, con videos de apoyo y buscador" />}
+        {inventario && <TarjetaManual href="/aprendizaje/manual/inventario" titulo="Manual de Inventario" color="bg-lime-100 text-lime-800"
+          texto="Primeros pasos, Inicio, Productos, Publicaciones, Ventas, Compras y Reportes, con capturas y buscador" />}
+      </div>
     </section>
   )
 }
 
-export default function AprendizajeClient({ manualInventario = false }: { manualInventario?: boolean }) {
+export default function AprendizajeClient({ manualInventario = false, manualAutomatizaciones = false }: { manualInventario?: boolean; manualAutomatizaciones?: boolean }) {
   const [videos, setVideos] = useState<Video[] | null>(null)
   const [agendar, setAgendar] = useState<string | null>(null)
   const [conectar, setConectar] = useState(false)   // empresa sin cuenta de ML y el usuario es admin
@@ -93,7 +110,7 @@ export default function AprendizajeClient({ manualInventario = false }: { manual
   if (!videos) return <PageHeader title="Aprendizaje" subtitle="Cargando…" />
   if (videos.length === 0) {
     return <div className="space-y-5"><PageHeader title="Aprendizaje" subtitle="Por dónde empezar" />
-      <Manuales inventario={manualInventario} />
+      <Manuales inventario={manualInventario} automatizaciones={manualAutomatizaciones} />
       <PrimerosPasos agendar={agendar} hayVideos={false} /></div>
   }
 
@@ -118,7 +135,7 @@ export default function AprendizajeClient({ manualInventario = false }: { manual
   return (
     <div className="space-y-5">
       <PageHeader title="Aprendizaje" subtitle="Manuales y videos cortos para sacarle todo el provecho al sistema" />
-      <Manuales inventario={manualInventario} />
+      <Manuales inventario={manualInventario} automatizaciones={manualAutomatizaciones} />
 
       {/* Empujón a conectar (nunca bloquea: los videos se pueden seguir viendo sin conectar). */}
       {conectar && hechos >= 1 && (

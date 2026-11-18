@@ -7,6 +7,10 @@ import { Ventana } from '@/components/ui/Ventana'
 import { matchFuzzy } from '@/lib/search'
 import type { Capitulo } from '@/lib/manual'
 
+/** 18-11: video grabado que acompaña un capítulo (demostración de apoyo; el manual es lo que está al día). */
+export interface VideoApoyo { id: number; titulo: string; segundos: number | null; visto: boolean }
+const reloj = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
 // Vista de un manual de Aprendizaje (14-11): índice fijo a la izquierda (chips arriba en el celular), buscador, cada
 // capítulo con su captura (se abre grande) y sus temas. El texto viene del manual del asistente (lib/manual.ts).
 
@@ -48,8 +52,10 @@ function Texto({ texto }: { texto: string }) {
   return <div className="space-y-2">{bloques}</div>
 }
 
-export default function ManualVista({ titulo, capitulos, capturas, base, reabrirGuia }: {
+export default function ManualVista({ titulo, capitulos, capturas, base, reabrirGuia, videos }: {
   titulo: string; capitulos: Capitulo[]; capturas: Record<string, number>; base: string; reabrirGuia: boolean
+  /** Por capítulo: los videos que lo muestran (Manual de Automatizaciones). */
+  videos?: Record<string, VideoApoyo[]>
 }) {
   const router = useRouter()
   const [buscar, setBuscar] = useState('')
@@ -95,10 +101,31 @@ export default function ManualVista({ titulo, capitulos, capturas, base, reabrir
         </nav>
 
         <div className="min-w-0 space-y-8">
+          {videos && Object.keys(videos).length > 0 && (
+            <p className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
+              <span aria-hidden>▶</span>
+              <span>Este manual está siempre al día con las pantallas. Los <b className="font-semibold">videos de apoyo</b> de cada capítulo son una
+                demostración grabada: algún botón puede verse distinto, pero el funcionamiento es el mismo.</span>
+            </p>
+          )}
           {!filtrados.length && <p className="rounded-xl border border-neutral-200 bg-white px-4 py-8 text-center text-sm text-neutral-500">Nada coincide con «{buscar}». Prueba con otra palabra o pregunta en Ayuda.</p>}
           {filtrados.map(c => (
             <section key={c.id} id={c.id} className="scroll-mt-20 space-y-3">
               <h2 className="text-lg font-semibold text-neutral-900">{c.titulo}</h2>
+              {videos?.[c.id] && !buscar.trim() && (
+                <div className="flex flex-wrap gap-2">
+                  {videos[c.id].map(v => (
+                    <Link key={v.id} href={`/aprendizaje?video=${v.id}`}
+                      className="group inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-3 text-sm text-neutral-700 shadow-sm transition hover:border-neutral-300 hover:shadow">
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] ${v.visto ? 'bg-emerald-100 text-emerald-700' : 'bg-red-600 text-white'}`} aria-hidden>
+                        {v.visto ? '✓' : '▶'}
+                      </span>
+                      <span><span className="text-neutral-400">Video de apoyo · </span>{v.titulo}</span>
+                      {v.segundos ? <span className="text-xs text-neutral-400">{reloj(v.segundos)}</span> : null}
+                    </Link>
+                  ))}
+                </div>
+              )}
               {capturas[c.id] && !buscar.trim() && (
                 <button type="button" onClick={() => setGrande(c.id)} className="block w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 shadow-sm transition hover:shadow-md" title="Ver grande">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

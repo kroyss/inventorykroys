@@ -55,8 +55,8 @@ Casi todo se actualiza solo (ventas y preguntas cada minuto, publicaciones y sto
 Para traer algo **ya**, toca **↻ Actualizar** arriba, junto a Novedades (también en el teléfono). El puntito dice cómo
 está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada cosa y cuándo se actualizó:
 
-- **Ventas** · **Preguntas y mensajes** · **Publicaciones y stock** (Mis publicaciones, Stock, Stock vs inventario,
-  Importar) · **Promociones** · **Pagos, guías y pesos** (lo trae el programa de Pagos ME en tu PC, 1 a 3 min).
+- Las líneas: **Ventas** · **Preguntas y mensajes** · **Publicaciones y stock** (Mis publicaciones, Stock, Stock vs
+  inventario, Importar) · **Promociones** · **Pagos, guías y pesos** (lo trae el programa de Pagos ME en tu PC, 1 a 3 min).
 - **Actualizar todo** trae solo lo que no está al día (Promociones, que es lo más pesado, entra si tiene más de 6 h).
 - Cada línea tiene su **↻** cuando hace falta, para traer solo eso (por ejemplo solo Pagos antes de despachar).
 - Se ve solo lo que tu cuenta tiene encendido y tus permisos dejan ver. Si el programa de Pagos ME no está abierto,
@@ -1282,6 +1282,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   —Para empezar, Inicio, Productos, Publicaciones, Ventas, Inventario, Compras, Reportes y Ajustes— con capturas (se
   abren grandes al tocarlas), índice y buscador. Dice lo mismo que el asistente de Ayuda (salen del mismo texto) y
   trae el botón **Ver la guía de Primeros pasos** para volver a mostrar la guía en el Inicio si la ocultaste.
+  El **Manual de Automatizaciones** (con cualquiera de sus módulos) explica Cuentas de MercadoLibre, Preguntas, Mensajes,
+  Calificaciones y reputación, Stock, Pagos ME, Despachos, Reportador y Mis avisos; cada cuenta ve solo los capítulos
+  de sus módulos. El manual es lo que está al día con las pantallas; cada capítulo enlaza su **video de apoyo** (la
+  demostración grabada, con ✓ si ya lo viste), que puede mostrar algún botón distinto.
   **Cuando un video explica lo que preguntan, recomiéndalo** (además de responder), con su título:
 
   | Video | Qué enseña | Secciones |
