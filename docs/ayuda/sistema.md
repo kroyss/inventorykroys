@@ -916,7 +916,10 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
      recargo sobre costo con el medidor; el precio se calcula solo).
   - **Pon el peso de tus productos** (Venezuela; dice cuántos faltan): en Productos →
      MercadoEnvíos, el peso sale del portal (con Pagos ME se pide solo al importar o vincular, o de una vez con
-     **Traer pesos de ML**); los que el portal no tenga se escriben a mano. Se marca hecho cuando todos los productos tienen peso.
+     **Traer pesos de ML**); los que el portal no tenga se escriben a mano. Solo cuentan los productos vinculados a una
+     publicación **activa** de ML (los que no vendes en ML o ya no traes no cuentan; si reactivas una publicación sin peso,
+     vuelve a contar). Se marca hecho cuando todos esos tienen peso. En MercadoEnvíos, el filtro **Sin peso · en ML** muestra
+     justo esos; **Sin peso (todos)** incluye los demás.
   3. **Pon el stock que tienes hoy:** en Inventario, en cada producto **Ajustar** y escribes cuántas unidades tienes.
      Después el stock baja con las ventas y sube con las compras.
   4. **Registra tu primera venta:** en Ventas → **Por confirmar** confirmas las ventas de MercadoLibre (quedan

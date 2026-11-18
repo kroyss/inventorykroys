@@ -19,7 +19,7 @@ const STATUS_META: Record<ShipStatus, { label: string; chip: string }> = {
   unregistered: { label: '⚪ Sin peso',        chip: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
 }
 
-type Filter = 'all' | 'unregistered' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
+type Filter = 'all' | 'unregistered' | 'sin_peso_ml' | 'capped' | 'aggregate' | 'impossible' | 'distintos'
 
 export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false, descuento = true }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean; descuento?: boolean }) {
   const router = useRouter()
@@ -85,6 +85,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
     let arr = rows
     if (filter === 'distintos') arr = arr.filter(r => !!r.p.pesos_ml)
     else if (filter === 'unregistered') arr = arr.filter(r => r.info.status === 'unregistered')
+    else if (filter === 'sin_peso_ml') arr = arr.filter(r => r.info.status === 'unregistered' && r.p.en_ml_activa)
     else if (filter === 'capped')     arr = arr.filter(r => r.info.status === 'capped')
     else if (filter === 'aggregate')  arr = arr.filter(r => r.info.status === 'aggregate')
     else if (filter === 'impossible') arr = arr.filter(r => r.info.status === 'impossible' || r.info.status === 'overweight')
@@ -162,12 +163,15 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
         <span className="text-amber-700"> ⚠️ Tope</span> = se le baja el descuento para conservar el envío gratis;</>}
         <span className="text-sky-700"> 🛒 Por volumen</span> = a 1 unidad no llega, pero sí juntando unidades (normal en productos baratos);
         <span className="text-red-700"> 🚫 Revisar precio</span> = ni juntando unidades alcanza el umbral (precio muy bajo para su peso).
+        <b> Sin peso · en ML</b> = los que están en una publicación activa (los que importan); los demás sin peso no se venden hoy en ML.
       </p>
 
       {/* filtros */}
       <div className="flex flex-wrap items-center gap-2">
         {chip('all', 'Todos', rows.length, 'bg-neutral-900 text-white border-neutral-900')}
-        {chip('unregistered', '⚪ Sin peso', counts.unregistered, 'bg-neutral-700 text-white border-neutral-700')}
+        {/* 18-11: los que importan (publicación activa en ML; es lo que cuenta Primeros pasos) antes que todos los sin peso */}
+        {chip('sin_peso_ml', '⚪ Sin peso · en ML', rows.filter(r => r.info.status === 'unregistered' && r.p.en_ml_activa).length, 'bg-neutral-900 text-white border-neutral-900')}
+        {chip('unregistered', 'Sin peso (todos)', counts.unregistered, 'bg-neutral-700 text-white border-neutral-700')}
         {rows.some(r => r.p.pesos_ml) && chip('distintos', 'Pesos distintos en ML', rows.filter(r => r.p.pesos_ml).length, 'bg-amber-600 text-white border-amber-600')}
         {descuento && chip('capped', '⚠️ Con tope', counts.capped, 'bg-amber-500 text-white border-amber-500')}
         {chip('aggregate', '🛒 Por volumen', counts.aggregate, 'bg-sky-600 text-white border-sky-600')}

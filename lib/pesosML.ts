@@ -56,3 +56,10 @@ export async function pedirPesosSiFaltan(db: Pick<Pool, 'query'>, usuarioId: num
   await db.query(`INSERT INTO me_pedidos (pedido_por, pesos) VALUES ($1, TRUE)`, [usuarioId])
   return true
 }
+
+/** 18-11 (el dueño: «faltan 129» por productos huérfanos o que no vende en ML): el producto (alias p) está vinculado a
+ *  una publicación ACTIVA de ML (copia local ml_catalogo, al día cada hora, con cada venta y con cada cambio de stock).
+ *  El peso solo importa ahí: decide el envío gratis y el costo de envío. */
+export const SQL_EN_ML_ACTIVA = (p = 'p') => `EXISTS (SELECT 1 FROM product_ml_codes mpa
+    JOIN ml_catalogo cpa ON substring(cpa.item_id FROM 4) = split_part(mpa.ml_code, ':', 1)
+   WHERE mpa.product_id = ${p}.id AND mpa.is_active AND cpa.estado = 'active')`

@@ -4,6 +4,7 @@ import { apiError } from '@/lib/apiError'
 import { getSessionDb, unauthorized, forbidden } from '@/lib/session'
 import { puede } from '@/lib/permisos'
 import { tieneModulo } from '@/lib/modulos'
+import { SQL_EN_ML_ACTIVA } from '@/lib/pesosML'
 
 // Guía «Primeros pasos con tu inventario» del Inicio (14-11, el dueño: piloto del formato de aprendizaje nuevo en vez
 // de videos). Cada paso se marca solo con lo que la empresa ya hizo; nadie tiene que revisar nada. Ocultarla se guarda
@@ -30,7 +31,10 @@ export async function GET() {
              EXISTS (SELECT 1 FROM sales WHERE status IN ('PROCESADA','DESCARGADA','DESCARGADA_LOCAL')) AS procesada,
              EXISTS (SELECT 1 FROM purchase_orders) OR EXISTS (SELECT 1 FROM import_orders) AS compra,
              COALESCE((SELECT value FROM app_settings WHERE key = '${CLAVE}'), '') = '1' AS oculta,
-             (SELECT COUNT(*)::int FROM products WHERE is_active AND (weight_kg IS NULL OR weight_kg <= 0)) AS sin_peso`)
+             -- 18-11: solo los que están en una publicación ACTIVA de ML (huérfanos y productos que no se venden en ML
+             -- no cuentan; sin nada en ML el paso queda hecho). Si se reactiva una sin peso, vuelve a contar.
+             (SELECT COUNT(*)::int FROM products p WHERE p.is_active AND (p.weight_kg IS NULL OR p.weight_kg <= 0)
+                AND ${SQL_EN_ML_ACTIVA('p')}) AS sin_peso`)
     // 14-11: paso «Pon el peso» en toda empresa de Venezuela (tabla de MercadoEnvíos); la guía ya exige Inventario.
     const conPeso = a.u.country === 'VE'
     return NextResponse.json({ ...r, conML: tieneModulo(a.u, 'preguntas'), conPeso })

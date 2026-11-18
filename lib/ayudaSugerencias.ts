@@ -130,6 +130,7 @@ const S: Record<string, Sugerencia[]> = {
   ],
   '/productos/mercadoenvios': [
     { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
+    { pregunta: '¿Por qué Primeros pasos dice que faltan pesos?', respuesta: 'Cuenta solo los productos vinculados a una publicación **activa** de MercadoLibre sin peso (ahí el peso decide el envío gratis). Los que no vendes en ML o ya no traes no cuentan. En Productos → MercadoEnvíos, el filtro **Sin peso · en ML** te muestra justo esos. Si reactivas una publicación sin peso, vuelve a contar.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
   ],
   '/ventas': [
