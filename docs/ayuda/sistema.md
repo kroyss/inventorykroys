@@ -451,15 +451,18 @@ Los mensajes de tus ventas en MercadoLibre (posventa), de todas tus cuentas, par
 
 Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse** en MercadoLibre, por variante.
 
-- **Agotadas / Por agotarse:** el límite de «por agotarse» lo eliges tú (por defecto, menos de 3). Escribe el stock
-  nuevo en cada fila (✎) y toca **Actualizar en MercadoLibre**: solo cambia la cantidad disponible, nada más.
+- **Agotadas / Por agotarse:** el límite de «por agotarse» lo eliges tú (por defecto, menos de 3) con **✎ cambiar
+  límite**, junto a esa pestaña. Escribe el stock nuevo en cada fila y abajo aparece la barra **Actualizar en
+  MercadoLibre (N)**: solo cambia la cantidad disponible, nada más. En Pausadas, al marcar aparece **Reactivar**.
+- La **ⓘ** junto al título explica cómo cuenta (30 días, aviso de 7 días, revisión cada hora); bajo **Revisar ahora**
+  dice cuándo se revisó.
 - **Pausadas:** publicaciones pausadas a mano (o por ML al quedar en 0). Márcalas y toca **Reactivar en
   MercadoLibre** (o ▶ en cada una).
 - **No hay para reponer:** deja de avisar de ese producto hasta que lo repongas y vuelva a agotarse.
 - **Revisar ahora:** busca en ML en el momento (se puede cada 10 minutos). Además se revisa sola cada hora.
 - Si la empresa lleva Inventario, cada fila muestra cuánto tienes en inventario y un botón «usar» para ponerlo
-  como stock nuevo. Arriba sale un aviso: aquí ves **lo que dice MercadoLibre**; para **compararlo con tu inventario**
-  y arreglarlo en un clic está **Publicaciones → Stock vs inventario** (son dos pantallas distintas a propósito).
+  como stock nuevo, y arriba el botón **Comparar con inventario →**: aquí ves **lo que dice MercadoLibre**; compararlo
+  con tu inventario y arreglarlo en un clic está en **Publicaciones → Stock vs inventario** (dos pantallas a propósito).
 - «MercadoLibre la frenó (en revisión)»: ML la tiene en revisión; hay que verla en MercadoLibre.
 
 **Video:** «Calificaciones y Stock».

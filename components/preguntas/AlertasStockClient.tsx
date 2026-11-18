@@ -36,7 +36,7 @@ const hace = (s: string | null) => {
 }
 
 /** Automatizaciones → Stock: publicaciones (y variantes) de MercadoLibre vendidas en 30 días, agotadas o por agotarse. */
-export default function AlertasStockClient({ inicial = null }: { inicial?: Datos | null }) {   // 12-11: Agotadas ya vino en el HTML
+export default function AlertasStockClient({ inicial = null, conInventario = false }: { inicial?: Datos | null; conInventario?: boolean }) {   // 12-11: Agotadas ya vino en el HTML
   const [vista, setVista] = useState<Vista>('agotadas')
   const [datos, setDatos] = useState<Datos | null>(inicial)
   const [datosDe, setDatosDe] = useState<Vista | null>(inicial ? 'agotadas' : null)   // de qué pestaña son los datos cargados
@@ -44,6 +44,8 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
   const [revisando, setRevisando] = useState(false)
   const [umbral, setUmbral] = useState(inicial ? String(inicial.umbral) : '')
   const [guardandoUmbral, setGuardandoUmbral] = useState(false)
+  const [editandoUmbral, setEditandoUmbral] = useState(false)
+  const [verInfo, setVerInfo] = useState(false)
   const [vez, setVez] = useState(0)
   // Reponer desde aquí (admin): nuevo stock por fila (clave item:variante); solo las marcadas se envían.
   const confirm = useConfirm()
@@ -95,6 +97,7 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
       // Se ve al instante (la lista se recarga detrás).
       setDatos(d => d && { ...d, umbral: n })
       setVez(x => x + 1)
+      setEditandoUmbral(false)
     } finally { setGuardandoUmbral(false) }
   }
 
@@ -296,9 +299,34 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Stock"
-        subtitle="Lo que vendiste en los últimos 30 días y se agotó o está por agotarse en MercadoLibre, por variante. El aviso cuenta solo lo de los últimos 7 días"
-        actions={<button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>} />
+      {/* 18-11 (el dueño: «ocupa mucho espacio, mucha info regada»): dos filas. Lo fino va en la ⓘ (se toca, también en
+          el celular); «revisado hace…» bajo el botón; el límite de «por agotarse» se cambia en su pestaña; las barras de
+          acción aparecen solo cuando hay algo que mandar. */}
+      <PageHeader
+        title={<span className="inline-flex items-center gap-2">Stock
+          <button type="button" onClick={() => setVerInfo(v => !v)} aria-expanded={verInfo} aria-label="Cómo funciona" title="Cómo funciona"
+            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold ${verInfo ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 text-neutral-500 hover:border-neutral-500 hover:text-neutral-800'}`}>i</button>
+        </span>}
+        subtitle="Lo vendido en 30 días que se agotó o se está agotando en MercadoLibre, por variante"
+        actions={<>
+          {conInventario && <Link href="/inventario/stock-ml" className="btn-secondary text-sm whitespace-nowrap"
+            title="Compara lo que muestra ML con tu inventario y arréglalo en un clic (Publicaciones → Stock vs inventario)">Comparar con inventario →</Link>}
+          <div className="flex flex-col items-end">
+            <button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>
+            <span className="mt-0.5 text-[11px] text-neutral-400">{datos?.revision.hasta ? `revisado ${hace(datos.revision.hasta)}` : 'todavía no se revisó'}</span>
+          </div>
+        </>} />
+      {verInfo && (
+        <div className="-mt-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600 shadow-sm">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Solo lo que <b className="font-medium text-neutral-800">vendiste en los últimos 30 días</b>: lo que conviene reponer.</li>
+            <li>El aviso (y el numerito del menú) cuenta lo de los <b className="font-medium text-neutral-800">últimos 7 días</b>; lo más viejo queda abajo, sin sumar.</li>
+            <li>Se revisa sola cada hora; «Revisar ahora» busca en ML en el momento (como mucho cada 10 minutos).</li>
+            <li>El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).</li>
+            {conInventario && <li>Aquí ves <b className="font-medium text-neutral-800">lo que dice MercadoLibre</b>. Para compararlo con tu inventario: <Link href="/inventario/stock-ml" className="underline">Stock vs inventario</Link>.</li>}
+          </ul>
+        </div>
+      )}
 
       {vendeDeMas > 0 && (
         <Link href="/inventario/stock-ml" className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 border-l-4 border-l-red-400 bg-white px-4 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50">
@@ -307,59 +335,34 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
         </Link>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
-        <span>
-          Se revisa sola cada hora{datos?.revision.hasta ? ` · última revisión ${hace(datos.revision.hasta)}` : ' · todavía no se revisó: toca "Revisar ahora"'}.
-          {' '}El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).
-        </span>
-        {datos?.esAdmin && (
-          <label className="flex items-center gap-1.5">
-            Por agotarse = menos de
-            <input type="number" min={1} max={100} value={umbral} onChange={e => setUmbral(e.target.value)}
-              className="w-16 border border-neutral-300 rounded-lg px-2 py-1 text-sm text-neutral-800 num" />
-            unidades
-            {datos && umbral !== String(datos.umbral) && (
-              <button onClick={guardarUmbral} disabled={guardandoUmbral} className="btn-secondary text-xs px-2.5 py-1">{guardandoUmbral ? 'Guardando…' : 'Guardar'}</button>
-            )}
-          </label>
-        )}
-      </div>
-
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <Tabs value={vista} onChange={setVista} items={[
-          { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
-          { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
-          { value: 'pausadas', label: 'Pausadas', count: datos?.contadores.pausadas },
-        ]} />
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          <Tabs value={vista} onChange={setVista} items={[
+            { value: 'agotadas', label: 'Agotadas', count: datos?.contadores.agotadas },
+            { value: 'bajas', label: `Por agotarse (< ${datos?.umbral ?? 3})`, count: datos?.contadores.bajas },
+            { value: 'pausadas', label: 'Pausadas', count: datos?.contadores.pausadas },
+          ]} />
+          {/* El límite se cambia donde se usa: solo en su pestaña (administrador). */}
+          {datos?.esAdmin && vista === 'bajas' && (editandoUmbral ? (
+            <span className="flex items-center gap-1.5 pb-1.5 text-xs text-neutral-600">
+              menos de
+              <input type="number" min={1} max={100} value={umbral} onChange={e => setUmbral(e.target.value)} autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') guardarUmbral(); if (e.key === 'Escape') { setUmbral(String(datos.umbral)); setEditandoUmbral(false) } }}
+                className="w-14 rounded-lg border border-neutral-300 px-2 py-0.5 text-sm text-neutral-800 num" />
+              u.
+              <button type="button" onClick={guardarUmbral} disabled={guardandoUmbral || umbral === String(datos.umbral)}
+                className="btn-primary px-2 py-0.5 text-xs disabled:opacity-40">{guardandoUmbral ? 'Guardando…' : 'Guardar'}</button>
+              <button type="button" onClick={() => { setUmbral(String(datos.umbral)); setEditandoUmbral(false) }} className="underline">cancelar</button>
+            </span>
+          ) : (
+            <button type="button" onClick={() => setEditandoUmbral(true)} title="Cambiar desde cuántas unidades es «por agotarse»"
+              className="pb-2 text-xs text-neutral-500 underline-offset-2 hover:text-neutral-800 hover:underline">✎ cambiar límite</button>
+          ))}
+        </div>
         <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar publicación, variante o cuenta…"
           className="w-full sm:w-72 border border-neutral-300 rounded-lg px-3 py-1.5 text-sm" />
       </div>
 
-      {datos?.puedeStock && vista !== 'pausadas' && (datos.filas.length > 0 || aviso) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-2.5">
-          <p className="text-sm text-neutral-600">
-            {aviso ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
-              : 'Escribe el stock nuevo en cada fila y actualízalo en MercadoLibre sin salir de aquí.'}
-          </p>
-          <button onClick={enviar} disabled={!cuantas || enviando} className="btn-primary text-sm disabled:opacity-40">
-            {enviando ? 'Actualizando…' : `Actualizar en MercadoLibre${cuantas ? ` (${cuantas})` : ''}`}
-          </button>
-        </div>
-      )}
-
-      {datos?.puedeStock && vista === 'pausadas' && (datos.filas.length > 0 || aviso) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-neutral-200 shadow-sm px-4 py-2.5">
-          <p className="text-sm text-neutral-600">
-            {reactivando ? `Reactivando ${reactivando.hechas} de ${reactivando.total}… no cierres esta pantalla.`
-              : aviso ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
-              : 'Marca las que quieras volver a poner a la venta, o usa ▶ en cada una. Con ✎ cambias el stock antes.'}
-          </p>
-          <button onClick={() => reactivar((datos?.filas ?? []).filter(f => selP.has(clave(f))))} disabled={!selP.size || !!reactivando}
-            className="btn-primary text-sm disabled:opacity-40">
-            {reactivando ? 'Reactivando…' : `Reactivar en MercadoLibre${selP.size ? ` (${selP.size})` : ''}`}
-          </button>
-        </div>
-      )}
       {stockDe && (
         <CambiarStock item={stockDe.item_id} origen="pausadas" onCerrar={() => setStockDe(null)}
           onGuardado={res => {
@@ -393,6 +396,35 @@ export default function AlertasStockClient({ inicial = null }: { inicial?: Datos
             <span className="text-neutral-400">{verOlvido ? '▴' : '▾'}</span>
           </button>
           {verOlvido && <ul className="divide-y divide-neutral-100 border-t border-neutral-100">{olvido.map(fila)}</ul>}
+        </div>
+      )}
+      {/* Barra de acción (18-11): aparece solo cuando hay algo que mandar o un resultado que mostrar; queda fija abajo. */}
+      {datos?.puedeStock && vista !== 'pausadas' && (cuantas > 0 || enviando || aviso) && (
+        <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 shadow-lg md:bottom-4">
+          <p className="text-sm text-neutral-600">
+            {aviso && !cuantas ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
+              : <><b className="text-neutral-900 tabular-nums">{cuantas}</b> cambio{cuantas === 1 ? '' : 's'} de stock para MercadoLibre</>}
+          </p>
+          <div className="flex items-center gap-2">
+            {aviso && !cuantas && <button type="button" onClick={() => setAviso(null)} className="text-xs text-neutral-500 underline">Ocultar</button>}
+            {cuantas > 0 && <button onClick={enviar} disabled={enviando} className="btn-primary text-sm disabled:opacity-40">
+              {enviando ? 'Actualizando…' : `Actualizar en MercadoLibre (${cuantas})`}</button>}
+          </div>
+        </div>
+      )}
+      {datos?.puedeStock && vista === 'pausadas' && (selP.size > 0 || reactivando || aviso) && (
+        <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 shadow-lg md:bottom-4">
+          <p className="text-sm text-neutral-600">
+            {reactivando ? `Reactivando ${reactivando.hechas} de ${reactivando.total}… no cierres esta pantalla.`
+              : aviso && !selP.size ? <span className={aviso.ok ? 'text-emerald-700' : 'text-red-600'}>{aviso.ok ? '✓ ' : ''}{aviso.texto}</span>
+              : <><b className="text-neutral-900 tabular-nums">{selP.size}</b> marcada{selP.size === 1 ? '' : 's'} para volver a la venta</>}
+          </p>
+          <div className="flex items-center gap-2">
+            {aviso && !selP.size && !reactivando && <button type="button" onClick={() => setAviso(null)} className="text-xs text-neutral-500 underline">Ocultar</button>}
+            {selP.size > 0 && <button onClick={() => reactivar((datos?.filas ?? []).filter(f => selP.has(clave(f))))} disabled={!!reactivando}
+              className="btn-primary text-sm disabled:opacity-40">
+              {reactivando ? 'Reactivando…' : `Reactivar en MercadoLibre (${selP.size})`}</button>}
+          </div>
         </div>
       )}
     </div>
