@@ -198,10 +198,10 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
       {/* 18-11 (el dueño, como en Stock): lo de cómo funciona va en la ⓘ; arriba solo lo que se usa. */}
       <PageHeader title={<span className="inline-flex items-center gap-2">Calificaciones<BotonInfo abierto={verInfo} onClick={() => setVerInfo(v => !v)} /></span>}
         subtitle="Ventas de MercadoLibre sin calificar, cruzadas con el sistema"
-        actions={<div className="flex flex-col items-end">
+        actions={<>
+          {sinc && <span className="text-xs text-neutral-400 whitespace-nowrap">actualizadas {new Date(sinc).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>}
           <button onClick={actualizar} disabled={actualizando || corriendo} className="btn-secondary text-sm">{actualizando ? 'Trayendo ventas…' : 'Actualizar ventas'}</button>
-          {sinc && <span className="mt-0.5 text-[11px] text-neutral-400">actualizadas {new Date(sinc).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>}
-        </div>} />
+        </>} />
       {verInfo && datos && (
         <PanelInfo>
           <li><b className="font-medium text-neutral-800">Concretada</b>: {datos.desdeML ? 'su guía salió en Despachos' : 'está en el sistema (procesada o facturada)'}

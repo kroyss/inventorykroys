@@ -309,12 +309,11 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
         </span>}
         subtitle="Lo vendido en 30 días que se agotó o se está agotando en MercadoLibre, por variante"
         actions={<>
+          {/* 18-11 (el dueño): «revisado hace…» debajo del botón lo descuadraba; va a la izquierda, en la misma línea. */}
+          <span className="text-xs text-neutral-400 whitespace-nowrap">{datos?.revision.hasta ? `revisado ${hace(datos.revision.hasta)}` : 'todavía no se revisó'}</span>
           {conInventario && <Link href="/inventario/stock-ml" className="btn-secondary text-sm whitespace-nowrap"
             title="Compara lo que muestra ML con tu inventario y arréglalo en un clic (Publicaciones → Stock vs inventario)">Comparar con inventario →</Link>}
-          <div className="flex flex-col items-end">
-            <button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>
-            <span className="mt-0.5 text-[11px] text-neutral-400">{datos?.revision.hasta ? `revisado ${hace(datos.revision.hasta)}` : 'todavía no se revisó'}</span>
-          </div>
+          <button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>
         </>} />
       {verInfo && (
         <PanelInfo>
