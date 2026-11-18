@@ -53,6 +53,13 @@ const PANTALLAS = MANUAL === 'automatizaciones' ? PANTALLAS_AUTO : PANTALLAS_INV
     }, EMPRESA_DEMO)
     if (!ok) { console.log('no se pudo entrar a la empresa', EMPRESA_DEMO); process.exit(1) }
     console.log('empresa', ok)
+    // 18-11: siembra Stock y Pagos ME (el «Restaurar» de /demo) para que sus capturas no salgan vacías.
+    const sembrado = await page.evaluate(async () => {
+      const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secciones: ['stock', 'pagos'] }) })
+      return r.status
+    })
+    console.log('demo sembrada (stock, pagos):', sembrado)
   }
   for (const p of PANTALLAS) {
     await page.goto(URL + p.ruta, { waitUntil: 'networkidle' }).catch(() => {})
