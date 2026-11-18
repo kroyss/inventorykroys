@@ -22,6 +22,8 @@ export function PanelInfo({ children }: { children: ReactNode }) {
 
 /** Encabezado de pantalla con la ⓘ junto al título y su panel debajo (18-11: Preguntas, Mensajes, Despachos, Reportador).
  *  Sirve también desde páginas de servidor: el estado abierto/cerrado vive aquí. */
+// REGLA (18-11, el dueño): la nota ⓘ va amarrada a los cambios. Si cambia lo que hace la pantalla (botón, pestaña,
+// estado, flujo, permiso), actualizar en el MISMO commit su nota ⓘ y docs/ayuda/sistema.md §20 «Notas ⓘ de cada pantalla».
 export function EncabezadoInfo({ title, subtitle, actions, info }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; info: ReactNode }) {
   const [abierto, setAbierto] = useState(false)
   return <>

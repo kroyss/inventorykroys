@@ -864,7 +864,8 @@ Todo está en **Mi cuenta** (menú de arriba a la derecha, tu inicial). Antes se
 *Cómo lo pregunta la gente:* productos, catálogo, inventario, ventas, compras, entró mercancía, vincular publicaciones, combos, packs, promociones, reportes, tasa, ajustes.
 
 **La ⓘ junto al título** (Ventas, Compras, Inventario, Facturas, Productos, Publicaciones, Reportes, Finanzas, y también
-en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócala para abrirla o cerrarla.
+en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócala para abrirla o cerrarla. Lo que dice cada
+una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
 
 > Este espacio se prende por empresa (plan Completo). Si no lo ves, tu empresa trabaja «todo desde MercadoLibre».
 
@@ -1037,7 +1038,7 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   (contacto, condiciones), **con o sin precio** y cuántos por fila. **Guardar PDF** abre la impresión: elige «Guardar
   como PDF» y lo mandas por WhatsApp. La foto sale de la publicación de ML vinculada al producto. «Recordar estos
   datos» los deja para la próxima vez.
-- **Publicaciones** (menú propio, con pestañas Editar · Vincular · Stock · Promociones · MercadoEnvíos (Venezuela) · Tareas; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
+- **Publicaciones** (menú propio, con pestañas Mis publicaciones · Promociones (Venezuela) · Stock vs inventario, y a la derecha Historial de tareas; Vincular y Pesos se abren desde Mis publicaciones; ver [Publicaciones](#7b-publicaciones-inventario--publicaciones)):
 - **Vincular** (Publicaciones → Mis publicaciones → Vincular): une cada publicación (o cada variante) con su producto, para que las ventas de ML descuenten el
   producto correcto. Todo es manual: el sistema sugiere y tú confirmas con un clic.
   **Publicaciones nuevas:** al abrir Vincular, el sistema busca solo las publicaciones que creaste en ML (como mucho
@@ -1106,8 +1107,9 @@ en Automatizaciones) resume en pocas líneas cómo funciona esa sección: tócal
   ve: «Registrar venta» verifica y procesa de una vez; solo aparece si alguna quedó ahí con «Verificar pago».
   **Verificar el pago de un toque:** toca el chip azul «Pago por verificar · Bs …» → «✓ Sí, verificado» (o «✗ Inválido»):
   queda verificado como cuando cuadra con el banco y el botón pasa a «Registrar venta»; «deshacer» lo vuelve atrás.
-  **Por confirmar** y la lista de **Pagos ME** son la misma lista: con Inventario, en las dos se verifica el pago y se
-  toca **Registrar venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
+  Con Inventario, los pagos de Pagos ME se verifican **solo aquí** (Pagos ME queda como «Conexión Pagos ME», en el menú
+  de tu cuenta): arriba sale la línea de estado de la PC y **⚙ Conexión** se despliega aquí mismo. Se toca **Registrar
+  venta** (no está «Ya la despaché por fuera», porque no descontaría el stock).
   **Ir a Despachos →** (arriba, junto a «Comprobar con el banco»; en Venezuela con Despachos): salta directo a imprimir
   las guías sin pasar por el menú.
   Abajo de la lista: **Vencidas** = ventas de más de N días (el plazo de «no concretada» de Calificaciones) sin pago y
@@ -1292,3 +1294,66 @@ mi información, es seguro, comparten mis datos, mi contraseña la ven.
 - **MercadoLibre:** el sistema usa la conexión que tú autorizaste para leer y responder en tu cuenta. La puedes
   desconectar cuando quieras en **Cuentas de MercadoLibre**.
 - Cualquier otra duda sobre tus datos o la privacidad: escríbenos a **Soporte** y te respondemos personalmente.
+
+---
+
+## 20. Notas ⓘ de cada pantalla
+
+*Cómo lo pregunta la gente:* qué es la i, el circulito de información, la ayuda de arriba, qué significa la ⓘ.
+
+Junto al título de cada sección hay una **ⓘ**: al tocarla se abre (o se cierra) un resumen corto de cómo funciona esa
+pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuario ese permiso. Lo que dice cada una:
+
+- **Ventas:** **Por confirmar** = ventas de MercadoLibre que faltan registrar (verificas el pago y «Registrar venta»
+  descuenta del inventario). **Traer pagos y ventas** trae al instante las nuevas (con Pagos ME también pagos y guías,
+  1 a 3 min); además llegan solas cada hora. **Comprobar con el banco** (con Pagos ME) cruza con el estado de cuenta;
+  **Ir a Despachos** salta a imprimir las guías. Estados: Borrador · Por despachar · Despachada · Local. **Nueva venta**:
+  para una venta local o una de ML que no llegó sola.
+- **Compras:** **+ Compra** = lo que le compraste a un proveedor, con su costo; el stock entra al recibirla. Por
+  etapas: Pendiente → Pagada → En camino → Recibida → Finalizada (a medias = Parcial). Importaciones: pagos 50/100 %,
+  fotos, datos de envío y costos. La lista va por último movimiento.
+- **Inventario:** **Bajo** = lo que tienes alcanza para menos de lo que tarda en llegar la mercancía (reglas de
+  Reponer); un mínimo escrito a mano manda. Mín y máx en gris = recomendados que se mueven con las ventas. Cada venta
+  resta y cada compra recibida suma. **Ajuste de stock** guarda el número real contado. **Reponer** = qué comprar;
+  **Stock en ML** = tu stock contra tus publicaciones.
+- **Facturas:** las facturas fiscales de las ventas; **Retención pendiente** espera el comprobante del cliente; **Hoja
+  de prueba** cuadra el papel; Configuración: número siguiente y corrimiento.
+- **Productos:** costo, precio y rentabilidad de cada producto (tócalo para la ficha). **Importar desde ML** crea
+  productos desde tus publicaciones. Recargo sobre costo vs Rentabilidad (lo que te queda después de ML, sobre el
+  costo). **Costos ML**: comisión y envío del cálculo. Filtros: Costo estimado, Sin costo, Rentabilidad baja y
+  **Menos de $3** (Venezuela), cada uno con su arreglo en lote.
+- **Mis publicaciones** (Publicaciones): etiquetas solo si algo pide atención (**Stock distinto** con Igualar, **Sin
+  vincular**, **Sin peso**, **En promo**) y filtros con esas. Tocar una abre el editor; lo guardado va directo a ML y
+  los cambios en lote van por la cola.
+- **Promociones:** campañas de ML, qué publicaciones entran y hasta dónde bajar; antes de entrar, la rentabilidad al
+  precio de la promo y si mantiene el envío gratis. **+ Campaña propia**.
+- **Stock vs inventario** (Publicaciones): cada producto con todas sus publicaciones; arriba Vende de más (urgente),
+  Tienes y no vendes y Por ajustar. **Poner en ML** cambia la publicación; **Corregir stock** cambia el inventario.
+  Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones.
+- **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
+  vs inventario pueda comparar. Lo que falta sale en el botón Vincular de Mis publicaciones y en cada fila.
+- **Reportes:** el detalle con Excel: por fechas (Ventas, Compras) y cómo estás hoy (Inventario, En tránsito, Conteos).
+  Ventas → Por producto = el top y cuánto subió o bajó. La ganancia, solo con permiso de costos. El resumen está en el
+  Inicio; qué comprar, en Inventario → Reponer.
+- **Finanzas:** de toda la organización (Venezuela y Colombia, en dólares): Movimientos, Cierre mensual, Capital /
+  Liquidez (aparte las reservas) y Costos ML (envíos contra lo facturado).
+- **Preguntas:** abre una para ver la publicación y lo que ese comprador preguntó antes; responde escribiendo, con
+  respuesta rápida o **Proponer con IA** (no sale sin que lo revises; con confianza baja te dice qué revisar).
+  Historial = lo respondido; Configuración (administrador): Mi IA, datos de productos, respuestas rápidas.
+- **Mensajes:** leer aquí no lo marca leído en ML (se marca al responder o tocar el sobre). **Por atender**: Responder,
+  Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Al comprar, Recordatorios y Pedir
+  calificación.
+- **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
+  días; se revisa sola cada hora y «Revisar ahora» como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
+- **Pagos ME:** **Traer pagos y guías** (la PC trae de MercadoEnvíos pagos, guías y ventas nuevas, 1 a 3 min; también
+  sola durante el día). Sin inventario se verifica cada pago aquí (uno a uno o con Comprobar con el banco); con
+  inventario se verifica en Ventas → Por confirmar y aquí queda la conexión y el historial. Las guías pagadas pasan
+  solas a Despachos. La línea de arriba dice si la PC está lista; ⚙ Conexión: cuentas, programa, extensión y PC.
+- **Despachos:** arrastra los PDFs de MercadoEnvíos (o entran solos desde Pagos ME) y forman un lote; revisa cada
+  etiqueta y **Generar PDF** (4 por hoja, imprimir a «Tamaño real»). Una guía impresa no sale dos veces («Ya impresa»);
+  **En espera** la aparta. Al final del día, **Cerrar jornada** → Manifiesto por transportista (y cola del Reportador).
+- **Reportador:** reporta las guías impresas en Despachos al cerrar la jornada (las de TEALCA, al escribir la guía
+  final); lo impreso directo en ML no se entera. Trabaja en el servidor (se puede cerrar la pantalla) y revisa la
+  conversación para no repetir. **Vista previa** no manda nada. ML corta mensajes largos y rechaza links de Facebook.
+- **Calificaciones:** Concretada / No concretada / Revisar (decides tú), Próximas (en tu espera) y Automática si la
+  tienes prendida; los textos cambian según si usas Despachos, Reportador y Pagos ME.

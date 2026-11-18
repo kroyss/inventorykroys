@@ -151,7 +151,7 @@ export default function VincularMLClient({ conCuentas, paraQuien = 'el administr
     <ConStock.Provider value={conStock}>
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Une cada publicación (o cada color/modelo) con su producto, con un clic.</li><li>Así cada venta de MercadoLibre descuenta el producto correcto y Stock en ML puede comparar.</li><li>Las que faltan salen en el numerito del botón Vincular de <b className="font-medium text-neutral-800">Mis publicaciones</b> y en su fila («Sin vincular»).</li></>} title="Vincular con MercadoLibre"
+      <EncabezadoInfo info={<><li>Une cada publicación (o cada color/modelo) con su producto, con un clic.</li><li>Así cada venta de MercadoLibre descuenta el producto correcto y Stock vs inventario puede comparar.</li><li>Las que faltan salen en el numerito del botón Vincular de <b className="font-medium text-neutral-800">Mis publicaciones</b> y en su fila («Sin vincular»).</li></>} title="Vincular con MercadoLibre"
         subtitle="Une cada publicación (o cada color/modelo) con su producto. Así las ventas de ML descuentan el producto correcto."
         actions={datos.esDueno ? <Link href="/productos/importar-ml" className={`${sinProductos ? 'btn-primary' : 'btn-secondary'} text-sm`} title="Crear productos nuevos a partir de publicaciones">Crear productos desde ML</Link> : undefined} />
 
