@@ -6,6 +6,7 @@ import { ESCALONES, PLANES, PLANES_PROXIMAMENTE, RECARGAS_IA, CREDITOS_PRUEBA, C
 import { VisitasRegistro } from './ResumenPanel'
 import DespegueCard from './DespegueCard'
 import FundadoresPanel from './FundadoresPanel'
+import PruebasRadar from './PruebasRadar'
 
 const usd = (n: number) => `$${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })}`
 const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
@@ -16,11 +17,11 @@ const ddmm = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
 export default function ProgramasPanel({ hoy, visitas }: { hoy: string; visitas: unknown }) {
   const radar = precioRadarMes(hoy || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }))
   // 14-11: segmentos en vez de una página larga con plegables al final (lo vigente primero; lo que pasó, aparte).
-  const [sub, setSub] = useState<'precios' | 'prueba' | 'despegue' | 'fundadores'>('precios')
+  const [sub, setSub] = useState<'precios' | 'prueba' | 'radar' | 'despegue' | 'fundadores'>('precios')
   return (
     <div className="space-y-4">
       <Segmentos etiqueta="Programas y promos" valor={sub} onCambio={setSub} items={[
-        { k: 'precios', t: 'Planes y precios' }, { k: 'prueba', t: 'Prueba 15 días' },
+        { k: 'precios', t: 'Planes y precios' }, { k: 'prueba', t: 'Prueba 15 días' }, { k: 'radar', t: 'Prueba Radar' },
         { k: 'despegue', t: 'Despegue · Grupo 1' }, { k: 'fundadores', t: 'Fundadores' }]} />
 
       {sub === 'precios' && <section className="space-y-3">
@@ -71,12 +72,14 @@ export default function ProgramasPanel({ hoy, visitas }: { hoy: string; visitas:
           <div>
             <h3 className="text-sm font-semibold text-neutral-900">Prueba gratis de 15 días (autoregistro)</h3>
             <p className="text-sm text-neutral-500">
-              Desde /registro: Automatizaciones + Pagos ME y {CREDITOS_PRUEBA} créditos de IA. Los 15 días corren desde el alta; una prueba por cuenta de ML.
+              Desde /registro: Automatizaciones + Pagos ME y {CREDITOS_PRUEBA} créditos de IA, más el Radar en vista de prueba (10 búsquedas en 7 días, desde el 18-11). Los 15 días corren desde el alta; una prueba por cuenta de ML.
             </p>
           </div>
           <VisitasRegistro inicial={visitas} />
         </div>
       </section>}
+
+      {sub === 'radar' && <section className="space-y-2"><PruebasRadar /></section>}
 
       {sub === 'despegue' && <section className="space-y-2">
         <p className="text-sm text-neutral-500">Programa que ya pasó: queda para consultar.</p>

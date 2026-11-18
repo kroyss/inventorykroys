@@ -747,6 +747,23 @@ async function clientesPorVencer() {
       : q === 0 ? `<b>vence hoy</b> (${r.hasta})` : q === 1 ? `vence mañana (${r.hasta})` : `vence en ${q} días (${r.hasta})`
     const aviso = q < 0 ? '' : r.con_telegram ? ' · ✅ le llega el aviso por Telegram' : ' · ⚠️ sin Telegram: escríbele tú'
     return `• ${esc(r.nombre)}${r.fundador ? ' (Fundador)' : ''}${r.estado === 'activo' ? ' · plan' : ''} · ${cuando}${aviso}`
+  }).concat(await radarMesPorVencer())
+}
+
+/** 18-11 (el dueño): el Radar mensual (solo Radar) también vence; mismas fechas que el plan (3 días antes a 3 después). */
+async function radarMesPorVencer() {
+  const { rows } = await dbGlobal().query(
+    `SELECT o.nombre, to_char(o.radar_mes_hasta, 'DD/MM') AS hasta,
+            o.radar_mes_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date AS quedan
+     FROM organizaciones o
+     WHERE o.id <> $1 AND NOT o.interna AND o.radar_mes_hasta IS NOT NULL
+       AND o.radar_mes_hasta - (NOW() AT TIME ZONE 'America/Caracas')::date BETWEEN -3 AND $2
+     ORDER BY o.radar_mes_hasta, o.nombre`, [ORGANIZACION_PLATAFORMA, AVISAR_FIN_PRUEBA_DIAS])
+  return rows.map(r => {
+    const q = Number(r.quedan)
+    const cuando = q < 0 ? `<b>venció ${q === -1 ? 'ayer' : `hace ${-q} días`}</b> (${r.hasta}) · quedó en solo lectura`
+      : q === 0 ? `<b>vence hoy</b> (${r.hasta})` : q === 1 ? `vence mañana (${r.hasta})` : `vence en ${q} días (${r.hasta})`
+    return `• ${esc(r.nombre)} · Radar mensual · ${cuando} · lo ve en el Radar`
   })
 }
 

@@ -522,6 +522,17 @@ ejemplo y el botón **Pagar y activar**: lleva a **Mi plan** (app.elcomercianted
 mismo usuario y contraseña y paga por Pago Móvil o Binance. Cuando lo confirmamos se abre todo (salir y volver a
 entrar). Al vencer el mes vuelve la pantalla de pago. Los precios están en radar.elcomerciantedigital.com/precios.
 
+> **Prueba del Radar (cuentas nuevas desde el 18-11-2026):** quien se registra en el Radar o en el Sistema tiene, al
+entrar por primera vez, **10 búsquedas en 7 días**. La vista está bloqueada: los productos solo aparecen al hacer una
+búsqueda (palabra, categoría, filtro u orden distinto), que usa 1 de las 10 y muestra la **primera página** con datos
+reales; volver a una ya hecha no gasta («Tus búsquedas»). Sin lo nuevo del mes, sellos, filtros Pro ni Competencia, y solo
+se guardan en la cabina productos de sus búsquedas. Arriba dice cuántas quedan y hasta cuándo. A los 7 días queda en solo
+lectura con la cabina y el botón para activar el Radar. Una prueba por persona: si desde el mismo equipo y conexión ya se
+hizo otra prueba en los últimos 30 días, la cuenta nueva entra directo a la pantalla de pago.
+
+> **Aviso de vencimiento del Radar mensual:** desde 5 días antes, arriba sale «Tu mes de Radar vence en N días» con
+**Pagar el mes siguiente** (los últimos 2 días, en rojo).
+
 > **Programas y pruebas** (Programa Despegue, prueba de un día): el Radar abre **completo los días del programa o de
 la prueba**, de 00:00 a 23:59 (hora de Venezuela). Cuando ya no quedan días, se entra en solo lectura con la cabina
 guardada.

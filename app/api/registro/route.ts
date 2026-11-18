@@ -91,7 +91,8 @@ async function registrar(req: NextRequest): Promise<NextResponse> {
     // Desde el Radar: la misma empresa de siempre, pero con SOLO el módulo Radar (sin prueba del Sistema). Los demás
     // módulos se prenden en Plataforma si los paga o se le incluyen.
     const c = await crearCuenta(client, {
-      nombre: b.negocio, country: 'VE', modulos: radar ? ['radar'] : [...MODULOS_PRUEBA], alta: radar ? 'radar' : 'prueba',
+      // 18-11 (el dueño, mig 186): la prueba de 15 días trae también el Radar, en su vista de prueba (10 búsquedas en 7 días).
+      nombre: b.negocio, country: 'VE', modulos: radar ? ['radar'] : [...MODULOS_PRUEBA, 'radar'], alta: radar ? 'radar' : 'prueba',
       admin: { username: b.usuario, full_name: b.nombre, password: b.clave, email: b.correo },
       origenOrgId: ORGANIZACION_PLATAFORMA, origen: radar ? 'radar' : 'autoregistro',
       registro: { correo: b.correo, whatsapp: b.whatsapp || null, telegram: b.telegram || null, ip_hash: ipHash,

@@ -80,7 +80,14 @@ el portal de MercadoEnvíos de Venezuela.
   pagas, al entrar al Radar ves 5 productos de ejemplo y el botón **Pagar y activar**, que te lleva a **Mi plan**
   (app.elcomerciantedigital.com/renovar) con tu mismo usuario y contraseña; pagas por Pago Móvil o Binance y, cuando
   lo confirmamos, se abre el Radar completo. Al vencer el mes vuelve la pantalla de pago; si pagas antes, el mes nuevo
-  se suma a continuación. Solo hay pago mensual.
+  se suma a continuación. Solo hay pago mensual. Desde 5 días antes del vencimiento, el Radar avisa arriba «Tu mes de
+  Radar vence en N días».
+- **Prueba del Radar (cuentas nuevas desde el 18-11-2026):** quien se registra en /registro (prueba de 15 días) o en el
+  Radar tiene, al entrar al Radar por primera vez, **10 búsquedas en 7 días** con la vista bloqueada: solo ve productos al
+  gastar una búsqueda, solo la primera página, sin lo nuevo del mes, sellos, filtros Pro ni Competencia. Al terminar queda
+  en solo lectura con su cabina y el botón para activar el Radar. Una prueba por persona (mismo equipo y conexión en 30 días
+  = sin prueba). El dueño la sigue en **Plataforma → Programas y promos → Prueba Radar** (búsquedas usadas, si sigue,
+  terminó o pagó, contacto) y con el **ojo** ve su Radar tal como lo ven, en solo lectura (no gasta sus búsquedas).
 
 ---
 
