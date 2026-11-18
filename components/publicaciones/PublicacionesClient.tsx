@@ -12,7 +12,7 @@ interface Fila {
   item_id: string; titulo: string; precio: number | null; moneda: string | null; disponible: number; estado: string
   thumbnail: string | null; sku: string | null; cuenta: string; variantes: number; editada_at: string | null
   // Fase 4 (18-11): avisos de la fila (lib/avisosPublicaciones.ts); solo vienen los que el usuario puede ver.
-  sin_vincular: boolean; sin_peso: boolean; promo: boolean
+  sin_vincular: boolean; sin_peso: boolean; promo: string[] | null   // promo: nombres de las campañas
   stock: null | { nivel: 'vende' | 'stock'; code: string; disponible: number
                   pubs: { item_id: string; variante_id: string | null; variante: string | null; ml: number | null; queda: number; reactivar: boolean }[] }
 }
@@ -45,7 +45,7 @@ export default function PublicacionesClient() {
   const [error, setError] = useState(false)
   const [elegidas, setElegidas] = useState<Set<string>>(new Set())
   const [todasBusqueda, setTodasBusqueda] = useState(false)
-  const [accion, setAccion] = useState<null | 'descripcion' | 'precio'>(null)
+  const [accion, setAccion] = useState<null | 'descripcion' | 'precio' | 'pausar' | 'activar'>(null)
   // 08-11: «Actualizar desde ML» relee el catálogo ya (si no, las nuevas aparecen en la vuelta automática de cada 6 h).
   const [recarga, setRecarga] = useState(0)
   const [actualizando, setActualizando] = useState(false)
@@ -138,7 +138,6 @@ export default function PublicacionesClient() {
                     <span className="block text-sm text-neutral-900 truncate">{f.titulo}</span>
                     <span className="block text-xs text-neutral-500">
                       {f.item_id} · {f.cuenta}{f.sku ? ` · SKU ${f.sku}` : ''}{f.variantes ? ` · ${f.variantes} variantes` : ''}
-                      {f.estado === 'paused' && <span className="ml-1 text-amber-700">· Pausada</span>}
                       {f.editada_at && <span className="ml-1 text-sky-700">· editada aquí</span>}
                     </span>
                   </span>
@@ -149,7 +148,7 @@ export default function PublicacionesClient() {
                   <span className="text-neutral-300">→</span>
                 </Link>
                 </div>
-                <AvisosFila f={f} puedeIgualar={!!r.puedeIgualar} vincular={!!vinc} envios={envios?.href ?? null} onIgualado={releer} />
+                <AvisosFila key={`${f.item_id}-${f.estado}`} f={f} vincular={!!vinc} envios={envios?.href ?? null} onCambio={releer} />
               </li>
             ))}
           </ul>
@@ -159,6 +158,9 @@ export default function PublicacionesClient() {
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={limpiar} className="btn-secondary !px-3 !py-1.5">Quitar selección</button>
                 <button type="button" onClick={() => setAccion('descripcion')} className="btn-secondary !px-3 !py-1.5">Encabezado, condiciones o pie</button>
+                {/* 18-11 (el dueño): pausar / activar lo elegido, junto a cambiar precio. */}
+                <button type="button" onClick={() => setAccion('pausar')} className="btn-secondary !px-3 !py-1.5">Pausar</button>
+                <button type="button" onClick={() => setAccion('activar')} className="btn-secondary !px-3 !py-1.5">Activar</button>
                 <button type="button" onClick={() => setAccion('precio')} className="btn-primary text-sm">Cambiar precios</button>
               </div>
             </div>
@@ -174,6 +176,10 @@ export default function PublicacionesClient() {
       )}
       {accion === 'descripcion' && <LoteDescripcion sel={sel} cuantas={cuantas} onCerrar={() => setAccion(null)} onHecho={limpiar} />}
       {accion === 'precio' && <LotePrecio sel={sel} onCerrar={() => setAccion(null)} onHecho={limpiar} />}
+      {(accion === 'pausar' || accion === 'activar') && (
+        <LoteEstado sel={sel} cuantas={cuantas} estado={accion === 'pausar' ? 'paused' : 'active'}
+          onCerrar={() => { setAccion(null); setRecarga(n => n + 1) }} onHecho={limpiar} />
+      )}
     </div>
   )
 }
@@ -184,45 +190,61 @@ const AVISOS_UI: { k: Aviso; t: string }[] = [
 const ETQ = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-4 whitespace-nowrap'
 
 /** Fase 4 (18-11, el dueño: «al estilo ML»): etiquetas cortas SOLO cuando algo pide atención; cada una lleva a lo que
- *  lo resuelve. «Igualar» pone en ML lo que hay con la misma acción de Stock vs inventario (el servidor recalcula ahora). */
-function AvisosFila({ f, puedeIgualar, vincular, envios, onIgualado }: {
-  f: Fila; puedeIgualar: boolean; vincular: boolean; envios: string | null; onIgualado: () => void
+ *  lo resuelve. Stock: solo avisa y dice la diferencia (es delicado: se analiza en Stock vs inventario, con el producto
+ *  ya filtrado). En promo: las campañas al pasar el cursor; el clic abre Promociones con esa publicación. Además, el
+ *  estado con su botón (Activa · Pausar / Pausada · Activar). */
+function AvisosFila({ f, vincular, envios, onCambio }: {
+  f: Fila; vincular: boolean; envios: string | null; onCambio: () => void
 }) {
   const confirmar = useConfirm()
+  const [estado, setEstado] = useState(f.estado)
   const [trabajando, setTrabajando] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const st = f.stock
-  if (!st && !f.sin_vincular && !f.sin_peso && !f.promo && !msg) return null
   const una = st?.pubs.length === 1 ? st.pubs[0] : null
-  const detalle = st ? (una ? `ML ${una.ml ?? 0} → ${una.queda}${una.reactivar ? ' y activar' : ''}` : st.pubs.length ? `${st.pubs.length} variantes` : '') : ''
-  const igualar = async () => {
-    if (!st?.pubs.length) return
-    const lineas = st.pubs.map(p => `${p.variante ? `${p.variante}: ` : ''}ML ${p.ml ?? 0} → ${p.queda}${p.reactivar ? ' (y se activa)' : ''}`)
-    if (!await confirmar({ title: 'Poner en ML lo que hay', message: `${st.code} · tienes ${st.disponible}\n${lineas.join('\n')}`, confirmText: 'Sí, igualar' })) return
+  const detalle = !st ? '' : una ? `ML ${una.ml ?? 0} · inventario ${una.queda}${una.reactivar ? ' (pausada)' : ''}`
+    : st.pubs.length > 1 ? `${st.pubs.length} variantes no cuadran` : `tienes ${st.disponible}`
+  const tituloStock = !st ? '' : [
+    st.nivel === 'vende' ? `MercadoLibre ofrece más de lo que tienes (${st.disponible} disponibles).` : 'Lo que muestra MercadoLibre no coincide con tu inventario.',
+    ...st.pubs.map(p => `${p.variante ? `${p.variante}: ` : ''}ML ${p.ml ?? 0} → según inventario ${p.queda}${p.reactivar ? ' (y activarla)' : ''}`),
+    'Toca para ver el detalle en Stock vs inventario.',
+  ].join('\n')
+  const puedeCambiar = estado === 'active' || estado === 'paused'
+  const cambiarEstado = async () => {
+    const nuevo = estado === 'active' ? 'paused' : 'active'
+    if (!await confirmar({
+      title: nuevo === 'paused' ? 'Pausar la publicación' : 'Activar la publicación',
+      message: `${f.titulo}\n${f.item_id} · ${f.cuenta}${nuevo === 'paused' ? '\n\nQueda «pausada a mano»: el stock automático no la reactiva solo.' : ''}`,
+      confirmText: nuevo === 'paused' ? 'Sí, pausar' : 'Sí, activar',
+    })) return
     setTrabajando(true); setMsg(null)
     try {
-      const res = await fetch('/api/stock-en-ml', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'igualar', pubs: st.pubs.slice(0, 20).map(p => ({ item_id: p.item_id, variante_id: p.variante_id })) }) })
+      const res = await fetch('/api/publicaciones/estado', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: nuevo, items: [f.item_id] }) })
       const d = await res.json().catch(() => null)
-      const malas = ((d?.resultados ?? []) as { ok: boolean; error?: string }[]).filter(x => !x.ok)
-      if (!res.ok) setMsg(d?.error ?? 'No se pudo igualar')
-      else if (malas.length) setMsg(malas[0].error ?? 'ML no aceptó el cambio')
-      else { setMsg('✓ Igualado'); onIgualado() }
-    } catch { setMsg('No se pudo igualar') }
+      const r0 = (d?.resultados ?? [])[0] as { ok: boolean; error?: string } | undefined
+      if (!res.ok) setMsg(d?.error ?? 'No se pudo')
+      else if (r0 && !r0.ok) setMsg(r0.error ?? 'MercadoLibre no aceptó el cambio')
+      else { setEstado(nuevo); setMsg(nuevo === 'paused' ? '✓ Pausada' : '✓ Activa'); onCambio() }
+    } catch { setMsg('No se pudo') }
     setTrabajando(false)
   }
   return (
     <div className="flex flex-wrap items-center gap-1.5 pb-2.5 pl-[6.25rem] pr-3 -mt-1">
+      {puedeCambiar ? (
+        <button type="button" onClick={cambiarEstado} disabled={trabajando}
+          title={estado === 'active' ? 'Activa en MercadoLibre. Toca para pausarla.' : 'Pausada en MercadoLibre. Toca para activarla.'}
+          className={`${ETQ} bg-white hover:border-neutral-300 disabled:opacity-50 ${estado === 'active' ? 'border-neutral-200 text-neutral-600' : 'border-amber-200 text-amber-800'}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${estado === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          {estado === 'active' ? 'Activa' : 'Pausada'}
+          <span className="font-medium underline underline-offset-2">{trabajando ? '…' : estado === 'active' ? 'Pausar' : 'Activar'}</span>
+        </button>
+      ) : estado ? <span className={`${ETQ} border-neutral-200 bg-neutral-50 text-neutral-500`}>{estado === 'under_review' ? 'En revisión de ML' : estado === 'closed' ? 'Finalizada' : estado}</span> : null}
       {st && (
-        <span className={`${ETQ} ${st.nivel === 'vende' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}
-          title={st.nivel === 'vende' ? 'MercadoLibre ofrece más de lo que tienes en el inventario' : 'El stock en ML no coincide con tu inventario'}>
-          {st.nivel === 'vende' ? 'Vende de más' : 'Stock distinto'}{detalle && <span className="num">· {detalle}</span>}
-          {puedeIgualar && st.pubs.length > 0 && (
-            <button type="button" onClick={igualar} disabled={trabajando} className="ml-0.5 font-medium underline underline-offset-2 disabled:opacity-50">
-              {trabajando ? 'Igualando…' : 'Igualar'}</button>
-          )}
-          <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(st.code)}`} className="ml-0.5 underline underline-offset-2">Ver</Link>
-        </span>
+        <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(st.code)}`} title={tituloStock}
+          className={`${ETQ} ${st.nivel === 'vende' ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300' : 'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300'}`}>
+          {st.nivel === 'vende' ? 'Vende de más' : 'Stock distinto'}{detalle && <span className="num">· {detalle}</span>}<span aria-hidden>→</span>
+        </Link>
       )}
       {f.sin_vincular && (vincular
         ? <Link href={`/vincular-ml?buscar=${encodeURIComponent(f.item_id)}`} className={`${ETQ} border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-300`}>Sin vincular · Vincular →</Link>
@@ -230,9 +252,66 @@ function AvisosFila({ f, puedeIgualar, vincular, envios, onIgualado }: {
       {f.sin_peso && (envios
         ? <Link href={envios} className={`${ETQ} border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-300`}>Sin peso · Cargar →</Link>
         : <span className={`${ETQ} border-neutral-200 bg-neutral-50 text-neutral-600`}>Sin peso</span>)}
-      {f.promo && <Link href="/productos/promociones" className={`${ETQ} border-lime-200 bg-lime-50 text-lime-800 hover:border-lime-300`}>En promo</Link>}
+      {f.promo && (
+        <Link href={`/productos/promociones?buscar=${encodeURIComponent(f.item_id)}`}
+          title={`En promoción:\n${f.promo.map(n => `· ${n}`).join('\n')}\nToca para verla en Promociones.`}
+          className={`${ETQ} border-lime-200 bg-lime-50 text-lime-800 hover:border-lime-300`}>
+          En promo{f.promo.length > 1 && <span className="num">· {f.promo.length}</span>}
+        </Link>
+      )}
       {msg && <span className={`text-[11px] ${msg.startsWith('✓') ? 'text-emerald-700' : 'text-red-600'}`}>{msg}</span>}
     </div>
+  )
+}
+
+/** Pausar o activar las elegidas (18-11): hasta 10 directo, más por la cola (avance como los otros lotes). */
+function LoteEstado({ sel, cuantas, estado, onCerrar, onHecho }: {
+  sel: Seleccion; cuantas: number; estado: 'paused' | 'active'; onCerrar: () => void; onHecho: () => void
+}) {
+  const [enviando, setEnviando] = useState(false)
+  const [lote, setLote] = useState<number | null>(null)
+  const [res, setRes] = useState<null | { ok: number; malas: { item_id: string; error?: string }[]; yaEstaban: number }>(null)
+  const [error, setError] = useState<string | null>(null)
+  const pausar = estado === 'paused'
+  const mandar = async () => {
+    setEnviando(true); setError(null)
+    try {
+      const r = await fetch('/api/publicaciones/estado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado, ...sel }) })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) setError(d?.error ?? 'No se pudo')
+      else if (d?.lote) { setLote(d.lote.id); onHecho() }
+      else {
+        const rs = (d?.resultados ?? []) as { item_id: string; ok: boolean; error?: string }[]
+        setRes({ ok: rs.filter(x => x.ok).length, malas: rs.filter(x => !x.ok), yaEstaban: d?.yaEstaban ?? 0 }); onHecho()
+      }
+    } catch { setError('No se pudo') }
+    setEnviando(false)
+  }
+  return (
+    <Modal titulo={`${pausar ? 'Pausar' : 'Activar'} ${cuantas.toLocaleString('es-VE')} publicaci${cuantas === 1 ? 'ón' : 'ones'}`} onCerrar={() => !enviando && onCerrar()}>
+      {lote ? <Listo lote={lote} onCerrar={onCerrar} /> : res ? <>
+        <div className={`text-sm rounded-lg px-3 py-2 border ${res.malas.length ? 'text-amber-900 bg-amber-50 border-amber-200' : 'text-emerald-800 bg-emerald-50 border-emerald-200'}`}>
+          <ul className="space-y-0.5">
+            {res.ok > 0 && <li>✓ {res.ok} {pausar ? 'pausada' : 'activada'}{res.ok === 1 ? '' : 's'}</li>}
+            {res.yaEstaban > 0 && <li>= {res.yaEstaban} ya {res.yaEstaban === 1 ? 'estaba' : 'estaban'} {pausar ? 'pausada' : 'activa'}{res.yaEstaban === 1 ? '' : 's'}</li>}
+            {res.malas.map(m => <li key={m.item_id}>✗ {m.item_id}: {m.error ?? 'no se pudo'}</li>)}
+          </ul>
+        </div>
+        <div className="flex justify-end"><button type="button" onClick={onCerrar} className="btn-primary text-sm">Listo</button></div>
+      </> : <>
+        <p className="text-sm text-neutral-600">
+          {pausar
+            ? 'Quedan «pausadas a mano»: el stock automático no las reactiva solo. Las que ya estaban pausadas no se tocan.'
+            : 'Solo se activan las que tienen stock en MercadoLibre; las demás te dirán por qué. Las que ya estaban activas no se tocan.'}
+          {cuantas > 10 && ' Son más de 10: van por la cola de MercadoLibre y puedes seguir trabajando.'}
+        </p>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCerrar} disabled={enviando} className="btn-secondary !px-3 !py-1.5">Cancelar</button>
+          <button type="button" onClick={mandar} disabled={enviando} className="btn-primary text-sm">{enviando ? 'Mandando…' : pausar ? 'Sí, pausar' : 'Sí, activar'}</button>
+        </div>
+      </>}
+    </Modal>
   )
 }
 

@@ -477,12 +477,17 @@ Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas ord
 cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones** en el menú se abre la primera:
 - **Mis publicaciones** (antes «Editar»; viene con el Inventario; permiso **Publicaciones (editar en MercadoLibre)**):
   la lista de todas tus publicaciones, como en ML. Cada fila lleva una **etiqueta corta solo si algo pide atención**:
+  - **Activa · Pausar** / **Pausada · Activar** (siempre): el estado en ML; al tocarlo pide confirmar y la pausa o la
+    activa. Pausada desde aquí queda «pausada a mano» (el stock automático no la reactiva). Para varias: elígelas y
+    abajo **Pausar** o **Activar** (más de 10 van por la cola; las que ya estaban así no se tocan; solo se activan las
+    que tienen stock en ML).
   - **Stock distinto** (ámbar) o **Vende de más** (rojo): el stock de ML no coincide con tu inventario (la misma cuenta
-    de Stock vs inventario). **Igualar** pone en ML lo que hay (pide confirmar y muestra ML X → Y); **Ver** abre
-    Stock vs inventario con ese producto.
+    de Stock vs inventario). Dice la diferencia (ML X · inventario Y, o cuántas variantes no cuadran; el detalle al
+    pasar el cursor). Solo avisa: al tocarla abre **Stock vs inventario** con ese producto, donde se analiza y arregla.
   - **Sin vincular**: activa con stock y sin producto. Lleva a **Vincular** con esa publicación.
   - **Sin peso** (Venezuela): su producto no tiene peso. Lleva a **Pesos y envío gratis**.
-  - **En promo** (Venezuela): está en una promoción (según la última lectura de Promociones).
+  - **En promo** (Venezuela): está en una promoción (según la última lectura de Promociones). Al pasar el cursor dice
+    en qué campañas; al tocarla abre **Promociones** buscando esa publicación.
   Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo**) muestran solo lo que hay
   que arreglar. Cada etiqueta sale solo si tienes permiso para esa pantalla. Arriba a la derecha: **Vincular** y
   **Pesos y envío gratis** (con lo que falta), **Textos de descripción** y **Actualizar desde ML**. Tocar la fila abre
@@ -1322,9 +1327,10 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   productos desde tus publicaciones. Recargo sobre costo vs Rentabilidad (lo que te queda después de ML, sobre el
   costo). **Costos ML**: comisión y envío del cálculo. Filtros: Costo estimado, Sin costo, Rentabilidad baja y
   **Menos de $3** (Venezuela), cada uno con su arreglo en lote.
-- **Mis publicaciones** (Publicaciones): etiquetas solo si algo pide atención (**Stock distinto** con Igualar, **Sin
-  vincular**, **Sin peso**, **En promo**) y filtros con esas. Tocar una abre el editor; lo guardado va directo a ML y
-  los cambios en lote van por la cola.
+- **Mis publicaciones** (Publicaciones): cada fila con su estado (**Activa · Pausar** / **Pausada · Activar**; también
+  en lote) y etiquetas solo si algo pide atención (**Stock distinto** dice la diferencia y abre Stock vs inventario,
+  **Sin vincular**, **Sin peso**, **En promo** con sus campañas) y filtros con esas. Tocar una abre el editor; lo
+  guardado va directo a ML y los cambios en lote van por la cola.
 - **Promociones:** campañas de ML, qué publicaciones entran y hasta dónde bajar; antes de entrar, la rentabilidad al
   precio de la promo y si mantiene el envío gratis. **+ Campaña propia**.
 - **Stock vs inventario** (Publicaciones): cada producto con todas sus publicaciones; arriba Vende de más (urgente),

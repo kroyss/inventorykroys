@@ -38,15 +38,20 @@ export async function avisosStock(db: Pool, empresaId: number, pais: string, fre
   return datos
 }
 
-/** Ids de publicaciones que están adentro de una promoción (última foto de Promociones). */
-export async function itemsEnPromo(db: Pool): Promise<Set<string>> {
-  const { rows } = await db.query<{ id: string }>(
-    `SELECT DISTINCT i->>'id' AS id
+/** Publicaciones que están adentro de una promoción (última foto de Promociones) → nombres de sus campañas. */
+export async function itemsEnPromo(db: Pool): Promise<Map<string, string[]>> {
+  const { rows } = await db.query<{ id: string; nombres: string[] }>(
+    `SELECT i->>'id' AS id, array_agg(DISTINCT COALESCE(NULLIF(cp.nombre, ''), 'Promoción de MercadoLibre')) AS nombres
      FROM ml_promociones_cache c,
           jsonb_array_elements(CASE WHEN jsonb_typeof(c.datos->'items') = 'array' THEN c.datos->'items' ELSE '[]'::jsonb END) i,
           jsonb_array_elements(CASE WHEN jsonb_typeof(i->'promos') = 'array' THEN i->'promos' ELSE '[]'::jsonb END) pr
-     WHERE pr->>'estado' = 'started'`)
-  return new Set(rows.map(r => r.id))
+     LEFT JOIN LATERAL (
+       SELECT x->>'nombre' AS nombre
+       FROM jsonb_array_elements(CASE WHEN jsonb_typeof(c.datos->'campanas') = 'array' THEN c.datos->'campanas' ELSE '[]'::jsonb END) x
+       WHERE x->>'id' = pr->>'campana' LIMIT 1) cp ON TRUE
+     WHERE pr->>'estado' = 'started'
+     GROUP BY 1`)
+  return new Map(rows.map(r => [r.id, r.nombres]))
 }
 
 // Las subconsultas de vínculos NO dependen de la fila: Postgres las calcula una vez y las guarda en una tabla hash

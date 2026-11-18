@@ -15,7 +15,8 @@ export const metadata = { title: 'Promociones' }
 // Promociones de MercadoLibre (migraciones 094 y 097, lib/promocionesML.ts). La foto de ML se guarda por
 // cuenta; aquí se cruza con el PESO del portal de MercadoEnvíos (me_productos) o el del producto vinculado,
 // y con el COSTO del producto (para la rentabilidad al precio de la promoción).
-export default async function PromocionesPage() {
+export default async function PromocionesPage({ searchParams }: { searchParams: Promise<{ buscar?: string }> }) {
+  const { buscar } = await searchParams
   const session = await getServerSession(authOptions)
   if (!session || !puede(session.user, 'ver_productos')) redirect('/dashboard')
   if (session.user.country !== 'VE' || !tieneModulo(session.user, 'promociones') || !puede(session.user, 'promociones')) redirect('/productos')
@@ -109,6 +110,7 @@ export default async function PromocionesPage() {
       pesosAl={pesosAl}
       conPagosME={tieneModulo(session.user, 'pagos_me')}
       historial={acciones.slice(0, 60) as AccionHecha[]}
+      buscarInicial={buscar?.slice(0, 80) ?? ''}
     />
   </>)
 }

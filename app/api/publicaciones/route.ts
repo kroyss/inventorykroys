@@ -31,14 +31,14 @@ export async function GET(req: NextRequest) {
   try {
     const [stock, promo] = await Promise.all([
       ve.stock ? avisosStock(s.db, u.empresaId, u.country, p.get('fresco') === '1').catch(() => new Map<string, AvisoStock>()) : Promise.resolve(new Map<string, AvisoStock>()),
-      ve.promo ? itemsEnPromo(s.db).catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
+      ve.promo ? itemsEnPromo(s.db).catch(() => new Map<string, string[]>()) : Promise.resolve(new Map<string, string[]>()),
     ])
     const w = whereFiltro({ q: p.get('q') ?? '', cuenta: Number(p.get('cuenta')) || null, estado: p.get('estado') })
     // Los arrays de ids (stock, promo) van como parámetro solo si se ven: cada $n debe usarse en la consulta.
     const args = [...w.args]
     const cond: Partial<Record<Aviso, string>> = {}
     if (ve.stock) { args.push([...stock.keys()]); cond.stock = `m.item_id = ANY($${args.length}::text[])` }
-    if (ve.promo) { args.push([...promo]); cond.promo = `m.item_id = ANY($${args.length}::text[])` }
+    if (ve.promo) { args.push([...promo.keys()]); cond.promo = `m.item_id = ANY($${args.length}::text[])` }
     if (ve.vincular) cond.vincular = SQL_SIN_VINCULAR
     if (ve.peso) cond.peso = SQL_SIN_PESO
     const extra = avisoPedido ? ` AND ${cond[avisoPedido]}` : ''
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     const filas = rows.map(({ _st, _pr, ...r }) => {
       void _st; void _pr
       const st = stock.get(r.item_id)
-      return { ...r, stock: st ? { nivel: st.nivel, code: st.code, disponible: st.disponible, pubs: st.pubs } : null, promo: promo.has(r.item_id) }
+      return { ...r, stock: st ? { nivel: st.nivel, code: st.code, disponible: st.disponible, pubs: st.pubs } : null, promo: promo.get(r.item_id) ?? null }
     })
     const { n, todas, ...avisos } = t
     return NextResponse.json({ filas, total: n, todas, porPagina: POR_PAGINA, cuentas, avisos, aviso: avisoPedido,
