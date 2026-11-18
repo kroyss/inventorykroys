@@ -73,6 +73,8 @@ export async function GET(req: NextRequest) {
         const x = pubs.get(`${r.item_id}:${r.variante_id === '0' ? '' : r.variante_id}`) ?? pubs.get(`${r.item_id}:`)
         if (!x) continue
         r.sugerido = x.p.objetivo
+        // 18-11: envío gratis por cantidad (lo calcula Stock en ML con el peso y el precio de hoy, con la promo si tiene).
+        r.envio_cantidad = x.p.envio_cantidad
         if (x.p.objetivo === 0 && x.f.disponible > 0) {
           const otras = x.f.pubs.filter(q => q !== x.p && (q.objetivo ?? q.ml_disponible ?? 0) > 0)
             .map(q => `${q.cuenta}${q.variante ? ` ${q.variante}` : ''} ${q.objetivo ?? q.ml_disponible}`)

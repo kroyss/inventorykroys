@@ -14,6 +14,7 @@ import { desactivadosPublicados, filasStockML, leerReserva } from '@/lib/stockCo
 import { contarSinVincular } from '@/lib/importarML'
 import { guardarEstadoVende, revisarVendeDeMas } from '@/lib/vendeDeMas'
 import { guardarInventarioAlDia, leerInventarioAlDia } from '@/lib/inventarioAlDia'
+import { leerTablasEnvio } from '@/lib/mlShippingDb'
 
 // Stock en ML, Fase 1 (26-10; lib/stockConML.ts, pantalla Inventario → «Stock en ML»).
 //   GET → cada producto vinculado con sus publicaciones, lo que muestran en ML y lo que deberían mostrar
@@ -49,17 +50,21 @@ export async function GET(req: NextRequest) {
     const revisar = req.nextUrl.searchParams.get('revisar') === '1'
     // sinVincular: activas y con unidades en ML pero sin producto: se venden sin que el inventario se entere (aviso → Vincular).
     // desactivados (17-11): productos desactivados con publicaciones activas en ML (ya no se les controla el stock).
-    const [filas, reserva, sinVincular, desactivados, inventarioAlDia, { rows: [cola] }] = await Promise.all([
+    const [filas, reserva, sinVincular, desactivados, inventarioAlDia, { rows: [cola] }, tablas] = await Promise.all([
       revisar ? revisarVendeDeMas(s.db, pais).then(r => r.filas)
               : filasStockML(s.db, pais).then(async f => { await guardarEstadoVende(s.db, f).catch(() => {}); return f }),
       leerReserva(s.db), contarSinVincular(s.db), desactivadosPublicados(s.db), leerInventarioAlDia(s.db),
       // 17-11: lo que está en la cola de ML desde esta pantalla (al volver, se sigue viendo el avance).
       s.db.query(`SELECT id::int, total::int, tipo FROM ml_pub_lotes WHERE tipo IN ('stock', 'estado') AND estado = 'en_curso'
-                  ORDER BY creado_at DESC LIMIT 1`)])
+                  ORDER BY creado_at DESC LIMIT 1`),
+      leerTablasEnvio(s.db)])
     return NextResponse.json({ filas, reserva, sinVincular, desactivados, inventarioAlDia,
                                cola: cola ? { id: cola.id, total: cola.total, que: cola.tipo === 'stock' ? 'Poniendo en ML lo que hay' : 'Cambiando el estado de publicaciones' } : null,
                                puedeCambiar: puede(s.session.user, 'reponer_stock'),
-                               puedeReserva: puede(s.session.user, 'inventario_config'), puedeReactivar: puede(s.session.user, 'ver_productos') })
+                               puedeReserva: puede(s.session.user, 'inventario_config'), puedeReactivar: puede(s.session.user, 'ver_productos'),
+                               // 18-11 «Crear pack» (POST /api/publicaciones/pack): mismo permiso y módulo que editar publicaciones.
+                               puedePack: pais === 'VE' && puede(s.session.user, 'editar_publicaciones') && tieneModulo(s.session.user, 'publicaciones'),
+                               tablas })
   } catch (err) {
     return apiError(err)
   }

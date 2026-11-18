@@ -15,7 +15,7 @@
 //     queda «en reserva»: nada automático, se asigna a mano después de chequear (y no se puede asignar más de lo que hay).
 // Solo lee de la base; los cambios en ML los hace aplicarCambio (lib/stockML.ts), que relee ML antes y después.
 import type { Pool } from 'pg'
-import { envioPorTransportista, type EstadoEnvio } from '@/lib/mlShipping'
+import { envioPorTransportista, envioPorCantidad, type EstadoEnvio, type EnvioPorCantidad, type TablasEnvio } from '@/lib/mlShipping'
 import { leerTablasEnvio } from '@/lib/mlShippingDb'
 import { sinEnteraVieja } from '@/lib/vinculoEntero'
 import { DIAS_CON_PAGO, DIAS_MAX } from '@/lib/porConfirmar'
@@ -53,6 +53,9 @@ export interface PubStockML {
   compartida: { con: string[]; aporte: number | null } | null
   /** 17-11: vinculada ENTERA y tiene variantes → sus variantes (para «Dividir por variantes» y para ponerlas en 0). */
   variantes_ml: { id: string; nombre: string | null; disponible: number; foto: string | null }[] | null
+  /** 18-11 Envío gratis POR CANTIDAD (VE): al precio de hoy (con la promo si tiene), qué cantidades que el comprador puede
+   *  llevar (hasta lo que mostrará ML, máx. 20) quedan sin envío gratis. `precio` = el usado; `promo` = si es de promoción. */
+  envio_cantidad: (EnvioPorCantidad & { precio: number; promo: boolean }) | null
 }
 
 export interface FilaStockML {
@@ -77,6 +80,19 @@ export interface FilaStockML {
   diferencia: boolean
   /** «Se acabó» (bodega, mig 181): vigente hasta que entra mercancía o se ajusta el inventario. Cuenta como 0 disponible. */
   sin_fisico: { at: string; por: string | null } | null
+}
+
+/** 18-11: el precio EN PROMOCIÓN vigente de cada publicación (el menor de sus promos «started», última foto de
+ *  Promociones). Es lo que paga hoy el comprador: con él se calcula el envío gratis por cantidad. */
+export async function preciosEnPromo(db: Pick<Pool, 'query'>): Promise<Map<string, number>> {
+  const { rows } = await db.query<{ id: string; precio: number }>(
+    `SELECT i->>'id' AS id, MIN(NULLIF(pr->>'precio', '')::float) AS precio
+     FROM ml_promociones_cache c,
+          jsonb_array_elements(CASE WHEN jsonb_typeof(c.datos->'items') = 'array' THEN c.datos->'items' ELSE '[]'::jsonb END) i,
+          jsonb_array_elements(CASE WHEN jsonb_typeof(i->'promos') = 'array' THEN i->'promos' ELSE '[]'::jsonb END) pr
+     WHERE pr->>'estado' = 'started' AND jsonb_typeof(pr->'precio') = 'number'
+     GROUP BY 1`)
+  return new Map(rows.filter(r => r.precio > 0).map(r => [r.id, r.precio]))
 }
 
 export const RESERVA_DEFECTO = 2
@@ -166,7 +182,7 @@ export async function desactivadosPublicados(db: Pool): Promise<DesactivadoPubli
 }
 
 export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[]> {
-  const [{ rows }, compromiso, tablas, ventas, reserva] = await Promise.all([
+  const [{ rows }, compromiso, tablas, ventas, reserva, enPromo] = await Promise.all([
     db.query(
       `SELECT p.id AS product_id, p.code, p.name, COALESCE(i.quantity, 0)::int AS stock, p.weight_kg::float AS peso,
               m.id AS codigo_id, m.ml_code, m.ml_account AS cuenta, COALESCE(m.unidades, 1)::int AS unidades,
@@ -190,6 +206,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
     leerTablasEnvio(db),
     ventas60PorCodigo(db),
     leerReserva(db),
+    pais === 'VE' ? preciosEnPromo(db).catch(() => new Map<string, number>()) : Promise.resolve(new Map<string, number>()),
   ])
 
   const porProducto = new Map<number, FilaStockML & { codigos: string[] }>()
@@ -224,6 +241,7 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
       actualizado_at: r.actualizado_at,
       pausa_mano: r.pausa_mano_at && r.estado === 'paused' ? { at: r.pausa_mano_at, por: r.pausa_mano_por, motivo: r.pausa_mano_motivo } : null,
       compartida: null,
+      envio_cantidad: null,
       variantes_ml: !varId && variantes.length
         ? variantes.map(x => ({ id: String(x.id), nombre: x.nombre, disponible: Number(x.disponible) || 0, foto: x.foto ?? null })) : null,
     })
@@ -300,7 +318,25 @@ export async function filasStockML(db: Pool, pais: string): Promise<FilaStockML[
   }
   compartidas(filas)
   enteras(filas)
+  if (pais === 'VE') porCantidad(filas, tablas, enPromo)
   return filas
+}
+
+// 18-11 (el dueño: un cliente quería 10 bolsas y no se pudo): envío gratis por cantidad, hasta lo que el comprador podrá
+// llevar (lo que mostrará ML: lo sugerido o lo de hoy, máx. 20), al precio que paga hoy (con la promo si tiene).
+function porCantidad(filas: FilaStockML[], tablas: TablasEnvio, enPromo: Map<string, number>) {
+  for (const f of filas) {
+    if (f.peso == null || !(f.peso > 0)) continue
+    for (const p of f.pubs) {
+      if (p.precio == null || !(p.precio > 0) || p.sin_sincronizar) continue
+      const promo = enPromo.get(p.item_id)
+      const precio = promo != null && promo < p.precio ? promo : p.precio
+      const hasta = Math.max(p.objetivo ?? 0, p.ml_disponible ?? 0)
+      if (hasta < 2) continue
+      const e = envioPorCantidad(f.peso * p.unidades, precio, tablas, hasta)
+      if (e) p.envio_cantidad = { ...e, precio, promo: precio !== p.precio }
+    }
+  }
 }
 
 // 17-11 (el dueño): publicación vinculada ENTERA que tiene variantes (vínculos viejos; el inventario va por variante).

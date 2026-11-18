@@ -11,6 +11,8 @@ import type { DesactivadoPublicado, FilaStockML, PubStockML } from '@/lib/stockC
 import { AbrirFicha } from '@/components/preguntas/FichaPublicacion'
 import { cambioML, grupoDe, motivosDecidir, urgencia, type GrupoStock } from '@/lib/stockGrupos'
 import { EncabezadoInfo } from '@/components/ui/Info'
+import CrearPack from '@/components/publicaciones/CrearPack'
+import { listaCantidades, type TablasEnvio } from '@/lib/mlShipping'
 
 // 17-11 (el dueño: «nos llenamos de opciones»): la pantalla se ordena por QUÉ HAY QUE HACER. Cada producto cae en UN
 // solo grupo, por prioridad (los números suman lo que falta, sin repetir): Vende de más → Tienes y no vendes → Para
@@ -42,6 +44,8 @@ const ENVIO: Record<string, { t: string; c: string; title: string }> = {
 
 export interface StockMLRespuesta { filas: FilaStockML[]; reserva: number | null; sinVincular: number; puedeCambiar: boolean; puedeReserva: boolean
   desactivados?: DesactivadoPublicado[]; puedeReactivar?: boolean; inventarioAlDia?: boolean
+  /** 18-11 «Crear pack» (VE, permiso de editar publicaciones) y las tablas de envío para su cuenta. */
+  puedePack?: boolean; tablas?: TablasEnvio
   cola?: { id: number; total: number; que: string } | null }
 /** 17-11: más de 10 publicaciones van por la cola de ML (lib/colaML.ts, 60 por minuto, sigue aunque cierres la pantalla). */
 const TOPE_DIRECTO = 10
@@ -75,6 +79,9 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [actualizando, setActualizando] = useState(false)
   const [reserva, setReserva] = useState<number | null>(inicial?.reserva ?? null)
   const [puedeReserva, setPuedeReserva] = useState(!!inicial?.puedeReserva)
+  // 18-11 «Crear pack»: la publicación (y su producto) para la que se arma el pack.
+  const [packDe, setPackDe] = useState<{ f: FilaStockML; p: PubStockML } | null>(null)
+  const [pack, setPack] = useState<{ puede: boolean; tablas?: TablasEnvio }>({ puede: !!inicial?.puedePack, tablas: inicial?.tablas })
   const [sinVincular, setSinVincular] = useState(inicial?.sinVincular ?? 0)
   // 17-11: productos desactivados que siguen publicados en ML (faltó pausar o la vinculación está mal).
   const [desactivados, setDesactivados] = useState<DesactivadoPublicado[]>(inicial?.desactivados ?? [])
@@ -91,7 +98,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const cargar = (revisar = false) => fetch(`/api/stock-en-ml${revisar ? '?revisar=1' : ''}`, { cache: 'no-store' }).then(async r => {
     const d = await r.json().catch(() => ({}))
     if (!r.ok) { setError(d.error ?? 'No se pudo cargar'); return null }
-    setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setSinVincular(d.sinVincular ?? 0); setError(null)
+    setFilas(d.filas); setPuedeCambiar(!!d.puedeCambiar); setReserva(d.reserva ?? null); setPuedeReserva(!!d.puedeReserva); setPack({ puede: !!d.puedePack, tablas: d.tablas }); setSinVincular(d.sinVincular ?? 0); setError(null)
     setDesactivados(d.desactivados ?? []); setPuedeReactivar(!!d.puedeReactivar); setAlDia(d.inventarioAlDia ?? true)
     if (d.cola) setCola(c => (c && c.id === d.cola.id ? c : { ...d.cola, hechos: 0, errores: 0, lista: [], terminado: false }))
     return d.filas as FilaStockML[]
@@ -221,7 +228,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   return (
     <div className="space-y-4 pb-20">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Cada producto con todas sus publicaciones: lo que MercadoLibre ofrece contra lo que tienes en inventario.</li><li>Arriba, lo que hay que hacer: <b className="font-medium text-neutral-800">Vende de más</b> (ML ofrece más de lo que tienes: urgente), <b className="font-medium text-neutral-800">Tienes y no vendes</b> y <b className="font-medium text-neutral-800">Por ajustar</b>.</li><li>Poner en ML cambia tus publicaciones; <b className="font-medium text-neutral-800">Corregir stock</b> cambia tu inventario (queda como ajuste).</li><li>Más de 10 publicaciones a la vez van por la cola: el avance sale abajo a la derecha y queda en <b className="font-medium text-neutral-800">Historial de tareas</b>.</li><li>Publicación por publicación también lo ves en <b className="font-medium text-neutral-800">Mis publicaciones</b>: la etiqueta «Stock distinto» con su botón Igualar.</li></>} title="Stock en MercadoLibre"
+      <EncabezadoInfo info={<><li>Cada producto con todas sus publicaciones: lo que MercadoLibre ofrece contra lo que tienes en inventario.</li><li>Arriba, lo que hay que hacer: <b className="font-medium text-neutral-800">Vende de más</b> (ML ofrece más de lo que tienes: urgente), <b className="font-medium text-neutral-800">Tienes y no vendes</b> y <b className="font-medium text-neutral-800">Por ajustar</b>.</li><li>Poner en ML cambia tus publicaciones; <b className="font-medium text-neutral-800">Corregir stock</b> cambia tu inventario (queda como ajuste).</li><li>Más de 10 publicaciones a la vez van por la cola: el avance sale abajo a la derecha y queda en <b className="font-medium text-neutral-800">Historial de tareas</b>.</li><li>Publicación por publicación también lo ves en <b className="font-medium text-neutral-800">Mis publicaciones</b>: la etiqueta «Stock distinto» con su botón Igualar.</li><li><b className="font-medium text-neutral-800">«⚠ Desde N u. pierde envío gratis»</b>: comprando esa cantidad el paquete pesa más y no llega al mínimo (revisado hasta 20, con la promo). <b className="font-medium text-neutral-800">Crear pack</b> arma un «Pack xN» con envío gratis. «✓ Envío gratis aunque lleve…» = puedes subir el stock sin miedo.</li></>} title="Stock en MercadoLibre"
         subtitle="Cada producto con todas sus publicaciones: pon en ML lo que hay y reactiva las pausadas en todas tus cuentas de una vez"
         actions={<>
           <Link href="/inventario" className="btn-secondary text-sm whitespace-nowrap">← Inventario</Link>
@@ -424,7 +431,8 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
                 setResultados(r => { const x = new Map(r); for (const y of d.resultados as Res[]) x.set(clave(y), y); return x })
                 await cargar()
               }}
-              onHistorial={() => setHistorial({ product_id: f.product_id, nombre: `${f.code} ${f.name}` })} />
+              onHistorial={() => setHistorial({ product_id: f.product_id, nombre: `${f.code} ${f.name}` })}
+              onPack={pack.puede ? p => setPackDe({ f, p }) : undefined} />
           ))}
           {visibles.length > ver && (
             <button onClick={() => setVer(v => v + POR_PAGINA)} className="btn-secondary w-full text-sm">Ver {Math.min(POR_PAGINA, visibles.length - ver)} más ({visibles.length - ver} quedan)</button>
@@ -500,6 +508,11 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
           </div>
         </div>
       )}
+      {packDe && packDe.f.peso != null && packDe.p.envio_cantidad && (
+        <CrearPack item={packDe.p.item_id} varianteId={packDe.p.variante_id} titulo={packDe.p.titulo} peso={packDe.f.peso}
+          precio={packDe.p.envio_cantidad.precio} pierde={packDe.p.envio_cantidad.pierde} disponible={packDe.f.publicable}
+          tablas={pack.tablas} onCerrar={() => setPackDe(null)} onCreado={() => { void cargar() }} />
+      )}
     </div>
   )
 }
@@ -519,7 +532,9 @@ function CambiarReserva({ valor, onGuardar }: { valor: number; onGuardar: (u: nu
   )
 }
 
-function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, etiquetas, resaltar, cuenta, aplicables, ocupado, onAplicar, onDividir, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial }: {
+function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados, verCombos, etiquetas, resaltar, cuenta, aplicables, ocupado, onAplicar, onDividir, onMarcar, onUnidades, onSincronizar, onAsignar, onCorregir, onEstado, onSinFisico, onHistorial, onPack }: {
+  /** 18-11 «Crear pack» desde el aviso de envío gratis por cantidad. */
+  onPack?: (p: PubStockML) => void
   f: FilaStockML; puedeCambiar: boolean; conVincular: boolean; marcable: boolean; marcado: boolean; resultados: Map<string, Res>; verCombos: boolean
   /** 17-11: por qué está en «Para decidir». */
   etiquetas: string[]
@@ -680,13 +695,16 @@ function Producto({ f, puedeCambiar, conVincular, marcable, marcado, resultados,
           onUnidades={u => onUnidades(p, u)} onSincronizar={v => onSincronizar(p, v)}
           editar={puedeCambiar && !editando && asignables.includes(p) ? () => setEditando(true) : undefined}
           dividir={onDividir && p.entera_con_variantes && p.variantes_ml?.length ? () => onDividir(p) : undefined}
+          pack={onPack && p.unidades === 1 && p.envio_cantidad?.pierde.length ? () => onPack(p) : undefined}
           asignar={editando && puedeCambiar && asignables.includes(p) ? { valor: valor(p), onCambio: v => setAsig(a => ({ ...a, [clave(p)]: v })) } : undefined} />)}
       </ul>
     </section>
   )
 }
 
-function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar, editar, dividir }: {
+function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUnidades, onSincronizar, onEstado, asignar, editar, dividir, pack }: {
+  /** 18-11: abrir «Crear pack» (comprando varias pierde el envío gratis). */
+  pack?: () => void
   p: PubStockML; res?: Res; puedeCambiar: boolean; reserva: boolean; abrirOpciones: boolean; onUnidades: (u: number) => void; onSincronizar: (v: boolean) => void
   onEstado: (estado: 'paused' | 'active', motivo: string) => Promise<boolean>
   atenuada: boolean
@@ -760,6 +778,18 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
               {p.bloqueada_envio && <div className="font-normal text-red-700">pausada: sin envío gratis</div>}
             </div>}
       </div>
+      {/* 18-11 (el dueño: un cliente quería 10 bolsas): envío gratis por cantidad, hasta lo que mostrará ML (máx. 20).
+          Pierde → aviso + «Crear pack». Sigue gratis y el stock sube → la confianza para subirlo. No cambia lo sugerido. */}
+      {p.envio_cantidad && (p.envio_cantidad.pierde.length ? (
+        <span className="flex w-full flex-wrap items-center gap-x-2 text-[11px] text-amber-800"
+          title={`Comprando ${listaCantidades(p.envio_cantidad.pierde)} u. queda sin envío gratis: ${p.envio_cantidad.kgDesde?.toLocaleString('de-DE')} kg pide $${p.envio_cantidad.minimoDesde} y con ${p.envio_cantidad.pierde[0]} pagaría $${(p.envio_cantidad.precio * p.envio_cantidad.pierde[0]).toLocaleString('de-DE', { maximumFractionDigits: 2 })}${p.envio_cantidad.promo ? ' (precio con la promo)' : ''}`}>
+          <span>⚠ Desde {p.envio_cantidad.pierde[0]} u. pierde envío gratis{p.envio_cantidad.promo ? ' (con la promo)' : ''}</span>
+          {pack && <button type="button" onClick={pack} className="font-medium text-sky-700 underline hover:text-sky-900">Crear pack</button>}
+        </span>
+      ) : (p.objetivo ?? 0) > (p.ml_disponible ?? 0) && (
+        <span className="w-full text-[11px] text-emerald-700" title="Revisado cantidad por cantidad con el peso y el precio de hoy (con la promo si tiene)">
+          ✓ Envío gratis aunque lleve {(p.objetivo ?? 0) > 20 ? '20 o más' : `hasta ${p.envio_cantidad.hasta}`} u.</span>
+      ))}
       {puedeCambiar && p.estado === 'active' && !p.sin_sincronizar && pausando == null && (
         <button type="button" onClick={() => setPausando('')} className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
           title="Deja de venderse en MercadoLibre (la publicación entera). «Poner en ML lo que hay» no la reactiva hasta que alguien la active">Pausar</button>

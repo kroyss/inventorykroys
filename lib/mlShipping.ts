@@ -245,6 +245,9 @@ export function envioGratisAhora(pesoKg: number | null | undefined, precio: numb
 }
 
 // ── Hueco de VARIAS unidades por la promoción (24-10, balanza MLV794933472) ──
+// 18-11 (el dueño: un cliente quería 10 bolsas): ya no solo 2 y 3, TODAS las cantidades hasta MAX_CANTIDAD (20) o
+// hasta lo que hay disponible. La tabla sube ~$10 por kg entre 1 y 5 kg: lo que cuesta menos de ~$13-15 el kg puede
+// perder el envío gratis cuando el paquete cae ahí y recuperarlo más arriba ($60 hasta 10 kg, $80 hasta 80 kg).
 // Con 1 unidad sigue gratis, pero comprando 2 o 3 el paquete pasa a otro rango de peso y al precio de la promo
 // ya no llega al mínimo (a precio normal sí): 2 × 0,9 kg = 1,8 kg pide $20 y la promo da 2 × $9,63 = $19,26.
 // Solo cuenta lo que causa la promo y hasta lo que hay disponible (sin stock para 2, no hay hueco).
@@ -253,12 +256,12 @@ export interface HuecoUnidades {
   /** Descuento máximo (%) sobre el precio normal que mantiene gratis de 1 a `unidades` (null = no se calcula). */
   tope: number | null
 }
-const MAX_HUECO = 3
+export const MAX_CANTIDAD = 20
 export function huecoVariasUnidades(pesoKg: number | null | undefined, precioPromo: number | null | undefined,
   precioNormal: number | null | undefined, tablas: TablasEnvio = TABLAS_DEFAULT, disponible?: number | null): HuecoUnidades | null {
   if (pesoKg == null || !(pesoKg > 0) || precioPromo == null || !(precioPromo > 0) || precioNormal == null || !(precioNormal > precioPromo)) return null
   if (envioPorTransportista(pesoKg, precioPromo, tablas).estado === 'destino') return null   // con 1 ya no llega: lo avisa lo de siempre
-  const max = Math.min(MAX_HUECO, disponible == null ? MAX_HUECO : disponible)
+  const max = Math.min(MAX_CANTIDAD, disponible == null ? MAX_CANTIDAD : disponible)
   for (let n = 2; n <= max; n++) {
     const t = tierFor(pesoKg * n, tablas.tealca)
     if (!t) return null
@@ -274,6 +277,40 @@ export function huecoVariasUnidades(pesoKg: number | null | undefined, precioPro
     }
   }
   return null
+}
+
+/**
+ * 18-11 Envío gratis POR CANTIDAD (con o sin promo): al precio que paga hoy el comprador, ¿qué cantidades de 2 a `hasta`
+ * (máx. 20) quedan SIN envío gratis aunque 1 unidad lo tenga? `pierde` vacío = todas siguen gratis (lo que da confianza
+ * para subir el stock). null = sin peso o sin precio, o con 1 unidad ya no es gratis (eso lo avisa lo de siempre).
+ */
+export interface EnvioPorCantidad { pierde: number[]; hasta: number; kgDesde: number | null; minimoDesde: number | null }
+export function envioPorCantidad(pesoKg: number | null | undefined, precio: number | null | undefined, tablas: TablasEnvio = TABLAS_DEFAULT,
+  hasta: number = MAX_CANTIDAD): EnvioPorCantidad | null {
+  if (pesoKg == null || !(pesoKg > 0) || precio == null || !(precio > 0)) return null
+  if (envioPorTransportista(pesoKg, precio, tablas).estado === 'destino') return null
+  const max = Math.max(1, Math.min(MAX_CANTIDAD, Math.floor(hasta)))
+  const pierde: number[] = []
+  for (let n = 2; n <= max; n++) {
+    const t = tierFor(pesoKg * n, tablas.tealca)
+    if (t && precio * n < t.minPrice) pierde.push(n)
+  }
+  const t0 = pierde.length ? tierFor(pesoKg * pierde[0], tablas.tealca) : null
+  return { pierde, hasta: max, kgDesde: pierde.length ? Math.round(pesoKg * pierde[0] * 100) / 100 : null, minimoDesde: t0?.minPrice ?? null }
+}
+
+/** «2, 3 y 5» */
+export const listaCantidades = (ns: number[]) => ns.length < 2 ? ns.join('') : `${ns.slice(0, -1).join(', ')} y ${ns[ns.length - 1]}`
+
+/**
+ * 18-11 PACK: el precio mínimo de un pack de `n` (su peso es n × peso) para que tenga envío gratis por TEALCA, y el
+ * sugerido = lo que pagaría llevando n sueltas, subido hasta ese mínimo si no llega.
+ */
+export function precioPack(pesoKg: number, precio: number, n: number, tablas: TablasEnvio = TABLAS_DEFAULT) {
+  const t = tierFor(pesoKg * n, tablas.tealca)
+  const sueltas = Math.round(precio * n * 100) / 100
+  const minimo = t?.minPrice ?? null
+  return { kg: Math.round(pesoKg * n * 1000) / 1000, minimo, sueltas, sugerido: minimo != null ? Math.max(sueltas, minimo) : sueltas }
 }
 
 /** Texto corto del hueco, igual en todas las pantallas. */

@@ -516,7 +516,8 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
 - **Historial de tareas** (enlace a la derecha): lo que se mandó a MercadoLibre en segundo plano. Mientras algo se
   está enviando, el avance sale abajo a la derecha de cualquier pantalla (también lo de Stock vs inventario cuando
   son más de 10 publicaciones).
-- **Promociones** (Venezuela, viene con el Inventario): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis. La
+- **Promociones** (Venezuela, viene con el Inventario): campañas de ML y hasta dónde puede bajar el precio sin perder el envío gratis
+  (desde el 18-11 revisa también a quien lleva varias: cada cantidad de 2 a 20 unidades, no solo 2 y 3). La
   columna **Rentabilidad** es lo que te queda al precio de la promo ÷ lo que te costó el producto (como en Productos);
   **Rentabilidad mínima** (20 % por defecto) marca en naranja las que quedan por debajo y las filtra con «Rentabilidad < X %».
   Campañas propias: **Editar** cambia la fecha de fin (máx. 31 días desde que empezó; una vencida ya no se puede editar).
@@ -964,6 +965,15 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   **Una etiqueta por fila** (del color de su tarjeta, junto al nombre): 🔴 «Urgente: tienes 0, ML ofrece 2» ·
   🟠 «ML ofrece 10, tienes 1» · 🔵 «Tienes 161 · ninguna activa» · 🟡 «ML 5 → quedará 2». En cada tarjeta lo más urgente
   va arriba (Vende de más: primero los de 0; Tienes y no vendes: los de más unidades; Por ajustar: la mayor diferencia).
+  **Envío gratis por cantidad (Venezuela, 18-11):** al comprar varias, ML suma el peso del paquete y pide el mínimo de
+  ese peso. El sistema revisa **cada cantidad** que el comprador puede llevar (hasta lo que mostrará ML, máx. 20) con el
+  precio de hoy (con la promo si tiene). Si alguna queda sin envío gratis, la publicación dice **«⚠ Desde N u. pierde
+  envío gratis»** (al pasar el cursor, cuáles y por qué) con el botón **Crear pack**; si todas siguen gratis y lo
+  sugerido sube el stock, dice **«✓ Envío gratis aunque lleve hasta N u.»** (para subirlo sin miedo). No cambia lo
+  sugerido. **Crear pack** copia la publicación como «… Pack XN» (fotos, categoría, características y descripción), con
+  un precio que llega al mínimo de envío gratis de ese peso (sugerido = N sueltas, subido hasta el mínimo si no llega);
+  queda **pausada** para revisarla y ya **vinculada «trae N u.»** al mismo producto. Falta registrar su peso (N × peso)
+  en el portal de MercadoEnvíos y activarla. Con variantes, se crea desde la variante vinculada.
   La tarjeta Vende de más dice cuántos son urgentes (lo mismo que el numerito del menú). «ML ofrece» cuenta solo las
   publicaciones **activas**: las pausadas no venden, así que no hacen sonar Vende de más.
   **Más de 10 publicaciones** (Arreglar o Pausar/Activar en lote) van por la **cola de MercadoLibre** (60 por minuto):
@@ -1083,7 +1093,8 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   revisar las sugerencias antes de aplicar. Arranca prendida si hubo entradas o ajustes de inventario en los últimos 60 días.
   Prendida, **Automatizaciones → Stock** usa el mismo reparto: «inventario N · sugerido X» (al tocarlo) pone lo que sugiere Stock en ML (no
   todo el inventario; al pasar el cursor lo explica) y la que está en 0 porque lo que hay está en otra publicación dice
-  «inventario N · está en PIKEKE 1». Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
+  «inventario N · está en PIKEKE 1». Si comprando varias pierde el envío gratis, debajo dice «⚠ desde N u. sin envío
+  gratis · pack» (el enlace abre Stock vs inventario con esa publicación, para Crear pack). Apagada (o sin inventario), Automatizaciones → Stock queda como siempre. Pack/combo («trae N u.») y «No sincronizar» están en **⋯ Más opciones** de cada publicación
   (en «Para decidir» salen abiertas). Tocar el **código MLV** abre la publicación ahí mismo (fotos, precio,
   variantes, descripción) sin ir a MercadoLibre.
   **Compartida con COD-…**: la misma publicación vinculada a varios productos (modelos que elige el comprador, p. ej. un
@@ -1353,7 +1364,9 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   precio de la promo y si mantiene el envío gratis. **+ Campaña propia**.
 - **Stock vs inventario** (Publicaciones): cada producto con todas sus publicaciones; arriba Vende de más (urgente),
   Tienes y no vendes y Por ajustar. **Poner en ML** cambia la publicación; **Corregir stock** cambia el inventario.
-  Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones.
+  Más de 10 a la vez van por la cola. Por publicación, también en Mis publicaciones. «⚠ Desde N u. pierde envío gratis»
+  revisa cada cantidad hasta 20 (con la promo) y ofrece **Crear pack**; «✓ Envío gratis aunque lleve hasta N u.» da la
+  confianza para subir el stock.
 - **Vincular:** une cada publicación (o color/modelo) con su producto, para que cada venta descuente el correcto y Stock
   vs inventario pueda comparar. Lo que falta sale en el botón Vincular de Mis publicaciones y en cada fila.
 - **Reportes:** el detalle con Excel: por fechas (Ventas, Compras) y cómo estás hoy (Inventario, En tránsito, Conteos).
@@ -1369,6 +1382,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   calificación.
 - **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
   días; se revisa sola cada hora y «Revisar ahora» como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
+  «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).
 - **Pagos ME:** **Traer pagos y guías** (la PC trae de MercadoEnvíos pagos, guías y ventas nuevas, 1 a 3 min; también
   sola durante el día). Sin inventario se verifica cada pago aquí (uno a uno o con Comprobar con el banco); con
   inventario se verifica en Ventas → Por confirmar y aquí queda la conexión y el historial. Las guías pagadas pasan

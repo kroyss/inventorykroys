@@ -18,6 +18,8 @@ interface Fila {
   inventario?: number | null      // lo que hay en el inventario del producto vinculado (solo empresas con inventario; 28-10 en las 3 vistas)
   sugerido?: number | null        // 17-11, inventario al día: lo que sugiere Stock en ML para esta publicación (mismo reparto)
   en_otras?: string | null        // 17-11: está en 0 a propósito, lo que hay está en estas publicaciones
+  /** 18-11: qué cantidades quedan sin envío gratis (hasta lo que mostrará ML, máx. 20). Solo con el inventario al día. */
+  envio_cantidad?: { pierde: number[]; hasta: number; promo: boolean } | null
 }
 export interface Datos {
   filas: Fila[]; contadores: { agotadas: number; bajas: number; pausadas: number }; umbral: number
@@ -296,6 +298,14 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
           )
         })()}
         {pasaInventario(f) && <p className="text-[11px] font-semibold text-amber-700 whitespace-nowrap">⚠ más de lo que tienes</p>}
+        {/* 18-11 (el dueño: un cliente quería 10 bolsas): comprando varias pierde el envío gratis → aviso corto y el pack
+            se arma en Stock vs inventario (con esa publicación ya buscada). No cambia lo sugerido. */}
+        {vista !== 'pausadas' && f.envio_cantidad?.pierde.length ? (
+          <p className="text-[11px] text-amber-700 whitespace-nowrap" title={`Comprando ${f.envio_cantidad.pierde.join(', ')} u. queda sin envío gratis${f.envio_cantidad.promo ? ' (precio con la promo)' : ''}`}>
+            ⚠ desde {f.envio_cantidad.pierde[0]} u. sin envío gratis ·{' '}
+            <Link href={`/inventario/stock-ml?buscar=${encodeURIComponent(f.item_id)}`} className="font-medium text-sky-700 underline hover:text-sky-900">pack</Link>
+          </p>
+        ) : null}
         <p className="text-[11px] text-neutral-400 whitespace-nowrap">
           {hace(vista === 'pausadas' ? f.pausada_desde ?? f.agotada_desde ?? null : vista === 'agotadas' ? f.agotada_desde : f.bajo_desde)}
         </p>
@@ -328,6 +338,7 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
             <li>El aviso (y el numerito del menú) cuenta lo de los <b className="font-medium text-neutral-800">últimos 7 días</b>; lo más viejo queda abajo, sin sumar.</li>
             <li>Se revisa sola cada hora; «Revisar ahora» busca en ML en el momento (como mucho cada 10 minutos).</li>
             <li>El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).</li>
+            {conInventario && <li><b className="font-medium text-neutral-800">«⚠ desde N u. sin envío gratis»</b>: comprando varias el paquete pesa más y pierde el envío gratis; «pack» lo arma en Stock vs inventario.</li>}
             {conInventario && <li>Aquí ves <b className="font-medium text-neutral-800">lo que dice MercadoLibre</b>. Para compararlo con tu inventario: <Link href="/inventario/stock-ml" className="underline">Stock vs inventario</Link>.</li>}
         </PanelInfo>
       )}

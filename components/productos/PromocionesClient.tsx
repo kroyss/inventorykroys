@@ -7,7 +7,7 @@ import { EmptyState, FilterPills, Pagination } from '@/components/ui'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { useTraidaME } from '@/components/pagosme/useTraidaME'
 import {
-  envioPorTransportista, topeDescuento, unidadesParaGratis, huecoVariasUnidades, textoHueco, tierFor, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
+  envioPorTransportista, topeDescuento, MAX_CANTIDAD, unidadesParaGratis, huecoVariasUnidades, textoHueco, tierFor, parseShippingTable, tablasEnvio, type TablasEnvio, type EstadoEnvio,
 } from '@/lib/mlShipping'
 import { mlNetFor, type VeRate } from '@/lib/pricingVE'
 import { ventaACosto } from '@/lib/salud'
@@ -71,7 +71,8 @@ const precioSeguro = (publicado: number, pct: number, base: { estado: EstadoEnvi
   const pedido = precioConPiso(publicado, pct)
   let min = base.estado === 'ambas' || base.estado === 'tealca' ? base.minTealca : null
   if (min != null && peso != null && peso > 0) {
-    for (let n = 2; n <= 3; n++) {
+    // 18-11: todas las cantidades hasta 20 (antes solo 2 y 3): la promo no deja sin envío gratis a quien lleva varias.
+    for (let n = 2; n <= MAX_CANTIDAD; n++) {
       const t = tierFor(peso * n, tablas.tealca)
       if (t && publicado * n >= t.minPrice) min = Math.max(min, Math.ceil(t.minPrice / n * 100) / 100)
     }
@@ -447,7 +448,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
   return (
     <div className="space-y-4">
       {/* 18-11 (el dueño): ⓘ en cada sección. */}
-      <EncabezadoInfo info={<><li>Las campañas de MercadoLibre: qué publicaciones pueden entrar y hasta dónde bajar el precio.</li><li>Antes de entrar ves la rentabilidad al precio de la promo y si mantiene el envío gratis por transportista.</li><li><b className="font-medium text-neutral-800">+ Campaña propia</b>: tu propia promoción, con las publicaciones que elijas.</li></>} title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
+      <EncabezadoInfo info={<><li>Las campañas de MercadoLibre: qué publicaciones pueden entrar y hasta dónde bajar el precio.</li><li>Antes de entrar ves la rentabilidad al precio de la promo y si mantiene el envío gratis por transportista, también para quien lleva varias (cada cantidad hasta 20).</li><li><b className="font-medium text-neutral-800">+ Campaña propia</b>: tu propia promoción, con las publicaciones que elijas.</li></>} title="Promociones" subtitle="Campañas de MercadoLibre, envío gratis por transportista y rentabilidad al precio de la promo"
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm whitespace-nowrap">← Productos</Link>
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>
@@ -958,7 +959,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
     const bajos = validas.filter(x => x.margen != null && x.margen < margenMin).length
     const dobles = validas.filter(x => x.exceso)
     const avisos = [dobles.length && `⚠ OJO: ${dobles.length} quedaría${dobles.length === 1 ? '' : 'n'} con MÁS DEL DOBLE de tu descuento habitual (${textoExceso(dobles[0].exceso!)}${dobles.length > 1 ? ', y otras' : ''}). Confirma que es correcto.`,
-      sinGratis && `• ${sinGratis} queda${sinGratis === 1 ? '' : 'n'} SIN envío gratis (cobro a destino, con 1 unidad o comprando 2 o 3).`,
+      sinGratis && `• ${sinGratis} queda${sinGratis === 1 ? '' : 'n'} SIN envío gratis (cobro a destino, con 1 unidad o comprando varias).`,
       zoom && `• ${zoom} pierde${zoom === 1 ? '' : 'n'} ZOOM: solo tendrá${zoom === 1 ? '' : 'n'} envío gratis por TEALCA. En Preguntas y Mensajes se verá así mientras dure la promoción.`,
       bajos && `• ${bajos} queda${bajos === 1 ? '' : 'n'} con rentabilidad menor a ${margenMin}%.`].filter(Boolean).join('\n')
     if (avisos && !await confirmarAviso({
