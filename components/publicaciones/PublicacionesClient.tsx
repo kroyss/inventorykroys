@@ -8,6 +8,7 @@ import { VistoNuevo } from '@/components/ui/Nuevo'
 import PendientesPreparar from '@/components/productos/PendientesPreparar'
 import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
 import CambiarStock from '@/components/preguntas/CambiarStock'
+import { useAlActualizar } from '@/lib/useAlActualizar'
 
 interface Fila {
   item_id: string; titulo: string; precio: number | null; moneda: string | null; disponible: number; estado: string
@@ -51,12 +52,8 @@ export default function PublicacionesClient() {
   const [recarga, setRecarga] = useState(0)
   // 18-11 (el dueño): cambiar el stock (por variante) desde la fila, con la ventana de siempre (CambiarStock).
   const [stockDe, setStockDe] = useState<string | null>(null)
-  const [actualizando, setActualizando] = useState(false)
-  const actualizar = async () => {
-    setActualizando(true)
-    await fetch('/api/publicaciones', { method: 'POST' }).catch(() => null)
-    setActualizando(false); setRecarga(n => n + 1)
-  }
+  // 18-11: «Actualizar desde ML» pasó a la central de actualización (botón de arriba): al terminar, se relee la lista.
+  useAlActualizar(['publicaciones'], () => setRecarga(n => n + 1))
 
   useEffect(() => { const t = setTimeout(() => { setBuscar(q); setPagina(1) }, 300); return () => clearTimeout(t) }, [q])
   useEffect(() => {
@@ -83,11 +80,6 @@ export default function PublicacionesClient() {
     <div className="space-y-3">
       {/* 08-11 (el dueño): acciones como botones, no como links sueltos. */}
       <div className="flex flex-wrap justify-end items-center gap-2">
-        <button type="button" onClick={actualizar} disabled={actualizando} className="btn-secondary !px-3 !py-1.5"
-          title="Trae de MercadoLibre las publicaciones nuevas y los cambios (sola se refresca cada hora)">
-          <svg viewBox="0 0 20 20" className={`h-4 w-4 ${actualizando ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          {actualizando ? 'Actualizando…' : 'Actualizar desde ML'}
-        </button>
         <VistoNuevo clave="mis_publicaciones" />
         {/* 18-11 Fase 4: Vincular y Pesos (antes el submenú «Preparar») se abren desde aquí, con lo que falta. */}
         {vinc && <Link href={vinc.href} className="btn-secondary !px-3 !py-1.5" title="Unir cada publicación o variante con su producto">Vincular<PendientesPreparar de="sinVincular" /></Link>}

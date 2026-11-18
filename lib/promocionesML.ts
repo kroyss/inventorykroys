@@ -525,3 +525,26 @@ export async function vigilarCampanas(db: Pool) {
   }
   return { cuentas: cuentas.length, nuevas }
 }
+
+/** Relee campañas y precios de TODAS las cuentas activas (botón de Promociones y central de actualización, 18-11). */
+export async function actualizarPromocionesEmpresa(db: Pool) {
+  const { rows: cuentas } = await db.query(`SELECT id, nickname FROM ml_conexiones WHERE estado = 'activa' ORDER BY id`)
+  const resultado: { cuenta: string; ok: boolean; publicaciones?: number; campanas?: number; error?: string }[] = []
+  for (const c of cuentas) {
+    try {
+      const f = await actualizarPromociones(db, c.id)
+      // Campañas conocidas (avisos de campaña nueva) y cuántas publicaciones pueden entrar en cada una.
+      await actualizarCampanas(db, c.id)
+      for (const k of f.campanas) {
+        const n = f.items.filter(i => i.promos.some(p => p.campana === k.id && p.estado === 'candidate')).length
+        await db.query(`UPDATE ml_campanas_vistas SET candidatas = $3 WHERE conexion_id = $1 AND campana_id = $2`, [c.id, k.id, n])
+      }
+      resultado.push({ cuenta: c.nickname, ok: true, publicaciones: f.items.length, campanas: f.campanas.length })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await anotarErrorPromociones(db, c.id, msg).catch(() => {})
+      resultado.push({ cuenta: c.nickname, ok: false, error: msg.slice(0, 200) })
+    }
+  }
+  return resultado
+}

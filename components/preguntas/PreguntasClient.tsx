@@ -21,6 +21,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { problemasDelTexto, revisarTexto, plantillaAplica, condicionPlantilla, idPlantilla, type Plantilla } from '@/lib/preguntasTexto'
 import { conflictoPesos, envioGratisAhora, huecoVariasUnidades, textoHueco, type PesoVinculado, type TablasEnvio } from '@/lib/mlShipping'
 import AvisoPesos from './AvisoPesos'
+import { useAlActualizar } from '@/lib/useAlActualizar'
 
 interface Pregunta {
   id: string; item_id: string; item_titulo: string | null; item_permalink: string | null; item_estado: string | null; item_imagen?: string | null; item_variantes?: number | null; datos_guardados?: number
@@ -267,7 +268,6 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
   // tarjetas pendientes. Mientras no coincida, se muestra "Cargando".
   const [datosDe, setDatosDe] = useState<string | null>(null)
   const ultimoPedido = useRef(0)
-  const [sincronizando, setSincronizando] = useState(false)
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
   const primera = usePrimera(inicial as Datos | null)
@@ -289,17 +289,8 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
   // Refresco suave cada minuto (el cron trae lo nuevo de ML).
   useEffect(() => { const t = setInterval(cargar, 60_000); return () => clearInterval(t) }, [cargar])
 
-  const sincronizar = async () => {
-    setSincronizando(true)
-    try {
-      const r = await fetch('/api/preguntas/sincronizar', { method: 'POST' })
-      const d = await r.json().catch(() => ({}))
-      if (!r.ok) { setAviso({ tipo: 'error', texto: d.error ?? 'No se pudo actualizar' }); return }
-      const errores = (d.resultado as { cuenta: string; error?: string }[]).filter(x => x.error)
-      if (errores.length) setAviso({ tipo: 'error', texto: errores.map(e => `${e.cuenta}: ${e.error}`).join(' · ') })
-      await cargar()
-    } finally { setSincronizando(false) }
-  }
+  // 18-11: «Actualizar ahora» pasó a la central de actualización (botón de arriba): al terminar, se relee.
+  useAlActualizar(['preguntas'], () => { cargar() })
 
   // Vuelta del OAuth de MercadoLibre (?conectada= / ?ml_error=)
   useEffect(() => {
@@ -308,7 +299,8 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
     if (ok || err) {
       setAviso(ok ? { tipo: 'ok', texto: `Cuenta ${ok} conectada. Trayendo sus preguntas…` } : { tipo: 'error', texto: err! })
       window.history.replaceState(null, '', '/preguntas')
-      if (ok) { setVista('pendientes'); sincronizar() }
+      // Cuenta recién conectada: se traen sus preguntas ya (sin esperar a la central de actualización).
+      if (ok) { setVista('pendientes'); fetch('/api/preguntas/sincronizar', { method: 'POST' }).catch(() => null).then(() => cargar()) }
       else setVista('cuentas')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,9 +322,6 @@ export default function PreguntasClient({ isAdmin, puedeCuentas, puedeReponer, i
         </>}
         actions={<>
           <UsoIA />
-          <button onClick={sincronizar} disabled={sincronizando || !!sinCuentas} className="btn-secondary text-sm">
-            {sincronizando ? 'Actualizando…' : 'Actualizar ahora'}
-          </button>
         </>} />
 
       {datos && (!datos.configuracion.ml || !datos.configuracion.ia) && (

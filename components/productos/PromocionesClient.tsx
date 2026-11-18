@@ -286,17 +286,6 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     return d
   }
 
-  const actualizarML = async (notaME?: string) => {
-    setBusy('ml'); setError(null); setAviso('Leyendo campañas y precios de MercadoLibre… puede tardar un minuto.')
-    const r = await fetch('/api/promociones/actualizar', { method: 'POST' })
-    const d = await r.json().catch(() => ({}))
-    setBusy(null)
-    if (!r.ok) { setAviso(null); setError(d.error ?? 'No se pudo leer MercadoLibre. Revisa que las cuentas sigan conectadas y prueba de nuevo.'); return }
-    const res = (d.resultado ?? []) as { cuenta: string; ok: boolean; publicaciones?: number; campanas?: number; error?: string }[]
-    setAviso(res.map(x => x.ok ? `${x.cuenta}: ${x.publicaciones} publicaciones, ${x.campanas} campañas` : `${x.cuenta}: error (${x.error})`).join(' · ') || 'Sin cuentas activas')
-    if (notaME) setError(notaME)
-    router.refresh()
-  }
   // "Traer ME y ML" (como Traer ME en Por confirmar): la PC de Pagos ME lee los pesos del portal (1-3 min);
   // cuando terminan todos sus perfiles, se lee MercadoLibre. Si la PC no responde en 5 min, solo ML.
   // 17-10: ML se lee ENSEGUIDA (publicaciones nuevas, campañas y precios); los pesos los trae la PC de Pagos ME
@@ -313,22 +302,12 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
     if (!tme.ocupada || !t || tomada.current === t.id || pedidoME) return
     tomada.current = t.id
     if (t.pesos) { setPedidoME({ id: t.id, desde: new Date(t.pedido_at).getTime() }); setEstadoPesos('trayendo con la PC de Pagos ME…') }
-    else setEstadoPesos('hay una traída de pagos en curso (sin pesos): cuando termine, toca «Traer ME y ML» para traer los pesos')
+    else setEstadoPesos('hay una traída de pagos en curso (sin pesos): cuando termine, toca ↻ Actualizar arriba para traer los pesos')
   }, [tme.ocupada, tme.traida, pedidoME])
   useEffect(() => {
     // Terminó la de pagos que se estaba esperando: se quita el aviso.
     if (!tme.ocupada && !pedidoME && estadoPesos?.startsWith('hay una traída')) setEstadoPesos(null)
   }, [tme.ocupada, pedidoME, estadoPesos])
-  const traerTodo = async () => {
-    if (conPagosME && !pedidoME) {
-      const r = await fetch('/api/promociones/pesos', { method: 'POST' }).catch(() => null)
-      const d = await r?.json().catch(() => null)
-      if (r?.ok && d?.pedido) { tomada.current = Number(d.pedido); setPedidoME({ id: d.pedido, desde: Date.now() }); setEstadoPesos('trayendo con la PC de Pagos ME…'); tme.recargar() }
-      else if (r?.status === 409) setEstadoPesos(d?.error ?? 'hay una traída de pagos en curso: cuando termine, vuelve a tocar')
-      else setEstadoPesos('no se pudo pedir a la PC de Pagos ME')
-    }
-    await actualizarML()
-  }
   // Pesos de antes de la traída: cuando llegan los nuevos (router.refresh → filas) se cuenta cuántos cambiaron
   // y se avisa (31-10: al terminar solo desaparecía "trayendo…" y no se notaba que ya estaba).
   const filasRef = useRef(filas)
@@ -452,10 +431,6 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm whitespace-nowrap">← Productos</Link>
           <button onClick={() => setModal({ tipo: 'nueva' })} disabled={!!busy || sinFoto} className="btn-secondary text-sm whitespace-nowrap">+ Campaña propia</button>
-          <button onClick={traerTodo} disabled={!!busy} className="btn-primary text-sm whitespace-nowrap"
-            title={conPagosME ? 'Primero los pesos del portal de MercadoEnvíos (PC de Pagos ME) y después campañas y precios de MercadoLibre' : 'Campañas y precios de MercadoLibre'}>
-            {busy === 'ml' ? 'Trayendo ML…' : conPagosME ? 'Traer ME y ML' : 'Actualizar desde MercadoLibre'}
-          </button>
         </>} />
 
       <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600 flex flex-wrap items-center gap-x-5 gap-y-1">
@@ -479,7 +454,7 @@ export default function PromocionesClient({ filas, campanas: campanasBase, cuent
       {aviso && <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">{aviso}</div>}
 
       {sinFoto ? (
-        <EmptyState message={`Todavía no se leyó nada de MercadoLibre. Toca "${conPagosME ? 'Traer ME y ML' : 'Actualizar desde MercadoLibre'}".`} />
+        <EmptyState message={'Todavía no se leyó nada de MercadoLibre. Toca ↻ Actualizar arriba (junto a Novedades), línea Promociones.'} />
       ) : <>
         {campanas.length > 0 && (
           <div className="space-y-2">
@@ -1125,7 +1100,7 @@ function AgregarModal({ minPorCuenta, modal, setModal, filas, campanas, margenA,
                     </td>
                     <td className="px-2 py-1.5 text-neutral-500">
                       {enviando && enCola.has(x.f.id) && !resultados[x.f.id] ? <span className="text-sky-700">⏳ en cola…</span>
-                        : resultados[x.f.id]?.ok && resultados[x.f.id].porConfirmar ? <span className="text-amber-700">{enviando ? '⏳ ML lo está procesando, comprobando…' : 'ML lo aceptó pero todavía no lo muestra. Revisa en unos minutos con «Traer ME y ML» antes de reintentar.'}</span>
+                        : resultados[x.f.id]?.ok && resultados[x.f.id].porConfirmar ? <span className="text-amber-700">{enviando ? '⏳ ML lo está procesando, comprobando…' : 'ML lo aceptó pero todavía no lo muestra. Revisa en unos minutos con ↻ Actualizar (arriba) antes de reintentar.'}</span>
                         : resultados[x.f.id]?.ok ? <span className="text-emerald-700">✓ En la campaña a {usd(resultados[x.f.id].precio)}
                           {resultados[x.f.id].manda != null && <span className="block text-amber-700">Hoy manda otra promoción más baja ({usd(resultados[x.f.id].manda)}): esta se aplica cuando aquella termine.</span>}</span>
                         : resultados[x.f.id] ? <span className="text-red-700">{resultados[x.f.id].error}

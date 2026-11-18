@@ -6,6 +6,8 @@ import CountrySwitcher from './CountrySwitcher'
 import NavLinks from './NavLinks'
 import AprendizajeNav from './AprendizajeNav'
 import NovedadesNav from './NovedadesNav'
+import ActualizarCentral from './ActualizarCentral'
+import { gruposDe } from '@/lib/actualizarGrupos'
 import EspacioSwitcher from './EspacioSwitcher'
 import { MODULOS_AUTOMATIZACIONES } from '@/lib/espacios'
 import { dbGlobal } from '@/lib/db'
@@ -40,6 +42,8 @@ export default async function Navbar() {
         <NavLinks role={role} permisos={session?.user.permisos ?? []} country={country} modulos={session?.user.modulos ?? []} />
 
         <div className="flex items-center gap-2 xl:gap-3 shrink-0 ml-auto">
+          {/* 18-11: central de actualización (también en el teléfono): reemplaza los botones de traer de cada pantalla. */}
+          <ActualizarCentral grupos={gruposDe(session?.user)} />
           <AprendizajeNav />
           <NovedadesNav />
           {session?.user.empresaId && !session.user.soporte && (

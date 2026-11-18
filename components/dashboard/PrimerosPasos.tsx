@@ -32,7 +32,7 @@ function pasos(e: Estado): Paso[] {
     ...(e.conPeso ? [{
       k: 'peso', titulo: e.sin_peso ? `Pon el peso de tus productos (faltan ${e.sin_peso})` : 'Pon el peso de tus productos',
       hecho: e.productos && !e.sin_peso, href: e.sin_peso ? '/productos/mercadoenvios?filtro=sin_peso_ml' : '/productos/mercadoenvios', ir: 'Ir a MercadoEnvíos',
-      como: 'El peso decide si el producto tiene envío gratis y cuánto te cobra ML de envío. Sale del portal de MercadoEnvíos (con Pagos ME): al importar o vincular se pide solo, y en Productos → MercadoEnvíos «Traer pesos de ML» lo trae de una vez. Los que el portal no tenga, escríbelos a mano. Solo cuentan los que están en una publicación activa de ML.',
+      como: 'El peso decide si el producto tiene envío gratis y cuánto te cobra ML de envío. Sale del portal de MercadoEnvíos (con Pagos ME): al importar o vincular se pide solo, y con ↻ Actualizar (arriba, junto a Novedades) lo trae de una vez. Los que el portal no tenga, escríbelos a mano. Solo cuentan los que están en una publicación activa de ML.',
     }] : []),
     {
       k: 'stock', titulo: 'Pon el stock que tienes hoy', hecho: e.stock, href: '/inventario', ir: 'Ir a Inventario',

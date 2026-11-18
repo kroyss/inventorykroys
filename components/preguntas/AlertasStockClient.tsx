@@ -7,6 +7,8 @@ import CambiarStock from './CambiarStock'
 import Link from '@/components/ui/Link'
 import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useAvisos } from '@/components/layout/Avisos'
+import { useAlActualizar } from '@/lib/useAlActualizar'
+import { abrirActualizar } from '@/lib/actualizarGrupos'
 
 /** Botón chico de la columna de la derecha (18-11): una sola acción por fila. */
 const CHIP = 'inline-flex items-center rounded-full px-2 py-0.5 font-medium ring-1 ring-inset transition'
@@ -51,7 +53,6 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
   const [datos, setDatos] = useState<Datos | null>(inicial)
   const [datosDe, setDatosDe] = useState<Vista | null>(inicial ? 'agotadas' : null)   // de qué pestaña son los datos cargados
   const [buscar, setBuscar] = useState('')
-  const [revisando, setRevisando] = useState(false)
   const [umbral, setUmbral] = useState(inicial ? String(inicial.umbral) : '')
   const [guardandoUmbral, setGuardandoUmbral] = useState(false)
   const [editandoUmbral, setEditandoUmbral] = useState(false)
@@ -91,13 +92,8 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
     return () => { vivo = false }
   }, [vista, vez])
 
-  const revisar = async () => {
-    setRevisando(true)
-    try {
-      const r = await fetch('/api/alertas-stock/revisar', { method: 'POST' })
-      if (r.status === 429) alert('Ya se revisó hace menos de 10 minutos. Vuelve a intentarlo en un rato.')
-    } finally { setRevisando(false); setVez(n => n + 1) }
-  }
+  // 18-11: «Revisar ahora» pasó a la central de actualización (botón de arriba): al terminar, se relee la lista.
+  useAlActualizar(['publicaciones'], () => setVez(n => n + 1))
   const guardarUmbral = async () => {
     const n = parseInt(umbral, 10)
     if (!(n >= 1 && n <= 100)) return
@@ -347,16 +343,16 @@ export default function AlertasStockClient({ inicial = null, conInventario = fal
         subtitle="Lo vendido en 30 días que se agotó o se está agotando en MercadoLibre, por variante"
         actions={<>
           {/* 18-11 (el dueño): «revisado hace…» debajo del botón lo descuadraba; va a la izquierda, en la misma línea. */}
-          <span className="text-xs text-neutral-400 whitespace-nowrap">{datos?.revision.hasta ? `revisado ${hace(datos.revision.hasta)}` : 'todavía no se revisó'}</span>
+          <button type="button" onClick={abrirActualizar} title="Se revisa sola cada hora. Para revisar ya: ↻ Actualizar (arriba)"
+            className="text-xs text-neutral-400 whitespace-nowrap hover:text-neutral-700 hover:underline">{datos?.revision.hasta ? `revisado ${hace(datos.revision.hasta)}` : 'todavía no se revisó'}</button>
           {conInventario && <Link href="/inventario/stock-ml" className="btn-secondary text-sm whitespace-nowrap"
             title="Compara lo que muestra ML con tu inventario y arréglalo en un clic (Publicaciones → Stock vs inventario)">Comparar con inventario →</Link>}
-          <button onClick={revisar} disabled={revisando} className="btn-secondary text-sm">{revisando ? 'Revisando…' : 'Revisar ahora'}</button>
         </>} />
       {verInfo && (
         <PanelInfo>
             <li>Solo lo que <b className="font-medium text-neutral-800">vendiste en los últimos 30 días</b>: lo que conviene reponer.</li>
             <li>El aviso (y el numerito del menú) cuenta lo de los <b className="font-medium text-neutral-800">últimos 7 días</b>; lo más viejo queda abajo, sin sumar.</li>
-            <li>Se revisa sola cada hora; «Revisar ahora» busca en ML en el momento (como mucho cada 10 minutos).</li>
+            <li>Se revisa sola cada hora; para revisar ya, toca <b className="font-medium text-neutral-800">↻ Actualizar</b> arriba, junto a Novedades (como mucho cada 10 minutos).</li>
             <li>El tiempo de cada una cuenta desde que el sistema la vio así (lo que ya estaba agotado al empezar, el 02/10, cuenta desde ese día).</li>
             {conInventario && <li><b className="font-medium text-neutral-800">«⚠ desde N u. sin envío gratis»</b>: comprando varias el paquete pesa más y pierde el envío gratis; «pack» lo arma en Stock vs inventario.</li>}
             {conInventario && <li>Aquí ves <b className="font-medium text-neutral-800">lo que dice MercadoLibre</b>. Para compararlo con tu inventario: <Link href="/inventario/stock-ml" className="underline">Stock vs inventario</Link>.</li>}

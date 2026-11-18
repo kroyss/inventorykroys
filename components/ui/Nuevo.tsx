@@ -13,6 +13,8 @@ export const NUEVOS = {
   reponer: '2026-12-18',
   // 18-11 Fase 4: Mis publicaciones (lista con avisos por fila).
   mis_publicaciones: '2026-12-18',
+  // 18-11: central de actualización (botón de arriba, junto a Novedades).
+  actualizar: '2026-12-18',
 } as const
 export type ClaveNuevo = keyof typeof NUEVOS
 

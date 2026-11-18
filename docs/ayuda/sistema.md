@@ -48,6 +48,23 @@ el portal de MercadoEnvíos de Venezuela.
 
 ---
 
+
+## 1b. Actualizar (botón de arriba, junto a Novedades)
+
+Casi todo se actualiza solo (ventas y preguntas cada minuto, publicaciones y stock cada hora, tasa 3 veces al día).
+Para traer algo **ya**, toca **↻ Actualizar** arriba, junto a Novedades (también en el teléfono). El puntito dice cómo
+está: **verde** todo al día, **amarillo** algo viejo. Abre un panel con cada cosa y cuándo se actualizó:
+
+- **Ventas** · **Preguntas y mensajes** · **Publicaciones y stock** (Mis publicaciones, Stock, Stock vs inventario,
+  Importar) · **Promociones** · **Pagos, guías y pesos** (lo trae el programa de Pagos ME en tu PC, 1 a 3 min).
+- **Actualizar todo** trae solo lo que no está al día (Promociones, que es lo más pesado, entra si tiene más de 6 h).
+- Cada línea tiene su **↻** cuando hace falta, para traer solo eso (por ejemplo solo Pagos antes de despachar).
+- Se ve solo lo que tu cuenta tiene encendido y tus permisos dejan ver. Si el programa de Pagos ME no está abierto,
+  la línea lo dice («abre el programa de Pagos ME») y lo demás se actualiza igual.
+- Puedes cerrar el panel y seguir: las pantallas se ponen al día solas al terminar.
+- Reemplaza a «Actualizar desde ML», «Revisar ahora», «Actualizar ahora», «Actualizar ventas», «⬇ Traer pesos de ML»
+  y «Traer ME y ML». **Traer pagos y guías** sigue en Pagos ME, Por confirmar y Calificaciones (es la misma traída).
+
 ## 2. Entrar, cuenta y prueba gratis
 
 *Cómo lo pregunta la gente:* clave, contraseña, no puedo entrar, login, registrarme, crear cuenta, prueba gratis, días de prueba, vencida.
@@ -462,15 +479,15 @@ Lo que vendiste en los últimos 30 días y se **agotó** o está **por agotarse*
 - **Agotadas / Por agotarse:** el límite de «por agotarse» lo eliges tú (por defecto, menos de 3) con **✎ cambiar
   límite**, junto a esa pestaña. Escribe el stock nuevo en cada fila y abajo aparece la barra **Actualizar en
   MercadoLibre (N)**: solo cambia la cantidad disponible, nada más. En Pausadas, al marcar aparece **Reactivar**.
-- La **ⓘ** junto al título explica cómo cuenta (30 días, aviso de 7 días, revisión cada hora); bajo **Revisar ahora**
-  dice cuándo se revisó.
+- La **ⓘ** junto al título explica cómo cuenta (30 días, aviso de 7 días, revisión cada hora); arriba dice cuándo se revisó
+  (al tocarlo abre ↻ Actualizar).
 - **Pausadas:** publicaciones pausadas a mano (o por ML al quedar en 0). Márcalas y toca **Reactivar en
   MercadoLibre** (o ▶ en cada una).
 - **Cada fila (con Inventario):** a la derecha, siempre **inventario N** (lo que hay en tu inventario) y, si conviene
   subir el stock en ML, **sugerido X** (al tocarlo lo escribe como stock nuevo). Debajo, **hace 17 h / hace 2 días / hace 40 min**:
   desde cuándo está agotada, por agotarse o pausada.
 - **No hay para reponer:** deja de avisar de ese producto hasta que lo repongas y vuelva a agotarse.
-- **Revisar ahora:** busca en ML en el momento (se puede cada 10 minutos). Además se revisa sola cada hora.
+- **Revisar ya:** con **↻ Actualizar** (arriba, junto a Novedades), línea Publicaciones y stock (se puede cada 10 minutos). Además se revisa sola cada hora.
 - Si la empresa lleva Inventario, cada fila muestra cuánto tienes en inventario y un botón «usar» para ponerlo
   como stock nuevo, y arriba el botón **Comparar con inventario →**: aquí ves **lo que dice MercadoLibre**; compararlo
   con tu inventario y arreglarlo en un clic está en **Publicaciones → Stock vs inventario** (dos pantallas a propósito).
@@ -502,14 +519,14 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
   - **Sin peso** (Venezuela): su producto no tiene peso. Lleva a **Pesos y envío gratis**.
   - **En promo** (Venezuela): está en una promoción (según la última lectura de Promociones). Al pasar el cursor dice
     en qué campañas; al tocarla abre **Promociones** buscando esa publicación.
-  **Al día:** la lista es una copia del catálogo de ML (se relee sola **cada hora**, junto con la revisión de stock, o con
-  **Actualizar desde ML**). Cuando llega una venta nueva, se relee al momento **solo la publicación vendida** (su stock y
+  **Al día:** la lista es una copia del catálogo de ML (se relee sola **cada hora**, junto con la revisión de stock, o ya con
+  **↻ Actualizar** (arriba, junto a Novedades)). Cuando llega una venta nueva, se relee al momento **solo la publicación vendida** (su stock y
   si ML la pausó al quedar en 0) y con esa misma lectura quedan al día Mis publicaciones, Stock vs inventario y
   **Automatizaciones → Stock** (cada lectura de ML se aprovecha para todas). Lo que cambies directo en ML sin vender
   aparece en la próxima relectura. Al abrir una publicación, el editor la lee en vivo.
   Arriba, los filtros con su número (**Stock distinto · Sin vincular · Sin peso · En promo**) muestran solo lo que hay
   que arreglar. Cada etiqueta sale solo si tienes permiso para esa pantalla. Arriba a la derecha: **Vincular** y
-  **Pesos y envío gratis** (con lo que falta: publicaciones activas con stock sin producto, el mismo número que el filtro «Sin vincular»; al pasar el cursor, cuántos colores/modelos), **Textos de descripción** y **Actualizar desde ML**. Tocar la fila abre
+  **Pesos y envío gratis** (con lo que falta: publicaciones activas con stock sin producto, el mismo número que el filtro «Sin vincular»; al pasar el cursor, cuántos colores/modelos) y **Textos de descripción**. Tocar la fila abre
   el editor (ver abajo).
 - **Promociones** (ver abajo).
 - **Stock vs inventario:** el stock que muestra cada cuenta de ML contra tu inventario, con sus grupos y arreglos en lote.
@@ -531,7 +548,7 @@ cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones
 **Editar** sirve para cambiar tus publicaciones **sin entrar a ML**, con una pantalla parecida a la de ML.
 
 - **Buscar:** por título, SKU o número (MLV…), por cuenta y activas/pausadas. Toca una para abrirla.
-- **↻ Actualizar desde ML** (arriba a la derecha): trae ya las publicaciones nuevas o recién reactivadas. Sin tocarlo,
+- **↻ Actualizar** (arriba, junto a Novedades): trae ya las publicaciones nuevas o recién reactivadas. Sin tocarlo,
   la lista se refresca sola cada hora, por eso una recién publicada puede tardar un poco en aparecer.
 - La pantalla trae lo que hay **ahora mismo** en MercadoLibre:
   - **Título:** solo se puede cambiar si la publicación **no tiene ventas** (regla de MercadoLibre).
@@ -622,8 +639,8 @@ de MercadoLibre (**un perfil de Chrome por cada cuenta de ML**). Ser administrad
 **Una traída a la vez:** mientras corre una traída de MercadoEnvíos (pedida desde Pagos ME, Por confirmar, una venta o
 Promociones, por ti o por otra persona), los botones «Traer» quedan en «Buscando…» aunque recargues la página, y no se
 pide otra. Abajo a la derecha, el aviso de tareas muestra cada cuenta (órdenes, y pesos ✓ o ⚠ si no se pudieron leer), o
-«Esperando la PC» si el programa no está conectado. Si en Promociones pides pesos mientras corre una de pagos, espera a
-que termine y vuelve a tocar «Traer ME y ML».
+«Esperando la PC» si el programa no está conectado. La central **↻ Actualizar** (arriba) usa esa misma traída: si ya hay una
+corriendo, la sigue en vez de pedir otra.
 
 **Uso diario:** toca **Traer pagos y guías** y espera el aviso verde. Chrome se abre solo, trabaja y se cierra: no
 lo toques. Luego verifica cada pago (Pago correcto / inválido). **Despachos no imprime guías con el pago sin
@@ -916,7 +933,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
      recargo sobre costo con el medidor; el precio se calcula solo).
   - **Pon el peso de tus productos** (Venezuela; dice cuántos faltan): en Productos →
      MercadoEnvíos, el peso sale del portal (con Pagos ME se pide solo al importar o vincular, o de una vez con
-     **Traer pesos de ML**); los que el portal no tenga se escriben a mano. Solo cuentan los productos vinculados a una
+     **↻ Actualizar** (arriba, junto a Novedades)); los que el portal no tenga se escriben a mano. Solo cuentan los productos vinculados a una
      publicación **activa** de ML (los que no vendes en ML o ya no traes no cuentan; si reactivas una publicación sin peso,
      vuelve a contar). Se marca hecho cuando todos esos tienen peso. En MercadoEnvíos, el filtro **Sin peso · en ML** muestra
      justo esos; **Sin peso (todos)** incluye los demás.
@@ -945,7 +962,7 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   del día. En la ficha y en MercadoEnvíos se ve con la marca **ME** y no se edita a mano. El peso es **solo** el del portal (nunca el que declara la
   publicación). Pasa al producto al crear, importar o vincular, y si a alguna publicación vinculada le falta, el sistema
   **pide solo** una traída de pesos a Pagos ME (llegan en 1 a 3 minutos con la PC prendida; no se repite si ya se pidió
-  en la última media hora). También de una vez con **⬇ Traer pesos de ML** (en MercadoEnvíos, con Pagos ME).
+  en la última media hora). También de una vez con **↻ Actualizar** (arriba, junto a Novedades), línea Pagos, guías y pesos (con Pagos ME).
   MercadoEnvíos está para toda empresa de Venezuela con Inventario; el descuento máximo y el aplicado se ven solo con
   el módulo Descuento ML. A mano solo los productos que el portal no da. **Pesos distintos
   en ML** = sus publicaciones pesan distinto en el portal: casi siempre un pack sin marcar «trae N u.» o un vínculo mal
@@ -1006,8 +1023,8 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   En **Inicio**, mientras haya ventas con costo estimado en el período sale: «El X % de lo vendido en este período usa
   costo estimado: la ganancia es aproximada · Completar costos». Si no está en ML → Productos → **+ Producto** solo con lo tuyo (costo, recargo, stock); cuando lo publiques,
   lo vinculas y el peso y la foto llegan solos.
-- **Actualizar desde ML** (Publicaciones, Productos → Importar desde ML, Stock): si el catálogo de esa cuenta se leyó hace menos de
-  5 minutos no se vuelve a leer (ya está al día).
+- **Traer de ML** (Publicaciones, Importar desde ML, Stock): con **↻ Actualizar** (arriba, junto a Novedades); si se leyó hace menos de
+  10 minutos no se vuelve a leer (ya está al día).
 - **Productos:** catálogo, precios y rentabilidad de cada producto. **Importar desde ML** (botón arriba en Productos; con el catálogo vacío sale grande en el centro) crea productos a partir de
   tus publicaciones (cada una, o cada color/modelo, queda vinculada). En cada publicación nueva, **Es uno que ya tengo**
   abre un buscador: escribes el código o el nombre de tu producto, lo eliges y la publicación queda vinculada a él (no
@@ -1186,9 +1203,9 @@ una está en [Notas ⓘ de cada pantalla](#20-notas--de-cada-pantalla).
   como ajuste.
 - **Compras:** **+ Compra** (en un paso: carga el inventario), o por etapas si la empresa lo usa.
 - **Promociones:** campañas de MercadoLibre, qué publicaciones pueden entrar y hasta dónde bajar el precio sin
-  perder el envío gratis. **Traer ME y ML** trae precios y campañas de MercadoLibre y los pesos del portal de
-  MercadoEnvíos (con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar sale un aviso verde con cuántas
-  publicaciones cambiaron de peso y la página se actualiza sola, no hace falta recargar.
+  perder el envío gratis. Precios y campañas se traen con **↻ Actualizar** (arriba, junto a Novedades), línea **Promociones** (y los pesos
+  en la línea Pagos, guías y pesos, con la PC de Pagos ME prendida, 1 a 3 minutos); al terminar la página se actualiza
+  sola, no hace falta recargar.
   **Aviso de «más del doble» (para no equivocarse de %):** el sistema toma tu **descuento habitual** en cada cuenta
   (el % que más se repite entre tus promos vigentes, ej. 10%; no el más bajo, porque unas pocas promos de ML en 1-2%
   lo distorsionaban). Toda publicación con **más del doble** (más de 20% en ese ejemplo; si lo habitual es 5%, más de
@@ -1388,7 +1405,7 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   Pedir pago y Escribirle (más de 12 h sin mensajes). **Atendidas** con buscador. Al comprar, Recordatorios y Pedir
   calificación.
 - **Stock** (Automatizaciones): lo vendido en los últimos 30 días que se agotó o está por agotarse; el aviso cuenta 7
-  días; se revisa sola cada hora y «Revisar ahora» como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
+  días; se revisa sola cada hora y con ↻ Actualizar (arriba) como mucho cada 10 min. Con inventario, enlace a Stock vs inventario.
   «⚠ desde N u. sin envío gratis · pack»: comprando varias pierde el envío gratis (el pack se arma en Stock vs inventario).
 - **Pagos ME:** **Traer pagos y guías** (la PC trae de MercadoEnvíos pagos, guías y ventas nuevas, 1 a 3 min; también
   sola durante el día). Sin inventario se verifica cada pago aquí (uno a uno o con Comprobar con el banco); con

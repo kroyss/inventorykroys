@@ -24,8 +24,7 @@ type Filter = 'all' | 'unregistered' | 'sin_peso_ml' | 'capped' | 'aggregate' | 
 export default function MercadoEnviosClient({ initialProducts, inicialTasa = null, pagosME = false, descuento = true, inicialFiltro }: { initialProducts: Product[]; inicialTasa?: import('@/lib/inicial').TasaYAjustes | null; pagosME?: boolean; descuento?: boolean; inicialFiltro?: 'sin_peso_ml' }) {
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>(initialProducts)
-  // 14-11: «Traer pesos de ML» (pesos del portal de MercadoEnvíos vía Pagos ME).
-  const [trayendo, setTrayendo] = useState(false)
+  // 18-11: «Traer pesos de ML» pasó a la central de actualización (botón de arriba, línea Pagos, guías y pesos).
   const [aviso, setAviso] = useState<string | null>(null)
   const [search, setSearch]     = useState('')
   // 18-11 (el dueño): desde Primeros pasos llega ?filtro=sin_peso_ml → abre justo en los que faltan.
@@ -111,21 +110,6 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
     setProducts(ps => ps.map(p => p.id === id ? { ...p, weight_kg: kg, peso_origen: 'manual' } : p))
   }
 
-  async function traerPesos() {
-    setTrayendo(true); setError(''); setAviso(null)
-    const r = await fetch('/api/products/pesos-ml', { method: 'POST' }).catch(() => null)
-    const d = await r?.json().catch(() => null)
-    setTrayendo(false)
-    if (!r?.ok) { setError(d?.error ?? 'No se pudieron traer los pesos. Prueba de nuevo.'); return }
-    const partes: string[] = []
-    if (d.del_portal) partes.push(`${d.del_portal} producto${d.del_portal === 1 ? '' : 's'} tomaron el peso de MercadoEnvíos.`)
-    if (d.portal === 'pedido') partes.push('Pedí al programa de Pagos ME los pesos del portal de MercadoEnvíos: llegan en 1 a 3 minutos (con la PC prendida) y se ponen solos.')
-    else if (d.portal === 'en_curso') partes.push('Ya hay una traída de MercadoEnvíos en curso: los pesos del portal llegan cuando termine.')
-    else if (!partes.length) partes.push('Los pesos ya están al día con MercadoEnvíos.')
-    if (d.sin_peso) partes.push(`Quedan ${d.sin_peso} sin peso: cárgalos a mano.`)
-    setAviso(partes.join(' '))
-    router.refresh()
-  }
 
   const chip = (f: Filter, label: string, n: number, active: string) => (
     <button onClick={() => setFilter(f)}
@@ -144,11 +128,6 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold text-neutral-900">📦 MercadoEnvíos</h1>
-        {pagosME && <button type="button" onClick={traerPesos} disabled={trayendo}
-          title="Pide al programa de Pagos ME los pesos del portal de MercadoEnvíos y los pasa a tus productos"
-          className="btn-secondary text-sm disabled:opacity-50">
-          {trayendo ? 'Trayendo…' : '⬇ Traer pesos de ML'}
-        </button>}
         {descuento && <div className="ml-auto text-sm text-neutral-500">
           Descuento global: <b className="text-neutral-800">{globalDiscount.toFixed(1)}%</b>
           {rate && <span className="text-neutral-400"> · exceso {rate.excess}%</span>}
@@ -157,7 +136,7 @@ export default function MercadoEnviosClient({ initialProducts, inicialTasa = nul
 
       <p className="text-xs text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg p-3 leading-relaxed">
         El <b>peso</b> sale solo del portal de MercadoEnvíos (<b className="text-sky-700">ML</b>: el que usa ML para el envío gratis; lo
-        trae Pagos ME por medio de los vínculos; al importar o vincular un producto se piden solos, y con «Traer pesos de ML» de una vez). A mano solo los que el portal no da.
+        trae Pagos ME por medio de los vínculos; al importar o vincular un producto se piden solos, y de una vez con <b>↻ Actualizar</b> arriba, junto a Novedades). A mano solo los que el portal no da.
         <b className="text-amber-700"> Pesos distintos</b> = sus publicaciones pesan distinto en ML: suele ser un pack sin marcar «trae N u.» o un
         vínculo mal hecho (revísalo en Publicaciones → Vincular o Stock).{descuento && <> El sistema calcula el <b>descuento máximo</b> que aguanta sin perder
         envío gratis (según la tabla de ML) y <b>limita solo</b> el descuento global a ese tope.

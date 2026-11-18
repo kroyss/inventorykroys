@@ -6,6 +6,7 @@ import { BotonInfo, PanelInfo } from '@/components/ui/Info'
 import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { LoQueSeHablo } from '@/components/ventas/PagoYContexto'
 import { DIA_AUTO_NO_CONCRETADA, MAX_DIAS_NO_CONCRETADA, ML_CONCRETA_SOLA_DIAS, diasParaConcretarSola } from '@/lib/noConcretada'
+import { useAlActualizar } from '@/lib/useAlActualizar'
 
 interface Orden {
   id: string; fecha: string; comprador: string | null; productos: string | null; total: number; moneda: string
@@ -96,7 +97,6 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
   const [leyendo, setLeyendo] = useState<Set<string>>(new Set())
   const [corriendo, setCorriendo] = useState(false)
   const [progreso, setProgreso] = useState<{ hechas: number; total: number; errores: string[]; quitadas: string[] } | null>(null)
-  const [actualizando, setActualizando] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const parar = useRef(false)
 
@@ -134,16 +134,8 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
   }, [vista, primera])
   useEffect(() => { cargar() }, [cargar])
 
-  const actualizar = async () => {
-    setActualizando(true); setAviso(null)
-    try {
-      const r = await fetch('/api/calificaciones/sincronizar', { method: 'POST' })
-      const d = await r.json().catch(() => ({}))
-      const errores = (d.resultado ?? []).filter((x: { error?: string }) => x.error)
-      if (!r.ok || errores.length) setAviso(errores.map((e: { cuenta: string; error: string }) => `${e.cuenta}: ${e.error}`).join(' · ') || d.error)
-      await cargar()
-    } finally { setActualizando(false) }
-  }
+  // 18-11: «Actualizar ventas» pasó a la central de actualización (botón de arriba): al terminar, se relee.
+  useAlActualizar(['ventas', 'pagosme'], () => { cargar() })
 
   const visibles = useMemo(() => (datos?.ordenes ?? []).filter(o => filtro === 'todas' || (filtro === 'calificaron' ? !!o.cal_comprador : o.sugerencia === filtro)), [datos, filtro])
   const nCalificaron = (datos?.ordenes ?? []).filter(o => o.cal_comprador && !o.en_espera).length
@@ -200,7 +192,6 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
         subtitle="Ventas de MercadoLibre sin calificar, cruzadas con el sistema"
         actions={<>
           {sinc && <span className="text-xs text-neutral-400 whitespace-nowrap">actualizadas {new Date(sinc).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>}
-          <button onClick={actualizar} disabled={actualizando || corriendo} className="btn-secondary text-sm">{actualizando ? 'Trayendo ventas…' : 'Actualizar ventas'}</button>
         </>} />
       {verInfo && datos && (
         <PanelInfo>
@@ -290,7 +281,7 @@ export default function CalificacionesClient({ isAdmin, despachaVE = false, inic
           {visibles.length === 0 ? (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm">
               <EmptyState message={datos.cuentas.length === 0 ? 'No hay cuentas de MercadoLibre conectadas (Automatiza → Cuentas de MercadoLibre).'
-                : vista === 'listas' ? 'No hay ventas por calificar. Si recién conectaste las cuentas, dale "Actualizar ventas".' : vista === 'proximas' ? 'Nada en espera.' : 'Nada por definir.'} />
+                : vista === 'listas' ? 'No hay ventas por calificar. Si recién conectaste las cuentas, toca ↻ Actualizar arriba (junto a Novedades).' : vista === 'proximas' ? 'Nada en espera.' : 'Nada por definir.'} />
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-x-auto">

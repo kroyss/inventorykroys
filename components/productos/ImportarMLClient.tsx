@@ -6,6 +6,7 @@ import { Cargando, EmptyState, FilterPills, KPICard, PageHeader } from '@/compon
 import { Combobox, type ComboOption } from '@/components/ui/Combobox'
 import { matchTokens } from '@/lib/search'
 import type { EstadoImportar, FilaImportar } from '@/lib/importarML'
+import { useAlActualizar } from '@/lib/useAlActualizar'
 
 // Productos → Importar desde MercadoLibre (lib/importarML.ts). Primeros pasos: las publicaciones
 // (o cada variante) se vinculan a un producto existente o se crean como productos nuevos.
@@ -158,13 +159,8 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
     return { ok: r.ok && d.ok !== false, d }
   }
 
-  const actualizar = async () => {
-    setOcupado('actualizar'); setAviso(null)
-    const { ok, d } = await post({ accion: 'actualizar' })
-    setAviso(ok ? { ok: true, texto: 'Lista actualizada con lo que hay ahora en MercadoLibre.' }
-      : { ok: false, texto: d.errores?.join(' · ') || d.error || 'No se pudo traer de MercadoLibre' })
-    await cargar(); setOcupado(null)
-  }
+  // 18-11: «Actualizar desde ML» pasó a la central de actualización (botón de arriba).
+  useAlActualizar(['publicaciones'], () => { cargar() })
 
   const vincular = async (f: FilaImportar, productId: number, code: string) => {
     setOcupado(f.codigo); setAviso(null)
@@ -218,13 +214,6 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
         subtitle="Primeros pasos: tus publicaciones se convierten en productos. Vincula las que ya tienes y crea las que faltan."
         actions={<>
           <Link href="/productos" className="btn-secondary text-sm">Volver a Productos</Link>
-          <button type="button" onClick={actualizar} disabled={!!ocupado} className="btn-secondary text-sm inline-flex items-center gap-1.5">
-            <svg className={`h-3.5 w-3.5 ${ocupado === 'actualizar' ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
-            </svg>
-            {ocupado === 'actualizar' ? 'Trayendo…' : 'Actualizar desde ML'}
-          </button>
         </>} />
 
       <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-xs leading-relaxed text-amber-900">
@@ -288,7 +277,7 @@ export default function ImportarMLClient({ conCuentas, buscarInicial = '' }: { c
             {!visibles.length ? (
               <EmptyState message={filtro === 'vinculada' ? 'Todavía no hay publicaciones vinculadas a tus productos.'
                 : filas.length ? 'Nada por revisar aquí: todas tus publicaciones ya tienen su producto.'
-                : 'No hay publicaciones en el catálogo todavía. Toca “Actualizar desde ML” para traerlas.'} />
+                : 'No hay publicaciones en el catálogo todavía. Toca ↻ Actualizar (arriba, junto a Novedades) para traerlas.'} />
             ) : (
               <ul className="divide-y divide-neutral-100">
                 {pagina1.map(f => {

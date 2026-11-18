@@ -13,6 +13,7 @@ import { cambioML, grupoDe, motivosDecidir, urgencia, type GrupoStock } from '@/
 import { EncabezadoInfo } from '@/components/ui/Info'
 import CrearPack from '@/components/publicaciones/CrearPack'
 import { listaCantidades, type TablasEnvio } from '@/lib/mlShipping'
+import { useAlActualizar } from '@/lib/useAlActualizar'
 
 // 17-11 (el dueño: «nos llenamos de opciones»): la pantalla se ordena por QUÉ HAY QUE HACER. Cada producto cae en UN
 // solo grupo, por prioridad (los números suman lo que falta, sin repetir): Vende de más → Tienes y no vendes → Para
@@ -76,7 +77,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
   const [marcados, setMarcados] = useState<Set<number>>(new Set())
   const [trabajando, setTrabajando] = useState<{ hechos: number; total: number } | null>(null)
   const [resultados, setResultados] = useState<Map<string, Res>>(new Map())
-  const [actualizando, setActualizando] = useState(false)
+  // 18-11: «Actualizar desde ML» pasó a la central de actualización (botón de arriba): al terminar, se relee.
   const [reserva, setReserva] = useState<number | null>(inicial?.reserva ?? null)
   const [puedeReserva, setPuedeReserva] = useState(!!inicial?.puedeReserva)
   // 18-11 «Crear pack»: la publicación (y su producto) para la que se arma el pack.
@@ -103,6 +104,7 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
     if (d.cola) setCola(c => (c && c.id === d.cola.id ? c : { ...d.cola, hechos: 0, errores: 0, lista: [], terminado: false }))
     return d.filas as FilaStockML[]
   })
+  useAlActualizar(['publicaciones'], () => { cargar() })
   const conInicial = !!inicial
   useEffect(() => {
     (async () => {
@@ -236,13 +238,6 @@ export default function StockMLClient({ buscarInicial = '', conVincular = false,
             title="Quién cambió qué en MercadoLibre: stock, pausas y reactivaciones">Historial</button>
           <button type="button" onClick={() => setVerAjustes(true)} className="btn-secondary text-sm whitespace-nowrap"
             title="Inventario al día, reserva de seguridad y cómo se calcula">⚙ Ajustes</button>
-          {puedeCambiar && (
-            <button disabled={actualizando} className="btn-secondary text-sm whitespace-nowrap disabled:opacity-50"
-              title="Vuelve a leer de MercadoLibre el stock y el estado de todas tus publicaciones (tarda un poco)"
-              onClick={async () => { setActualizando(true); await pedir({ accion: 'actualizar' }); await cargar(); setActualizando(false) }}>
-              {actualizando ? 'Leyendo MercadoLibre…' : 'Actualizar desde ML'}
-            </button>
-          )}
         </>} />
 
       {desactivados.length > 0 && (
@@ -737,7 +732,7 @@ function FilaPub({ p, res, puedeCambiar, reserva, abrirOpciones, atenuada, onUni
             title={`La misma publicación está vinculada a otros productos: ML muestra la suma de todos.${p.compartida.aporte != null ? ` Este aporta ${p.compartida.aporte}.` : ''}`}>
             Compartida con {p.compartida.con.join(', ')}{p.compartida.aporte != null ? ` · aporta ${p.compartida.aporte}` : ''}</span>}
         </div>
-        <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está activa ni pausada en ML (cerrada o finalizada); si la acabas de crear, pulsa «Actualizar desde ML»</span>}</div>
+        <div className="truncate text-neutral-800" title={p.titulo ?? ''}>{p.titulo ?? <span className="text-neutral-400">No está activa ni pausada en ML (cerrada o finalizada); si la acabas de crear, toca ↻ Actualizar arriba</span>}</div>
       </div>
 
       {!verOpciones && p.unidades > 1 && <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700" title="Pack o combo: cada venta descuenta esta cantidad">trae {p.unidades} u.</span>}

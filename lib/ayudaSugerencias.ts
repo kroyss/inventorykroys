@@ -63,7 +63,7 @@ const S: Record<string, Sugerencia[]> = {
       respuesta: 'Escribe el stock nuevo en cada fila (✎) y toca **Actualizar en MercadoLibre**. Solo cambia la cantidad disponible, nada más. Si tu inventario está marcado como al día y pones más de lo que tienes, la casilla se pone ámbar y te pide «Actualizar igual».' },
     { pregunta: '¿Qué significa «en 0 a propósito»?',
       respuesta: 'Con el inventario al día, esta pantalla usa el mismo reparto que Stock en ML: esa publicación está en 0 porque lo que tienes ya está publicado en otra (te dice cuál). «inventario N · sugerido X» (al tocarlo) pone lo que sugiere Stock en ML (X), no todo el inventario.' },
-    { pregunta: '¿Cada cuánto se revisa?', respuesta: 'Sola cada hora. Con **Revisar ahora** buscas en el momento (cada 10 minutos como máximo).' },
+    { pregunta: '¿Cada cuánto se revisa?', respuesta: 'Sola cada hora. Para revisar ya, toca **↻ Actualizar** arriba, junto a Novedades (cada 10 minutos como máximo).' },
   ],
   '/pagos-me': [
     { pregunta: '¿Dónde verifico los pagos si llevo inventario?',
@@ -129,7 +129,8 @@ const S: Record<string, Sugerencia[]> = {
     { pregunta: 'El estimado ya está bien', respuesta: 'Toca **Está bien así**: queda como costo real y deja de salir aquí.' },
   ],
   '/productos/mercadoenvios': [
-    { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **⬇ Traer pesos de ML** lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
+    { pregunta: '¿Cómo cargo los pesos de una vez?', respuesta: 'El peso sale del portal de MercadoEnvíos con **Pagos ME**: al importar o vincular un producto se pide solo, y **↻ Actualizar** (arriba, línea Pagos, guías y pesos) lo trae de una vez (llega en 1 a 3 minutos con la PC prendida). Los que el portal no tenga, escríbelos a mano.' },
+    { pregunta: '¿Dónde quedó «Actualizar desde ML», «Revisar ahora» o «Traer pesos»?', respuesta: 'Todo está en **↻ Actualizar**, arriba junto a Novedades: un panel con Ventas, Preguntas, Publicaciones y stock, Promociones y Pagos (guías y pesos), cuándo se actualizó cada uno, **Actualizar todo** (solo lo viejo) y un ↻ por línea. Traer pagos y guías sigue en Pagos ME.' },
     { pregunta: '¿Por qué Primeros pasos dice que faltan pesos?', respuesta: 'Cuenta solo los productos vinculados a una publicación **activa** de MercadoLibre sin peso (ahí el peso decide el envío gratis). Los que no vendes en ML o ya no traes no cuentan. En Productos → MercadoEnvíos, el filtro **Sin peso · en ML** te muestra justo esos. Si reactivas una publicación sin peso, vuelve a contar.' },
     { pregunta: '¿Puedo cambiar la tabla de MercadoEnvíos?', respuesta: 'No: es la misma para todos los vendedores de ML Venezuela y la mantiene al día El Comerciante Digital cuando ML la cambia. La ves en **Costos ML**.' },
   ],
