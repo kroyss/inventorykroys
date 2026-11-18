@@ -217,9 +217,15 @@ export default async function InicioPage() {
               <b className="text-white">Gratis</b> con Automatizaciones o Completo · Radar PRO los fines de semana <b className="text-white">+${RADAR_PRO.precio}/mes</b> ·
               Solo el Radar {radarMes.promo && <s className="text-neutral-500">${radarMes.lista}</s>} <b className="text-lime-400">${radarMes.precio}/mes</b>
             </p>
-            <a href="https://radar.elcomerciantedigital.com/precios" className="inline-flex items-center gap-1.5 text-sm font-semibold text-lime-400 hover:text-lime-300">
-              Precios del Radar <span aria-hidden="true">→</span>
-            </a>
+            <span className="flex flex-wrap items-center gap-3">
+              {/* 18-11 (el dueño): las cuentas nuevas prueban el Radar gratis (Radar mig 036), sin decir cuántas búsquedas. */}
+              <a href="https://radar.elcomerciantedigital.com/registro" className="inline-flex items-center gap-1.5 rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-lime-300">
+                ¡Pruébalo gratis! Busca tus primeros productos <span aria-hidden="true">→</span>
+              </a>
+              <a href="https://radar.elcomerciantedigital.com/precios" className="inline-flex items-center gap-1.5 text-sm font-semibold text-lime-400 hover:text-lime-300">
+                Precios del Radar <span aria-hidden="true">→</span>
+              </a>
+            </span>
           </div>
         </section>
 

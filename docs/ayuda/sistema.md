@@ -75,7 +75,8 @@ el portal de MercadoEnvíos de Venezuela.
   los planes «Próximamente» no se ofrecen. **Mejorar mi plan** también muestra lo que ganas.
 - **Cuenta solo del Radar:** si te registraste desde radar.elcomerciantedigital.com, tu cuenta entra solo al
   Radar; si intentas entrar al Sistema te lo indica. Para usar el Sistema, escríbenos.
-- **Radar mensual (solo Radar):** el registro del Radar está siempre abierto. Para entrar se paga el mes:
+- **Radar mensual (solo Radar):** el registro del Radar está siempre abierto. Desde el 18-11-2026 el registro invita a **probarlo
+  gratis** («¡Pruébalo gratis!», también en la página de inicio y en los precios del Radar). Después se paga el mes:
   **$20 al mes** (en noviembre 2026, **$14**, −30%), y ese mes tienes el **Radar PRO todos los días**. Mientras no
   pagas, al entrar al Radar ves 5 productos de ejemplo y el botón **Pagar y activar**, que te lleva a **Mi plan**
   (app.elcomerciantedigital.com/renovar) con tu mismo usuario y contraseña; pagas por Pago Móvil o Binance y, cuando
@@ -487,6 +488,9 @@ Todo lo de tus publicaciones de MercadoLibre en un solo menú, con pestañas ord
 cada una aparece si tu empresa y tu usuario la tienen). Al tocar **Publicaciones** en el menú se abre la primera:
 - **Mis publicaciones** (antes «Editar»; viene con el Inventario; permiso **Publicaciones (editar en MercadoLibre)**):
   la lista de todas tus publicaciones, como en ML. Cada fila lleva una **etiqueta corta solo si algo pide atención**:
+  - **«N disp. ✎»** y **«N variantes»** (en las que puedes editar): abren **Cambiar stock** ahí mismo, con un cuadro por
+    variante; lo que pones va directo a ML (por ejemplo, dejar en 0 la variante que se agotó sin entrar a la publicación).
+    La flecha **→** abre la publicación.
   - **Activa · Pausar** / **Pausada · Activar** (siempre): el estado en ML; al tocarlo pide confirmar y la pausa o la
     activa. Pausada desde aquí queda «pausada a mano» (el stock automático no la reactiva). Para varias: elígelas y
     abajo **Pausar** o **Activar** (van por la cola, con el avance abajo a la derecha y en Historial de tareas; las que ya estaban así no se tocan; solo se activan las
@@ -1342,7 +1346,8 @@ pantalla. Algunas líneas salen solo si tu empresa tiene ese módulo o tu usuari
   **Menos de $3** (Venezuela), cada uno con su arreglo en lote.
 - **Mis publicaciones** (Publicaciones): cada fila con su estado (**Activa · Pausar** / **Pausada · Activar**; también
   en lote) y etiquetas solo si algo pide atención (**Stock distinto** dice la diferencia y abre Stock vs inventario,
-  **Sin vincular**, **Sin peso**, **En promo** con sus campañas) y filtros con esas. Tocar una abre el editor; lo
+  **Sin vincular**, **Sin peso**, **En promo** con sus campañas) y filtros con esas. **«N disp. ✎»** / **«N variantes»**
+  abren Cambiar stock (un cuadro por variante, directo a ML). Tocar una abre el editor; lo
   guardado va directo a ML y los cambios en lote van por la cola.
 - **Promociones:** campañas de ML, qué publicaciones entran y hasta dónde bajar; antes de entrar, la rentabilidad al
   precio de la promo y si mantiene el envío gratis. **+ Campaña propia**.

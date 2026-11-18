@@ -23,7 +23,7 @@ export interface ResultadoStock { item_id: string; variante_id: string | null; o
 const clave = (item: string, v: string | null) => `${item}:${v ?? ''}`
 
 export default function CambiarStock({ item, variante = null, origen, publicar, onCerrar, onGuardado }: {
-  item: string; variante?: string | null; origen: 'preguntas' | 'mensajes' | 'ficha' | 'stock' | 'pausadas'
+  item: string; variante?: string | null; origen: 'preguntas' | 'mensajes' | 'ficha' | 'stock' | 'pausadas' | 'publicaciones'
   /** Preguntas: casilla "Publicar mi respuesta al guardar" (marcada si ya escribió algo). */
   publicar?: boolean
   onCerrar: () => void

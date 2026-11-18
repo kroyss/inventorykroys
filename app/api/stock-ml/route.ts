@@ -58,7 +58,7 @@ const Body = z.object({
     cantidad: z.number().int().min(0).max(99999).nullable(),
   })).min(1).max(40),
   reactivar: z.boolean().default(false),
-  origen: z.enum(['preguntas', 'mensajes', 'ficha', 'stock', 'pausadas']),
+  origen: z.enum(['preguntas', 'mensajes', 'ficha', 'stock', 'pausadas', 'publicaciones']),
 })
 
 export async function POST(req: NextRequest) {

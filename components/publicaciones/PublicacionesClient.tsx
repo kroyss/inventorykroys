@@ -7,6 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider'
 import { VistoNuevo } from '@/components/ui/Nuevo'
 import PendientesPreparar from '@/components/productos/PendientesPreparar'
 import { pestanasML } from '@/components/productos/PublicacionesMLTabs'
+import CambiarStock from '@/components/preguntas/CambiarStock'
 
 interface Fila {
   item_id: string; titulo: string; precio: number | null; moneda: string | null; disponible: number; estado: string
@@ -48,6 +49,8 @@ export default function PublicacionesClient() {
   const [accion, setAccion] = useState<null | 'descripcion' | 'precio' | 'pausar' | 'activar'>(null)
   // 08-11: «Actualizar desde ML» relee el catálogo ya (si no, las nuevas aparecen en la vuelta automática de cada 6 h).
   const [recarga, setRecarga] = useState(0)
+  // 18-11 (el dueño): cambiar el stock (por variante) desde la fila, con la ventana de siempre (CambiarStock).
+  const [stockDe, setStockDe] = useState<string | null>(null)
   const [actualizando, setActualizando] = useState(false)
   const actualizar = async () => {
     setActualizando(true)
@@ -137,21 +140,44 @@ export default function PublicacionesClient() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm text-neutral-900 truncate">{f.titulo}</span>
                     <span className="block text-xs text-neutral-500">
-                      {f.item_id} · {f.cuenta}{f.sku ? ` · SKU ${f.sku}` : ''}{f.variantes ? ` · ${f.variantes} variantes` : ''}
+                      {f.item_id} · {f.cuenta}{f.sku ? ` · SKU ${f.sku}` : ''}{f.variantes && !r.puedeIgualar ? ` · ${f.variantes} variantes` : ''}
                       {f.editada_at && <span className="ml-1 text-sky-700">· editada aquí</span>}
                     </span>
                   </span>
-                  <span className="text-right shrink-0">
-                    <span className="block text-sm font-medium num">{precio(f.precio, f.moneda)}</span>
-                    <span className={`block text-xs num ${f.disponible > 0 ? 'text-neutral-500' : 'text-red-600'}`}>{f.disponible} disp.</span>
-                  </span>
-                  <span className="text-neutral-300">→</span>
+                  {!r.puedeIgualar && (
+                    <span className="text-right shrink-0">
+                      <span className="block text-sm font-medium num">{precio(f.precio, f.moneda)}</span>
+                      <span className={`block text-xs num ${f.disponible > 0 ? 'text-neutral-500' : 'text-red-600'}`}>{f.disponible} disp.</span>
+                    </span>
+                  )}
+                  {!r.puedeIgualar && <span className="text-neutral-300">→</span>}
                 </Link>
+                {r.puedeIgualar && (
+                  <div className="flex shrink-0 items-center">
+                    <span className="text-right">
+                      <span className="block text-sm font-medium num">{precio(f.precio, f.moneda)}</span>
+                      {/* 18-11 (el dueño): tocar el stock abre «Cambiar stock» (un cuadro por variante), sin entrar. */}
+                      <button type="button" onClick={() => setStockDe(f.item_id)}
+                        title={f.variantes ? 'Ver y cambiar el stock de cada variante' : 'Cambiar el stock en MercadoLibre'}
+                        className={`block w-full text-right text-xs num hover:underline ${f.disponible > 0 ? 'text-neutral-500 hover:text-neutral-800' : 'text-red-600'}`}>
+                        {f.disponible} disp. <span aria-hidden="true">✎</span>
+                      </button>
+                      {f.variantes > 0 && (
+                        <button type="button" onClick={() => setStockDe(f.item_id)} title="Ver y cambiar el stock de cada variante"
+                          className="block w-full text-right text-[11px] text-sky-700 hover:underline">{f.variantes} variantes</button>
+                      )}
+                    </span>
+                    <Link href={`/publicaciones/${f.item_id}`} className="px-3 py-2.5 text-neutral-300 hover:text-neutral-500" aria-label="Abrir la publicación">→</Link>
+                  </div>
+                )}
                 </div>
                 <AvisosFila key={`${f.item_id}-${f.estado}`} f={f} vincular={!!vinc} envios={envios?.href ?? null} onCambio={releer} />
               </li>
             ))}
           </ul>
+          {stockDe && (
+            <CambiarStock item={stockDe} origen="publicaciones" onCerrar={() => setStockDe(null)} onGuardado={() => releer()} />
+          )}
           {cuantas > 0 && (
             <div className="sticky bottom-16 md:bottom-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white/95 backdrop-blur px-4 py-3 shadow">
               <span className="text-sm text-neutral-700">{cuantas.toLocaleString('es-VE')} elegida{cuantas === 1 ? '' : 's'}{todasBusqueda ? ' (toda la búsqueda)' : ''}</span>
